@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Runs artisan inside the app container. The host PHP is 8.0; never run Laravel with it.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec docker compose -f compose.yml -f compose.dev.yml exec -T app php artisan "$@"

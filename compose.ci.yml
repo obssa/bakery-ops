@@ -1,0 +1,40 @@
+# CI e2e overlay: use the image built by the docker-build job (loaded from its artifact),
+# expose the API and Reverb to the runner so Playwright (running natively) can reach them,
+# and run the app in testing mode with a single Octane worker once Octane is introduced.
+#   docker compose -f compose.yml -f compose.ci.yml up -d --wait
+services:
+  app:
+    image: bakery-ops-api:ci
+    build: !reset null
+    environment:
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
+      OCTANE_WORKERS: "1"
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_ID: ci
+      REVERB_APP_KEY: ci-key
+      REVERB_APP_SECRET: ci-secret
+    ports:
+      - "8000:8000"
+
+  worker:
+    image: bakery-ops-api:ci
+    environment:
+      APP_ENV: testing
+      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
+
+  ws:
+    image: bakery-ops-api:ci
+    environment:
+      APP_ENV: testing
+      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
+      REVERB_APP_ID: ci
+      REVERB_APP_KEY: ci-key
+      REVERB_APP_SECRET: ci-secret
+    ports:
+      - "8080:8080"
+
+  minio:
+    ports:
+      - "9000:9000"

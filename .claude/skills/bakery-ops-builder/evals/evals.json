@@ -1,0 +1,74 @@
+{
+  "skill_name": "bakery-ops-builder",
+  "evals": [
+    {
+      "id": 1,
+      "name": "plan-phase-1",
+      "prompt": "We're in the bakery-ops repo and Phase 0 is done. Plan Phase 1 (ordering and the live kitchen/bar screens). Write the plan file the way this project expects and tell me what has to be true before anyone writes Orders code.",
+      "expected_output": "A docs/phases/phase-1-plan.md following the phase-plan template: contract tests listed first (orders->inventory reserve/release/consume + Availability::bulk, orders->catalog Prices::at snapshot + stationFor, orders->identity short code / acting-as / PIN, payments->orders totals), migrations with NUMERIC scales, action endpoints with permissions and idempotency, events, intra-phase build order, test list incl. Playwright p1-order-flow and p1-shortfall, Phase1Seeder, ADRs 0006/0007. The agent stops for approval instead of coding and says plan_approved must be set by Ramin.",
+      "files": ["evals/fixtures/status-phase0-done.json"],
+      "expectations": [
+        "Produces docs/phases/phase-1-plan.md (or equivalent plan document) with sections for contract tests, migrations, endpoints, events, build order, tests, seeds, ADRs",
+        "Lists consumer-side contract tests BEFORE Orders implementation and names Reservations::reserve/release/consume or equivalent Inventory capabilities as the thing to prove first",
+        "States that Payments in Phase 1 is a schema-complete skeleton where only cash can pass validation (no photo upload yet)",
+        "Mentions that the plan needs Ramin's approval (plan_approved) before coding begins and does not start implementing Orders",
+        "Migrations specify decimal(12,2) for money and decimal(14,4) for quantities, and include branch_id and client_uuid on orders"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "refuse-phase-2-start",
+      "prompt": "Can we start Phase 2 now? I want to begin the production module today.",
+      "expected_output": "The agent runs the entry preflight (gate_check.py --mode entry --phase 2 or reads STATUS.json equivalently), sees Phase 1 is not done (gate-p1 red / no done_commit) and refuses to start, naming the red Phase 1 gate and the missing production contracts, and lists exactly what must happen first. It does not create Production code.",
+      "files": ["evals/fixtures/status-phase1-red.json"],
+      "expectations": [
+        "Answers no / not yet rather than starting Phase 2 work",
+        "Names the Phase 1 gate (gate-p1 or gate:p1) as not green or Phase 1 as not done as the blocking reason",
+        "Names the missing contract tests for Production (production->inventory, production->catalog, production->identity) or the unapproved Phase 2 plan as further prerequisites",
+        "Does not create any files under app/Modules/Production",
+        "Refers to gate_check.py --mode entry (or runs it) as the mechanism for this decision"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "place-production-module",
+      "prompt": "Add the production module: bakers get production requests when a cake runs out, accept them, log the batch, and the cake becomes available again. Where does this go and how do we build it so it doesn't break anything?",
+      "expected_output": "The agent places Production in Phase 2 (step 2.7), lists its dependencies with named capabilities (Inventory Stock::of + Ledger::appendMany atomic + StockOut event; Catalog scaled recipe + default_batch_qty; Identity assignedUsers/isOverseer; Notifications by event only), explains the cycle break with Shifts via the StationPresenceResolver / ShiftAttacher interfaces instead of importing Shifts, and prescribes contract tests first, then module tests, then implementation, ending with gate_check --mode module.",
+      "files": ["evals/fixtures/status-phase1-done.json"],
+      "expectations": [
+        "Places the module in Phase 2 and names its build-order position after purchases/transfers/notifications or cites manifest step 2.7",
+        "Lists dependencies on Inventory, Catalog and Identity with at least one named capability each (e.g. Ledger::appendMany, Recipes::activeFor scaled by yield, assignedUsers)",
+        "Says Production must not import Shifts and names the interface-based cycle break (StationPresenceResolver / ShiftAttacher or AssignedUsersResolver / NullShiftAttacher)",
+        "Prescribes writing consumer-side contract tests before any Production code",
+        "Mentions Notifications are reached by domain events, not by importing Notifications models"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "explain-or-fix-ci",
+      "prompt": "CI is red on my PR for the inventory module: mod-inventory failed, and so did mod-orders, e2e-p1 and gate-p1. Which one do I fix and why is the pipeline shaped like this?",
+      "expected_output": "The agent explains the needs: chain mirrors the module dependency graph, so mod-inventory is the lowest failing job and the only one to fix; downstream failures are consequences. It notes mod-inventory also runs consumers' contract tests (contract:orders->inventory etc.), so the break may be a contract regression rather than an inventory unit test, and points at scripts/ci/pest-groups.sh / the module-tests reusable workflow and local parity via python scripts/task.py ci.",
+      "files": [],
+      "expectations": [
+        "Identifies mod-inventory as the job to fix first and the others as downstream consequences of the needs chain",
+        "Explains that the job graph mirrors the module dependency graph (identity -> catalog -> inventory -> orders ...)",
+        "Mentions that the inventory job also runs consumer contract tests (contract:orders->inventory or similar) so a consumer expectation may be what broke",
+        "Suggests reproducing locally with the same steps (python scripts/task.py ci / make ci or the pest group)"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "real-start-shared-module",
+      "prompt": "Start Phase 0 step 0.2: build the Shared module (branches, stations, BranchScoped, Bilingual cast, Quantity/Money value objects, StateMachine trait, Idempotency middleware with its table, ActorContext) with its tests, inside the repo rules.",
+      "expected_output": "Real code under apps/api/app/Shared with migrations using decimal(14,4)/(12,2), branch_id on stations and idempotency_keys, unit tests for Quantity/Money/StateMachine, arch and invariant tests still green, and scripts/check_invariants.py --all clean. The agent runs the checks via Docker (scripts/pest or task.py), not host PHP, and updates STATUS via phase_status.py module shared in_progress.",
+      "files": [],
+      "expectations": [
+        "Creates migrations for branches, stations and idempotency_keys with branch_id on stations and idempotency_keys",
+        "Quantity and Money value objects use brick/math BigDecimal (no float arithmetic)",
+        "Adds unit tests for Quantity/Money arithmetic and StateMachine illegal transitions tagged with the unit group",
+        "Runs or instructs running tests through Docker (scripts/pest, scripts/artisan or task.py), never host php",
+        "python scripts/check_invariants.py --numeric --branch-id --bilingual reports zero violations on the result"
+      ]
+    }
+  ]
+}

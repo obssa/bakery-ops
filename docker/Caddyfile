@@ -1,0 +1,17 @@
+# Reverse proxy used by the `full` profile (and later by production). Local dev talks to
+# the API on :8000 and Next on :3000 directly, so this file only matters once the stack is deployed.
+:80 {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy app:8000
+	}
+
+	handle /app/* {
+		reverse_proxy ws:8080
+	}
+
+	handle {
+		reverse_proxy web-next:3000
+	}
+}

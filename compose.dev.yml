@@ -1,0 +1,42 @@
+# Local development overlay: dev image target, the whole repo bind-mounted at /workspace (so tests and
+# scripts can reach docs/, the skill manifest and ../../docs/openapi.json), ports exposed to the host.
+# Bind mounts are slower on Windows; keep the repo under the WSL2-backed drive if that bites.
+#   docker compose -f compose.yml -f compose.dev.yml up -d --wait
+services:
+  app:
+    build:
+      target: dev
+    image: bakery-ops-api:dev
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+    working_dir: /workspace/apps/api
+    volumes:
+      - .:/workspace
+    ports:
+      - "8000:8000"
+
+  worker:
+    image: bakery-ops-api:dev
+    working_dir: /workspace/apps/api
+    volumes:
+      - .:/workspace
+
+  ws:
+    image: bakery-ops-api:dev
+    working_dir: /workspace/apps/api
+    volumes:
+      - .:/workspace
+    ports:
+      - "8080:8080"
+
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"

@@ -1,0 +1,40 @@
+name: setup-api
+description: PHP 8.3 + Composer deps for apps/api, with caches. Pinned to the same PHP minor as docker/php.Dockerfile.
+
+runs:
+  using: composite
+  steps:
+    - uses: shivammathur/setup-php@v2
+      with:
+        php-version: "8.3"
+        extensions: pdo_pgsql, pgsql, redis, intl, bcmath, gd, zip, pcntl, mbstring, xml, curl
+        tools: composer:v2
+        coverage: none
+      env:
+        COMPOSER_TOKEN: ${{ github.token }}
+
+    - name: Composer cache dir
+      id: composer-cache
+      shell: bash
+      run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v4
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: composer-${{ runner.os }}-${{ hashFiles('apps/api/composer.lock') }}
+        restore-keys: composer-${{ runner.os }}-
+
+    - uses: actions/cache@v4
+      with:
+        path: apps/api/tmp/phpstan
+        key: phpstan-${{ runner.os }}-${{ github.sha }}
+        restore-keys: phpstan-${{ runner.os }}-
+
+    - name: Install
+      shell: bash
+      working-directory: apps/api
+      run: |
+        composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader
+        cp -n .env.ci .env || true
+        php artisan key:generate --force --no-interaction
+        mkdir -p tmp/phpstan

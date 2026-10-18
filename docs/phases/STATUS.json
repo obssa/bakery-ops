@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "current_phase": 0,
+  "invariants_version": 1,
+  "phases": {
+    "0": {
+      "status": "in_progress",
+      "plan": "docs/phases/phase-0-plan.md",
+      "plan_approved": false,
+      "plan_approved_by": null,
+      "report": null,
+      "gate_job": "gate-p0",
+      "gate_run_url": null,
+      "done_commit": null,
+      "done_at": null,
+      "adrs": [],
+      "adr_waiver": null,
+      "contracts_required": [
+        "inventory->catalog",
+        "catalog->identity"
+      ],
+      "modules": {
+        "repo": "todo",
+        "shared": "todo",
+        "audit": "todo",
+        "identity": "todo",
+        "catalog": "todo",
+        "inventory": "todo",
+        "web": "todo",
+        "seeds": "todo",
+        "docs": "todo"
+      },
+      "playwright_projects": [
+        "p0-admin-smoke"
+      ]
+    },
+    "1": {
+      "status": "todo",
+      "plan": "docs/phases/phase-1-plan.md",
+      "plan_approved": false,
+      "plan_approved_by": null,
+      "report": null,
+      "gate_job": "gate-p1",
+      "gate_run_url": null,
+      "done_commit": null,
+      "done_at": null,
+      "adrs": [],
+      "adr_waiver": null,
+      "contracts_required": [
+        "orders->inventory",
+        "orders->catalog",
+        "orders->identity",
+        "payments->orders"
+      ],
+      "modules": {
+        "contracts": "todo",
+        "shared.broadcast": "todo",
+        "orders": "todo",
+        "payments": "todo",
+        "read-models": "todo",
+        "web": "todo",
+        "docs": "todo"
+      },
+      "playwright_projects": [
+        "p1-order-flow",
+        "p1-shortfall"
+      ]
+    },
+    "2": {
+      "status": "todo",
+      "plan": "docs/phases/phase-2-plan.md",
+      "plan_approved": false,
+      "plan_approved_by": null,
+      "report": null,
+      "gate_job": "gate-p2",
+      "gate_run_url": null,
+      "done_commit": null,
+      "done_at": null,
+      "adrs": [],
+      "adr_waiver": null,
+      "contracts_required": [
+        "production->inventory",
+        "production->catalog",
+        "production->identity",
+        "notifications->identity"
+      ],
+      "modules": {
+        "contracts": "todo",
+        "inventory.purchases": "todo",
+        "inventory.transfers": "todo",
+        "catalog.recipe-versions": "todo",
+        "notifications": "todo",
+        "inventory.reorder": "todo",
+        "production": "todo",
+        "web": "todo",
+        "docs": "todo"
+      },
+      "playwright_projects": [
+        "p2-stockout-production",
+        "p2-purchase-transfer"
+      ]
+    },
+    "3": {
+      "status": "todo",
+      "plan": "docs/phases/phase-3-plan.md",
+      "plan_approved": false,
+      "plan_approved_by": null,
+      "report": null,
+      "gate_job": "gate-p3",
+      "gate_run_url": null,
+      "done_commit": null,
+      "done_at": null,
+      "adrs": [],
+      "adr_waiver": null,
+      "contracts_required": [
+        "shifts->inventory",
+        "shifts->identity",
+        "shifts->payments"
+      ],
+      "modules": {
+        "contracts": "todo",
+        "shifts.instances": "todo",
+        "shifts.counts": "todo",
+        "shifts.locks": "todo",
+        "shifts.cash": "todo",
+        "shifts.handover": "todo",
+        "web": "todo",
+        "docs": "todo"
+      },
+      "playwright_projects": [
+        "p3-handover",
+        "p3-opening-prefill"
+      ]
+    },
+    "4": {
+      "status": "todo",
+      "plan": "docs/phases/phase-4-plan.md",
+      "plan_approved": false,
+      "plan_approved_by": null,
+      "report": null,
+      "gate_job": "gate-p4",
+      "gate_run_url": null,
+      "done_commit": null,
+      "done_at": null,
+      "adrs": [],
+      "adr_waiver": null,
+      "contracts_required": [
+        "payments->orders",
+        "analytics->facts"
+      ],
+      "modules": {
+        "contracts": "todo",
+        "shared.files": "todo",
+        "payments": "todo",
+        "analytics": "todo",
+        "web": "todo",
+        "docs": "todo"
+      },
+      "playwright_projects": [
+        "p4-pay-photo-split",
+        "p4-dashboards"
+      ]
+    },
+    "5": {
+      "status": "todo",
+      "plan": "docs/phases/phase-5-plan.md",
+      "plan_approved": false,
+      "plan_approved_by": null,
+      "report": null,
+      "gate_job": "gate-p5",
+      "gate_run_url": null,
+      "done_commit": null,
+      "done_at": null,
+      "adrs": [],
+      "adr_waiver": null,
+      "contracts_required": [],
+      "modules": {
+        "identity.devices": "todo",
+        "web.offline": "todo",
+        "print-bridge": "todo",
+        "i18n": "todo",
+        "ops": "todo",
+        "docs": "todo"
+      },
+      "playwright_projects": [
+        "p5-device",
+        "p5-offline"
+      ]
+    }
+  },
+  "modules": {
+    "shared": {
+      "phase": 0,
+      "status": "todo",
+      "stable_since": null
+    },
+    "audit": {
+      "phase": 0,
+      "status": "todo",
+      "stable_since": null
+    },
+    "identity": {
+      "phase": 0,
+      "status": "todo",
+      "stable_since": null
+    },
+    "catalog": {
+      "phase": 0,
+      "status": "todo",
+      "stable_since": null
+    },
+    "inventory": {
+      "phase": 0,
+      "status": "todo",
+      "stable_since": null
+    },
+    "orders": {
+      "phase": 1,
+      "status": "todo",
+      "stable_since": null
+    },
+    "payments": {
+      "phase": 1,
+      "status": "todo",
+      "stable_since": null
+    },
+    "notifications": {
+      "phase": 2,
+      "status": "todo",
+      "stable_since": null
+    },
+    "production": {
+      "phase": 2,
+      "status": "todo",
+      "stable_since": null
+    },
+    "shifts": {
+      "phase": 3,
+      "status": "todo",
+      "stable_since": null
+    },
+    "analytics": {
+      "phase": 4,
+      "status": "todo",
+      "stable_since": null
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "app": {
+    "name": "ቤከሪ ኦፕስ",
+    "tagline": "ትዕዛዞች፣ ወጥ ቤት፣ ዳቦ ቤት፣ ክምችት እና ፈረቃዎች በአንድ ቦታ",
+    "phase_notice": "ምዕራፍ 0 መሠረት። ገጾች በየምዕራፉ ይሞላሉ።"
+  },
+  "nav": {
+    "login": "ግባ",
+    "pad": "የአስተናጋጅ ፓድ",
+    "till": "ካሽ",
+    "kds_kitchen": "የወጥ ቤት ማሳያ",
+    "kds_bar": "የባር ማሳያ",
+    "production": "የምርት ሰሌዳ",
+    "admin": "የአስተዳዳሪ ኮንሶል"
+  },
+  "login": {
+    "title": "ግባ",
+    "phone": "ስልክ ቁጥር",
+    "password": "የይለፍ ቃል",
+    "submit": "ግባ"
+  },
+  "pad": {
+    "title": "የአስተናጋጅ ፓድ",
+    "enter_code": "አጭር ኮድዎን ያስገቡ",
+    "coming": "በምዕራፍ 1 ይገኛል"
+  },
+  "till": {
+    "title": "የካሽ ጣቢያ",
+    "coming": "በምዕራፍ 1 ይገኛል"
+  },
+  "kds": {
+    "kitchen_title": "ወጥ ቤት",
+    "bar_title": "ባር",
+    "coming": "በምዕራፍ 1 ይገኛል"
+  },
+  "production": {
+    "title": "የምርት ሰሌዳ",
+    "coming": "በምዕራፍ 2 ይገኛል"
+  },
+  "admin": {
+    "title": "የአስተዳዳሪ ኮንሶል",
+    "catalog": "ካታሎግ",
+    "people": "ሰዎች",
+    "inventory": "ክምችት",
+    "coming": "ካታሎግ እና ሰዎች በምዕራፍ 0 ደረጃ 0.7 ይመጣሉ"
+  },
+  "common": {
+    "language": "ቋንቋ",
+    "english": "እንግሊዝኛ",
+    "amharic": "አማርኛ"
+  }
+}

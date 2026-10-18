@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "docs/phases/STATUS.json",
+  "type": "object",
+  "required": ["schema_version", "current_phase", "invariants_version", "phases", "modules"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "current_phase": {"type": "integer", "minimum": 0, "maximum": 5},
+    "invariants_version": {"type": "integer", "minimum": 1},
+    "phases": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[0-5]$"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["status", "plan", "plan_approved", "gate_job", "contracts_required", "modules", "playwright_projects"],
+        "additionalProperties": false,
+        "properties": {
+          "status": {"enum": ["todo", "planning", "plan_approved", "in_progress", "gate_pending", "done"]},
+          "plan": {"type": "string"},
+          "plan_approved": {"type": "boolean"},
+          "plan_approved_by": {"type": ["string", "null"]},
+          "report": {"type": ["string", "null"]},
+          "gate_job": {"type": "string", "pattern": "^gate-p[0-5]$"},
+          "gate_run_url": {"type": ["string", "null"]},
+          "done_commit": {"type": ["string", "null"], "pattern": "^[0-9a-f]{7,40}$"},
+          "done_at": {"type": ["string", "null"]},
+          "adrs": {"type": "array", "items": {"type": "string"}},
+          "adr_waiver": {"type": ["string", "null"]},
+          "contracts_required": {"type": "array", "items": {"type": "string", "pattern": "^[a-z]+->[a-z]+$"}},
+          "modules": {"type": "object", "additionalProperties": {"enum": ["todo", "in_progress", "done"]}},
+          "playwright_projects": {"type": "array", "items": {"type": "string", "pattern": "^p[0-5]-[a-z0-9-]+$"}}
+        }
+      }
+    },
+    "modules": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["phase", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "phase": {"type": "integer", "minimum": 0, "maximum": 5},
+          "status": {"enum": ["todo", "in_progress", "stable"]},
+          "stable_since": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

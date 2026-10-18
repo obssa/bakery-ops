@@ -1,0 +1,52 @@
+{
+  "app": {
+    "name": "Bakery Ops",
+    "tagline": "Orders, kitchen, bakery, stock and shifts in one place",
+    "phase_notice": "Phase 0 skeleton. Screens fill in phase by phase."
+  },
+  "nav": {
+    "login": "Sign in",
+    "pad": "Waiter pad",
+    "till": "Till",
+    "kds_kitchen": "Kitchen display",
+    "kds_bar": "Bar display",
+    "production": "Production board",
+    "admin": "Admin console"
+  },
+  "login": {
+    "title": "Sign in",
+    "phone": "Phone number",
+    "password": "Password",
+    "submit": "Sign in"
+  },
+  "pad": {
+    "title": "Waiter pad",
+    "enter_code": "Enter your short code",
+    "coming": "Available in Phase 1"
+  },
+  "till": {
+    "title": "Cashier till",
+    "coming": "Available in Phase 1"
+  },
+  "kds": {
+    "kitchen_title": "Kitchen",
+    "bar_title": "Bar",
+    "coming": "Available in Phase 1"
+  },
+  "production": {
+    "title": "Production board",
+    "coming": "Available in Phase 2"
+  },
+  "admin": {
+    "title": "Admin console",
+    "catalog": "Catalog",
+    "people": "People",
+    "inventory": "Inventory",
+    "coming": "Catalog and People arrive in Phase 0 step 0.7"
+  },
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "amharic": "Amharic"
+  }
+}

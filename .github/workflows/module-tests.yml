@@ -1,0 +1,65 @@
+# Reusable job: run one module's Pest groups, then the contract tests its consumers wrote against it.
+# A module job only runs after the jobs of the modules it depends on (see ci.yml `needs:`), so the
+# first red job in a run names the lowest broken module.
+name: module-tests
+
+on:
+  workflow_call:
+    inputs:
+      module:
+        required: true
+        type: string
+      groups:
+        description: Pest groups owned by the module (comma separated)
+        required: true
+        type: string
+      contracts:
+        description: contract:<consumer>-><module> groups to run against it (comma separated, may be empty)
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  pest:
+    name: ${{ inputs.module }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bakery_test
+          POSTGRES_USER: bakery
+          POSTGRES_PASSWORD: secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bakery -d bakery_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: bakery_test
+      DB_USERNAME: bakery
+      DB_PASSWORD: secret
+      REDIS_HOST: 127.0.0.1
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: Migrate
+        working-directory: apps/api
+        run: php artisan migrate --force --no-interaction
+      - name: Module tests (${{ inputs.groups }})
+        run: bash scripts/ci/pest-groups.sh "${{ inputs.groups }}"
+      - name: Consumer contracts against ${{ inputs.module }}
+        if: inputs.contracts != ''
+        run: bash scripts/ci/pest-groups.sh "${{ inputs.contracts }}" --allow-empty

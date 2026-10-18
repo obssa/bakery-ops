@@ -1,0 +1,49 @@
+// bakery-ops ERD (DBML). Regenerated/extended every phase; scripts/erd_check.py fails CI when a
+// migration creates a table that is not documented here. Laravel's framework tables are listed
+// so the check stays honest; domain tables are added as their migrations land.
+
+Project bakery_ops {
+  database_type: 'PostgreSQL'
+  Note: 'Phase 0 skeleton. Money NUMERIC(12,2), quantities NUMERIC(14,4) in base units. branch_id on every tenant table.'
+}
+
+// ---- Laravel framework tables (shipped with the scaffold)
+Table users {
+  id bigint [pk]
+  name varchar
+  email varchar [unique]
+  email_verified_at timestamp
+  password varchar
+  remember_token varchar
+  created_at timestamp
+  updated_at timestamp
+  Note: 'Phase 0.4 extends: branch_id, phone, short_code_hash, locale, is_active, photo_url, soft delete'
+}
+Table password_reset_tokens { email varchar [pk]  token varchar  created_at timestamp }
+Table sessions { id varchar [pk]  user_id bigint  ip_address varchar  user_agent text  payload text  last_activity int }
+Table cache { key varchar [pk]  value text  expiration int }
+Table cache_locks { key varchar [pk]  owner varchar  expiration int }
+Table jobs { id bigint [pk]  queue varchar  payload text  attempts smallint  reserved_at int  available_at int  created_at int }
+Table job_batches { id varchar [pk]  name varchar  total_jobs int  pending_jobs int  failed_jobs int  failed_job_ids text  options text  cancelled_at int  created_at int  finished_at int }
+Table failed_jobs { id bigint [pk]  uuid varchar [unique]  connection text  queue text  payload text  exception text  failed_at timestamp }
+
+// ---- Phase 0 domain tables (planned; documented ahead of their migrations)
+Table branches { id bigint [pk]  name varchar  timezone varchar  currency varchar  settings jsonb  created_at timestamp  updated_at timestamp  deleted_at timestamp }
+Table stations { id bigint [pk]  branch_id bigint [ref: > branches.id]  code varchar  name_en varchar  name_am varchar  requires_overseer boolean  sort int }
+Table idempotency_keys { id bigint [pk]  branch_id bigint  user_id bigint  key varchar  request_hash varchar  response_status int  response_body jsonb  expires_at timestamp }
+Table audit_log { id bigint [pk]  branch_id bigint  actor_id bigint  acting_user_id bigint  action varchar  subject_type varchar  subject_id bigint  before jsonb  after jsonb  shift_instance_id bigint  station_id bigint  device_id bigint  ip varchar  at timestamp  Note: 'append-only (trigger)' }
+Table units { id bigint [pk]  code varchar  base_unit_id bigint  factor "numeric(14,4)" }
+Table categories { id bigint [pk]  branch_id bigint  kind varchar  name_en varchar  name_am varchar  parent_id bigint  sort int }
+Table items { id bigint [pk]  branch_id bigint  kind varchar  name_en varchar  name_am varchar  category_id bigint  unit_id bigint  sku varchar  is_active boolean  is_new_until date  default_batch_qty "numeric(14,4)"  deleted_at timestamp }
+Table item_prices { id bigint [pk]  item_id bigint  price "numeric(12,2)"  currency varchar  effective_from timestamp  effective_to timestamp }
+Table item_station_assignments { item_id bigint  station_id bigint }
+Table recipes { id bigint [pk]  product_item_id bigint  yield_qty "numeric(14,4)"  yield_unit_id bigint  version int  is_active boolean }
+Table recipe_lines { id bigint [pk]  recipe_id bigint  ingredient_item_id bigint  qty "numeric(14,4)"  unit_id bigint  is_optional boolean  waste_pct "numeric(5,2)" }
+Table recipe_steps { id bigint [pk]  recipe_id bigint  order int  text_en text  text_am text }
+Table modifiers { id bigint [pk]  item_id bigint  name_en varchar  name_am varchar  price_delta "numeric(12,2)"  recipe_delta jsonb }
+Table locations { id bigint [pk]  branch_id bigint  name varchar  station_id bigint  type varchar }
+Table stock_movements { id bigint [pk]  branch_id bigint  item_id bigint  from_location_id bigint  to_location_id bigint  qty "numeric(14,4)"  reason varchar  ref_type varchar  ref_id bigint  reservation_ref uuid  shift_instance_id bigint  user_id bigint  acting_user_id bigint  station_id bigint  device_id bigint  client_uuid uuid  created_at timestamp  Note: 'append-only; sole writer Ledger' }
+Table stock_balances { id bigint [pk]  branch_id bigint  item_id bigint  location_id bigint  on_hand "numeric(14,4)"  reserved "numeric(14,4)"  updated_at timestamp  Note: 'row-lock target (ADR 0002)' }
+Table user_station_assignments { user_id bigint  station_id bigint  can_count boolean  is_overseer boolean }
+Table devices { id bigint [pk]  branch_id bigint  name varchar  fingerprint varchar  enrolled_by bigint  enrolled_at timestamp  revoked_at timestamp }
+Table acting_sessions { id bigint [pk]  user_id bigint  device_id bigint  started_at timestamp  expires_at timestamp  ended_at timestamp }

@@ -1,0 +1,90 @@
+# Reusable e2e job: bring up the real stack (compose.yml + compose.ci.yml) from the image the
+# docker-build job produced, seed the demo bakery up to the phase, serve the built Next app, and run
+# the phase's Playwright projects natively on the runner.
+name: e2e
+
+on:
+  workflow_call:
+    inputs:
+      phase:
+        required: true
+        type: number
+      projects:
+        description: space separated Playwright project names
+        required: true
+        type: string
+      profiles:
+        description: compose profiles to enable (e.g. "full" for worker, ws, minio)
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  playwright:
+    name: e2e phase ${{ inputs.phase }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with: { name: api-image, path: /tmp }
+      - run: docker load -i /tmp/api.tar
+
+      - name: Start stack
+        env:
+          COMPOSE_PROFILES: ${{ inputs.profiles }}
+        run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180
+
+      - name: Migrate and seed up to phase ${{ inputs.phase }}
+        run: docker compose -f compose.yml -f compose.ci.yml exec -T -e SEED_PHASE=${{ inputs.phase }} app php artisan migrate:fresh --force --seed --seeder=DemoSeeder
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm, cache-dependency-path: apps/web/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/web
+
+      - uses: actions/download-artifact@v4
+        with: { name: web-build, path: apps/web/.next }
+
+      - name: Playwright browsers (cached)
+        uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+      - run: pnpm exec playwright install-deps chromium
+        working-directory: apps/web
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+
+      - name: Run Playwright projects
+        working-directory: apps/web
+        env:
+          CI: "true"
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_REVERB_HOST: localhost
+          NEXT_PUBLIC_REVERB_PORT: "8080"
+          NEXT_PUBLIC_REVERB_SCHEME: http
+          PLAYWRIGHT_WEB_SERVER: next-start
+        run: |
+          args=""
+          for p in ${{ inputs.projects }}; do args="$args --project=$p"; done
+          pnpm exec playwright test $args
+
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=200
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-p${{ inputs.phase }}
+          path: |
+            apps/web/test-results
+            apps/web/playwright-report
+          retention-days: 7

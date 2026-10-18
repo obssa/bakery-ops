@@ -1,0 +1,47 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.ci
+
+# Skill eval workspace (local only)
+.claude/skills/bakery-ops-builder-workspace/
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Laravel (apps/api)
+apps/api/vendor/
+apps/api/node_modules/
+apps/api/storage/*.key
+apps/api/storage/logs/*
+apps/api/storage/framework/cache/data/*
+apps/api/storage/framework/sessions/*
+apps/api/storage/framework/views/*
+apps/api/storage/framework/testing/*
+apps/api/bootstrap/cache/*.php
+apps/api/.phpunit.result.cache
+apps/api/.phpunit.cache/
+apps/api/tmp/
+
+# Next.js (apps/web)
+apps/web/.next/
+apps/web/out/
+apps/web/tsconfig.tsbuildinfo
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/blob-report/
+apps/web/next-env.d.ts
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

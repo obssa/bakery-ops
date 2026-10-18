@@ -1,0 +1,127 @@
+# Base stack. Production-shaped: the API image carries its own code (target ci).
+# Local development layers compose.dev.yml on top (bind mounts, dev target, exposed ports):
+#   docker compose -f compose.yml -f compose.dev.yml up -d --wait
+# CI e2e layers compose.ci.yml (pre-built image from the docker-build job).
+name: bakery-ops
+
+x-api-env: &api-env
+  APP_ENV: ${APP_ENV:-local}
+  APP_DEBUG: ${APP_DEBUG:-true}
+  APP_URL: http://localhost:8000
+  APP_TIMEZONE: UTC
+  LOG_CHANNEL: stderr
+  DB_CONNECTION: pgsql
+  DB_HOST: db
+  DB_PORT: "5432"
+  DB_DATABASE: bakery
+  DB_USERNAME: bakery
+  DB_PASSWORD: secret
+  CACHE_STORE: redis
+  QUEUE_CONNECTION: redis
+  SESSION_DRIVER: redis
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-log}
+  REVERB_HOST: ws
+  REVERB_PORT: "8080"
+  REVERB_SCHEME: http
+  FILESYSTEM_DISK: ${FILESYSTEM_DISK:-local}
+  AWS_ENDPOINT: http://minio:9000
+  AWS_URL: http://localhost:9000/bakery
+  AWS_BUCKET: bakery
+  AWS_ACCESS_KEY_ID: bakery
+  AWS_SECRET_ACCESS_KEY: bakerysecret
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_USE_PATH_STYLE_ENDPOINT: "true"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php.Dockerfile
+      target: ci
+    image: bakery-ops-api:local
+    environment:
+      <<: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 8000) ? 0 : 1);"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  worker:
+    image: bakery-ops-api:local
+    command: ["php", "artisan", "queue:work", "--tries=3", "--sleep=1"]
+    environment:
+      <<: *api-env
+    depends_on:
+      app:
+        condition: service_healthy
+    profiles: ["full"]
+
+  ws:
+    image: bakery-ops-api:local
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    environment:
+      <<: *api-env
+    depends_on:
+      app:
+        condition: service_healthy
+    profiles: ["full"]
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bakery
+      POSTGRES_USER: bakery
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bakery -d bakery"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: bakery
+      MINIO_ROOT_PASSWORD: bakerysecret
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    profiles: ["full"]
+
+  web:
+    image: caddy:2-alpine
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    profiles: ["full"]
+
+volumes:
+  db_data:
+  minio_data:

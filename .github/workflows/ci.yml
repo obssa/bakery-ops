@@ -1,0 +1,323 @@
+# bakery-ops CI. The job graph mirrors the module dependency graph in
+# .claude/skills/bakery-ops-builder/assets/dependency-manifest.json (ci.module_jobs / e2e_jobs / gate_jobs):
+# a module's tests only run after the modules it depends on are green, and gate-pN fans in everything
+# phase N relies on. Jobs for phases above docs/phases/STATUS.json current_phase are skipped.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------ where are we
+  status:
+    runs-on: ubuntu-latest
+    outputs:
+      phase: ${{ steps.s.outputs.phase }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: s
+        run: |
+          phase=$(jq -r .current_phase docs/phases/STATUS.json)
+          echo "phase=$phase" >> "$GITHUB_OUTPUT"
+          echo "current phase: $phase"
+      - name: Validate STATUS.json
+        run: python3 .claude/skills/bakery-ops-builder/scripts/phase_status.py validate
+
+  # ------------------------------------------------------------------ api static
+  api-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: Pint
+        working-directory: apps/api
+        run: vendor/bin/pint --test
+      - name: PHPStan
+        working-directory: apps/api
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+  api-arch:
+    needs: api-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: Migration lint
+        run: python3 scripts/check_invariants.py --numeric --branch-id --bilingual --append-only
+      - name: Architecture and invariant tests
+        run: bash scripts/ci/pest-groups.sh "arch,invariants"
+
+  invariants:
+    needs: api-arch
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_DB: bakery_test, POSTGRES_USER: bakery, POSTGRES_PASSWORD: secret }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U bakery" --health-interval 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: Route list
+        working-directory: apps/api
+        env: { DB_HOST: 127.0.0.1, DB_DATABASE: bakery_test, DB_USERNAME: bakery, DB_PASSWORD: secret }
+        run: mkdir -p tmp && php artisan route:list --json > tmp/routes.json
+      - name: All repo invariants
+        run: python3 scripts/check_invariants.py --all --routes apps/api/tmp/routes.json
+
+  openapi-check:
+    needs: api-arch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-api
+      - name: Export spec and compare with docs/openapi.json
+        working-directory: apps/api
+        run: |
+          php artisan scramble:export --path=tmp/openapi.json
+          python3 - <<'PY'
+          import json, sys
+          a = json.load(open('tmp/openapi.json')); b = json.load(open('../../docs/openapi.json'))
+          for d in (a, b): d.get('info', {}).pop('version', None)
+          if a != b:
+              print('docs/openapi.json is stale: run scripts/artisan scramble:export --path=../../docs/openapi.json'); sys.exit(1)
+          print('openapi in sync')
+          PY
+
+  erd-check:
+    needs: api-arch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/erd_check.py
+
+  # ------------------------------------------------------------------ module chain (dependency order)
+  mod-identity:
+    needs: api-arch
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: identity, groups: "module:identity", contracts: "contract:catalog->identity,contract:orders->identity,contract:production->identity,contract:notifications->identity,contract:shifts->identity" }
+
+  mod-catalog:
+    needs: mod-identity
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: catalog, groups: "module:catalog", contracts: "contract:inventory->catalog,contract:orders->catalog,contract:production->catalog" }
+
+  mod-inventory:
+    needs: mod-catalog
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory" }
+
+  mod-orders:
+    needs: [status, mod-inventory]
+    if: fromJSON(needs.status.outputs.phase) >= 1
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: orders, groups: "module:orders", contracts: "contract:payments->orders" }
+
+  mod-payments:
+    needs: [status, mod-orders]
+    if: fromJSON(needs.status.outputs.phase) >= 1
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: payments, groups: "module:payments", contracts: "contract:shifts->payments" }
+
+  mod-production:
+    needs: [status, mod-inventory]
+    if: fromJSON(needs.status.outputs.phase) >= 2
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: production, groups: "module:production" }
+
+  mod-notifications:
+    needs: [status, mod-inventory]
+    if: fromJSON(needs.status.outputs.phase) >= 2
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: notifications, groups: "module:notifications" }
+
+  mod-shifts:
+    needs: [status, mod-orders, mod-inventory, mod-payments]
+    if: fromJSON(needs.status.outputs.phase) >= 3
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: shifts, groups: "module:shifts" }
+
+  mod-analytics:
+    needs: [status, mod-shifts, mod-production, mod-notifications]
+    if: fromJSON(needs.status.outputs.phase) >= 4
+    uses: ./.github/workflows/module-tests.yml
+    with: { module: analytics, groups: "module:analytics", contracts: "contract:analytics->facts" }
+
+  # ------------------------------------------------------------------ web
+  web-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm, cache-dependency-path: apps/web/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/web
+      - run: pnpm lint
+        working-directory: apps/web
+      - run: pnpm exec tsc --noEmit
+        working-directory: apps/web
+
+  i18n-check:
+    needs: [status, web-lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/check_invariants.py --i18n ${{ fromJSON(needs.status.outputs.phase) >= 5 && '--strict-i18n' || '' }}
+
+  web-build:
+    needs: web-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm, cache-dependency-path: apps/web/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/web
+      - uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**') }}
+          restore-keys: next-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}-
+      - run: pnpm build
+        working-directory: apps/web
+        env: { NEXT_PUBLIC_API_URL: http://localhost:8000 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: |
+            apps/web/.next
+            !apps/web/.next/cache
+          retention-days: 1
+
+  # ------------------------------------------------------------------ api image for e2e
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php.Dockerfile
+          target: ci
+          tags: bakery-ops-api:ci
+          outputs: type=docker,dest=/tmp/api.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: actions/upload-artifact@v4
+        with: { name: api-image, path: /tmp/api.tar, retention-days: 1 }
+
+  # ------------------------------------------------------------------ e2e per phase
+  e2e-p0:
+    needs: [status, mod-catalog, web-build, docker-build]
+    uses: ./.github/workflows/e2e.yml
+    with: { phase: 0, projects: "p0-admin-smoke" }
+
+  e2e-p1:
+    needs: [status, mod-payments, web-build, docker-build]
+    if: fromJSON(needs.status.outputs.phase) >= 1
+    uses: ./.github/workflows/e2e.yml
+    with: { phase: 1, projects: "p1-order-flow p1-shortfall", profiles: "full" }
+
+  e2e-p2:
+    needs: [status, mod-production, mod-notifications, web-build, docker-build]
+    if: fromJSON(needs.status.outputs.phase) >= 2
+    uses: ./.github/workflows/e2e.yml
+    with: { phase: 2, projects: "p2-stockout-production p2-purchase-transfer", profiles: "full" }
+
+  e2e-p3:
+    needs: [status, mod-shifts, web-build, docker-build]
+    if: fromJSON(needs.status.outputs.phase) >= 3
+    uses: ./.github/workflows/e2e.yml
+    with: { phase: 3, projects: "p3-handover p3-opening-prefill", profiles: "full" }
+
+  e2e-p4:
+    needs: [status, mod-analytics, web-build, docker-build]
+    if: fromJSON(needs.status.outputs.phase) >= 4
+    uses: ./.github/workflows/e2e.yml
+    with: { phase: 4, projects: "p4-pay-photo-split p4-dashboards", profiles: "full" }
+
+  perf-dashboards:
+    needs: [status, e2e-p4]
+    if: fromJSON(needs.status.outputs.phase) >= 4
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "TODO(p4) k6 perf-dashboards job is defined in Phase 4"
+
+  e2e-p5:
+    needs: [status, e2e-p4]
+    if: fromJSON(needs.status.outputs.phase) >= 5
+    uses: ./.github/workflows/e2e.yml
+    with: { phase: 5, projects: "p5-device p5-offline", profiles: "full" }
+
+  backup-drill:
+    needs: [status, e2e-p5]
+    if: fromJSON(needs.status.outputs.phase) >= 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "TODO(p5) backup-drill job is defined in Phase 5"
+
+  # ------------------------------------------------------------------ gates (required checks on main)
+  gate-p0:
+    needs: [api-arch, mod-inventory, mod-catalog, e2e-p0, openapi-check, erd-check, invariants]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gate_check.py --mode done --phase 0 --ci
+
+  gate-p1:
+    needs: [status, gate-p0, mod-orders, mod-payments, e2e-p1]
+    if: fromJSON(needs.status.outputs.phase) >= 1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gate_check.py --mode done --phase 1 --ci
+
+  gate-p2:
+    needs: [status, gate-p1, mod-production, mod-notifications, e2e-p2]
+    if: fromJSON(needs.status.outputs.phase) >= 2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gate_check.py --mode done --phase 2 --ci
+
+  gate-p3:
+    needs: [status, gate-p2, mod-shifts, e2e-p3]
+    if: fromJSON(needs.status.outputs.phase) >= 3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gate_check.py --mode done --phase 3 --ci
+
+  gate-p4:
+    needs: [status, gate-p3, mod-analytics, e2e-p4, perf-dashboards]
+    if: fromJSON(needs.status.outputs.phase) >= 4
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gate_check.py --mode done --phase 4 --ci
+
+  gate-p5:
+    needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill]
+    if: fromJSON(needs.status.outputs.phase) >= 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gate_check.py --mode done --phase 5 --ci

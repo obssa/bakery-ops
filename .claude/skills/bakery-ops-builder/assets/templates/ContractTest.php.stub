@@ -1,0 +1,30 @@
+<?php
+
+/**
+ * Contract: {{consumer}} -> {{provider}}
+ *
+ * Written BEFORE any code exists in App\Modules\{{Consumer}}. Instantiates only {{Provider}} classes
+ * and factories. Each test is phrased from the consumer's point of view: "when I, {{Consumer}}, call
+ * X with Y, I rely on Z". It runs in {{Provider}}'s CI job for the life of the project, so a later
+ * change to {{Provider}} that breaks this expectation fails before any {{Consumer}} test runs.
+ */
+
+use App\Modules\{{Provider}}\Contracts\{{Capability}};
+
+uses(Tests\TestCase::class, Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->group('contract:{{consumer}}->{{provider}}', 'contract');
+
+beforeEach(function () {
+    $this->seed(Database\Seeders\Phase{{N}}Seeder::class);
+    $this->branch = currentBranch();
+});
+
+it('{{case 1 from the manifest, in the consumer\'s words}}', function () {
+    // arrange: provider factories only
+    // act: the provider capability the consumer will call
+    // assert: compare decimal strings, never floats; assert shapes the consumer will depend on
+    expect(true)->toBeTrue();
+})->todo();
+
+it('{{case 2}}', function () {
+})->todo();
