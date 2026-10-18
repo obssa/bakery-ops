@@ -222,6 +222,14 @@ def mode_entry(root: str, man: dict, st: dict, n: int, a, rep: Report, pest: Pes
             rep.add(last in approvers, "approval author", f"{last or 'uncommitted'}", warn=True)
 
     for pair in man["phases"][key]["contracts_required"]:
+        consumer, provider = pair.split("->")
+        provider_phase = man["modules"].get(provider, {}).get("phase")
+        if provider_phase is not None and provider_phase >= n and n > 0:
+            # The provider itself is built in this phase (e.g. payments->orders in Phase 1): the contract
+            # cannot be green at phase entry. It is required before the consumer's own step instead
+            # (gate_check --mode module --module <provider> runs it once the consumer has written it).
+            rep.add(None, f"contract {pair}", f"intra-phase: provider {provider} is built in phase {n}; write it before step '{consumer}', checked by --mode module --module {provider}")
+            continue
         check_contract(root, man, pair, rep, pest, prev_commit, require_unmodified_consumer=(n > 0))
 
     phase_modules = [m for m, info in man["modules"].items() if info["phase"] == n]

@@ -31,7 +31,7 @@ jobs:
           echo "phase=$phase" >> "$GITHUB_OUTPUT"
           echo "current phase: $phase"
       - name: Validate STATUS.json
-        run: python3 .claude/skills/bakery-ops-builder/scripts/phase_status.py validate
+        run: python3 scripts/phase_status.py validate
 
   # ------------------------------------------------------------------ api static
   api-lint:
