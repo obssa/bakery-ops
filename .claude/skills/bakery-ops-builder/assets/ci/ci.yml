@@ -20,7 +20,7 @@ permissions:
 jobs:
   # ------------------------------------------------------------------ where are we
   status:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       phase: ${{ steps.s.outputs.phase }}
     steps:
@@ -35,7 +35,7 @@ jobs:
 
   # ------------------------------------------------------------------ api static
   api-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -48,7 +48,7 @@ jobs:
 
   api-arch:
     needs: api-lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -59,7 +59,7 @@ jobs:
 
   invariants:
     needs: api-arch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
@@ -78,7 +78,7 @@ jobs:
 
   openapi-check:
     needs: api-arch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -97,7 +97,7 @@ jobs:
 
   erd-check:
     needs: api-arch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/erd_check.py
@@ -156,7 +156,7 @@ jobs:
 
   # ------------------------------------------------------------------ web
   web-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -172,14 +172,14 @@ jobs:
 
   i18n-check:
     needs: [status, web-lint]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/check_invariants.py --i18n ${{ fromJSON(needs.status.outputs.phase) >= 5 && '--strict-i18n' || '' }}
 
   web-build:
     needs: web-lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -206,7 +206,7 @@ jobs:
 
   # ------------------------------------------------------------------ api image for e2e
   docker-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -255,7 +255,7 @@ jobs:
   perf-dashboards:
     needs: [status, e2e-p4]
     if: fromJSON(needs.status.outputs.phase) >= 4
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: echo "TODO(p4) k6 perf-dashboards job is defined in Phase 4"
@@ -269,7 +269,7 @@ jobs:
   backup-drill:
     needs: [status, e2e-p5]
     if: fromJSON(needs.status.outputs.phase) >= 5
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: echo "TODO(p5) backup-drill job is defined in Phase 5"
@@ -277,7 +277,7 @@ jobs:
   # ------------------------------------------------------------------ gates (required checks on main)
   gate-p0:
     needs: [api-arch, mod-inventory, mod-catalog, e2e-p0, openapi-check, erd-check, invariants]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/gate_check.py --mode done --phase 0 --ci
@@ -285,7 +285,7 @@ jobs:
   gate-p1:
     needs: [status, gate-p0, mod-orders, mod-payments, e2e-p1]
     if: fromJSON(needs.status.outputs.phase) >= 1
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/gate_check.py --mode done --phase 1 --ci
@@ -293,7 +293,7 @@ jobs:
   gate-p2:
     needs: [status, gate-p1, mod-production, mod-notifications, e2e-p2]
     if: fromJSON(needs.status.outputs.phase) >= 2
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/gate_check.py --mode done --phase 2 --ci
@@ -301,7 +301,7 @@ jobs:
   gate-p3:
     needs: [status, gate-p2, mod-shifts, e2e-p3]
     if: fromJSON(needs.status.outputs.phase) >= 3
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/gate_check.py --mode done --phase 3 --ci
@@ -309,7 +309,7 @@ jobs:
   gate-p4:
     needs: [status, gate-p3, mod-analytics, e2e-p4, perf-dashboards]
     if: fromJSON(needs.status.outputs.phase) >= 4
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/gate_check.py --mode done --phase 4 --ci
@@ -317,7 +317,7 @@ jobs:
   gate-p5:
     needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill]
     if: fromJSON(needs.status.outputs.phase) >= 5
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/gate_check.py --mode done --phase 5 --ci
