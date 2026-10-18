@@ -82,6 +82,11 @@ composer (`~/.composer/cache`, key `composer.lock`), PHPStan (`apps/api/tmp/phps
 
 ## Branch protection and required checks
 
+GitHub constraints met on 2026-10-18: Actions minutes on a **private** repo need working billing (the first run
+failed with "recent account payments have failed or your spending limit needs to be increased"), and branch
+protection on a private repo needs GitHub Pro. Either make the repo public or fix billing / upgrade; until then
+CI does not run and gate jobs cannot be required checks. Runners are pinned to `ubuntu-24.04`.
+
 `main` requires `gate-p0 … gate-p<current>`, linear history, no force push. When a phase is declared
 done, a human adds `gate-p<N+1>` to the required list; the skill reminds, it cannot do it. Set the
 first one with:
