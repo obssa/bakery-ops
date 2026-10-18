@@ -36,7 +36,7 @@ carries the actor stamp (`created_by_user_id`, `acting_user_id?`, `shift_instanc
 |---|---|---|
 | `categories` | branch_id, kind, name_en, name_am, parent_id, sort | Flour & grains, Dairy, Packaging, Breads, Cakes, Hot drinks, Sandwiches … |
 | `units` | code (kg, g, L, ml, pcs, slice, tray), base_unit_id, factor | all math in base units, display unit may differ |
-| `items` | branch_id, kind (`ingredient` / `product`), name_en, name_am, category_id, unit_id, sku, is_active, is_new_until, default_batch_qty, deleted_at | `is_new_until` drives the New row on pads; `default_batch_qty` sizes auto production requests |
+| `items` | branch_id, kind (`ingredient` / `product`), fulfilment (`to_order` / `to_stock` / `bought_in`), name_en, name_am, category_id, unit_id, sku, is_active, is_new_until, default_batch_qty, production_station_id?, deleted_at | `fulfilment` decides how availability is computed and whether a stock-out auto-requests production; `production_station_id` is the station that makes a display-case product; `is_new_until` drives the New row on pads; `default_batch_qty` sizes auto production requests |
 | `item_prices` | item_id, price, currency, effective_from, effective_to | history, never overwritten; order lines snapshot the price |
 | `item_station_assignments` | item_id, station_id | latte → bar, cake → cake_room; null for display-case items |
 | `recipes` | product_item_id, yield_qty, yield_unit_id, version, is_active | one active version per product; old versions kept |
@@ -44,8 +44,8 @@ carries the actor stamp (`created_by_user_id`, `acting_user_id?`, `shift_instanc
 | `recipe_steps` | recipe_id, order, text_en, text_am | optional, shown on the production card |
 | `modifiers` | item_id, name_en, name_am, price_delta, recipe_delta JSONB | "no onion", large size |
 
-Availability of a product at a location = `floor(min over lines of available(ingredient, location) / qty_per_unit)`;
-empty recipe → `on_hand` of the product itself.
+Availability of a product at a location: `to_order` = `floor(min over lines of available(ingredient, location) / qty_per_unit)`;
+`to_stock` and `bought_in` = `available` of the product itself at that location (display case for counter products).
 
 ## Inventory (Phase 0 core; purchases, transfers, costs, reorder Phase 2)
 

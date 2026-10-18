@@ -79,13 +79,19 @@ These are the contract surfaces. Expose each as a final service class (or interf
 |---|---|---|---|
 | 1 | Inventory movements carry `shift_instance_id`; Shifts (P3) needs Inventory balances | Inventory never imports Shifts. `shift_instance_id` is a nullable FK read from `ActorContext`. P3 adds middleware that fills it from `Shifts::current(station)` and flips `ledger.require_shift_for_station_locations=true`. Pre-P3 rows legitimately keep null; nothing is backfilled. | P3 |
 | 2 | Orders ↔ Payments | Payments depends on Orders (reads totals). Orders reacts to `PaymentRecorded` through a listener and never imports Payments classes. | P1 |
-| 3 | Production (P2) needs "on-shift users" and "open an ad-hoc shift" | Interfaces `StationPresenceResolver` and `ShiftAttacher` live in Identity. P2 binds `AssignedUsersResolver` and `NullShiftAttacher`; P3 rebinds to the Shifts implementations. The Production contract test runs against both bindings. | P3 |
+| 3 | Production (P2) needs "on-shift users" and "open an ad-hoc shift" | Interfaces `StationPresenceResolver` and `ShiftAttacher` live in Identity, and so do the Phase 2 default bindings `AssignedUsersResolver` and `NullShiftAttacher` (they must exist before any Production code, or the `production->identity` contract cannot be green). P3 rebinds to the Shifts implementations. The Production contract test runs against both bindings. | P3 |
 | 4 | Audit is used by everyone and needs shift/station/device | Audit is a leaf reading only `ActorContext`; subjects by morph string; arch test forbids Audit using any other module. | P0 |
 | 5 | Catalog recipe cost roll-up needs Inventory moving-average cost | `RecipeCost` lives in Inventory. The admin Catalog screen calls `GET /inventory/recipe-costs/{product}`. | P2 |
 | 6 | Product availability needs recipe explosion and is needed by Orders and Production | `Availability` lives in Inventory (which may import Catalog). Orders and Production both call it; neither re-implements the math. | P0/P1 |
 | 7 | Notifications ↔ every producer | Inbound by events only; payloads are arrays of ids and bilingual strings; Notifications imports no producer models. | P2 |
 | 8 | `station_id` / `device_id` stamped before devices are managed | `stations` in Shared from P0; `devices` in Identity from P0 with an optional header; `EnsureEnrolledDevice` enforced in P5 behind a flag. | P5 |
 | 9 | Analytics needs costs (P2), shifts (P3), payments (P4) | Analytics is last and read-only through provider-owned `*Facts` classes, so a provider schema change fails the provider's own tests first. | P4 |
+
+## Two Catalog facts every consumer relies on
+
+- `items.fulfilment` (`to_order | to_stock | bought_in`): availability of a sandwich is limited by ingredients, of a cake by finished goods on hand, of bottled water by its own on_hand. `Availability` in Inventory branches on it; `AutoRequest` in Production fires only for `to_stock` items with a recipe.
+- `items.production_station_id` + `Routing::productionStationFor`: a cake has no KDS step (`stationFor` is null) but is made in the cake room. Production requests route by the production station; order lines route by `stationFor`.
+- Cross-module event classes live in `App\Shared\Events` so Notifications and Analytics can subscribe without importing producer modules.
 
 ## Forced stubs the phase order creates (build them with their final schema, never throwaway)
 

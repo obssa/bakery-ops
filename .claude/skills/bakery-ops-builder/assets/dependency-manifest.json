@@ -1,7 +1,10 @@
 {
   "schema_version": 1,
   "project": "bakery-ops",
-  "human_approvers": ["obssa77@gmail.com", "ramin77software@gmail.com"],
+  "human_approvers": [
+    "obssa77@gmail.com",
+    "ramin77software@gmail.com"
+  ],
   "description": "Single source of truth for the phase-gated build: modules, what each needs from the others, the order they are built in, and the tests that prove each dependency before anything depends on it.",
   "paths": {
     "status": "docs/phases/STATUS.json",
@@ -30,136 +33,816 @@
   },
   "modules": {
     "shared": {
-      "layer": 0, "phase": 0, "namespace": "App\\Shared",
+      "layer": 0,
+      "phase": 0,
+      "namespace": "App\\Shared",
       "depends_on": [],
-      "provides": ["CurrentBranch", "ActorContext{user_id, acting_user_id?, shift_instance_id?, station_id?, device_id?}", "Quantity (NUMERIC 14,4 via brick/math)", "Money (NUMERIC 12,2 via brick/math)", "StateMachine trait + IllegalTransition", "Idempotency middleware + idempotency_keys table", "Bilingual cast", "BranchScoped trait", "DomainEvent base", "Broadcast channel registry station.{id} user.{id} branch.{id}.stock", "Files::put/signedUrl (Phase 4)"],
-      "tables": ["branches", "stations", "idempotency_keys"]
+      "provides": [
+        "CurrentBranch",
+        "ActorContext{user_id, acting_user_id?, shift_instance_id?, station_id?, device_id?}",
+        "Quantity (NUMERIC 14,4 via brick/math)",
+        "Money (NUMERIC 12,2 via brick/math)",
+        "StateMachine trait + IllegalTransition",
+        "Idempotency middleware + idempotency_keys table",
+        "Bilingual cast",
+        "BranchScoped trait",
+        "DomainEvent base",
+        "Broadcast channel registry station.{id} user.{id} branch.{id}.stock",
+        "Files::put/signedUrl (Phase 4)",
+        "App\\Shared\\Events namespace for cross-module domain event classes (array payloads), so Notifications and Analytics never import producer modules"
+      ],
+      "tables": [
+        "branches",
+        "stations",
+        "idempotency_keys"
+      ]
     },
     "audit": {
-      "layer": 1, "phase": 0, "namespace": "App\\Modules\\Audit",
-      "depends_on": ["shared"],
-      "needs": {"shared": ["ActorContext"]},
-      "provides": ["AuditedAction::run(callable, subject, action) with before/after JSONB snapshots", "audit_log append-only (DB trigger)", "subjects referenced by morph strings only"],
-      "tables": ["audit_log"]
+      "layer": 1,
+      "phase": 0,
+      "namespace": "App\\Modules\\Audit",
+      "depends_on": [
+        "shared"
+      ],
+      "needs": {
+        "shared": [
+          "ActorContext"
+        ]
+      },
+      "provides": [
+        "AuditedAction::run(callable, subject, action) with before/after JSONB snapshots",
+        "audit_log append-only (DB trigger)",
+        "subjects referenced by morph strings only"
+      ],
+      "tables": [
+        "audit_log"
+      ]
     },
     "identity": {
-      "layer": 2, "phase": 0, "namespace": "App\\Modules\\Identity",
-      "depends_on": ["shared", "audit"],
-      "needs": {"shared": ["CurrentBranch", "BranchScoped"], "audit": ["AuditedAction for user/role/short-code changes"]},
-      "provides": ["authenticate(phone, password) -> bearer token", "verifyShortCode(branch, code) -> User; argon2id; 5 attempts then 15-min lockout", "ActingAsSession::start(user, 10 min)", "can(user, permission, ?station)", "verifyPinFor(permission, pin) -> User", "assignedUsers(station)", "canCount(user, station)", "isOverseer(user, station)", "devices table + optional X-Device-Id (enforced Phase 5)", "interface StationPresenceResolver::onDuty(station)", "interface ShiftAttacher::attach(user, station)"],
-      "tables": ["users", "roles", "permissions", "model_has_roles", "model_has_permissions", "role_has_permissions", "user_station_assignments", "devices", "acting_sessions"]
+      "layer": 2,
+      "phase": 0,
+      "namespace": "App\\Modules\\Identity",
+      "depends_on": [
+        "shared",
+        "audit"
+      ],
+      "needs": {
+        "shared": [
+          "CurrentBranch",
+          "BranchScoped"
+        ],
+        "audit": [
+          "AuditedAction for user/role/short-code changes"
+        ]
+      },
+      "provides": [
+        "authenticate(phone, password) -> bearer token",
+        "verifyShortCode(branch, code) -> User; argon2id; 5 attempts then 15-min lockout",
+        "ActingAsSession::start(user, 10 min)",
+        "can(user, permission, ?station)",
+        "verifyPinFor(permission, pin) -> User",
+        "assignedUsers(station)",
+        "canCount(user, station)",
+        "isOverseer(user, station)",
+        "devices table + optional X-Device-Id (enforced Phase 5)",
+        "interface StationPresenceResolver::onDuty(station)",
+        "interface ShiftAttacher::attach(user, station)",
+        "Phase 2 default bindings AssignedUsersResolver (StationPresenceResolver) and NullShiftAttacher (ShiftAttacher) live HERE, not in Production, so the production->identity contract can be green with zero Production code; Phase 3 rebinds to Shifts"
+      ],
+      "tables": [
+        "users",
+        "roles",
+        "permissions",
+        "model_has_roles",
+        "model_has_permissions",
+        "role_has_permissions",
+        "user_station_assignments",
+        "devices",
+        "acting_sessions"
+      ]
     },
     "catalog": {
-      "layer": 3, "phase": 0, "namespace": "App\\Modules\\Catalog",
-      "depends_on": ["identity", "shared", "audit"],
-      "needs": {"identity": ["can(user, 'catalog.manage')"], "shared": ["Bilingual", "Quantity", "Money"], "audit": ["AuditedAction"]},
-      "provides": ["items CRUD with kind, default_batch_qty, is_new_until", "Units::toBase(qty, unit) -> Quantity", "Prices::at(item, at) -> Money", "Recipes::activeFor(product) -> ?Recipe{version, yield, lines in base units}", "Recipes::version(product, n)", "Routing::stationFor(item) -> ?Station", "Modifiers::for(item) with price and recipe deltas", "Items::isNew(item)", "Items::activeAtLocationType(type)"],
-      "tables": ["categories", "units", "items", "item_prices", "item_station_assignments", "recipes", "recipe_lines", "recipe_steps", "modifiers"]
+      "layer": 3,
+      "phase": 0,
+      "namespace": "App\\Modules\\Catalog",
+      "depends_on": [
+        "identity",
+        "shared",
+        "audit"
+      ],
+      "needs": {
+        "identity": [
+          "can(user, 'catalog.manage')"
+        ],
+        "shared": [
+          "Bilingual",
+          "Quantity",
+          "Money"
+        ],
+        "audit": [
+          "AuditedAction"
+        ]
+      },
+      "provides": [
+        "items CRUD with kind, default_batch_qty, is_new_until",
+        "items.fulfilment enum to_order | to_stock | bought_in (a sandwich runs out when an ingredient does; a cake when finished goods hit 0; water when on_hand hits 0)",
+        "items.production_station_id (nullable) + Routing::productionStationFor(item): the station that MAKES a display-case product (cake -> cake_room) even though Routing::stationFor is null for it (no KDS step)",
+        "Units::toBase(qty, unit) -> Quantity",
+        "Prices::at(item, at) -> Money",
+        "Recipes::activeFor(product) -> ?Recipe{version, yield, lines in base units}",
+        "Recipes::version(product, n)",
+        "Routing::stationFor(item) -> ?Station",
+        "Modifiers::for(item) with price and recipe deltas",
+        "Items::isNew(item)",
+        "Items::activeAtLocationType(type)"
+      ],
+      "tables": [
+        "categories",
+        "units",
+        "items",
+        "item_prices",
+        "item_station_assignments",
+        "recipes",
+        "recipe_lines",
+        "recipe_steps",
+        "modifiers"
+      ]
     },
     "inventory": {
-      "layer": 4, "phase": 0, "namespace": "App\\Modules\\Inventory",
-      "depends_on": ["catalog", "identity", "shared", "audit"],
-      "needs": {"catalog": ["Recipes::activeFor", "Units::toBase", "Items::kind"], "identity": ["can(user, 'inventory.*')"], "shared": ["ActorContext (stamps shift_instance_id, user_id, station_id)", "Quantity"], "audit": ["AuditedAction"]},
-      "provides": ["Ledger::append(MovementIntent) / appendMany([...]) as the ONLY writer of stock_movements", "Ledger::lock(items x locations) in ascending (item_id, location_id) order", "Stock::of(item, location) -> {on_hand, reserved, available}", "Stock::balanceAt(item|location, timestamp)", "Reservations::reserve(lines[], ref) -> ok | Shortfall{ingredient, qty_short, station}", "Reservations::release(ref) idempotent", "Reservations::consume(ref, actual[])", "Availability::ofProduct(product, location) / bulk(products[], location)", "Phase 2: Purchases::confirm, Transfers::request/confirm, Costs::movingAverage, RecipeCost::rollUp, ReorderRules::evaluate"],
-      "events": ["StockChanged", "StockLow", "StockOut"],
-      "tables": ["locations", "stock_movements", "stock_balances", "item_stock_view (materialized)", "suppliers", "purchases", "purchase_lines", "item_costs", "transfers", "reorder_rules", "stock_alert_states"]
+      "layer": 4,
+      "phase": 0,
+      "namespace": "App\\Modules\\Inventory",
+      "depends_on": [
+        "catalog",
+        "identity",
+        "shared",
+        "audit"
+      ],
+      "needs": {
+        "catalog": [
+          "Recipes::activeFor",
+          "Units::toBase",
+          "Items::kind"
+        ],
+        "identity": [
+          "can(user, 'inventory.*')"
+        ],
+        "shared": [
+          "ActorContext (stamps shift_instance_id, user_id, station_id)",
+          "Quantity"
+        ],
+        "audit": [
+          "AuditedAction"
+        ]
+      },
+      "provides": [
+        "Ledger::append(MovementIntent) / appendMany([...]) as the ONLY writer of stock_movements",
+        "Ledger::lock(items x locations) in ascending (item_id, location_id) order",
+        "Stock::of(item, location) -> {on_hand, reserved, available}",
+        "Stock::balanceAt(item|location, timestamp)",
+        "Reservations::reserve(lines[], ref) -> ok | Shortfall{ingredient, qty_short, station}",
+        "Reservations::release(ref) idempotent",
+        "Reservations::consume(ref, actual[])",
+        "Availability::ofProduct(product, location) / bulk(products[], location) (branches on items.fulfilment: to_order = floor(min(available ingredient / qty)), to_stock and bought_in = on_hand of the product at its location)",
+        "Phase 2: Purchases::confirm, Transfers::request/confirm, Costs::movingAverage, RecipeCost::rollUp, ReorderRules::evaluate"
+      ],
+      "events": [
+        "StockChanged",
+        "StockLow",
+        "StockOut"
+      ],
+      "tables": [
+        "locations",
+        "stock_movements",
+        "stock_balances",
+        "item_stock_view (materialized)",
+        "suppliers",
+        "purchases",
+        "purchase_lines",
+        "item_costs",
+        "transfers",
+        "reorder_rules",
+        "stock_alert_states"
+      ]
     },
     "orders": {
-      "layer": 5, "phase": 1, "namespace": "App\\Modules\\Orders",
-      "depends_on": ["inventory", "catalog", "identity", "shared", "audit"],
-      "event_only": ["payments"],
-      "needs": {"inventory": ["Reservations::reserve/release/consume", "Availability::bulk", "Ledger::append(sale)"], "catalog": ["Prices::at(now) snapshot", "Recipes::activeFor (snapshot recipe_version on line)", "Routing::stationFor", "Modifiers::for"], "identity": ["verifyShortCode", "ActingAsSession", "can(user, 'orders.*', station)", "verifyPinFor('orders.void')"], "shared": ["ActorContext", "Idempotency", "Broadcast::station/user"], "payments": ["listens to PaymentRecorded -> markPaidIfSettled"]},
-      "provides": ["order + order_line state machines", "SendOrder (one transaction: lock, availability, reserve, events)", "LineAccepted/Ready(consume)/Rejected(release)/Served", "Void(reason, pin)", "Tickets::since(station, cursor)", "Orders::totals(order)", "Orders::openAt(station, time)", "Phase 4: Orders::refund(order, reason, pin)"],
-      "events": ["OrderSent", "LineAccepted", "LineReady", "LineRejected", "OrderPaid", "OrderVoided"],
-      "tables": ["orders", "order_lines", "order_line_modifiers", "order_events"]
+      "layer": 5,
+      "phase": 1,
+      "namespace": "App\\Modules\\Orders",
+      "depends_on": [
+        "inventory",
+        "catalog",
+        "identity",
+        "shared",
+        "audit"
+      ],
+      "event_only": [
+        "payments"
+      ],
+      "needs": {
+        "inventory": [
+          "Reservations::reserve/release/consume",
+          "Availability::bulk",
+          "Ledger::append(sale)"
+        ],
+        "catalog": [
+          "Prices::at(now) snapshot",
+          "Recipes::activeFor (snapshot recipe_version on line)",
+          "Routing::stationFor",
+          "Modifiers::for"
+        ],
+        "identity": [
+          "verifyShortCode",
+          "ActingAsSession",
+          "can(user, 'orders.*', station)",
+          "verifyPinFor('orders.void')"
+        ],
+        "shared": [
+          "ActorContext",
+          "Idempotency",
+          "Broadcast::station/user"
+        ],
+        "payments": [
+          "listens to PaymentRecorded -> markPaidIfSettled"
+        ]
+      },
+      "provides": [
+        "order + order_line state machines",
+        "SendOrder (one transaction: lock, availability, reserve, events)",
+        "LineAccepted/Ready(consume)/Rejected(release)/Served",
+        "Void(reason, pin)",
+        "Tickets::since(station, cursor)",
+        "Orders::totals(order)",
+        "Orders::openAt(station, time)",
+        "Phase 4: Orders::refund(order, reason, pin)"
+      ],
+      "events": [
+        "OrderSent",
+        "LineAccepted",
+        "LineReady",
+        "LineRejected",
+        "OrderPaid",
+        "OrderVoided"
+      ],
+      "tables": [
+        "orders",
+        "order_lines",
+        "order_line_modifiers",
+        "order_events"
+      ]
     },
     "payments": {
-      "layer": 6, "phase": 1, "full_phase": 4, "namespace": "App\\Modules\\Payments",
-      "depends_on": ["orders", "identity", "shared", "audit"],
-      "needs": {"orders": ["Orders::totals(order) -> {total, paid, balance}", "Phase 4: Orders::refund"], "identity": ["can('payments.take')", "verifyPinFor('payments.void')"], "shared": ["Files::put (Phase 4)", "Idempotency"]},
-      "provides": ["Channels::enabled()", "Payments::record(order, channel, amount, reference?, photo?) enforcing requires_photo / requires_reference", "Payments::balanceDue(order)", "verify / dispute", "void / refund (Phase 4)", "Totals::byChannel(date | shift_instance)", "Totals::cash(shift_instance)"],
-      "events": ["PaymentRecorded", "PaymentVoided"],
-      "tables": ["payment_channels", "payments"]
+      "layer": 6,
+      "phase": 1,
+      "full_phase": 4,
+      "namespace": "App\\Modules\\Payments",
+      "depends_on": [
+        "orders",
+        "identity",
+        "shared",
+        "audit"
+      ],
+      "needs": {
+        "orders": [
+          "Orders::totals(order) -> {total, paid, balance}",
+          "Phase 4: Orders::refund"
+        ],
+        "identity": [
+          "can('payments.take')",
+          "verifyPinFor('payments.void')"
+        ],
+        "shared": [
+          "Files::put (Phase 4)",
+          "Idempotency"
+        ]
+      },
+      "provides": [
+        "Channels::enabled()",
+        "Payments::record(order, channel, amount, reference?, photo?) enforcing requires_photo / requires_reference",
+        "Payments::balanceDue(order)",
+        "verify / dispute",
+        "void / refund (Phase 4)",
+        "Totals::byChannel(date | shift_instance)",
+        "Totals::cash(shift_instance)"
+      ],
+      "events": [
+        "PaymentRecorded",
+        "PaymentVoided"
+      ],
+      "tables": [
+        "payment_channels",
+        "payments"
+      ]
     },
     "notifications": {
-      "layer": 5, "phase": 2, "namespace": "App\\Modules\\Notifications",
-      "depends_on": ["identity", "shared"],
-      "needs": {"identity": ["recipient resolution by role / station assignment", "StationPresenceResolver", "user locale"], "shared": ["Broadcast::user"]},
-      "subscribes": ["StockLow", "StockOut", "ProductionRequested", "ProductionAssigned", "CountSubmitted", "VarianceDecided", "LineReady", "LineRejected"],
-      "provides": ["Notifier::send(users, type, payload, deepLink)", "dedupe store keyed (item, location, type) reset on recovery", "drivers in_app, push (VAPID), telegram, sms behind one interface; array driver in CI"],
-      "tables": ["notifications", "notification_dedupe"]
+      "layer": 5,
+      "phase": 2,
+      "namespace": "App\\Modules\\Notifications",
+      "depends_on": [
+        "identity",
+        "shared"
+      ],
+      "needs": {
+        "identity": [
+          "recipient resolution by role / station assignment",
+          "StationPresenceResolver",
+          "user locale"
+        ],
+        "shared": [
+          "Broadcast::user"
+        ]
+      },
+      "subscribes": [
+        "StockLow",
+        "StockOut",
+        "ProductionRequested",
+        "ProductionAssigned",
+        "CountSubmitted",
+        "VarianceDecided",
+        "LineReady",
+        "LineRejected"
+      ],
+      "provides": [
+        "Notifier::send(users, type, payload, deepLink)",
+        "dedupe store keyed (item, location, type) reset on recovery",
+        "drivers in_app, push (VAPID), telegram, sms behind one interface; array driver in CI"
+      ],
+      "tables": [
+        "notifications",
+        "notification_dedupe"
+      ]
     },
     "production": {
-      "layer": 5, "phase": 2, "namespace": "App\\Modules\\Production",
-      "depends_on": ["inventory", "catalog", "identity", "shared", "audit"],
-      "event_only": ["notifications"], "interface_only": ["shifts"],
-      "needs": {"catalog": ["Recipes::activeFor scaled by yield", "items.default_batch_qty", "Routing::stationFor"], "inventory": ["Stock::of", "Ledger::appendMany (consume + output atomically)", "Transfers::request", "listens to StockOut"], "identity": ["assignedUsers(station)", "isOverseer", "can('production.fulfil', station)", "StationPresenceResolver::onDuty", "ShiftAttacher::attach (no-op until Phase 3)"], "shared": ["stations.requires_overseer"]},
-      "provides": ["production_request + batch state machines", "Requests::create(product, qty, due, reason)", "AutoRequest listener on StockOut (kind=product with non-empty recipe)", "Batches::confirm(batch, produced, waste)"],
-      "events": ["ProductionRequested", "ProductionAssigned", "BatchDone"],
-      "tables": ["production_requests", "production_batches"]
+      "layer": 5,
+      "phase": 2,
+      "namespace": "App\\Modules\\Production",
+      "depends_on": [
+        "inventory",
+        "catalog",
+        "identity",
+        "shared",
+        "audit"
+      ],
+      "event_only": [
+        "notifications"
+      ],
+      "interface_only": [
+        "shifts"
+      ],
+      "needs": {
+        "catalog": [
+          "Recipes::activeFor scaled by yield",
+          "items.default_batch_qty",
+          "Routing::stationFor"
+        ],
+        "inventory": [
+          "Stock::of",
+          "Ledger::appendMany (consume + output atomically)",
+          "Transfers::request",
+          "listens to StockOut"
+        ],
+        "identity": [
+          "assignedUsers(station)",
+          "isOverseer",
+          "can('production.fulfil', station)",
+          "StationPresenceResolver::onDuty",
+          "ShiftAttacher::attach (no-op until Phase 3)"
+        ],
+        "shared": [
+          "stations.requires_overseer"
+        ]
+      },
+      "provides": [
+        "production_request + batch state machines",
+        "Requests::create(product, qty, due, reason)",
+        "AutoRequest listener on StockOut (kind=product with non-empty recipe)",
+        "Batches::confirm(batch, produced, waste)"
+      ],
+      "events": [
+        "ProductionRequested",
+        "ProductionAssigned",
+        "BatchDone"
+      ],
+      "tables": [
+        "production_requests",
+        "production_batches"
+      ]
     },
     "shifts": {
-      "layer": 6, "phase": 3, "namespace": "App\\Modules\\Shifts",
-      "depends_on": ["inventory", "identity", "payments", "catalog", "shared", "audit"],
-      "needs": {"inventory": ["Stock::balanceAt(location, now) for expected closing", "Ledger::append(count_adjustment)", "movements by shift_instance_id for review summary"], "identity": ["canCount", "isOverseer", "roster users", "can('shifts.approve')"], "payments": ["Totals::cash(shift)", "Totals::byChannel(shift)"], "catalog": ["items held at a location type"], "shared": ["writes ActorContext.shift_instance_id via middleware"]},
-      "provides": ["Shifts::current(station) -> ?instance", "openAdHoc(station, user)", "Counts::submit/approve/reject/lock", "Locks::previousClosing(location)", "HashChain::verify(location)", "Replay::at(station, time)", "implements StationPresenceResolver (on-shift) and ShiftAttacher"],
-      "events": ["ShiftOpened", "CountSubmitted", "VarianceDecided", "ShiftLocked"],
-      "tables": ["shift_templates", "shift_instances", "shift_roster", "stock_counts", "stock_count_lines", "variance_reasons", "cash_declarations", "handover_notes"]
+      "layer": 6,
+      "phase": 3,
+      "namespace": "App\\Modules\\Shifts",
+      "depends_on": [
+        "inventory",
+        "identity",
+        "payments",
+        "catalog",
+        "shared",
+        "audit"
+      ],
+      "needs": {
+        "inventory": [
+          "Stock::balanceAt(location, now) for expected closing",
+          "Ledger::append(count_adjustment)",
+          "movements by shift_instance_id for review summary"
+        ],
+        "identity": [
+          "canCount",
+          "isOverseer",
+          "roster users",
+          "can('shifts.approve')"
+        ],
+        "payments": [
+          "Totals::cash(shift)",
+          "Totals::byChannel(shift)"
+        ],
+        "catalog": [
+          "items held at a location type"
+        ],
+        "shared": [
+          "writes ActorContext.shift_instance_id via middleware"
+        ]
+      },
+      "provides": [
+        "Shifts::current(station) -> ?instance",
+        "openAdHoc(station, user)",
+        "Counts::submit/approve/reject/lock",
+        "Locks::previousClosing(location)",
+        "HashChain::verify(location)",
+        "Replay::at(station, time)",
+        "implements StationPresenceResolver (on-shift) and ShiftAttacher"
+      ],
+      "events": [
+        "ShiftOpened",
+        "CountSubmitted",
+        "VarianceDecided",
+        "ShiftLocked"
+      ],
+      "tables": [
+        "shift_templates",
+        "shift_instances",
+        "shift_roster",
+        "stock_counts",
+        "stock_count_lines",
+        "variance_reasons",
+        "cash_declarations",
+        "handover_notes"
+      ]
     },
     "analytics": {
-      "layer": 7, "phase": 4, "namespace": "App\\Modules\\Analytics",
-      "depends_on": ["orders", "payments", "production", "inventory", "shifts", "catalog", "shared"],
+      "layer": 7,
+      "phase": 4,
+      "namespace": "App\\Modules\\Analytics",
+      "depends_on": [
+        "orders",
+        "payments",
+        "production",
+        "inventory",
+        "shifts",
+        "catalog",
+        "shared"
+      ],
       "read_only": true,
-      "needs": {"orders": ["Orders\\Facts::sales(range)"], "payments": ["Payments\\Facts::payments(range)"], "production": ["Production\\Facts::batches(range)"], "inventory": ["Inventory\\Facts::movements(range)", "Costs::movingAverage"], "shifts": ["Shifts\\Facts::instances(range)", "listens to ShiftLocked"], "catalog": ["names, categories"]},
-      "provides": ["summary tables", "Rebuild::day(branch, date) idempotent", "dashboard endpoints that read only summaries", "exports xlsx/pdf", "weekly summary job"],
-      "tables": ["daily_sales", "daily_station_metrics", "daily_item_metrics", "daily_channel_totals"]
+      "needs": {
+        "orders": [
+          "Orders\\Facts::sales(range)"
+        ],
+        "payments": [
+          "Payments\\Facts::payments(range)"
+        ],
+        "production": [
+          "Production\\Facts::batches(range)"
+        ],
+        "inventory": [
+          "Inventory\\Facts::movements(range)",
+          "Costs::movingAverage"
+        ],
+        "shifts": [
+          "Shifts\\Facts::instances(range)",
+          "listens to ShiftLocked"
+        ],
+        "catalog": [
+          "names, categories"
+        ]
+      },
+      "provides": [
+        "summary tables",
+        "Rebuild::day(branch, date) idempotent",
+        "dashboard endpoints that read only summaries",
+        "exports xlsx/pdf",
+        "weekly summary job"
+      ],
+      "tables": [
+        "daily_sales",
+        "daily_station_metrics",
+        "daily_item_metrics",
+        "daily_channel_totals"
+      ]
     }
   },
   "cycle_breaks": [
-    {"between": ["inventory", "shifts"], "problem": "movements carry shift_instance_id but Shifts arrives in Phase 3", "break": "nullable FK read from ActorContext; Phase 3 middleware fills it from Shifts::current; Phase 3 flips config ledger.require_shift_for_station_locations; pre-Phase-3 rows keep null", "closed_in_phase": 3},
-    {"between": ["orders", "payments"], "problem": "paid transition vs order totals", "break": "Payments imports Orders; Orders listens to PaymentRecorded and never imports Payments", "closed_in_phase": 1},
-    {"between": ["production", "shifts"], "problem": "Phase 2 needs on-shift users and ad-hoc shift opening, both Shifts concepts", "break": "interfaces StationPresenceResolver and ShiftAttacher live in Identity; Phase 2 binds AssignedUsersResolver + NullShiftAttacher; Phase 3 rebinds to Shifts; the contract test runs against both bindings", "closed_in_phase": 3},
-    {"between": ["audit", "*"], "problem": "Audit is used by everyone and needs shift/station/device", "break": "Audit is a leaf reading ActorContext; subjects by morph string; arch test forbids Audit using other modules", "closed_in_phase": 0},
-    {"between": ["catalog", "inventory"], "problem": "recipe cost roll-up needs moving-average purchase cost", "break": "RecipeCost lives in Inventory; the admin Catalog screen calls GET /inventory/recipe-costs/{product}", "closed_in_phase": 2},
-    {"between": ["orders", "production"], "problem": "both need product availability from recipe explosion", "break": "Availability lives in Inventory; neither consumer re-implements the math", "closed_in_phase": 1},
-    {"between": ["notifications", "*"], "problem": "every producer wants to notify", "break": "inbound by domain events with array payloads (ids + bilingual strings); Notifications imports no producer models", "closed_in_phase": 2},
-    {"between": ["identity", "*"], "problem": "station_id and device_id stamped before devices are managed", "break": "stations in Shared from Phase 0; devices table in Identity from Phase 0 with optional header; EnsureEnrolledDevice middleware enforced in Phase 5 behind a flag", "closed_in_phase": 5},
-    {"between": ["analytics", "*"], "problem": "needs costs (P2), shifts (P3), payments (P4)", "break": "Analytics is last and read-only through provider-owned Facts query classes, so a provider schema change fails the provider's own tests first", "closed_in_phase": 4}
+    {
+      "between": [
+        "inventory",
+        "shifts"
+      ],
+      "problem": "movements carry shift_instance_id but Shifts arrives in Phase 3",
+      "break": "nullable FK read from ActorContext; Phase 3 middleware fills it from Shifts::current; Phase 3 flips config ledger.require_shift_for_station_locations; pre-Phase-3 rows keep null",
+      "closed_in_phase": 3
+    },
+    {
+      "between": [
+        "orders",
+        "payments"
+      ],
+      "problem": "paid transition vs order totals",
+      "break": "Payments imports Orders; Orders listens to PaymentRecorded and never imports Payments",
+      "closed_in_phase": 1
+    },
+    {
+      "between": [
+        "production",
+        "shifts"
+      ],
+      "problem": "Phase 2 needs on-shift users and ad-hoc shift opening, both Shifts concepts",
+      "break": "interfaces StationPresenceResolver and ShiftAttacher live in Identity; Phase 2 binds AssignedUsersResolver + NullShiftAttacher; Phase 3 rebinds to Shifts; the contract test runs against both bindings",
+      "closed_in_phase": 3
+    },
+    {
+      "between": [
+        "audit",
+        "*"
+      ],
+      "problem": "Audit is used by everyone and needs shift/station/device",
+      "break": "Audit is a leaf reading ActorContext; subjects by morph string; arch test forbids Audit using other modules",
+      "closed_in_phase": 0
+    },
+    {
+      "between": [
+        "catalog",
+        "inventory"
+      ],
+      "problem": "recipe cost roll-up needs moving-average purchase cost",
+      "break": "RecipeCost lives in Inventory; the admin Catalog screen calls GET /inventory/recipe-costs/{product}",
+      "closed_in_phase": 2
+    },
+    {
+      "between": [
+        "orders",
+        "production"
+      ],
+      "problem": "both need product availability from recipe explosion",
+      "break": "Availability lives in Inventory; neither consumer re-implements the math",
+      "closed_in_phase": 1
+    },
+    {
+      "between": [
+        "notifications",
+        "*"
+      ],
+      "problem": "every producer wants to notify",
+      "break": "inbound by domain events with array payloads (ids + bilingual strings); Notifications imports no producer models",
+      "closed_in_phase": 2
+    },
+    {
+      "between": [
+        "identity",
+        "*"
+      ],
+      "problem": "station_id and device_id stamped before devices are managed",
+      "break": "stations in Shared from Phase 0; devices table in Identity from Phase 0 with optional header; EnsureEnrolledDevice middleware enforced in Phase 5 behind a flag",
+      "closed_in_phase": 5
+    },
+    {
+      "between": [
+        "analytics",
+        "*"
+      ],
+      "problem": "needs costs (P2), shifts (P3), payments (P4)",
+      "break": "Analytics is last and read-only through provider-owned Facts query classes, so a provider schema change fails the provider's own tests first",
+      "closed_in_phase": 4
+    }
   ],
   "contracts": {
-    "inventory->catalog": {"phase": 0, "file": "apps/api/tests/Contract/Inventory/CatalogContractTest.php", "cases": ["Recipes::activeFor returns lines converted to base units", "Units::toBase round-trips to 4 dp for every seeded unit", "empty recipe for bought-in product returns null lines, not an exception"]},
-    "catalog->identity": {"phase": 0, "file": "apps/api/tests/Contract/Catalog/IdentityContractTest.php", "cases": ["every catalog write returns 403 for non-admin roles", "admin passes can('catalog.manage')"]},
-    "orders->inventory": {"phase": 1, "file": "apps/api/tests/Contract/Orders/InventoryContractTest.php", "cases": ["reserve() for two lines sharing an ingredient reserves the sum", "Shortfall names ingredient, qty_short in base unit and station", "release(ref) twice is a no-op", "consume(ref, actual) writes exactly one production_consume per ingredient and reduces reserved by the reserved amount", "lock order is deterministic: 50 interleavings never deadlock", "Availability::bulk matches floor(min(available / qty_per_unit))"]},
-    "orders->catalog": {"phase": 1, "file": "apps/api/tests/Contract/Orders/CatalogContractTest.php", "cases": ["Prices::at(sent_at) returns the price effective then, not now", "Routing::stationFor is null for display-case products", "Modifiers::for returns price and recipe deltas in base units"]},
-    "orders->identity": {"phase": 1, "file": "apps/api/tests/Contract/Orders/IdentityContractTest.php", "cases": ["verifyShortCode rejects a code from another branch", "acting-as session expires at 10 minutes", "verifyPinFor('orders.void') accepts manager, rejects cashier"]},
-    "payments->orders": {"phase": 1, "full_phase": 4, "file": "apps/api/tests/Contract/Payments/OrdersContractTest.php", "cases": ["Orders::totals returns total, paid, balance as decimal strings", "PaymentRecorded with balance zero moves the order to paid and writes sale movements for display-case lines", "Phase 4: Orders::refund writes reversing movements referencing originals and leaves originals untouched"]},
-    "production->inventory": {"phase": 2, "file": "apps/api/tests/Contract/Production/InventoryContractTest.php", "cases": ["appendMany is all-or-nothing: a failure on the last movement leaves zero rows", "Stock::of reflects a purchase_in immediately", "StockOut fires exactly once when available crosses to 0 and not again until it rises above 0"]},
-    "production->catalog": {"phase": 2, "file": "apps/api/tests/Contract/Production/CatalogContractTest.php", "cases": ["recipe with yield 40 scaled to 60 multiplies every line by 1.5 in base units", "default_batch_qty is present for every produced product"]},
-    "production->identity": {"phase": 2, "file": "apps/api/tests/Contract/Production/IdentityContractTest.php", "cases": ["assignedUsers(station) excludes inactive users", "isOverseer is per station", "StationPresenceResolver::onDuty returns assigned users under the Phase 2 binding"]},
-    "notifications->identity": {"phase": 2, "file": "apps/api/tests/Contract/Notifications/IdentityContractTest.php", "cases": ["recipients by role and by station assignment", "locale drives which of _en/_am is rendered"]},
-    "shifts->inventory": {"phase": 3, "file": "apps/api/tests/Contract/Shifts/InventoryContractTest.php", "cases": ["balanceAt(location, t) equals the sum of movements with created_at <= t", "Ledger::append accepts count_adjustment with ref_type=stock_count_line"]},
-    "shifts->identity": {"phase": 3, "file": "apps/api/tests/Contract/Shifts/IdentityContractTest.php", "cases": ["canCount and isOverseer per station", "StationPresenceResolver can be rebound to the Shifts implementation and the Production contract still passes"]},
-    "shifts->payments": {"phase": 3, "file": "apps/api/tests/Contract/Shifts/PaymentsContractTest.php", "cases": ["Totals::cash(shift) sums only non-voided cash payments whose order carries that shift", "Totals::byChannel(shift) counts and sums per channel"]},
-    "analytics->facts": {"phase": 4, "file": "apps/api/tests/Contract/Analytics/FactsContractTest.php", "cases": ["every Facts port returns stable shapes bucketed by Africa/Addis_Ababa day", "facts exclude voided payments and cancelled orders"]}
+    "inventory->catalog": {
+      "phase": 0,
+      "file": "apps/api/tests/Contract/Inventory/CatalogContractTest.php",
+      "cases": [
+        "Recipes::activeFor returns lines converted to base units",
+        "Units::toBase round-trips to 4 dp for every seeded unit",
+        "empty recipe for bought-in product returns null lines, not an exception"
+      ]
+    },
+    "catalog->identity": {
+      "phase": 0,
+      "file": "apps/api/tests/Contract/Catalog/IdentityContractTest.php",
+      "cases": [
+        "every catalog write returns 403 for non-admin roles",
+        "admin passes can('catalog.manage')"
+      ]
+    },
+    "orders->inventory": {
+      "phase": 1,
+      "file": "apps/api/tests/Contract/Orders/InventoryContractTest.php",
+      "cases": [
+        "reserve() for two lines sharing an ingredient reserves the sum",
+        "Shortfall names ingredient, qty_short in base unit and station",
+        "release(ref) twice is a no-op",
+        "consume(ref, actual) writes exactly one production_consume per ingredient and reduces reserved by the reserved amount",
+        "lock order is deterministic: 50 interleavings never deadlock",
+        "Availability::bulk matches floor(min(available / qty_per_unit))"
+      ]
+    },
+    "orders->catalog": {
+      "phase": 1,
+      "file": "apps/api/tests/Contract/Orders/CatalogContractTest.php",
+      "cases": [
+        "Prices::at(sent_at) returns the price effective then, not now",
+        "Routing::stationFor is null for display-case products",
+        "Modifiers::for returns price and recipe deltas in base units"
+      ]
+    },
+    "orders->identity": {
+      "phase": 1,
+      "file": "apps/api/tests/Contract/Orders/IdentityContractTest.php",
+      "cases": [
+        "verifyShortCode rejects a code from another branch",
+        "acting-as session expires at 10 minutes",
+        "verifyPinFor('orders.void') accepts manager, rejects cashier"
+      ]
+    },
+    "payments->orders": {
+      "phase": 1,
+      "full_phase": 4,
+      "file": "apps/api/tests/Contract/Payments/OrdersContractTest.php",
+      "cases": [
+        "Orders::totals returns total, paid, balance as decimal strings",
+        "PaymentRecorded with balance zero moves the order to paid and writes sale movements for display-case lines",
+        "Phase 4: Orders::refund writes reversing movements referencing originals and leaves originals untouched"
+      ]
+    },
+    "production->inventory": {
+      "phase": 2,
+      "file": "apps/api/tests/Contract/Production/InventoryContractTest.php",
+      "cases": [
+        "appendMany is all-or-nothing: a failure on the last movement leaves zero rows",
+        "Stock::of reflects a purchase_in immediately",
+        "StockOut fires exactly once when available crosses to 0 and not again until it rises above 0",
+        "Availability for a to_stock product equals its finished-goods on_hand at the display_case location"
+      ]
+    },
+    "production->catalog": {
+      "phase": 2,
+      "file": "apps/api/tests/Contract/Production/CatalogContractTest.php",
+      "cases": [
+        "recipe with yield 40 scaled to 60 multiplies every line by 1.5 in base units",
+        "default_batch_qty is present for every produced product",
+        "Routing::productionStationFor(cake) returns the cake_room station although Routing::stationFor(cake) is null"
+      ]
+    },
+    "production->identity": {
+      "phase": 2,
+      "file": "apps/api/tests/Contract/Production/IdentityContractTest.php",
+      "cases": [
+        "assignedUsers(station) excludes inactive users",
+        "isOverseer is per station",
+        "StationPresenceResolver::onDuty returns assigned users under the Phase 2 binding"
+      ]
+    },
+    "notifications->identity": {
+      "phase": 2,
+      "file": "apps/api/tests/Contract/Notifications/IdentityContractTest.php",
+      "cases": [
+        "recipients by role and by station assignment",
+        "locale drives which of _en/_am is rendered"
+      ]
+    },
+    "shifts->inventory": {
+      "phase": 3,
+      "file": "apps/api/tests/Contract/Shifts/InventoryContractTest.php",
+      "cases": [
+        "balanceAt(location, t) equals the sum of movements with created_at <= t",
+        "Ledger::append accepts count_adjustment with ref_type=stock_count_line"
+      ]
+    },
+    "shifts->identity": {
+      "phase": 3,
+      "file": "apps/api/tests/Contract/Shifts/IdentityContractTest.php",
+      "cases": [
+        "canCount and isOverseer per station",
+        "StationPresenceResolver can be rebound to the Shifts implementation and the Production contract still passes"
+      ]
+    },
+    "shifts->payments": {
+      "phase": 3,
+      "file": "apps/api/tests/Contract/Shifts/PaymentsContractTest.php",
+      "cases": [
+        "Totals::cash(shift) sums only non-voided cash payments whose order carries that shift",
+        "Totals::byChannel(shift) counts and sums per channel"
+      ]
+    },
+    "analytics->facts": {
+      "phase": 4,
+      "file": "apps/api/tests/Contract/Analytics/FactsContractTest.php",
+      "cases": [
+        "every Facts port returns stable shapes bucketed by Africa/Addis_Ababa day",
+        "facts exclude voided payments and cancelled orders"
+      ]
+    }
   },
   "phases": {
     "0": {
-      "name": "Foundations and ledger", "weeks": "1-2",
-      "entry": ["empty repo", "Docker Desktop running", "scripts/doctor passes (PHP 8.3 in container, Node 24 on host, LF endings, .env present)"],
-      "contracts_required": ["inventory->catalog", "catalog->identity"],
+      "name": "Foundations and ledger",
+      "weeks": "1-2",
+      "entry": [
+        "empty repo",
+        "Docker Desktop running",
+        "scripts/doctor passes (PHP 8.3 in container, Node 24 on host, LF endings, .env present)"
+      ],
+      "contracts_required": [
+        "inventory->catalog",
+        "catalog->identity"
+      ],
       "steps": [
-        {"id": "0.1", "module": "repo", "builds": "monorepo layout apps/api + apps/web, compose.yml + compose.ci.yml, .gitattributes LF, Makefile + scripts wrappers that run PHP only in Docker, CI workflow with lint jobs green on commit 1"},
-        {"id": "0.2", "module": "shared", "builds": "branches, stations, BranchScoped, Bilingual, Quantity/Money, StateMachine, Idempotency middleware + table, ActorContext (scoped, Octane-safe), migration-lint, arch-test skeleton, invariants skeleton", "pest_groups": ["arch", "invariants", "unit"]},
-        {"id": "0.3", "module": "audit", "builds": "audit_log with append-only trigger, AuditedAction, activitylog config decision (ADR)", "pest_groups": ["unit", "feature", "invariants"]},
-        {"id": "0.4", "module": "identity", "builds": "users (phone), Sanctum bearer tokens, roles/permissions seeded from the section 7 matrix, short code set/verify/lockout, acting-as session, user_station_assignments, devices (optional header), GET /me", "pest_groups": ["module:identity", "feature"]},
-        {"id": "0.5", "module": "catalog", "builds": "units (toBase), categories, items (kind, default_batch_qty, is_new_until), item_prices + Prices::at, item_station_assignments, recipes + recipe_lines v1 with activeFor, modifiers schema", "pest_groups": ["module:catalog", "contract:catalog->identity"]},
-        {"id": "0.6", "module": "inventory", "builds": "locations, stock_movements (append-only trigger; reasons incl. reservation, reservation_release), stock_balances, item_stock_view, Ledger, Reservations, Availability, Stock::balanceAt", "pest_groups": ["module:inventory", "property", "concurrency", "contract:inventory->catalog"]},
-        {"id": "0.7", "module": "web", "builds": "next-intl en/am, Noto Sans Ethiopic, /login, /admin with Catalog CRUD (both kinds) and People minimal, TS client generated from OpenAPI", "playwright": ["p0-admin-smoke"]},
-        {"id": "0.8", "module": "seeds", "builds": "Phase0Seeder: 1 branch, 6 stations, 7 locations, units, categories, ~30 items, prices, recipes for 5 products, one user per role with short codes"},
-        {"id": "0.9", "module": "docs", "builds": "ADR 0001-0005, docs/openapi.json, docs/erd.dbml, STATUS.json, phase-0-report.md"}
+        {
+          "id": "0.1",
+          "module": "repo",
+          "builds": "monorepo layout apps/api + apps/web, compose.yml + compose.ci.yml, .gitattributes LF, Makefile + scripts wrappers that run PHP only in Docker, CI workflow with lint jobs green on commit 1"
+        },
+        {
+          "id": "0.2",
+          "module": "shared",
+          "builds": "branches, stations, BranchScoped, Bilingual, Quantity/Money, StateMachine, Idempotency middleware + table, ActorContext (scoped, Octane-safe), migration-lint, arch-test skeleton, invariants skeleton",
+          "pest_groups": [
+            "arch",
+            "invariants",
+            "unit"
+          ]
+        },
+        {
+          "id": "0.3",
+          "module": "audit",
+          "builds": "audit_log with append-only trigger, AuditedAction, activitylog config decision (ADR)",
+          "pest_groups": [
+            "unit",
+            "feature",
+            "invariants"
+          ]
+        },
+        {
+          "id": "0.4",
+          "module": "identity",
+          "builds": "users (phone), Sanctum bearer tokens, roles/permissions seeded from the section 7 matrix, short code set/verify/lockout, acting-as session, user_station_assignments, devices (optional header), GET /me; AssignedUsersResolver + NullShiftAttacher default bindings for the two interfaces",
+          "pest_groups": [
+            "module:identity",
+            "feature"
+          ]
+        },
+        {
+          "id": "0.5",
+          "module": "catalog",
+          "builds": "units (toBase), categories, items (kind, fulfilment, default_batch_qty, is_new_until, production_station_id), item_prices + Prices::at, item_station_assignments, recipes + recipe_lines v1 with activeFor, modifiers schema",
+          "pest_groups": [
+            "module:catalog",
+            "contract:catalog->identity"
+          ]
+        },
+        {
+          "id": "0.6",
+          "module": "inventory",
+          "builds": "locations, stock_movements (append-only trigger; reasons incl. reservation, reservation_release), stock_balances, item_stock_view, Ledger, Reservations, Availability, Stock::balanceAt",
+          "pest_groups": [
+            "module:inventory",
+            "property",
+            "concurrency",
+            "contract:inventory->catalog"
+          ]
+        },
+        {
+          "id": "0.7",
+          "module": "web",
+          "builds": "next-intl en/am, Noto Sans Ethiopic, /login, /admin with Catalog CRUD (both kinds) and People minimal, TS client generated from OpenAPI",
+          "playwright": [
+            "p0-admin-smoke"
+          ]
+        },
+        {
+          "id": "0.8",
+          "module": "seeds",
+          "builds": "Phase0Seeder: 1 branch, 6 stations, 7 locations, units, categories, ~30 items, prices, recipes for 5 products, one user per role with short codes"
+        },
+        {
+          "id": "0.9",
+          "module": "docs",
+          "builds": "ADR 0001-0005, docs/openapi.json, docs/erd.dbml, STATUS.json, phase-0-report.md"
+        }
       ],
       "gate": {
-        "pest_group": "gate:p0", "ci_job": "gate-p0", "playwright_projects": ["p0-admin-smoke"],
+        "pest_group": "gate:p0",
+        "ci_job": "gate-p0",
+        "playwright_projects": [
+          "p0-admin-smoke"
+        ],
         "criteria": [
           "LedgerPropertiesTest: 200 random movement sequences over 5 items x 3 locations keep sum(movements) == stock_balances == item_stock_view",
           "ReservationPropertyTest: random reserve/release/consume never produce available < 0; over-reserve returns Shortfall{ingredient, qty_short, station}",
@@ -169,23 +852,92 @@
           "arch, invariants, migration-lint and route-permission coverage all green"
         ]
       },
-      "adrs": ["0001-modular-monolith-and-module-boundaries", "0002-stock-balances-table-vs-materialized-view", "0003-idempotency-and-client-uuid", "0004-numeric-as-string-end-to-end", "0005-phase-gates-and-ci"]
+      "adrs": [
+        "0001-modular-monolith-and-module-boundaries",
+        "0002-stock-balances-table-vs-materialized-view",
+        "0003-idempotency-and-client-uuid",
+        "0004-numeric-as-string-end-to-end",
+        "0005-phase-gates-and-ci"
+      ]
     },
     "1": {
-      "name": "Ordering and live KDS", "weeks": "3-5",
-      "entry": ["gate-p0 green on main", "phase-1-plan.md approved", "contract:orders->inventory, orders->catalog, orders->identity green with no Orders code yet"],
-      "contracts_required": ["orders->inventory", "orders->catalog", "orders->identity", "payments->orders"],
+      "name": "Ordering and live KDS",
+      "weeks": "3-5",
+      "entry": [
+        "gate-p0 green on main",
+        "phase-1-plan.md approved",
+        "contract:orders->inventory, orders->catalog, orders->identity green with no Orders code yet"
+      ],
+      "contracts_required": [
+        "orders->inventory",
+        "orders->catalog",
+        "orders->identity",
+        "payments->orders"
+      ],
       "steps": [
-        {"id": "1.1", "module": "contracts", "builds": "tests/Contract/Orders/{Inventory,Catalog,Identity}ContractTest.php green against unchanged providers"},
-        {"id": "1.2", "module": "shared.broadcast", "builds": "Reverb config, private channel auth for station.{id}, user.{id}, branch.{id}.stock", "pest_groups": ["feature"]},
-        {"id": "1.3", "module": "orders", "builds": "orders, order_lines (unit_price_snapshot, recipe_version, station_id, client_uuid), order_events; both state machines; SendOrder; accept / ready (consume) / reject (release) / served; void with manager PIN (unpaid only); Tickets::since", "pest_groups": ["module:orders", "unit", "feature", "concurrency"]},
-        {"id": "1.4", "module": "payments", "builds": "final schema for payment_channels (seeded with the 8 channels, requires_photo / requires_reference) and payments; POST /orders/{id}/payments where only cash can pass validation yet; PaymentRecorded -> Orders paid -> sale movements for display-case lines -> closed", "pest_groups": ["module:payments", "contract:payments->orders"]},
-        {"id": "1.5", "module": "read-models", "builds": "GET /menu?location, GET /stations/{id}/tickets?since, GET /orders?mine|unpaid", "pest_groups": ["feature"]},
-        {"id": "1.6", "module": "web", "builds": "/pad, /kds/kitchen, /kds/bar, /till (cash pay), Echo client, Workbox shell cache, minimal outbox (send, accept, ready) with client UUID + Idempotency-Key, admin Orders board", "playwright": ["p1-order-flow", "p1-shortfall"]},
-        {"id": "1.7", "module": "docs", "builds": "Phase1Seeder (tables, open orders), ADR 0006 reserve-at-send / consume-at-ready / sale-at-pay, ADR 0007 bearer tokens not SPA cookies, OpenAPI, ERD, report"}
+        {
+          "id": "1.1",
+          "module": "contracts",
+          "builds": "tests/Contract/Orders/{Inventory,Catalog,Identity}ContractTest.php green against unchanged providers"
+        },
+        {
+          "id": "1.2",
+          "module": "shared.broadcast",
+          "builds": "Reverb config, private channel auth for station.{id}, user.{id}, branch.{id}.stock",
+          "pest_groups": [
+            "feature"
+          ]
+        },
+        {
+          "id": "1.3",
+          "module": "orders",
+          "builds": "orders, order_lines (unit_price_snapshot, recipe_version, station_id, client_uuid), order_events; both state machines; SendOrder; accept / ready (consume) / reject (release) / served; void with manager PIN (unpaid only); Tickets::since",
+          "pest_groups": [
+            "module:orders",
+            "unit",
+            "feature",
+            "concurrency"
+          ]
+        },
+        {
+          "id": "1.4",
+          "module": "payments",
+          "builds": "final schema for payment_channels (seeded with the 8 channels, requires_photo / requires_reference) and payments; POST /orders/{id}/payments where only cash can pass validation yet; PaymentRecorded -> Orders paid -> sale movements for display-case lines -> closed",
+          "pest_groups": [
+            "module:payments",
+            "contract:payments->orders"
+          ]
+        },
+        {
+          "id": "1.5",
+          "module": "read-models",
+          "builds": "GET /menu?location, GET /stations/{id}/tickets?since, GET /orders?mine|unpaid",
+          "pest_groups": [
+            "feature"
+          ]
+        },
+        {
+          "id": "1.6",
+          "module": "web",
+          "builds": "/pad, /kds/kitchen, /kds/bar, /till (cash pay), Echo client, Workbox shell cache, minimal outbox (send, accept, ready) with client UUID + Idempotency-Key, admin Orders board",
+          "playwright": [
+            "p1-order-flow",
+            "p1-shortfall"
+          ]
+        },
+        {
+          "id": "1.7",
+          "module": "docs",
+          "builds": "Phase1Seeder (tables, open orders), ADR 0006 reserve-at-send / consume-at-ready / sale-at-pay, ADR 0007 bearer tokens not SPA cookies, OpenAPI, ERD, report"
+        }
       ],
       "gate": {
-        "pest_group": "gate:p1", "ci_job": "gate-p1", "playwright_projects": ["p1-order-flow", "p1-shortfall"],
+        "pest_group": "gate:p1",
+        "ci_job": "gate-p1",
+        "playwright_projects": [
+          "p1-order-flow",
+          "p1-shortfall"
+        ],
         "criteria": [
           "p1-order-flow: three browser contexts (pad, kitchen KDS, till): short code -> add sandwich + latte -> Send -> kitchen ticket visible within 5 s over WebSocket (no /tickets polling after initial load) -> accept -> ready -> pad badge -> served -> till cash pay -> closed",
           "post-conditions via API: movement sequence reservation, production_consume, sale; available equals seeded minus sold",
@@ -193,71 +945,276 @@
           "gate:p1 Pest: exhaustive state-machine tables, SendOrder is one transaction, idempotent replay returns the same body and one order, void audits both actors, foreign-station channel auth is 403"
         ]
       },
-      "adrs": ["0006-reserve-at-send-consume-at-ready-sale-at-pay", "0007-bearer-tokens-not-spa-cookies"]
+      "adrs": [
+        "0006-reserve-at-send-consume-at-ready-sale-at-pay",
+        "0007-bearer-tokens-not-spa-cookies"
+      ]
     },
     "2": {
-      "name": "Inventory and production", "weeks": "6-8",
-      "entry": ["gate-p1 green on main", "phase-2-plan.md approved", "contract:production->* and notifications->identity green with no Production/Notifications code yet"],
-      "contracts_required": ["production->inventory", "production->catalog", "production->identity", "notifications->identity"],
+      "name": "Inventory and production",
+      "weeks": "6-8",
+      "entry": [
+        "gate-p1 green on main",
+        "phase-2-plan.md approved",
+        "contract:production->* and notifications->identity green with no Production/Notifications code yet"
+      ],
+      "contracts_required": [
+        "production->inventory",
+        "production->catalog",
+        "production->identity",
+        "notifications->identity"
+      ],
       "steps": [
-        {"id": "2.1", "module": "contracts", "builds": "tests/Contract/Production/*, tests/Contract/Notifications/IdentityContractTest.php"},
-        {"id": "2.2", "module": "inventory.purchases", "builds": "suppliers, purchases, purchase_lines, confirm -> purchase_in, item_costs moving average to 4 dp", "pest_groups": ["module:inventory"]},
-        {"id": "2.3", "module": "inventory.transfers", "builds": "transfers requested -> confirmed/rejected -> transfer movements", "pest_groups": ["module:inventory"]},
-        {"id": "2.4", "module": "catalog.recipe-versions", "builds": "publish new recipe version (swap is_active in one transaction, old kept), Inventory RecipeCost::rollUp, margin vs Prices::at", "pest_groups": ["module:catalog", "module:inventory"]},
-        {"id": "2.5", "module": "notifications", "builds": "notifications table, Notifier, drivers (in_app, push, telegram; array in CI), dedupe store, locale rendering", "pest_groups": ["module:notifications"]},
-        {"id": "2.6", "module": "inventory.reorder", "builds": "reorder_rules, EvaluateThresholds job on StockChanged, StockLow/StockOut with stock_alert_states for re-fire after recovery", "pest_groups": ["feature"]},
-        {"id": "2.7", "module": "production", "builds": "requests, batches, state machine, stations.requires_overseer, Batches::confirm atomic, AutoRequest on StockOut, AssignedUsersResolver, NullShiftAttacher", "pest_groups": ["module:production", "unit"]},
-        {"id": "2.8", "module": "web", "builds": "/production kanban, KDS stock strip + transfer request, till display-case panel + request production, admin Inventory + recipe versions + planner", "playwright": ["p2-stockout-production", "p2-purchase-transfer"]},
-        {"id": "2.9", "module": "docs", "builds": "Phase2Seeder, ADR 0008 presence resolver interface, ADR 0009 alert dedupe, OpenAPI, ERD, report"}
+        {
+          "id": "2.1",
+          "module": "contracts",
+          "builds": "tests/Contract/Production/*, tests/Contract/Notifications/IdentityContractTest.php"
+        },
+        {
+          "id": "2.2",
+          "module": "inventory.purchases",
+          "builds": "suppliers, purchases, purchase_lines, confirm -> purchase_in, item_costs moving average to 4 dp",
+          "pest_groups": [
+            "module:inventory"
+          ]
+        },
+        {
+          "id": "2.3",
+          "module": "inventory.transfers",
+          "builds": "transfers requested -> confirmed/rejected -> transfer movements",
+          "pest_groups": [
+            "module:inventory"
+          ]
+        },
+        {
+          "id": "2.4",
+          "module": "catalog.recipe-versions",
+          "builds": "publish new recipe version (swap is_active in one transaction, old kept), Inventory RecipeCost::rollUp, margin vs Prices::at",
+          "pest_groups": [
+            "module:catalog",
+            "module:inventory"
+          ]
+        },
+        {
+          "id": "2.5",
+          "module": "notifications",
+          "builds": "notifications table, Notifier, drivers (in_app, push, telegram; array in CI), dedupe store, locale rendering",
+          "pest_groups": [
+            "module:notifications"
+          ]
+        },
+        {
+          "id": "2.6",
+          "module": "inventory.reorder",
+          "builds": "reorder_rules, EvaluateThresholds job on StockChanged, StockLow/StockOut with stock_alert_states for re-fire after recovery",
+          "pest_groups": [
+            "feature"
+          ]
+        },
+        {
+          "id": "2.7",
+          "module": "production",
+          "builds": "requests, batches, state machine, stations.requires_overseer, Batches::confirm atomic, AutoRequest on StockOut; output location = the display_case (or station) location the pad reads so 'available immediately' holds; Identity's AssignedUsersResolver / NullShiftAttacher stay the Phase 2 bindings",
+          "pest_groups": [
+            "module:production",
+            "unit"
+          ]
+        },
+        {
+          "id": "2.8",
+          "module": "web",
+          "builds": "/production kanban, KDS stock strip + transfer request, till display-case panel + request production, admin Inventory + recipe versions + planner",
+          "playwright": [
+            "p2-stockout-production",
+            "p2-purchase-transfer"
+          ]
+        },
+        {
+          "id": "2.9",
+          "module": "docs",
+          "builds": "Phase2Seeder, ADR 0008 presence resolver interface, ADR 0009 alert dedupe, OpenAPI, ERD, report"
+        }
       ],
       "gate": {
-        "pest_group": "gate:p2", "ci_job": "gate-p2", "playwright_projects": ["p2-stockout-production", "p2-purchase-transfer"],
+        "pest_group": "gate:p2",
+        "ci_job": "gate-p2",
+        "playwright_projects": [
+          "p2-stockout-production",
+          "p2-purchase-transfer"
+        ],
         "criteria": [
           "p2-stockout-production: cake on_hand 1 -> pad sells it -> request card appears on /production -> baker accepts -> Done (6 produced, 0 waste) -> overseer confirms where required -> pad shows 6 available; the worker container is running",
           "p2-purchase-transfer: admin purchase -> store balance; kitchen requests transfer -> store confirms -> balances move",
           "gate:p2 Pest: moving average to 4 dp, version publish keeps old version readable, dedupe, atomic batch (N consume + 1 output), AutoRequest only for produced items with a recipe"
         ]
       },
-      "adrs": ["0008-station-presence-resolver-interface", "0009-stock-alert-dedupe"]
+      "adrs": [
+        "0008-station-presence-resolver-interface",
+        "0009-stock-alert-dedupe"
+      ]
     },
     "3": {
-      "name": "Shifts and handover", "weeks": "9-11",
-      "entry": ["gate-p2 green on main", "phase-3-plan.md approved", "contract:shifts->* green with no Shifts code yet"],
-      "contracts_required": ["shifts->inventory", "shifts->identity", "shifts->payments"],
+      "name": "Shifts and handover",
+      "weeks": "9-11",
+      "entry": [
+        "gate-p2 green on main",
+        "phase-3-plan.md approved",
+        "contract:shifts->* green with no Shifts code yet"
+      ],
+      "contracts_required": [
+        "shifts->inventory",
+        "shifts->identity",
+        "shifts->payments"
+      ],
       "steps": [
-        {"id": "3.1", "module": "contracts", "builds": "tests/Contract/Shifts/{Inventory,Identity,Payments}ContractTest.php"},
-        {"id": "3.2", "module": "shifts.instances", "builds": "templates, instances (date = local start date), roster, state machine, Shifts::current(station), ActorContext middleware, openAdHoc, rebind StationPresenceResolver / ShiftAttacher, flip ledger.require_shift_for_station_locations, update Phase 0-2 seeds to open shifts", "pest_groups": ["module:shifts", "unit"]},
-        {"id": "3.3", "module": "shifts.counts", "builds": "stock_counts + lines; opening expected = previous locked closing; closing expected = balanceAt(now); bilingual variance reasons; immutable after submit; approve -> count_adjustment; reject -> recount with both kept; overseer co-sign", "pest_groups": ["feature"]},
-        {"id": "3.4", "module": "shifts.locks", "builds": "payload_hash + previous_hash per (branch, location), canonical JSON, DB trigger forbids UPDATE on locked rows except superseded_by_id, admin unlock = new version, HashChain::verify", "pest_groups": ["invariants", "unit"]},
-        {"id": "3.5", "module": "shifts.cash", "builds": "cash_declarations (denominations JSONB, float); expected = opening float + Totals::cash(shift); channel reconciliation", "pest_groups": ["feature"]},
-        {"id": "3.6", "module": "shifts.handover", "builds": "handover_notes; GET /replay?station&at (balances, open orders, who was on)", "pest_groups": ["feature"]},
-        {"id": "3.7", "module": "web", "builds": "open/close flows on KDS, production, till widget; admin Shifts (templates, roster, side-by-side approval, notes, replay)", "playwright": ["p3-handover", "p3-opening-prefill"]},
-        {"id": "3.8", "module": "docs", "builds": "Phase3Seeder (two days of locked history), ADR 0010 hash chain canonicalisation, ADR 0011 shift attribution, report, pilot feedback template"}
+        {
+          "id": "3.1",
+          "module": "contracts",
+          "builds": "tests/Contract/Shifts/{Inventory,Identity,Payments}ContractTest.php"
+        },
+        {
+          "id": "3.2",
+          "module": "shifts.instances",
+          "builds": "templates, instances (date = local start date), roster, state machine, Shifts::current(station), ActorContext middleware, openAdHoc, rebind StationPresenceResolver / ShiftAttacher, flip ledger.require_shift_for_station_locations, update Phase 0-2 seeds to open shifts",
+          "pest_groups": [
+            "module:shifts",
+            "unit"
+          ]
+        },
+        {
+          "id": "3.3",
+          "module": "shifts.counts",
+          "builds": "stock_counts + lines; opening expected = previous locked closing; closing expected = balanceAt(now); bilingual variance reasons; immutable after submit; approve -> count_adjustment; reject -> recount with both kept; overseer co-sign",
+          "pest_groups": [
+            "feature"
+          ]
+        },
+        {
+          "id": "3.4",
+          "module": "shifts.locks",
+          "builds": "payload_hash + previous_hash per (branch, location), canonical JSON, DB trigger forbids UPDATE on locked rows except superseded_by_id, admin unlock = new version, HashChain::verify",
+          "pest_groups": [
+            "invariants",
+            "unit"
+          ]
+        },
+        {
+          "id": "3.5",
+          "module": "shifts.cash",
+          "builds": "cash_declarations (denominations JSONB, float); expected = opening float + Totals::cash(shift); channel reconciliation",
+          "pest_groups": [
+            "feature"
+          ]
+        },
+        {
+          "id": "3.6",
+          "module": "shifts.handover",
+          "builds": "handover_notes; GET /replay?station&at (balances, open orders, who was on)",
+          "pest_groups": [
+            "feature"
+          ]
+        },
+        {
+          "id": "3.7",
+          "module": "web",
+          "builds": "open/close flows on KDS, production, till widget; admin Shifts (templates, roster, side-by-side approval, notes, replay)",
+          "playwright": [
+            "p3-handover",
+            "p3-opening-prefill"
+          ]
+        },
+        {
+          "id": "3.8",
+          "module": "docs",
+          "builds": "Phase3Seeder (two days of locked history), ADR 0010 hash chain canonicalisation, ADR 0011 shift attribution, report, pilot feedback template"
+        }
       ],
       "gate": {
-        "pest_group": "gate:p3", "ci_job": "gate-p3", "playwright_projects": ["p3-handover", "p3-opening-prefill"],
+        "pest_group": "gate:p3",
+        "ci_job": "gate-p3",
+        "playwright_projects": [
+          "p3-handover",
+          "p3-opening-prefill"
+        ],
         "criteria": [
           "p3-handover: kitchen closing count with one variance -> reason required -> submit -> admin side-by-side approve -> count_adjustment visible in ledger -> lock -> hash shown -> next shift opening prefilled with locked values",
           "p3-opening-prefill across midnight on the Night template",
           "gate:p3 Pest: HashChainTest detects tampering, ShiftAttributionTest (movements during an open shift carry its id), PresenceResolverSwapTest (auto-request targets on-shift users first), enforcement rejects a station-location movement without an open shift, replay equals state at time over seeded history"
         ]
       },
-      "adrs": ["0010-hash-chain-canonical-json", "0011-shift-attribution-rules"]
+      "adrs": [
+        "0010-hash-chain-canonical-json",
+        "0011-shift-attribution-rules"
+      ]
     },
     "4": {
-      "name": "Payments and analytics", "weeks": "12-14",
-      "entry": ["gate-p3 green on main", "phase-4-plan.md approved", "contract:payments->orders (refund) and analytics->facts green", "MinIO service in CI"],
-      "contracts_required": ["payments->orders", "analytics->facts"],
+      "name": "Payments and analytics",
+      "weeks": "12-14",
+      "entry": [
+        "gate-p3 green on main",
+        "phase-4-plan.md approved",
+        "contract:payments->orders (refund) and analytics->facts green",
+        "MinIO service in CI"
+      ],
+      "contracts_required": [
+        "payments->orders",
+        "analytics->facts"
+      ],
       "steps": [
-        {"id": "4.1", "module": "contracts", "builds": "refund path in tests/Contract/Payments/OrdersContractTest.php, tests/Contract/Analytics/FactsContractTest.php"},
-        {"id": "4.2", "module": "shared.files", "builds": "S3 disk (MinIO in CI), signed URLs, EXIF strip, 1600 px max, upload endpoint", "pest_groups": ["feature"]},
-        {"id": "4.3", "module": "payments", "builds": "channel admin CRUD (bilingual, sort, enable), photo attach, reference, split to zero balance, verify/dispute, void/refund with PIN -> Orders::refund -> reversing movements, receipt PDF", "pest_groups": ["module:payments"]},
-        {"id": "4.4", "module": "analytics", "builds": "daily_sales, daily_station_metrics, daily_item_metrics, daily_channel_totals; Rebuild::day idempotent; triggers ShiftLocked, nightly, on demand; dashboards read summaries only; exports; weekly summary", "pest_groups": ["module:analytics"]},
-        {"id": "4.5", "module": "web", "builds": "till pay sheet (camera, split, reference, change), admin Payments, Analytics dashboards + product pages, order timeline with photos, Audit UI", "playwright": ["p4-pay-photo-split", "p4-dashboards"]},
-        {"id": "4.6", "module": "docs", "builds": "Phase4Seeder (90 days incl. splits, voids, refunds), ADR 0012 summary rebuild semantics, report"}
+        {
+          "id": "4.1",
+          "module": "contracts",
+          "builds": "refund path in tests/Contract/Payments/OrdersContractTest.php, tests/Contract/Analytics/FactsContractTest.php"
+        },
+        {
+          "id": "4.2",
+          "module": "shared.files",
+          "builds": "S3 disk (MinIO in CI), signed URLs, EXIF strip, 1600 px max, upload endpoint",
+          "pest_groups": [
+            "feature"
+          ]
+        },
+        {
+          "id": "4.3",
+          "module": "payments",
+          "builds": "channel admin CRUD (bilingual, sort, enable), photo attach, reference, split to zero balance, verify/dispute, void/refund with PIN -> Orders::refund -> reversing movements, receipt PDF",
+          "pest_groups": [
+            "module:payments"
+          ]
+        },
+        {
+          "id": "4.4",
+          "module": "analytics",
+          "builds": "daily_sales, daily_station_metrics, daily_item_metrics, daily_channel_totals; Rebuild::day idempotent; triggers ShiftLocked, nightly, on demand; dashboards read summaries only; exports; weekly summary",
+          "pest_groups": [
+            "module:analytics"
+          ]
+        },
+        {
+          "id": "4.5",
+          "module": "web",
+          "builds": "till pay sheet (camera, split, reference, change), admin Payments, Analytics dashboards + product pages, order timeline with photos, Audit UI",
+          "playwright": [
+            "p4-pay-photo-split",
+            "p4-dashboards"
+          ]
+        },
+        {
+          "id": "4.6",
+          "module": "docs",
+          "builds": "Phase4Seeder (90 days incl. splits, voids, refunds), ADR 0012 summary rebuild semantics, report"
+        }
       ],
       "gate": {
-        "pest_group": "gate:p4", "ci_job": "gate-p4", "playwright_projects": ["p4-pay-photo-split", "p4-dashboards"], "extra_ci_jobs": ["perf-dashboards"],
+        "pest_group": "gate:p4",
+        "ci_job": "gate-p4",
+        "playwright_projects": [
+          "p4-pay-photo-split",
+          "p4-dashboards"
+        ],
+        "extra_ci_jobs": [
+          "perf-dashboards"
+        ],
         "criteria": [
           "ChannelTotalsEqualPaymentsTest on the seeded day: daily_channel_totals.amount == SUM(payments.amount) WHERE status <> voided per channel; counts equal; daily_sales.revenue == SUM(orders.total) for paid/closed",
           "p4-pay-photo-split: Telebirr with photo + cash remainder; requires_photo blocks completion until a photo is attached",
@@ -265,22 +1222,70 @@
           "dashboards hit no raw tables (query log assertion); Rebuild::day run twice yields identical rows"
         ]
       },
-      "adrs": ["0012-summary-rebuild-semantics"]
+      "adrs": [
+        "0012-summary-rebuild-semantics"
+      ]
     },
     "5": {
-      "name": "Hardening and Amharic", "weeks": "15-16",
-      "entry": ["gate-p4 green on main", "phase-5-plan.md approved"],
+      "name": "Hardening and Amharic",
+      "weeks": "15-16",
+      "entry": [
+        "gate-p4 green on main",
+        "phase-5-plan.md approved"
+      ],
       "contracts_required": [],
       "steps": [
-        {"id": "5.1", "module": "identity.devices", "builds": "EnsureEnrolledDevice on station routes behind a flag, admin enrolment UI; first because it changes every e2e fixture", "pest_groups": ["feature"], "playwright": ["p5-device"]},
-        {"id": "5.2", "module": "web.offline", "builds": "outbox for all writes, conflict UI, photo queue, reconnect reconcile", "playwright": ["p5-offline"]},
-        {"id": "5.3", "module": "print-bridge", "builds": "ESC/POS bridge, bilingual receipt, TIN"},
-        {"id": "5.4", "module": "i18n", "builds": "full am dictionary; i18n parity script strict"},
-        {"id": "5.5", "module": "ops", "builds": "nightly pg_dump container, restore drill script, k6 load test (60 devices), Sentry, Pulse, health endpoints"},
-        {"id": "5.6", "module": "docs", "builds": "admin handbook, on-call plan, docs/go-live-checklist.json with a verifier per item"}
+        {
+          "id": "5.1",
+          "module": "identity.devices",
+          "builds": "EnsureEnrolledDevice on station routes behind a flag, admin enrolment UI; first because it changes every e2e fixture",
+          "pest_groups": [
+            "feature"
+          ],
+          "playwright": [
+            "p5-device"
+          ]
+        },
+        {
+          "id": "5.2",
+          "module": "web.offline",
+          "builds": "outbox for all writes, conflict UI, photo queue, reconnect reconcile",
+          "playwright": [
+            "p5-offline"
+          ]
+        },
+        {
+          "id": "5.3",
+          "module": "print-bridge",
+          "builds": "ESC/POS bridge, bilingual receipt, TIN"
+        },
+        {
+          "id": "5.4",
+          "module": "i18n",
+          "builds": "full am dictionary; i18n parity script strict"
+        },
+        {
+          "id": "5.5",
+          "module": "ops",
+          "builds": "nightly pg_dump container, restore drill script, k6 load test (60 devices), Sentry, Pulse, health endpoints"
+        },
+        {
+          "id": "5.6",
+          "module": "docs",
+          "builds": "admin handbook, on-call plan, docs/go-live-checklist.json with a verifier per item"
+        }
       ],
       "gate": {
-        "pest_group": "gate:p5", "ci_job": "gate-p5", "playwright_projects": ["p5-device", "p5-offline"], "extra_ci_jobs": ["i18n-check", "backup-drill"],
+        "pest_group": "gate:p5",
+        "ci_job": "gate-p5",
+        "playwright_projects": [
+          "p5-device",
+          "p5-offline"
+        ],
+        "extra_ci_jobs": [
+          "i18n-check",
+          "backup-drill"
+        ],
         "criteria": [
           "unknown device gets 403 on station routes; admin routes unaffected",
           "p5-offline: an order queued offline replays once when online; the server has exactly one order",
@@ -296,28 +1301,129 @@
   "ci": {
     "workflow": ".github/workflows/ci.yml",
     "module_jobs": {
-      "api-lint": [], "api-arch": ["api-lint"],
-      "mod-identity": ["api-arch"], "mod-catalog": ["mod-identity"], "mod-inventory": ["mod-catalog"],
-      "mod-orders": ["mod-inventory"], "mod-payments": ["mod-orders"], "mod-production": ["mod-inventory"], "mod-notifications": ["mod-inventory"],
-      "mod-shifts": ["mod-orders", "mod-inventory", "mod-payments"], "mod-analytics": ["mod-shifts", "mod-production", "mod-notifications"],
-      "web-lint": [], "web-build": ["web-lint"], "docker-build": [],
-      "openapi-check": ["api-arch"], "erd-check": ["api-arch"], "invariants": ["api-arch"], "i18n-check": ["web-lint"]
+      "api-lint": [],
+      "api-arch": [
+        "api-lint"
+      ],
+      "mod-identity": [
+        "api-arch"
+      ],
+      "mod-catalog": [
+        "mod-identity"
+      ],
+      "mod-inventory": [
+        "mod-catalog"
+      ],
+      "mod-orders": [
+        "mod-inventory"
+      ],
+      "mod-payments": [
+        "mod-orders"
+      ],
+      "mod-production": [
+        "mod-inventory"
+      ],
+      "mod-notifications": [
+        "mod-inventory"
+      ],
+      "mod-shifts": [
+        "mod-orders",
+        "mod-inventory",
+        "mod-payments"
+      ],
+      "mod-analytics": [
+        "mod-shifts",
+        "mod-production",
+        "mod-notifications"
+      ],
+      "web-lint": [],
+      "web-build": [
+        "web-lint"
+      ],
+      "docker-build": [],
+      "openapi-check": [
+        "api-arch"
+      ],
+      "erd-check": [
+        "api-arch"
+      ],
+      "invariants": [
+        "api-arch"
+      ],
+      "i18n-check": [
+        "web-lint"
+      ]
     },
     "e2e_jobs": {
-      "e2e-p0": ["mod-catalog", "web-build", "docker-build"],
-      "e2e-p1": ["mod-payments", "web-build", "docker-build"],
-      "e2e-p2": ["mod-production", "mod-notifications", "web-build", "docker-build"],
-      "e2e-p3": ["mod-shifts", "web-build", "docker-build"],
-      "e2e-p4": ["mod-analytics", "web-build", "docker-build"],
-      "e2e-p5": ["e2e-p4"]
+      "e2e-p0": [
+        "mod-catalog",
+        "web-build",
+        "docker-build"
+      ],
+      "e2e-p1": [
+        "mod-payments",
+        "web-build",
+        "docker-build"
+      ],
+      "e2e-p2": [
+        "mod-production",
+        "mod-notifications",
+        "web-build",
+        "docker-build"
+      ],
+      "e2e-p3": [
+        "mod-shifts",
+        "web-build",
+        "docker-build"
+      ],
+      "e2e-p4": [
+        "mod-analytics",
+        "web-build",
+        "docker-build"
+      ],
+      "e2e-p5": [
+        "e2e-p4"
+      ]
     },
     "gate_jobs": {
-      "gate-p0": ["api-arch", "mod-inventory", "mod-catalog", "e2e-p0", "openapi-check", "erd-check", "invariants"],
-      "gate-p1": ["gate-p0", "mod-orders", "mod-payments", "e2e-p1"],
-      "gate-p2": ["gate-p1", "mod-production", "mod-notifications", "e2e-p2"],
-      "gate-p3": ["gate-p2", "mod-shifts", "e2e-p3"],
-      "gate-p4": ["gate-p3", "mod-analytics", "e2e-p4", "perf-dashboards"],
-      "gate-p5": ["gate-p4", "e2e-p5", "i18n-check", "backup-drill"]
+      "gate-p0": [
+        "api-arch",
+        "mod-inventory",
+        "mod-catalog",
+        "e2e-p0",
+        "openapi-check",
+        "erd-check",
+        "invariants"
+      ],
+      "gate-p1": [
+        "gate-p0",
+        "mod-orders",
+        "mod-payments",
+        "e2e-p1"
+      ],
+      "gate-p2": [
+        "gate-p1",
+        "mod-production",
+        "mod-notifications",
+        "e2e-p2"
+      ],
+      "gate-p3": [
+        "gate-p2",
+        "mod-shifts",
+        "e2e-p3"
+      ],
+      "gate-p4": [
+        "gate-p3",
+        "mod-analytics",
+        "e2e-p4",
+        "perf-dashboards"
+      ],
+      "gate-p5": [
+        "gate-p4",
+        "e2e-p5",
+        "i18n-check",
+        "backup-drill"
+      ]
     }
   }
 }

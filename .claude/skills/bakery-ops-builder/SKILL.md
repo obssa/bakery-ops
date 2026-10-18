@@ -58,7 +58,9 @@ tree is clean; `docs/phases/phase-<N>-plan.md` exists and STATUS says `plan_appr
 by Ramin's own commit, which is how "wait for my OK" survives when nobody is watching); every contract
 in `contracts_required` has its test file, contains no `->todo()`, and is green **while the consumer
 module's directory is still unchanged**; every dependency module is `stable`. When it refuses, do what
-it names and nothing else. Do not edit STATUS.json to make it pass.
+it names and nothing else. Do not edit STATUS.json to make it pass. If the only failures are "plan missing" or
+"plan not approved", the right move is step 3 (write the plan, commit, stop); if a dependency is unstable or a
+contract is missing, the right move is to say so and offer the upstream work instead.
 
 ### 3. Plan the phase, then stop
 
