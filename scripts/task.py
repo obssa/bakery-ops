@@ -124,21 +124,23 @@ def task_test(groups: str | None) -> None:
 
 
 def task_modules() -> None:
+    """Same rule as .github/workflows/module-tests.yml: a module still `todo` in STATUS.json may have no
+    tests; once it is in_progress or stable, an empty group is a failure (a job that runs nothing proves nothing)."""
     phase = current_phase()
+    with open(os.path.join(ROOT, "docs", "phases", "STATUS.json"), encoding="utf-8") as fh:
+        module_status = {k: v.get("status", "todo") for k, v in json.load(fh)["modules"].items()}
     for m in MODULE_ORDER:
-        mod_dir = os.path.join(API, "app", "Modules", m.capitalize())
-        tests_dir = os.path.join(API, "tests", "Modules", m.capitalize())
-        if not os.path.isdir(mod_dir) and not os.path.isdir(tests_dir):
-            print(f"-- module {m}: not started, skipped")
-            continue
+        status = module_status.get(m, "todo")
         groups = f"module:{m}{MODULE_EXTRA.get(m, '')}"
-        print(f"-- module {m} ({groups})")
+        print(f"-- module {m} [{status}] ({groups})")
         r = app("vendor/bin/pest", *[f"--group={g}" for g in groups.split(",")], "--colors=never", check=False, capture=True)
         out = (r.stdout or "") + (r.stderr or "")
         print(out[-3000:])
         if "No tests found" in out:
-            print(f"   (no tests tagged {groups} yet)")
-            continue
+            if status == "todo":
+                print(f"   (no tests tagged {groups} yet: allowed while the module is todo)")
+                continue
+            sys.exit(f"module {m} is {status} but has no tests tagged {groups}: a module that runs nothing proves nothing")
         if r.returncode != 0:
             sys.exit(f"module {m} is red; everything after it in the dependency order was not run (phase {phase})")
 

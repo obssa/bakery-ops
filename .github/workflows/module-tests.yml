@@ -58,8 +58,15 @@ jobs:
       - name: Migrate
         working-directory: apps/api
         run: php artisan migrate --force --no-interaction
+      - name: Module status (a module still `todo` in STATUS.json may run with no tests yet)
+        id: st
+        run: |
+          status=$(jq -r --arg m "${{ inputs.module }}" '.modules[$m].status // "todo"' docs/phases/STATUS.json)
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          if [ "$status" = "todo" ]; then echo "allow=--allow-empty" >> "$GITHUB_OUTPUT"; else echo "allow=" >> "$GITHUB_OUTPUT"; fi
+          echo "module ${{ inputs.module }} is $status"
       - name: Module tests (${{ inputs.groups }})
-        run: bash scripts/ci/pest-groups.sh "${{ inputs.groups }}"
+        run: bash scripts/ci/pest-groups.sh "${{ inputs.groups }}" ${{ steps.st.outputs.allow }}
       - name: Consumer contracts against ${{ inputs.module }}
         if: inputs.contracts != ''
         run: bash scripts/ci/pest-groups.sh "${{ inputs.contracts }}" --allow-empty
