@@ -224,7 +224,7 @@ def mode_entry(root: str, man: dict, st: dict, n: int, a, rep: Report, pest: Pes
     for pair in man["phases"][key]["contracts_required"]:
         consumer, provider = pair.split("->")
         provider_phase = man["modules"].get(provider, {}).get("phase")
-        if provider_phase is not None and provider_phase >= n and n > 0:
+        if provider_phase is not None and provider_phase >= n:
             # The provider itself is built in this phase (e.g. payments->orders in Phase 1): the contract
             # cannot be green at phase entry. It is required before the consumer's own step instead
             # (gate_check --mode module --module <provider> runs it once the consumer has written it).
