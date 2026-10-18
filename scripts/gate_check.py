@@ -112,11 +112,15 @@ class PestRunner:
     def _resolve(self, runner: str | None) -> list[str] | None:
         if runner:
             return runner.split()
-        wrapper = os.path.join(self.root, "scripts", "pest")
-        if os.path.exists(wrapper) and shutil.which("bash"):
-            return ["bash", wrapper]
+        # Prefer the compose service directly: on Windows `bash` may resolve to WSL's stub, so never
+        # go through the scripts/pest wrapper here. Host PHP (8.0) is never used.
+        if shutil.which("docker") and os.path.exists(os.path.join(self.root, "compose.yml")):
+            probe = subprocess.run(["docker", "compose", "-f", "compose.yml", "-f", "compose.dev.yml", "ps", "-q", "app"],
+                                   cwd=self.root, text=True, capture_output=True)
+            if probe.returncode == 0 and probe.stdout.strip():
+                return ["docker", "compose", "-f", "compose.yml", "-f", "compose.dev.yml", "exec", "-T", "app", "vendor/bin/pest"]
         direct = os.path.join(self.root, "apps", "api", "vendor", "bin", "pest")
-        if os.path.exists(direct):
+        if os.path.exists(direct) and os.name != "nt":
             return [direct]
         return None
 
@@ -125,7 +129,7 @@ class PestRunner:
         if not self.enabled:
             return None, f"pest --group={groups} not run (--no-tests/--ci)"
         if not self.cmd:
-            return None, "no pest runner found (scripts/pest or apps/api/vendor/bin/pest)"
+            return None, "no pest runner: start the stack (python scripts/task.py up) so tests can run in the app container"
         proc = subprocess.run([*self.cmd, *[f"--group={g}" for g in groups.split(",")], "--colors=never"], cwd=self.root,
                               text=True, capture_output=True)
         out = (proc.stdout or "") + (proc.stderr or "")
