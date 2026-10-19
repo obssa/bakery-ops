@@ -21,8 +21,8 @@
       ],
       "modules": {
         "repo": "done",
-        "shared": "in_progress",
-        "audit": "todo",
+        "shared": "done",
+        "audit": "in_progress",
         "identity": "todo",
         "catalog": "todo",
         "inventory": "todo",
@@ -191,12 +191,12 @@
   "modules": {
     "shared": {
       "phase": 0,
-      "status": "in_progress",
-      "stable_since": null
+      "status": "stable",
+      "stable_since": "2026-10-19T09:57:39Z"
     },
     "audit": {
       "phase": 0,
-      "status": "todo",
+      "status": "in_progress",
       "stable_since": null
     },
     "identity": {
