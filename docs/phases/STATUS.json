@@ -20,7 +20,7 @@
         "catalog->identity"
       ],
       "modules": {
-        "repo": "todo",
+        "repo": "done",
         "shared": "todo",
         "audit": "todo",
         "identity": "todo",
