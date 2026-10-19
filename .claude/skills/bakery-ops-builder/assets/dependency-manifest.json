@@ -29,7 +29,8 @@
     "concurrency": "Second-connection row-lock tests; use DatabaseTruncation not RefreshDatabase",
     "module:<name>": "All tests owned by a module",
     "contract:<consumer>-><provider>": "Consumer-side tests against a provider; written before the consumer, green with zero consumer code",
-    "gate:p<N>": "The phase exit gate"
+    "gate:p<N>": "The phase exit gate",
+    "seeds": "The demo bakery (DemoSeeder / PhaseNSeeder): idempotent, branch-isolated, ledger-consistent; runs in mod-inventory"
   },
   "modules": {
     "shared": {

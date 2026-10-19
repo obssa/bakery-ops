@@ -70,6 +70,16 @@ No previous phase. Working tree committed. Contracts internal to the phase (`inv
 product categories, ~30 items, prices, recipes for 5 products (bread, cake, sandwich, latte, pizza), one
 user per role with short codes, opening balances via `purchase_in` movements.
 
+As built (step 0.8): the demo branch "Demo Bakery" (`bakery.demo.branch`, marked `settings.demo`), 6 stations, 7 locations
+linked to their stations, 8 ingredient + 6 product categories, 43 ingredients and 28 products (15 to order, 10 to stock,
+3 bought in) with ETB prices, routing, production stations and batch sizes, an active v1 recipe for every made product
+(25), opening stock through the Ledger (purchase_in into the store, an opening count where the bakery and the cake room
+made their goods, transfers to where stock is used or sold), and 9 people (one per role plus a second waiter, an
+overseer flag, station assignments, short codes). Credentials from `BAKERY_DEMO_PASSWORD` (documented default only in
+local/testing). Idempotent, branch-isolated, every write audited. `DemoSeeder` composes the phase seeders up to
+`SEED_PHASE`; `php artisan bakery:seed-demo {--branch=} {--phase=} {--force}` loads them on a server. Tests:
+`tests/Seeders` (group `seeds`, run by `mod-inventory`).
+
 ## 9. ADRs
 
 0001 modular monolith · 0002 stock_balances vs matview · 0003 idempotency · 0004 NUMERIC as string ·

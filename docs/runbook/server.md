@@ -90,6 +90,32 @@ password once. Store the phone and the password as the repository secrets `E2E_A
 without them `live-e2e` skips the admin flow (and says so). The same command creates the first real admin of a fresh
 install (`--branch="<shop name>"`).
 
+## Demo bakery (its own branch)
+
+The demo bakery (README, "Demo bakery") can be loaded on the live site to show the system with realistic data. It goes
+into a branch of its own, "Demo Bakery" by default, created on the first run in Africa/Addis_Ababa and ETB and marked as
+a demo branch; a branch of that name that is not a demo branch is refused, so shop data and the "E2E Test Branch" are
+never touched. Production needs `--force` and a password of its own for the demo accounts; nothing is written without
+them.
+
+1. Add a long random `BAKERY_DEMO_PASSWORD` to `~/bakery-ops.orcamind.dev/.env` (8 characters at least; the documented
+   local default is refused here). Keep it in the owner's records; it is every demo account's password and the seed of
+   their short codes. Optional: `BAKERY_DEMO_BRANCH="<name>"` for another branch name.
+2. The release caches the configuration (`optimize`), so refresh it after editing `.env`:
+   `cd ~/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan config:cache`
+3. Load it:
+   ```
+   cd ~/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan bakery:seed-demo --force
+   ```
+   It prints what the branch holds (items by kind, recipes, users, locations, movements) and, for the accounts it
+   created, their short codes, once. Sign in at https://bakery-ops.orcamind.dev/app/ with a demo phone (README) and
+   `BAKERY_DEMO_PASSWORD`.
+
+Running it again (for example after a later phase adds its seeder: `--phase=<n>` stops at a phase) only adds what is
+missing; existing rows, passwords and short codes stay as they are. `--branch="<name>"` loads a second, separate demo
+branch. To retire the demo, deactivate its users under People (soft deletes only; nothing is ever removed from the
+ledger).
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.
