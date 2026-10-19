@@ -57,10 +57,11 @@ it('every write route under api/v1 is registered in tests/Support/write_endpoint
 
 it('replays every registered write endpoint idempotently', function () {
     foreach (writeEndpoints() as $entry) {
-        if (isset($entry['setup'])) {
-            ($entry['setup'])($this);
-        }
-        assertIdempotent($this, (string) $entry['method'], (string) $entry['uri'], ($entry['payload'])(), (string) $entry['table']);
+        // setup may return route parameters (['{id}' => 7]) for uris with placeholders; the registry keeps the literal
+        // route uri so the coverage check above can match it against the router.
+        $params = isset($entry['setup']) ? ($entry['setup'])($this) : [];
+        $uri = strtr((string) $entry['uri'], is_array($params) ? $params : []);
+        assertIdempotent($this, (string) $entry['method'], $uri, ($entry['payload'])(), (string) $entry['table']);
     }
     expect(true)->toBeTrue();
 })->group('invariants');

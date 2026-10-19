@@ -7,11 +7,16 @@ declare(strict_types=1);
  * Nothing here is a test; everything here exists so tests can state behaviour in one line.
  */
 
+use App\Modules\Identity\Contracts\PermissionRegistry;
+use App\Modules\Identity\Models\User;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Branch;
 use App\Shared\Tenancy\CurrentBranch;
+use Database\Seeders\RolesSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 if (! function_exists('currentBranch')) {
@@ -54,6 +59,57 @@ if (! function_exists('withActor')) {
             ->atStation($stationId)
             ->onDevice($deviceId)
             ->inShift($shiftInstanceId);
+    }
+}
+
+if (! function_exists('seedRoles')) {
+    /** Roles and permissions from the section 7 matrix (Identity, step 0.4); spatie's cache is cleared on both sides (traps.md). */
+    function seedRoles(): void
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        app(RolesSeeder::class)->run();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+}
+
+if (! function_exists('identityRoles')) {
+    /** @return list<string> the eight roles of the matrix */
+    function identityRoles(): array
+    {
+        return PermissionRegistry::ROLES;
+    }
+}
+
+if (! function_exists('makeUser')) {
+    /**
+     * One user of $role in $branch (roles must be seeded: seedRoles()).
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    function makeUser(Branch $branch, string $role = 'waiter', array $attributes = []): User
+    {
+        $user = User::factory()->create(['branch_id' => $branch->id] + $attributes);
+        $user->assignRole($role);
+
+        return $user->fresh() ?? $user;
+    }
+}
+
+if (! function_exists('loginAs')) {
+    /** Authenticate the next requests as $user through Sanctum (bearer token semantics, no SPA cookie; ADR 0007). */
+    function loginAs(User $user): User
+    {
+        Sanctum::actingAs($user, ['*']);
+
+        return $user;
+    }
+}
+
+if (! function_exists('idempotencyKey')) {
+    /** @return array<string, string> the header every write request carries (rule 7) */
+    function idempotencyKey(): array
+    {
+        return ['Idempotency-Key' => (string) Str::uuid()];
     }
 }
 
