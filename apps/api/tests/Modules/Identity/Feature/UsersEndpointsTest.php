@@ -22,6 +22,9 @@ beforeEach(function () {
     $this->other = Branch::factory()->create();
     $this->stranger = makeUser($this->other, 'waiter', ['name' => 'Stranger']);
     loginAs($this->admin);
+    // service calls made directly by the test (ShortCodes::set) run as the admin in the admin's branch
+    actInBranch($this->branch);
+    withActor($this->admin->id);
 });
 
 it('lists the branch users with roles, station assignments and whether a short code is set, never other branches', function () {

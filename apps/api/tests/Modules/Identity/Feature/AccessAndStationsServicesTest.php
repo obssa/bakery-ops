@@ -26,6 +26,7 @@ beforeEach(function () {
     $this->branch = actInBranch(Branch::factory()->create());
     $this->kitchen = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $this->branch->id]);
     $this->bar = Station::factory()->forCode(StationCode::Bar)->create(['branch_id' => $this->branch->id]);
+    withActor(makeUser($this->branch, 'admin')->id);
     $this->access = app(Access::class);
     $this->stations = app(Stations::class);
 });

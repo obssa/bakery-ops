@@ -6,7 +6,9 @@ use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Identity\Contracts\ShortCodes;
 use App\Modules\Identity\Models\ActingSession;
 use App\Modules\Identity\Models\Device;
+use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Branch;
+use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
 
 /*
@@ -22,9 +24,12 @@ beforeEach(function () {
     $this->branch = Branch::factory()->create();
     $this->device = Device::factory()->create(['branch_id' => $this->branch->id, 'fingerprint' => 'pad-1']);
     $this->waiter = makeUser($this->branch, 'waiter', ['name' => 'Almaz']);
+    // the admin's write of record; the request-scoped context is cleared again so the public route starts cold
     actInBranch($this->branch);
+    withActor(makeUser($this->branch, 'admin')->id);
     app(ShortCodes::class)->set($this->waiter, '4821');
-    app(\App\Shared\Tenancy\CurrentBranch::class)->clear();
+    app(CurrentBranch::class)->clear();
+    app(ActorContext::class)->reset();
 });
 
 it('starts a 10-minute acting session for the right code and returns the actor', function () {
@@ -139,8 +144,10 @@ it('does not accept a code from another branch, nor from an inactive user', func
     $other = Branch::factory()->create();
     $stranger = makeUser($other, 'waiter');
     actInBranch($other);
+    withActor($stranger->id);
     app(ShortCodes::class)->set($stranger, '9999');
-    app(\App\Shared\Tenancy\CurrentBranch::class)->clear();
+    app(CurrentBranch::class)->clear();
+    app(ActorContext::class)->reset();
 
     $this->withHeaders(['X-Device-Id' => 'pad-1'])->postJson('/api/v1/short-code/verify', ['code' => '9999'])
         ->assertStatus(401)->assertJsonPath('message_key', 'identity.short_code.invalid');

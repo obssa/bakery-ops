@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Identity\Models\User;
+use App\Shared\Http\ApiError;
 use App\Shared\Models\Branch;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
@@ -73,7 +74,7 @@ it('creates the spatie, assignment, device and acting-session tables with their 
 })->group('module:identity', 'invariants');
 
 it('no longer needs the users exception in .invariants-allow', function () {
-    $file = dirname(__DIR__, 2).'/.invariants-allow';
+    $file = dirname(__DIR__, 3).'/.invariants-allow';
     $tables = array_filter(array_map(fn (string $l) => trim(explode('#', $l, 2)[0]), file($file, FILE_IGNORE_NEW_LINES) ?: []));
 
     expect($tables)->not->toContain('users');
@@ -89,6 +90,6 @@ it('keeps the en and am identity dictionaries in step, and ApiError reads them',
             ->and($am[$key])->toBeString()->not->toBeEmpty("am {$key} is empty")->not->toBe($value, "am {$key} is still English");
     }
 
-    $body = \App\Shared\Http\ApiError::body('identity.login.invalid');
+    $body = ApiError::body('identity.login.invalid');
     expect($body['message_en'])->toBe($en['login.invalid'])->and($body['message_am'])->toBe($am['login.invalid']);
 })->group('module:identity', 'invariants');

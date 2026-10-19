@@ -71,6 +71,7 @@ it('revokes a device, after which its header is refused; revoking twice is harml
 
     $this->withHeaders(['X-Device-Id' => 'pad-x'])->getJson('/api/v1/me')->assertStatus(403)->assertJsonPath('message_key', 'identity.device.revoked');
 
+    $this->flushHeaders();
     $this->travel(5)->minutes();
     $this->withHeaders(idempotencyKey())->postJson("/api/v1/devices/{$device->id}/revoke")->assertOk();
     expect($device->fresh()?->revoked_at?->equalTo($revokedAt))->toBeTrue();

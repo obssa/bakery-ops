@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
 use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Identity\Models\User;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Actor\ActorRequired;
 use App\Shared\Enums\StationCode;

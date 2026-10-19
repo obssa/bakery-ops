@@ -116,6 +116,8 @@ it('revokes the current token on logout and records it', function () {
     expect(DB::table('personal_access_tokens')->count())->toBe(0)
         ->and(AuditLog::query()->where('action', 'auth.logout')->where('actor_id', $this->cashier->id)->exists())->toBeTrue();
 
+    // every real request builds a fresh guard; the test kernel reuses one, so forget the cached user first
+    app('auth')->forgetGuards();
     $this->withToken($token)->getJson('/api/v1/me')->assertStatus(401);
 })->group('module:identity', 'feature');
 
