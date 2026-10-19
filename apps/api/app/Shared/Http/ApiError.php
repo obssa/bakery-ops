@@ -33,9 +33,16 @@ final class ApiError
         ] + $extra;
     }
 
+    /**
+     * A message_key is a lang key: `identity.short_code.locked` reads lang/<locale>/identity.php (each module owns its
+     * dictionary pair); a bare key without a lang file of its own (`idempotency.key_required`) reads shared.php.
+     */
     private static function message(string $key, string $locale): string
     {
-        $message = trans('shared.'.$key, [], $locale);
+        $message = trans($key, [], $locale);
+        if (! is_string($message) || $message === $key) {
+            $message = trans('shared.'.$key, [], $locale);
+        }
 
         return is_string($message) ? $message : 'shared.'.$key;
     }

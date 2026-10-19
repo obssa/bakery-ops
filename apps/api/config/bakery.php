@@ -16,4 +16,18 @@ return [
         // How long the in-flight lock is held at most if the handler never returns.
         'lock_seconds' => 60,
     ],
+
+    'identity' => [
+        // Short codes (architecture.md section 5, Identity): 4-6 digits, argon2id, 5 failed attempts then a 15-minute lock.
+        'short_code' => [
+            'min_digits' => 4,
+            'max_digits' => 6,
+            'max_attempts' => 5,
+            'lock_minutes' => 15,
+        ],
+        // How long a short-code "acting as" session lasts on a shared pad.
+        'acting_session_minutes' => 10,
+        // Name recorded on every Sanctum personal access token issued by POST /login (ADR 0007).
+        'token_name' => 'api',
+    ],
 ];

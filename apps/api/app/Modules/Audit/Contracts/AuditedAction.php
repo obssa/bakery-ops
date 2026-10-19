@@ -38,8 +38,10 @@ final class AuditedAction
      * returns is then taken as the subject). $context is anything that is not a subject attribute (a reason, a note).
      *
      * @template TResult
+     * @template TSubject of Model|null
      *
-     * @param  callable(Model|null): TResult  $action
+     * @param  callable(TSubject): TResult  $action  receives $subject, so a closure may type it (fn (User $u) => ...)
+     * @param  TSubject  $subject
      * @param  array<string, mixed>  $context
      * @return TResult
      */

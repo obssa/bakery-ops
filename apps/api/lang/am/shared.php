@@ -14,4 +14,15 @@ return [
     'state_machine' => [
         'illegal_transition' => 'ይህ የሁኔታ ለውጥ ከአሁኑ ሁኔታ አይፈቀድም።',
     ],
+    'validation' => [
+        'failed' => 'ጥያቄው ማረጋገጫውን አላለፈም፤ errors ይመልከቱ።',
+    ],
+    'auth' => [
+        'unauthenticated' => 'ለመቀጠል ይግቡ።',
+        'forbidden' => 'ይህን ለማድረግ ፈቃድ የለዎትም።',
+    ],
+    'http' => [
+        'not_found' => 'አልተገኘም።',
+        'too_many_requests' => 'በጣም ብዙ ሙከራዎች፤ ትንሽ ቆይተው እንደገና ይሞክሩ።',
+    ],
 ];

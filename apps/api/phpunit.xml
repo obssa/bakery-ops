@@ -28,6 +28,9 @@
         <env name="DB_DATABASE" value="bakery_test"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
+        <!-- argon2id short codes: cheap parameters in tests only (production uses the hashing defaults) -->
+        <env name="ARGON_MEMORY" value="1024"/>
+        <env name="ARGON_TIME" value="1"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_URL" value=""/>

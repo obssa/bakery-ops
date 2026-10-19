@@ -1,3 +1,2 @@
 # Tables temporarily allowed without branch_id. One per line, with the reason. Keep a TODO(p<N>) marker
 # in the reason: gate_check --mode done refuses to close that phase while the marker exists.
-users  # TODO(p0): step 0.4 (Identity) adds branch_id, phone, short_code_hash, locale; delete this line then
