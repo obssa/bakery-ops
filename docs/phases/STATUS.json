@@ -21,7 +21,7 @@
       ],
       "modules": {
         "repo": "done",
-        "shared": "todo",
+        "shared": "in_progress",
         "audit": "todo",
         "identity": "todo",
         "catalog": "todo",
@@ -191,7 +191,7 @@
   "modules": {
     "shared": {
       "phase": 0,
-      "status": "todo",
+      "status": "in_progress",
       "stable_since": null
     },
     "audit": {
