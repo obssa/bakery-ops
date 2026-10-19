@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity;
 
+use App\Modules\Identity\Console\CreateAdminCommand;
 use App\Modules\Identity\Contracts\ActingAsSession;
 use App\Modules\Identity\Contracts\ShiftAttacher;
 use App\Modules\Identity\Contracts\StationPresenceResolver;
@@ -19,7 +20,8 @@ use Illuminate\Support\ServiceProvider;
 
 /**
  * Identity (layer 2): routes, the request-scoped acting session, the two Phase 2 default bindings (cycle 3), the
- * public-route rate limiters and the `identity.authenticated` gate every active user passes (GET /me, POST /logout).
+ * public-route rate limiters, the `identity.authenticated` gate every active user passes (GET /me, POST /logout) and
+ * the `bakery:create-admin` console command.
  * The other capabilities (Authenticate, ShortCodes, Access, Stations) are plain classes resolved per use: they
  * carry the scoped ActorContext / CurrentBranch, so a singleton would leak one request into the next (traps.md).
  */
@@ -41,5 +43,9 @@ final class IdentityServiceProvider extends ServiceProvider
             ->by('short-code|'.$request->ip().'|'.$request->header(ResolveActor::DEVICE_HEADER, '')));
 
         $this->loadRoutesFrom(base_path('routes/modules/identity.php'));
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([CreateAdminCommand::class]);
+        }
     }
 }
