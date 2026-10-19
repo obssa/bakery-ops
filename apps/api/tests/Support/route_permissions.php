@@ -11,10 +11,11 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item} and {category} with a row of the right table in the caller's branch, and
+ * the matrix test substitutes {id}, {item}, {category} and {location} with a row of the right table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
  */
 $all = ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'];
+$floor = ['admin', 'manager', 'cashier', 'chef', 'barista', 'cake_baker', 'bread_baker'];
 
 return [
     // Identity (step 0.4)
@@ -50,4 +51,13 @@ return [
     'PUT /api/v1/items/{item}/stations' => ['permission' => 'catalog.manage', 'roles' => ['admin'], 'module' => 'catalog'],
     'GET /api/v1/items/{item}/modifiers' => ['permission' => 'catalog.view', 'roles' => $all, 'module' => 'catalog'],
     'POST /api/v1/items/{item}/modifiers' => ['permission' => 'catalog.manage', 'roles' => ['admin'], 'module' => 'catalog'],
+
+    // Inventory (step 0.6): the floor reads stock and the ledger (not the waiter); admin configures locations and
+    // records the Phase 0 manual movements
+    'GET /api/v1/locations' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
+    'POST /api/v1/locations' => ['permission' => 'inventory.manage', 'roles' => ['admin'], 'module' => 'inventory'],
+    'PATCH /api/v1/locations/{location}' => ['permission' => 'inventory.manage', 'roles' => ['admin'], 'module' => 'inventory'],
+    'GET /api/v1/stock' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
+    'POST /api/v1/stock/movements' => ['permission' => 'inventory.adjust', 'roles' => ['admin'], 'module' => 'inventory'],
+    'GET /api/v1/ledger' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
 ];

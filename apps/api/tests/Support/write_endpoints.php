@@ -28,6 +28,8 @@ use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Enums\LocationType;
+use App\Modules\Inventory\Models\Location;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -308,5 +310,52 @@ return [
             return ['{item}' => (string) $latte->id];
         },
         'payload' => fn (): array => ['name_en' => 'Large', 'name_am' => 'ትልቅ', 'price_delta' => '10.00'],
+    ],
+
+    // Inventory (step 0.6)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/locations',
+        'module' => 'inventory',
+        'table' => 'locations',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => ['name_en' => 'Display case', 'name_am' => 'ማሳያ', 'type' => 'display_case'],
+    ],
+    [
+        'method' => 'PATCH',
+        'uri' => '/api/v1/locations/{location}',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $location = Location::factory()->ofType(LocationType::Kitchen)->create(['branch_id' => $me->branch_id]);
+
+            return ['{location}' => (string) $location->id];
+        },
+        'payload' => fn (): array => ['name_en' => 'Main kitchen', 'name_am' => 'ዋና ኩሽና'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/stock/movements',
+        'module' => 'inventory',
+        'table' => 'stock_movements',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            Item::factory()->ingredient('kg')->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'sku' => 'IDEM-STOCK-FLOUR']);
+            Location::factory()->ofType(LocationType::Store)->create(['branch_id' => $me->branch_id, 'name_en' => 'Idempotent store']);
+
+            return [];
+        },
+        // the flour and the store created by setup, read in the admin's (current) branch
+        'payload' => fn (): array => [
+            'item_id' => Item::query()->where('sku', 'IDEM-STOCK-FLOUR')->latest('id')->firstOrFail()->id,
+            'location_id' => Location::query()->where('name_en', 'Idempotent store')->latest('id')->firstOrFail()->id,
+            'reason' => 'purchase_in',
+            'qty' => '25',
+        ],
     ],
 ];

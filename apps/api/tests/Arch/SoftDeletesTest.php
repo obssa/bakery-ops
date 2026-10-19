@@ -15,7 +15,9 @@ $noSoftDeletes = [
     'App\Modules\Audit\Models\AuditLog',  // append-only (DB trigger + model guard): rows are never deleted, softly or otherwise
     'App\Modules\Identity\Models\ActingSession',  // history of who acted when: ends (ended_at / expires_at), never deleted
     'App\Modules\Catalog\Models\ItemPrice',  // price history: a price is closed by effective_to, never deleted (Prices::at reads it)
-    // other append-only tables arrive with their modules: StockMovement (0.6), OrderEvent (P1)
+    'App\Modules\Inventory\Ledger\StockMovement',  // the append-only ledger (DB trigger + model guard): corrections are new movements
+    'App\Modules\Inventory\Ledger\StockBalance',  // the running balance the Ledger keeps per (item, location): updated in place, never deleted
+    // other append-only tables arrive with their modules: OrderEvent (P1)
 ];
 
 it('every mutable tenant model soft-deletes', function () use ($noSoftDeletes) {

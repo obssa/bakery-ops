@@ -7,12 +7,21 @@ declare(strict_types=1);
  * Nothing here is a test; everything here exists so tests can state behaviour in one line.
  */
 
+use App\Modules\Catalog\Models\Item;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Identity\Contracts\PermissionRegistry;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Contracts\Movement;
+use App\Modules\Inventory\Enums\LocationType;
+use App\Modules\Inventory\Ledger\Ledger;
+use App\Modules\Inventory\Ledger\MovementIntent;
+use App\Modules\Inventory\Ledger\MovementReason;
+use App\Modules\Inventory\Models\Location;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Branch;
+use App\Shared\Models\Station;
 use App\Shared\Tenancy\CurrentBranch;
+use Brick\Math\BigDecimal;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -101,6 +110,101 @@ if (! function_exists('catalogUnit')) {
     function catalogUnit(string $code): Unit
     {
         return Unit::query()->where('code', $code)->firstOrFail();
+    }
+}
+
+if (! function_exists('stockLocation')) {
+    /** A location of $branch where stock is held (Inventory, step 0.6): the store by default, optionally tied to a station. */
+    function stockLocation(Branch $branch, LocationType $type = LocationType::Store, ?Station $station = null): Location
+    {
+        return Location::factory()->ofType($type)->create(['branch_id' => $branch->id, 'station_id' => $station?->id]);
+    }
+}
+
+if (! function_exists('stockIn')) {
+    /**
+     * Write one movement of $qty (base units, signed as the reason wants) through the Ledger, the only writer of the
+     * stock tables (ADR 0002). Needs an authenticated ActorContext (withActor) like every ledger write.
+     */
+    function stockIn(Item|int $item, Location|int $location, string $qty, MovementReason $reason = MovementReason::PurchaseIn): Movement
+    {
+        return app(Ledger::class)->append(MovementIntent::of(
+            $item instanceof Item ? $item->id : $item,
+            $location instanceof Location ? $location->id : $location,
+            $qty,
+            $reason,
+            'test',
+        ));
+    }
+}
+
+if (! function_exists('stockRow')) {
+    /** The stock_balances row of (item, location) as the database holds it, decimal strings included; null when none. */
+    function stockRow(Item|int $item, Location|int $location): ?object
+    {
+        return DB::table('stock_balances')
+            ->where('item_id', $item instanceof Item ? $item->id : $item)
+            ->where('location_id', $location instanceof Location ? $location->id : $location)
+            ->first();
+    }
+}
+
+if (! function_exists('ledgerOracle')) {
+    /**
+     * Three independent readings of a branch's stock, keyed "item:location" => [on_hand, reserved] as 4 dp strings
+     * (ADR 0002's reconciliation): `movements` folds the raw stock_movements rows with the domain table's rule (the
+     * reservation reasons move reserved only; a production_consume / sale with a reservation_ref moves both; everything
+     * else moves on_hand; the row's place is the side the sign points at), `balances` reads stock_balances, `view`
+     * reads item_stock_view. Pairs at zero/zero are left out of all three, so a balance row created at zero and never
+     * moved compares equal to no row at all.
+     *
+     * @return array{movements: array<string, array{0: string, 1: string}>, balances: array<string, array{0: string, 1: string}>, view: array<string, array{0: string, 1: string}>}
+     */
+    function ledgerOracle(int $branchId): array
+    {
+        $fold = [];
+        foreach (DB::table('stock_movements')->where('branch_id', $branchId)->orderBy('id')->get() as $row) {
+            $qty = BigDecimal::of((string) $row->qty);
+            $location = match (true) {
+                $row->from_location_id === null => $row->to_location_id,
+                $row->to_location_id === null => $row->from_location_id,
+                $qty->isNegative() => $row->from_location_id,
+                default => $row->to_location_id,
+            };
+            $key = $row->item_id.':'.$location;
+            $fold[$key] ??= [BigDecimal::zero(), BigDecimal::zero()];
+            $reservedOnly = in_array($row->reason, ['reservation', 'reservation_release'], true);
+            $both = in_array($row->reason, ['production_consume', 'sale'], true) && $row->reservation_ref !== null;
+            if (! $reservedOnly) {
+                $fold[$key][0] = $fold[$key][0]->plus($qty);
+            }
+            if ($reservedOnly || $both) {
+                $fold[$key][1] = $fold[$key][1]->plus($qty);
+            }
+        }
+
+        $normalise = function (iterable $pairs): array {
+            $out = [];
+            foreach ($pairs as $key => [$onHand, $reserved]) {
+                $onHand = (string) BigDecimal::of((string) $onHand)->toScale(4);
+                $reserved = (string) BigDecimal::of((string) $reserved)->toScale(4);
+                if ($onHand !== '0.0000' || $reserved !== '0.0000') {
+                    $out[(string) $key] = [$onHand, $reserved];
+                }
+            }
+            ksort($out);
+
+            return $out;
+        };
+        $rows = fn (string $table): array => DB::table($table)->where('branch_id', $branchId)->get()
+            ->mapWithKeys(fn (object $r): array => [$r->item_id.':'.$r->location_id => [(string) $r->on_hand, (string) $r->reserved]])
+            ->all();
+
+        return [
+            'movements' => $normalise($fold),
+            'balances' => $normalise($rows('stock_balances')),
+            'view' => $normalise($rows('item_stock_view')),
+        ];
     }
 }
 

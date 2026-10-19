@@ -21,7 +21,7 @@ it('uses dotted lowercase permission names and lists every permission exactly on
         expect($permission)->toMatch('/^[a-z]+(\.[a-z_]+)+$/');
     }
     expect($all)->toContain(
-        'catalog.manage', 'catalog.view', 'people.manage', 'inventory.view', 'inventory.adjust',
+        'catalog.manage', 'catalog.view', 'people.manage', 'inventory.view', 'inventory.adjust', 'inventory.manage',
         'orders.create', 'orders.accept', 'orders.void', 'payments.take', 'payments.void',
         'production.request', 'production.fulfil', 'production.confirm', 'transfers.request', 'transfers.confirm',
         'shifts.count', 'shifts.approve', 'shifts.unlock', 'channels.manage', 'analytics.view', 'audit.view',
@@ -48,6 +48,9 @@ it('follows the matrix row by row', function (string $permission, array $roles) 
     'confirm production request' => ['production.confirm', ['admin', 'manager']],
     'fulfil production request' => ['production.fulfil', ['admin', 'cake_baker', 'bread_baker']],
     'record purchase' => ['purchases.record', ['admin', 'manager']],
+    'see stock and the ledger' => ['inventory.view', ['admin', 'manager', 'cashier', 'chef', 'barista', 'cake_baker', 'bread_baker']],
+    'adjust stock by hand' => ['inventory.adjust', ['admin']],
+    'configure stock locations' => ['inventory.manage', ['admin']],
     'request transfer' => ['transfers.request', ['admin', 'manager', 'cashier', 'chef', 'barista', 'cake_baker', 'bread_baker']],
     'confirm transfer' => ['transfers.confirm', ['admin', 'manager']],
     'enter counts' => ['shifts.count', ['admin', 'manager', 'cashier', 'chef', 'barista', 'cake_baker', 'bread_baker']],

@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Models\Item;
+use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Models\Location;
+use App\Shared\Models\Branch;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -32,7 +36,27 @@ function seedAppendOnlyRow(string $table): int
             'actor_id' => 1, 'action' => 'probe', 'subject_type' => 'probe', 'subject_id' => 1,
             'before' => null, 'after' => json_encode(['n' => 1]), 'at' => now(),
         ]),
+        'stock_movements' => (function (): int {
+            $branch = Branch::factory()->create();
+            $user = User::factory()->create(['branch_id' => $branch->id]);
+
+            return DB::table('stock_movements')->insertGetId([
+                'branch_id' => $branch->id,
+                'item_id' => Item::factory()->ingredient('g')->create(['branch_id' => $branch->id, 'created_by_user_id' => $user->id])->id,
+                'to_location_id' => Location::factory()->create(['branch_id' => $branch->id])->id,
+                'qty' => '1.0000', 'reason' => 'purchase_in', 'ref_type' => 'probe', 'user_id' => $user->id, 'created_at' => now(),
+            ]);
+        })(),
         default => throw new LogicException("seedAppendOnlyRow(): add a seed row for append-only table {$table}"),
+    };
+}
+
+/** A change to a column the table really has, so the trigger (not an unknown column) is what refuses it. */
+function appendOnlyTamper(string $table): array
+{
+    return match ($table) {
+        'stock_movements' => ['qty' => '2.0000'],
+        default => ['action' => 'tampered'],
     };
 }
 
@@ -59,7 +83,7 @@ it('rejects UPDATE and DELETE on every append-only table that exists, at the dat
 
         expect(triggerEvents($table))->toContain('UPDATE', 'DELETE');
 
-        expect(fn () => DB::transaction(fn () => DB::table($table)->where('id', $id)->update(['action' => 'tampered'])))
+        expect(fn () => DB::transaction(fn () => DB::table($table)->where('id', $id)->update(appendOnlyTamper($table))))
             ->toThrow(QueryException::class, 'append-only');
         expect(fn () => DB::transaction(fn () => DB::table($table)->where('id', $id)->delete()))
             ->toThrow(QueryException::class, 'append-only');
