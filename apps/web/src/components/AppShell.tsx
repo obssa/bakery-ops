@@ -27,7 +27,7 @@ function Account() {
   const me = useSession((s) => s.me);
   const signOut = useSession((s) => s.signOut);
 
-  if (status === "unknown") return <span className="min-h-12 w-24" aria-hidden="true" />;
+  if (status === "unknown") return <span className="inline-block h-12 w-24" aria-hidden="true" />;
 
   if (status !== "signed-in" || !me) {
     return (
