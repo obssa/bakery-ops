@@ -6,13 +6,18 @@
       "name": "plan-phase-1",
       "prompt": "We're in the bakery-ops repo and Phase 0 is done. Plan Phase 1 (ordering and the live kitchen/bar screens). Write the plan file the way this project expects and tell me what has to be true before anyone writes Orders code.",
       "expected_output": "A docs/phases/phase-1-plan.md following the phase-plan template: contract tests listed first (orders->inventory reserve/release/consume + Availability::bulk, orders->catalog Prices::at snapshot + stationFor, orders->identity short code / acting-as / PIN, payments->orders totals), migrations with NUMERIC scales, action endpoints with permissions and idempotency, events, intra-phase build order, test list incl. Playwright p1-order-flow and p1-shortfall, Phase1Seeder, ADRs 0006/0007. The agent stops for approval instead of coding and says plan_approved must be set by Ramin.",
-      "files": ["evals/fixtures/status-phase0-done.json"],
+      "files": [
+        "evals/fixtures/status-phase0-done.json"
+      ],
       "expectations": [
         "Produces docs/phases/phase-1-plan.md (or equivalent plan document) with sections for contract tests, migrations, endpoints, events, build order, tests, seeds, ADRs",
         "Lists consumer-side contract tests BEFORE Orders implementation and names Reservations::reserve/release/consume or equivalent Inventory capabilities as the thing to prove first",
         "States that Payments in Phase 1 is a schema-complete skeleton where only cash can pass validation (no photo upload yet)",
         "Mentions that the plan needs Ramin's approval (plan_approved) before coding begins and does not start implementing Orders",
-        "Migrations specify decimal(12,2) for money and decimal(14,4) for quantities, and include branch_id and client_uuid on orders"
+        "Migrations specify decimal(12,2) for money and decimal(14,4) for quantities, and include branch_id and client_uuid on orders",
+        "Quotes the output of gate_check.py --mode entry (or phase_status.py show) rather than only describing the state",
+        "Uses the manifest's capability names verbatim (Reservations::reserve/release/consume, Prices::at, Routing::stationFor) instead of invented service names",
+        "Lists all four Phase 1 contracts from the manifest (orders->inventory, orders->catalog, orders->identity, payments->orders) and marks payments->orders as intra-phase"
       ]
     },
     {
@@ -20,13 +25,17 @@
       "name": "refuse-phase-2-start",
       "prompt": "Can we start Phase 2 now? I want to begin the production module today.",
       "expected_output": "The agent runs the entry preflight (gate_check.py --mode entry --phase 2 or reads STATUS.json equivalently), sees Phase 1 is not done (gate-p1 red / no done_commit) and refuses to start, naming the red Phase 1 gate and the missing production contracts, and lists exactly what must happen first. It does not create Production code.",
-      "files": ["evals/fixtures/status-phase1-red.json"],
+      "files": [
+        "evals/fixtures/status-phase1-red.json"
+      ],
       "expectations": [
         "Answers no / not yet rather than starting Phase 2 work",
         "Names the Phase 1 gate (gate-p1 or gate:p1) as not green or Phase 1 as not done as the blocking reason",
         "Names the missing contract tests for Production (production->inventory, production->catalog, production->identity) or the unapproved Phase 2 plan as further prerequisites",
         "Does not create any files under app/Modules/Production",
-        "Refers to gate_check.py --mode entry (or runs it) as the mechanism for this decision"
+        "Refers to gate_check.py --mode entry (or runs it) as the mechanism for this decision",
+        "Pastes the gate_check entry output verbatim with the FAIL lines (not a paraphrase)",
+        "Orients with phase_status.py show (or equivalent STATUS read) before answering and names the next in-order step of the current phase"
       ]
     },
     {
@@ -34,13 +43,18 @@
       "name": "place-production-module",
       "prompt": "Add the production module: bakers get production requests when a cake runs out, accept them, log the batch, and the cake becomes available again. Where does this go and how do we build it so it doesn't break anything?",
       "expected_output": "The agent places Production in Phase 2 (step 2.7), lists its dependencies with named capabilities (Inventory Stock::of + Ledger::appendMany atomic + StockOut event; Catalog scaled recipe + default_batch_qty; Identity assignedUsers/isOverseer; Notifications by event only), explains the cycle break with Shifts via the StationPresenceResolver / ShiftAttacher interfaces instead of importing Shifts, and prescribes contract tests first, then module tests, then implementation, ending with gate_check --mode module.",
-      "files": ["evals/fixtures/status-phase1-done.json"],
+      "files": [
+        "evals/fixtures/status-phase1-done.json"
+      ],
       "expectations": [
         "Places the module in Phase 2 and names its build-order position after purchases/transfers/notifications or cites manifest step 2.7",
         "Lists dependencies on Inventory, Catalog and Identity with at least one named capability each (e.g. Ledger::appendMany, Recipes::activeFor scaled by yield, assignedUsers)",
         "Says Production must not import Shifts and names the interface-based cycle break (StationPresenceResolver / ShiftAttacher or AssignedUsersResolver / NullShiftAttacher)",
         "Prescribes writing consumer-side contract tests before any Production code",
-        "Mentions Notifications are reached by domain events, not by importing Notifications models"
+        "Mentions Notifications are reached by domain events, not by importing Notifications models",
+        "Lists all four Phase 2 contracts required by the manifest (production->inventory, production->catalog, production->identity, notifications->identity)",
+        "Uses the manifest capability names (Ledger::appendMany, Recipes::activeFor scaled by yield, assignedUsers, isOverseer) rather than invented ones",
+        "Does not propose hand-editing STATUS.json (plan_approved, module status or phase) to make progress"
       ]
     },
     {
@@ -53,7 +67,9 @@
         "Identifies mod-inventory as the job to fix first and the others as downstream consequences of the needs chain",
         "Explains that the job graph mirrors the module dependency graph (identity -> catalog -> inventory -> orders ...)",
         "Mentions that the inventory job also runs consumer contract tests (contract:orders->inventory or similar) so a consumer expectation may be what broke",
-        "Suggests reproducing locally with the same steps (python scripts/task.py ci / make ci or the pest group)"
+        "Suggests reproducing locally with the same steps (python scripts/task.py ci / make ci or the pest group)",
+        "States that with current_phase 0 the Phase 1 jobs are skipped by the status job, not failed, and that gate-p0 is the blocking required check",
+        "Cites the manifest ci.module_jobs / gate_jobs or references/ci-cd.md as the source of the job graph"
       ]
     },
     {
@@ -67,8 +83,13 @@
         "Quantity and Money value objects use brick/math BigDecimal (no float arithmetic)",
         "Adds unit tests for Quantity/Money arithmetic and StateMachine illegal transitions tagged with the unit group",
         "Runs or instructs running tests through Docker (scripts/pest, scripts/artisan or task.py), never host php",
-        "python scripts/check_invariants.py --numeric --branch-id --bilingual reports zero violations on the result"
+        "python scripts/check_invariants.py --numeric --branch-id --bilingual reports zero violations on the result",
+        "gate_check.py --mode entry --phase 0 was run and reported PASS before any Shared code was written (evidence in RESPONSE.md)",
+        "Tests were committed before implementation (a red-tests commit precedes the implementation commits in the branch history)",
+        "gate_check.py --mode module --module shared reports PASS and phase_status.py module-stable shared was run (STATUS.json shows modules.shared.status = stable)",
+        "Idempotency middleware and ActorContext each have passing tests tagged module:shared"
       ]
     }
-  ]
+  ],
+  "notes": "Iteration 2 (2026-10-19): assertions extended to skill-only process behaviour after iteration 1 showed the repo infrastructure alone satisfies the outcome assertions. Baseline copies must keep .claude/skills/bakery-ops-builder/assets (manifest) so scripts run; fixtures should state their premise in README-EVAL.md."
 }
