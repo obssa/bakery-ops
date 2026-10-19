@@ -125,6 +125,7 @@ it('seeds kg g L ml pcs slice tray on the base units g, ml and pcs', function ()
 })->group('module:catalog', 'invariants');
 
 it('constrains kind and fulfilment at the database level and keeps unit codes unique', function () {
+    seedRoles();
     $branch = Branch::factory()->create();
     $user = makeUser($branch, 'admin');
     $row = fn (array $over): array => $over + [
@@ -142,6 +143,7 @@ it('constrains kind and fulfilment at the database level and keeps unit codes un
 it('keeps sku unique per branch and lets two branches share one', function () {
     $a = Branch::factory()->create();
     $b = Branch::factory()->create();
+    seedRoles();
     $user = makeUser($a, 'admin');
     $row = fn (int $branchId): array => [
         'branch_id' => $branchId, 'kind' => 'product', 'fulfilment' => 'to_stock', 'name_en' => 'Cake', 'name_am' => 'ኬክ',
