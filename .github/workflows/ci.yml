@@ -49,11 +49,32 @@ jobs:
   api-arch:
     needs: api-lint
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_DB: bakery_test, POSTGRES_USER: bakery, POSTGRES_PASSWORD: secret }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U bakery" --health-interval 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 20
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: bakery_test
+      DB_USERNAME: bakery
+      DB_PASSWORD: secret
+      REDIS_HOST: 127.0.0.1
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
       - name: Migration lint
         run: python3 scripts/check_invariants.py --numeric --branch-id --bilingual --append-only
+      - name: Migrate test database
+        working-directory: apps/api
+        run: php artisan migrate --force --no-interaction
       - name: Architecture and invariant tests
         run: bash scripts/ci/pest-groups.sh "arch,invariants"
 
@@ -71,7 +92,7 @@ jobs:
       - uses: ./.github/actions/setup-api
       - name: Route list
         working-directory: apps/api
-        env: { DB_HOST: 127.0.0.1, DB_DATABASE: bakery_test, DB_USERNAME: bakery, DB_PASSWORD: secret }
+        env: { DB_CONNECTION: pgsql, DB_HOST: 127.0.0.1, DB_DATABASE: bakery_test, DB_USERNAME: bakery, DB_PASSWORD: secret }
         run: mkdir -p tmp && php artisan route:list --json > tmp/routes.json
       - name: All repo invariants
         run: python3 scripts/check_invariants.py --all --routes apps/api/tmp/routes.json
@@ -202,6 +223,7 @@ jobs:
           path: |
             apps/web/.next
             !apps/web/.next/cache
+          include-hidden-files: true
           retention-days: 1
 
   # ------------------------------------------------------------------ api image for e2e
