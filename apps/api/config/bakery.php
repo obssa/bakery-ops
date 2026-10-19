@@ -30,4 +30,15 @@ return [
         // Name recorded on every Sanctum personal access token issued by POST /login (ADR 0007).
         'token_name' => 'api',
     ],
+
+    'demo' => [
+        // The demo bakery (Database\Seeders\Phase0Seeder .. PhaseNSeeder, `php artisan bakery:seed-demo`) lives in a
+        // branch of its own, created on the first run and marked settings.demo = true; a branch of that name that is
+        // not a demo branch is refused, so shop data is never touched.
+        'branch' => env('BAKERY_DEMO_BRANCH', 'Demo Bakery'),
+        // The password of every demo account; their short codes are derived from it. Required outside local and
+        // testing (the seeders refuse to run without it); local and testing fall back to the documented
+        // Database\Seeders\Demo\DemoCredentials::LOCAL_PASSWORD, which is refused everywhere else.
+        'password' => env('BAKERY_DEMO_PASSWORD'),
+    ],
 ];
