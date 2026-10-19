@@ -7,6 +7,9 @@ parameters:
         - app
         - database
         - routes
-    # tests/ are Pest closures; PHPStan cannot type $this inside them without the Pest plugin,
+        # Plain classes/enums used by tests (e.g. the DoorStatus state machine): analysed so traits that
+        # only tests exercise so far (StateMachine until Orders lands) are still type-checked at level 8.
+        - tests/Fixtures
+    # The rest of tests/ are Pest closures; PHPStan cannot type $this inside them without the Pest plugin,
     # and the tests prove themselves by running. Application code stays at level 8.
     tmpDir: tmp/phpstan

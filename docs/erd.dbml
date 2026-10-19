@@ -27,10 +27,10 @@ Table jobs { id bigint [pk]  queue varchar  payload text  attempts smallint  res
 Table job_batches { id varchar [pk]  name varchar  total_jobs int  pending_jobs int  failed_jobs int  failed_job_ids text  options text  cancelled_at int  created_at int  finished_at int }
 Table failed_jobs { id bigint [pk]  uuid varchar [unique]  connection text  queue text  payload text  exception text  failed_at timestamp }
 
-// ---- Phase 0 domain tables (planned; documented ahead of their migrations)
-Table branches { id bigint [pk]  name varchar  timezone varchar  currency varchar  settings jsonb  created_at timestamp  updated_at timestamp  deleted_at timestamp }
-Table stations { id bigint [pk]  branch_id bigint [ref: > branches.id]  code varchar  name_en varchar  name_am varchar  requires_overseer boolean  sort int }
-Table idempotency_keys { id bigint [pk]  branch_id bigint  user_id bigint  key varchar  request_hash varchar  response_status int  response_body jsonb  expires_at timestamp }
+// ---- Phase 0 domain tables (branches, stations, idempotency_keys migrated in step 0.2; the rest planned ahead of their migrations)
+Table branches { id bigint [pk]  name varchar(120)  timezone varchar(64)  currency char(3)  settings json  created_at timestamp  updated_at timestamp  deleted_at timestamp  Note: 'the tenant (step 0.2); timezone defaults to Africa/Addis_Ababa, currency to ETB; settings is plain JSON (no DB default, the model supplies {})' }
+Table stations { id bigint [pk]  branch_id bigint [ref: > branches.id]  code varchar(20)  name_en varchar(120)  name_am varchar(120)  requires_overseer boolean  sort smallint  created_at timestamp  updated_at timestamp  deleted_at timestamp  Note: 'step 0.2; code in till|kitchen|bar|cake_room|bakery|store (CHECK constraint stations_code_check); unique (branch_id, code)' }
+Table idempotency_keys { id bigint [pk]  branch_id bigint [ref: > branches.id]  user_id bigint  key varchar(255)  request_hash char(64)  response_status smallint  response_body json  expires_at timestamp  created_at timestamp  updated_at timestamp  Note: 'step 0.2; unique (branch_id, user_id, key); user_id has no FK (Shared is the leaf, ADR 0001); index expires_at' }
 Table audit_log { id bigint [pk]  branch_id bigint  actor_id bigint  acting_user_id bigint  action varchar  subject_type varchar  subject_id bigint  before jsonb  after jsonb  shift_instance_id bigint  station_id bigint  device_id bigint  ip varchar  at timestamp  Note: 'append-only (trigger)' }
 Table units { id bigint [pk]  code varchar  base_unit_id bigint  factor "numeric(14,4)" }
 Table categories { id bigint [pk]  branch_id bigint  kind varchar  name_en varchar  name_am varchar  parent_id bigint  sort int }
