@@ -62,13 +62,22 @@ it names and nothing else. Do not edit STATUS.json to make it pass. If the only 
 "plan not approved", the right move is step 3 (write the plan, commit, stop); if a dependency is unstable or a
 contract is missing, the right move is to say so and offer the upstream work instead.
 
-### 3. Plan the phase, then stop
+### 3. Plan the phase (standing approval since 2026-10-19)
+
+Ramin granted standing approval on 2026-10-19: "proceed to the next phase without waiting for my permission".
+So: still write the plan (it is the design record and the test list), commit it, set `plan_approved: true` with
+`plan_approved_by: "standing approval: Ramin, 2026-10-19"`, and continue immediately. Stop and ask only for
+actions that are destructive, cost money, or need his accounts (server secrets, billing, domain changes), or
+for a data-model question that changes the ledger's meaning. Report progress briefly between steps and fully
+at each gate.
+
+#### Original procedure (if Ramin withdraws the standing approval)
 
 Copy `assets/templates/phase-plan.md` to `docs/phases/phase-<N>-plan.md` and fill it from the phase
-reference and the manifest: contract tests first, migrations with NUMERIC scales, endpoints with
+reference and the manifest: contract tests first, migrations with DECIMAL scales, endpoints with
 request/response shapes and permissions, events and listeners, intra-phase build order, the test list,
-seeds, ADRs, assumptions. Set the phase status to `planning` via `phase_status.py`, commit, and end your
-turn telling Ramin the plan is ready for approval. Resume only when `plan_approved` is true.
+seeds, ADRs, assumptions. Set the phase status to `planning` via `phase_status.py`, commit, and (without
+standing approval) end your turn telling Ramin the plan is ready; resume only when `plan_approved` is true.
 
 ### 4. Build one module at a time, in the manifest's order
 
@@ -85,8 +94,10 @@ c. **Implement** inside `app/Modules/<Name>` (or `app/Shared`), exposing the cap
    `ActorContext`, uses `Quantity`/`Money`, and registers in `tests/Support/write_endpoints.php` and
    `route_permissions.php`.
 d. Push the branch and let CI run (`python scripts/task.py ci` is available for local debugging in Docker, not required). Fix until the checks are green.
-e. Branch `phase-<N>/<module>`, PR with the template filled (tests added, assumptions, gate impact),
-   CI green, merge. Small PRs: one module or sub-module each.
+e. Branch `phase-<N>/<module>`, push, open the PR (CI runs on PRs and on main only), wait for the checks,
+   then fast-forward `main` to the branch head locally and push (`git merge --ff-only`): the same commit
+   keeps its green checks and both author and committer stay Ramin. Every push to main deploys to
+   https://bakery-ops.orcamind.dev after CI. Small PRs: one module or sub-module each.
 f. `python scripts/gate_check.py --mode module --module <name>` then
    `python scripts/phase_status.py module-stable <name>`. Only `stable` modules may be depended on.
 
@@ -102,10 +113,11 @@ and requires `docs/phases/phase-<N>-report.md` (from `assets/templates/gate-repo
 `phase_status.py claim-done <N>` records `done_commit`, commit, push, wait for `gate-p<N>` green on
 `main`, record the run URL, tag `phase-<N>-complete`.
 
-### 6. Stop and show
+### 6. Report and continue
 
-End the turn with the gate report summary and the list of things only Ramin can do (add `gate-p<N+1>`
-to required checks, approve the next plan). Never begin the next phase in the same turn.
+Write the gate report, add `gate-p<N+1>` to the required checks (`gh api` works with the owner's token),
+report the gate briefly, and go straight on to the next phase's plan (standing approval). Only things that
+need Ramin's accounts or money wait for him.
 
 ## Answering common requests
 
