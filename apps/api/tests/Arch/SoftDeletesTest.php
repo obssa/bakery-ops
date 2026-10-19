@@ -14,6 +14,7 @@ $noSoftDeletes = [
     'App\Shared\Models\IdempotencyKey',  // technical, expires; rows are swept, not "deleted" by a user
     'App\Modules\Audit\Models\AuditLog',  // append-only (DB trigger + model guard): rows are never deleted, softly or otherwise
     'App\Modules\Identity\Models\ActingSession',  // history of who acted when: ends (ended_at / expires_at), never deleted
+    'App\Modules\Catalog\Models\ItemPrice',  // price history: a price is closed by effective_to, never deleted (Prices::at reads it)
     // other append-only tables arrive with their modules: StockMovement (0.6), OrderEvent (P1)
 ];
 

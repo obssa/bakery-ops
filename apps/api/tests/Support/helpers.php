@@ -7,6 +7,7 @@ declare(strict_types=1);
  * Nothing here is a test; everything here exists so tests can state behaviour in one line.
  */
 
+use App\Modules\Catalog\Models\Unit;
 use App\Modules\Identity\Contracts\PermissionRegistry;
 use App\Modules\Identity\Models\User;
 use App\Shared\Actor\ActorContext;
@@ -92,6 +93,14 @@ if (! function_exists('makeUser')) {
         $user->assignRole($role);
 
         return $user->fresh() ?? $user;
+    }
+}
+
+if (! function_exists('catalogUnit')) {
+    /** One of the units every database carries from its migration (kg g L ml pcs slice tray; Catalog, step 0.5). */
+    function catalogUnit(string $code): Unit
+    {
+        return Unit::query()->where('code', $code)->firstOrFail();
     }
 }
 

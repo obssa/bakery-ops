@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 $allowedWithoutScope = [
     'App\Shared\Models\Branch',          // the tenant
     'App\Shared\Models\IdempotencyKey',  // scoped explicitly by (branch_id, user_id, key) in the middleware
+    'App\Modules\Catalog\Models\Unit',   // global reference data every branch shares (units is in BRANCH_ALLOWLIST)
 ];
 
 it('every tenant model uses BranchScoped', function () use ($allowedWithoutScope) {
