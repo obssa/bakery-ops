@@ -17,11 +17,11 @@ shared with the owner's other site on the same account (ADR 0006).
 | Database | MySQL database and user `<account>_bakeryops`, all privileges; password only in the server `.env` |
 | Drivers | database cache, sessions and queue (cron-drained); `BROADCAST_CONNECTION=log` (polling) until a WebSocket host exists |
 | Web app | `DEPLOY_WEB_MODE=skip` until the Next.js shell is export-safe, then `static` (served from `public/app/`) |
-| Deploy key | ed25519 key used only by this repository's GitHub Actions, authorised with the `restrict` option |
+| Deploy key | ed25519 key used by this repository's GitHub Actions and by the owner's PC for provisioning; authorised with the `restrict` option (commands and rsync only, no terminal, no forwarding) |
 | Host key | pinned in the GitHub secret `DEPLOY_KNOWN_HOSTS` |
 | Rollback snapshot | `~/releases/bakery-ops/prev.tar.gz` (code only, written before every deploy) |
 
-Status: **not yet provisioned** (pipeline, keys and variables prepared 2026-10-19; `DEPLOY_ENABLED=false`).
+Status: **provisioned 2026-10-19** (steps 1-10 done from the owner's PC over SSH with the deploy key; `DEPLOY_ENABLED=true`). The host's CloudLinux Node.js selector offers Node 10-22, so a server-rendered web app is possible later.
 
 ## One-time provisioning checklist (cPanel Terminal or SSH as the account user)
 
