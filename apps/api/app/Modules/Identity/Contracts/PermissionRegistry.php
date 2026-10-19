@@ -29,6 +29,8 @@ final class PermissionRegistry
         'people.manage' => ['admin'],
         'inventory.view' => self::FLOOR,
         'inventory.adjust' => ['admin'],
+        // configuring stock locations (Inventory, step 0.6): configuration, admin only like catalog.manage
+        'inventory.manage' => ['admin'],
         'purchases.record' => ['admin', 'manager'],
         'orders.create' => ['admin', 'manager', 'cashier', 'waiter'],
         'orders.accept' => ['admin', 'manager', 'chef', 'barista'],

@@ -3,6 +3,7 @@
 use App\Modules\Audit\AuditServiceProvider;
 use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Identity\IdentityServiceProvider;
+use App\Modules\Inventory\InventoryServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Shared\SharedServiceProvider;
 
@@ -12,4 +13,5 @@ return [
     AuditServiceProvider::class,
     IdentityServiceProvider::class,
     CatalogServiceProvider::class,
+    InventoryServiceProvider::class,
 ];
