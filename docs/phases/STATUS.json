@@ -27,8 +27,8 @@
         "catalog": "done",
         "inventory": "done",
         "web": "done",
-        "seeds": "in_progress",
-        "docs": "todo"
+        "seeds": "done",
+        "docs": "in_progress"
       },
       "playwright_projects": [
         "p0-admin-smoke"
