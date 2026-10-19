@@ -13,6 +13,22 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # Web shell: the static export of apps/web under /app/ (ADR 0006, step 0.7). LiteSpeed serves its files and
+    # folders (folder -> index.html) as they are; PHP never runs for /app.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^app(/.*)?$ - [L]
+
+    # An unknown page inside a language: that language's "page not found" page.
+    RewriteCond %{DOCUMENT_ROOT}/app/$1/not-found/index.html -f
+    RewriteRule ^app/(en|am)(/.*)?$ app/$1/not-found/index.html [L]
+
+    # Anything else under /app (no language yet, e.g. /app/admin/): the start page, which picks the language. A
+    # missing /app/_next/ asset (an old page after a deploy) is not a page: it falls through to a plain 404.
+    RewriteCond %{REQUEST_URI} !^/app/_next/
+    RewriteCond %{DOCUMENT_ROOT}/app/index.html -f
+    RewriteRule ^app(/.*)?$ app/index.html [L]
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
@@ -22,4 +38,20 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_dir.c>
+    # /app/ and every page folder of the web shell open their index.html; the site root keeps index.php.
+    DirectoryIndex index.html index.php
+</IfModule>
+
+<IfModule mod_setenvif.c>
+    <IfModule mod_headers.c>
+        # Web shell caching: /app/_next/static/ files carry a content hash in their names, so they never change;
+        # every other /app file (the HTML pages, the RSC .txt payloads) is revalidated so a deploy shows at once.
+        SetEnvIf Request_URI "^/app/" BAKERY_WEB_PAGE
+        SetEnvIf Request_URI "^/app/_next/static/" !BAKERY_WEB_PAGE BAKERY_WEB_ASSET
+        Header set Cache-Control "public, max-age=31536000, immutable" env=BAKERY_WEB_ASSET
+        Header set Cache-Control "no-cache" env=BAKERY_WEB_PAGE
+    </IfModule>
 </IfModule>

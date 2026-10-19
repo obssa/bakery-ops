@@ -21,6 +21,17 @@ excludes="$work/scripts/deploy/rsync-excludes.txt"
 [ -f "$excludes" ] || { echo "no rsync exclude list found; refusing to sync with --delete"; exit 1; }
 rsync -a --delete --exclude-from="$excludes" "$work/" "$APP_DIR/"
 cd "$APP_DIR"
+# rsync never touches public/.htaccess (cPanel keeps its PHP handler there), yet a release may have changed Laravel's
+# rules in it (the /app web shell rules did): rebuild it from the restored release's copy, exactly as release.sh does.
+if [ -f scripts/deploy/public.htaccess ]; then
+    blocks="$(awk '/BEGIN cPanel-generated/{k=1} k{print} /END cPanel-generated/{k=0}' public/.htaccess 2>/dev/null || true)"
+    {
+        if [ -n "$blocks" ]; then printf '%s\n\n' "$blocks"; fi
+        cat scripts/deploy/public.htaccess
+    } > public/.htaccess.new
+    mv public/.htaccess.new public/.htaccess
+    echo "public/.htaccess restored from the previous release"
+fi
 rm -f bootstrap/cache/*.php
 "$PHP_BIN" artisan optimize
 "$PHP_BIN" artisan up || true

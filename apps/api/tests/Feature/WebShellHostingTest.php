@@ -19,18 +19,30 @@ it('redirects the site root to the web shell under /app/ without starting a sess
 
 it('reads the CORS allowlist from CORS_ALLOWED_ORIGINS and defaults to no origin at all', function () {
     $load = fn (): array => require config_path('cors.php');
+    // compose puts the variable into $_SERVER/$_ENV as well, which env() reads before getenv(): set all three
+    $set = function (?string $value): void {
+        if ($value === null) {
+            unset($_SERVER['CORS_ALLOWED_ORIGINS'], $_ENV['CORS_ALLOWED_ORIGINS']);
+            putenv('CORS_ALLOWED_ORIGINS');
 
-    putenv('CORS_ALLOWED_ORIGINS');
+            return;
+        }
+        $_SERVER['CORS_ALLOWED_ORIGINS'] = $_ENV['CORS_ALLOWED_ORIGINS'] = $value;
+        putenv("CORS_ALLOWED_ORIGINS={$value}");
+    };
+    $saved = getenv('CORS_ALLOWED_ORIGINS');
+
     try {
+        $set(null);
         expect($load()['allowed_origins'])->toBe([])
             ->and($load()['paths'])->toBe(['api/*']);
 
-        putenv('CORS_ALLOWED_ORIGINS= http://localhost:3000 ,http://127.0.0.1:3000,');
+        $set(' http://localhost:3000 ,http://127.0.0.1:3000,');
         expect($load()['allowed_origins'])->toBe(['http://localhost:3000', 'http://127.0.0.1:3000'])
             ->and($load()['allowed_origins_patterns'])->toBe([])
             ->and($load()['supports_credentials'])->toBeFalse();
     } finally {
-        putenv('CORS_ALLOWED_ORIGINS');
+        $set($saved === false ? null : $saved);
     }
 })->group('invariants', 'feature');
 
