@@ -10,7 +10,7 @@ x-api-env: &api-env
   APP_URL: http://localhost:8000
   APP_TIMEZONE: UTC
   LOG_CHANNEL: stderr
-  DB_CONNECTION: mysql
+  DB_CONNECTION: mariadb
   DB_HOST: db
   DB_PORT: "3306"
   DB_DATABASE: bakery
@@ -76,22 +76,22 @@ services:
     profiles: ["full"]
 
   db:
-    # MySQL 8: the engine the live site runs on (shared cPanel, ADR 0006). PostgreSQL stays an option
-    # for a VPS; keep schema and tests portable (DECIMAL, JSON, triggers, FOR UPDATE; no matviews).
-    image: mysql:8.0
+    # MariaDB 10.11: the engine the live site runs on (shared cPanel, ADR 0006); CI uses the same image.
+    # PostgreSQL stays an option for a VPS; keep schema and tests portable (DECIMAL, JSON, triggers, FOR UPDATE).
+    image: mariadb:10.11
     # log_bin_trust_function_creators: the append-only triggers (audit_log, stock_movements, order_events) are
-    # created by migrations as the app user; with binary logging on, MySQL otherwise demands SUPER (error 1419).
-    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci", "--log-bin-trust-function-creators=1"]
+    # created by migrations as the app user; with binary logging on, the server otherwise demands SUPER (1419).
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--log-bin-trust-function-creators=1"]
     environment:
-      MYSQL_DATABASE: bakery
-      MYSQL_USER: bakery
-      MYSQL_PASSWORD: secret
-      MYSQL_ROOT_PASSWORD: root
+      MARIADB_DATABASE: bakery
+      MARIADB_USER: bakery
+      MARIADB_PASSWORD: secret
+      MARIADB_ROOT_PASSWORD: root
     volumes:
       - db_data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
+      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
       interval: 3s
       timeout: 5s
       retries: 30

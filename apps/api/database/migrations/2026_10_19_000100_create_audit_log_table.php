@@ -62,7 +62,7 @@ return new class extends Migration
      */
     private function forbidUpdateDelete(): void
     {
-        if (DB::getDriverName() === 'mysql') {
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
             DB::unprepared(<<<'SQL'
                 CREATE TRIGGER audit_log_forbid_update_delete_update
                 BEFORE UPDATE ON audit_log FOR EACH ROW
@@ -96,7 +96,7 @@ return new class extends Migration
 
     private function dropForbidUpdateDelete(): void
     {
-        if (DB::getDriverName() === 'mysql') {
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
             DB::unprepared('DROP TRIGGER IF EXISTS audit_log_forbid_update_delete_update');
             DB::unprepared('DROP TRIGGER IF EXISTS audit_log_forbid_update_delete_delete');
         } elseif (DB::getDriverName() === 'pgsql') {

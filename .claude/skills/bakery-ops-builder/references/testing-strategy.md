@@ -51,7 +51,7 @@ depended on by the next step.
 
 ## Test infrastructure decisions
 
-- **Database**: the production engine in tests too (MySQL 8 service in CI, never SQLite): triggers, DECIMAL,
+- **Database**: the production engine in tests too (MariaDB 10.11 service in CI, never SQLite): triggers, DECIMAL,
   `FOR UPDATE` and JSON must be the real thing. Keep the schema portable to PostgreSQL (ADR 0006). `RefreshDatabase` for most groups; **`DatabaseTruncation` for `concurrency`**,
   because the transaction wrapper hides rows from a second connection.
 - **Queues**: feature tests assert dispatch with `Queue::fake()` and have a `sync` twin asserting the

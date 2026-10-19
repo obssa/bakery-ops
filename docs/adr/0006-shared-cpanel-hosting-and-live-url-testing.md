@@ -40,7 +40,7 @@ offline-tolerant clients as deployment option (a).
 
    | Concern | On cPanel (now) | VPS / later |
    |---|---|---|
-   | Database | MySQL 8 (`DB_CONNECTION=mysql`) unless the host provides PostgreSQL; all schema and tests must stay portable (DECIMAL, JSON, triggers, `FOR UPDATE`, no materialized views, no partial indexes) | PostgreSQL 16 |
+   | Database | MariaDB 10.11 on the host (`DB_CONNECTION=mariadb`; CI and the local stack run the same image) unless the host provides PostgreSQL; all schema and tests must stay portable (DECIMAL, JSON, triggers, `FOR UPDATE`, no materialized views, no partial indexes) | PostgreSQL 16 |
    | Cache / session / queue | `database` drivers; queue drained by cron `queue:work --stop-when-empty --max-time=50` every minute | Redis + Horizon |
    | Live updates (KDS, pads) | polling of `GET /stations/{id}/tickets?since=<cursor>` and `/menu` availability every few seconds; Reverb channels stay in the code behind `BROADCAST_CONNECTION` and are enabled when a WebSocket host exists (hosted Pusher-compatible service or a VPS) | Reverb |
    | Files (receipt photos) | local `private` disk on the account, signed URLs through Laravel | S3-compatible |
@@ -49,7 +49,7 @@ offline-tolerant clients as deployment option (a).
 
 5. **Phase impact**: Phase 0's `stock_balances` table (ADR 0002) already carries the row-lock design, so
    dropping the materialized view costs nothing: `item_stock_view` becomes a reconciliation query/report,
-   not a view. The CI module jobs run against the production engine (MySQL 8 service) so tests prove what
+   not a view. The CI module jobs run against the production engine (MariaDB 10.11, found on the host on 2026-10-19; service) so tests prove what
    production runs; a PostgreSQL job can be added later if a VPS move is planned.
 
 ## Consequences

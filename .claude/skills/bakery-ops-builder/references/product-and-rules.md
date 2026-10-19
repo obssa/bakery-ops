@@ -33,7 +33,7 @@ and English throughout.
 - **API**: Laravel 13 (the architecture document says Laravel 11; by October 2026 every Laravel 11 release carries unpatched security advisories and Composer refuses to install it, so the current major is used; skeleton structure and packages are the same), PHP 8.3, Octane, Sanctum bearer tokens, Reverb (WebSockets), Horizon + Redis
   queues, spatie/laravel-permission, spatie/laravel-activitylog, maatwebsite/excel, barryvdh/laravel-dompdf,
   brick/math for all money and quantity arithmetic, dedoc/scramble for OpenAPI 3.1 from code.
-- **DB**: MySQL 8 on the live host (the document allows it "if hosting dictates"; ADR 0006), PostgreSQL 16 on a VPS later; schema stays portable: `DECIMAL(12,2)` money, `DECIMAL(14,4)` quantities, JSON columns, triggers, `SELECT ... FOR UPDATE`, no materialized views, no partial indexes. Redis only where available (database drivers on cPanel).
+- **DB**: MariaDB 10.11 on the live host (Laravel `mariadb` driver; CI and local stack use the same image) (the document allows it "if hosting dictates"; ADR 0006), PostgreSQL 16 on a VPS later; schema stays portable: `DECIMAL(12,2)` money, `DECIMAL(14,4)` quantities, JSON columns, triggers, `SELECT ... FOR UPDATE`, no materialized views, no partial indexes. Redis only where available (database drivers on cPanel).
 - **Web**: Next.js 15 App Router, TypeScript strict, Tailwind, shadcn/ui, TanStack Query, Zustand,
   next-intl (`en`, `am`), Workbox service worker, IndexedDB outbox, Noto Sans Ethiopic.
 - **Files**: S3-compatible (MinIO locally and in CI, Cloudflare R2 later).

@@ -21,6 +21,6 @@ it('has a home for every module in the dependency graph', function () {
     }
 })->group('invariants');
 
-it('runs tests against the production engine (MySQL), never sqlite', function () {
-    expect(config('database.default'))->toBe('mysql');
+it('runs tests against the production engine (MariaDB, the live driver), never sqlite', function () {
+    expect(config('database.default'))->toBe('mariadb');
 })->group('invariants');
