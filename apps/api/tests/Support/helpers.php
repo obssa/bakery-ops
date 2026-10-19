@@ -40,6 +40,23 @@ if (! function_exists('actAsUserId')) {
     }
 }
 
+if (! function_exists('withActor')) {
+    /**
+     * Resolve the request-scoped ActorContext fully: user plus (optionally) the short-code actor, station, device and
+     * shift, exactly what every AuditedAction and ledger write stamps (rule 4). Ids are plain ints: Shared and Audit
+     * never FK to Identity or Shifts tables.
+     */
+    function withActor(int $userId, ?int $actingUserId = null, ?int $stationId = null, ?int $deviceId = null, ?int $shiftInstanceId = null): ActorContext
+    {
+        return app(ActorContext::class)
+            ->authenticate($userId)
+            ->actingAs($actingUserId)
+            ->atStation($stationId)
+            ->onDevice($deviceId)
+            ->inShift($shiftInstanceId);
+    }
+}
+
 if (! function_exists('dbSchema')) {
     /**
      * What information_schema calls table_schema for the test database: the database name on MySQL, 'public' on

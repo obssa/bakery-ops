@@ -30,6 +30,14 @@ foreach ($allowed as $module => $may) {
         ->group('arch');
 }
 
+arch('Audit is a leaf above Shared: it reads ActorContext and touches no other module, nor the scaffold models or HTTP layer')
+    ->expect('App\Modules\Audit')
+    ->not->toUse(array_merge(
+        array_map(fn (string $m) => "App\Modules\{$m}", array_values(array_diff($all, ['Audit']))),
+        ['App\Models', 'App\Http', 'App\Providers'],
+    ))
+    ->group('arch', 'module:audit');
+
 arch('Shared is a leaf: it never imports a module')
     ->expect('App\Shared')
     ->not->toUse(array_map(fn (string $m) => "App\Modules\{$m}", $all))

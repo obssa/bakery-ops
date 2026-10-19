@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 $noSoftDeletes = [
     'App\Shared\Models\IdempotencyKey',  // technical, expires; rows are swept, not "deleted" by a user
-    // append-only tables arrive with their modules: StockMovement (0.6), AuditLog (0.3), OrderEvent (P1)
+    'App\Modules\Audit\Models\AuditLog',  // append-only (DB trigger + model guard): rows are never deleted, softly or otherwise
+    // other append-only tables arrive with their modules: StockMovement (0.6), OrderEvent (P1)
 ];
 
 it('every mutable tenant model soft-deletes', function () use ($noSoftDeletes) {
