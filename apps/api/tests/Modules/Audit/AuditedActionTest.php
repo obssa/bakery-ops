@@ -52,7 +52,7 @@ it('writes one row with the actor stamp, the subject and before/after snapshots'
         ->and($row->after)->toBeArray()->toHaveKey('name_en', 'Hot kitchen')
         ->and($row->after['id'])->toBe($this->station->id)
         ->and($row->context)->toBeNull()
-        ->and($row->ip)->toBeNull()
+        ->and($row->ip)->toBe('127.0.0.1') // the testing kernel's request, as a real request would carry the client IP
         ->and($row->at)->toBeInstanceOf(CarbonImmutable::class)
         ->and($row->at->greaterThanOrEqualTo($before->startOfSecond()))->toBeTrue()
         ->and($row->at->lessThanOrEqualTo(CarbonImmutable::now()->addSecond()))->toBeTrue();
@@ -85,7 +85,8 @@ it('records a soft delete as an after snapshot with deleted_at set', function ()
 it('stores the optional context next to the snapshots', function () {
     app(AuditedAction::class)->run(fn () => null, $this->station, 'station.flag', ['reason' => 'oven broken', 'note_en' => 'x', 'note_am' => 'y']);
 
-    expect(AuditLog::query()->firstOrFail()->context)->toBe(['reason' => 'oven broken', 'note_en' => 'x', 'note_am' => 'y']);
+    // toEqual: MySQL stores JSON object keys in its own order; the pairs are what matter.
+    expect(AuditLog::query()->firstOrFail()->context)->toEqual(['reason' => 'oven broken', 'note_en' => 'x', 'note_am' => 'y']);
 })->group('module:audit', 'feature');
 
 it('returns whatever the action returns, not only models', function () {
@@ -171,7 +172,7 @@ it('records non-model events with the payload as the after snapshot', function (
         ->and($fresh->subject_type)->toBe('shift_instance')
         ->and($fresh->subject_id)->toBe(12)
         ->and($fresh->before)->toBeNull()
-        ->and($fresh->after)->toBe(['station' => 'kitchen', 'opened_by' => 5])
+        ->and($fresh->after)->toEqual(['station' => 'kitchen', 'opened_by' => 5])
         ->and($fresh->actor_id)->toBe(5)
         ->and($fresh->acting_user_id)->toBe(9)
         ->and($fresh->branch_id)->toBe($this->branch->id);
