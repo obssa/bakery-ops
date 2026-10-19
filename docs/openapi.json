@@ -889,6 +889,322 @@
                 }
             }
         },
+        "/v1/ledger": {
+            "get": {
+                "operationId": "inventory.ledger.index",
+                "tags": [
+                    "Ledger"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "location",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Inclusive upper bound; when from is given too, not before it.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 200
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `MovementResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/MovementResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/locations": {
+            "get": {
+                "operationId": "inventory.locations.index",
+                "tags": [
+                    "Locations"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `LocationResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/LocationResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "inventory.locations.store",
+                "tags": [
+                    "Locations"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreLocationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/locations/{location}": {
+            "patch": {
+                "operationId": "inventory.locations.update",
+                "tags": [
+                    "Locations"
+                ],
+                "parameters": [
+                    {
+                        "name": "location",
+                        "in": "path",
+                        "required": true,
+                        "description": "The location ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateLocationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/items/{item}/modifiers": {
             "get": {
                 "operationId": "catalog.items.modifiers.index",
@@ -1293,6 +1609,104 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/stock": {
+            "get": {
+                "operationId": "inventory.stock.index",
+                "tags": [
+                    "Stock"
+                ],
+                "parameters": [
+                    {
+                        "name": "location",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `StockLineResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/StockLineResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/stock/movements": {
+            "post": {
+                "operationId": "inventory.stock.movements.store",
+                "tags": [
+                    "Stock"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreMovementRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -1862,6 +2276,55 @@
                 ],
                 "title": "ItemResource"
             },
+            "LocationResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "branch_id": {
+                        "type": "integer"
+                    },
+                    "name_en": {
+                        "type": "string"
+                    },
+                    "name_am": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "name_en",
+                    "name_am",
+                    "type",
+                    "station_id",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "LocationResource"
+            },
             "LoginRequest": {
                 "type": "object",
                 "properties": {
@@ -1948,6 +2411,121 @@
                     "recipe_delta"
                 ],
                 "title": "ModifierResource"
+            },
+            "MovementResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "branch_id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "location_id": {
+                        "type": "integer"
+                    },
+                    "from_location_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "to_location_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "qty": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "on_hand_delta": {
+                        "type": "string"
+                    },
+                    "reserved_delta": {
+                        "type": "string"
+                    },
+                    "ref_type": {
+                        "type": "string"
+                    },
+                    "ref_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "reservation_ref": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "client_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "user_id": {
+                        "type": "integer"
+                    },
+                    "acting_user_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "shift_instance_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "device_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "item_id",
+                    "location_id",
+                    "from_location_id",
+                    "to_location_id",
+                    "qty",
+                    "reason",
+                    "on_hand_delta",
+                    "reserved_delta",
+                    "ref_type",
+                    "ref_id",
+                    "reservation_ref",
+                    "client_uuid",
+                    "user_id",
+                    "acting_user_id",
+                    "shift_instance_id",
+                    "station_id",
+                    "device_id",
+                    "created_at"
+                ],
+                "title": "MovementResource"
             },
             "PutRecipeRequest": {
                 "type": "object",
@@ -2108,6 +2686,46 @@
                 ],
                 "title": "StationResource"
             },
+            "StockLineResource": {
+                "type": "object",
+                "properties": {
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "location_id": {
+                        "type": "integer"
+                    },
+                    "name_en": {
+                        "type": "string"
+                    },
+                    "name_am": {
+                        "type": "string"
+                    },
+                    "base_unit_code": {
+                        "type": "string"
+                    },
+                    "on_hand": {
+                        "type": "string"
+                    },
+                    "reserved": {
+                        "type": "string"
+                    },
+                    "available": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "item_id",
+                    "location_id",
+                    "name_en",
+                    "name_am",
+                    "base_unit_code",
+                    "on_hand",
+                    "reserved",
+                    "available"
+                ],
+                "title": "StockLineResource"
+            },
             "StoreCategoryRequest": {
                 "type": "object",
                 "description": "POST /categories: a category of one kind in the admin's branch, named in both languages (rule 9), optionally under\na live parent of the same kind and branch.",
@@ -2260,6 +2878,44 @@
                 ],
                 "title": "StoreItemRequest"
             },
+            "StoreLocationRequest": {
+                "type": "object",
+                "description": "POST /locations: a place stock is held in, named in both languages (rule 9), of one of the location types, optionally\ntied to a station of the admin's branch.",
+                "properties": {
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "store",
+                            "kitchen",
+                            "bar",
+                            "cake_room",
+                            "bakery",
+                            "display_case",
+                            "cash_drawer"
+                        ]
+                    },
+                    "station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "name_en",
+                    "name_am",
+                    "type"
+                ],
+                "title": "StoreLocationRequest"
+            },
             "StoreModifierRequest": {
                 "type": "object",
                 "description": "POST /items/{item}/modifiers: a bilingual name (rule 9), a price delta (signed money, decimal string, default 0) and\nan optional recipe delta: signed, non-zero quantities of live items of the branch, each in a unit that converts to\nthe item's base unit (checked by the controller against the database).",
@@ -2310,6 +2966,54 @@
                     "name_am"
                 ],
                 "title": "StoreModifierRequest"
+            },
+            "StoreMovementRequest": {
+                "type": "object",
+                "description": "POST /stock/movements: one of the Phase 0 manual movements (purchase_in, waste, return, count_adjustment) of a live\nitem at a live location of the admin's branch. qty is a decimal string (ADR 0004) in unit_id (default: the item's\nown unit), converted to the item's base unit by the controller: a positive amount for purchase_in, return and waste\n(waste is recorded as stock leaving), a signed one for count_adjustment. client_uuid makes an offline replay safe\n(ADR 0003); note is kept on the audit row.",
+                "properties": {
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "location_id": {
+                        "type": "integer"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "purchase_in",
+                            "waste",
+                            "return",
+                            "count_adjustment"
+                        ]
+                    },
+                    "qty": {
+                        "type": "string"
+                    },
+                    "unit_id": {
+                        "type": "integer"
+                    },
+                    "client_uuid": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "item_id",
+                    "location_id",
+                    "reason",
+                    "qty"
+                ],
+                "title": "StoreMovementRequest"
             },
             "StoreStationRequest": {
                 "type": "object",
@@ -2443,6 +3147,7 @@
                                 "people.manage",
                                 "inventory.view",
                                 "inventory.adjust",
+                                "inventory.manage",
                                 "purchases.record",
                                 "orders.create",
                                 "orders.accept",
@@ -2635,6 +3340,30 @@
                 },
                 "title": "UpdateItemRequest"
             },
+            "UpdateLocationRequest": {
+                "type": "object",
+                "description": "PATCH /locations/{location}: rename it or tie it to another station (or none). The type is fixed: it decides where\navailability is computed (display-case products at the display_case location), so a store never turns into one.",
+                "properties": {
+                    "type": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "title": "UpdateLocationRequest"
+            },
             "UpdateUserRequest": {
                 "type": "object",
                 "description": "PATCH /users/{id}: any subset of the editable attributes, the role, and the direct permission overrides (sent as\nthe complete new list). Phone is not editable here: it is the login id.",
@@ -2686,6 +3415,7 @@
                                 "people.manage",
                                 "inventory.view",
                                 "inventory.adjust",
+                                "inventory.manage",
                                 "purchases.record",
                                 "orders.create",
                                 "orders.accept",
