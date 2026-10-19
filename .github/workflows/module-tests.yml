@@ -50,6 +50,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
+      - name: Prepare MySQL (triggers need log_bin_trust_function_creators under binlog)
+        run: bash scripts/ci/mysql-prepare.sh
       - name: Migrate
         working-directory: apps/api
         run: php artisan migrate --force --no-interaction

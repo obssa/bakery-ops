@@ -72,11 +72,15 @@ jobs:
       - uses: ./.github/actions/setup-api
       - name: Migration lint
         run: python3 scripts/check_invariants.py --numeric --branch-id --bilingual --append-only
+      - name: Prepare MySQL (triggers need log_bin_trust_function_creators under binlog)
+        run: bash scripts/ci/mysql-prepare.sh
       - name: Migrate test database
         working-directory: apps/api
         run: php artisan migrate --force --no-interaction
-      - name: Architecture and invariant tests
-        run: bash scripts/ci/pest-groups.sh "arch,invariants"
+      # Foundation groups: arch + invariants, the plain unit tests, and the module tests of the two layers below
+      # the module chain (Shared, Audit have no mod-* job of their own; identity's job only starts once these pass).
+      - name: Architecture, invariant, unit and foundation-module tests
+        run: bash scripts/ci/pest-groups.sh "arch,invariants,unit,module:shared,module:audit"
 
   invariants:
     needs: api-arch
