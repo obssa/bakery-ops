@@ -243,6 +243,19 @@ jobs:
           path: apps/web/.next/cache
           key: next-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**') }}
           restore-keys: next-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}-
+      # What deploy.yml ships to the live host (ADR 0006): the static export under /app, both locales prerendered.
+      - name: Static export builds (NEXT_OUTPUT=export)
+        working-directory: apps/web
+        env: { NEXT_OUTPUT: export }
+        run: |
+          pnpm build
+          for f in out/index.html out/404.html out/en/index.html out/am/index.html out/en/login/index.html out/en/admin/catalog/index.html out/am/admin/people/index.html out/en/not-found/index.html; do
+            test -f "$f" || { echo "::error::static export is missing $f"; exit 1; }
+          done
+          grep -q '<html lang="en"' out/en/index.html || { echo "::error::out/en is not <html lang=en>"; exit 1; }
+          grep -q '<html lang="am"' out/am/index.html || { echo "::error::out/am is not <html lang=am>"; exit 1; }
+          if grep -rl "localhost:8000" out >/dev/null; then echo "::error::the export calls localhost:8000 instead of its own origin"; exit 1; fi
+          rm -rf out
       - run: pnpm build
         working-directory: apps/web
         env: { NEXT_PUBLIC_API_URL: http://localhost:8000 }

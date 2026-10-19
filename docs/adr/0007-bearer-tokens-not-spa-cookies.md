@@ -32,6 +32,10 @@ The shared waiter pad is a second credential on top of the token: `POST /api/v1/
 session whose id the pad sends on every write, so `acting_user_id` is stamped on each write while the
 pad's own account stays the `actor` (rule 4).
 
+Note (step 0.7, 2026-10-20): the live web shell ended up on the API's own origin (`/app/`, ADR 0006), so the
+production allowlist is empty; `config/cors.php` reads `CORS_ALLOWED_ORIGINS` (compose sets `http://localhost:3000` for
+the local stack and CI) and never answers `*`. The shell keeps the token in memory and `localStorage`.
+
 ## Consequences
 
 - Positive: one credential format for the browser, the PWA's offline outbox and any future native or

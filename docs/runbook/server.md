@@ -16,7 +16,8 @@ shared with the owner's other site on the same account (ADR 0006).
 | PHP (CLI, cron, deploy) | `/opt/alt/php83/usr/bin/php` (GitHub variable `DEPLOY_PHP_BIN`) |
 | Database | MySQL database and user `<account>_bakeryops`, all privileges; password only in the server `.env` |
 | Drivers | database cache, sessions and queue (cron-drained); `BROADCAST_CONNECTION=log` (polling) until a WebSocket host exists |
-| Web app | `DEPLOY_WEB_MODE=skip` until the Next.js shell is export-safe, then `static` (served from `public/app/`) |
+| Web app | `DEPLOY_WEB_MODE=static` once step 0.7 (the export-safe web shell) is on `main`: the static export is served by LiteSpeed from `public/app/` at https://bakery-ops.orcamind.dev/app/ (`/` redirects there), same origin as `/api/v1`, so the server `.env` needs no `CORS_ALLOWED_ORIGINS` |
+| Live-e2e account | admin of the isolated branch "E2E Test Branch" (see "E2E account" below); its phone and password only in the GitHub secrets `E2E_ADMIN_PHONE` / `E2E_ADMIN_PASSWORD` |
 | Deploy key | ed25519 key used by this repository's GitHub Actions and by the owner's PC for provisioning; authorised with the `restrict` option (commands and rsync only, no terminal, no forwarding) |
 | Host key | pinned in the GitHub secret `DEPLOY_KNOWN_HOSTS` |
 | Rollback snapshot | `~/releases/bakery-ops/prev.tar.gz` (code only, written before every deploy) |
@@ -57,9 +58,37 @@ Status: **provisioned 2026-10-19** (steps 1-10 done from the owner's PC over SSH
    `public/storage`, `bootstrap/cache/`, `public/.htaccess` and files cPanel creates.
 5. `scripts/deploy/release.sh` on the server: rebuilds `public/.htaccess` (cPanel's PHP handler block +
    Laravel's rules), storage skeleton, `migrate --force`, `optimize`, `storage:link`, `queue:restart`, permissions, up.
-6. `scripts/deploy/smoke.sh` checks `/api/v1/health`, `/up`, JSON 404s (and `/app/` when the web is deployed).
+6. `scripts/deploy/smoke.sh` checks `/api/v1/health`, `/up`, JSON 404s, the `/` redirect, and with the web deployed `/app/`,
+   `/app/en/` and `/app/am/` (200 with the right `<html lang>`); the not-found fallback and the immutable `_next/static`
+   cache header are reported as warnings.
    A failure runs `scripts/deploy/rollback.sh` (code only) and fails the job.
 7. `live-e2e` runs the Playwright tests tagged `@live` against the live URL.
+
+## Web shell under /app (public/.htaccess)
+
+`deploy.yml` builds the Next.js app with `NEXT_OUTPUT=export` and copies `out/` to `public/app/`. Laravel's
+`public/.htaccess` (shipped as `scripts/deploy/public.htaccess`, behind cPanel's handler block) serves it without PHP:
+
+- an existing file or folder under `/app` is served as it is (`DirectoryIndex index.html index.php`: a page folder
+  opens its `index.html`, the site root still opens `index.php`);
+- an unknown page under `/app/en/` or `/app/am/` gets that language's "page not found" page (`/app/<locale>/not-found/`);
+- any other `/app` path without a language gets the start page `/app/index.html`, which picks the language (the
+  signed-in user's, else the browser's) and keeps the rest of the path; a missing `/app/_next/` asset is a plain 404;
+- `/app/_next/static/*` is `Cache-Control: public, max-age=31536000, immutable`, every other `/app` file `no-cache`;
+- everything else goes to Laravel's front controller as before. A rollback restores the previous release's rules too.
+
+## E2E account (live Playwright tests)
+
+The `@live` Playwright tests sign in as the admin of a branch of their own, so nothing they create touches shop data:
+
+```
+cd ~/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan bakery:create-admin <phone> --name="E2E Admin" --branch="E2E Test Branch"
+```
+
+The command creates the branch when it does not exist, refuses a phone that is already in it, and prints the generated
+password once. Store the phone and the password as the repository secrets `E2E_ADMIN_PHONE` and `E2E_ADMIN_PASSWORD`;
+without them `live-e2e` skips the admin flow (and says so). The same command creates the first real admin of a fresh
+install (`--branch="<shop name>"`).
 
 ## Manual operations
 

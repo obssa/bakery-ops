@@ -24,6 +24,11 @@ jobs:
     name: e2e phase ${{ inputs.phase }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # The admin the Playwright flows sign in as (p0-admin-smoke and later). Throwaway credentials for the CI stack
+      # only, so they are job env, not secrets; created below with `php artisan bakery:create-admin`.
+      E2E_ADMIN_PHONE: "+251911000099"
+      E2E_ADMIN_PASSWORD: ci-e2e-admin-password
     steps:
       - uses: actions/checkout@v4
 
@@ -38,6 +43,11 @@ jobs:
 
       - name: Migrate and seed up to phase ${{ inputs.phase }}
         run: docker compose -f compose.yml -f compose.ci.yml exec -T -e SEED_PHASE=${{ inputs.phase }} app php artisan migrate:fresh --force --seed --seeder=DemoSeeder
+
+      - name: Create the e2e admin in its own branch
+        run: >-
+          docker compose -f compose.yml -f compose.ci.yml exec -T app
+          php artisan bakery:create-admin "$E2E_ADMIN_PHONE" --name="E2E Admin" --branch="E2E Test Branch" --password="$E2E_ADMIN_PASSWORD"
 
       - uses: pnpm/action-setup@v4
         with: { version: 9 }

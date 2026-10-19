@@ -52,6 +52,12 @@ offline-tolerant clients as deployment option (a).
    not a view. The CI module jobs run against the production engine (MariaDB 10.11, found on the host on 2026-10-19; service) so tests prove what
    production runs; a PostgreSQL job can be added later if a VPS move is planned.
 
+Note (step 0.7, 2026-10-20): the web shell is export-safe. It is served under `/app/` on the API's own origin
+(`basePath: '/app'`, `trailingSlash`, `/app/en/...` and `/app/am/...` prerendered, no middleware, record pages by
+`?id=`); `GET /` redirects to `/app/`; `public/.htaccess` serves `/app` without PHP (rules in `docs/runbook/server.md`).
+Being same-origin, production needs no CORS origin at all (ADR 0007's allowlist is `http://localhost:3000` locally and
+in CI only). The live `@live` tests sign in as the admin of the isolated "E2E Test Branch".
+
 ## Consequences
 
 - Positive: one URL, automatic deploys, honest tests in the environment the shop will use, no local

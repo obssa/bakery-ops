@@ -8,7 +8,8 @@ name: deploy
 # .env or storage/ (server configuration and data stay authoritative). Skipped until the repository
 # variable DEPLOY_ENABLED is "true" (set after one-time provisioning, docs/runbook/server.md).
 #
-# Secrets:   DEPLOY_HOST, DEPLOY_USER, DEPLOY_PORT, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
+# Secrets:   DEPLOY_HOST, DEPLOY_USER, DEPLOY_PORT, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS,
+#            E2E_ADMIN_PHONE, E2E_ADMIN_PASSWORD (optional: the live-e2e admin of the "E2E Test Branch")
 # Variables: DEPLOY_ENABLED, DEPLOY_PATH, DEPLOY_PHP_BIN, DEPLOY_URL, DEPLOY_WEB_MODE (skip | static)
 
 on:
@@ -59,17 +60,26 @@ jobs:
         working-directory: apps/api
         run: composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
 
+      - uses: actions/setup-node@v4
+        if: vars.DEPLOY_WEB_MODE == 'static'
+        with: { node-version: 24 }
+
+      # The web shell is a static export LiteSpeed serves from public/app/ on the API's own origin (ADR 0006): no
+      # NEXT_PUBLIC_API_URL, so the shell calls /api/v1 on whatever host served it.
       - name: Build the web app (static export) when DEPLOY_WEB_MODE=static
         if: vars.DEPLOY_WEB_MODE == 'static'
         working-directory: apps/web
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.DEPLOY_URL || 'https://bakery-ops.orcamind.dev' }}
           NEXT_OUTPUT: export
         run: |
-          corepack enable && corepack prepare pnpm@9 --activate
+          corepack enable && corepack prepare pnpm@9.15.9 --activate
           pnpm install --frozen-lockfile
           pnpm build
-          test -d out && rm -rf ../api/public/app && mkdir -p ../api/public/app && cp -r out/. ../api/public/app/
+          for f in out/index.html out/en/index.html out/am/index.html out/en/not-found/index.html out/am/not-found/index.html; do
+            test -f "$f" || { echo "static export is missing $f"; exit 1; }
+          done
+          rm -rf ../api/public/app && mkdir -p ../api/public/app && cp -r out/. ../api/public/app/
+          echo "web shell: $(find ../api/public/app -type f | wc -l) files in public/app"
 
       - name: Assemble the release folder
         run: |
@@ -191,6 +201,10 @@ jobs:
           CI: "true"
           PLAYWRIGHT_BASE_URL: ${{ vars.DEPLOY_URL || 'https://bakery-ops.orcamind.dev' }}
           NEXT_PUBLIC_API_URL: ${{ vars.DEPLOY_URL || 'https://bakery-ops.orcamind.dev' }}
+          # The admin of the isolated "E2E Test Branch" (created on the server with `php artisan bakery:create-admin`);
+          # everything the @live flows create stays in that branch. Without these secrets the admin flow is skipped.
+          E2E_ADMIN_PHONE: ${{ secrets.E2E_ADMIN_PHONE }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
         run: pnpm exec playwright test --grep "@live"
       - uses: actions/upload-artifact@v4
         if: failure()
