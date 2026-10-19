@@ -10,15 +10,29 @@ Project bakery_ops {
 // ---- Laravel framework tables (shipped with the scaffold)
 Table users {
   id bigint [pk]
+  branch_id bigint [ref: > branches.id]
   name varchar
-  email varchar [unique]
-  email_verified_at timestamp
+  phone varchar(20)
+  email varchar
   password varchar
+  short_code_hash varchar
+  short_code_attempts smallint
+  pin_locked_until timestamp
+  locale char(2)
+  is_active boolean
+  photo_url varchar(2048)
   remember_token varchar
   created_at timestamp
   updated_at timestamp
-  Note: 'Phase 0.4 extends: branch_id, phone, short_code_hash, locale, is_active, photo_url, soft delete'
+  deleted_at timestamp
+  Note: 'step 0.4 (Identity): the scaffold table extended by 2026_10_19_000200; phone is the login id, unique (branch_id, phone); short_code_hash is argon2id, never shown after creation; locale CHECK users_locale_check in (en, am); roles/permissions via spatie tables (guard web); soft deletes'
 }
+Table personal_access_tokens { id bigint [pk]  tokenable_type varchar  tokenable_id bigint  name text  token varchar(64) [unique]  abilities text  last_used_at timestamp  expires_at timestamp  created_at timestamp  updated_at timestamp  Note: 'step 0.4; Sanctum bearer tokens (ADR 0007), published migration; global (no branch_id): the tokenable user carries the branch' }
+Table permissions { id bigint [pk]  name varchar(125)  guard_name varchar(125)  created_at timestamp  updated_at timestamp  Note: 'step 0.4; spatie/laravel-permission; names from PermissionRegistry (App.Modules.Identity.Contracts), seeded by RolesSeeder; global by design (unique (name, guard_name))' }
+Table roles { id bigint [pk]  name varchar(125)  guard_name varchar(125)  created_at timestamp  updated_at timestamp  Note: 'step 0.4; admin, manager, cashier, waiter, chef, barista, cake_baker, bread_baker; global (unique (name, guard_name))' }
+Table model_has_permissions { permission_id bigint [ref: > permissions.id]  model_type varchar  model_id bigint  Note: 'step 0.4; per-user permission overrides (direct grants); primary (permission_id, model_id, model_type)' }
+Table model_has_roles { role_id bigint [ref: > roles.id]  model_type varchar  model_id bigint  Note: 'step 0.4; one role per user by convention (syncRoles); primary (role_id, model_id, model_type)' }
+Table role_has_permissions { permission_id bigint [ref: > permissions.id]  role_id bigint [ref: > roles.id]  Note: 'step 0.4; the section 7 matrix; primary (permission_id, role_id)' }
 Table password_reset_tokens { email varchar [pk]  token varchar  created_at timestamp }
 Table sessions { id varchar [pk]  user_id bigint  ip_address varchar  user_agent text  payload text  last_activity int }
 Table cache { key varchar [pk]  value text  expiration int }
@@ -44,6 +58,6 @@ Table modifiers { id bigint [pk]  item_id bigint  name_en varchar  name_am varch
 Table locations { id bigint [pk]  branch_id bigint  name varchar  station_id bigint  type varchar }
 Table stock_movements { id bigint [pk]  branch_id bigint  item_id bigint  from_location_id bigint  to_location_id bigint  qty "numeric(14,4)"  reason varchar  ref_type varchar  ref_id bigint  reservation_ref uuid  shift_instance_id bigint  user_id bigint  acting_user_id bigint  station_id bigint  device_id bigint  client_uuid uuid  created_at timestamp  Note: 'append-only; sole writer Ledger' }
 Table stock_balances { id bigint [pk]  branch_id bigint  item_id bigint  location_id bigint  on_hand "numeric(14,4)"  reserved "numeric(14,4)"  updated_at timestamp  Note: 'row-lock target (ADR 0002)' }
-Table user_station_assignments { user_id bigint  station_id bigint  can_count boolean  is_overseer boolean }
-Table devices { id bigint [pk]  branch_id bigint  name varchar  fingerprint varchar  enrolled_by bigint  enrolled_at timestamp  revoked_at timestamp }
-Table acting_sessions { id bigint [pk]  user_id bigint  device_id bigint  started_at timestamp  expires_at timestamp  ended_at timestamp }
+Table user_station_assignments { id bigint [pk]  branch_id bigint [ref: > branches.id]  user_id bigint [ref: > users.id]  station_id bigint [ref: > stations.id]  can_count boolean  is_overseer boolean  created_at timestamp  updated_at timestamp  deleted_at timestamp  Note: 'step 0.4; unique (user_id, station_id) for the row's whole life: withdrawn rows are soft-deleted and restored when the station comes back (Stations::replace)' }
+Table devices { id bigint [pk]  branch_id bigint [ref: > branches.id]  name varchar(120)  fingerprint varchar(191) [unique]  enrolled_by bigint [ref: > users.id]  enrolled_at timestamp  revoked_at timestamp  created_at timestamp  updated_at timestamp  deleted_at timestamp  Note: 'step 0.4; fingerprint = the X-Device-Id header; optional on every route until Phase 5 (EnsureEnrolledDevice); revoked devices are refused at once' }
+Table acting_sessions { id bigint [pk]  branch_id bigint [ref: > branches.id]  user_id bigint [ref: > users.id]  device_id bigint [ref: > devices.id]  started_at timestamp  expires_at timestamp  ended_at timestamp  created_at timestamp  updated_at timestamp  Note: 'step 0.4; a verified short code opens 10 minutes of acting-as (expires_at); ended_at when the pad locks; history, never deleted (no soft delete); index (user_id, expires_at)' }

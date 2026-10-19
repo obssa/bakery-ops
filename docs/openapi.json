@@ -10,6 +10,330 @@
         }
     ],
     "paths": {
+        "/v1/login": {
+            "post": {
+                "operationId": "identity.login",
+                "tags": [
+                    "Auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "token": {
+                                            "type": "string"
+                                        },
+                                        "token_type": {
+                                            "type": "string",
+                                            "const": "Bearer"
+                                        },
+                                        "user": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "permissions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "locale": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "token",
+                                        "token_type",
+                                        "user",
+                                        "permissions",
+                                        "locale"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/me": {
+            "get": {
+                "operationId": "identity.me",
+                "tags": [
+                    "Auth"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "user": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "permissions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "locale": {
+                                            "type": "string"
+                                        },
+                                        "acting": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "session": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "started_at": {
+                                                            "type": "string"
+                                                        },
+                                                        "expires_at": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "started_at",
+                                                        "expires_at"
+                                                    ]
+                                                },
+                                                "user": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        },
+                                                        "photo_url": {
+                                                            "type": [
+                                                                "string",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "locale": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name",
+                                                        "photo_url",
+                                                        "locale"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "session",
+                                                "user"
+                                            ]
+                                        },
+                                        "device": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "id"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "user",
+                                        "permissions",
+                                        "locale",
+                                        "acting",
+                                        "device"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/logout": {
+            "post": {
+                "operationId": "identity.logout",
+                "tags": [
+                    "Auth"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "logged_out": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "logged_out"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/devices": {
+            "get": {
+                "operationId": "identity.devices.index",
+                "tags": [
+                    "Devices"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `DeviceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/DeviceResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "identity.devices.store",
+                "tags": [
+                    "Devices"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreDeviceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/devices/{id}/revoke": {
+            "post": {
+                "operationId": "identity.devices.revoke",
+                "tags": [
+                    "Devices"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/health": {
             "get": {
                 "operationId": "health",
@@ -25,6 +349,1006 @@
                                     "type": "string"
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/short-code/verify": {
+            "post": {
+                "operationId": "identity.short-code.verify",
+                "tags": [
+                    "ShortCode"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerifyShortCodeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "user": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "photo_url": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "locale": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name",
+                                                "photo_url",
+                                                "locale"
+                                            ]
+                                        },
+                                        "permissions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "acting_session": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "started_at": {
+                                                    "type": "string"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "started_at",
+                                                "expires_at"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "user",
+                                        "permissions",
+                                        "acting_session"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/stations": {
+            "get": {
+                "operationId": "identity.stations.index",
+                "tags": [
+                    "Stations"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `StationResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/StationResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "identity.stations.store",
+                "tags": [
+                    "Stations"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreStationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/users": {
+            "get": {
+                "operationId": "identity.users.index",
+                "tags": [
+                    "Users"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `UserResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/UserResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "identity.users.store",
+                "tags": [
+                    "Users"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreUserRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/users/{id}": {
+            "patch": {
+                "operationId": "identity.users.update",
+                "tags": [
+                    "Users"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateUserRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/users/{id}/short-code/reset": {
+            "post": {
+                "operationId": "identity.users.short-code.reset",
+                "tags": [
+                    "Users"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "user_id": {
+                                            "type": "integer"
+                                        },
+                                        "short_code": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "user_id",
+                                        "short_code"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/users/{id}/stations": {
+            "put": {
+                "operationId": "identity.users.stations.replace",
+                "tags": [
+                    "Users"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReplaceUserStationsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "user_id": {
+                                            "type": "integer"
+                                        },
+                                        "assignments": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "user_id",
+                                        "assignments"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "DeviceResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "branch_id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "fingerprint": {
+                        "type": "string"
+                    },
+                    "enrolled_by": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "enrolled_at": {
+                        "type": "string"
+                    },
+                    "revoked_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "name",
+                    "fingerprint",
+                    "enrolled_by",
+                    "enrolled_at",
+                    "revoked_at"
+                ],
+                "title": "DeviceResource"
+            },
+            "LoginRequest": {
+                "type": "object",
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 20
+                    },
+                    "password": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "branch_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "phone",
+                    "password"
+                ],
+                "title": "LoginRequest"
+            },
+            "ReplaceUserStationsRequest": {
+                "type": "object",
+                "description": "PUT /users/{id}/stations: the user's complete set of station assignments (an empty list withdraws them all).",
+                "properties": {
+                    "assignments": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "station_id": {
+                                    "type": "integer"
+                                },
+                                "can_count": {
+                                    "type": "boolean"
+                                },
+                                "is_overseer": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "station_id",
+                                "can_count",
+                                "is_overseer"
+                            ]
+                        },
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "assignments"
+                ],
+                "title": "ReplaceUserStationsRequest"
+            },
+            "StationResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "branch_id": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string"
+                    },
+                    "name_am": {
+                        "type": "string"
+                    },
+                    "requires_overseer": {
+                        "type": "boolean"
+                    },
+                    "sort": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "code",
+                    "name_en",
+                    "name_am",
+                    "requires_overseer",
+                    "sort"
+                ],
+                "title": "StationResource"
+            },
+            "StoreDeviceRequest": {
+                "type": "object",
+                "description": "POST /devices: enrol a pad or till by the fingerprint it will send as X-Device-Id (globally unique, including\nsoft-deleted rows: a fingerprint is a physical device).",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "fingerprint": {
+                        "type": "string",
+                        "maxLength": 191
+                    }
+                },
+                "required": [
+                    "name",
+                    "fingerprint"
+                ],
+                "title": "StoreDeviceRequest"
+            },
+            "StoreStationRequest": {
+                "type": "object",
+                "description": "POST /stations: one station per code per branch (Shared's stations table), named in both languages (rule 9).",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "enum": [
+                            "till",
+                            "kitchen",
+                            "bar",
+                            "cake_room",
+                            "bakery",
+                            "store"
+                        ]
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "requires_overseer": {
+                        "type": "boolean"
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                    }
+                },
+                "required": [
+                    "code",
+                    "name_en",
+                    "name_am"
+                ],
+                "title": "StoreStationRequest"
+            },
+            "StoreUserRequest": {
+                "type": "object",
+                "description": "POST /users: a person of the admin's branch with one role, optional direct permission overrides, an optional short\ncode (checked again for uniqueness by ShortCodes) and a locale.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "phone": {
+                        "type": "string",
+                        "pattern": "^\\+?[0-9]{9,15}$",
+                        "maxLength": 20
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 255
+                    },
+                    "locale": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "am"
+                        ]
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "admin",
+                            "manager",
+                            "cashier",
+                            "waiter",
+                            "chef",
+                            "barista",
+                            "cake_baker",
+                            "bread_baker"
+                        ]
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "catalog.manage",
+                                "catalog.view",
+                                "people.manage",
+                                "inventory.view",
+                                "inventory.adjust",
+                                "purchases.record",
+                                "orders.create",
+                                "orders.accept",
+                                "orders.void",
+                                "orders.void_request",
+                                "payments.take",
+                                "payments.void",
+                                "production.request",
+                                "production.confirm",
+                                "production.fulfil",
+                                "transfers.request",
+                                "transfers.confirm",
+                                "shifts.count",
+                                "shifts.cosign",
+                                "shifts.approve",
+                                "shifts.unlock",
+                                "channels.manage",
+                                "analytics.view",
+                                "analytics.view_own",
+                                "audit.view",
+                                "stations.all"
+                            ]
+                        }
+                    },
+                    "short_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^\\d{4,6}$"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "photo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    }
+                },
+                "required": [
+                    "name",
+                    "phone",
+                    "password",
+                    "locale",
+                    "role"
+                ],
+                "title": "StoreUserRequest"
+            },
+            "UpdateUserRequest": {
+                "type": "object",
+                "description": "PATCH /users/{id}: any subset of the editable attributes, the role, and the direct permission overrides (sent as\nthe complete new list). Phone is not editable here: it is the login id.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 255
+                    },
+                    "locale": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "am"
+                        ]
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "admin",
+                            "manager",
+                            "cashier",
+                            "waiter",
+                            "chef",
+                            "barista",
+                            "cake_baker",
+                            "bread_baker"
+                        ]
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "catalog.manage",
+                                "catalog.view",
+                                "people.manage",
+                                "inventory.view",
+                                "inventory.adjust",
+                                "purchases.record",
+                                "orders.create",
+                                "orders.accept",
+                                "orders.void",
+                                "orders.void_request",
+                                "payments.take",
+                                "payments.void",
+                                "production.request",
+                                "production.confirm",
+                                "production.fulfil",
+                                "transfers.request",
+                                "transfers.confirm",
+                                "shifts.count",
+                                "shifts.cosign",
+                                "shifts.approve",
+                                "shifts.unlock",
+                                "channels.manage",
+                                "analytics.view",
+                                "analytics.view_own",
+                                "audit.view",
+                                "stations.all"
+                            ]
+                        }
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "photo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    }
+                },
+                "title": "UpdateUserRequest"
+            },
+            "UserResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "branch_id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "locale": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "photo_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "has_short_code": {
+                        "type": "boolean"
+                    },
+                    "roles": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "permissions_direct": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "stations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "station_id": {
+                                    "type": "integer"
+                                },
+                                "can_count": {
+                                    "type": "boolean"
+                                },
+                                "is_overseer": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "station_id",
+                                "can_count",
+                                "is_overseer"
+                            ]
+                        }
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "name",
+                    "phone",
+                    "email",
+                    "locale",
+                    "is_active",
+                    "photo_url",
+                    "has_short_code",
+                    "roles",
+                    "permissions_direct",
+                    "stations",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "UserResource"
+            },
+            "VerifyShortCodeRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^\\d{4,6}$"
+                    },
+                    "user_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "the pad may name the person whose code is typed (per-user lockout) and, before enrolment, its branch"
+                    },
+                    "branch_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "code"
+                ],
+                "title": "VerifyShortCodeRequest"
+            }
+        },
+        "responses": {
+            "ValidationException": {
+                "description": "Validation error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Errors overview."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "description": "A detailed description of each field that failed validation.",
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "message",
+                                "errors"
+                            ]
+                        }
+                    }
+                }
+            },
+            "ModelNotFoundException": {
+                "description": "Not found",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
+            "AuthorizationException": {
+                "description": "Authorization error",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
+                        }
+                    }
+                }
+            },
+            "AuthenticationException": {
+                "description": "Unauthenticated",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "description": "Error overview."
+                                }
+                            },
+                            "required": [
+                                "message"
+                            ]
                         }
                     }
                 }
