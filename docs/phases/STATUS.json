@@ -24,8 +24,8 @@
         "shared": "done",
         "audit": "done",
         "identity": "done",
-        "catalog": "in_progress",
-        "inventory": "todo",
+        "catalog": "done",
+        "inventory": "in_progress",
         "web": "todo",
         "seeds": "todo",
         "docs": "todo"
@@ -206,12 +206,12 @@
     },
     "catalog": {
       "phase": 0,
-      "status": "in_progress",
-      "stable_since": null
+      "status": "stable",
+      "stable_since": "2026-10-19T16:55:28Z"
     },
     "inventory": {
       "phase": 0,
-      "status": "todo",
+      "status": "in_progress",
       "stable_since": null
     },
     "orders": {
