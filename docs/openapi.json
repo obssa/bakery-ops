@@ -228,6 +228,161 @@
                 }
             }
         },
+        "/v1/categories": {
+            "get": {
+                "operationId": "catalog.categories.index",
+                "tags": [
+                    "Categories"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `CategoryResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CategoryResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "catalog.categories.store",
+                "tags": [
+                    "Categories"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreCategoryRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/categories/{category}": {
+            "patch": {
+                "operationId": "catalog.categories.update",
+                "tags": [
+                    "Categories"
+                ],
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "path",
+                        "required": true,
+                        "description": "The category ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateCategoryRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "catalog.categories.destroy",
+                "tags": [
+                    "Categories"
+                ],
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "path",
+                        "required": true,
+                        "description": "The category ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/devices": {
             "get": {
                 "operationId": "identity.devices.index",
@@ -350,6 +505,637 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/v1/items/{item}/prices": {
+            "get": {
+                "operationId": "catalog.items.prices.index",
+                "tags": [
+                    "ItemPrices"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `ItemPriceResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ItemPriceResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "catalog.items.prices.store",
+                "tags": [
+                    "ItemPrices"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreItemPriceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/items/{item}/stations": {
+            "put": {
+                "operationId": "catalog.items.stations.update",
+                "tags": [
+                    "ItemStations"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReplaceItemStationsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "item_id": {
+                                            "type": "integer"
+                                        },
+                                        "station_ids": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "item_id",
+                                        "station_ids"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/items": {
+            "get": {
+                "operationId": "catalog.items.index",
+                "tags": [
+                    "Items"
+                ],
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ingredient",
+                                "product"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "category_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "is_active",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `ItemResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ItemResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "catalog.items.store",
+                "tags": [
+                    "Items"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreItemRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/items/{item}": {
+            "get": {
+                "operationId": "catalog.items.show",
+                "tags": [
+                    "Items"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "catalog.items.update",
+                "tags": [
+                    "Items"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateItemRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "catalog.items.destroy",
+                "tags": [
+                    "Items"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/items/{item}/modifiers": {
+            "get": {
+                "operationId": "catalog.items.modifiers.index",
+                "tags": [
+                    "Modifiers"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `ModifierResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ModifierResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "catalog.items.modifiers.store",
+                "tags": [
+                    "Modifiers"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreModifierRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/items/{item}/recipe": {
+            "get": {
+                "operationId": "catalog.items.recipe.show",
+                "tags": [
+                    "Recipes"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "array"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "null"
+                                                },
+                                                "product_item_id": {
+                                                    "type": "integer"
+                                                },
+                                                "version": {
+                                                    "type": "null"
+                                                },
+                                                "is_active": {
+                                                    "type": "boolean"
+                                                },
+                                                "yield_qty": {
+                                                    "type": "null"
+                                                },
+                                                "yield_unit_id": {
+                                                    "type": "null"
+                                                },
+                                                "yield_unit_code": {
+                                                    "type": "null"
+                                                },
+                                                "yield_base_qty": {
+                                                    "type": "null"
+                                                },
+                                                "base_unit_code": {
+                                                    "type": "string"
+                                                },
+                                                "lines": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                },
+                                                "steps": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "minItems": 0,
+                                                    "maxItems": 0
+                                                },
+                                                "updated_at": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "product_item_id",
+                                                "version",
+                                                "is_active",
+                                                "yield_qty",
+                                                "yield_unit_id",
+                                                "yield_unit_code",
+                                                "yield_base_qty",
+                                                "base_unit_code",
+                                                "lines",
+                                                "steps",
+                                                "updated_at"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "catalog.items.recipe.update",
+                "tags": [
+                    "Recipes"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PutRecipeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -492,6 +1278,75 @@
                         "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/StoreStationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/units": {
+            "get": {
+                "operationId": "catalog.units.index",
+                "tags": [
+                    "Units"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `UnitResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/UnitResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "catalog.units.store",
+                "tags": [
+                    "Units"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreUnitRequest"
                             }
                         }
                     }
@@ -747,6 +1602,52 @@
     },
     "components": {
         "schemas": {
+            "CategoryResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "branch_id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string"
+                    },
+                    "name_am": {
+                        "type": "string"
+                    },
+                    "parent_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "sort": {
+                        "type": "integer"
+                    },
+                    "deleted_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "kind",
+                    "name_en",
+                    "name_am",
+                    "parent_id",
+                    "sort",
+                    "deleted_at"
+                ],
+                "title": "CategoryResource"
+            },
             "DeviceResource": {
                 "type": "object",
                 "properties": {
@@ -789,6 +1690,178 @@
                 ],
                 "title": "DeviceResource"
             },
+            "ItemPriceResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "price": {
+                        "type": "string"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "effective_from": {
+                        "type": "string"
+                    },
+                    "effective_to": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_current": {
+                        "type": "boolean"
+                    },
+                    "created_by_user_id": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "item_id",
+                    "price",
+                    "currency",
+                    "effective_from",
+                    "effective_to",
+                    "is_current",
+                    "created_by_user_id",
+                    "created_at"
+                ],
+                "title": "ItemPriceResource"
+            },
+            "ItemResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "branch_id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "fulfilment": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string"
+                    },
+                    "name_am": {
+                        "type": "string"
+                    },
+                    "category_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "unit_id": {
+                        "type": "integer"
+                    },
+                    "unit_code": {
+                        "type": "string"
+                    },
+                    "base_unit_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sku": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "is_new_until": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_new": {
+                        "type": "string"
+                    },
+                    "default_batch_qty": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "production_station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "station_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "created_by_user_id": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "deleted_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "branch_id",
+                    "kind",
+                    "fulfilment",
+                    "name_en",
+                    "name_am",
+                    "category_id",
+                    "unit_id",
+                    "unit_code",
+                    "base_unit_code",
+                    "sku",
+                    "is_active",
+                    "is_new_until",
+                    "is_new",
+                    "default_batch_qty",
+                    "production_station_id",
+                    "station_ids",
+                    "created_by_user_id",
+                    "created_at",
+                    "updated_at",
+                    "deleted_at"
+                ],
+                "title": "ItemResource"
+            },
             "LoginRequest": {
                 "type": "object",
                 "properties": {
@@ -812,6 +1885,159 @@
                     "password"
                 ],
                 "title": "LoginRequest"
+            },
+            "ModifierResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "name_en": {
+                        "type": "string"
+                    },
+                    "name_am": {
+                        "type": "string"
+                    },
+                    "price_delta": {
+                        "type": "string"
+                    },
+                    "recipe_delta": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "ingredient_item_id": {
+                                    "type": "integer"
+                                },
+                                "qty": {
+                                    "type": "string"
+                                },
+                                "unit_id": {
+                                    "type": "string"
+                                },
+                                "unit_code": {
+                                    "type": "string"
+                                },
+                                "qty_base": {
+                                    "type": "string"
+                                },
+                                "base_unit_code": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "ingredient_item_id",
+                                "qty",
+                                "unit_id",
+                                "unit_code",
+                                "qty_base",
+                                "base_unit_code"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "item_id",
+                    "name_en",
+                    "name_am",
+                    "price_delta",
+                    "recipe_delta"
+                ],
+                "title": "ModifierResource"
+            },
+            "PutRecipeRequest": {
+                "type": "object",
+                "description": "PUT /items/{item}/recipe: the whole recipe (version 1 in Phase 0): yield quantity and unit, at least one line\n(a live item of the branch, each ingredient once, a positive quantity in a unit, optional flag, waste 0 <= w < 100)\nand optional bilingual steps (rule 9). Quantities are decimal strings (ADR 0004). Unit convertibility and\nself-reference are checked by RecipeBook against the database.",
+                "properties": {
+                    "yield_qty": {
+                        "type": "string"
+                    },
+                    "yield_unit_id": {
+                        "type": "integer"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "ingredient_item_id": {
+                                    "type": "integer"
+                                },
+                                "qty": {
+                                    "type": "string"
+                                },
+                                "unit_id": {
+                                    "type": "integer"
+                                },
+                                "is_optional": {
+                                    "type": "boolean"
+                                },
+                                "waste_pct": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "ingredient_item_id",
+                                "qty",
+                                "unit_id"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "uniqueItems": true
+                    },
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "text_en": {
+                                    "type": "string",
+                                    "maxLength": 2000
+                                },
+                                "text_am": {
+                                    "type": "string",
+                                    "maxLength": 2000
+                                }
+                            },
+                            "required": [
+                                "text_en",
+                                "text_am"
+                            ]
+                        },
+                        "maxItems": 50
+                    }
+                },
+                "required": [
+                    "yield_qty",
+                    "yield_unit_id",
+                    "lines"
+                ],
+                "title": "PutRecipeRequest"
+            },
+            "ReplaceItemStationsRequest": {
+                "type": "object",
+                "description": "PUT /items/{item}/stations: the complete set of stations the item's order lines route to (an empty list makes it a\ndisplay-case item with no station step). Each a live station of the admin's branch, once.",
+                "properties": {
+                    "station_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "station_ids"
+                ],
+                "title": "ReplaceItemStationsRequest"
             },
             "ReplaceUserStationsRequest": {
                 "type": "object",
@@ -882,6 +2108,44 @@
                 ],
                 "title": "StationResource"
             },
+            "StoreCategoryRequest": {
+                "type": "object",
+                "description": "POST /categories: a category of one kind in the admin's branch, named in both languages (rule 9), optionally under\na live parent of the same kind and branch.",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "ingredient",
+                            "product"
+                        ]
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "parent_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                    }
+                },
+                "required": [
+                    "kind",
+                    "name_en",
+                    "name_am"
+                ],
+                "title": "StoreCategoryRequest"
+            },
             "StoreDeviceRequest": {
                 "type": "object",
                 "description": "POST /devices: enrol a pad or till by the fingerprint it will send as X-Device-Id (globally unique, including\nsoft-deleted rows: a fingerprint is a physical device).",
@@ -900,6 +2164,152 @@
                     "fingerprint"
                 ],
                 "title": "StoreDeviceRequest"
+            },
+            "StoreItemPriceRequest": {
+                "type": "object",
+                "description": "POST /items/{item}/prices: the new price as a decimal string (ADR 0004) and, optionally, when it takes effect\n(ISO-8601 with an offset; default now). The currency is the branch's.",
+                "properties": {
+                    "price": {
+                        "type": "string"
+                    },
+                    "effective_from": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "price"
+                ],
+                "title": "StoreItemPriceRequest"
+            },
+            "StoreItemRequest": {
+                "type": "object",
+                "description": "POST /items: an ingredient or a product of the admin's branch, named in both languages (rule 9). A product says how\nit is fulfilled; an ingredient is always bought in (the default). The category holds items of the same kind; sku is\nunique per branch; the batch size and the producing station belong to products only. Quantities are decimal\nstrings (ADR 0004).",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "ingredient",
+                            "product"
+                        ]
+                    },
+                    "fulfilment": {
+                        "type": "string",
+                        "enum": [
+                            "to_order",
+                            "to_stock",
+                            "bought_in"
+                        ]
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "category_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "unit_id": {
+                        "type": "integer"
+                    },
+                    "sku": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "is_new_until": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "default_batch_qty": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "production_station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "kind",
+                    "fulfilment",
+                    "name_en",
+                    "name_am",
+                    "unit_id"
+                ],
+                "title": "StoreItemRequest"
+            },
+            "StoreModifierRequest": {
+                "type": "object",
+                "description": "POST /items/{item}/modifiers: a bilingual name (rule 9), a price delta (signed money, decimal string, default 0) and\nan optional recipe delta: signed, non-zero quantities of live items of the branch, each in a unit that converts to\nthe item's base unit (checked by the controller against the database).",
+                "properties": {
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "price_delta": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "recipe_delta": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "ingredient_item_id": {
+                                    "type": "integer"
+                                },
+                                "qty": {
+                                    "type": "string"
+                                },
+                                "unit_id": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "ingredient_item_id",
+                                "qty",
+                                "unit_id"
+                            ]
+                        },
+                        "maxItems": 20
+                    }
+                },
+                "required": [
+                    "name_en",
+                    "name_am"
+                ],
+                "title": "StoreModifierRequest"
             },
             "StoreStationRequest": {
                 "type": "object",
@@ -939,6 +2349,43 @@
                     "name_am"
                 ],
                 "title": "StoreStationRequest"
+            },
+            "StoreUnitRequest": {
+                "type": "object",
+                "description": "POST /units: a global unit (every branch shares it), named in both languages (rule 9). A derived unit names a base\nunit (one without a base of its own) and a positive factor as a decimal string; a base unit has factor 1.",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+                        "maxLength": 16
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 60
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 60
+                    },
+                    "base_unit_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "factor": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "code",
+                    "name_en",
+                    "name_am"
+                ],
+                "title": "StoreUnitRequest"
             },
             "StoreUserRequest": {
                 "type": "object",
@@ -1047,6 +2494,146 @@
                     "role"
                 ],
                 "title": "StoreUserRequest"
+            },
+            "UnitResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string"
+                    },
+                    "name_am": {
+                        "type": "string"
+                    },
+                    "base_unit_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "base_unit_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "factor": {
+                        "type": "string"
+                    },
+                    "is_base": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "code",
+                    "name_en",
+                    "name_am",
+                    "base_unit_id",
+                    "base_unit_code",
+                    "factor",
+                    "is_base"
+                ],
+                "title": "UnitResource"
+            },
+            "UpdateCategoryRequest": {
+                "type": "object",
+                "description": "PATCH /categories/{category}: rename (both languages stay filled, rule 9), move under another live category of the\nsame kind and branch, or reorder. The kind is fixed: the items it holds are of that kind.",
+                "properties": {
+                    "kind": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "parent_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                    }
+                },
+                "title": "UpdateCategoryRequest"
+            },
+            "UpdateItemRequest": {
+                "type": "object",
+                "description": "PATCH /items/{item}: any subset of the editable attributes. The kind is fixed (it decides which inventory the\nitem's stock belongs to); an ingredient stays bought in; the unit may change only within the same base unit (the\ncontroller checks, since every stock movement of the item is written in that base).",
+                "properties": {
+                    "kind": {
+                        "type": "string"
+                    },
+                    "fulfilment": {
+                        "type": "string",
+                        "enum": [
+                            "to_order",
+                            "to_stock",
+                            "bought_in"
+                        ]
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "category_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "unit_id": {
+                        "type": "integer"
+                    },
+                    "sku": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "is_new_until": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date"
+                    },
+                    "default_batch_qty": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "a batch size and a producing station belong to products only"
+                    },
+                    "production_station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "title": "UpdateItemRequest"
             },
             "UpdateUserRequest": {
                 "type": "object",
