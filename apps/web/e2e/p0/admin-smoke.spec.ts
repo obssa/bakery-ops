@@ -11,12 +11,18 @@ import { test, expect, type Page } from "@playwright/test";
 //   against https://bakery-ops.orcamind.dev/app/ as the admin of the isolated "E2E Test Branch" (repository
 //   secrets). Everything they create lives in that branch under names unique to the run; shop data is never touched.
 //
+// - CI e2e-p0 also seeds the demo bakery (DemoSeeder, SEED_PHASE=0) and passes DEMO_ADMIN_PHONE / DEMO_ADMIN_PASSWORD
+//   (the documented local/CI demo password): the seeded catalog and people must show in both languages. Not @live: on
+//   the live site the demo bakery is loaded by hand (docs/runbook/server.md) and its password is not a CI secret.
+//
 // Paths are relative to baseURL (".../app/"), so "en/login/" is /app/en/login/.
 
 const live = !!process.env.PLAYWRIGHT_BASE_URL;
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
 const phone = process.env.E2E_ADMIN_PHONE ?? "";
 const password = process.env.E2E_ADMIN_PASSWORD ?? "";
+const demoPhone = process.env.DEMO_ADMIN_PHONE ?? "";
+const demoPassword = process.env.DEMO_ADMIN_PASSWORD ?? "";
 const run = `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 
 function requireAdmin() {
@@ -30,10 +36,17 @@ function requireAdmin() {
   );
 }
 
-async function signIn(page: Page) {
+function requireDemoAdmin() {
+  if (demoPhone && demoPassword) return;
+  // CI seeds the demo bakery before Playwright runs and must not pass by skipping; a local run may not have seeded it.
+  if (process.env.CI) throw new Error("DEMO_ADMIN_PHONE and DEMO_ADMIN_PASSWORD must be set in CI (e2e.yml): the e2e job seeds the demo bakery.");
+  test.skip(true, "DEMO_ADMIN_PHONE / DEMO_ADMIN_PASSWORD are not set: seed the demo bakery (php artisan bakery:seed-demo) and set them.");
+}
+
+async function signIn(page: Page, account: { phone: string; password: string } = { phone, password }) {
   await page.goto("en/login/");
-  await page.getByLabel("Phone number").fill(phone);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Phone number").fill(account.phone);
+  await page.getByLabel("Password").fill(account.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/app\/en\/admin\/$/);
   await expect(page.getByRole("heading", { level: 1, name: "Admin console" })).toBeVisible();
@@ -171,6 +184,34 @@ test.describe("p0 admin smoke", () => {
     await expect(row).toContainText(person.phone);
     await expect(row).toContainText("Cashier");
     await expect(row).toContainText("አማርኛ");
+  });
+
+  // Not @live (see the header): the demo bakery Phase0Seeder loads, as its admin sees it.
+  test("the demo bakery's admin sees its seeded catalog and people in English and Amharic", async ({ page }) => {
+    requireDemoAdmin();
+    await signIn(page, { phone: demoPhone, password: demoPassword });
+
+    await page.getByRole("link", { name: "Catalog" }).first().click();
+    const items = page.getByRole("table", { name: "Items" });
+    await expect(items.getByRole("row").filter({ hasText: "Macchiato" })).toContainText("Made to order");
+    await expect(items.getByRole("row").filter({ hasText: "Black forest cake (slice)" })).toContainText("Made in batches");
+    await expect(items.getByRole("row").filter({ hasText: "Bottled water 0.5 L" })).toContainText("Bought in");
+    await expect(items.getByRole("row").filter({ hasText: "Wheat flour" })).toContainText("Flour & grains");
+    await expect(items.getByRole("row").filter({ hasText: "Wheat flour" })).toContainText("Ingredient");
+
+    await page.getByRole("link", { name: "አማርኛ" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "am");
+    const itemsAm = page.getByRole("table", { name: "ዕቃዎች" });
+    await expect(itemsAm.getByRole("row").filter({ hasText: "ማኪያቶ" })).toContainText("ምርት");
+    await expect(itemsAm.getByRole("row").filter({ hasText: "የስንዴ ዱቄት" })).toContainText("ዱቄትና እህል");
+
+    await page.getByRole("link", { name: "English" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await page.getByRole("link", { name: "People" }).first().click();
+    const people = page.getByRole("table", { name: "People" });
+    await expect(people.getByRole("row")).toHaveCount(10); // the header and the nine demo accounts
+    await expect(people.getByRole("row").filter({ hasText: "Hirut Desta (ሂሩት ደስታ)" })).toContainText("Cake baker");
+    await expect(people.getByRole("row").filter({ hasText: demoPhone })).toContainText("Admin");
   });
 
   test("a wrong password is refused with the API's message in the page's language @live", async ({ page }) => {

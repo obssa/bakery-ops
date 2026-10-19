@@ -29,6 +29,10 @@ jobs:
       # only, so they are job env, not secrets; created below with `php artisan bakery:create-admin`.
       E2E_ADMIN_PHONE: "+251911000099"
       E2E_ADMIN_PASSWORD: ci-e2e-admin-password
+      # The demo bakery's admin (Phase0Seeder, seeded below): APP_ENV=testing in compose.ci.yml, so the demo accounts
+      # use the documented local/CI password (Database\Seeders\Demo\DemoCredentials::LOCAL_PASSWORD).
+      DEMO_ADMIN_PHONE: "+251900000101"
+      DEMO_ADMIN_PASSWORD: demo-bakery-local
     steps:
       - uses: actions/checkout@v4
 

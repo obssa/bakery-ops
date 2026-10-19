@@ -12,6 +12,7 @@
             <directory>tests/Contract</directory>
             <directory>tests/Gate</directory>
             <directory>tests/Modules</directory>
+            <directory>tests/Seeders</directory>
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>

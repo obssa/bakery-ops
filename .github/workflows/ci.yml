@@ -166,7 +166,9 @@ jobs:
   mod-inventory:
     needs: mod-catalog
     uses: ./.github/workflows/module-tests.yml
-    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory" }
+    # `seeds`: the demo bakery (Phase0Seeder ..) must stay valid as later phases change; Inventory is the top of the
+    # Phase 0 chain the seeders write through, so it runs here, after every module it depends on is green.
+    with: { module: inventory, groups: "module:inventory,property,concurrency,seeds", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory" }
 
   mod-orders:
     needs: [status, mod-inventory]
