@@ -23,8 +23,8 @@
         "repo": "done",
         "shared": "done",
         "audit": "done",
-        "identity": "in_progress",
-        "catalog": "todo",
+        "identity": "done",
+        "catalog": "in_progress",
         "inventory": "todo",
         "web": "todo",
         "seeds": "todo",
@@ -201,12 +201,12 @@
     },
     "identity": {
       "phase": 0,
-      "status": "in_progress",
-      "stable_since": null
+      "status": "stable",
+      "stable_since": "2026-10-19T15:17:57Z"
     },
     "catalog": {
       "phase": 0,
-      "status": "todo",
+      "status": "in_progress",
       "stable_since": null
     },
     "inventory": {
