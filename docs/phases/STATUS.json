@@ -25,9 +25,9 @@
         "audit": "done",
         "identity": "done",
         "catalog": "done",
-        "inventory": "in_progress",
-        "web": "in_progress",
-        "seeds": "todo",
+        "inventory": "done",
+        "web": "done",
+        "seeds": "in_progress",
         "docs": "todo"
       },
       "playwright_projects": [
@@ -211,8 +211,8 @@
     },
     "inventory": {
       "phase": 0,
-      "status": "in_progress",
-      "stable_since": null
+      "status": "stable",
+      "stable_since": "2026-10-19T22:10:10Z"
     },
     "orders": {
       "phase": 1,
