@@ -139,8 +139,8 @@ jobs:
           for d in (a, b): d.get('info', {}).pop('version', None)
           if a != b:
               dump = lambda d: json.dumps(d, indent=2, sort_keys=True).splitlines()
-              sys.stdout.writelines(l + '
-' for l in difflib.unified_diff(dump(b), dump(a), 'docs/openapi.json', 'exported', lineterm='', n=2))
+              for line in difflib.unified_diff(dump(b), dump(a), 'docs/openapi.json', 'exported', lineterm='', n=2):
+                  print(line)
               print('docs/openapi.json is stale: run scripts/artisan scramble:export --path=../../docs/openapi.json (against a migrated database)'); sys.exit(1)
           print('openapi in sync')
           PY
