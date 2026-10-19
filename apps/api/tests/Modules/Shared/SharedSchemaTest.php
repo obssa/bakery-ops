@@ -39,8 +39,10 @@ it('accepts exactly the six station codes', function () {
         [dbSchema()],
     );
     expect($constraint)->not->toBeNull('stations_code_check must exist');
+    // MySQL reports the clause with escaped, charset-prefixed literals (_utf8mb4\'till\'); PostgreSQL as 'till'::text.
+    $clause = str_replace('\\', '', (string) $constraint?->def);
     foreach (StationCode::values() as $value) {
-        expect((string) $constraint?->def)->toContain("'{$value}'");
+        expect($clause)->toContain("'{$value}'");
     }
     expect(fn () => DB::table('stations')->insert([
         'branch_id' => $branch->id, 'code' => 'garage', 'name_en' => 'Garage', 'name_am' => 'ጋራዥ',
