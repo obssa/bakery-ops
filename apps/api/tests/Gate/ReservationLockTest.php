@@ -10,6 +10,7 @@ use App\Modules\Inventory\Contracts\Reserved;
 use App\Modules\Inventory\Contracts\ReserveLine;
 use App\Modules\Inventory\Contracts\Shortfall;
 use App\Modules\Inventory\Enums\LocationType;
+use App\Modules\Inventory\Ledger\Ledger;
 use App\Shared\Models\Branch;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
@@ -96,3 +97,8 @@ it('makes a second reservation of the last cake wait for the first, then find it
         ->and($late->qtyShort->toString())->toBe('1.0000')
         ->and(stockRow($this->cake, $this->display))->on_hand->toBe('1.0000')->reserved->toBe('1.0000');
 })->group('gate:p0', 'concurrency', 'module:inventory');
+
+it('refuses to lock outside a transaction: a lock released at once protects nothing', function () {
+    expect(DB::transactionLevel())->toBe(0)
+        ->and(fn () => app(Ledger::class)->lock([[$this->cake->id, $this->display->id]]))->toThrow(LogicException::class);
+})->group('concurrency', 'module:inventory');

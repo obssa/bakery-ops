@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Inventory\Ledger\InvalidMovement;
+use App\Modules\Inventory\Ledger\LedgerReader;
 use App\Modules\Inventory\Ledger\MovementIntent;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Shared\Values\Quantity;
@@ -78,6 +79,15 @@ it('knows which reasons need, allow or refuse a reservation_ref', function () {
         ->and(fn () => MovementReason::ReservationRelease->effect('-1', false))->toThrow(InvalidMovement::class)
         ->and(fn () => MovementReason::PurchaseIn->effect('1', true))->toThrow(InvalidMovement::class)
         ->and(fn () => MovementReason::Waste->effect('-1', true))->toThrow(InvalidMovement::class);
+})->group('unit', 'module:inventory');
+
+it('is mirrored exactly by the SQL the ledger reader sums with', function () {
+    $list = fn (array $reasons): string => implode(', ', array_map(fn (MovementReason $r): string => "'{$r->value}'", $reasons));
+    $reservedOnly = array_values(array_filter(MovementReason::cases(), fn (MovementReason $r): bool => $r->needsReservationRef()));
+    $consumes = array_values(array_filter(MovementReason::cases(), fn (MovementReason $r): bool => $r->canCarryReservationRef() && ! $r->needsReservationRef()));
+
+    expect(LedgerReader::ON_HAND_SQL)->toBe("CASE WHEN reason IN ({$list($reservedOnly)}) THEN 0 ELSE qty END")
+        ->and(LedgerReader::RESERVED_SQL)->toBe("CASE WHEN reason IN ({$list($reservedOnly)}) THEN qty WHEN reason IN ({$list($consumes)}) AND reservation_ref IS NOT NULL THEN qty ELSE 0 END");
 })->group('unit', 'module:inventory');
 
 it('builds intents that say where the stock left from and arrived at', function () {

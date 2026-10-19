@@ -85,11 +85,13 @@ it('never lets reserve, release or consume take available below zero, and names 
     $where = [$sandwich->id => $kitchen, $toast->id => $kitchen, $cake->id => $display, $soda->id => $display];
     $stationOf = [$kitchen->id => $station->id, $display->id => null];
 
-    stockIn($cheese, $kitchen, (string) $rng->getInt(0, 400));
-    stockIn($ham, $kitchen, (string) $rng->getInt(0, 400));
-    stockIn($flour, $kitchen, (string) $rng->getInt(0, 600));
-    stockIn($cake, $display, (string) $rng->getInt(0, 8));
-    stockIn($soda, $display, (string) $rng->getInt(0, 12));
+    // opening stock, sometimes none at all (a purchase of zero is not a movement)
+    foreach ([[$cheese, $kitchen, 400], [$ham, $kitchen, 400], [$flour, $kitchen, 600], [$cake, $display, 8], [$soda, $display, 12]] as [$item, $location, $max]) {
+        $opening = $rng->getInt(0, $max);
+        if ($opening > 0) {
+            stockIn($item, $location, (string) $opening);
+        }
+    }
 
     $reservations = app(Reservations::class);
     $open = [];       // ref => "item:location" => reserved qty (string)

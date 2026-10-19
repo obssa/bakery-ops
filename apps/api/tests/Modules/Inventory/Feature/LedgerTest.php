@@ -180,7 +180,8 @@ it('moves reserved with the reservation reasons and both columns with a consumpt
 it('dispatches StockChanged once per changed balance, after the commit, with decimal strings', function () {
     Event::fake([StockChanged::class]);
 
-    $this->ledger->appendMany([
+    // resolved after faking: the Ledger is resolved per use and takes the dispatcher it is built with
+    app(Ledger::class)->appendMany([
         MovementIntent::of($this->flour->id, $this->store->id, '5', MovementReason::PurchaseIn, 'test'),
         MovementIntent::of($this->flour->id, $this->store->id, '2', MovementReason::PurchaseIn, 'test'),
         MovementIntent::of($this->sugar->id, $this->kitchen->id, '1.5', MovementReason::PurchaseIn, 'test'),
@@ -222,11 +223,10 @@ it('writes a client_uuid once per branch: a replay of the same offline record is
         ->and(stockRow($this->flour, $this->store)?->on_hand)->toBe('1.0000');
 })->group('module:inventory', 'feature');
 
-it('locks balance rows only inside a transaction, creating a missing row at zero', function () {
+it('locks balance rows in ascending (item, location) order, creating a missing row at zero', function () {
     stockIn($this->sugar, $this->store, '3');
 
-    expect(fn () => $this->ledger->lock([[$this->flour->id, $this->store->id]]))->toThrow(LogicException::class);
-
+    // (outside any transaction lock() refuses: tests/Gate/ReservationLockTest.php, where no test transaction wraps it)
     $levels = DB::transaction(fn () => $this->ledger->lock([
         [$this->sugar->id, $this->store->id],
         [$this->flour->id, $this->kitchen->id],
