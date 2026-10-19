@@ -23,6 +23,12 @@ every write.
   `(branch_id, client_uuid)`: orders, order_lines, payments, stock_counts, production_batches,
   transfers, purchases. This makes a replay safe even if the key store was flushed.
 - Keys expire after 24 hours.
+- Middleware order (added 2026-10-19, step 0.5): authentication, the actor middleware, the permission
+  check, idempotency, and only then route-model binding (`bootstrap/app.php` priority list). A replay
+  must return the stored response even when the bound row has changed since: an outbox retry of
+  `DELETE /items/{item}` finds the item soft-deleted, and binding first would answer `404` instead of
+  the stored `200`. Permission before binding also keeps a role without the permission from probing
+  which ids exist (`403`, not `404`).
 
 ## Consequences
 

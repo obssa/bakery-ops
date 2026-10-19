@@ -245,6 +245,27 @@ it('lets every role read items and refuses item writes to every role but admin',
     expect($item->fresh()?->trashed())->toBeFalse();
 })->group('module:catalog', 'feature');
 
+it('replays a delete with the same key although the item is gone by then: the pad retry gets the stored answer, not 404', function () {
+    $item = Item::factory()->product(Fulfilment::BoughtIn)->create(['branch_id' => $this->branch->id]);
+    $key = idempotencyKey();
+
+    $first = $this->withHeaders($key)->deleteJson("/api/v1/items/{$item->id}")->assertOk();
+    $second = $this->withHeaders($key)->deleteJson("/api/v1/items/{$item->id}");
+
+    $second->assertOk()->assertHeader('Idempotency-Replayed', 'true');
+    expect($second->json())->toEqual($first->json());
+    // a new key is a new request: the item is gone, so that one is 404
+    $this->withHeaders(idempotencyKey())->deleteJson("/api/v1/items/{$item->id}")->assertStatus(404);
+    expect(AuditLog::query()->where('action', 'item.delete')->where('subject_id', $item->id)->count())->toBe(1);
+})->group('module:catalog', 'feature');
+
+it('answers 403 before looking the item up: a role without catalog.manage cannot probe ids', function () {
+    loginAs(makeUser($this->branch, 'cashier'));
+
+    $this->withHeaders(idempotencyKey())->patchJson('/api/v1/items/999999', ['name_en' => 'x'])->assertStatus(403);
+    $this->withHeaders(idempotencyKey())->deleteJson('/api/v1/items/999999')->assertStatus(403);
+})->group('module:catalog', 'feature');
+
 it('replays an item creation idempotently', function () {
     assertIdempotent($this, 'POST', '/api/v1/items', [
         'kind' => 'product', 'fulfilment' => 'bought_in', 'name_en' => 'Bottled water', 'name_am' => 'የታሸገ ውሃ', 'unit_id' => catalogUnit('pcs')->id,

@@ -39,7 +39,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
         // The branch must be resolved before route model binding and before permission/idempotency middleware run.
+        // Route model binding comes last (Catalog, step 0.5): the permission check answers 403 before a lookup can say
+        // 404, and an idempotent replay must return the stored response even when the bound row has changed since
+        // (a retried DELETE of an item finds it soft-deleted; binding first would answer 404 instead of the replay).
+        // Applied in this order, each lands right before SubstituteBindings: actor, permission, idempotency, bindings.
         $middleware->prependToPriorityList(SubstituteBindings::class, ResolveActor::class);
+        $middleware->prependToPriorityList(SubstituteBindings::class, PermissionMiddleware::class);
+        $middleware->prependToPriorityList(SubstituteBindings::class, Idempotency::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
