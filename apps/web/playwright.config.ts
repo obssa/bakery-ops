@@ -4,13 +4,17 @@ import { defineConfig, devices } from "@playwright/test";
 // projects; earlier phases' projects keep running in every CI run so later work cannot break them.
 // Tests always run against the BUILT app (`next start`): the dev server hydrates late and makes taps
 // flaky. Service workers are blocked except for the Phase 5 offline project.
+//
+// The shell lives under /app (basePath; on the live host it is the static export LiteSpeed serves from
+// public/app/, ADR 0006), so baseURL ends in "/app/" and tests navigate with relative paths ("en/login/").
 // Live mode: PLAYWRIGHT_BASE_URL=https://bakery-ops.orcamind.dev runs the suite against the deployed site
 // (no local web server is started; the API is the same origin). Tests that can run there carry "@live"
-// in their title; the deploy workflow runs `--grep @live` after every release (ADR 0006).
-const liveBase = process.env.PLAYWRIGHT_BASE_URL;
+// in their title; the deploy workflow runs `--grep @live` after every release.
+const liveBase = process.env.PLAYWRIGHT_BASE_URL?.replace(/\/+$/, "");
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? liveBase ?? "http://localhost:8000";
 const webPort = Number(process.env.PLAYWRIGHT_WEB_PORT ?? 3000);
-const baseURL = liveBase ?? `http://localhost:${webPort}`;
+const origin = liveBase ?? `http://localhost:${webPort}`;
+const baseURL = `${origin}/app/`;
 
 const tablet = { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } };
 
