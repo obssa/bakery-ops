@@ -106,19 +106,42 @@ jobs:
   openapi-check:
     needs: api-arch
     runs-on: ubuntu-24.04
+    # Scramble types model attributes from the database schema, so the export needs a migrated database
+    # (the same engine as the module jobs); without one it aborts on the first model it meets.
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env: { MARIADB_DATABASE: bakery_test, MARIADB_USER: bakery, MARIADB_PASSWORD: secret, MARIADB_ROOT_PASSWORD: root }
+        ports: ["3306:3306"]
+        options: --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      DB_CONNECTION: mariadb
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: bakery_test
+      DB_USERNAME: bakery
+      DB_PASSWORD: secret
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
+      - name: Prepare MySQL (triggers need log_bin_trust_function_creators under binlog)
+        run: bash scripts/ci/mysql-prepare.sh
+      - name: Migrate
+        working-directory: apps/api
+        run: php artisan migrate --force --no-interaction
       - name: Export spec and compare with docs/openapi.json
         working-directory: apps/api
         run: |
           php artisan scramble:export --path=tmp/openapi.json
           python3 - <<'PY'
-          import json, sys
+          import difflib, json, sys
           a = json.load(open('tmp/openapi.json')); b = json.load(open('../../docs/openapi.json'))
           for d in (a, b): d.get('info', {}).pop('version', None)
           if a != b:
-              print('docs/openapi.json is stale: run scripts/artisan scramble:export --path=../../docs/openapi.json'); sys.exit(1)
+              dump = lambda d: json.dumps(d, indent=2, sort_keys=True).splitlines()
+              sys.stdout.writelines(l + '
+' for l in difflib.unified_diff(dump(b), dump(a), 'docs/openapi.json', 'exported', lineterm='', n=2))
+              print('docs/openapi.json is stale: run scripts/artisan scramble:export --path=../../docs/openapi.json (against a migrated database)'); sys.exit(1)
           print('openapi in sync')
           PY
 
