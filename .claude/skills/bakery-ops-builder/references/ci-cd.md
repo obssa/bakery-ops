@@ -141,7 +141,18 @@ by Ramin; that is how "wait for my OK" survives an unattended agent.
 
 `--ci` switches test checks from "run them now" to "trust the `needs` chain" and makes output GitHub-annotation friendly.
 
-## Deploy later (not now)
+## Deploy (live since 2026-10-19 decision, ADR 0006)
+
+`.github/workflows/deploy.yml` runs on `workflow_run` after `ci` succeeds on `main`: build release on the runner
+(`composer install --no-dev`, optional static web export when `DEPLOY_WEB_MODE=static`), rsync over SSH to the
+cPanel site folder (`scripts/deploy/rsync-excludes.txt` protects `.env`, `storage/`, `public/.htaccess`),
+`scripts/deploy/release.sh` on the server, `scripts/deploy/smoke.sh` against https://bakery-ops.orcamind.dev,
+rollback on failure, then the `live-e2e` job runs Playwright `--grep @live` with `PLAYWRIGHT_BASE_URL`.
+Secrets `DEPLOY_HOST/USER/PORT/SSH_KEY/KNOWN_HOSTS`; variables `DEPLOY_ENABLED/PATH/PHP_BIN/URL/WEB_MODE`.
+Provisioning steps: `docs/runbook/server.md`. Tag a Playwright test `@live` only when it can run against the
+deployed data (no local seeds assumed).
+
+## Deploy later (VPS option)
 
 When Ramin has a server: add `deploy-staging.yml` (on push to `main` after `gate-p<current>` green:
 build images, push to GHCR, `ssh` + `docker compose pull && up -d` + `artisan migrate --force`) and

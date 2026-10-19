@@ -27,7 +27,7 @@ No previous phase. Working tree committed. Contracts internal to the phase (`inv
 4. `audit_log` (branch_id, actor_id, acting_user_id?, action, subject_type, subject_id, before jsonb, after jsonb, shift_instance_id?, station_id?, device_id?, ip, at) + `forbid_update_delete()` trigger function and trigger
 5. `users` (branch_id, name, phone unique per branch, email?, password, short_code_hash, short_code_attempts, pin_locked_until, locale, is_active, photo_url, soft delete); spatie permission tables; `user_station_assignments` (user_id, station_id, can_count, is_overseer); `devices` (branch_id, name, fingerprint, enrolled_by, enrolled_at, revoked_at); `acting_sessions`
 6. `units` (code, base_unit_id?, factor NUMERIC(14,4)); `categories` (branch_id, kind, name_en, name_am, parent_id, sort); `items` (branch_id, kind, name_en, name_am, category_id, unit_id, sku, is_active, is_new_until, default_batch_qty NUMERIC(14,4), soft delete); `item_prices` (item_id, price NUMERIC(12,2), currency, effective_from, effective_to); `item_station_assignments`; `recipes` (product_item_id, yield_qty NUMERIC(14,4), yield_unit_id, version, is_active); `recipe_lines` (recipe_id, ingredient_item_id, qty NUMERIC(14,4), unit_id, is_optional, waste_pct NUMERIC(5,2)); `recipe_steps`; `modifiers`
-7. `locations` (branch_id, name, station_id?, type enum); `stock_movements` (append-only, trigger; branch_id, item_id, from_location_id?, to_location_id?, qty NUMERIC(14,4) signed, reason enum, ref_type, ref_id, reservation_ref?, shift_instance_id? (no FK yet), user_id, acting_user_id?, station_id?, device_id?, client_uuid?, created_at); `stock_balances` (branch_id, item_id, location_id, on_hand, reserved NUMERIC(14,4), unique (item_id, location_id)); materialized view `item_stock_view`
+7. `locations` (branch_id, name, station_id?, type enum); `stock_movements` (append-only, trigger; branch_id, item_id, from_location_id?, to_location_id?, qty NUMERIC(14,4) signed, reason enum, ref_type, ref_id, reservation_ref?, shift_instance_id? (no FK yet), user_id, acting_user_id?, station_id?, device_id?, client_uuid?, created_at); `stock_balances` (branch_id, item_id, location_id, on_hand, reserved DECIMAL(14,4), unique (item_id, location_id)); `item_stock_view` as a plain view (SUM over movements) for reconciliation
 
 ## 4. Endpoints (all under `/api/v1`, bearer auth unless public, `Idempotency-Key` on writes)
 
@@ -76,6 +76,8 @@ user per role with short codes, opening balances via `purchase_in` movements.
 0005 phase gates and CI (all drafted with the skeleton; accepted when the phase closes).
 
 ## 10. Assumptions
+
+- Database engine is MySQL 8 (live host, ADR 0006); migrations stay portable to PostgreSQL. NUMERIC(p,s) in this plan means DECIMAL(p,s).
 
 - Laravel 13 instead of the document's Laravel 11: Laravel 11 is end-of-life and Composer blocks it on security advisories. Same skeleton layout; nothing in the design changes.
 

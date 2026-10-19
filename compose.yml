@@ -10,9 +10,9 @@ x-api-env: &api-env
   APP_URL: http://localhost:8000
   APP_TIMEZONE: UTC
   LOG_CHANNEL: stderr
-  DB_CONNECTION: pgsql
+  DB_CONNECTION: mysql
   DB_HOST: db
-  DB_PORT: "5432"
+  DB_PORT: "3306"
   DB_DATABASE: bakery
   DB_USERNAME: bakery
   DB_PASSWORD: secret
@@ -76,19 +76,23 @@ services:
     profiles: ["full"]
 
   db:
-    image: postgres:16-alpine
+    # MySQL 8: the engine the live site runs on (shared cPanel, ADR 0006). PostgreSQL stays an option
+    # for a VPS; keep schema and tests portable (DECIMAL, JSON, triggers, FOR UPDATE; no matviews).
+    image: mysql:8.0
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
     environment:
-      POSTGRES_DB: bakery
-      POSTGRES_USER: bakery
-      POSTGRES_PASSWORD: secret
+      MYSQL_DATABASE: bakery
+      MYSQL_USER: bakery
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: root
     volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+      - db_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bakery -d bakery"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
       interval: 3s
-      timeout: 3s
-      retries: 20
+      timeout: 5s
+      retries: 30
 
   redis:
     image: redis:7-alpine

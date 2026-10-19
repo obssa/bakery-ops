@@ -31,6 +31,12 @@ cannot run inside the reservation transaction. Both rules cannot be satisfied by
 - Negative: one more table to keep consistent; the discipline that only `Ledger` writes it must be
   enforced mechanically.
 
+## Note (2026-10-19)
+
+The live host runs MySQL 8 (ADR 0006), which has no materialized views: `item_stock_view` is a plain view /
+reconciliation query there. The decision stands unchanged because `stock_balances` was already the lock
+target and read path.
+
 ## Enforcement
 
 `tests/Arch/LedgerIsSoleWriterTest.php`, `tests/Gate/Phase0GateTest.php` (`LedgerPropertiesTest`,

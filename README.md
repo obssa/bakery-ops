@@ -7,9 +7,9 @@ receipt photos, full audit trail, analytics, Amharic and English.
 
 | Part | Path | Stack |
 |---|---|---|
-| API | `apps/api` | Laravel 13, PHP 8.3, PostgreSQL 16, Redis 7, Reverb, Horizon, Pest |
+| API | `apps/api` | Laravel 13, PHP 8.3, MySQL 8 (live), Pest; Redis/Reverb/Horizon on a VPS later |
 | Web | `apps/web` | Next.js 15, TypeScript strict, Tailwind, shadcn/ui, TanStack Query, next-intl, Workbox, Playwright |
-| Infra | `compose.yml`, `docker/` | Docker Compose: app, web (Caddy), ws, worker, db, redis, minio |
+| Infra | `compose.yml`, `docker/`, `.github/workflows/deploy.yml` | Live: https://bakery-ops.orcamind.dev (cPanel, deployed from `main`); Docker Compose for CI e2e and local debugging |
 | Docs | `docs/` | `architecture.md`, ADRs, `phases/STATUS.json`, OpenAPI, ERD |
 | Build skill | `.claude/skills/bakery-ops-builder` | Phase-gated build procedure used by Claude Code |
 

@@ -1,0 +1,21 @@
+# Paths the deploy never copies AND never deletes on the server.
+# Server configuration and data stay authoritative:
+/.env
+/.env.*
+/storage/
+/public/storage
+/bootstrap/cache/
+# Files cPanel / LiteSpeed create inside the site folder:
+/public/.well-known/
+# cPanel writes its PHP version handler into this file; release.sh rebuilds it
+# from cPanel's blocks plus Laravel's rules (scripts/deploy/public.htaccess).
+/public/.htaccess
+/.well-known/
+/cgi-bin/
+/public/cgi-bin/
+/.user.ini
+/public/.user.ini
+/php.ini
+/public/php.ini
+/error_log
+/public/error_log

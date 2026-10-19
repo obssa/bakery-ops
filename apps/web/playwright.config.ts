@@ -4,9 +4,13 @@ import { defineConfig, devices } from "@playwright/test";
 // projects; earlier phases' projects keep running in every CI run so later work cannot break them.
 // Tests always run against the BUILT app (`next start`): the dev server hydrates late and makes taps
 // flaky. Service workers are blocked except for the Phase 5 offline project.
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Live mode: PLAYWRIGHT_BASE_URL=https://bakery-ops.orcamind.dev runs the suite against the deployed site
+// (no local web server is started; the API is the same origin). Tests that can run there carry "@live"
+// in their title; the deploy workflow runs `--grep @live` after every release (ADR 0006).
+const liveBase = process.env.PLAYWRIGHT_BASE_URL;
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? liveBase ?? "http://localhost:8000";
 const webPort = Number(process.env.PLAYWRIGHT_WEB_PORT ?? 3000);
-const baseURL = `http://localhost:${webPort}`;
+const baseURL = liveBase ?? `http://localhost:${webPort}`;
 
 const tablet = { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } };
 
@@ -27,13 +31,15 @@ export default defineConfig({
     extraHTTPHeaders: { Accept: "application/json" },
   },
   metadata: { apiUrl },
-  webServer: {
-    command: process.env.PLAYWRIGHT_WEB_SERVER === "next-dev" ? "pnpm dev" : `pnpm start -p ${webPort}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    env: { NEXT_PUBLIC_API_URL: apiUrl },
-  },
+  webServer: liveBase
+    ? undefined
+    : {
+        command: process.env.PLAYWRIGHT_WEB_SERVER === "next-dev" ? "pnpm dev" : `pnpm start -p ${webPort}`,
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+        env: { NEXT_PUBLIC_API_URL: apiUrl },
+      },
   projects: [
     { name: "p0-admin-smoke", testDir: "./e2e/p0", use: tablet },
     { name: "p1-order-flow", testDir: "./e2e/p1", testMatch: /order-flow/, use: tablet },

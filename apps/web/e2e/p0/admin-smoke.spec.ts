@@ -6,7 +6,7 @@ import { test, expect } from "@playwright/test";
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 test.describe("p0 admin smoke", () => {
-  test("API health answers with the ledger-ready stack", async ({ request }) => {
+  test("API health answers with the ledger-ready stack @live", async ({ request }) => {
     const res = await request.get(`${apiUrl}/api/v1/health`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();

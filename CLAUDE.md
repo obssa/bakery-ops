@@ -3,6 +3,23 @@
 Bakery Operations Platform: POS + kitchen display + bakery production + ledger inventory + shift handover,
 for a bakery in Addis Ababa. Laravel 13 API (`apps/api`) + Next.js 15 PWA (`apps/web`), PostgreSQL 16, Redis 7.
 
+## Where it runs and where tests run
+
+- **The system runs at https://bakery-ops.orcamind.dev** (shared cPanel behind Cloudflare), deployed by
+  GitHub Actions from `main` after CI is green (`.github/workflows/deploy.yml`, ADR 0006,
+  `docs/runbook/server.md`). The developer PC never serves the site.
+- **Tests run in GitHub Actions and against the live URL**, not on the developer's machine: unit, feature,
+  property, arch and invariant tests in CI; e2e on the CI compose stack; Playwright tests tagged `@live`
+  against the deployed site after every deploy. Local Docker is for debugging only, never a gate.
+- Infrastructure is a driver choice in `.env` (MySQL on cPanel, database cache/session/queue, polling
+  instead of WebSockets until a WebSocket host exists). Code must stay portable to the VPS stack.
+
+## Authorship (non-negotiable)
+
+- Every commit, tag and PR is authored by the repository owner only (git identity `Obssa <obssa77@gmail.com>`).
+- **Never add `Co-Authored-By` or any AI/tool attribution trailer.** `.githooks/commit-msg` rejects them.
+- The deploy pipeline never creates commits.
+
 ## How work happens here
 
 - **Always work through the `bakery-ops-builder` skill** (`.claude/skills/bakery-ops-builder/SKILL.md`).
@@ -12,7 +29,7 @@ for a bakery in Addis Ababa. Laravel 13 API (`apps/api`) + Next.js 15 PWA (`apps
   A gate that is red upstream means the work you are about to do is built on sand.
 - **Contract tests first.** Before writing a consumer module, write the tests that prove the provider
   behaves the way the consumer needs, and get them green with zero consumer code.
-- **`make ci` before every PR.** It runs the same steps as GitHub Actions, inside Docker.
+- **CI is the gate, not your laptop.** Push a branch and read the checks; `python scripts/task.py ci` exists for local debugging in Docker but is optional.
 - **PHP runs only inside Docker.** The host has PHP 8.0; Laravel 13 needs 8.3. Use `scripts/php`,
   `scripts/artisan`, `scripts/composer`, `scripts/pest` (they `docker compose exec` into `app`).
 - Phase state lives in `docs/phases/STATUS.json`. `plan_approved: true` is set only by Ramin's own commit.

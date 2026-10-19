@@ -15,7 +15,7 @@ RUN apt-get update \
         git unzip ca-certificates \
         libpq-dev libzip-dev libicu-dev libpng-dev libjpeg-dev libfreetype6-dev libonig-dev \
  && docker-php-ext-configure gd --with-freetype --with-jpeg \
- && docker-php-ext-install -j"$(nproc)" pdo_pgsql pgsql intl bcmath gd zip pcntl opcache \
+ && docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_pgsql pgsql intl bcmath gd zip pcntl opcache \
  && pecl install redis \
  && docker-php-ext-enable redis \
  && apt-get purge -y --auto-remove \

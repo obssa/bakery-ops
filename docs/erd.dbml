@@ -3,8 +3,8 @@
 // so the check stays honest; domain tables are added as their migrations land.
 
 Project bakery_ops {
-  database_type: 'PostgreSQL'
-  Note: 'Phase 0 skeleton. Money NUMERIC(12,2), quantities NUMERIC(14,4) in base units. branch_id on every tenant table.'
+  database_type: 'MySQL'
+  Note: 'Phase 0 skeleton. Money DECIMAL(12,2), quantities DECIMAL(14,4) in base units. branch_id on every tenant table. Live engine MySQL 8 (ADR 0006); schema kept portable to PostgreSQL.'
 }
 
 // ---- Laravel framework tables (shipped with the scaffold)

@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Pest bootstrap. Groups are the backbone of the phase gates (see the bakery-ops-builder skill):
  *   arch, invariants, unit, feature, property, concurrency, module:<name>,
  *   contract:<consumer>-><provider>, gate:p<N>
- * Feature, Module, Contract and Gate tests get the Laravel TestCase + RefreshDatabase on Postgres.
+ * Feature, Module, Contract and Gate tests get the Laravel TestCase + RefreshDatabase on MySQL 8 (the live engine).
  * Concurrency tests opt into DatabaseTruncation themselves (RefreshDatabase hides rows from a second connection).
  */
 

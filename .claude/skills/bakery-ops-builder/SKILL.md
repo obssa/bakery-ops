@@ -84,7 +84,7 @@ c. **Implement** inside `app/Modules/<Name>` (or `app/Shared`), exposing the cap
    lists under `provides` as classes in `Contracts/`. Every write goes through `AuditedAction`, carries
    `ActorContext`, uses `Quantity`/`Money`, and registers in `tests/Support/write_endpoints.php` and
    `route_permissions.php`.
-d. **`make ci`** locally (inside Docker). Fix until green. It mirrors GitHub Actions job for job.
+d. Push the branch and let CI run (`python scripts/task.py ci` is available for local debugging in Docker, not required). Fix until the checks are green.
 e. Branch `phase-<N>/<module>`, PR with the template filled (tests added, assumptions, gate impact),
    CI green, merge. Small PRs: one module or sub-module each.
 f. `python scripts/gate_check.py --mode module --module <name>` then
@@ -124,6 +124,11 @@ to required checks, approve the next plan). Never begin the next phase in the sa
   default from `product-and-rules.md`, write the assumption in the plan or PR, continue.
 
 ## Rules of the road
+
+- The system runs at https://bakery-ops.orcamind.dev, deployed by GitHub Actions after CI is green.
+  Tests run in CI and, tagged `@live`, against that URL after each deploy; the developer PC is never the
+  gate (ADR 0006). Say "check it on the live URL" in hand-offs, not "run it locally".
+- Ramin is the sole author: never add `Co-Authored-By` or tool trailers to commits; the pipeline never commits.
 
 - PHP runs only in Docker (`scripts/php`, `scripts/artisan`, `scripts/composer`, `scripts/pest`). The
   host PHP is 8.0 and will corrupt `composer.lock` if used.

@@ -54,7 +54,7 @@ Availability of a product at a location: `to_order` = `floor(min over lines of a
 | `locations` | branch_id, name, station_id?, type (`store`, `kitchen`, `bar`, `cake_room`, `bakery`, `display_case`, `cash_drawer`) | stock is per location: kitchen flour and bakery flour are different piles |
 | `stock_movements` | branch_id, item_id, from_location_id?, to_location_id?, qty (signed, base unit), reason, ref_type, ref_id, reservation_ref?, shift_instance_id?, user_id, acting_user_id?, station_id?, device_id?, client_uuid?, created_at | **append-only, sole writer `Ledger`**. Reasons: `purchase_in`, `transfer`, `production_consume`, `production_output`, `sale`, `waste`, `count_adjustment`, `return`, `reservation`, `reservation_release` |
 | `stock_balances` | branch_id, item_id, location_id, on_hand, reserved, updated_at | upserted in the same transaction as every movement; **the row that `SELECT … FOR UPDATE` locks**; `available = on_hand − reserved` |
-| `item_stock_view` | item_id, location_id, on_hand, reserved, available | materialized SUM over movements; reconciliation oracle and admin report; refreshed by a queued job |
+| `item_stock_view` | item_id, location_id, on_hand, reserved, available | reconciliation query (SUM over movements) exposed as a report and asserted by the gate property test; a plain VIEW on MySQL, may become a materialized view on PostgreSQL (ADR 0006) |
 | `suppliers` | branch_id, name, phone, tin | |
 | `purchases`, `purchase_lines` | supplier_id, invoice_no, date, total; item_id, qty, unit_cost | confirm → `purchase_in` into the store location; feeds moving-average cost |
 | `item_costs` | item_id, moving_avg_cost, as_of | `(old_qty·old_cost + new_qty·new_cost) / (old_qty + new_qty)` to 4 dp |

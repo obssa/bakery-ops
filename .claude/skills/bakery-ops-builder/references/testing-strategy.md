@@ -51,8 +51,8 @@ depended on by the next step.
 
 ## Test infrastructure decisions
 
-- **Database**: Postgres in tests too (never SQLite): triggers, NUMERIC, `FOR UPDATE`, materialized views
-  must be the real thing. `RefreshDatabase` for most groups; **`DatabaseTruncation` for `concurrency`**,
+- **Database**: the production engine in tests too (MySQL 8 service in CI, never SQLite): triggers, DECIMAL,
+  `FOR UPDATE` and JSON must be the real thing. Keep the schema portable to PostgreSQL (ADR 0006). `RefreshDatabase` for most groups; **`DatabaseTruncation` for `concurrency`**,
   because the transaction wrapper hides rows from a second connection.
 - **Queues**: feature tests assert dispatch with `Queue::fake()` and have a `sync` twin asserting the
   effect. Compose always runs the `worker`, so e2e exercises the real queue.
@@ -75,7 +75,13 @@ depended on by the next step.
 - Playwright: `apps/web/e2e/p1/order-flow.spec.ts` under project `p1-order-flow`.
 - Every test name says the behaviour, not the method: `it('releases the reservation when a line is rejected')`.
 
-## Before any PR (`make ci` runs all of this inside Docker)
+## Where tests run
+
+GitHub Actions is the gate: every push and PR runs the module chain, e2e on the compose stack and the gate
+jobs; every deploy runs the `@live` Playwright tests against https://bakery-ops.orcamind.dev. The developer
+PC is not a test target (ADR 0006); `python scripts/task.py ci` remains for local debugging inside Docker.
+
+## What `scripts/task.py ci` runs (same order as CI; optional locally)
 
 Pint → PHPStan level 8 → `arch,invariants` → migration-lint → module groups in dependency order
 (identity, catalog, inventory, orders, payments, production, notifications, shifts, analytics; a

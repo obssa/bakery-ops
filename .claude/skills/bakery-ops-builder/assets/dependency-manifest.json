@@ -215,7 +215,7 @@
         "locations",
         "stock_movements",
         "stock_balances",
-        "item_stock_view (materialized)",
+        "item_stock_view (reconciliation view)",
         "suppliers",
         "purchases",
         "purchase_lines",

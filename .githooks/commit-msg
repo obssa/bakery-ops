@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Repository rule: the owner is the sole author. Reject AI/tool attribution trailers.
+if grep -qiE '^(Co-Authored-By|Generated with|Signed-off-by: .*(claude|anthropic|bot))' "$1"; then
+  echo "commit-msg: attribution trailers are not allowed in this repository (sole author rule)." >&2
+  exit 1
+fi

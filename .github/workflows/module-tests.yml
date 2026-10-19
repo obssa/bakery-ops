@@ -25,16 +25,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: bakery_test
-          POSTGRES_USER: bakery
-          POSTGRES_PASSWORD: secret
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U bakery -d bakery_test"
-          --health-interval 5s --health-timeout 3s --health-retries 20
+      mysql:
+        image: mysql:8.0
+        env: { MYSQL_DATABASE: bakery_test, MYSQL_USER: bakery, MYSQL_PASSWORD: secret, MYSQL_ROOT_PASSWORD: root }
+        ports: ["3306:3306"]
+        options: --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot" --health-interval 5s --health-timeout 5s --health-retries 30
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
@@ -42,9 +37,9 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 5s --health-timeout 3s --health-retries 20
     env:
-      DB_CONNECTION: pgsql
+      DB_CONNECTION: mysql
       DB_HOST: 127.0.0.1
-      DB_PORT: 5432
+      DB_PORT: 3306
       DB_DATABASE: bakery_test
       DB_USERNAME: bakery
       DB_PASSWORD: secret

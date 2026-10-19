@@ -1,0 +1,202 @@
+name: deploy
+
+# main -> ci green (gate-p0 and everything it needs) -> build release on the runner -> rsync over SSH to the
+# cPanel site folder behind https://bakery-ops.orcamind.dev -> migrate/cache on the server -> smoke test the
+# live URL -> Playwright @live tests against the live URL. A failed smoke test restores the previous release.
+#
+# The pipeline never creates commits (the repository owner is the sole author, ADR 0006) and never copies
+# .env or storage/ (server configuration and data stay authoritative). Skipped until the repository
+# variable DEPLOY_ENABLED is "true" (set after one-time provisioning, docs/runbook/server.md).
+#
+# Secrets:   DEPLOY_HOST, DEPLOY_USER, DEPLOY_PORT, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
+# Variables: DEPLOY_ENABLED, DEPLOY_PATH, DEPLOY_PHP_BIN, DEPLOY_URL, DEPLOY_WEB_MODE (skip | static)
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-bakery-ops
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build release
+    # Only pushes to this repository deploy. Pull requests (including from forks of the public repo) run CI
+    # but can never reach the deploy job.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      sha: ${{ steps.rev.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - id: rev
+        run: echo "sha=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_mysql, pdo_pgsql, intl, bcmath, gd, zip, mbstring, xml, curl
+          tools: composer:v2
+          coverage: none
+
+      - name: Install production dependencies
+        working-directory: apps/api
+        run: composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Build the web app (static export) when DEPLOY_WEB_MODE=static
+        if: vars.DEPLOY_WEB_MODE == 'static'
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.DEPLOY_URL || 'https://bakery-ops.orcamind.dev' }}
+          NEXT_OUTPUT: export
+        run: |
+          corepack enable && corepack prepare pnpm@9 --activate
+          pnpm install --frozen-lockfile
+          pnpm build
+          test -d out && rm -rf ../api/public/app && mkdir -p ../api/public/app && cp -r out/. ../api/public/app/
+
+      - name: Assemble the release folder
+        run: |
+          mkdir -p release
+          rsync -a apps/api/ release/ \
+            --exclude=.git/ --exclude=node_modules/ --exclude=tests/ --exclude=storage/ \
+            --exclude='.env*' --exclude=phpunit.xml --exclude=phpstan.neon --exclude=pint.json \
+            --exclude=tmp/ --exclude=AGENTS.md --exclude=CLAUDE.md --exclude=.invariants-allow
+          mkdir -p release/scripts/deploy
+          cp scripts/deploy/*.sh scripts/deploy/rsync-excludes.txt release/scripts/deploy/
+          cp apps/api/public/.htaccess release/scripts/deploy/public.htaccess
+          echo "${{ steps.rev.outputs.sha }}" > release/REVISION
+          tar -czf release.tar.gz -C release .
+          du -sh release.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.tar.gz
+          retention-days: 7
+
+  deploy:
+    name: deploy to bakery-ops.orcamind.dev
+    needs: build
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment:
+      name: live
+      url: ${{ vars.DEPLOY_URL || 'https://bakery-ops.orcamind.dev' }}
+    env:
+      SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      SSH_USER: ${{ secrets.DEPLOY_USER }}
+      SSH_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      APP_DIR: ${{ vars.DEPLOY_PATH }}
+      PHP_BIN: ${{ vars.DEPLOY_PHP_BIN || 'php' }}
+      URL: ${{ vars.DEPLOY_URL || 'https://bakery-ops.orcamind.dev' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Unpack the release
+        run: mkdir release && tar -xzf release.tar.gz -C release
+
+      - name: Configure SSH (pinned host key)
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_HOST" && test -n "$SSH_USER" && test -n "$APP_DIR" && test -n "$KEY" && test -n "$KNOWN_HOSTS" \
+            || { echo "deploy secrets/variables are incomplete (DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS, DEPLOY_PATH)"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          printf 'Host target\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  ServerAliveInterval 15\n' \
+            "$SSH_HOST" "$SSH_USER" "$SSH_PORT" > ~/.ssh/config
+
+      - name: Maintenance mode and rollback snapshot
+        run: ssh target "APP_DIR=\"$APP_DIR\" PHP_BIN=\"$PHP_BIN\" bash -s" < scripts/deploy/pre-release.sh
+
+      - name: Resolve the site folder on the server
+        id: dir
+        run: echo "path=$(ssh target "echo \"$APP_DIR\"")" >> "$GITHUB_OUTPUT"
+
+      - name: Copy the release
+        id: copy
+        run: rsync -az --delete --exclude-from=scripts/deploy/rsync-excludes.txt -e ssh release/ "target:${{ steps.dir.outputs.path }}/"
+
+      - name: Migrate, cache, restart queue
+        run: ssh target "APP_DIR=\"$APP_DIR\" PHP_BIN=\"$PHP_BIN\" bash -s" < scripts/deploy/release.sh
+
+      - name: Smoke test the live site
+        run: bash scripts/deploy/smoke.sh "$URL" "${{ vars.DEPLOY_WEB_MODE || 'skip' }}"
+
+      - name: Roll back on failure
+        if: failure() && steps.copy.outcome != 'skipped'
+        run: ssh target "APP_DIR=\"$APP_DIR\" PHP_BIN=\"$PHP_BIN\" bash -s" < scripts/deploy/rollback.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy to bakery-ops.orcamind.dev"
+            echo "- Revision: \`${{ needs.build.outputs.sha }}\`"
+            echo "- URL: $URL"
+            echo "- Result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  live-e2e:
+    name: Playwright @live against the site
+    needs: deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm, cache-dependency-path: apps/web/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/web
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Run the @live tests against the deployed URL
+        working-directory: apps/web
+        env:
+          CI: "true"
+          PLAYWRIGHT_BASE_URL: ${{ vars.DEPLOY_URL || 'https://bakery-ops.orcamind.dev' }}
+          NEXT_PUBLIC_API_URL: ${{ vars.DEPLOY_URL || 'https://bakery-ops.orcamind.dev' }}
+        run: pnpm exec playwright test --grep "@live"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-live
+          path: |
+            apps/web/test-results
+            apps/web/playwright-report
+          retention-days: 7
