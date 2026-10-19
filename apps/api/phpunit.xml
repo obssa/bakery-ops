@@ -23,6 +23,9 @@
         </include>
     </source>
     <php>
+        <!-- one process runs the whole suite and keeps every test case (and the arch plugin's parsed sources) until the
+             end; the 128M php.ini default ran out once Catalog landed (step 0.5), locally and in any CI job group. -->
+        <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="DB_CONNECTION" value="mysql"/>
         <env name="DB_DATABASE" value="bakery_test"/>
