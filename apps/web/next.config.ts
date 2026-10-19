@@ -3,12 +3,28 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
-// No `output: "standalone"`: pnpm's symlinked node_modules make the standalone copy fail on Windows
-// (EPERM symlink) and CI serves the app with `next start` from .next anyway.
+// The shell lives under /app on the API's own origin (ADR 0006): the live host is shared cPanel (LiteSpeed, no Node
+// server), so deploy.yml builds a static export (NEXT_OUTPUT=export -> out/) and copies it to apps/api/public/app/.
+// Locally and in CI `next start` serves the same pages under the same /app base path.
+//
+// Export-safe by construction: every route is prerendered (both locales via generateStaticParams), no middleware,
+// no cookies()/headers(), no server actions, no dynamic segments beyond [locale]; record pages use ?id= queries.
+// trailingSlash: every page is a folder with index.html, which LiteSpeed serves without rewrites.
+//
+// NEXT_PUBLIC_API_URL is the API origin baked into the bundle. Default: http://localhost:8000 (compose) for
+// `next build`, empty for the export, i.e. same origin: the live shell calls /api/v1 on whatever host served it.
+const basePath = "/app";
+const exporting = process.env.NEXT_OUTPUT === "export";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  basePath,
+  trailingSlash: true,
+  images: { unoptimized: true },
+  ...(exporting ? { output: "export" as const } : {}),
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? (exporting ? "" : "http://localhost:8000"),
+    NEXT_PUBLIC_BASE_PATH: basePath,
   },
 };
 

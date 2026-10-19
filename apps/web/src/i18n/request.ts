@@ -1,16 +1,13 @@
+import { hasLocale } from "next-intl";
 import { getRequestConfig } from "next-intl/server";
-import { cookies } from "next/headers";
+import { routing } from "./routing";
 
-export const locales = ["en", "am"] as const;
-export type Locale = (typeof locales)[number];
-export const defaultLocale: Locale = "en";
-
-// Locale comes from a cookie (per device: the kitchen tablet runs in Amharic, the admin console in
-// English). Phase 0.7 adds the per-user locale from GET /me and a switcher in the shell.
-export default getRequestConfig(async () => {
-  const store = await cookies();
-  const raw = store.get("locale")?.value;
-  const locale: Locale = (locales as readonly string[]).includes(raw ?? "") ? (raw as Locale) : defaultLocale;
+// Static rendering: the locale comes from the [locale] segment (setRequestLocale in every layout and page), never
+// from cookies or headers, so every page can be exported. Pages outside [locale] (the start page, the bare 404)
+// render with the default locale.
+export default getRequestConfig(async ({ requestLocale }) => {
+  const requested = await requestLocale;
+  const locale = hasLocale(routing.locales, requested) ? requested : routing.defaultLocale;
   return {
     locale,
     messages: (await import(`../../messages/${locale}.json`)).default,

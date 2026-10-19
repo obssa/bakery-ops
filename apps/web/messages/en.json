@@ -2,7 +2,9 @@
   "app": {
     "name": "Bakery Ops",
     "tagline": "Orders, kitchen, bakery, stock and shifts in one place",
-    "phase_notice": "Phase 0 skeleton. Screens fill in phase by phase."
+    "phase_notice": "Phase 0: sign-in, the catalog and people work today. The other screens arrive phase by phase.",
+    "opening": "Opening Bakery Ops…",
+    "skip_to_content": "Skip to content"
   },
   "nav": {
     "login": "Sign in",
@@ -11,13 +13,23 @@
     "kds_kitchen": "Kitchen display",
     "kds_bar": "Bar display",
     "production": "Production board",
-    "admin": "Admin console"
+    "admin": "Admin console",
+    "home": "Home",
+    "main": "Screens",
+    "sign_out": "Sign out",
+    "signed_in_as": "Signed in: {name}"
+  },
+  "home": {
+    "screens": "Screens",
+    "open": "Open"
   },
   "login": {
     "title": "Sign in",
+    "intro": "Use the phone number and password your admin gave you.",
     "phone": "Phone number",
     "password": "Password",
-    "submit": "Sign in"
+    "submit": "Sign in",
+    "submitting": "Signing in…"
   },
   "pad": {
     "title": "Waiter pad",
@@ -42,11 +54,104 @@
     "catalog": "Catalog",
     "people": "People",
     "inventory": "Inventory",
-    "coming": "Catalog and People arrive in Phase 0 step 0.7"
+    "sections": "Admin sections",
+    "intro": "Set up what the bakery buys and sells, and who works here.",
+    "catalog_desc": "Ingredients and products with their categories and units.",
+    "people_desc": "Staff accounts, roles and languages.",
+    "checking": "Checking your sign-in…",
+    "no_access": "Your account cannot open this page. Ask an admin."
+  },
+  "catalog": {
+    "title": "Catalog",
+    "intro": "Everything the bakery buys and sells, each named in English and in Amharic.",
+    "items": "Items",
+    "filter": "Show",
+    "filter_all": "All",
+    "filter_ingredient": "Ingredients",
+    "filter_product": "Products",
+    "col_name": "Name",
+    "col_kind": "Kind",
+    "col_fulfilment": "Fulfilment",
+    "col_category": "Category",
+    "col_unit": "Unit",
+    "col_sku": "SKU",
+    "kind_ingredient": "Ingredient",
+    "kind_product": "Product",
+    "fulfilment_to_order": "Made to order",
+    "fulfilment_to_stock": "Made in batches",
+    "fulfilment_bought_in": "Bought in",
+    "no_items": "No items here yet.",
+    "new_item": "New item",
+    "field_kind": "Kind",
+    "field_fulfilment": "Fulfilment",
+    "field_name_en": "Name (English)",
+    "field_name_am": "Name (Amharic)",
+    "field_category": "Category",
+    "field_unit": "Unit",
+    "field_sku": "SKU",
+    "no_category": "No category",
+    "choose_unit": "Choose a unit",
+    "optional": "optional",
+    "create_item": "Create item",
+    "item_created": "Created “{name}”.",
+    "categories": "Categories",
+    "no_categories": "No categories yet.",
+    "add_category": "Add category",
+    "category_created": "Added “{name}”."
+  },
+  "people": {
+    "title": "People",
+    "intro": "Everyone who signs in to Bakery Ops in this branch.",
+    "list": "People",
+    "col_name": "Name",
+    "col_phone": "Phone",
+    "col_role": "Role",
+    "col_language": "Language",
+    "col_status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "no_people": "No people yet.",
+    "new_person": "New person",
+    "field_name": "Full name",
+    "field_phone": "Phone number",
+    "field_password": "Password",
+    "password_hint": "At least 8 characters. Give it to the person privately.",
+    "field_role": "Role",
+    "field_language": "Language",
+    "add_person": "Add person",
+    "person_created": "Added {name}.",
+    "roles": {
+      "admin": "Admin",
+      "manager": "Manager",
+      "cashier": "Cashier",
+      "waiter": "Waiter",
+      "chef": "Chef",
+      "barista": "Barista",
+      "cake_baker": "Cake baker",
+      "bread_baker": "Bread baker"
+    }
+  },
+  "locale": {
+    "en": "English",
+    "am": "አማርኛ"
   },
   "common": {
     "language": "Language",
     "english": "English",
-    "amharic": "Amharic"
+    "amharic": "Amharic",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "retry": "Try again"
+  },
+  "errors": {
+    "network": "Cannot reach the server. Check the connection and try again.",
+    "unknown": "Something went wrong. Try again.",
+    "field": "Check this field.",
+    "session_expired": "Your sign-in has ended. Sign in again."
+  },
+  "not_found": {
+    "title": "Page not found",
+    "body": "There is no page at this address.",
+    "home": "Go to the start page"
   }
 }

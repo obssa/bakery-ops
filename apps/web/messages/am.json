@@ -2,7 +2,9 @@
   "app": {
     "name": "ቤከሪ ኦፕስ",
     "tagline": "ትዕዛዞች፣ ወጥ ቤት፣ ዳቦ ቤት፣ ክምችት እና ፈረቃዎች በአንድ ቦታ",
-    "phase_notice": "ምዕራፍ 0 መሠረት። ገጾች በየምዕራፉ ይሞላሉ።"
+    "phase_notice": "ምዕራፍ 0፦ መግቢያ፣ ካታሎግ እና ሰዎች ዛሬ ይሰራሉ። ሌሎቹ ገጾች በየምዕራፉ ይመጣሉ።",
+    "opening": "ቤከሪ ኦፕስ በመክፈት ላይ…",
+    "skip_to_content": "ወደ ይዘቱ ዝለል"
   },
   "nav": {
     "login": "ግባ",
@@ -11,13 +13,23 @@
     "kds_kitchen": "የወጥ ቤት ማሳያ",
     "kds_bar": "የባር ማሳያ",
     "production": "የምርት ሰሌዳ",
-    "admin": "የአስተዳዳሪ ኮንሶል"
+    "admin": "የአስተዳዳሪ ኮንሶል",
+    "home": "መነሻ",
+    "main": "ገጾች",
+    "sign_out": "ውጣ",
+    "signed_in_as": "የገቡት፦ {name}"
+  },
+  "home": {
+    "screens": "ገጾች",
+    "open": "ክፈት"
   },
   "login": {
     "title": "ግባ",
+    "intro": "አስተዳዳሪዎ የሰጠዎትን ስልክ ቁጥር እና የይለፍ ቃል ይጠቀሙ።",
     "phone": "ስልክ ቁጥር",
     "password": "የይለፍ ቃል",
-    "submit": "ግባ"
+    "submit": "ግባ",
+    "submitting": "በመግባት ላይ…"
   },
   "pad": {
     "title": "የአስተናጋጅ ፓድ",
@@ -42,11 +54,104 @@
     "catalog": "ካታሎግ",
     "people": "ሰዎች",
     "inventory": "ክምችት",
-    "coming": "ካታሎግ እና ሰዎች በምዕራፍ 0 ደረጃ 0.7 ይመጣሉ"
+    "sections": "የአስተዳዳሪ ክፍሎች",
+    "intro": "ዳቦ ቤቱ የሚገዛውን እና የሚሸጠውን፣ እንዲሁም እዚህ የሚሰሩትን ያዘጋጁ።",
+    "catalog_desc": "ግብዓቶች እና ምርቶች ከምድቦቻቸው እና ከመለኪያዎቻቸው ጋር።",
+    "people_desc": "የሠራተኞች መለያዎች፣ ሚናዎች እና ቋንቋዎች።",
+    "checking": "መግባትዎን በማረጋገጥ ላይ…",
+    "no_access": "መለያዎ ይህን ገጽ መክፈት አይችልም። አስተዳዳሪን ይጠይቁ።"
+  },
+  "catalog": {
+    "title": "ካታሎግ",
+    "intro": "ዳቦ ቤቱ የሚገዛው እና የሚሸጠው ሁሉ፣ እያንዳንዱ በእንግሊዝኛ እና በአማርኛ ስም።",
+    "items": "ዕቃዎች",
+    "filter": "አሳይ",
+    "filter_all": "ሁሉም",
+    "filter_ingredient": "ግብዓቶች",
+    "filter_product": "ምርቶች",
+    "col_name": "ስም",
+    "col_kind": "ዓይነት",
+    "col_fulfilment": "አቅርቦት",
+    "col_category": "ምድብ",
+    "col_unit": "መለኪያ",
+    "col_sku": "የዕቃ ኮድ (SKU)",
+    "kind_ingredient": "ግብዓት",
+    "kind_product": "ምርት",
+    "fulfilment_to_order": "በትዕዛዝ የሚዘጋጅ",
+    "fulfilment_to_stock": "በጅምላ ተዘጋጅቶ የሚቀመጥ",
+    "fulfilment_bought_in": "ተገዝቶ የሚመጣ",
+    "no_items": "እዚህ እስካሁን ምንም ዕቃ የለም።",
+    "new_item": "አዲስ ዕቃ",
+    "field_kind": "ዓይነት",
+    "field_fulfilment": "አቅርቦት",
+    "field_name_en": "ስም (በእንግሊዝኛ)",
+    "field_name_am": "ስም (በአማርኛ)",
+    "field_category": "ምድብ",
+    "field_unit": "መለኪያ",
+    "field_sku": "የዕቃ ኮድ (SKU)",
+    "no_category": "ምድብ የለም",
+    "choose_unit": "መለኪያ ይምረጡ",
+    "optional": "አማራጭ",
+    "create_item": "ዕቃ ፍጠር",
+    "item_created": "«{name}» ተፈጥሯል።",
+    "categories": "ምድቦች",
+    "no_categories": "እስካሁን ምንም ምድብ የለም።",
+    "add_category": "ምድብ ጨምር",
+    "category_created": "«{name}» ታክሏል።"
+  },
+  "people": {
+    "title": "ሰዎች",
+    "intro": "በዚህ ቅርንጫፍ ወደ ቤከሪ ኦፕስ የሚገቡ ሁሉ።",
+    "list": "ሰዎች",
+    "col_name": "ስም",
+    "col_phone": "ስልክ",
+    "col_role": "ሚና",
+    "col_language": "ቋንቋ",
+    "col_status": "ሁኔታ",
+    "active": "ንቁ",
+    "inactive": "ንቁ ያልሆነ",
+    "no_people": "እስካሁን ማንም የለም።",
+    "new_person": "አዲስ ሰው",
+    "field_name": "ሙሉ ስም",
+    "field_phone": "ስልክ ቁጥር",
+    "field_password": "የይለፍ ቃል",
+    "password_hint": "ቢያንስ 8 ፊደላት። ለሰውየው በግል ይስጡ።",
+    "field_role": "ሚና",
+    "field_language": "ቋንቋ",
+    "add_person": "ሰው ጨምር",
+    "person_created": "{name} ታክለዋል።",
+    "roles": {
+      "admin": "አስተዳዳሪ",
+      "manager": "ሥራ አስኪያጅ",
+      "cashier": "ገንዘብ ተቀባይ",
+      "waiter": "አስተናጋጅ",
+      "chef": "ሼፍ",
+      "barista": "ባሪስታ",
+      "cake_baker": "ኬክ ጋጋሪ",
+      "bread_baker": "ዳቦ ጋጋሪ"
+    }
+  },
+  "locale": {
+    "en": "English",
+    "am": "አማርኛ"
   },
   "common": {
     "language": "ቋንቋ",
     "english": "እንግሊዝኛ",
-    "amharic": "አማርኛ"
+    "amharic": "አማርኛ",
+    "loading": "በመጫን ላይ…",
+    "saving": "በማስቀመጥ ላይ…",
+    "retry": "እንደገና ይሞክሩ"
+  },
+  "errors": {
+    "network": "አገልጋዩን ማግኘት አልተቻለም። ግንኙነቱን አረጋግጠው እንደገና ይሞክሩ።",
+    "unknown": "የሆነ ችግር ተፈጥሯል። እንደገና ይሞክሩ።",
+    "field": "ይህን መስክ ያረጋግጡ።",
+    "session_expired": "መግቢያዎ አብቅቷል። እንደገና ይግቡ።"
+  },
+  "not_found": {
+    "title": "ገጹ አልተገኘም",
+    "body": "በዚህ አድራሻ ምንም ገጽ የለም።",
+    "home": "ወደ መነሻ ገጽ ይሂዱ"
   }
 }
