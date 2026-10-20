@@ -31,6 +31,8 @@ return [
     'GET /api/v1/devices' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/devices' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/devices/{id}/revoke' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    // live updates (step 1.2, ADR 0009): every active user may ask; the channel rules decide which channel (403 otherwise)
+    'POST /api/v1/broadcasting/auth' => ['permission' => 'identity.authenticated', 'roles' => $all, 'module' => 'identity'],
 
     // Catalog (step 0.5): every role reads the catalog, only admin edits items, recipes and prices (section 7 matrix)
     'GET /api/v1/units' => ['permission' => 'catalog.view', 'roles' => $all, 'module' => 'catalog'],

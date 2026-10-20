@@ -23,6 +23,7 @@ use App\Shared\Models\Station;
 use App\Shared\Tenancy\CurrentBranch;
 use Brick\Math\BigDecimal;
 use Database\Seeders\RolesSeeder;
+use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -245,6 +246,14 @@ if (! function_exists('publicRoutes')) {
     }
 }
 
+if (! function_exists('readLikeWrites')) {
+    /** @return array<string, string> write-method api/v1 routes that write nothing, 'METHOD uri' => reason (see read_like_writes.php) */
+    function readLikeWrites(): array
+    {
+        return require __DIR__.'/read_like_writes.php';
+    }
+}
+
 if (! function_exists('writeEndpoints')) {
     /** @return array<int, array<string, mixed>> the write-endpoint registry (see write_endpoints.php) */
     function writeEndpoints(): array
@@ -312,5 +321,26 @@ if (! function_exists('discoverClasses')) {
         sort($classes);
 
         return $classes;
+    }
+}
+
+if (! function_exists('useLiveTransport')) {
+    /**
+     * Switch the broadcast connection for the rest of the test (ADR 0009): `null` (the default everywhere), `log`, or a
+     * WebSocket transport (`reverb`, `pusher`) with throwaway keys. Drivers already built are forgotten, so the next
+     * Broadcast call builds the one asked for.
+     */
+    function useLiveTransport(string $connection): void
+    {
+        config([
+            'broadcasting.default' => $connection,
+            'broadcasting.connections.reverb.key' => 'test-key',
+            'broadcasting.connections.reverb.secret' => 'test-secret',
+            'broadcasting.connections.reverb.app_id' => 'test-app',
+            'broadcasting.connections.pusher.key' => 'test-key',
+            'broadcasting.connections.pusher.secret' => 'test-secret',
+            'broadcasting.connections.pusher.app_id' => 'test-app',
+        ]);
+        app(BroadcastManager::class)->forgetDrivers();
     }
 }
