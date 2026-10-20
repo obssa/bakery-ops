@@ -697,6 +697,63 @@ Small PRs, each green in CI before the next; a step that completes a module ends
    `LiveFeed` (`poll` default; `reverb` / `pusher` through Echo when configured), Workbox shell cache, minimal outbox
    (send, accept, ready) with client UUID + `Idempotency-Key`. Playwright `p1-order-flow`, `p1-shortfall` replace the
    step 1.1 placeholders.
+   Step 1.6 is built as three web PRs: 1.6a (foundations and the kitchen and bar displays), 1.6b (pad and the
+   `p1-shortfall` flow), 1.6c (till, the admin Orders board and the full `p1-order-flow`).
+   As built (step 1.6a, `phase-1/web-kds`): the Playwright flow and its fixture helpers were committed red first, then the
+   API gap below, then the web. Where the plan left a detail open:
+   - **A chef could not find their rail.** `GET /stations` needs `people.manage` and a user's `stations` entries held
+     only ids, so a chef or barista could not tell which assigned station is the kitchen and which the bar. The
+     `stations` entries of `/me` and `/users` now also carry `code`, `name_en` and `name_am` (additive; the OpenAPI export
+     and `UsersEndpointsTest` follow; eager-loaded in `GET /users`). `/kds/kitchen` and `/kds/bar` use the assigned
+     stations of that code; admin and manager (`stations.all` and `people.manage`) also see every station of that code
+     from `GET /stations`. One station is used directly, several give a "Station" picker, none gives a message.
+   - **Types and decimals.** `src/lib/api/types.ts` gains Order, Line, Ticket and TicketsPage, Menu, DiningTable,
+     PaymentChannel, Payment and the `orders.send.shortfall` body (`ShortfallBody`); `ApiError` keeps the whole error body
+     so a refused send hands the shortfall to the pad. `src/lib/decimal.ts` compares, adds and trims decimal strings as
+     scaled integers (no floats); a ticket shows `qty` without padding zeros ("2.0000" reads "2").
+   - **`LiveFeed`** (`src/lib/live/`): `feed.ts` is transport-free (cursor, ETag, merge, never two requests in flight, a
+     call during a look repeats once after it), `transport.ts` has the transports, `tickets.ts` the rail's merge. Poll
+     transport: 2 s visible, 10 s hidden, paused offline and resumed on `online`, back-off 4 s, 8 s then 10 s after
+     errors, an immediate look on focus and after the screen's own write. The first request has no cursor; every later one
+     has `since=<cursor>` and the last `ETag` as `If-None-Match` (the second request therefore usually answers 200 with
+     the same rows, because the ETag covers the cursor; from the third a quiet rail is 304). Rows merge by id, the higher
+     `version` wins; served, rejected and voided lines stay in the state (an older copy must not bring one back) and are
+     only left off the rail, as is a ticket with no active line. The rail is sorted client-side by `sent_at`, then id.
+     `NEXT_PUBLIC_LIVE_TRANSPORT=reverb|pusher` selects an Echo adapter on `station.{id}` through
+     `/api/v1/broadcasting/auth`; every event and every connect only kicks a look, and a 30 s poll runs underneath. It adds
+     `laravel-echo` 2.5.0 and `pusher-js` 8.6.0 (exact), imported lazily so the default bundle does not carry them; if they
+     cannot start the screen keeps the slow poll and logs why. It is typed and compiled but not exercised by CI (no `ws`
+     e2e until a WebSocket host exists, ADR 0009 decision 6).
+   - **Outbox** (`src/lib/outbox/`): a zustand store mirrored to `localStorage` (every access in try/catch) for send order,
+     accept, ready and reject. Idempotency-Key fixed at enqueue (the order's `client_uuid` is the caller's), items sent
+     one at a time in order by the account that queued them, retried with the same key after a network error or a 5xx
+     (2 s, 4 s, 8 s, then 10 s), dropped on a 4xx and kept as a failure (the API's error whole) until dismissed. A 401
+     ends the session and keeps the queue. `PendingIndicator` in the shell shows the count and the failures. The queue
+     resumes on start, on `online` and on sign-in.
+   - **Shell cache.** `scripts/build-sw.mjs` (`workbox-build` 7.4.1, exact, dev dependency) runs after `next build` only
+     for the static export and writes `out/sw.js` (scope `/app/`) precaching the export's HTML, JS, CSS, fonts and images
+     with query strings ignored; there are no runtime routes, so `/api/` is never cached. The deploy copies `out/` whole
+     (`DEPLOY_WEB_MODE=static`), so the release and rsync scripts ship it unchanged. It is registered only when the build
+     was an export (`NEXT_PUBLIC_SHELL_CACHE`), and a failed registration is ignored.
+   - **KDS.** Tickets oldest first with order number, table or takeaway, waiter, a timer (`lib/kds.ts`:
+     amber at 5 min, red at 10 min, one constant, with the words "Slow" and "Late" so colour is not the only signal),
+     notes, and the lines at that station with modifiers and quantity. A new line gets Accept, Ready and Reject; an
+     accepted one Ready and Reject; a ready one waits for the pad to serve it and then leaves. Reject opens an inline
+     form with the four reasons (labels in both languages; the note is required for `other`). Accept, ready and reject
+     go through the outbox and the rail looks again at once. The chime is two generated tones, played when a line that
+     was not on the rail arrives after the first load; browsers need a tap first, so the first pointer or key event on
+     the screen unlocks audio; the mute choice is remembered per device. Timers use the device clock against `sent_at`
+     (never negative).
+   - **Playwright.** `e2e/p1/order-flow-kds.spec.ts` (`@live`, in `p1-order-flow`) and `e2e/support/{env,api,fixture}.ts`.
+     The fixture finds or creates the kitchen or bar station, its location, the chef or barista, the waiter (short code
+     reset), the table `E2E-T1` and the cashier by fixed phone numbers (`+2519110002xx`; passwords derived from the
+     admin's, so nothing is committed), and makes a run-unique ingredient with stock, a product routed to the station, its
+     recipe and its price. The waiter sends through the API; the test asserts the ticket within 5 s, a 304 on the idle
+     rail, that every request after the first has `since` and `If-None-Match`, accept, ready, the line leaving once served
+     through the API, and the ledger `purchase_in`, `reservation`, `production_consume`. The `test.fixme` of
+     `order-flow.spec.ts` stays until 1.6c.
+   - The repository has no web unit-test runner, so the merge and cursor logic is covered by that flow and kept in pure
+     functions (`mergeTickets`, `railOf`, `backoffDelay`, `decimal.ts`) for a runner to pick up.
 7. **1.7 docs and seeds**: `Phase1Seeder`, ADR 0008 / 0009 accepted, OpenAPI, ERD, gate report.
 
 ## 7. Test list
