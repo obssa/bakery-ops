@@ -1,7 +1,8 @@
 # bakery-ops
 
 Bakery Operations Platform: POS + kitchen display + bakery production + ledger inventory + shift handover,
-for a bakery in Addis Ababa. Laravel 13 API (`apps/api`) + Next.js 15 PWA (`apps/web`), PostgreSQL 16, Redis 7.
+for a bakery in Addis Ababa. Laravel 13 API (`apps/api`) + Next.js 15 PWA (`apps/web`, static export under `/app`), MariaDB 10.11 (live and CI);
+PostgreSQL 16 + Redis 7 remain the VPS upgrade path (ADR 0006).
 
 ## Where it runs and where tests run
 

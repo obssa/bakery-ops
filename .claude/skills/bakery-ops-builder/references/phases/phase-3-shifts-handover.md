@@ -20,7 +20,7 @@ presence resolution for production).
 | 3.5 | shifts.cash | `cash_declarations` (denominations JSONB, opening float); expected = float + `Totals::cash(shift)`; per-channel reconciliation counts | Payments | `feature` |
 | 3.6 | shifts.handover | `handover_notes`; `GET /replay?station&at` (balances, open orders, who was on) | Inventory, Orders | `feature` |
 | 3.7 | web | open/close flows on KDS, production board, till widget; admin Shifts (templates, roster calendar, side-by-side variance approval with photos, notes, replay at a point in time) | | Playwright `p3-handover`, `p3-opening-prefill` |
-| 3.8 | docs | `Phase3Seeder` (two days of locked history); ADR 0010 hash chain canonical JSON; ADR 0011 shift attribution rules; report; pilot feedback template | | |
+| 3.8 | docs | `Phase3Seeder` (two days of locked history); ADR 0011 hash chain canonical JSON; ADR 0012 shift attribution rules; report; pilot feedback template | | |
 
 ## Contract tests (consumer view, written first)
 - Inventory: `balanceAt(location, t)` equals the sum of movements with `created_at <= t`;
@@ -49,7 +49,7 @@ tamper detection; unlock creates a new version; cash declaration arithmetic; rep
 4. Phases 0–2 gates still green with the updated seeds.
 
 ## Artifacts
-ADR 0010, ADR 0011, OpenAPI, ERD, `phase-3-report.md`, pilot feedback list template, STATUS: shifts `stable`.
+ADR 0011, ADR 0013, OpenAPI, ERD, `phase-3-report.md`, pilot feedback list template, STATUS: shifts `stable`.
 
 ## Traps specific to this phase
 Canonical JSON for hashes · locked-row trigger exceptions for `superseded_by_id` · time zone and local

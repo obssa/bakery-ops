@@ -20,7 +20,7 @@ reserve/release/consume behaviour was pinned down by contract tests *before* a l
 | 1.4 | payments (skeleton, final schema) | `payment_channels` seeded with all 8 channels and their `requires_photo` / `requires_reference`; `payments`; `POST /orders/{id}/payments` where only cash can pass validation yet; `PaymentRecorded` → Orders `paid` → `sale` movements for display-case lines → `closed` | Orders, Identity | `module:payments`, `contract:payments->orders` |
 | 1.5 | read models | `GET /menu?location` (products with availability, price, isNew, modifiers), `GET /stations/{id}/tickets?since=<cursor>`, `GET /orders?mine|unpaid` | Catalog, Inventory, Orders | `feature` |
 | 1.6 | web | `/pad`, `/kds/kitchen`, `/kds/bar`, `/till` (cash pay), Echo client, Workbox shell cache, minimal outbox (send order, accept, ready) with client UUID + `Idempotency-Key`, admin Orders live board | all above | Playwright `p1-order-flow`, `p1-shortfall` |
-| 1.7 | docs | `Phase1Seeder` (tables, open orders); ADR 0006 reserve at send / consume at ready / sale at pay; ADR 0007 bearer tokens not SPA cookies; OpenAPI; ERD; report | | |
+| 1.7 | docs | `Phase1Seeder` (tables, open orders); ADR 0008 reserve at send / consume at ready / sale at pay; OpenAPI; ERD; report | | |
 
 Forced stubs: Payments gets its final schema now (no throwaway); `orders.shift_instance_id` stays null
 until Phase 3; `LineReady` reaches the waiter over Reverb `user.{id}` directly (persisted notification
@@ -55,7 +55,7 @@ cursor is monotonic; `GET /menu` hides availability-0 products and shows "3 left
 4. All Phase 0 gate checks still green.
 
 ## Artifacts
-ADR 0006, ADR 0007, OpenAPI diff reviewed, ERD, `phase-1-report.md`, STATUS: orders, payments(skeleton)
+ADR 0008 (ADR 0007 bearer tokens already written in Phase 0), OpenAPI diff reviewed, ERD, `phase-1-report.md`, STATUS: orders, payments(skeleton)
 `stable`.
 
 ## Traps specific to this phase

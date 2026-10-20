@@ -21,7 +21,7 @@ work and notifications, which is where "works locally, fails in compose" traps l
 | 2.6 | inventory.reorder | `reorder_rules`; `EvaluateThresholds` job on `StockChanged`; `StockLow` / `StockOut` with `stock_alert_states` for re-fire after recovery | Notifications (events) | `feature` |
 | 2.7 | production | `production_requests`, `production_batches`, state machines, `stations.requires_overseer`, `Batches::confirm` atomic (N consume + 1 output), `AutoRequest` on `StockOut` for `kind=product` with a non-empty recipe, `AssignedUsersResolver`, `NullShiftAttacher`; `advance` order schema fields (due_at, deposit) land here, UI later | Inventory, Catalog, Identity, Notifications | `module:production`, `unit` |
 | 2.8 | web | `/production` kanban; KDS stock strip + transfer request; till display-case panel + Request production; admin Inventory (stock by location, ledger, purchases, transfers, reorder) + recipe versions with cost + production planner | | Playwright `p2-stockout-production`, `p2-purchase-transfer` |
-| 2.9 | docs | `Phase2Seeder`; ADR 0008 station presence resolver interface; ADR 0009 alert dedupe; OpenAPI; ERD; report | | |
+| 2.9 | docs | `Phase2Seeder`; ADR 0009 station presence resolver interface; ADR 0010 alert dedupe; OpenAPI; ERD; report | | |
 
 ## Contract tests (consumer view, written first)
 - Inventory: `appendMany` is all-or-nothing (inject a failure on the last movement, assert zero rows);
@@ -50,7 +50,7 @@ N consume + 1 output atomically; overseer gating per station; `AutoRequest` only
 4. Phase 0 and 1 gates still green.
 
 ## Artifacts
-ADR 0008, ADR 0009, OpenAPI, ERD, `phase-2-report.md`, STATUS: production, notifications `stable`,
+ADR 0009, ADR 0010, OpenAPI, ERD, `phase-2-report.md`, STATUS: production, notifications `stable`,
 inventory and catalog remain `stable` (their contracts extended).
 
 ## Traps specific to this phase

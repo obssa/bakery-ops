@@ -929,7 +929,7 @@
         {
           "id": "1.7",
           "module": "docs",
-          "builds": "Phase1Seeder (tables, open orders), ADR 0006 reserve-at-send / consume-at-ready / sale-at-pay, ADR 0007 bearer tokens not SPA cookies, OpenAPI, ERD, report"
+          "builds": "Phase1Seeder (tables, open orders), ADR 0008 reserve-at-send / consume-at-ready / sale-at-pay, OpenAPI, ERD, report"
         }
       ],
       "gate": {
@@ -947,8 +947,7 @@
         ]
       },
       "adrs": [
-        "0006-reserve-at-send-consume-at-ready-sale-at-pay",
-        "0007-bearer-tokens-not-spa-cookies"
+        "0008-reserve-at-send-consume-at-ready-sale-at-pay"
       ]
     },
     "2": {
@@ -1033,7 +1032,7 @@
         {
           "id": "2.9",
           "module": "docs",
-          "builds": "Phase2Seeder, ADR 0008 presence resolver interface, ADR 0009 alert dedupe, OpenAPI, ERD, report"
+          "builds": "Phase2Seeder, ADR 0009 presence resolver interface, ADR 0010 alert dedupe, OpenAPI, ERD, report"
         }
       ],
       "gate": {
@@ -1050,8 +1049,8 @@
         ]
       },
       "adrs": [
-        "0008-station-presence-resolver-interface",
-        "0009-stock-alert-dedupe"
+        "0009-station-presence-resolver-interface",
+        "0010-stock-alert-dedupe"
       ]
     },
     "3": {
@@ -1127,7 +1126,7 @@
         {
           "id": "3.8",
           "module": "docs",
-          "builds": "Phase3Seeder (two days of locked history), ADR 0010 hash chain canonicalisation, ADR 0011 shift attribution, report, pilot feedback template"
+          "builds": "Phase3Seeder (two days of locked history), ADR 0011 hash chain canonicalisation, ADR 0012 shift attribution, report, pilot feedback template"
         }
       ],
       "gate": {
@@ -1144,8 +1143,8 @@
         ]
       },
       "adrs": [
-        "0010-hash-chain-canonical-json",
-        "0011-shift-attribution-rules"
+        "0011-hash-chain-canonical-json",
+        "0012-shift-attribution-rules"
       ]
     },
     "4": {
@@ -1203,7 +1202,7 @@
         {
           "id": "4.6",
           "module": "docs",
-          "builds": "Phase4Seeder (90 days incl. splits, voids, refunds), ADR 0012 summary rebuild semantics, report"
+          "builds": "Phase4Seeder (90 days incl. splits, voids, refunds), ADR 0013 summary rebuild semantics, report"
         }
       ],
       "gate": {
@@ -1224,7 +1223,7 @@
         ]
       },
       "adrs": [
-        "0012-summary-rebuild-semantics"
+        "0013-summary-rebuild-semantics"
       ]
     },
     "5": {
