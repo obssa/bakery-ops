@@ -41,7 +41,7 @@
       ]
     },
     "1": {
-      "status": "in_progress",
+      "status": "gate_pending",
       "plan": "docs/phases/phase-1-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
@@ -64,8 +64,8 @@
         "orders": "done",
         "payments": "done",
         "read-models": "done",
-        "web": "in_progress",
-        "docs": "todo"
+        "web": "done",
+        "docs": "done"
       },
       "playwright_projects": [
         "p1-order-flow",
