@@ -14,6 +14,8 @@ export class ApiError extends Error {
   readonly key: string;
   readonly messages: Partial<Record<Locale, string>>;
   readonly fieldErrors: Record<string, string[]>;
+  /** The whole error body, for answers that carry more than a message (409 orders.send.shortfall has the shortfall). */
+  readonly body: Record<string, unknown>;
 
   constructor(status: number, body: Partial<ApiErrorBody>) {
     super(body.message_en || body.message_key || `HTTP ${status}`);
@@ -22,6 +24,7 @@ export class ApiError extends Error {
     this.key = body.message_key || (status === 0 ? "network" : `http.${status}`);
     this.messages = { en: body.message_en, am: body.message_am };
     this.fieldErrors = body.errors ?? {};
+    this.body = body as Record<string, unknown>;
   }
 
   get isNetwork(): boolean {
@@ -87,4 +90,44 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw new ApiError(response.status, body);
   }
   return json as T;
+}
+
+/** What a conditional GET came back with: the page, or "nothing changed" (304). */
+export type ConditionalResult<T> = { notModified: true; etag: string | null } | { notModified: false; etag: string | null; data: T };
+
+/**
+ * A GET that sends If-None-Match and treats 304 as an answer (ADR 0009: the cursor feeds are polled this way). The
+ * ETag comes back so the caller can send it with the next poll. Errors are ApiErrors like everywhere else.
+ */
+export async function conditionalGet<T>(
+  path: string,
+  options: { query?: RequestOptions["query"]; token?: string | null; etag?: string | null; signal?: AbortSignal } = {},
+): Promise<ConditionalResult<T>> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  if (options.etag) headers["If-None-Match"] = options.etag;
+
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path, options.query), { method: "GET", headers, signal: options.signal, cache: "no-store" });
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === "AbortError") throw cause;
+    throw new ApiError(0, { message_key: "network" });
+  }
+  const etag = response.headers.get("ETag");
+  if (response.status === 304) return { notModified: true, etag: etag ?? options.etag ?? null };
+
+  const text = await response.text();
+  let json: unknown = undefined;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = undefined;
+    }
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status, json && typeof json === "object" ? (json as Partial<ApiErrorBody>) : {});
+  }
+  return { notModified: false, etag, data: json as T };
 }

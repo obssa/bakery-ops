@@ -25,6 +25,8 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? (exporting ? "" : "http://localhost:8000"),
     NEXT_PUBLIC_BASE_PATH: basePath,
+    // the shell cache (public/sw.js) exists only in the static export, so only that build registers it
+    NEXT_PUBLIC_SHELL_CACHE: exporting ? "1" : "",
   },
 };
 

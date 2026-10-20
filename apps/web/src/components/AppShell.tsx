@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { Suspense, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useSession } from "@/lib/session";
+import { PendingIndicator } from "./PendingIndicator";
 import { LanguageSwitcher, LanguageSwitcherWithQuery } from "./LanguageSwitcher";
 import { SCREENS } from "@/lib/screens";
 import { focusRing } from "./styles";
@@ -94,6 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </nav>
       </header>
+      <PendingIndicator />
       <main id="content" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
         {children}
       </main>

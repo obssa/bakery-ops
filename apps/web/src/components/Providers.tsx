@@ -2,7 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
+import { startOutbox } from "@/lib/outbox/store";
 import { useSession } from "@/lib/session";
+import { ServiceWorker } from "./ServiceWorker";
 
 /** Client-side state for every page: the query cache and the device's sign-in (read from storage once). */
 export function Providers({ children }: { children: ReactNode }) {
@@ -22,10 +24,18 @@ export function Providers({ children }: { children: ReactNode }) {
     if (status === "unknown") void init();
   }, [status, init]);
 
+  // writes queued before a reload or a lost connection go out as soon as this device can send them
+  useEffect(() => startOutbox(), []);
+
   // signing out (or a 401) must not leave another user's lists in the cache
   useEffect(() => {
     if (status === "signed-out") client.clear();
   }, [status, client]);
 
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <ServiceWorker />
+      {children}
+    </QueryClientProvider>
+  );
 }
