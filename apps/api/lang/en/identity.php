@@ -23,6 +23,9 @@ return [
     'acting_session' => [
         'expired' => 'Your short-code session has ended; enter your code again.',
     ],
+    'channel' => [
+        'forbidden' => 'You may not follow this live channel.',
+    ],
     'short_code' => [
         'format' => 'A short code is 4 to 6 digits.',
         'taken' => 'Another person in this branch already uses that short code.',

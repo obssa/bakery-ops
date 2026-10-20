@@ -24,6 +24,8 @@ use Illuminate\Support\ServiceProvider;
  * the `bakery:create-admin` console command.
  * The other capabilities (Authenticate, ShortCodes, Access, Stations) are plain classes resolved per use: they
  * carry the scoped ActorContext / CurrentBranch, so a singleton would leak one request into the next (traps.md).
+ * The live-channel rules (Broadcasting\ChannelRules, ADR 0009) are one of them, applied by POST /broadcasting/auth in
+ * routes/modules/identity.php; the channel names they judge live in Shared (App\Shared\Live\Channels).
  */
 final class IdentityServiceProvider extends ServiceProvider
 {

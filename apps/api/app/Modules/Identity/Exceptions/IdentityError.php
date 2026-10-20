@@ -56,6 +56,12 @@ final class IdentityError extends RuntimeException
         return new self('identity.acting_session.expired', 401);
     }
 
+    /** POST /broadcasting/auth: the channel is not one of the registry, or the user may not follow it (ADR 0009). */
+    public static function channelForbidden(): self
+    {
+        return new self('identity.channel.forbidden', 403);
+    }
+
     public static function shortCodeFormat(): self
     {
         return new self('identity.short_code.format', 422);

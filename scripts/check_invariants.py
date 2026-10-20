@@ -12,7 +12,8 @@ What each check does (details in references/invariants.md):
   bilingual    in every Schema::create, *_en columns have an *_am sibling and vice versa
   append-only  stock_movements, audit_log, order_events have a forbid_update_delete trigger in some migration
   idempotency  (needs `artisan route:list --json` output) every write route under api/v1 has idempotency +
-               auth:sanctum + a permission/can middleware unless in the public allowlist
+               auth:sanctum + a permission/can middleware unless in the public allowlist; a read-like write (a write
+               method that writes nothing, READ_LIKE_WRITES) needs no idempotency but keeps auth + permission
   i18n         apps/web/messages/en.json and am.json have identical key sets (am may hold __TODO__ unless --strict-i18n)
 Exit 0 clean, 1 violations, 2 usage.
 """
@@ -34,6 +35,8 @@ BRANCH_ALLOWLIST = {
 }
 APPEND_ONLY_TABLES = ["stock_movements", "audit_log", "order_events"]
 PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify"}
+# write-method routes that write nothing (mirrors apps/api/tests/Support/read_like_writes.php)
+READ_LIKE_WRITES = {"POST api/v1/broadcasting/auth"}
 MONEY_RX = re.compile(r"(price|amount|total|cost|subtotal|discount|tax|deposit|float)", re.I)
 QTY_RX = re.compile(r"(^qty$|_qty$|quantity)", re.I)
 FORBIDDEN_COL_RX = re.compile(r"->\s*(float|double|unsignedFloat|unsignedDouble)\s*\(\s*['\"](\w+)['\"]")
@@ -201,7 +204,8 @@ def check_idempotency(root: str, f: Findings, routes_path: str | None) -> bool:
             mw = [mw]
         mw_s = " ".join(normalise_middleware(mw))
         public = uri in PUBLIC_ROUTES
-        if methods & {"POST", "PUT", "PATCH", "DELETE"} and not public and "idempotency" not in mw_s:
+        writes = {m for m in methods & {"POST", "PUT", "PATCH", "DELETE"} if f"{m} {uri}" not in READ_LIKE_WRITES}
+        if writes and not public and "idempotency" not in mw_s:
             f.add("idempotency", f"{r.get('method')} {uri}: write route without the idempotency middleware (rule 7)")
         if not public and "auth:sanctum" not in mw_s:
             f.add("permission", f"{r.get('method')} {uri}: no auth:sanctum middleware (rule 6)")
@@ -265,6 +269,7 @@ Schema::create('stock_movements', function (Blueprint $t) {
             {"method": "POST", "uri": "api/v1/orders", "middleware": ["api", "auth:sanctum", "permission:orders.create"]},
             {"method": "GET", "uri": "api/v1/orders", "middleware": ["api"]},
             {"method": "POST", "uri": "api/v1/login", "middleware": ["api"]},
+            {"method": "POST", "uri": "api/v1/broadcasting/auth", "middleware": ["api", "auth:sanctum", "can:identity.authenticated"]},
         ], fh)
     with open(os.path.join(tmp, "apps", "web", "messages", "en.json"), "w", encoding="utf-8") as fh:
         json.dump({"pad": {"send": "Send", "table": "Table"}}, fh)
@@ -289,6 +294,7 @@ Schema::create('stock_movements', function (Blueprint $t) {
     ]
     bad = [name for name, pred in expected if not any(pred(m) for m in msgs)]
     false_pos = [m for m in msgs if "qty" in m and "decimal(14,4)" in m and "is decimal" in m]
+    false_pos += [m for m in msgs if "broadcasting/auth" in m]
     for m in msgs:
         print("  caught:", m)
     if bad or false_pos:

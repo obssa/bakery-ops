@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Identity\Http\Controllers\AuthController;
+use App\Modules\Identity\Http\Controllers\BroadcastingAuthController;
 use App\Modules\Identity\Http\Controllers\DevicesController;
 use App\Modules\Identity\Http\Controllers\ShortCodeController;
 use App\Modules\Identity\Http\Controllers\StationsController;
@@ -22,6 +23,10 @@ Route::prefix('api/v1')->middleware('api')->group(function (): void {
     Route::middleware(['auth:sanctum', 'actor'])->group(function (): void {
         Route::get('/me', [AuthController::class, 'me'])->middleware('can:identity.authenticated')->name('identity.me');
         Route::post('/logout', [AuthController::class, 'logout'])->middleware(['can:identity.authenticated', 'idempotency'])->name('identity.logout');
+        // Live updates (ADR 0009, step 1.2): signs a private-channel subscription for Reverb or a Pusher-compatible
+        // transport once one is configured; Broadcasting\ChannelRules decides the channel. It writes nothing, so it
+        // carries no idempotency (tests/Support/read_like_writes.php).
+        Route::post('/broadcasting/auth', BroadcastingAuthController::class)->middleware('can:identity.authenticated')->name('identity.broadcasting.auth');
 
         Route::middleware('permission:people.manage')->group(function (): void {
             Route::get('/users', [UsersController::class, 'index'])->name('identity.users.index');

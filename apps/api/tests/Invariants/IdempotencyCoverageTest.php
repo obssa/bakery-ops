@@ -93,7 +93,7 @@ it('lists every read-like write route with a reason; each exists, is protected, 
     expect(readLikeWrites())->not->toBeEmpty();
     foreach (readLikeWrites() as $entry => $reason) {
         expect($reason)->toBeString()->not->toBeEmpty("{$entry}: say why it writes nothing")
-            ->and($routes)->toHaveKey($entry, "{$entry} is listed as read-like but no such route exists");
+            ->and(array_key_exists($entry, $routes))->toBeTrue("{$entry} is listed as read-like but no such route exists");
         [$method, $uri] = explode(' ', $entry, 2);
         expect(in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true))->toBeTrue("{$entry}: only write methods need listing")
             ->and(in_array($uri, publicRoutes(), true))->toBeFalse("{$entry}: a read-like route is still protected");
