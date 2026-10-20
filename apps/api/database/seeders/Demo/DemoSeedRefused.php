@@ -32,6 +32,11 @@ final class DemoSeedRefused extends RuntimeException
         return new self("Branch \"{$name}\" exists and is not a demo branch; the demo bakery is only ever seeded into a branch of its own. Choose another name (--branch / BAKERY_DEMO_BRANCH).");
     }
 
+    public static function phaseZeroMissing(): self
+    {
+        return new self('Phase 1 of the demo bakery extends Phase 0, and the demo branch does not exist yet: run the phase seeders in order (DemoSeeder, or bakery:seed-demo).');
+    }
+
     public static function blankBranchName(): self
     {
         return new self('The demo branch needs a name (--branch / BAKERY_DEMO_BRANCH).');

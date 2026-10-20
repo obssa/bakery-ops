@@ -372,6 +372,56 @@ final class DemoBakery
         ['role' => 'bread_baker', 'en' => 'Abebe Girma', 'am' => 'አበበ ግርማ', 'phone' => '+251900000109', 'locale' => 'am', 'stations' => [['bakery', true, false]]],
     ];
 
+    /** The shared pad's account (Phase 1): a waiter-role account the tablet stays signed in with; the waiters switch by short code. */
+    public const string PAD_PHONE = '+251900000110';
+
+    public const string PAD_NAME_EN = 'Pad 1';
+
+    public const string PAD_NAME_AM = 'ፓድ 1';
+
+    /** The enrolled device of the shared pad (Phase 1). */
+    public const string PAD_DEVICE = 'Front pad';
+
+    /**
+     * The dining room (Phase 1): T1-T10 inside, Terrace 1-2 outside. code => [English, Amharic, seats]; the grid shows
+     * them in this order. Codes are what an order snapshots as its table_code.
+     *
+     * @var array<string, array{0: string, 1: string, 2: int}>
+     */
+    public const array TABLES = [
+        'T1' => ['Table 1', 'ጠረጴዛ 1', 2],
+        'T2' => ['Table 2', 'ጠረጴዛ 2', 2],
+        'T3' => ['Table 3', 'ጠረጴዛ 3', 4],
+        'T4' => ['Table 4', 'ጠረጴዛ 4', 4],
+        'T5' => ['Table 5', 'ጠረጴዛ 5', 4],
+        'T6' => ['Table 6', 'ጠረጴዛ 6', 4],
+        'T7' => ['Table 7', 'ጠረጴዛ 7', 6],
+        'T8' => ['Table 8', 'ጠረጴዛ 8', 6],
+        'T9' => ['Table 9', 'ጠረጴዛ 9', 8],
+        'T10' => ['Table 10', 'ጠረጴዛ 10', 8],
+        'TR1' => ['Terrace 1', 'በረንዳ 1', 4],
+        'TR2' => ['Terrace 2', 'በረንዳ 2', 4],
+    ];
+
+    /**
+     * Today's sample orders (Phase 1): the pad's waiter (a person's phone) takes them at a table and drives them as far as
+     * `stage` says, through Orders' actions: open (a cart on the table, not sent), sent (queued on the kitchen and bar
+     * rails), accepted (the kitchen line accepted: the order is in progress), ready (every station line ready), served
+     * (every line handed over, unpaid: the till's queue) and paid (served, then paid in cash and closed, so the
+     * display-case croissant is sold). Lines are [SKU, quantity]; a few units of plentiful stock each.
+     *
+     * @var array<string, array{table: string, waiter: string, stage: string, lines: list<array{0: string, 1: string}>}>
+     */
+    public const array SAMPLE_ORDERS = [
+        'open-t3' => ['table' => 'T3', 'waiter' => '+251900000104', 'stage' => 'open', 'lines' => [['P-SND-CHICKEN', '1'], ['P-PST-CROISSANT', '1']]],
+        'sent-t1' => ['table' => 'T1', 'waiter' => '+251900000105', 'stage' => 'sent', 'lines' => [['P-SND-CHICKEN', '1'], ['P-HOT-LATTE', '1']]],
+        'sent-t2' => ['table' => 'T2', 'waiter' => '+251900000104', 'stage' => 'sent', 'lines' => [['P-SND-CLUB', '1'], ['P-HOT-CAPPUCCINO', '2']]],
+        'progress-t4' => ['table' => 'T4', 'waiter' => '+251900000105', 'stage' => 'accepted', 'lines' => [['P-SND-CHICKEN', '1'], ['P-HOT-CAPPUCCINO', '1']]],
+        'ready-t5' => ['table' => 'T5', 'waiter' => '+251900000104', 'stage' => 'ready', 'lines' => [['P-SND-TUNA', '1'], ['P-HOT-MACCHIATO', '1']]],
+        'served-t6' => ['table' => 'T6', 'waiter' => '+251900000105', 'stage' => 'served', 'lines' => [['P-SND-CHICKEN', '1'], ['P-PST-CROISSANT', '1']]],
+        'paid-t7' => ['table' => 'T7', 'waiter' => '+251900000104', 'stage' => 'paid', 'lines' => [['P-HOT-LATTE', '1'], ['P-PST-CROISSANT', '1']]],
+    ];
+
     /** @return array<string, array{requires_overseer: bool, sort: int}> */
     public static function stations(): array
     {
@@ -406,6 +456,18 @@ final class DemoBakery
     public static function people(): array
     {
         return self::PEOPLE;
+    }
+
+    /** @return array<string, array{0: string, 1: string, 2: int}> */
+    public static function tables(): array
+    {
+        return self::TABLES;
+    }
+
+    /** @return array<string, array{table: string, waiter: string, stage: string, lines: list<array{0: string, 1: string}>}> */
+    public static function sampleOrders(): array
+    {
+        return self::SAMPLE_ORDERS;
     }
 
     /** @param  PersonSpec  $person */

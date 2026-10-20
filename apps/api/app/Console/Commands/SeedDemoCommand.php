@@ -9,6 +9,7 @@ use Database\Seeders\Demo\DemoCredentials;
 use Database\Seeders\Demo\DemoSeedRefused;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\Phase0Seeder;
+use Database\Seeders\Phase1Seeder;
 use Illuminate\Console\Command;
 use Illuminate\Database\Seeder;
 
@@ -80,7 +81,7 @@ final class SeedDemoCommand extends Command
     }
 
     /**
-     * Run the phase seeders in order and answer the accounts Phase0Seeder created.
+     * Run the phase seeders in order and answer the accounts they created (Phase 0's people, Phase 1's pad account).
      *
      * @return list<array{name: string, role: string, phone: string, short_code: string}>
      */
@@ -92,8 +93,8 @@ final class SeedDemoCommand extends Command
             $seeder = $this->laravel->make($class);
             $seeder->setContainer($this->laravel)->setCommand($this);
             $this->components->task($class, fn () => $seeder->__invoke());
-            if ($seeder instanceof Phase0Seeder) {
-                $accounts = $seeder->createdAccounts();
+            if ($seeder instanceof Phase0Seeder || $seeder instanceof Phase1Seeder) {
+                $accounts = [...$accounts, ...$seeder->createdAccounts()];
             }
         }
 
@@ -119,6 +120,6 @@ final class SeedDemoCommand extends Command
             $accounts,
         ));
         $this->line('Every demo account signs in with its phone and the demo password (BAKERY_DEMO_PASSWORD; locally and in tests the documented default).');
-        $this->line('The short codes are shown only this once; an admin can reset one under People.');
+        $this->line('The short codes are shown only this once; an admin can reset one under People. The shared pad account has none ("-").');
     }
 }

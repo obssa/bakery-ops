@@ -16,6 +16,7 @@ final class DemoCounts
     private const array TABLES = [
         'stations', 'locations', 'categories', 'item_prices', 'item_station_assignments', 'recipes', 'recipe_lines',
         'recipe_steps', 'users', 'user_station_assignments', 'stock_movements', 'stock_balances', 'audit_log',
+        'devices', 'dining_tables', 'payment_channels', 'orders', 'order_lines', 'order_events', 'payments',
     ];
 
     /**
