@@ -13,8 +13,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * An order line (phase-1 plan section 4, "Line"): the product in both languages, the quantity and money as decimal
  * strings (ADR 0004), the modifiers as written with the line, the station it goes to (null for a display-case line),
- * its status and who moved it when, and its version (the live feeds merge by it, ADR 0009). Load lines.item,
- * lines.modifiers and lines.station first (OrderResource::load).
+ * its status and who moved it when (accepted, prepared, served; rejected with the reason code, the note and the
+ * reason in English and Amharic, which the pad shows on a line given back), and its version (the live feeds merge by
+ * it, ADR 0009). Load lines.item, lines.modifiers and lines.station first (OrderResource::load).
  *
  * @mixin OrderLine
  */
@@ -57,11 +58,17 @@ final class OrderLineResource extends JsonResource
             'recipe_version' => $line->recipe_version,
             'accepted_by' => $line->accepted_by_user_id,
             'accepted_at' => $line->accepted_at?->toIso8601String(),
+            'prepared_by' => $line->prepared_by_user_id,
             'ready_at' => $line->ready_at?->toIso8601String(),
+            'served_by' => $line->served_by_user_id,
             'served_at' => $line->served_at?->toIso8601String(),
             'rejected' => $line->reject_reason === null ? null : [
                 'reason' => $line->reject_reason->value,
                 'note' => $line->reject_note,
+                'message_en' => $line->reject_reason->message('en'),
+                'message_am' => $line->reject_reason->message('am'),
+                'by' => $line->rejected_by_user_id,
+                'at' => $line->rejected_at?->toIso8601String(),
             ],
             'notes' => $line->notes,
             'version' => $line->version,

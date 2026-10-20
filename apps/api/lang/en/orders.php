@@ -5,7 +5,8 @@ declare(strict_types=1);
 /*
  * English messages for App\Modules\Orders (message_key = orders.<group>.<name>). Every key has an Amharic twin in
  * lang/am/orders.php (rule 9); tests/Modules/Orders/OrdersLangTest.php keeps them in step. send.shortfall_line is the
- * sentence the pad shows on a short line (Support\ShortfallReport).
+ * sentence the pad shows on a short line (Support\ShortfallReport); reject.reason.* are the reasons a station gives a
+ * line back for (Enums\RejectReason), shown on that line.
  */
 return [
     'send' => [
@@ -17,6 +18,18 @@ return [
         'not_open' => 'This order is no longer open: it was already sent, cancelled or voided.',
         'not_owner' => 'This is another waiter\'s order. Only its waiter or a manager can change it.',
         'empty' => 'This order has no lines to send.',
+        'not_sent' => 'This order has not been sent to the stations yet.',
+    ],
+    'station' => [
+        'forbidden' => 'This line belongs to another station. Only the staff of its station or a manager can work on it.',
+    ],
+    'reject' => [
+        'reason' => [
+            'ingredient_spoiled' => 'An ingredient has spoiled.',
+            'equipment_down' => 'The equipment is not working.',
+            'out_of_stock' => 'Out of stock.',
+            'other' => 'Another reason (see the note).',
+        ],
     ],
     'item' => [
         'not_sellable' => 'This item cannot be sold here: it is not an active product of this branch.',

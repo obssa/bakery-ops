@@ -49,6 +49,18 @@ final class OrderError extends RuntimeException
         return new self('orders.order.not_owner', 403);
     }
 
+    /** A station works only the lines of its own station (orders.accept there), unless it works at every one. */
+    public static function stationForbidden(): self
+    {
+        return new self('orders.station.forbidden', 403);
+    }
+
+    /** A line of an open cart is on no station's rail yet: it is accepted, made, rejected or served once sent. */
+    public static function notSent(OrderStatus $status): self
+    {
+        return new self('orders.order.not_sent', 409, ['status' => $status->value]);
+    }
+
     public static function empty(): self
     {
         return new self('orders.order.empty', 422);
