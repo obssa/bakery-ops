@@ -184,7 +184,7 @@ it('snapshots the price in force at sent_at: a change while the cart is open is 
     app(PriceHistory::class)->open($m->sandwich, Money::of('300.00'), CarbonImmutable::now());
 
     ($this->send)($order['id'])->assertOk()->assertJsonPath('lines.0.unit_price', '270.00')->assertJsonPath('totals.total', '270.00');
-    expect(OrderLine::query()->where('order_id', $order['id'])->value('unit_price_snapshot'))->toBe('270.00');
+    expect(DB::table('order_lines')->where('order_id', $order['id'])->value('unit_price_snapshot'))->toBe('270.00');
 })->group('module:orders', 'feature');
 
 it('reserves what the modifiers make of the recipe: no onion is not refused when the onion is out', function () {
@@ -426,16 +426,20 @@ it('replays a refused send with the same key as the same 409, and a new key send
 it('sends in one database transaction: one BEGIN, every write of the send inside it', function () {
     $m = $this->menu;
     $order = ($this->openOrder)([$m->line($m->sandwich), $m->line($m->latte), $m->line($m->croissant)]);
-    $baseline = DB::connection()->transactionLevel(); // RefreshDatabase's wrapping transaction
-    $begins = [];
+    // RefreshDatabase wraps the test in a transaction: what production opens with BEGIN starts here one level above it
+    // (the idempotency middleware's key row gets a savepoint of its own under that wrapper, outside the send)
+    $baseline = DB::connection()->transactionLevel();
+    $transaction = 0;
     $writes = [];
-    Event::listen(TransactionBeginning::class, function (TransactionBeginning $e) use (&$begins): void {
-        $begins[] = $e->connection->transactionLevel();
+    Event::listen(TransactionBeginning::class, function (TransactionBeginning $e) use (&$transaction, $baseline): void {
+        if ($e->connection->transactionLevel() === $baseline + 1) {
+            $transaction++;
+        }
     });
-    DB::listen(function (QueryExecuted $q) use (&$writes): void {
+    DB::listen(function (QueryExecuted $q) use (&$writes, &$transaction, $baseline): void {
         foreach (['/^\s*insert\s+(?:ignore\s+)?into\s+[`"]?(\w+)/i', '/^\s*update\s+[`"]?(\w+)/i', '/^\s*delete\s+from\s+[`"]?(\w+)/i'] as $pattern) {
             if (preg_match($pattern, $q->sql, $match) === 1) {
-                $writes[] = [$match[1], $q->connection->transactionLevel()];
+                $writes[] = [$match[1], $q->connection->transactionLevel() > $baseline ? $transaction : null];
 
                 return;
             }
@@ -444,12 +448,11 @@ it('sends in one database transaction: one BEGIN, every write of the send inside
 
     ($this->send)($order['id'])->assertOk();
 
-    $outermost = array_values(array_filter($begins, fn (int $level): bool => $level === $baseline + 1));
-    expect($outermost)->toHaveCount(1, 'one BEGIN: savepoints inside it are the same transaction');
-    $sendWrites = array_values(array_filter($writes, fn (array $w): bool => $w[0] !== 'idempotency_keys'));
-    expect(collect($sendWrites)->pluck(0)->unique()->sort()->values()->all())
+    $sendWrites = collect($writes)->reject(fn (array $w): bool => $w[0] === 'idempotency_keys');
+    expect($sendWrites->pluck(0)->unique()->sort()->values()->all())
         ->toBe(['audit_log', 'order_counters', 'order_events', 'order_lines', 'orders', 'stock_balances', 'stock_movements'])
-        ->and(collect($sendWrites)->every(fn (array $w): bool => $w[1] > $baseline))->toBeTrue('every write of the send runs inside that transaction');
+        ->and($sendWrites->pluck(1)->contains(null))->toBeFalse('no write of the send runs outside a transaction')
+        ->and($sendWrites->pluck(1)->unique()->values()->all())->toHaveCount(1, 'one BEGIN: every write of the send, savepoints included, is in the same transaction');
 })->group('module:orders', 'feature');
 
 it('rolls the whole send back when any of its writes fails: no number, no reservation, no event, no audit row', function () {
