@@ -34,7 +34,7 @@ test.describe("p1 shortfall", () => {
     await expect(line).toBeVisible();
     await line.getByRole("button", { name: `Increase quantity of ${product}` }).click();
     await line.getByRole("button", { name: `Increase quantity of ${product}` }).click();
-    await expect(line.getByLabel(`Quantity of ${product}`)).toHaveValue("3");
+    await expect(line.getByRole("textbox", { name: `Quantity of ${product}` })).toHaveValue("3");
 
     // 3 > 2: nothing is sent, the shortfall sits on that line
     await page.getByRole("button", { name: "Send order" }).click();
@@ -43,7 +43,7 @@ test.describe("p1 shortfall", () => {
     await expect(short).toContainText(fixture.ingredient.name_en);
     await expect(short).toContainText("1 kg");
     await expect(short).toContainText(fixture.station.name_en);
-    await expect(line.getByLabel(`Quantity of ${product}`)).toHaveValue("3");
+    await expect(line.getByRole("textbox", { name: `Quantity of ${product}` })).toHaveValue("3");
 
     // the same shortfall in Amharic (the unlocked pad and its cart survive the language switch)
     await page.getByRole("link", { name: "አማርኛ" }).click();
@@ -60,7 +60,7 @@ test.describe("p1 shortfall", () => {
     await expect(page).toHaveURL(/\/app\/en\/pad\/$/);
     const again = page.getByRole("region", { name: "Cart" }).getByRole("listitem").filter({ hasText: product });
     await again.getByRole("button", { name: `Decrease quantity of ${product}` }).click();
-    await expect(again.getByLabel(`Quantity of ${product}`)).toHaveValue("2");
+    await expect(again.getByRole("textbox", { name: `Quantity of ${product}` })).toHaveValue("2");
     await page.getByRole("button", { name: "Send order" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Order sent" })).toBeVisible({ timeout: 30_000 });
 

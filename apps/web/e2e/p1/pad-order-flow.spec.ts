@@ -22,20 +22,20 @@ test.describe("p1 order flow: pad lock", () => {
     await expect(page.getByRole("heading", { name: "Enter your short code" })).toBeVisible({ timeout: 30_000 });
 
     await typeCode(page, WRONG);
-    await expect(page.getByRole("alert")).toContainText("That short code is not right.");
+    await expect(page.getByRole("alert").filter({ hasText: "That short code is not right." })).toBeVisible();
     for (let attempt = 2; attempt <= 5; attempt++) await typeCode(page, WRONG);
     await typeCode(page, WRONG);
-    await expect(page.getByRole("alert")).toContainText("Too many wrong codes; try again in a few minutes.");
+    await expect(page.getByRole("alert").filter({ hasText: "Too many wrong codes; try again in a few minutes." })).toBeVisible();
     // even the right code is refused while locked out
     await typeCode(page, fixture.waiter.shortCode);
-    await expect(page.getByRole("alert")).toContainText("Too many wrong codes");
+    await expect(page.getByRole("alert").filter({ hasText: "Too many wrong codes" })).toBeVisible();
     await expect(page.getByText(`Acting: ${fixture.waiter.name}`)).toHaveCount(0);
 
     // the same device on the Amharic page: the lockout message comes in Amharic
     await page.getByRole("link", { name: "አማርኛ" }).click();
     await expect(page).toHaveURL(/\/app\/am\/pad\/$/);
     await typeCode(page, fixture.waiter.shortCode, "ክፈት");
-    await expect(page.getByRole("alert")).toContainText("በጣም ብዙ የተሳሳቱ ኮዶች");
+    await expect(page.getByRole("alert").filter({ hasText: "በጣም ብዙ የተሳሳቱ ኮዶች" })).toBeVisible();
   });
 
   test("the pad locks after 60 s without a touch and parks the waiter cart @live", async ({ page }) => {

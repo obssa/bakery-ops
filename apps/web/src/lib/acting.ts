@@ -116,3 +116,10 @@ export function actingHeaders(): Record<string, string> {
   if (sessionId !== null) headers[ACTING_HEADER] = String(sessionId);
   return headers;
 }
+
+// signing the pad account out leaves the pad locked for whoever signs in next
+useSession.subscribe((state, previous) => {
+  if (previous.status === "signed-in" && state.status !== "signed-in") {
+    useActing.setState({ user: null, sessionId: null, expiresAt: null, lockedBy: null });
+  }
+});

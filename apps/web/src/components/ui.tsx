@@ -109,3 +109,16 @@ export function PageHeader({ title, intro }: { title: string; intro?: string }) 
     </header>
   );
 }
+
+const BADGE_TONES = {
+  neutral: "bg-neutral-100 text-neutral-800",
+  blue: "bg-blue-100 text-blue-900",
+  green: "bg-green-100 text-green-900",
+  amber: "bg-amber-100 text-amber-900",
+  red: "bg-red-100 text-red-900",
+} as const;
+
+/** A small status label. The words carry the meaning; the tone only adds to it. */
+export function Badge({ tone = "neutral", children, className = "" }: { tone?: keyof typeof BADGE_TONES; children: ReactNode; className?: string }) {
+  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${BADGE_TONES[tone]} ${className}`}>{children}</span>;
+}

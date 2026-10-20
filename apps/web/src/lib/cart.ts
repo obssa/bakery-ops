@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { uuid } from "./api/idempotency";
 import type { MenuItem, NewOrder, NewOrderLine, OrderType, ShortfallLine } from "./api/types";
 import { addDecimal, compareDecimal, multiplyDecimal, stepQuantity } from "./decimal";
+import { useSession } from "./session";
 
 // The waiter's cart on the pad. Pure functions over a plain object (so a test runner can pick them up) and a small
 // store that keeps one cart PER WAITER in memory: locking the pad parks the cart, the same waiter's code brings it
@@ -45,7 +46,7 @@ export interface Cart {
   error: Refusal | null;
 }
 
-export function newCart(): Cart {
+export function emptyCart(): Cart {
   return { orderUuid: uuid(), type: "dine_in", tableId: null, notes: "", lines: [], serverOrderId: null, sending: false, shortfall: [], lineErrors: {}, error: null };
 }
 
@@ -145,14 +146,14 @@ interface CartsState {
   carts: Record<number, Cart>;
   update: (userId: number, change: (cart: Cart) => Cart) => void;
   reset: (userId: number) => void;
-  /** a cart whose order was sent is finished: the waiter starts a new one (the table choice is kept) */
+  /** a cart whose order was sent is finished: the waiter starts a new one (dine-in or takeaway is kept, the table is not) */
   finish: (userId: number) => void;
 }
 
 export const useCarts = create<CartsState>()((set, get) => ({
   carts: {},
   update(userId, change) {
-    const current = get().carts[userId] ?? newCart();
+    const current = get().carts[userId] ?? emptyCart();
     set({ carts: { ...get().carts, [userId]: change(current) } });
   },
   reset(userId) {
@@ -162,6 +163,11 @@ export const useCarts = create<CartsState>()((set, get) => ({
   },
   finish(userId) {
     const previous = get().carts[userId];
-    set({ carts: { ...get().carts, [userId]: { ...newCart(), type: previous?.type ?? "dine_in" } } });
+    set({ carts: { ...get().carts, [userId]: { ...emptyCart(), type: previous?.type ?? "dine_in" } } });
   },
 }));
+
+// signing the pad account out ends every parked cart: they belong to the waiters of that sign-in
+useSession.subscribe((state, previous) => {
+  if (previous.status === "signed-in" && state.status !== "signed-in") useCarts.setState({ carts: {} });
+});

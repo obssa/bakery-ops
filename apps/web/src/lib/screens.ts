@@ -1,7 +1,7 @@
-// The screens of the system, in the order the shell lists them. The admin console and the kitchen and bar displays are live; the others
+// The screens of the system, in the order the shell lists them. The admin console, the waiter pad and the kitchen and bar displays are live; the others
 // say which phase brings them (their dictionaries' `coming` text).
 export const SCREENS = [
-  { href: "/pad", key: "pad", coming: "pad" },
+  { href: "/pad", key: "pad", coming: null },
   { href: "/till", key: "till", coming: "till" },
   { href: "/kds/kitchen", key: "kds_kitchen", coming: null },
   { href: "/kds/bar", key: "kds_bar", coming: null },
