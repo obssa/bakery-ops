@@ -61,7 +61,7 @@
       "modules": {
         "contracts": "done",
         "shared.broadcast": "done",
-        "orders": "todo",
+        "orders": "in_progress",
         "payments": "todo",
         "read-models": "todo",
         "web": "todo",
@@ -222,7 +222,7 @@
     },
     "orders": {
       "phase": 1,
-      "status": "todo",
+      "status": "in_progress",
       "stable_since": null
     },
     "payments": {
