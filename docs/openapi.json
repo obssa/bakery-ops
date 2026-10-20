@@ -4751,6 +4751,15 @@
                                 "station_id": {
                                     "type": "integer"
                                 },
+                                "code": {
+                                    "type": "string"
+                                },
+                                "name_en": {
+                                    "type": "string"
+                                },
+                                "name_am": {
+                                    "type": "string"
+                                },
                                 "can_count": {
                                     "type": "boolean"
                                 },
@@ -4760,6 +4769,9 @@
                             },
                             "required": [
                                 "station_id",
+                                "code",
+                                "name_en",
+                                "name_am",
                                 "can_count",
                                 "is_overseer"
                             ]

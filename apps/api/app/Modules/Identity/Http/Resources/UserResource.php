@@ -24,7 +24,7 @@ final class UserResource extends JsonResource
     {
         /** @var User $user */
         $user = $this->resource;
-        $user->loadMissing(['roles', 'permissions', 'stationAssignments']);
+        $user->loadMissing(['roles', 'permissions', 'stationAssignments.station']);
 
         return [
             'id' => $user->id,
@@ -43,6 +43,9 @@ final class UserResource extends JsonResource
                 ->values()
                 ->map(fn (UserStationAssignment $a): array => [
                     'station_id' => $a->station_id,
+                    'code' => $a->station->code->value,
+                    'name_en' => $a->station->name_en,
+                    'name_am' => $a->station->name_am,
                     'can_count' => $a->can_count,
                     'is_overseer' => $a->is_overseer,
                 ])->all(),

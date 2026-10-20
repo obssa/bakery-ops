@@ -35,7 +35,7 @@ final class UsersController
     public function index(): AnonymousResourceCollection
     {
         return UserResource::collection(
-            User::query()->with(['roles', 'permissions', 'stationAssignments'])->orderBy('name')->orderBy('id')->get(),
+            User::query()->with(['roles', 'permissions', 'stationAssignments.station'])->orderBy('name')->orderBy('id')->get(),
         );
     }
 

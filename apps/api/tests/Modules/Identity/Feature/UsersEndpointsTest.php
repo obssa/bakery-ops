@@ -42,7 +42,14 @@ it('lists the branch users with roles, station assignments and whether a short c
     $row = collect($response->json('data'))->firstWhere('id', $chef->id);
     expect($row['roles'])->toBe(['chef'])
         ->and($row['has_short_code'])->toBeTrue()
-        ->and($row['stations'])->toBe([['station_id' => $kitchen->id, 'can_count' => true, 'is_overseer' => false]])
+        ->and($row['stations'])->toBe([[
+            'station_id' => $kitchen->id,
+            'code' => 'kitchen',
+            'name_en' => $kitchen->name_en,
+            'name_am' => $kitchen->name_am,
+            'can_count' => true,
+            'is_overseer' => false,
+        ]])
         ->and($row)->not->toHaveKeys(['password', 'short_code_hash', 'short_code', 'remember_token']);
 })->group('module:identity', 'feature');
 
