@@ -223,9 +223,7 @@ it('answers 304 with no body when If-None-Match is current, and does not build t
     expect($again->getContent())->toBe('')->and($again->headers->get('ETag'))->toBe($etag)->and($again->headers->get('Cache-Control'))->toBe('no-cache, private');
     foreach ($touched as $sql) {
         expect($sql)->not->toContain('stock_balances')->and($sql)->not->toContain('item_stock_view');
-        if (str_contains($sql, 'from `items`') || str_contains($sql, 'from `modifiers`')) {
-            expect($sql)->toContain('count(*)'); // only the fingerprint, never the rows
-        }
+        expect($sql)->not->toContain('from `items`')->and($sql)->not->toContain('from `modifiers`'); // the catalog counter, never the rows
     }
     expect(($this->menu)('', ['If-None-Match' => 'W/'.$etag])->status())->toBe(304);
     expect(($this->menu)('', ['If-None-Match' => '"other"'])->status())->toBe(200);
@@ -263,6 +261,26 @@ it('changes the ETag when stock changes, when a price changes, when the catalog 
 
     $this->travelTo(CarbonImmutable::now()->addDay());
     expect(($this->menu)('', ['If-None-Match' => $afterName])->status())->toBe(200); // a new day: is_new may roll over
+})->group('module:orders', 'feature');
+
+it('changes the ETag for every catalog edit, even two inside the same second (a client must never get a 304 over a missed edit)', function () {
+    $m = $this->floor->menu;
+    $etag = fn () => ($this->menu)()->headers->get('ETag');
+    $this->travelTo(CarbonImmutable::now()->startOfSecond()->addSeconds(5)); // frozen: every write below shares one stamp
+
+    $first = $etag();
+    $m->cake->forceFill(['name_en' => 'Black forest'])->save();
+    $second = $etag();
+    $m->cake->forceFill(['name_en' => 'White forest'])->save();
+    $third = $etag();
+    $m->withTomato->forceFill(['price_delta' => '13.00'])->save();
+    $fourth = $etag();
+    $m->cake->delete(); // a soft delete, still the same second
+    $fifth = $etag();
+
+    expect([$first, $second, $third, $fourth, $fifth])->toHaveCount(5)->and(array_unique([$first, $second, $third, $fourth, $fifth]))->toHaveCount(5);
+    expect(($this->menu)('', ['If-None-Match' => $second])->status())->toBe(200);
+    expect(($this->menu)('', ['If-None-Match' => $fifth])->status())->toBe(304);
 })->group('module:orders', 'feature');
 
 it('takes a fixed number of queries however many products the menu has', function () {

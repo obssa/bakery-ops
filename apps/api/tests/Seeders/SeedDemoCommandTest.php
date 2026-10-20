@@ -29,7 +29,7 @@ it('loads the demo bakery into "Demo Bakery" and reports what it holds, short co
     $output = Artisan::output();
 
     expect($exit)->toBe(0)
-        ->and(demoUsersOf(DemoBakery::DEFAULT_BRANCH))->toBe(9)
+        ->and(demoUsersOf(DemoBakery::DEFAULT_BRANCH))->toBe(10)
         ->and($output)->toContain(DemoBakery::DEFAULT_BRANCH)
         ->and($output)->toContain('ingredients')
         ->and($output)->toContain('stock_movements')
@@ -45,7 +45,7 @@ it('loads the demo bakery into "Demo Bakery" and reports what it holds, short co
     $exit = Artisan::call('bakery:seed-demo');
     $again = Artisan::output();
     expect($exit)->toBe(0)
-        ->and(demoUsersOf(DemoBakery::DEFAULT_BRANCH))->toBe(9)
+        ->and(demoUsersOf(DemoBakery::DEFAULT_BRANCH))->toBe(10)
         ->and(Branch::query()->count())->toBe(1)
         ->and($again)->toContain('no new accounts');
     foreach ($codes as $code) {
