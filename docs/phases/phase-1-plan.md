@@ -793,7 +793,7 @@ Small PRs, each green in CI before the next; a step that completes a module ends
      of the moment of the tap). A refused send is kept as an outbox failure marked `inline`: the shell strip stays quiet
      and the pad takes it (`components/pad/outcomes.ts`): `409 orders.send.shortfall` keeps the cart as it was, stores the
      order id (the API holds the order open) and puts the shortfall on the exact line, matched by `line_client_uuid`:
-     "ingredient: short by 1 kg at Kitchen" in the page language, plus a hint to reduce or remove the line; a `422` is
+     "ingredient: short by 1000 g at Kitchen" in the page language (the API reports the shortage in the ingredient's base unit, grams for kilograms of stock), plus a hint to reduce or remove the line; a `422` is
      shown on the line it names (`line_client_uuid`, else `lines.N.*` by position), anything else above the cart. Fixing
      the line and sending again queues `PUT /orders/{id}/lines` then `POST /orders/{id}/send` on the same order; the
      second waits for the first (`after`) and is dropped with it if the first is refused. The cart is read-only while a
@@ -813,14 +813,18 @@ Small PRs, each green in CI before the next; a step that completes a module ends
      turning ready after the first load plays the chime (generated tones from 1.6a, mute toggle shared with the kitchen
      display) and vibrates for 200 ms where the device can.
    - **Playwright.** `shortfall.spec.ts` (`@live`, `p1-shortfall`): an ingredient stocked for exactly 2 kg and a
-     product using 1 kg; the waiter signs in as the pad, unlocks, picks table `E2E-T1`, orders 3, sends, sees "ingredient:
-     short by 1 kg at <station>" inline on that line, switches to Amharic and sees it in Amharic (cart and unlocked pad
+     product using 1 kg; the device starts signed in as the pad account (its API token is placed where the app keeps it, because `POST /login` is throttled), the waiter unlocks, picks table `E2E-T1`, orders 3, sends, sees "ingredient:
+     short by 1000 g at <station>" inline on that line, switches to Amharic and sees it in Amharic (cart and unlocked pad
      survive the language switch), back to English reduces to 2 and sends; then through the API: one order with that
      product, `sent`, quantity 2, and the ledger `purchase_in, reservation` only (exactly one reservation). `pad-order-flow.spec.ts`
      (`@live`, `p1-order-flow`): five wrong codes then the lockout message in English and Amharic (a six-digit wrong code,
      so it can never be somebody's four-digit code); and with Playwright's clock, a touch at 40 s keeps the pad open, 61 s
      without one locks it (no name, no cart text), and the same code restores the parked cart. Shared helpers:
-     `e2e/support/pad.ts`, and `buildWaiter` plus the ingredient's Amharic name in `fixture.ts`.
+     `e2e/support/pad.ts`, and `buildWaiter`, per-process API logins and per-fixture unique item names in `fixture.ts`. The admin smoke test that used `/pad` as its "screen of a later phase" now uses the production board.
+   - **A defect the lockout flow found, fixed here.** `AttemptCounter` (Identity) only trusted `is_int()` from the cache, and Redis
+     hands whole numbers back as strings, so on Redis (CI and the VPS stack) failed short codes were never counted and
+     the 15-minute lockout never happened; the database store of the live host was fine. It now reads numeric values
+     (`tests/Modules/Identity/Feature/AttemptCounterStoresTest.php` runs it over a store that returns strings).
 7. **1.7 docs and seeds**: `Phase1Seeder`, ADR 0008 / 0009 accepted, OpenAPI, ERD, gate report.
 
 ## 7. Test list

@@ -41,7 +41,7 @@ test.describe("p1 shortfall", () => {
     const short = line.getByRole("alert");
     await expect(short).toBeVisible({ timeout: 30_000 });
     await expect(short).toContainText(fixture.ingredient.name_en);
-    await expect(short).toContainText("1 kg");
+    await expect(short).toContainText("1000 g");
     await expect(short).toContainText(fixture.station.name_en);
     await expect(line.getByRole("textbox", { name: `Quantity of ${product}` })).toHaveValue("3");
 
@@ -52,7 +52,7 @@ test.describe("p1 shortfall", () => {
     const shortAm = lineAm.getByRole("alert");
     await expect(shortAm).toBeVisible({ timeout: 30_000 });
     await expect(shortAm).toContainText(fixture.ingredient.name_am);
-    await expect(shortAm).toContainText("1 kg");
+    await expect(shortAm).toContainText("1000 g");
     await expect(shortAm).toContainText(fixture.station.name_am);
 
     // back in English: reduce to 2 and send again, on the same order
