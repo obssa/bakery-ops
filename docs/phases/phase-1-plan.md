@@ -17,10 +17,33 @@ shared (2026-10-19T09:57Z), audit (10:51Z), identity (15:17Z), catalog (16:55Z),
 at `e57b791` (tag `phase-0-complete`). `payments->orders` is intra-phase (its provider, Orders, is built in this
 phase): the gate skips it at entry and it is written at step 1.4, before any Payments code.
 
-At plan approval (after the standing-approval commit, before step 1.1; `--no-tests`, so Pest groups are not run):
+At plan approval (after the standing-approval commit, before step 1.1; `--no-tests`, so Pest groups are not run).
+The three failures are the contract files step 1.1 writes, as expected at this point:
 
 ```
-ENTRY_CHECK_NO_TESTS
+$ python scripts/gate_check.py --mode entry --phase 1 --no-tests   # at 494a9ac
+== gate_check: entry phase 1 (Ordering and live KDS)
+  [PASS] phase 0 done                     status=done done_commit=e57b791878396338f12158b6737df4950e1ba491
+  [PASS] phase 0 commit in history        e57b79187839 is an ancestor of HEAD
+  [SKIP] gate:p0 green                    pest --group=gate:p0 not run (--no-tests/--ci)
+  [PASS] clean working tree               clean
+  [PASS] phase plan exists                docs/phases/phase-1-plan.md
+  [PASS] plan approved by Ramin           plan_approved=True by standing approval: Ramin, 2026-10-19
+  [PASS] approval author                  obssa77@gmail.com
+  [FAIL] contract orders->inventory file  missing apps/api/tests/Contract/Orders/InventoryContractTest.php
+  [FAIL] contract orders->catalog file    missing apps/api/tests/Contract/Orders/CatalogContractTest.php
+  [FAIL] contract orders->identity file   missing apps/api/tests/Contract/Orders/IdentityContractTest.php
+  [SKIP] contract payments->orders        intra-phase: provider orders is built in phase 1; write it before step 'payments', checked by --mode module --module orders
+  [PASS] dep orders->inventory stable     stable
+  [PASS] dep orders->catalog stable       stable
+  [PASS] dep orders->identity stable      stable
+  [PASS] dep orders->shared stable        stable
+  [PASS] dep orders->audit stable         stable
+  [PASS] dep payments->identity stable    stable
+  [PASS] dep payments->shared stable      stable
+  [PASS] dep payments->audit stable       stable
+  [SKIP] Phase1Seeder                     not yet (created during the phase)
+== result: FAIL (3 failed, 0 warnings, 20 checks)
 ```
 
 After step 1.1 (contract tests written, provider fixes in, tests run in Docker):
