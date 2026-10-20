@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Orders\Models\Order;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Events\TransactionBeginning;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
@@ -15,6 +16,8 @@ use Tests\Support\OrderFloor;
  * Idempotency-Key and body twice return the identical body and write one order. The detail (price snapshot, shortfall,
  * rollback, events) is tests/Modules/Orders/Feature/SendOrderTest.php; this is the gate's own check.
  */
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->floor = OrderFloor::open($this);

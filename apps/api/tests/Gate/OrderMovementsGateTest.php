@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Support\OrderFloor;
 
@@ -11,6 +12,8 @@ use Tests\Support\OrderFloor;
  * latte) and `reservation -> sale` for the counter line (croissant); and at the end `available` is what was seeded minus
  * what was sold or made. The same flow in a browser is the `p1-order-flow` Playwright project.
  */
+
+uses(RefreshDatabase::class);
 
 it('moves stock reservation, then consume at ready, then sale at payment, and leaves available = seeded - used', function () {
     $f = OrderFloor::open($this);

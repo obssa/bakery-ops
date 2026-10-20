@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Identity\Contracts\ShortCodes;
 use App\Modules\Orders\Models\OrderEvent;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\OrderFloor;
@@ -13,6 +14,8 @@ use Tests\Support\OrderFloor;
  * actor of the audit row, the approver is in its context and on the order's timeline. A cashier's PIN does not approve.
  * The detail is tests/Modules/Orders/Feature/VoidOrderTest.php.
  */
+
+uses(RefreshDatabase::class);
 
 it('voids a sent order with a manager PIN: reservations released, asker and approver both audited', function () {
     $f = OrderFloor::open($this);

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Shared\Live\Channels;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\OrderFloor;
 
 /*
@@ -10,6 +11,8 @@ use Tests\Support\OrderFloor;
  * the bar's channel and the bar's tickets with 403, in both languages; their own station answers. Channel auth detail:
  * tests/Modules/Shared/BroadcastingAuthEndpointTest.php; tickets: StationTicketsEndpointTest.php.
  */
+
+uses(RefreshDatabase::class);
 
 it('refuses a foreign station on the channel and on the tickets feed with 403, and serves the own station', function () {
     $f = OrderFloor::open($this);
