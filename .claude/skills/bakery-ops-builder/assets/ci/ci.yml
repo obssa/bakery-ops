@@ -254,25 +254,29 @@ jobs:
     needs: [status, mod-payments, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 1
     uses: ./.github/workflows/e2e.yml
+    # polling transport, as the live host runs it (ADR 0009): the worker but no `ws` (Reverb) service,
+    # BROADCAST_CONNECTION=null, NEXT_PUBLIC_LIVE_TRANSPORT=poll
     with: { phase: 1, projects: "p1-order-flow p1-shortfall", profiles: "full" }
 
+  # e2e-p2..p5 keep the stack they had before step 1.2 (worker and Reverb, `ws` now being its own compose profile)
+  # until their phase plans settle the transport; ADR 0009 has the screens poll unless a WebSocket host exists.
   e2e-p2:
     needs: [status, mod-production, mod-notifications, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 2
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 2, projects: "p2-stockout-production p2-purchase-transfer", profiles: "full" }
+    with: { phase: 2, projects: "p2-stockout-production p2-purchase-transfer", profiles: "full,ws" }
 
   e2e-p3:
     needs: [status, mod-shifts, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 3
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 3, projects: "p3-handover p3-opening-prefill", profiles: "full" }
+    with: { phase: 3, projects: "p3-handover p3-opening-prefill", profiles: "full,ws" }
 
   e2e-p4:
     needs: [status, mod-analytics, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 4
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 4, projects: "p4-pay-photo-split p4-dashboards", profiles: "full" }
+    with: { phase: 4, projects: "p4-pay-photo-split p4-dashboards", profiles: "full,ws" }
 
   perf-dashboards:
     needs: [status, e2e-p4]
@@ -286,7 +290,7 @@ jobs:
     needs: [status, e2e-p4]
     if: fromJSON(needs.status.outputs.phase) >= 5
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 5, projects: "p5-device p5-offline", profiles: "full" }
+    with: { phase: 5, projects: "p5-device p5-offline", profiles: "full,ws" }
 
   backup-drill:
     needs: [status, e2e-p5]

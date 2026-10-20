@@ -68,6 +68,8 @@ services:
         condition: service_healthy
     profiles: ["full"]
 
+  # Reverb: only when a WebSocket transport is switched on (ADR 0009), so its own profile, not `full`: the live host and
+  # the e2e jobs poll (BROADCAST_CONNECTION=null). Start it with COMPOSE_PROFILES=full,ws and BROADCAST_CONNECTION=reverb.
   ws:
     image: bakery-ops-api:local
     command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
@@ -76,7 +78,7 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    profiles: ["full"]
+    profiles: ["ws"]
 
   db:
     # MariaDB 10.11: the engine the live site runs on (shared cPanel, ADR 0006); CI uses the same image.

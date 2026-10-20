@@ -14,7 +14,10 @@ on:
         required: true
         type: string
       profiles:
-        description: compose profiles to enable (e.g. "full" for worker, ws and the Caddy proxy; "s3" adds minio)
+        description: >-
+          compose profiles to enable, comma separated ("full" for the worker and the Caddy proxy; "ws" adds Reverb and
+          switches the API's broadcasting to it; "s3" adds minio). Without "ws" the stack polls, as the live host does
+          (BROADCAST_CONNECTION=null, ADR 0009).
         required: false
         type: string
         default: ""
@@ -31,10 +34,15 @@ jobs:
         with: { name: api-image, path: /tmp }
       - run: docker load -i /tmp/api.tar
 
+      # Live updates (ADR 0009): the API broadcasts only when this job starts Reverb (the `ws` profile); otherwise
+      # BROADCAST_CONNECTION=null, nothing is queued, and the screens poll their cursor feeds as on the live host.
       - name: Start stack
         env:
           COMPOSE_PROFILES: ${{ inputs.profiles }}
-        run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180
+          BROADCAST_CONNECTION: ${{ contains(format(',{0},', inputs.profiles), ',ws,') && 'reverb' || 'null' }}
+        run: |
+          echo "profiles: '${COMPOSE_PROFILES}', broadcasting: ${BROADCAST_CONNECTION}"
+          docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180
 
       - name: Migrate and seed up to phase ${{ inputs.phase }}
         run: docker compose -f compose.yml -f compose.ci.yml exec -T -e SEED_PHASE=${{ inputs.phase }} app php artisan migrate:fresh --force --seed --seeder=DemoSeeder
@@ -93,6 +101,7 @@ jobs:
         env:
           CI: "true"
           NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_LIVE_TRANSPORT: ${{ contains(format(',{0},', inputs.profiles), ',ws,') && 'reverb' || 'poll' }}
           NEXT_PUBLIC_REVERB_HOST: localhost
           NEXT_PUBLIC_REVERB_PORT: "8080"
           NEXT_PUBLIC_REVERB_SCHEME: http
