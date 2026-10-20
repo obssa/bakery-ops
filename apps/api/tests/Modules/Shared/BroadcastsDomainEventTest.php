@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Modules\Catalog\Models\Item;
 use App\Shared\Events\StockChanged;
-use App\Shared\Live\BroadcastsDomainEvent;
 use App\Shared\Live\Broadcasts\StockChangedBroadcast;
+use App\Shared\Live\BroadcastsDomainEvent;
 use App\Shared\Live\LiveTransport;
 use App\Shared\Models\Branch;
+use Illuminate\Broadcasting\Broadcasters\NullBroadcaster;
 use Illuminate\Broadcasting\BroadcastEvent;
+use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
@@ -49,7 +51,10 @@ it('defaults to the null broadcaster everywhere unless configured', function () 
         $set($saved === false ? null : $saved);
     }
 
-    expect(config('broadcasting.default'))->toBe('null')
+    // env() reads BROADCAST_CONNECTION=null as PHP null; Laravel's BroadcastManager (and LiveTransport) take that as `null`
+    expect(config('broadcasting.default'))->toBeIn([null, 'null'])
+        ->and(LiveTransport::driver())->toBe('null')
+        ->and(app(BroadcastManager::class)->connection())->toBeInstanceOf(NullBroadcaster::class)
         ->and(file_get_contents(base_path('.env.example')))->toContain("\nBROADCAST_CONNECTION=null\n")
         ->and(file_get_contents(base_path('.env.ci')))->toContain("\nBROADCAST_CONNECTION=null\n")
         ->and(file_get_contents(base_path('../../compose.yml')))->toContain('BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-null}');
@@ -61,7 +66,11 @@ it('treats null and log as no transport, reverb and pusher as one', function () 
         expect(LiveTransport::isOn())->toBe($on, $connection);
     }
     config(['broadcasting.default' => 'missing']);
-    expect(LiveTransport::isOn())->toBeFalse();
+    expect(LiveTransport::isOn())->toBeFalse()
+        ->and(LiveTransport::driver())->toBeNull();
+    config(['broadcasting.default' => null]);
+    expect(LiveTransport::isOn())->toBeFalse()
+        ->and(LiveTransport::driver())->toBe('null');
 })->group('module:shared', 'feature');
 
 it('is a ShouldBroadcast companion dispatched after commit, on the private channels it names', function () {

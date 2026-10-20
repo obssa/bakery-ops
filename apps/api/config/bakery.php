@@ -31,6 +31,12 @@ return [
         'token_name' => 'api',
     ],
 
+    'live' => [
+        // Live updates (ADR 0009 decision 4): a polling cursor is never advanced past rows younger than this, so a row
+        // whose transaction commits after a higher id was served is still delivered. Longer than any order transaction.
+        'overlap_seconds' => 5,
+    ],
+
     'demo' => [
         // The demo bakery (Database\Seeders\Phase0Seeder .. PhaseNSeeder, `php artisan bakery:seed-demo`) lives in a
         // branch of its own, created on the first run and marked settings.demo = true; a branch of that name that is

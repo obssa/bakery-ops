@@ -23,7 +23,8 @@ x-api-env: &api-env
   SESSION_DRIVER: redis
   REDIS_HOST: redis
   REDIS_PORT: "6379"
-  BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-log}
+  # live updates poll (ADR 0009): null sends and queues nothing; set reverb (with the `ws` profile) to switch WebSockets on
+  BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-null}
   REVERB_HOST: ws
   REVERB_PORT: "8080"
   REVERB_SCHEME: http

@@ -21,7 +21,8 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => ['Idempotency-Replayed'],
+    // ETag: the polled feeds answer 304 to If-None-Match (ADR 0009), so the web shell must be able to read it
+    'exposed_headers' => ['Idempotency-Replayed', 'ETag'],
 
     'max_age' => 600,
 
