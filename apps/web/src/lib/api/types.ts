@@ -417,3 +417,39 @@ export interface LineErrorBody extends ApiErrorBody {
   line_client_uuid?: string;
   field?: string;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Step 1.6c: the cashier till and the admin Orders board.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** One row of an order's timeline (GET /orders/{order} `events`, oldest first). */
+export interface OrderEvent {
+  id: number;
+  event: string;
+  order_line_id: number | null;
+  station_id: number | null;
+  user_id: number | null;
+  acting_user_id: number | null;
+  approved_by_user_id: number | null;
+  payload: Record<string, unknown> | null;
+  at: string;
+}
+
+/** GET /orders/{order}: the order with its timeline. */
+export interface OrderDetail extends Order {
+  events: OrderEvent[];
+}
+
+/** POST /orders/{order}/payments body (cash only until Phase 4). */
+export interface NewPayment {
+  client_uuid: string;
+  channel_code: string;
+  amount: DecimalString;
+  tendered_amount?: DecimalString;
+}
+
+/** POST /orders/{order}/void body: the reason and the PIN (short code) of a manager or admin. */
+export interface VoidBody {
+  reason: string;
+  pin: string;
+}
