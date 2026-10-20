@@ -309,10 +309,10 @@ it('has the unique keys and the indexes the pad, KDS and till feeds read', funct
     foreach ($expected as $table => $keys) {
         $indexes = ordersIndexes($table);
         foreach ($keys['unique'] as $columns) {
-            expect($indexes['unique'])->toContain($columns, "{$table}: unique ({$columns})");
+            expect(in_array($columns, $indexes['unique'], true))->toBeTrue("{$table}: unique ({$columns}) missing, has: ".implode(' | ', $indexes['unique']));
         }
         foreach ($keys['plain'] as $columns) {
-            expect(array_merge($indexes['plain'], $indexes['unique']))->toContain($columns, "{$table}: index ({$columns})");
+            expect(in_array($columns, array_merge($indexes['plain'], $indexes['unique']), true))->toBeTrue("{$table}: index ({$columns}) missing, has: ".implode(' | ', $indexes['plain']));
         }
     }
 })->group('module:orders', 'invariants');
