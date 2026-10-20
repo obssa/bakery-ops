@@ -91,8 +91,8 @@ it('takes a cash payment for a served order: paid and closed, display-case lines
     expect($row->status->value)->toBe('closed')
         ->and($row->paid_total->amount())->toBe('340.00')
         ->and($f->moved($croissantRef, 'sale', [$m->croissant], $m->display))->toBe([$m->croissant->id => '-1.0000'])
-        ->and(OrderEvent::query()->where('order_id', $order['id'])->orderBy('id')->pluck('event')->map(fn ($e) => $e->value)->all())
-        ->toMatchArray(['order.settled', 'order.paid', 'order.closed']);
+        ->and(array_slice(OrderEvent::query()->where('order_id', $order['id'])->orderBy('id')->pluck('event')->map(fn ($e) => $e->value)->all(), -3))
+        ->toBe(['order.settled', 'order.paid', 'order.closed']);
 })->group('module:payments', 'feature');
 
 it('defaults the tendered cash to the amount: no change', function () {

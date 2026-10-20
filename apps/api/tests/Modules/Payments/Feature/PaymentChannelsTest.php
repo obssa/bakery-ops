@@ -85,7 +85,7 @@ it('answers Payments\\Contracts\\Channels: the enabled channels of the branch, a
 
     // ensureDefaults is idempotent and never touches what the admin changed
     $fresh = Branch::factory()->create();
-    PaymentChannel::query()->withoutGlobalScopes()->where('branch_id', $fresh->id)->delete();
+    PaymentChannel::query()->withoutGlobalScopes()->where('branch_id', $fresh->id)->forceDelete();
     expect($channels->ensureDefaults($fresh->id))->toBe(8)
         ->and($channels->ensureDefaults($fresh->id))->toBe(0)
         ->and(PaymentChannel::query()->withoutGlobalScopes()->where('branch_id', $fresh->id)->count())->toBe(8);

@@ -5,6 +5,7 @@ use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Identity\IdentityServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
+use App\Modules\Payments\PaymentsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Shared\SharedServiceProvider;
 
@@ -16,4 +17,5 @@ return [
     CatalogServiceProvider::class,
     InventoryServiceProvider::class,
     OrdersServiceProvider::class,
+    PaymentsServiceProvider::class,
 ];
