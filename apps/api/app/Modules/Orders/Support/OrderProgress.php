@@ -25,8 +25,8 @@ use Carbon\CarbonImmutable;
  * is ready at send, so its being ready is not work started: SendOrder's `sent` for a sandwich and a croissant and
  * `ready` for counter lines only are what derive() says too (tests/Unit/Orders/OrderProgressTest.php).
  *
- * The payment side (a settled order becomes paid, then closed, when its last line is served) arrives with Payments in
- * step 1.4: until then nothing settles an order.
+ * The payment side (a settled order becomes paid, then closed, when its last line is served) is Settlement's, called by
+ * LineWork right after apply() and by the ApplyPayment listener (step 1.4); apply() only takes the order to served.
  */
 final class OrderProgress
 {

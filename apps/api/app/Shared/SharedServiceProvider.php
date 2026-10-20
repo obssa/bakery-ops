@@ -10,10 +10,12 @@ use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
 use App\Shared\Events\LineServed;
 use App\Shared\Events\OrderLineEvent;
+use App\Shared\Events\OrderPaid;
 use App\Shared\Events\OrderSent;
 use App\Shared\Events\OrderVoided;
 use App\Shared\Events\StockChanged;
 use App\Shared\Live\Broadcasts\OrderLineBroadcast;
+use App\Shared\Live\Broadcasts\OrderPaidBroadcast;
 use App\Shared\Live\Broadcasts\OrderSentBroadcast;
 use App\Shared\Live\Broadcasts\OrderVoidedBroadcast;
 use App\Shared\Live\Broadcasts\StockChangedBroadcast;
@@ -49,6 +51,9 @@ final class SharedServiceProvider extends ServiceProvider
             if ($event->stationIds !== []) {
                 event(new OrderSentBroadcast($event));
             }
+        });
+        Event::listen(OrderPaid::class, static function (OrderPaid $event): void {
+            event(new OrderPaidBroadcast($event));
         });
         Event::listen(OrderVoided::class, static function (OrderVoided $event): void {
             event(new OrderVoidedBroadcast($event));

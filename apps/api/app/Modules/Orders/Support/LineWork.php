@@ -20,7 +20,8 @@ use App\Modules\Orders\Models\OrderLine;
  *   3. the action moves the line through its state machine (an illegal move throws IllegalTransition: 409, nothing
  *      written) and does its own writes (Inventory's consume at ready, release at reject), then the line's version
  *      goes up and the line.* row joins the timeline;
- *   4. the order follows its lines (OrderProgress), its totals are taken again (a rejected line is not charged) and
+ *   4. the order follows its lines (OrderProgress), its totals are taken again (a rejected line is not charged), an
+ *      order settled earlier that is now served is paid, sold and closed (Settlement), and
  *      its version goes up: the order changed with its line, so the live feeds that merge by version see it.
  * Anything that throws rolls the whole of it back. The caller dispatches its domain event once this returns, after the
  * commit.
@@ -32,6 +33,7 @@ final class LineWork
         private readonly OrderProgress $progress,
         private readonly OrderTimeline $timeline,
         private readonly CartLines $cart,
+        private readonly Settlement $settlement,
     ) {}
 
     /**
@@ -60,6 +62,7 @@ final class LineWork
 
             $this->progress->apply($order);
             $this->cart->retotal($order);
+            $this->settlement->close($order); // paid earlier and this was the last line to hand over: paid, sold, closed
             $order->version = $order->version + 1;
             $order->save();
             $line->setRelation('order', $order);

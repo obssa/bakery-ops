@@ -91,9 +91,9 @@ it('moves a served order to paid, sells its display-case lines and closes it whe
         ->and($row->closed_at)->not->toBeNull()
         ->and(($this->totals)($order['id'])->balance)->toBe('0.00')
         ->and(($this->totals)($order['id'])->paid)->toBe($total)
-        // one sale row per display-case line, carrying the line's ref
-        ->and($f->moved($croissantRef, 'sale', [$m->croissant], $m->display))->toBe([$m->croissant->id => '2.0000'])
-        ->and($f->moved($waterRef, 'sale', [$m->water], $m->display))->toBe([$m->water->id => '1.0000'])
+        // one sale row per display-case line, carrying the line's ref (stock leaves: the quantity is negative)
+        ->and($f->moved($croissantRef, 'sale', [$m->croissant], $m->display))->toBe([$m->croissant->id => '-2.0000'])
+        ->and($f->moved($waterRef, 'sale', [$m->water], $m->display))->toBe([$m->water->id => '-1.0000'])
         ->and($f->outstanding($croissantRef))->toBe([])
         ->and($f->level($m->croissant, $m->display)->onHand->toString())->toBe($onHandBefore->minus('2')->toString())
         ->and($f->level($m->croissant, $m->display)->reserved->toString())->toBe('0.0000')
@@ -138,7 +138,7 @@ it('only settles an order that is not served yet, and pays and closes it when it
     expect($row->status->value)->toBe('closed')
         ->and($row->paid_at)->not->toBeNull()
         ->and($row->closed_at)->not->toBeNull()
-        ->and($f->moved($croissantRef, 'sale', [$m->croissant], $m->display))->toBe([$m->croissant->id => '1.0000'])
+        ->and($f->moved($croissantRef, 'sale', [$m->croissant], $m->display))->toBe([$m->croissant->id => '-1.0000'])
         ->and(array_slice($timeline, -3))->toBe(['order.served', 'order.paid', 'order.closed'])
         ->and($this->paidEvents)->toHaveCount(1)
         ->and($this->paidEvents[0]['order_id'])->toBe($order['id']);

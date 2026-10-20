@@ -17,8 +17,8 @@ use Carbon\CarbonImmutable;
  * POST /order-lines/{line}/served (phase-1 plan section 4; workflows-and-screens.md, "Waiter taps Served"). ready ->
  * served, only after ready, as one AuditedAction (order_line.serve, LineWork): served_by is the person who handed it
  * over (the waiter acting by short code on the shared pad), served_at now. Nothing is written to the ledger: a station
- * line was consumed at ready, a display-case line is sold at payment (step 1.4). The order is served once every live
- * line is (OrderProgress). LineServed after the commit (the ticket leaves the station's rail).
+ * line was consumed at ready, a display-case line is sold at payment. The order is served once every live
+ * line is (OrderProgress); one paid before is then paid, sold and closed too (Settlement, in LineWork's transaction). LineServed after the commit (the ticket leaves the station's rail).
  */
 final class ServeLine
 {
