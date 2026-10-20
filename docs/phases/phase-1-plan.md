@@ -631,6 +631,66 @@ Small PRs, each green in CI before the next; a step that completes a module ends
      lang parity in `PaymentsLangTest` (nine keys); the OpenAPI export gains the two operations.
 5. **1.5 read models**: `GET /menu`, `GET /stations/{id}/tickets?since`, `GET /orders?mine|unpaid&since`, `GET
    /orders/{id}`, `GET /dining-tables` with states; ETag / 304; cursor with the overlap window. Group `feature`.
+   As built (step 1.5, `phase-1/read-models`): tests first (red: the four GET routes were 404/405, the `state` key and
+   the bulk capabilities missing), then the capabilities, then the endpoints. Groups `module:orders`, `feature`; one test
+   file per endpoint (`MenuEndpointTest`, `StationTicketsEndpointTest`, `OrdersIndexTest`, `OrderShowTest`,
+   `DiningTableStateTest`) plus `MenuReadsContractTest` for the bulk reads. Where the plan left a detail open:
+   - **Bulk reads, so the menu is a fixed number of queries.** The per-product capabilities cost a query or two per
+     product (`Routing::stationFor`, `Locations::forProduct`, `Modifiers::for`, `Prices::at`, and `Recipes::activeFor` inside
+     `Availability::bulk`), which on a shared host polled by every pad grows with the menu. Additive, each pinned equal to
+     its single twin by `MenuReadsContractTest`: Catalog `Prices::atMany`, `Routing::stationsForMany`,
+     `Modifiers::offeredFor` (with `ModifierOffer`: name and price delta, no recipe delta), `Recipes::activeForMany`,
+     `Items::menuFingerprint`; Inventory `Locations::idsForProducts` (ids only: Orders never holds a `Location`),
+     `Locations::has`, `Stock::fingerprint`, and `Exploder::explodeMany` behind the unchanged `Availability::bulk`. The
+     menu test adds twelve made-to-order and twelve shelf products and asserts the query count does not move.
+   - **`GET /menu`** (`MenuController`, `Support\MenuBuilder`): the live, active products of the branch with a price in
+     force now (a product without one cannot be sold, so it is not listed), ingredients never. `available` is the
+     `Availability::bulk` quantity as a 4 dp decimal string (`"4.0000"`, not `"4"`: ADR 0004's quantity format; the plan's
+     `"0"` is shorthand), one `bulk` call per location. `low` = 1 to 3 units left; a product with 0 is `unavailable`, not
+     `low`. A product with 0 is left out unless `include_unavailable=1`, which lists it with `available: "0.0000"` and
+     `unavailable_reason` = `out_of_stock`, or `no_location` when its station has no stock location yet (codes, not
+     sentences: the pad owns the wording). `?location=<id>` puts every product at that location and returns the products
+     with stock there; an id that is not a live location of the branch is `422 validation.failed`. `categories` are the
+     product categories the listed items use, by `sort` then id; items are ordered by English name. No lang keys were
+     added: the only errors are the existing 403 and the shared 422.
+   - **ETag of the menu**: branch, `location`, `include_unavailable`, `Items::menuFingerprint` (row count and latest
+     `updated_at` of products, categories, modifiers, station assignments, recipes and recipe lines, deleted rows
+     included; the prices in force now, so a price taking effect or ending changes the tag with no row written; the
+     branch's calendar day for `is_new`) and `Stock::fingerprint` (highest ledger movement id, which every receipt,
+     sale, waste and reservation moves, and the locations' state): nine small aggregate queries and no rows. `updated_at`
+     is whole seconds, so two catalog edits in the same second after a poll can share a tag; the next change or the next
+     day fixes it, and stock and prices, the fast-moving parts, are exact.
+   - **`GET /stations/{station}/tickets`** (`StationTicketsController`): the route needs `orders.accept`, then
+     `OrderAccess::assertAtStationRail` checks the person (the short-code person on a shared screen) at that station
+     (`403 orders.station.forbidden`; admin and manager hold `stations.all`; a waiter or cashier is stopped by the route as
+     `auth.forbidden`); another branch's station is 404 through the bound `Station`. The ETag is the new
+     `Tickets::etag(station, Tickets::fingerprint(...))`, which `TicketsPage::etag` now calls too, so the 304 is answered
+     before the page is built; the 200 carries that tag (never newer than its body, so a client can only be re-sent a page,
+     never kept on a stale one).
+   - **`GET /orders`** (`OrdersController::index`, `Support\OrderList`): the waiter's list is forced to the orders they own
+     (`owner_user_id` = the waiter acting by short code, else the account) unless the person holds `stations.all` or
+     `payments.take` (`OrderAccess::seesEveryOrder`); `?mine=1` narrows anyone to their own. No `status` means `active` =
+     open, sent, in progress, ready, served and paid (not closed, cancelled, voided); `status=<value>` takes one status;
+     `unpaid=1` = sent, in progress, ready, served (it overrides `status`). A first load returns at most `limit` (100,
+     at most 200) orders, newest first. `?since=` is a poll over the branch's `order_events` (the person's own when
+     mine) through `OverlapCursor`: every order with an event after the cursor, newest first, whatever its status, because
+     an order that stopped matching (paid, cancelled, voided) must arrive once so the client can drop it; `status` and
+     `unpaid` are therefore not applied to a poll (the client merges by id and version and filters itself), `mine` and
+     `dining_table_id` are. A `since` that is not a plain number is a first load. The ETag is the feed fingerprint plus
+     branch, person (when mine), status, unpaid, table and limit; a 304 reads three indexed aggregates and never the
+     orders. The Order resource now exposes `relations()` so the list eager-loads in a fixed number of queries.
+   - **`GET /orders/{order}`**: the Order resource plus `events` (id, event, order_line_id, station_id, user_id,
+     acting_user_id, approved_by_user_id, payload, at), oldest first, one query. The owner and anyone who sees every order
+     may read it; for any other waiter it is `404`, the same as another branch's order (`OrderAccess::assertMayRead`). It
+     is not a conditional poll: the pad reads one order when it opens it.
+   - **`GET /dining-tables` state** (`Support\TableStates`, one grouped query for the whole grid): `waiting` when the
+     table has an order sent, in progress or ready; else `ordering` when it has an open order; else `served` when its
+     only active orders are served and unpaid; else `free` (nothing, or only cancelled, voided, paid or closed orders).
+     Precedence waiting, ordering, served. `bill` is in the enum but never produced in Phase 1: there is no "request the
+     bill" action yet. `state` is the last key of the resource, so `POST` and `PATCH /dining-tables` answer with it too.
+   - Registries: four rows in `route_permissions.php` (the matrix gains the `{station}` placeholder: a kitchen station
+     the caller is assigned to); no write endpoints; no schema change (ERD unchanged); the OpenAPI export gains the four
+     operations and the `state` property.
 6. **1.6 web**: `/pad` (short-code lock screen, tables, menu with "3 left", New row, cart, Send, inline shortfall, my
    orders with the ready badge, 60 s idle lock), `/kds/kitchen` and `/kds/bar` (ticket rail, timers, accept / ready /
    reject, chime), `/till` (ordering surface, unpaid queue, cash pay sheet with change due), admin Orders live board;
