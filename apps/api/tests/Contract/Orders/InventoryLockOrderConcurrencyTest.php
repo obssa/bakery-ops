@@ -22,11 +22,12 @@ use Tests\Support\CommitsForConcurrency;
  * Contract: orders -> inventory, "lock order is deterministic: 50 interleavings never deadlock" (group concurrency).
  *
  * The way Orders sends (ADR 0008): ONE outer transaction per order, one reservation ref per line, all lines in one
- * reserveMany call. Here two orders whose lines share four ingredients, sent in opposite line orders, run in two real
- * processes (pcntl_fork) that start together, 50 rounds. Each process wraps the call in its own outer transaction
- * with a single attempt, exactly like SendOrder, so a deadlock would surface as an error instead of being retried
- * away; the engine's own deadlock counter must not move either. CommitsForConcurrency (DatabaseTruncation): the
- * children connect on their own and must see the committed stock.
+ * reserveMany call. Here two orders whose lines share an ingredient (each line also has two of its own), sent in
+ * opposite line orders, run in two real processes (pcntl_fork) that start together, 50 rounds. Each process wraps the
+ * call in its own outer transaction with a single attempt, exactly like SendOrder, so a deadlock would surface as an
+ * error instead of being retried away; the engine's own deadlock counter must not move either. (Locking one line after
+ * the other fails this test within a few rounds; one ascending pass over the union of the rows passes it.)
+ * CommitsForConcurrency (DatabaseTruncation): the children connect on their own and must see the committed stock.
  */
 
 uses(CommitsForConcurrency::class);
@@ -122,9 +123,10 @@ beforeEach(function () {
     $kitchenStation = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $b]);
     $this->kitchen = stockLocation($this->branch, LocationType::Kitchen, $kitchenStation);
 
-    // four ingredients that both products use, in different amounts
+    // each product has two ingredients of its own and shares the bread: locking one line after the other would take
+    // the rows in a different order for each order of the lines (and deadlock); one ascending pass never does
     $this->ingredients = [];
-    foreach (['Bread', 'Chicken', 'Lettuce', 'Butter'] as $name) {
+    foreach (['Chicken', 'Lettuce', 'Butter', 'Ham', 'Bread'] as $name) {
         $this->ingredients[$name] = Item::factory()->ingredient('g')->create(['branch_id' => $b, 'name_en' => $name]);
         stockIn($this->ingredients[$name], $this->kitchen, '100000');
     }
@@ -137,8 +139,8 @@ beforeEach(function () {
 
         return $product;
     };
-    $this->sandwich = $recipe('Sandwich', ['Bread' => '60', 'Chicken' => '120', 'Lettuce' => '20', 'Butter' => '10']);
-    $this->club = $recipe('Club', ['Butter' => '15', 'Lettuce' => '25', 'Chicken' => '90', 'Bread' => '90']);
+    $this->sandwich = $recipe('Sandwich', ['Chicken' => '120', 'Lettuce' => '20', 'Bread' => '60']);
+    $this->club = $recipe('Club', ['Ham' => '90', 'Butter' => '15', 'Bread' => '90']);
 });
 
 it('never deadlocks when two orders whose lines share ingredients are sent at once in opposite line orders (50 rounds)', function () {
@@ -173,7 +175,7 @@ it('never deadlocks when two orders whose lines share ingredients are sent at on
         ->and(engineDeadlocks())->toBe($deadlocksBefore, 'the engine detected no deadlock at all');
 
     // 100 orders, each one sandwich and one club
-    foreach (['Bread' => '15000.0000', 'Chicken' => '21000.0000', 'Lettuce' => '4500.0000', 'Butter' => '2500.0000'] as $name => $reserved) {
+    foreach (['Bread' => '15000.0000', 'Chicken' => '12000.0000', 'Lettuce' => '2000.0000', 'Ham' => '9000.0000', 'Butter' => '1500.0000'] as $name => $reserved) {
         expect(stockRow($this->ingredients[$name], $this->kitchen))->on_hand->toBe('100000.0000')->reserved->toBe($reserved);
     }
     $oracle = ledgerOracle($this->branch->id);
