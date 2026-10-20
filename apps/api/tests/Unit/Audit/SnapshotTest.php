@@ -40,3 +40,9 @@ it('redacts passwords, hashes, tokens and secrets by key, keeping nulls visible 
 it('redacts regardless of key case', function () use ($model) {
     expect(Snapshot::of($model(['Password' => 'x', 'API_KEY' => 'y'])))->toBe(['Password' => '[redacted]', 'API_KEY' => '[redacted]']);
 })->group('unit', 'module:audit');
+
+it('redacts a payment reference number: it is never logged', function () use ($model) {
+    $snapshot = Snapshot::of($model(['reference_no' => 'FT24001ABC', 'amount' => '340.00', 'receipt_photo_key' => null, 'reference_noted' => 'kept']));
+
+    expect($snapshot)->toBe(['reference_no' => '[redacted]', 'amount' => '340.00', 'receipt_photo_key' => null, 'reference_noted' => 'kept']);
+})->group('unit', 'module:audit');

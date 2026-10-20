@@ -531,4 +531,23 @@ return [
         },
         'payload' => fn (): array => ['name_en' => 'Window', 'name_am' => 'መስኮት', 'sort' => 3],
     ],
+    // Payments (step 1.4): a cash payment of a sent order (two cakes at 45.00) for the whole balance; the first request
+    // writes one payments row (the AuditedAction's audit row comes with it)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders/{order}/payments',
+        'module' => 'payments',
+        'table' => 'payments',
+        'setup' => function (TestCase $t) use ($admin, $orderableCake): array {
+            $cake = $orderableCake($admin());
+            $order = $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson('/api/v1/orders', [
+                'client_uuid' => (string) Str::uuid(),
+                'type' => 'takeaway',
+                'lines' => [['client_uuid' => (string) Str::uuid(), 'item_id' => $cake->id, 'qty' => '2']],
+            ]);
+
+            return ['{order}' => (string) $order->json('id')];
+        },
+        'payload' => fn (): array => ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '90.00', 'tendered_amount' => '100.00'],
+    ],
 ];

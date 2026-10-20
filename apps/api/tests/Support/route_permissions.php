@@ -88,4 +88,9 @@ return [
     'GET /api/v1/dining-tables' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
     'POST /api/v1/dining-tables' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],
     'PATCH /api/v1/dining-tables/{table}' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],
+
+    // Payments (step 1.4): the till's roles (payments.take: admin, manager, cashier); the person acting by short code must
+    // hold it too (403 auth.forbidden, checked by the action after this matrix)
+    'GET /api/v1/payment-channels' => ['permission' => 'payments.take', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'POST /api/v1/orders/{order}/payments' => ['permission' => 'payments.take', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
 ];

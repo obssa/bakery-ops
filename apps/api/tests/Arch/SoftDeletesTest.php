@@ -22,6 +22,7 @@ $noSoftDeletes = [
     'App\Modules\Orders\Models\OrderLineModifier',  // a snapshot written once with its line, which is never deleted
     'App\Modules\Orders\Models\OrderEvent',  // the append-only order timeline (DB trigger + model guard), the live-update cursor
     'App\Modules\Orders\Models\OrderCounter',  // the daily order-number row: locked FOR UPDATE and incremented in place, never deleted
+    'App\Modules\Payments\Models\Payment',  // never deleted: recorded, then verified, disputed or voided by status (Phase 4); the till's money trail
 ];
 
 it('every mutable tenant model soft-deletes', function () use ($noSoftDeletes) {
