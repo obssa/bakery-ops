@@ -1,19 +1,25 @@
 {
   "schema_version": 1,
-  "current_phase": 0,
+  "current_phase": 1,
   "invariants_version": 1,
   "phases": {
     "0": {
-      "status": "in_progress",
+      "status": "done",
       "plan": "docs/phases/phase-0-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19 (\"proceed to the next phase without waiting for my permission\")",
-      "report": null,
+      "report": "docs/phases/phase-0-report.md",
       "gate_job": "gate-p0",
       "gate_run_url": null,
-      "done_commit": null,
-      "done_at": null,
-      "adrs": [],
+      "done_commit": "e57b791878396338f12158b6737df4950e1ba491",
+      "done_at": "2026-10-20T01:04:33Z",
+      "adrs": [
+        "0001-modular-monolith-and-module-boundaries",
+        "0002-stock-balances-table-vs-materialized-view",
+        "0003-idempotency-and-client-uuid",
+        "0004-numeric-as-string-end-to-end",
+        "0005-phase-gates-and-ci"
+      ],
       "adr_waiver": null,
       "contracts_required": [
         "inventory->catalog",
@@ -35,7 +41,7 @@
       ]
     },
     "1": {
-      "status": "todo",
+      "status": "planning",
       "plan": "docs/phases/phase-1-plan.md",
       "plan_approved": false,
       "plan_approved_by": null,
