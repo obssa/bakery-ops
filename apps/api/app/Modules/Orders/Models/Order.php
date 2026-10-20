@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Models;
 
+use App\Modules\Identity\Models\User;
 use App\Modules\Orders\Enums\CreatedVia;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Enums\OrderType;
@@ -62,6 +63,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read DiningTable|null $diningTable
+ * @property-read User|null $owner
  * @property-read Collection<int, OrderLine> $lines
  * @property-read Collection<int, OrderEvent> $events
  */
@@ -134,6 +136,16 @@ final class Order extends Model
     public function diningTable(): BelongsTo
     {
         return $this->belongsTo(DiningTable::class, 'dining_table_id');
+    }
+
+    /**
+     * Whose order it is: the waiter acting by short code when it was taken on a shared pad, else its creator.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
     }
 
     /**
