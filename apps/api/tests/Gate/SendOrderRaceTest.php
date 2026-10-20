@@ -90,7 +90,7 @@ it('gives two orders sent at the same moment the numbers 1 and 2 of the day, nev
 })->group('concurrency', 'module:orders', 'feature');
 
 it('creates one order when the same POST /orders arrives twice at once under one Idempotency-Key', function () {
-    config(['cache.default' => 'database']); // the key lock must be shared between the two processes, as Redis is live
+    config(['cache.default' => 'database']); // the key lock must be shared between the two processes, as on the live host
     $m = $this->menu;
     loginAs($this->waiters[0]);
     $key = idempotencyKey();

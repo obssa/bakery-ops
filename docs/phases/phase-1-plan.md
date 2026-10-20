@@ -422,7 +422,7 @@ Small PRs, each green in CI before the next; a step that completes a module ends
      - the last cake: one 200, one 409, available never below zero;
      - two sends at once take the numbers 1 and 2;
      - one `POST /orders` sent twice at once under one key: one order (the database cache store shares the key
-       lock between the processes, as Redis does live).
+       lock between the processes, as it does on the live host).
      Registries: four rows in `route_permissions.php` and `write_endpoints.php`; the matrix test gains the
      `{order}` placeholder (an open cart of the caller's own). No schema change (ERD unchanged); the OpenAPI
      export gains the four operations.
