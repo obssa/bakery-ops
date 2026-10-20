@@ -22,6 +22,7 @@ use App\Modules\Orders\Enums\LineStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Enums\OrderType;
 use App\Modules\Orders\Enums\RejectReason;
+use App\Modules\Orders\Exceptions\OrderError;
 use App\Modules\Orders\Exceptions\SendRefused;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
@@ -153,16 +154,17 @@ it('keeps the ledger honest through random order sequences: oracle, reserved, av
 
         $orders = Order::query()->orderBy('id')->get();
         $lines = OrderLine::query()->orderBy('id')->get();
+        unset($created);
         $candidates = [['new'], ['new'], ['new']];
-        foreach ($orders as $order) {
-            $live = in_array($order->status, [OrderStatus::Sent, OrderStatus::InProgress, OrderStatus::Ready, OrderStatus::Served], true);
-            if ($order->status === OrderStatus::Open) {
-                $candidates[] = ['send', $order->id];
+        foreach ($orders as $known) {
+            $live = in_array($known->status, [OrderStatus::Sent, OrderStatus::InProgress, OrderStatus::Ready, OrderStatus::Served], true);
+            if ($known->status === OrderStatus::Open) {
+                $candidates[] = ['send', $known->id];
             }
-            if ($live && $order->settled_at === null) {
-                $candidates[] = ['void', $order->id];
-                if (! $order->total->isZero()) {
-                    $candidates[] = ['pay', $order->id];
+            if ($live && $known->settled_at === null) {
+                $candidates[] = ['void', $known->id];
+                if (! $known->total->isZero()) {
+                    $candidates[] = ['pay', $known->id];
                 }
             }
         }
@@ -186,52 +188,56 @@ it('keeps the ledger honest through random order sequences: oracle, reserved, av
         $trace[] = $id === null ? $kind : "{$kind} #{$id}";
         $before = DB::table('stock_movements')->where('branch_id', $b)->count();
 
-        switch ($kind) {
-            case 'new':
-                $inputs = [];
-                foreach (range(1, $rng->getInt(1, 3)) as $i) {
-                    $product = $products[$rng->getInt(0, count($products) - 1)];
-                    $mods = [];
-                    foreach ($modifiersOf[$product->id] ?? [] as $modifier) {
-                        if ($rng->getInt(0, 3) === 0) {
-                            $mods[] = $modifier->id;
+        try {
+            switch ($kind) {
+                case 'new':
+                    $inputs = [];
+                    foreach (range(1, $rng->getInt(1, 3)) as $i) {
+                        $product = $products[$rng->getInt(0, count($products) - 1)];
+                        $mods = [];
+                        foreach ($modifiersOf[$product->id] ?? [] as $modifier) {
+                            if ($rng->getInt(0, 3) === 0) {
+                                $mods[] = $modifier->id;
+                            }
                         }
+                        $inputs[] = new LineInput($i - 1, (string) Str::uuid(), $product->id, Quantity::of((string) $rng->getInt(1, 3)), $mods, null);
                     }
-                    $inputs[] = new LineInput($i - 1, (string) Str::uuid(), $product->id, Quantity::of((string) $rng->getInt(1, 3)), $mods, null);
-                }
-                [$order] = $create->handle((string) Str::uuid(), OrderType::Takeaway, null, null, $inputs, $waiter, CreatedVia::WaiterPad);
-                $before = DB::table('stock_movements')->where('branch_id', $b)->count();
-                // fall through: a new cart is sent at once, and stays open when the stock is short
-            case 'send':
-                $order ??= Order::query()->findOrFail($id);
-                try {
-                    $send->send($order);
-                } catch (SendRefused) {
-                    expect(DB::table('stock_movements')->where('branch_id', $b)->count())->toBe($before, "{$at}: a refused send wrote movements")
-                        ->and(Order::query()->findOrFail($order->id)->status)->toBe(OrderStatus::Open, "{$at}: a refused send left the cart open");
-                }
-                break;
-            case 'accept':
-                $accept->handle(OrderLine::query()->findOrFail($id), $stationUser(OrderLine::query()->findOrFail($id)));
-                break;
-            case 'ready':
-                $ready->handle(OrderLine::query()->findOrFail($id), $stationUser(OrderLine::query()->findOrFail($id)));
-                break;
-            case 'reject':
-                $reject->handle(OrderLine::query()->findOrFail($id), $stationUser(OrderLine::query()->findOrFail($id)), RejectReason::OutOfStock, null);
-                break;
-            case 'served':
-                $serve->handle(OrderLine::query()->findOrFail($id), $waiter);
-                break;
-            case 'void':
-                $void->handle(Order::query()->findOrFail($id), $cashier, $manager, 'Property sequence');
-                break;
-            case 'pay':
-                $order = Order::query()->findOrFail($id);
-                $pay->handle($order->id, (string) Str::uuid(), 'cash', $order->total->amount(), $order->total->amount(), null, $cashier);
-                break;
+                    [$created] = $create->handle((string) Str::uuid(), OrderType::Takeaway, null, null, $inputs, $waiter, CreatedVia::WaiterPad);
+                    $before = DB::table('stock_movements')->where('branch_id', $b)->count();
+                    // fall through: a new cart is sent at once, and stays open when the stock is short
+                case 'send':
+                    $order = $created ?? Order::query()->findOrFail($id);
+                    try {
+                        $send->send($order);
+                    } catch (SendRefused) {
+                        expect(DB::table('stock_movements')->where('branch_id', $b)->count())->toBe($before, "{$at}: a refused send wrote movements")
+                            ->and(Order::query()->findOrFail($order->id)->status)->toBe(OrderStatus::Open, "{$at}: a refused send left the cart open");
+                    }
+                    break;
+                case 'accept':
+                    $accept->handle(OrderLine::query()->findOrFail($id), $stationUser(OrderLine::query()->findOrFail($id)));
+                    break;
+                case 'ready':
+                    $ready->handle(OrderLine::query()->findOrFail($id), $stationUser(OrderLine::query()->findOrFail($id)));
+                    break;
+                case 'reject':
+                    $reject->handle(OrderLine::query()->findOrFail($id), $stationUser(OrderLine::query()->findOrFail($id)), RejectReason::OutOfStock, null);
+                    break;
+                case 'served':
+                    $serve->handle(OrderLine::query()->findOrFail($id), $waiter);
+                    break;
+                case 'void':
+                    $void->handle(Order::query()->findOrFail($id), $cashier, $manager, 'Property sequence');
+                    break;
+                case 'pay':
+                    $order = Order::query()->findOrFail($id);
+                    $pay->handle($order->id, (string) Str::uuid(), 'cash', $order->total->amount(), $order->total->amount(), null, $cashier);
+                    break;
+            }
+        } catch (Throwable $e) {
+            throw new RuntimeException("{$at}: {$kind} threw ".$e::class.': '.$e->getMessage().($e instanceof OrderError ? ' '.json_encode($e->extra).' order #'.($id ?? 'new') : ''), 0, $e);
         }
-        unset($order);
+        unset($created);
 
         // the oracle: movements == balances == view
         $oracle = ledgerOracle($b);
