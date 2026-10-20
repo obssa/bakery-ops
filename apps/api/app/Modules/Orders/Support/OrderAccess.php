@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Orders\Support;
 
 use App\Modules\Identity\Contracts\Access;
+use App\Modules\Identity\Exceptions\IdentityError;
 use App\Modules\Identity\Models\User;
 use App\Modules\Orders\Enums\CreatedVia;
 use App\Modules\Orders\Exceptions\OrderError;
@@ -81,6 +82,30 @@ final class OrderAccess
         }
 
         return $person;
+    }
+
+    /**
+     * The person who asks for a void: the waiter acting by short code, else the account, who must hold
+     * orders.void_request (admin, manager, cashier). Anyone with it may ask for any order (a cashier at the till voids
+     * a waiter's order); the approval is the PIN's.
+     *
+     * @throws OrderError auth.forbidden (403)
+     */
+    public function voidRequester(): User
+    {
+        return $this->person('orders.void_request');
+    }
+
+    /**
+     * The owner of a PIN that holds orders.void in this branch (a manager, the admin): Identity's verifyPinFor, which
+     * locks the prompt after five wrong PINs of the asking actor. Called outside the void's transaction so a failed
+     * attempt is still counted.
+     *
+     * @throws IdentityError identity.pin.rejected (403), identity.short_code.locked (423)
+     */
+    public function voidApprover(string $pin): User
+    {
+        return $this->access->verifyPinFor('orders.void', $pin);
     }
 
     public function createdVia(): CreatedVia

@@ -19,6 +19,12 @@ return [
         'not_owner' => 'This is another waiter\'s order. Only its waiter or a manager can change it.',
         'empty' => 'This order has no lines to send.',
         'not_sent' => 'This order has not been sent to the stations yet.',
+        'paid' => 'This order has been paid. Paid orders are refunded, not voided.',
+        'not_voidable' => 'Only an order that was sent and is not paid can be voided. An unsent order is cancelled.',
+    ],
+    'void' => [
+        'reason_required' => 'Say why the order is voided.',
+        'pin_required' => 'A manager must type their PIN (4 to 6 digits) to approve the void.',
     ],
     'station' => [
         'forbidden' => 'This line belongs to another station. Only the staff of its station or a manager can work on it.',

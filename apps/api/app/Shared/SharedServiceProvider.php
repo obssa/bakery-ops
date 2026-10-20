@@ -11,9 +11,11 @@ use App\Shared\Events\LineRejected;
 use App\Shared\Events\LineServed;
 use App\Shared\Events\OrderLineEvent;
 use App\Shared\Events\OrderSent;
+use App\Shared\Events\OrderVoided;
 use App\Shared\Events\StockChanged;
 use App\Shared\Live\Broadcasts\OrderLineBroadcast;
 use App\Shared\Live\Broadcasts\OrderSentBroadcast;
+use App\Shared\Live\Broadcasts\OrderVoidedBroadcast;
 use App\Shared\Live\Broadcasts\StockChangedBroadcast;
 use App\Shared\Tenancy\CurrentBranch;
 use Illuminate\Support\Facades\Event;
@@ -47,6 +49,9 @@ final class SharedServiceProvider extends ServiceProvider
             if ($event->stationIds !== []) {
                 event(new OrderSentBroadcast($event));
             }
+        });
+        Event::listen(OrderVoided::class, static function (OrderVoided $event): void {
+            event(new OrderVoidedBroadcast($event));
         });
         Event::listen([LineAccepted::class, LineReady::class, LineRejected::class, LineServed::class], static function (OrderLineEvent $event): void {
             $companion = new OrderLineBroadcast($event);

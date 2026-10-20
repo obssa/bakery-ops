@@ -8,10 +8,12 @@ use App\Modules\Orders\Actions\CancelOrder;
 use App\Modules\Orders\Actions\CreateOrder;
 use App\Modules\Orders\Actions\ReplaceLines;
 use App\Modules\Orders\Actions\SendOrder;
+use App\Modules\Orders\Actions\VoidOrder;
 use App\Modules\Orders\Exceptions\SendRefused;
 use App\Modules\Orders\Http\Requests\CancelOrderRequest;
 use App\Modules\Orders\Http\Requests\ReplaceLinesRequest;
 use App\Modules\Orders\Http\Requests\StoreOrderRequest;
+use App\Modules\Orders\Http\Requests\VoidOrderRequest;
 use App\Modules\Orders\Http\Resources\OrderResource;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Support\OrderAccess;
@@ -31,6 +33,10 @@ use Illuminate\Http\Request;
  *   PUT  /orders/{order}/lines   200 the open order with its new lines
  *   POST /orders/{order}/send    200 the sent order (a sent order answers itself); 409 orders.send.shortfall
  *   POST /orders/{order}/cancel  200 the cancelled order
+ *   POST /orders/{order}/void    200 the voided order (step 1.3d; orders.void_request, approved by a manager's or the
+ *                                admin's PIN); 403 identity.pin.rejected, 423 identity.short_code.locked,
+ *                                409 orders.order.paid / orders.order.not_voidable
+ *   POST /orders/{order}/void    200 the voided order (step 1.3d; orders.void_request + a manager PIN); 403 identity.pin.rejected, 423 identity.short_code.locked, 409 orders.order.paid / not_voidable
  */
 final class OrdersController
 {
@@ -86,6 +92,20 @@ final class OrdersController
         $this->access->assertMayChange($order);
 
         return $this->answer($request, $cancel->handle($order, $request->reason()), 200);
+    }
+
+    /**
+     * The asker needs orders.void_request (the route checked the account, OrderAccess the person acting by short code);
+     * the state is checked first, so a refused order does not spend a PIN attempt; then the PIN (a manager's or the
+     * admin's) is verified, then the void is one transaction.
+     */
+    public function void(VoidOrderRequest $request, Order $order, VoidOrder $void): JsonResponse
+    {
+        $requester = $this->access->voidRequester();
+        $void->assertVoidable($order);
+        $approver = $this->access->voidApprover($request->pin());
+
+        return $this->answer($request, $void->handle($order, $requester, $approver, $request->reason()), 200);
     }
 
     private function answer(Request $request, Order $order, int $status): JsonResponse

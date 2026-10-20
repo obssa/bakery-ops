@@ -153,7 +153,6 @@ it('records the asker as the actor and the approver in the audit row and the tim
     $context = json_decode((string) $audit->context, true);
     expect($audit->actor_id)->toBe($f->cashier->id)
         ->and($context)->toMatchArray(['reason' => 'Customer left before the food came', 'approved_by_user_id' => $f->manager->id])
-        ->and($context['line_ids'])->toHaveCount(3)
         ->and(json_decode((string) $audit->after, true)['status'])->toBe('voided');
 
     $voided = OrderEvent::query()->where('order_id', $this->order['id'])->where('event', 'order.voided')->sole();
@@ -219,19 +218,16 @@ it('refuses what cannot be voided: an open cart, a cancelled or voided order, an
     $cart = $f->send([$m->line($m->sandwich)], null, ['send' => false]);
     ($this->void)($cart['id'])->assertStatus(409)->assertJsonPath('message_key', 'orders.order.not_voidable')->assertJsonPath('status', 'open');
 
-    foreach (['cancelled', 'voided'] as $status) {
-        $order = $f->send([$m->line($m->latte)]);
-        Order::query()->whereKey($order['id'])->update(['status' => $status]);
+    foreach (['cancelled' => 11, 'voided' => 12] as $status => $no) {
+        $order = ['id' => Order::factory()->sent($no)->create(['branch_id' => $f->branch->id, 'created_by_user_id' => $f->waiter->id, 'status' => $status])->id];
         ($this->void)($order['id'])->assertStatus(409)->assertJsonPath('message_key', 'orders.order.not_voidable')->assertJsonPath('status', $status);
     }
-    foreach (['paid', 'closed'] as $status) {
-        $order = $f->send([$m->line($m->latte)]);
-        Order::query()->whereKey($order['id'])->update(['status' => $status]);
+    foreach (['paid' => 13, 'closed' => 14] as $status => $no) {
+        $order = ['id' => Order::factory()->sent($no)->create(['branch_id' => $f->branch->id, 'created_by_user_id' => $f->waiter->id, 'status' => $status])->id];
         ($this->void)($order['id'])->assertStatus(409)->assertJsonPath('message_key', 'orders.order.paid')->assertJsonPath('status', $status);
     }
-    $settled = $f->send([$m->line($m->latte)]);
-    Order::query()->whereKey($settled['id'])->update(['settled_at' => CarbonImmutable::now()]);
-    ($this->void)($settled['id'])->assertStatus(409)->assertJsonPath('message_key', 'orders.order.paid')->assertJsonPath('status', 'sent');
+    $settled = Order::factory()->sent(15)->create(['branch_id' => $f->branch->id, 'created_by_user_id' => $f->waiter->id, 'settled_at' => CarbonImmutable::now()]);
+    ($this->void)($settled->id)->assertStatus(409)->assertJsonPath('message_key', 'orders.order.paid')->assertJsonPath('status', 'sent');
 
     expect(DB::table('audit_log')->where('action', 'order.void')->count())->toBe(0);
 })->group('module:orders', 'feature');

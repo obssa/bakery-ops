@@ -22,8 +22,9 @@ final class OrderTimeline
 
     /**
      * @param  array<string, mixed>  $payload  ids, decimal strings and reason codes only
+     * @param  int|null  $approvedByUserId  the owner of the manager PIN that approved it (a void), else null
      */
-    public function record(Order $order, OrderEventType $event, array $payload = [], ?OrderLine $line = null): OrderEvent
+    public function record(Order $order, OrderEventType $event, array $payload = [], ?OrderLine $line = null, ?int $approvedByUserId = null): OrderEvent
     {
         $row = new OrderEvent;
         $row->forceFill([
@@ -35,7 +36,7 @@ final class OrderTimeline
             'event' => $event,
             'user_id' => $this->actor->requireUserId(),
             'acting_user_id' => $this->actor->actingUserId(),
-            'approved_by_user_id' => null,
+            'approved_by_user_id' => $approvedByUserId,
             'actor_station_id' => $this->actor->stationId(),
             'device_id' => $this->actor->deviceId(),
             'shift_instance_id' => $this->actor->shiftInstanceId(),

@@ -34,6 +34,18 @@ final class OrderError extends RuntimeException
         return new self('orders.order.not_open', 409, ['status' => $status->value]);
     }
 
+    /** Only a sent order that is not paid is voided: an open cart is cancelled, a cancelled or voided one is over. */
+    public static function notVoidable(OrderStatus $status): self
+    {
+        return new self('orders.order.not_voidable', 409, ['status' => $status->value]);
+    }
+
+    /** Paid, settled or closed: the money was taken, so it is a refund (Phase 4), not a void. */
+    public static function paid(OrderStatus $status): self
+    {
+        return new self('orders.order.paid', 409, ['status' => $status->value]);
+    }
+
     /**
      * The person acting by short code on a shared pad does not hold the permission the route asks of the logged-in
      * account (the same answer as the permission middleware's, shared lang key auth.forbidden).

@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Route;
  * class discovery never executes it). Every route: auth:sanctum, the actor middleware (branch, actor, the acting-as
  * session of a shared pad, the device), a permission (rule 6): orders.create (admin, manager, cashier, waiter) to take,
  * change, send and cancel an order and to serve a ready line; orders.accept (chef, barista; admin and manager anywhere)
- * for the station actions accept, ready and reject, checked again at the line's own station by the controller; every
+ * for the station actions accept, ready and reject, checked again at the line's own station by the controller;
+ * orders.void_request (admin, manager, cashier) to ask for a void, which a manager's or the admin's PIN approves; every
  * write also carries idempotency (rule 7). {order} and {line} bind through the BranchScoped models, so another
  * branch's order or line is 404. Every route is listed in tests/Support/route_permissions.php and every write in
  * tests/Support/write_endpoints.php.
@@ -23,6 +24,9 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::post('/orders/{order}/send', [OrdersController::class, 'send'])->whereNumber('order')->name('orders.send');
         Route::post('/orders/{order}/cancel', [OrdersController::class, 'cancel'])->whereNumber('order')->name('orders.cancel');
         Route::post('/order-lines/{line}/served', [OrderLinesController::class, 'served'])->whereNumber('line')->name('order-lines.served');
+    });
+    Route::middleware(['permission:orders.void_request', 'idempotency'])->group(function (): void {
+        Route::post('/orders/{order}/void', [OrdersController::class, 'void'])->whereNumber('order')->name('orders.void');
     });
     Route::middleware(['permission:orders.accept', 'idempotency'])->group(function (): void {
         Route::post('/order-lines/{line}/accept', [OrderLinesController::class, 'accept'])->whereNumber('line')->name('order-lines.accept');
