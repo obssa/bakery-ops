@@ -1900,6 +1900,126 @@
                 }
             }
         },
+        "/v1/payment-channels": {
+            "get": {
+                "operationId": "payments.channels",
+                "tags": [
+                    "Payments"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_en": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_am": {
+                                                        "type": "string"
+                                                    },
+                                                    "is_enabled": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "requires_photo": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "requires_reference": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "sort": {
+                                                        "type": "integer"
+                                                    },
+                                                    "accepted_now": {
+                                                        "type": "boolean"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "code",
+                                                    "name_en",
+                                                    "name_am",
+                                                    "is_enabled",
+                                                    "requires_photo",
+                                                    "requires_reference",
+                                                    "sort",
+                                                    "accepted_now"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/orders/{order}/payments": {
+            "post": {
+                "operationId": "payments.store",
+                "tags": [
+                    "Payments"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordPaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/items/{item}/recipe": {
             "get": {
                 "operationId": "catalog.items.recipe.show",
@@ -3230,6 +3350,44 @@
                     "lines"
                 ],
                 "title": "PutRecipeRequest"
+            },
+            "RecordPaymentRequest": {
+                "type": "object",
+                "description": "POST /orders/{order}/payments: the client's id for the payment (ADR 0003), the channel's code, the amount as a\ndecimal string (up to 10 integer digits and 2 decimals, above zero: money is never a JSON number, ADR 0004), the cash\nhanded over for cash, and the bank's or wallet's reference when the channel asks for one. Whether the channel is\nusable, the amount is the balance and the cash covers it are Payments' rules (RecordPayment), answered with their own\nmessage keys.",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "channel_code": {
+                        "type": "string",
+                        "maxLength": 32
+                    },
+                    "amount": {
+                        "type": "string",
+                        "pattern": "^[0-9]{1,10}(\\.[0-9]{1,2})?$"
+                    },
+                    "tendered_amount": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^[0-9]{1,10}(\\.[0-9]{1,2})?$"
+                    },
+                    "reference_no": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    }
+                },
+                "required": [
+                    "client_uuid",
+                    "channel_code",
+                    "amount"
+                ],
+                "title": "RecordPaymentRequest"
             },
             "RejectLineRequest": {
                 "type": "object",

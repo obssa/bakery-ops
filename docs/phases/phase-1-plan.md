@@ -567,6 +567,68 @@ Small PRs, each green in CI before the next; a step that completes a module ends
 4. **1.4 payments** (skeleton, final schema): `contract:payments->orders` first, then the two migrations, `Channels`,
    `Payments::record` (cash only passes), the two endpoints, `PaymentRecorded` -> `ApplyPayment`, `BranchCreated` ->
    default channels. Groups `module:payments`, `contract:payments->orders`. Ends `module-stable payments`.
+   As built (step 1.4, `phase-1/payments-skeleton`): contract first (red: the order stayed `served` and unsettled, no `sale`
+   rows), then Orders' provider fix, then the Payments tests (red), then the module. Where the plan left a detail open:
+   - Contract `payments->orders` (`tests/Contract/Payments/OrdersContractTest.php`): five cases, written against
+     `Orders\Contracts` and `App\Shared\Events\PaymentRecorded` only: totals as decimal strings; a served order paid in
+     full goes `paid` -> one `sale` row per display-case line -> `closed` with `OrderPaid` after the commit; a payment
+     before the food only settles, and serving the last line then pays, sells and closes; a rollback of the payment's
+     transaction leaves the order and the ledger untouched; a part payment adds to `paid_total` and settles nothing.
+     `PaymentRecorded` (payment_id, order_id, channel_code, amount, balance_after) was added to Shared in the same
+     commit so the contract fails on behaviour, not on a missing class. A `sale` movement is negative (stock leaves).
+   - Orders. `Listeners\ApplyPayment` (registered by `OrdersServiceProvider`, synchronous) takes the order lock
+     (`OrderLock`, free inside the payment's transaction), adds the amount to `paid_total`, sets `settled_at` and writes
+     `order.settled` when the balance is zero, then hands to `Support\Settlement`, which is also called by `LineWork`
+     right after `OrderProgress::apply`, so the two paths (payment after the food, food after the payment) share one
+     implementation: `served` -> `paid` -> `Reservations::consumeMany(sale)` for the served lines without a station ->
+     `closed`, `order.paid` and `order.closed` on the timeline, `OrderPaid` (order_id, branch_id, total, paid_at) after
+     the commit with its inert `OrderPaidBroadcast` on `branch.{id}.orders`. The listener refuses what Payments should
+     have refused (status not sent..served, already settled, amount not positive or above the balance) with a
+     `LogicException`, which rolls the payment back: a bug, never a 4xx. Part payments are accepted by the listener
+     (Phase 4); Payments does not send them yet. A line rejected after full payment would leave an overpayment: refunds
+     are Phase 4.
+   - New Orders capability `Orders::forPayment(orderId, lock = false)` -> `OrderPaymentView` (status, settled, totals,
+     `isPayable()`): `totals` alone cannot say whether an order is payable, and Payments may not read Orders' models.
+     With `lock` it is a `SELECT ... FOR UPDATE` of the order inside the caller's transaction, the lock `ApplyPayment`
+     takes again, so two payments of one order (any keys, any client UUIDs) run one after the other and the second sees
+     `settled`. Tests: `OrdersForPaymentTest`, `ApplyPaymentTest`.
+   - Schema exactly as section 3. The channel migration inserts the eight defaults for every existing branch (soft-deleted
+     ones too) with `INSERT IGNORE` on `(branch_id, code)`, through a public `backfill()` the test calls on a populated
+     table: idempotent, and it never resurrects or edits a channel an admin changed or removed. Its list is a copy of
+     `Support\DefaultChannels` (a migration must not depend on application classes); `DefaultChannelsTest` keeps them equal.
+     Names: Cash, Telebirr, CBE Birr, CBE bank transfer, Awash Bank, Dashen Bank, Bank of Abyssinia, Cooperative Bank of
+     Oromia, with Amharic twins. `PaymentStatus` is a state machine now (`recorded` -> `verified` | `disputed` | `voided`,
+     `verified` -> `voided`, per domain-model.md) so the exhaustive test pins it; Phase 1 only writes `recorded`.
+   - `BranchCreated` is dispatched from the `Branch` model's `created` hook (not from the creating code): the admin
+     command, `Phase0Seeder` and every factory create branches through the model, so no path can forget it. It is
+     synchronous (not after commit), so the channels exist in the same transaction as the branch. Cost: eight channel rows
+     per branch in every test (one multi-row `INSERT IGNORE`). The listener writes with the explicit branch id because no
+     branch is resolved yet.
+   - `Payments\Contracts`: `Channels` (`enabled()`, `find(code)`, `ensureDefaults(Branch|int)`, `ChannelView` with
+     `acceptedNow()`) and `Payments::record(...)` -> `RecordedPayment`, final classes built per use like the other
+     modules' contracts. The endpoint is a thin caller of `record`.
+   - `GET /payment-channels` lists the branch's non-removed channels, disabled ones included (`is_enabled` false,
+     `accepted_now` false), in `sort` order. `accepted_now` = enabled and no photo required.
+   - `POST /orders/{order}/payments`: the order id is a plain number (Payments cannot bind Orders' model); another branch's
+     order is 404 through `forPayment`. Check order: a known `client_uuid` first (replay: 200 with the same payment and
+     the order as it is now; `409 payments.client_uuid.reused` for another order's UUID, a new key), then the channel
+     (`payments.channel.unknown` | `disabled` | `photo_required` | `reference_required`, all 422, in that order, so
+     a switched-off digital channel says disabled), then under the order lock `payments.order.not_payable` (409: open,
+     cancelled, voided, closed; `status` in the body), `payments.order.settled` (409), `payments.amount.mismatch` (422,
+     carries the `balance`), `payments.tendered.too_low` (422). `reference_required` is reachable only for a channel an
+     admin set to ask for a reference without a photo (no screen edits channels in Phase 1; the test sets it in the
+     database). Cash: `tendered_amount` omitted means exactly the amount (change 0.00); other channels store neither.
+     Money fields must be decimal strings (up to 10 integer digits, 2 decimals, above zero); a JSON number is 422.
+   - Actor: `received_by_user_id` is the person who took the money (the cashier acting by short code on a shared till,
+     else the account), `acting_user_id` repeats the short-code person, the audit row (`payment.record`) names the
+     account; the person acting must hold `payments.take` too (`PaymentAccess`, 403 `auth.forbidden`), so a waiter's
+     short code on the till is refused. The response carries `client_uuid`, `currency` and `order.id` in addition to
+     the fields of section 4; `received_by` is the user id.
+   - `reference_no` is stored but never logged: `Audit\Snapshot` now redacts a `reference_no` attribute (SnapshotTest
+     case), so neither `before`/`after` of the audit row nor the response carries it.
+   - Registries: two rows in `route_permissions.php`, one in `write_endpoints.php` (the GET is a read); `Payment` joins
+     the `SoftDeletesTest` allowlist (never deleted: voided by status in Phase 4); `docs/erd.dbml` gains both tables;
+     lang parity in `PaymentsLangTest` (nine keys); the OpenAPI export gains the two operations.
 5. **1.5 read models**: `GET /menu`, `GET /stations/{id}/tickets?since`, `GET /orders?mine|unpaid&since`, `GET
    /orders/{id}`, `GET /dining-tables` with states; ETag / 304; cursor with the overlap window. Group `feature`.
 6. **1.6 web**: `/pad` (short-code lock screen, tables, menu with "3 left", New row, cart, Send, inline shortfall, my
