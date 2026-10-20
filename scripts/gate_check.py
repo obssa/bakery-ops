@@ -344,8 +344,15 @@ def mode_done(root: str, man: dict, st: dict, n: int, a, rep: Report, pest: Pest
         if dc and is_git_repo(root):
             code, _ = git(root, "merge-base", "--is-ancestor", dc, "HEAD")
             rep.add(code == 0, "done_commit in history", f"{dc[:12]}")
-            code2, diff = git(root, "diff", "--name-only", dc, "HEAD", "--", "apps")
-            rep.add(not diff.strip(), "no app code after done_commit", "only docs changed since" if not diff.strip() else f"{len(diff.splitlines())} app file(s) changed after done_commit")
+            # The claim is "this commit is the phase as built": until the next phase starts, only docs and STATUS may
+            # follow it. Once phase N+1 is in_progress (its entry gate passed) app code moves on with that phase;
+            # this gate then keeps proving phase N through its tests and Playwright projects, not by freezing apps/.
+            nxt = st["phases"].get(str(n + 1), {})
+            if nxt.get("status", "todo") not in ("todo", "planning", "plan_approved"):
+                rep.add(None, "no app code after done_commit", f"phase {n + 1} is {nxt.get('status')}: app code moves on with it")
+            else:
+                code2, diff = git(root, "diff", "--name-only", dc, "HEAD", "--", "apps")
+                rep.add(not diff.strip(), "no app code after done_commit", "only docs changed since" if not diff.strip() else f"{len(diff.splitlines())} app file(s) changed after done_commit")
         rep.add(all(v == "done" for v in ph["modules"].values()), "all phase steps done", ", ".join(f"{k}={v}" for k, v in ph["modules"].items() if v != "done") or "all done")
         for m in phase_mods:
             rep.add(st["modules"].get(m, {}).get("status") == "stable", f"module {m} stable", st["modules"].get(m, {}).get("status", "missing"))
