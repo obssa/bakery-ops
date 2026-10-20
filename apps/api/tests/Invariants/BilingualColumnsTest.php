@@ -6,8 +6,9 @@ use Illuminate\Support\Facades\DB;
 
 /*
  * Rule 9 at the schema level: any *_en column has its *_am sibling and vice versa, and the user-facing tables
- * carry the pair (stations now; items, categories, modifiers, recipe_steps, payment_channels, variance_reasons
- * as their modules land). Asked of information_schema so it holds on MySQL 8 and PostgreSQL alike (ADR 0006).
+ * carry the pair (stations now; items, categories, modifiers, recipe_steps, dining tables, the order line modifier
+ * snapshot, payment_channels, variance_reasons as their modules land). Asked of information_schema so it holds on
+ * MySQL 8 and PostgreSQL alike (ADR 0006).
  */
 
 $userFacing = [
@@ -18,6 +19,8 @@ $userFacing = [
     'payment_channels' => 'name',
     'variance_reasons' => 'name',
     'recipe_steps' => 'text',
+    'dining_tables' => 'name',
+    'order_line_modifiers' => 'name',
 ];
 
 it('pairs every _en column with an _am column', function () {

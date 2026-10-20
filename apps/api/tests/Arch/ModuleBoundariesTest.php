@@ -38,6 +38,11 @@ arch('Audit is a leaf above Shared: it reads ActorContext and touches no other m
     ))
     ->group('arch', 'module:audit');
 
+arch('Orders reads Inventory through its Contracts: Locations names where a line is stocked, never the Location model or the Ledger')
+    ->expect('App\Modules\Orders')
+    ->not->toUse(['App\Modules\Inventory\Models', 'App\Modules\Inventory\Ledger\Ledger', 'App\Modules\Inventory\Ledger\StockBalance', 'App\Modules\Payments'])
+    ->group('arch', 'module:orders');
+
 arch('Shared is a leaf: it never imports a module')
     ->expect('App\Shared')
     ->not->toUse(array_map(fn (string $m) => "App\Modules\{$m}", $all))

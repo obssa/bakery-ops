@@ -9,6 +9,7 @@ use App\Shared\Models\Branch;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 /*
  * references/invariants.md, "Append-only": stock_movements, audit_log and order_events reject UPDATE and DELETE at
@@ -47,6 +48,20 @@ function seedAppendOnlyRow(string $table): int
                 'qty' => '1.0000', 'reason' => 'purchase_in', 'ref_type' => 'probe', 'user_id' => $user->id, 'created_at' => now(),
             ]);
         })(),
+        'order_events' => (function (): int {
+            $branch = Branch::factory()->create();
+            $user = User::factory()->create(['branch_id' => $branch->id]);
+            $orderId = DB::table('orders')->insertGetId([
+                'branch_id' => $branch->id, 'client_uuid' => (string) Str::uuid(), 'type' => 'takeaway', 'created_via' => 'till',
+                'owner_user_id' => $user->id, 'created_by_user_id' => $user->id, 'currency' => 'ETB',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+
+            return DB::table('order_events')->insertGetId([
+                'branch_id' => $branch->id, 'order_id' => $orderId, 'owner_user_id' => $user->id, 'event' => 'order.created',
+                'user_id' => $user->id, 'payload' => json_encode(['probe' => true]), 'created_at' => now(),
+            ]);
+        })(),
         default => throw new LogicException("seedAppendOnlyRow(): add a seed row for append-only table {$table}"),
     };
 }
@@ -56,6 +71,7 @@ function appendOnlyTamper(string $table): array
 {
     return match ($table) {
         'stock_movements' => ['qty' => '2.0000'],
+        'order_events' => ['event' => 'order.voided'],
         default => ['action' => 'tampered'],
     };
 }
@@ -76,7 +92,7 @@ it('rejects UPDATE and DELETE on every append-only table that exists, at the dat
     $checked = 0;
     foreach (appendOnlyTables() as $table) {
         if (! Schema::hasTable($table)) {
-            continue; // arrives with its module (stock_movements 0.6, order_events P1)
+            continue; // arrives with its module (stock_movements 0.6, order_events 1.3a)
         }
         $checked++;
         $id = seedAppendOnlyRow($table);
