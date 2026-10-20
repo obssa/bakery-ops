@@ -1,6 +1,6 @@
 # ADR 0008: Reserve at send, consume at ready, sale at pay; one reservation per order line
 
-- Status: proposed (accepted when Phase 1 closes)
+- Status: accepted (Phase 1 gate, 2026-10-21)
 - Date: 2026-10-20
 - Phase: 1
 
@@ -72,6 +72,39 @@ deadlocking against another order.
   dish itself was never stocked).
 - Later phases: Production (Phase 2) uses the same ledger without reservations (`appendMany` of consume + output);
   Shifts (Phase 3) count what is left; Phase 4 refunds write reversing rows that reference the originals.
+
+## As built
+
+Phase 1 built exactly the decisions above; nothing in them changed. What the build settled, and where the ledger shows it:
+
+- **One lock pass per order is real.** `Reservations::reserveMany`, `releaseMany` and `consumeMany` explode every line,
+  lock the union of the balance rows once in ascending `(item_id, location_id)` order and write every row in one
+  `Ledger::appendMany`. The step 1.1 concurrency test (`tests/Contract/Orders/InventoryLockOrderConcurrencyTest.php`: 50
+  rounds, two orders that share ingredients and list them in opposite order, real parallel processes) deadlocked in every
+  round against a provider that locked line by line, and passes with the single ascending pass with the engine's
+  deadlock counter unchanged. Orders never calls the single-ref methods in a loop.
+- **Send** (`SendOrder`, one `AuditedAction`, one transaction): lock the order, resolve every line at `sent_at`, one
+  `reserveMany` (refs in line order, the modifiers' recipe deltas from the line's snapshot), and only then take the
+  day's number from `order_counters`, so that row is held for the last writes only. A `Shortfall` throws `SendRefused`
+  and everything rolls back: no reservation, no number, no event, no audit row; the cart stays `open`. The gate checks
+  the one transaction (`tests/Gate/SendOrderGateTest.php`).
+- **Ready** is `Reservations::consume(ref)` in the same transaction as the line's move to `ready`: one
+  `production_consume` per ingredient carrying the ref, what was reserved is what was used. A second tap is refused by the
+  line machine (409) and Inventory settles a ref once besides. **Reject** is `release(ref)`.
+- **Sale at payment** is `Support\Settlement`: `served -> paid`, `consumeMany(refs, sale)` for the served display-case
+  lines, `closed`. The two orders of events share it: payment after the food (`ApplyPayment`, a synchronous listener of
+  `PaymentRecorded` inside the payment's transaction) and food after the payment (`LineWork`, right after the last line is
+  served). The `sale` row is written when the order closes, not when the line is served.
+- **Void** releases every line that is not rejected or voided in one `releaseMany`, including display-case lines (ready at
+  send, still holding their reservation until the sale). What was consumed at ready stays consumed; nothing is reversed.
+  A line rejected after full payment would leave an overpayment: refunds and reversing movements are Phase 4.
+- **The ledger shows the sequence the decision promises**: `reservation -> production_consume` per station line,
+  `reservation -> sale` per display-case line, `reservation -> reservation_release` for a rejected or voided one.
+  `tests/Gate/OrderLedgerPropertyTest.php` (100 seeded sequences of at most 50 operations, group `gate:p1`) checks after
+  every operation that movements, balances and the view agree, that `reserved` equals the reservation rows of the lines
+  still open, and that `available` never goes below zero; at the end it checks the sequence of every closed order's lines.
+  `OrderMovementsGateTest` and the `p1-order-flow` Playwright flow check the same through the API and the screens.
+- **Negative stock** is still refused (the Phase 0 decision, still Ramin's); see the Phase 1 gate report.
 
 ## Enforcement
 

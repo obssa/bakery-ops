@@ -112,7 +112,28 @@ them.
    `BAKERY_DEMO_PASSWORD`.
 
 Running it again (for example after a later phase adds its seeder: `--phase=<n>` stops at a phase) only adds what is
-missing; existing rows, passwords and short codes stay as they are. `--branch="<name>"` loads a second, separate demo
+missing; existing rows, passwords and short codes stay as they are.
+
+**Phase 1 (ordering).** After the release that ships Phase 1, run the same command again on the branch that already
+holds Phase 0 (`php artisan bakery:seed-demo --force`; `--phase=1` is the same while Phase 1 is the last seeder). It
+adds only what Phase 1 brings and changes nothing of Phase 0 (a test seeds Phase 0, then Phase 1, and compares every
+catalog and stock table before and after):
+- the 12 dining tables (T1-T10 and Terrace 1-2, in both languages, with seats), unless a table with that code exists;
+- the eight payment channels, only those the branch lacks (the release's migration has already given them to existing
+  branches);
+- the shared pad: the device "Front pad" enrolled and one new account, "Pad 1" (a waiter-role account the tablet stays
+  signed in with; the two waiters of Phase 0 switch on it by short code). Like every demo account it signs in with its
+  phone and `BAKERY_DEMO_PASSWORD`, so the same variable must be set (production refuses the command without it); it has
+  no short code, and the command lists it with a dash in the code column;
+- today's sample orders (7, local date of the branch): one open on T3, two sent (kitchen and bar lines queued), one in
+  progress, one ready, one served and unpaid (the till queue) and one paid in cash and closed, with a croissant sold from
+  the display case. They are taken at the pad, sent and moved along by the same code the screens call, so the ledger,
+  the audit log and the timelines hold what a real shift would; they draw a few units of demo stock. A second run on the
+  same day writes nothing; a run on a later day adds that day's seven orders (and only those), so run it once when you
+  want to show the demo, not on a schedule.
+Nothing secret is printed or stored: the password is never shown, and the sample orders carry made-up tables and
+products only. Never run it with `--branch` pointing at the "E2E Test Branch" or at shop data (a branch that is not a
+demo branch is refused anyway). `--branch="<name>"` loads a second, separate demo
 branch. To retire the demo, deactivate its users under People (soft deletes only; nothing is ever removed from the
 ledger).
 

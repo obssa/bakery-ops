@@ -1,6 +1,6 @@
 # ADR 0009: Live updates through a transport abstraction, polling first
 
-- Status: proposed (accepted when Phase 1 closes)
+- Status: accepted (Phase 1 gate, 2026-10-21)
 - Date: 2026-10-20
 - Phase: 1
 
@@ -81,6 +81,47 @@ changes.
   their counts the same way; if the pilot shows the host cannot carry the polling, the VPS move of ADR 0006 brings
   Reverb, Redis and Octane without touching the endpoints.
 
+## As built
+
+The decisions stand; the build refined five of them.
+
+- **Polling is the transport on the live host and in CI.** `LiveFeed` (`apps/web/src/lib/live/`) is transport-free (cursor,
+  ETag, merge by id and the higher `version`, never two requests in flight) with a `poll` transport: the kitchen and bar
+  displays look every 2 s while visible and every 10 s hidden, back off after errors (4 s, 8 s, then 10 s), pause offline,
+  and look at once on focus and after the screen's own write; the pad's menu is a feed too (5 s visible, 20 s hidden) and
+  the table grid polls every 5 s. The first request has no cursor; every later one carries `since=<cursor>` and the last
+  `ETag` as `If-None-Match`. The second request usually answers 200 with the same rows (the ETag covers the cursor); from
+  the third a quiet rail is 304. The Playwright flows assert this rule on both rails.
+- **The overlap cursor and the unsettled-tail fingerprint** (`OverlapCursor`, `ConditionalPoll`). The cursor handed back is
+  the highest event id at least `bakery.live.overlap_seconds` (5 s) old and never below the client's; everything after it
+  is sent again and de-duplicated by `version`. The ETag covers `{since, next, max, pending}`, not only the highest id,
+  because a late commit below the maximum leaves the maximum unchanged and would be answered 304 until the next change
+  (decision 3, amended in step 1.2). `If-None-Match` is compared weakly because Cloudflare weakens the ETags it compresses.
+  A late-committed event is delivered (tests in `LiveMergeTest` and `TicketsSinceTest`).
+- **The menu's ETag** is the Catalog fingerprint plus the stock fingerprint (decision 1 said "the branch's last stock
+  movement id" only): the branch's `catalog_version` counter (bumped by every save or delete of the catalog models behind
+  the menu; step 1.7, because whole-second `updated_at` let two edits in one second share a tag), the prices in force now,
+  the branch's calendar day (`is_new`), the highest ledger movement id and the state of the locations. A few small
+  queries, no rows, and the menu stays at a fixed number of queries however many products it lists.
+- **Broadcast companions are inert under `null`.** Every domain event has a companion (`BroadcastsDomainEvent`,
+  `ShouldBroadcast` + `ShouldDispatchAfterCommit`, private channels of the registry only); `broadcastWhen()` is
+  `LiveTransport::isOn()`, which is false for the `null` driver and for `log` (which would only write the log yet still queue
+  a job for the cron-drained queue). The live host runs `BROADCAST_CONNECTION=null`: nothing is sent and nothing is queued.
+  Channel authorisation is `Identity\Broadcasting\ChannelRules` on `Access`, applied by `POST /api/v1/broadcasting/auth`
+  itself, not by `routes/channels.php`, because the null broadcaster never consults `Broadcast::channel()` registrations;
+  the transport only signs afterwards. The endpoint writes nothing and takes no `Idempotency-Key` (the first entry of
+  `tests/Support/read_like_writes.php`). `tests/Gate/LiveChannelsGateTest.php` pins the 403s.
+- **The Echo seam.** `NEXT_PUBLIC_LIVE_TRANSPORT=reverb|pusher` selects an Echo adapter on `station.{id}` (and the user,
+  stock and orders channels) through the auth endpoint; every event and every connect only kicks a fetch of the same cursor
+  endpoint, with a 30 s poll underneath. `laravel-echo` and `pusher-js` are exact-pinned and imported lazily, so the
+  default bundle does not carry them. The adapter is typed and compiled but not exercised by CI: there is no `ws` e2e
+  until a WebSocket host exists (decision 6). `e2e-p1` runs the polling transport and starts no Reverb.
+- **Not built: the lint rule of the enforcement section** (timers banned outside `src/lib/live/`). Timers are used
+  legitimately elsewhere (the shared clock `lib/useNow.ts`, the outbox retries, the pad's idle lock and menu panel, the
+  till screen), and every data poll does go through `LiveFeed`; the rule stays a candidate for a later hardening step
+  (Phase 5) rather than a gate. The gate checks the polling rule at the request level instead (first load without a
+  cursor, every later request with `since` and `If-None-Match`).
+
 ## Enforcement
 
 Step 1.2 tests (groups `module:shared`, `feature`): channel authorization per role and branch, 403 for a foreign
@@ -89,7 +130,7 @@ station, a non-assigned chef, another user's channel and another branch's stock 
 transport; `ConditionalPoll` 200 with ETag, 304 on a matching `If-None-Match`, new ETag after a change; the overlap
 cursor delivering a late-committed row and its fingerprint changing on it. Step 1.5 tests: ETag and 304 on the tickets and orders feeds, cursor monotonic and never past the overlap
 window, a late-committed event is still delivered. Gate `gate:p1` and Playwright `p1-order-flow` (ticket within 5 s,
-only `since=` polls after the initial load). `apps/web` ESLint rule (step 1.6): `setInterval` / `setTimeout` are
+only `since=` polls after the initial load). `apps/web` ESLint rule (planned for step 1.6, not built: see "As built"): `setInterval` / `setTimeout` are
 banned outside `src/lib/live/`, so screens subscribe through `LiveFeed` instead of polling on a timer of their own.
 
 ## Alternatives considered

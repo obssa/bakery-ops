@@ -893,6 +893,68 @@ Small PRs, each green in CI before the next; a step that completes a module ends
      screen still to come.
 7. **1.7 docs and seeds**: `Phase1Seeder`, ADR 0008 / 0009 accepted, OpenAPI, ERD, gate report.
 
+   As built (step 1.7, `phase-1/gate`): tests first (red: the same-second ETag test, the Phase 1 composition and
+   idempotence tests of `DemoSeederTest`), then the ETag fix, then the seeder, then the docs. Where the plan left a
+   detail open:
+   - **Menu ETag, exact.** Step 1.5 left two catalog edits inside one second able to share a tag (`updated_at` has whole
+     seconds). The catalog part of the fingerprint is now one counter: `branches.catalog_version` (migration
+     `2026_10_21_130100_add_catalog_version_to_branches`, `unsignedBigInteger` default 0), bumped by one by every save and
+     every delete (soft deletes included) of the seven Catalog models the menu reads (items, categories, modifiers, station
+     assignments, recipes, recipe lines, prices) through the `BumpsCatalogVersion` trait: one atomic
+     `update branches set catalog_version = catalog_version + 1 where id = ?` inside the writer's own transaction, so it
+     rolls back with the write it counts. Why this and not a hash over ids and full-precision stamps: timestamps are
+     `timestamp(0)` on these tables, so there is no sub-second stamp to hash without altering eight tables and every model's
+     date format; a hash would also need to read every row or at least eight aggregates on each 304. The counter makes the
+     tag exact for every catalog write made through the models (all of them: the API, the seeders and the factories), costs
+     one primary-key read per poll instead of eight count/max scans (`Items::menuFingerprint` is now the day, the counter
+     and the prices in force), and keeps the menu at a fixed number of queries (the existing test with 24 extra products
+     still passes unchanged). The cost is one extra single-row update per catalog write and a short row lock on the branch
+     row until the writer commits; Catalog writes are admin edits and the seeders, never the order path. A raw
+     query-builder write to a catalog table would not be counted, so Catalog writes go through its models (noted in the
+     trait). The stock part of the tag (highest ledger movement id, locations) is unchanged; the locations' `updated_at`
+     keeps whole-second precision, which only matters for two location edits inside one second and is not worth a column.
+     Tests: `MenuEndpointTest` (two, then three catalog edits and a soft delete in one frozen second: five distinct tags,
+     200 over the older tag, 304 over the current one; the 304 path reads neither `items` nor `modifiers`).
+   - **`Phase1Seeder`** (`database/seeders/Phase1Seeder.php`, data in `Demo\DemoBakery`), composed by `DemoSeeder` after
+     `Phase0Seeder` (`SEED_PHASE=1` and above; `e2e-p0` still seeds `SEED_PHASE=0` and gets no Phase 1 data; the payment
+     channels are the exception only in that `BranchCreated` already gives every new branch its eight, which Phase 0's
+     branch creation triggers, and `Channels::ensureDefaults` here only fills a branch that predates Payments). One
+     transaction, found-by-natural-key before written: tables by code (`T1`..`T10`, `TR1`, `TR2`: the plan says "Terrace
+     1-2", the code stays short; names "Table N / ጠረጴዛ N" and "Terrace N / በረንዳ N", 2 to 8 seats), the device "Front pad"
+     by name (deterministic fingerprint), the account "Pad 1" by phone (`+251900000110`, role waiter, the demo password, no
+     short code), each sample order by a deterministic client UUID (UUIDv5 of the branch, the branch's local date and the
+     order's key). The seven orders of today are taken as the pad account acting as Yonas or Hana on the "Front pad"
+     (`CreateOrder`), sent with `SendOrder`, accepted and readied as the chef or the barista at their own station
+     (`AcceptLine`, `MarkLineReady`), served as the waiter (`ServeLine`) and paid in cash by the cashier
+     (`RecordPayment`, tendered rounded up to the next 100): T3 open, T1 and T2 sent, T4 in progress (the sandwich
+     accepted), T5 ready, T6 served and unpaid, T7 paid and closed with a croissant sold. Nothing is written by raw
+     insert; the tables, the device and the account go through `AuditedAction` like the screens. Edge rules: a second run
+     on the same day writes nothing (not even an audit row); a run on a later day adds that day's seven orders and only
+     those (a pad would); a product missing or inactive skips its order; a send that finds the stock short leaves the
+     cart open on its table. `bakery:seed-demo` now lists the pad account too (short code "-").
+   - **Tests.** `DemoSeederTest` gains the Phase 1 composition (tables, channels, pad, order statuses by table, ledger
+     reasons, the one payment), a second run that writes nothing, and the "Phase 0 branch then Phase 1" case that proves a
+     live demo branch only gains what Phase 1 brings (catalog tables unchanged, one more user, seven orders);
+     `SeedDemoCommandTest` counts the pad account (10 users on a full run, 9 with `--phase=0`).
+   - **Gate tests** (`apps/api/tests/Gate/`, group `gate:p1`): `Phase1StateMachinesTest` (hand-written from-to tables of
+     `OrderStatus`, `LineStatus` and `PaymentStatus`, apart from the enums), `SendOrderGateTest` (one `BEGIN` for the
+     send; the identical body and one order on a replay; the same client UUID under a new key answers the same order),
+     `VoidGateTest` (releases, asker and approver audited, a cashier's PIN refused, no PIN stored), `LiveChannelsGateTest`
+     (channel auth and the tickets feed `403` for a foreign station, in both languages), `OrderMovementsGateTest` (the
+     movement sequence per line through the API and available = seeded - used) and `OrderLedgerPropertyTest` (100
+     seeded sequences of at most 50 operations over a menu with shared chicken, lettuce and butter and shared milk, driven
+     through the Orders and Payments actions; `ORDER_LEDGER_PROPERTY_SEED=<n>` replays one and the seed is in every
+     failure message). `SendOrderRaceTest` and `StationActionsRaceTest` stay where they are (group `concurrency`,
+     `module:orders`): the plan's gate list does not name them, and moving them would only rename history.
+   - **Not built from the plan.** The ESLint rule that bans timers outside `src/lib/live/` (ADR 0009, enforcement) was
+     never written: timers are used legitimately outside it (`useNow`, the outbox, the pad's idle lock). Every data poll
+     does go through `LiveFeed`. See the gate report.
+   - **ADR 0008 and 0009** are `accepted`, each with an "As built" section; ADR 0009's enforcement paragraph says the
+     lint rule was not built. OpenAPI re-exported: unchanged (no response changed in this step). ERD: `branches` gains
+     `catalog_version`; every Phase 1 table was already documented (`scripts/erd_check.py`: 0 missing).
+   - **Gate report** `docs/phases/phase-1-report.md`; STATUS: steps web and docs done, phase 1 `gate_pending`. `claim-done`
+     is run on `main` after the merge, with the merge commit and the green `gate-p1` run.
+
 ## 7. Test list
 
 - **Contract** (step 1.1): the four files of section 2; `contract:payments->orders` at step 1.4.
@@ -972,7 +1034,7 @@ composition and a second run that writes nothing.
 - **0009** Live updates through a transport abstraction, polling first on the live host; broadcasting behind
   `BROADCAST_CONNECTION`; channel auth written now.
 
-Both are `proposed` now and become `accepted` in the gate report. The manifest and the phase references renumber the
+Both were `proposed` during the build and became `accepted` at the gate (step 1.7), each with an "As built" section. The manifest and the phase references renumber the
 later ADRs: Phase 2 0010 (presence resolver interface), 0011 (alert dedupe); Phase 3 0012 (hash chain canonical JSON),
 0013 (shift attribution); Phase 4 0014 (summary rebuild semantics).
 

@@ -46,11 +46,14 @@ ETB) and never into another branch: six stations, seven stock locations, 14 cate
 | Barista | Tigist Mekonnen (ትዕግሥት መኮንን) | +251900000107 | Amharic | Bar (counts) |
 | Cake baker | Hirut Desta (ሂሩት ደስታ) | +251900000108 | Amharic | Cake room (counts), Bakery (overseer) |
 | Bread baker | Abebe Girma (አበበ ግርማ) | +251900000109 | Amharic | Bakery (counts) |
+| Pad (Phase 1) | Pad 1 (ፓድ 1) | +251900000110 | English | the shared pad's own account, no short code |
 
 The phone numbers are made up. Every demo account signs in with its phone and the demo password: `BAKERY_DEMO_PASSWORD`
 from the server `.env` (required outside local and testing; locally and in CI the documented default in
 `apps/api/database/seeders/Demo/DemoCredentials.php`). Short codes are derived from that password; `bakery:seed-demo`
 prints them once, when it creates the accounts, and an admin can reset one under People.
+Phase 1 adds 12 dining tables, the eight payment channels, the shared pad (device "Front pad", account "Pad 1") and
+today's seven sample orders at different stages (see the runbook).
 
 ## Local development (Windows, Docker Desktop)
 
