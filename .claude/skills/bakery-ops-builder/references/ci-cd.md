@@ -72,8 +72,10 @@ survive, only parallelism is lost.
 | `perf-dashboards` | k6 against compose with the 90-day seed, thresholds `p(95)<1000` |
 | `gate-p<N>` | `python scripts/gate_check.py --mode done --phase N --ci` |
 
-Reverb inside compose: the app container reaches `ws:8080`; the browser reaches `localhost:8080`.
-These are two env vars (`REVERB_HOST` vs `NEXT_PUBLIC_REVERB_HOST`), never one.
+Live updates in e2e (ADR 0009): `e2e-p1` and later run the polling transport, as the live host does
+(`BROADCAST_CONNECTION=null`, `NEXT_PUBLIC_LIVE_TRANSPORT=poll`), so no `ws` service is needed. When a
+WebSocket transport is switched on, Reverb inside compose: the app container reaches `ws:8080`; the browser
+reaches `localhost:8080`. These are two env vars (`REVERB_HOST` vs `NEXT_PUBLIC_REVERB_HOST`), never one.
 
 ## Caching
 

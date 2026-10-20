@@ -18,7 +18,7 @@ and dashboards must answer in under a second while reading only summary tables.
 | 4.3 | payments (full) | channel admin CRUD (bilingual, sort, enable); photo attach; reference; split to zero balance; overpay rejected; verify/dispute; void/refund with PIN → `Orders::refund` → reversing movements; receipt PDF (dompdf) | Orders, Identity, Files | `module:payments` |
 | 4.4 | analytics | `daily_sales`, `daily_station_metrics`, `daily_item_metrics`, `daily_channel_totals`; `Rebuild::day(branch, date)` idempotent; triggers: `ShiftLocked`, nightly schedule, on demand; dashboard endpoints read summaries only; Excel/PDF exports; weekly summary job (email/Telegram); optional Ethiopian calendar labels | all `Facts` ports | `module:analytics` |
 | 4.5 | web | till pay sheet (camera, split rows, reference, change due); admin Payments (channels, reconciliation vs photos, export); Analytics dashboards + per-product pages; order timeline with payment photos; Audit log UI | | Playwright `p4-pay-photo-split`, `p4-dashboards` |
-| 4.6 | docs | `Phase4Seeder` (90 days incl. splits, voids, refunds); ADR 0013 summary rebuild semantics; report | | |
+| 4.6 | docs | `Phase4Seeder` (90 days incl. splits, voids, refunds); ADR 0014 summary rebuild semantics; report | | |
 
 ## Contract tests (consumer view, written first)
 - Orders: `refund(order, reason, pin)` writes reversing `sale` / `production_consume` movements with
@@ -42,7 +42,7 @@ rows; dashboards hit no raw tables (query-log assertion); exports open; weekly s
 4. Phases 0–3 gates still green.
 
 ## Artifacts
-ADR 0013, OpenAPI, ERD, `phase-4-report.md`, STATUS: payments (full), analytics `stable`.
+ADR 0014, OpenAPI, ERD, `phase-4-report.md`, STATUS: payments (full), analytics `stable`.
 
 ## Traps specific to this phase
 MinIO endpoint vs public URL · signed URLs never logged · float creeping into totals (assert decimal

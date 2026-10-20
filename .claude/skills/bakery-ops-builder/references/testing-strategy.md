@@ -56,8 +56,9 @@ depended on by the next step.
   because the transaction wrapper hides rows from a second connection.
 - **Queues**: feature tests assert dispatch with `Queue::fake()` and have a `sync` twin asserting the
   effect. Compose always runs the `worker`, so e2e exercises the real queue.
-- **Broadcasting**: `Event::fake()` for unit/feature; real Reverb in e2e, asserting the ticket arrives
-  without a polling request after the initial load.
+- **Live updates** (ADR 0009): `Event::fake()` for unit/feature, plus channel-auth tests and "nothing queued
+  under the `null` broadcaster"; e2e runs the polling transport the live host runs and asserts the ticket
+  arrives within 5 s with only `since=` polls (304 while unchanged) after the initial load.
 - **Property tests**: Pest has no shrinking; use seeded generators, `->repeat()` / datasets, print the
   seed on failure, keep sequences ≤ 50 operations.
 - **Permissions**: `forgetCachedPermissions()` in test setup (spatie cache + Octane).

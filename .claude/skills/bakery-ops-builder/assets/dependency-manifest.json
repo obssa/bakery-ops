@@ -201,10 +201,11 @@
         "Ledger::lock(items x locations) in ascending (item_id, location_id) order",
         "Stock::of(item, location) -> {on_hand, reserved, available}",
         "Stock::balanceAt(item|location, timestamp)",
-        "Reservations::reserve(lines[], ref) -> ok | Shortfall{ingredient, qty_short, station}",
-        "Reservations::release(ref) idempotent",
-        "Reservations::consume(ref, actual[])",
+        "Reservations::reserve(lines[], ref) -> ok | Shortfall{ingredient, qty_short, station}, and reserveMany(ref => lines[]) for an order's lines in one ascending lock pass (the Shortfall names the short line's ref); ReserveLine takes per-unit recipe deltas (modifiers)",
+        "Reservations::release(ref) idempotent; releaseMany(refs) in one lock pass",
+        "Reservations::consume(ref, actual[]); consumeMany(refs, production_consume | sale) in one lock pass",
         "Availability::ofProduct(product, location) / bulk(products[], location) (branches on items.fulfilment: to_order = floor(min(available ingredient / qty)), to_stock and bought_in = on_hand of the product at its location)",
+        "Locations::forProduct(item) (its order station's location, the display case for counter products), forStation(station), displayCase()",
         "Phase 2: Purchases::confirm, Transfers::request/confirm, Costs::movingAverage, RecipeCost::rollUp, ReorderRules::evaluate"
       ],
       "events": [
@@ -242,9 +243,10 @@
       ],
       "needs": {
         "inventory": [
-          "Reservations::reserve/release/consume",
+          "Reservations::reserveMany / releaseMany / consumeMany (one lock pass per order); consume(ref) at ready, release(ref) at reject",
           "Availability::bulk",
-          "Ledger::append(sale)"
+          "Locations::forProduct",
+          "consumeMany(refs, sale) for display-case lines at payment"
         ],
         "catalog": [
           "Prices::at(now) snapshot",
@@ -261,7 +263,7 @@
         "shared": [
           "ActorContext",
           "Idempotency",
-          "Broadcast::station/user"
+          "live-update events (broadcast companions behind BROADCAST_CONNECTION, polling cursors; ADR 0009)"
         ],
         "payments": [
           "listens to PaymentRecorded -> markPaidIfSettled"
@@ -286,6 +288,8 @@
         "OrderVoided"
       ],
       "tables": [
+        "dining_tables",
+        "order_counters",
         "orders",
         "order_lines",
         "order_line_modifiers",
@@ -651,7 +655,13 @@
         "release(ref) twice is a no-op",
         "consume(ref, actual) writes exactly one production_consume per ingredient and reduces reserved by the reserved amount",
         "lock order is deterministic: 50 interleavings never deadlock",
-        "Availability::bulk matches floor(min(available / qty_per_unit))"
+        "Availability::bulk matches floor(min(available / qty_per_unit))",
+        "reserveMany (one ref per line) gives each line its share and the balance the sum; a Shortfall names the short line's ref, lines covered in the order sent",
+        "a line's modifier deltas change what is reserved: 'no onion' is not refused when onion is out, 'extra' reserves the extra, an optional line only when a modifier adds it",
+        "display-case lines are sold at payment with consumeMany(refs, sale): one sale per product carrying its ref",
+        "a void releases every open line of the order with one releaseMany; consumed lines stay consumed",
+        "Locations::forProduct names a line's stock location: its order station's location, the display case for counter products",
+        "every movement carries the pad account as user_id and the waiter as acting_user_id, with station and device"
       ]
     },
     "orders->catalog": {
@@ -660,7 +670,9 @@
       "cases": [
         "Prices::at(sent_at) returns the price effective then, not now",
         "Routing::stationFor is null for display-case products",
-        "Modifiers::for returns price and recipe deltas in base units"
+        "Modifiers::for returns price and recipe deltas in base units",
+        "Recipes::activeFor gives the version a line snapshots; Recipes::version(product, n) still answers an older version after a newer one is active",
+        "Items::isNew through is_new_until in the branch's local date; Items::fulfilment tells a station line from a counter line"
       ]
     },
     "orders->identity": {
@@ -669,7 +681,9 @@
       "cases": [
         "verifyShortCode rejects a code from another branch",
         "acting-as session expires at 10 minutes",
-        "verifyPinFor('orders.void') accepts manager, rejects cashier"
+        "verifyPinFor('orders.void') accepts manager, rejects cashier",
+        "can(user, 'orders.accept', station): chef at the kitchen yes, chef at the bar no, barista at the bar yes, admin and manager anywhere, waiter and cashier never",
+        "the order permissions follow the section 7 matrix: orders.create, orders.accept, orders.void, orders.void_request, tables.manage"
       ]
     },
     "payments->orders": {
@@ -679,6 +693,7 @@
       "cases": [
         "Orders::totals returns total, paid, balance as decimal strings",
         "PaymentRecorded with balance zero moves the order to paid and writes sale movements for display-case lines",
+        "a payment recorded before the last line is served settles the order, which becomes paid and closed when that line is served",
         "Phase 4: Orders::refund writes reversing movements referencing originals and leaves originals untouched"
       ]
     },
@@ -879,12 +894,12 @@
         {
           "id": "1.1",
           "module": "contracts",
-          "builds": "tests/Contract/Orders/{Inventory,Catalog,Identity}ContractTest.php green against unchanged providers"
+          "builds": "tests/Contract/Orders/{Inventory,Catalog,Identity}ContractTest.php (+ InventoryLockOrderConcurrencyTest.php) green against the providers, Orders untouched; provider fixes the contracts need (Inventory batch reservations, modifier deltas, Locations; Identity tables.manage)"
         },
         {
           "id": "1.2",
           "module": "shared.broadcast",
-          "builds": "Reverb config, private channel auth for station.{id}, user.{id}, branch.{id}.stock",
+          "builds": "live updates (ADR 0009): polling cursor feeds with ETag/304 on the live host and in CI; broadcast companions of the order events behind BROADCAST_CONNECTION (null on the live host, nothing queued); channel auth for station.{id}, user.{id}, branch.{id}.stock, branch.{id}.orders so Reverb or a Pusher-compatible service is a configuration switch",
           "pest_groups": [
             "feature"
           ]
@@ -892,7 +907,7 @@
         {
           "id": "1.3",
           "module": "orders",
-          "builds": "orders, order_lines (unit_price_snapshot, recipe_version, station_id, client_uuid), order_events; both state machines; SendOrder; accept / ready (consume) / reject (release) / served; void with manager PIN (unpaid only); Tickets::since",
+          "builds": "dining_tables, order_counters, orders, order_lines (unit_price_snapshot, recipe_version, station_id, location_id, client_uuid, reservation_ref), order_line_modifiers, order_events (append-only); both state machines; SendOrder (one transaction, reserveMany); accept / ready (consume) / reject (release) / served; void with manager PIN (unpaid only, releaseMany); Tickets::since; Orders::totals",
           "pest_groups": [
             "module:orders",
             "unit",
@@ -920,7 +935,7 @@
         {
           "id": "1.6",
           "module": "web",
-          "builds": "/pad, /kds/kitchen, /kds/bar, /till (cash pay), Echo client, Workbox shell cache, minimal outbox (send, accept, ready) with client UUID + Idempotency-Key, admin Orders board",
+          "builds": "/pad, /kds/kitchen, /kds/bar, /till (cash pay), LiveFeed client (polling by default, Echo when a WebSocket transport is configured), Workbox shell cache, minimal outbox (send, accept, ready) with client UUID + Idempotency-Key, admin Orders board",
           "playwright": [
             "p1-order-flow",
             "p1-shortfall"
@@ -929,7 +944,7 @@
         {
           "id": "1.7",
           "module": "docs",
-          "builds": "Phase1Seeder (tables, open orders), ADR 0008 reserve-at-send / consume-at-ready / sale-at-pay, OpenAPI, ERD, report"
+          "builds": "Phase1Seeder (dining tables, payment channels, shared pad, sample orders), ADR 0008 reserve-at-send / consume-at-ready / sale-at-pay, ADR 0009 live updates polling first, OpenAPI, ERD, report"
         }
       ],
       "gate": {
@@ -940,14 +955,15 @@
           "p1-shortfall"
         ],
         "criteria": [
-          "p1-order-flow: three browser contexts (pad, kitchen KDS, till): short code -> add sandwich + latte -> Send -> kitchen ticket visible within 5 s over WebSocket (no /tickets polling after initial load) -> accept -> ready -> pad badge -> served -> till cash pay -> closed",
-          "post-conditions via API: movement sequence reservation, production_consume, sale; available equals seeded minus sold",
+          "p1-order-flow: four browser contexts (pad, kitchen KDS, bar KDS, till): short code -> add chicken sandwich + latte + one display-case product -> Send -> kitchen ticket visible within 5 s through the configured live-update transport (polling on the live host and in CI: after the initial load the KDS issues only tickets?since=<cursor> requests with If-None-Match, answered 304 while nothing changes; ADR 0009) -> accept -> ready (kitchen and bar) -> pad ready badge -> served -> till cash pay -> closed",
+          "post-conditions via API: movement sequence reservation, production_consume for the station lines' ingredients and reservation, sale for the display-case line; available equals seeded minus sold",
           "p1-shortfall: selling more than available shows the inline shortfall on the exact line",
-          "gate:p1 Pest: exhaustive state-machine tables, SendOrder is one transaction, idempotent replay returns the same body and one order, void audits both actors, foreign-station channel auth is 403"
+          "gate:p1 Pest: exhaustive state-machine tables, SendOrder is one transaction, idempotent replay returns the same body and one order, void audits both actors, foreign-station channel auth and tickets feed are 403"
         ]
       },
       "adrs": [
-        "0008-reserve-at-send-consume-at-ready-sale-at-pay"
+        "0008-reserve-at-send-consume-at-ready-sale-at-pay",
+        "0009-live-updates-polling-first"
       ]
     },
     "2": {
@@ -1032,7 +1048,7 @@
         {
           "id": "2.9",
           "module": "docs",
-          "builds": "Phase2Seeder, ADR 0009 presence resolver interface, ADR 0010 alert dedupe, OpenAPI, ERD, report"
+          "builds": "Phase2Seeder, ADR 0010 presence resolver interface, ADR 0011 alert dedupe, OpenAPI, ERD, report"
         }
       ],
       "gate": {
@@ -1049,8 +1065,8 @@
         ]
       },
       "adrs": [
-        "0009-station-presence-resolver-interface",
-        "0010-stock-alert-dedupe"
+        "0010-station-presence-resolver-interface",
+        "0011-stock-alert-dedupe"
       ]
     },
     "3": {
@@ -1126,7 +1142,7 @@
         {
           "id": "3.8",
           "module": "docs",
-          "builds": "Phase3Seeder (two days of locked history), ADR 0011 hash chain canonicalisation, ADR 0012 shift attribution, report, pilot feedback template"
+          "builds": "Phase3Seeder (two days of locked history), ADR 0012 hash chain canonicalisation, ADR 0013 shift attribution, report, pilot feedback template"
         }
       ],
       "gate": {
@@ -1143,8 +1159,8 @@
         ]
       },
       "adrs": [
-        "0011-hash-chain-canonical-json",
-        "0012-shift-attribution-rules"
+        "0012-hash-chain-canonical-json",
+        "0013-shift-attribution-rules"
       ]
     },
     "4": {
@@ -1202,7 +1218,7 @@
         {
           "id": "4.6",
           "module": "docs",
-          "builds": "Phase4Seeder (90 days incl. splits, voids, refunds), ADR 0013 summary rebuild semantics, report"
+          "builds": "Phase4Seeder (90 days incl. splits, voids, refunds), ADR 0014 summary rebuild semantics, report"
         }
       ],
       "gate": {
@@ -1223,7 +1239,7 @@
         ]
       },
       "adrs": [
-        "0013-summary-rebuild-semantics"
+        "0014-summary-rebuild-semantics"
       ]
     },
     "5": {

@@ -45,10 +45,10 @@ These are the contract surfaces. Expose each as a final service class (or interf
 | Catalog | Identity | `can(user, 'catalog.manage')` |
 | Inventory | Catalog | `Recipes::activeFor(product)` in base units, `Units::toBase`, `Items::kind` |
 | Inventory | Shared | `ActorContext` (stamps user, shift, station on every movement), `Quantity` |
-| Orders | Inventory | `Reservations::reserve/release/consume`, `Availability::bulk`, `Ledger::append(sale)` |
+| Orders | Inventory | `Reservations::reserveMany/releaseMany/consumeMany` (one lock pass per order; modifier deltas on `ReserveLine`), `consume(ref)` at ready, `release(ref)` at reject, `Availability::bulk`, `Locations::forProduct`, `consumeMany(refs, sale)` at payment |
 | Orders | Catalog | `Prices::at(now)` snapshot, `Recipes::activeFor` (snapshot `recipe_version`), `Routing::stationFor`, `Modifiers::for` |
 | Orders | Identity | `verifyShortCode`, `ActingAsSession`, `can(..., station)`, `verifyPinFor('orders.void')` |
-| Orders | Shared | `ActorContext`, `Idempotency`, `Broadcast::station/user` |
+| Orders | Shared | `ActorContext`, `Idempotency`, live-update events (broadcast companions behind `BROADCAST_CONNECTION`, polling cursors; ADR 0009) |
 | Orders | Payments | listens to `PaymentRecorded` → `markPaidIfSettled` (never imports Payments) |
 | Payments | Orders | `Orders::totals(order) → {total, paid, balance}`; P4 `Orders::refund` |
 | Payments | Identity | `can('payments.take')`, `verifyPinFor('payments.void')` |
@@ -68,8 +68,8 @@ These are the contract surfaces. Expose each as a final service class (or interf
 |---|---|---|
 | `/login` + shell | 0 | Identity token + `GET /me` (permissions, locale); next-intl en/am |
 | `/admin` | 0 → 5 | P0 Catalog both kinds, People, ledger read · P1 Orders board, void · P2 Inventory, recipe versions + cost, planner · P3 Shifts · P4 Payments admin, Analytics, Audit UI · P5 Devices |
-| `/pad` | 1 | `verifyShortCode` + acting-as; `GET /menu?location` (Catalog + Inventory availability + prices + isNew + modifiers); Orders create/send/served/my-open; Reverb `user.{id}`; idempotency + client UUID; outbox (minimal P1, full P5) |
-| `/kds/kitchen`, `/kds/bar` | 1 | `Tickets::since`, accept/ready/reject; Reverb `station.{id}` · P2 stock strip + `Transfers::request` · P3 shift open/close · P5 device gate |
+| `/pad` | 1 | `verifyShortCode` + acting-as; `GET /menu?location` (Catalog + Inventory availability + prices + isNew + modifiers); Orders create/send/served/my-open; live updates (polling `GET /orders?mine&since`; `user.{id}` once a WebSocket transport is on); idempotency + client UUID; outbox (minimal P1, full P5) |
+| `/kds/kitchen`, `/kds/bar` | 1 | `Tickets::since`, accept/ready/reject; live updates (polling `tickets?since`; `station.{id}` once a WebSocket transport is on) · P2 stock strip + `Transfers::request` · P3 shift open/close · P5 device gate |
 | `/till` | 1 | everything `/pad` has; unpaid queue; cash (P1) · P2 display-case panel + `Requests::create` · P3 shift widget + cash declaration · P4 full pay sheet |
 | `/production` | 2 | requests/batches, scaled recipe, on-hand vs needed, notifications inbox · P3 ad-hoc shift from a notification |
 
@@ -100,5 +100,6 @@ These are the contract surfaces. Expose each as a final service class (or interf
   P1's availability check and P0's reservation gate need them. P2 adds versions publishing and cost.
 - P1: Payments gets its final `payment_channels` and `payments` schema with all eight channels seeded,
   but only cash can pass validation until photo upload exists in P4.
-- P1: `LineReady` reaches the waiter over Reverb `user.{id}` directly; P2 adds the persisted notification.
+- P1: `LineReady` reaches the waiter through the live-update transport directly (polled orders feed on the live host,
+  `user.{id}` once a WebSocket transport is on); P2 adds the persisted notification.
 - P1–P2: `orders.shift_instance_id` and movement `shift_instance_id` stay null until P3.

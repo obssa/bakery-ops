@@ -77,10 +77,12 @@ Reason → effect map lives in one class (`MovementReason`):
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `orders` | branch_id, order_no, type (`dine_in`, `takeaway`, `delivery`, `advance`), table_no, status, created_via (`waiter_pad`, `till`, `admin`), created_by_user_id, acting_user_id, shift_instance_id?, device_id?, client_uuid, subtotal, discount, tax, total, notes, due_at? | `advance` carries due date and deposit (schema P2, UI later) |
-| `order_lines` | order_id, item_id, qty, unit_price_snapshot, recipe_version, station_id?, status, prepared_by_user_id, ready_at, reservation_ref, reject_reason | each line has its own status so the bar can be ready while the kitchen cooks |
+| `dining_tables` | branch_id, code, name_en, name_am, seats, sort, is_active, deleted_at | the pad's table grid; state (free, ordering, waiting, served, bill) is computed from open orders |
+| `order_counters` | branch_id, business_date, last_no | daily order numbers per branch, the row locked to number an order |
+| `orders` | branch_id, order_no, business_date, type (`dine_in`, `takeaway`, `delivery`, `advance`), dining_table_id?, table_code, status, created_via (`waiter_pad`, `till`, `admin`), owner_user_id, created_by_user_id, acting_user_id, shift_instance_id?, device_id?, client_uuid, subtotal, discount, tax, total, paid_total, notes, sent_at, settled_at, paid_at, closed_at, void reason / by / approved_by, due_at? | `advance` carries due date and deposit (schema P2, UI later); never deleted, cancelled or voided by status |
+| `order_lines` | order_id, item_id, qty, unit_price_snapshot, modifier_price_snapshot, line_total, recipe_version, station_id?, location_id, status, accepted / prepared / served / rejected by and at, reservation_ref (one per line, ADR 0008), reject_reason, client_uuid, version | each line has its own status so the bar can be ready while the kitchen cooks |
 | `order_line_modifiers` | order_line_id, modifier_id, price_delta_snapshot, recipe_delta_snapshot | |
-| `order_events` | order_id, line_id?, event, user_id, acting_user_id, station_id, at, payload JSONB | append-only timeline |
+| `order_events` | order_id, line_id?, station_id?, owner_user_id, event, user_id, acting_user_id, approved_by_user_id?, device_id?, created_at, payload JSON | append-only timeline; its id is the live-update cursor (ADR 0009) |
 
 ## Payments (schema Phase 1; full Phase 4)
 
@@ -127,7 +129,7 @@ on demand. Dashboards read only these.
 | Machine | Transitions |
 |---|---|
 | order | open → sent → in_progress → ready → served → paid → closed; cancelled / voided (reason + manager PIN) from any state before closed |
-| order_line | queued → accepted → ready → served; rejected (reason) from queued or accepted |
+| order_line | queued → accepted → ready → served; rejected (reason) from queued or accepted; display-case lines queued → ready at send; voided with their order |
 | production_request | requested → accepted → in_progress → pending_confirmation (if station requires overseer) → done; cancelled |
 | production_batch | started → finished → confirmed |
 | shift_instance | scheduled → open (opening count confirmed) → counting → pending_approval (if variances) → locked; cannot lock with unresolved variances |
