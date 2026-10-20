@@ -2,8 +2,8 @@ import { test, expect, type Page, type Request, type Response } from "@playwrigh
 import { requireAdmin } from "../support/env";
 import { buildStationFixture, ledgerReasons, sendOrder, type StationFixture } from "../support/fixture";
 
-// Phase 1 gate project p1-order-flow, the kitchen half (step 1.6a; step 1.6c adds the pad, the bar and the till to the
-// full flow and replaces the fixme in order-flow.spec.ts). docs/phases/phase-1-plan.md section 7, ADR 0009.
+// Phase 1 gate project p1-order-flow, the kitchen half (step 1.6a; step 1.6c added the pad, the bar and the till in
+// order-flow.spec.ts, the full flow). docs/phases/phase-1-plan.md section 7, ADR 0009.
 //
 // A chef signs in on the kitchen display. A waiter (through the API; the pad arrives in step 1.6b) sends an order for a
 // chicken sandwich. The ticket appears on the chef's rail within 5 s through the polling transport; after the first

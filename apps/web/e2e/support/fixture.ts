@@ -55,6 +55,7 @@ const STAFF = {
   barista: { phone: "+251911000202", name: "E2E Barista" },
   waiter: { phone: "+251911000203", name: "E2E Waiter" },
   cashier: { phone: "+251911000204", name: "E2E Cashier" },
+  manager: { phone: "+251911000205", name: "E2E Manager" },
 } as const;
 
 /** The password of a fixed e2e account: derived from the admin's, so no credential is written in the repository. */
@@ -65,7 +66,7 @@ function passwordFor(adminPassword: string, role: keyof typeof STAFF): string {
 // POST /login is throttled (10 a minute per address) and every flow signs in through the browser too, so the API
 // sessions of the fixtures (the admin, the waiter) are made once per process and shared by the flows that follow.
 const logins = new Map<string, ReturnType<typeof Api.login>>();
-function loginOnce(phone: string, password: string, branchId?: number): ReturnType<typeof Api.login> {
+export function loginOnce(phone: string, password: string, branchId?: number): ReturnType<typeof Api.login> {
   const key = `${phone}|${branchId ?? ""}`;
   let pending = logins.get(key);
   if (!pending) {
@@ -132,46 +133,51 @@ async function ensureTable(admin: Api, code: string): Promise<{ id: number; code
   });
 }
 
-/**
- * One station with everything an order needs to flow through it: its stock location, a worker assigned to it, a
- * waiter with a short code, a table, an ingredient with stock, and a product routed to the station with a recipe and a
- * price. Returns what the flow needs to sign in and to check the ledger afterwards.
- */
 /** Counts the fixtures of this process: two flows of one run must not share item names. */
 let built = 0;
 
-export async function buildStationFixture(
-  adminCredentials: { phone: string; password: string },
+/** What one station contributes to a flow: its location, its worker, an ingredient with stock and a routed product. */
+export interface StationSide {
+  kind: StationKind;
+  station: Station;
+  location: Location;
+  worker: Staff;
+  ingredient: { id: number; name_en: string; name_am: string; unitId: number; stocked: string };
+  product: { id: number; name_en: string; name_am: string; price: string; ingredientPerUnit: string };
+}
+
+interface Units {
+  (code: string): number;
+}
+
+async function unitLookup(admin: Api): Promise<Units> {
+  const units = (await admin.get<{ data: Unit[] }>("/units")).data;
+  return (code: string): number => {
+    const found = units.find((u) => u.code === code);
+    if (!found) throw new Error(`unit ${code} is missing from the E2E branch`);
+    return found.id;
+  };
+}
+
+/** A station with its location and worker, a run-unique ingredient stocked at the location, and a product that uses it. */
+async function makeStationSide(
+  admin: Api,
+  adminPassword: string,
+  unit: Units,
   kind: StationKind,
-  options: { stock?: string; perUnit?: string; price?: string } = {},
-): Promise<StationFixture> {
-  const tag = `${run}${++built}`;
+  tag: string,
+  options: { stock?: string; perUnit?: string; price?: string },
+): Promise<StationSide> {
   const stocked = options.stock ?? "10.0000";
   const perUnit = options.perUnit ?? "0.2000";
   const price = options.price ?? "120.00";
-
-  const { api: admin, login } = await loginOnce(adminCredentials.phone, adminCredentials.password);
-  const branchId = login.user.branch_id;
 
   const station = await findOrCreateStation(admin, kind);
   const location = await findOrCreateLocation(admin, station);
 
   const workerRole = kind === "kitchen" ? "chef" : "barista";
-  const worker = await ensureStaff(admin, adminCredentials.password, workerRole);
+  const worker = await ensureStaff(admin, adminPassword, workerRole);
   await admin.put(`/users/${worker.id}/stations`, { assignments: [{ station_id: station.id, can_count: true, is_overseer: false }] });
-
-  const waiterStaff = await ensureStaff(admin, adminCredentials.password, "waiter");
-  const { short_code: shortCode } = await admin.post<{ short_code: string }>(`/users/${waiterStaff.id}/short-code/reset`);
-  const { api: waiterApi } = await loginOnce(waiterStaff.phone, waiterStaff.password, branchId);
-
-  const table = await ensureTable(admin, "E2E-T1");
-
-  const units = (await admin.get<{ data: Unit[] }>("/units")).data;
-  const unit = (code: string): number => {
-    const found = units.find((u) => u.code === code);
-    if (!found) throw new Error(`unit ${code} is missing from the E2E branch`);
-    return found.id;
-  };
 
   const ingredientNameAm = `የሙከራ ግብዓት ${tag}`;
   const ingredient = await admin.post<{ id: number; name_en: string }>("/items", {
@@ -208,17 +214,164 @@ export async function buildStationFixture(
   await admin.post(`/items/${product.id}/prices`, { price });
 
   return {
-    admin,
-    branchId,
     kind,
     station,
     location,
     worker,
-    waiter: { ...waiterStaff, api: waiterApi, shortCode },
-    table,
     ingredient: { id: ingredient.id, name_en: ingredient.name_en, name_am: ingredientNameAm, unitId: unit("kg"), stocked },
     product: { id: product.id, name_en: nameEn, name_am: nameAm, price, ingredientPerUnit: perUnit },
   };
+}
+
+/**
+ * One station with everything an order needs to flow through it: its stock location, a worker assigned to it, a
+ * waiter with a short code, a table, an ingredient with stock, and a product routed to the station with a recipe and a
+ * price. Returns what the flow needs to sign in and to check the ledger afterwards.
+ */
+export async function buildStationFixture(
+  adminCredentials: { phone: string; password: string },
+  kind: StationKind,
+  options: { stock?: string; perUnit?: string; price?: string } = {},
+): Promise<StationFixture> {
+  const tag = `${run}${++built}`;
+
+  const { api: admin, login } = await loginOnce(adminCredentials.phone, adminCredentials.password);
+  const branchId = login.user.branch_id;
+  const unit = await unitLookup(admin);
+  const side = await makeStationSide(admin, adminCredentials.password, unit, kind, tag, options);
+
+  const waiterStaff = await ensureStaff(admin, adminCredentials.password, "waiter");
+  const { short_code: shortCode } = await admin.post<{ short_code: string }>(`/users/${waiterStaff.id}/short-code/reset`);
+  const { api: waiterApi } = await loginOnce(waiterStaff.phone, waiterStaff.password, branchId);
+
+  const table = await ensureTable(admin, "E2E-T1");
+
+  return {
+    admin,
+    branchId,
+    kind,
+    station: side.station,
+    location: side.location,
+    worker: side.worker,
+    waiter: { ...waiterStaff, api: waiterApi, shortCode },
+    table,
+    ingredient: side.ingredient,
+    product: side.product,
+  };
+}
+
+// --- the till (step 1.6c) ----------------------------------------------------------------------------------------
+
+export interface TillStaff {
+  admin: Api;
+  branchId: number;
+  cashier: Staff & { api: Api };
+  /** a manager whose short code is the PIN that approves a void */
+  manager: Staff & { pin: string };
+}
+
+/** The fixed cashier (signed in on the API) and the fixed manager with a fresh PIN. */
+export async function buildTillStaff(adminCredentials: { phone: string; password: string }): Promise<TillStaff> {
+  const { api: admin, login } = await loginOnce(adminCredentials.phone, adminCredentials.password);
+  const branchId = login.user.branch_id;
+  const cashierStaff = await ensureStaff(admin, adminCredentials.password, "cashier");
+  const { api } = await loginOnce(cashierStaff.phone, cashierStaff.password, branchId);
+  const managerStaff = await ensureStaff(admin, adminCredentials.password, "manager");
+  const { short_code: pin } = await admin.post<{ short_code: string }>(`/users/${managerStaff.id}/short-code/reset`);
+  return { admin, branchId, cashier: { ...cashierStaff, api }, manager: { ...managerStaff, pin } };
+}
+
+async function findOrCreateDisplayCase(admin: Api): Promise<Location> {
+  const locations = (await admin.get<{ data: Location[] }>("/locations")).data;
+  const found = locations.find((l) => l.type === "display_case");
+  if (found) return found;
+  return admin.post<Location>("/locations", { name_en: "Display case", name_am: "የዕቃ ማሳያ", type: "display_case" });
+}
+
+export interface FlowFixture {
+  admin: Api;
+  branchId: number;
+  waiter: Staff & { api: Api; shortCode: string };
+  cashier: Staff & { api: Api };
+  chef: Staff & { api: Api };
+  barista: Staff & { api: Api };
+  table: { id: number; code: string };
+  kitchen: StationSide;
+  bar: StationSide;
+  displayCase: Location;
+  /** a product that is sold from the display case: no station, stock of its own at the display-case location */
+  croissant: { id: number; name_en: string; name_am: string; price: string; stocked: string };
+}
+
+/**
+ * Everything the full order flow needs: the kitchen and the bar (each with worker, ingredient and product), a
+ * display-case croissant with its own stock, the waiter (short code), the chef, the barista and the cashier signed in
+ * on the API, and the table. Prices make a total of 330.00: sandwich 180.00, latte 90.00, croissant 60.00.
+ */
+export async function buildFlowFixture(adminCredentials: { phone: string; password: string }): Promise<FlowFixture> {
+  const tag = `${run}${++built}`;
+  const { api: admin, login } = await loginOnce(adminCredentials.phone, adminCredentials.password);
+  const branchId = login.user.branch_id;
+  const unit = await unitLookup(admin);
+
+  const kitchen = await makeStationSide(admin, adminCredentials.password, unit, "kitchen", tag, { price: "180.00" });
+  const bar = await makeStationSide(admin, adminCredentials.password, unit, "bar", tag, { price: "90.00" });
+
+  const displayCase = await findOrCreateDisplayCase(admin);
+  const croissantStock = "5.0000";
+  const croissantPrice = "60.00";
+  const croissantEn = `E2E croissant ${tag}`;
+  const croissantAm = `የሙከራ ክሮዋሳን ${tag}`;
+  const croissant = await admin.post<{ id: number }>("/items", {
+    kind: "product",
+    fulfilment: "to_stock",
+    name_en: croissantEn,
+    name_am: croissantAm,
+    unit_id: unit("pcs"),
+  });
+  await admin.post(`/items/${croissant.id}/prices`, { price: croissantPrice });
+  await admin.post("/stock/movements", {
+    item_id: croissant.id,
+    location_id: displayCase.id,
+    reason: "purchase_in",
+    qty: croissantStock,
+    unit_id: unit("pcs"),
+    client_uuid: uuid(),
+    note: `e2e ${tag}`,
+  });
+
+  const waiterStaff = await ensureStaff(admin, adminCredentials.password, "waiter");
+  const { short_code: shortCode } = await admin.post<{ short_code: string }>(`/users/${waiterStaff.id}/short-code/reset`);
+  const cashierStaff = await ensureStaff(admin, adminCredentials.password, "cashier");
+  const [waiterSession, chefSession, baristaSession, cashierSession] = await Promise.all(
+    [waiterStaff, kitchen.worker, bar.worker, cashierStaff].map((s) => loginOnce(s.phone, s.password, branchId)),
+  );
+
+  return {
+    admin,
+    branchId,
+    waiter: { ...waiterStaff, api: waiterSession.api, shortCode },
+    cashier: { ...cashierStaff, api: cashierSession.api },
+    chef: { ...kitchen.worker, api: chefSession.api },
+    barista: { ...bar.worker, api: baristaSession.api },
+    table: await ensureTable(admin, "E2E-T1"),
+    kitchen,
+    bar,
+    displayCase,
+    croissant: { id: croissant.id, name_en: croissantEn, name_am: croissantAm, price: croissantPrice, stocked: croissantStock },
+  };
+}
+
+/** The ledger reasons of an item at a location, oldest first (the purchase that stocked it comes first). */
+export async function ledgerReasonsOf(admin: Api, itemId: number, locationId: number): Promise<string[]> {
+  const page = await admin.get<{ data: { id: number; reason: string }[] }>("/ledger", { item: itemId, location: locationId, per_page: 100 });
+  return [...page.data].sort((a, b) => a.id - b.id).map((m) => m.reason);
+}
+
+/** What the menu offers of a product right now, as the API's decimal string ("49.0000"), or null when it is not listed. */
+export async function menuAvailable(api: Api, itemId: number): Promise<string | null> {
+  const menu = await api.get<{ items: { item_id: number; available: string }[] }>("/menu", { include_unavailable: 1 });
+  return menu.items.find((i) => i.item_id === itemId)?.available ?? null;
 }
 
 export interface SentOrder {

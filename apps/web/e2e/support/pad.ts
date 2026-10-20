@@ -9,10 +9,13 @@ import { expect, type Page } from "@playwright/test";
 
 const TOKEN_KEY = "bakery-ops.token";
 
-/** Opens the pad page (English) on a device signed in as the pad account. */
-export async function openPad(page: Page, account: { api: { token: string | null } }, path = "en/pad/") {
-  const token = account.api.token;
-  if (!token) throw new Error("the pad account has no API session");
+/**
+ * Opens a page (English by default) on a device that is already signed in as `account`: the token of its API session is
+ * placed where the app keeps it (ADR 0007). Used by every role of the full order flow (kitchen, bar, till, admin).
+ */
+export async function openAs(page: Page, account: { token: string | null }, path: string) {
+  const token = account.token;
+  if (!token) throw new Error("the account has no API session");
   await page.addInitScript(
     ([key, value]) => {
       try {
@@ -24,6 +27,11 @@ export async function openPad(page: Page, account: { api: { token: string | null
     [TOKEN_KEY, token],
   );
   await page.goto(path);
+}
+
+/** Opens the pad page (English) on a device signed in as the pad account. */
+export async function openPad(page: Page, account: { api: { token: string | null } }, path = "en/pad/") {
+  await openAs(page, account.api, path);
 }
 
 /** Types a short code on the pad keypad and presses the unlock button (named in the page language). */
