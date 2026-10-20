@@ -40,6 +40,27 @@ export function subtractDecimal(a: string, b: string, dp = 2): string {
   return unscaled(scaled(a, dp) - scaled(b, dp), dp);
 }
 
+/**
+ * A money amount times a quantity (a line total): exact on scaled integers, rounded half up to `dp` places when the
+ * product has more (the API rounds the same way; its totals replace this figure after a send). Never a float.
+ */
+export function multiplyDecimal(amount: string, quantity: string, dp = 2): string {
+  const a = scaled(amount, dp);
+  const q = scaled(quantity, 4);
+  const product = a * q; // dp + 4 decimals
+  const unit = BigInt(10) ** BigInt(4);
+  const negative = product < BigInt(0);
+  const magnitude = negative ? -product : product;
+  const rounded = (magnitude + unit / BigInt(2)) / unit;
+  return unscaled(negative ? -rounded : rounded, dp);
+}
+
+/** Adds one to a whole-number quantity ("2" -> "3"); subtracts with a floor of zero when `by` is negative. */
+export function stepQuantity(quantity: string, by: 1 | -1): string {
+  const next = scaled(quantity, 0) + BigInt(by);
+  return unscaled(next < BigInt(0) ? BigInt(0) : next, 0);
+}
+
 /** "2.0000" -> "2", "0.2500" -> "0.25": how a quantity reads on a ticket. Not a number conversion. */
 export function trimDecimal(value: string): string {
   const { negative, whole, fraction } = parts(value);

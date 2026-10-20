@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { useMemo } from "react";
 import { useErrorText } from "@/lib/errors";
 import { useOutbox } from "@/lib/outbox/store";
 import { focusRing } from "./styles";
@@ -12,7 +13,9 @@ export function PendingIndicator() {
   const t = useTranslations("outbox");
   const errorText = useErrorText();
   const items = useOutbox((s) => s.items);
-  const failures = useOutbox((s) => s.failures);
+  // a refusal the pad shows on its own line (the shortfall) stays out of the strip
+  const allFailures = useOutbox((s) => s.failures);
+  const failures = useMemo(() => allFailures.filter((f) => !f.inline), [allFailures]);
   const dismiss = useOutbox((s) => s.dismissFailure);
 
   if (items.length === 0 && failures.length === 0) return null;

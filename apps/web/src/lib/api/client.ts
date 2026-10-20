@@ -32,6 +32,13 @@ export class ApiError extends Error {
   }
 }
 
+/** The 401 of a short-code session that ended or never was: the pad locks, the device stays signed in. */
+export const ACTING_EXPIRED_KEY = "identity.acting_session.expired";
+
+export function isActingExpired(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401 && error.key === ACTING_EXPIRED_KEY;
+}
+
 export interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
@@ -40,6 +47,8 @@ export interface RequestOptions {
   /** Required for writes; reuse the same key when retrying the same request (see idempotency.ts). */
   idempotencyKey?: string;
   signal?: AbortSignal;
+  /** Extra request headers: the pad sends X-Acting-Session and X-Device-Id (lib/acting.ts). */
+  headers?: Record<string, string>;
 }
 
 export function apiUrl(path: string, query?: RequestOptions["query"]): string {
@@ -54,7 +63,7 @@ export function apiUrl(path: string, query?: RequestOptions["query"]): string {
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (WRITE_METHODS.has(method)) {
@@ -101,9 +110,15 @@ export type ConditionalResult<T> = { notModified: true; etag: string | null } | 
  */
 export async function conditionalGet<T>(
   path: string,
-  options: { query?: RequestOptions["query"]; token?: string | null; etag?: string | null; signal?: AbortSignal } = {},
+  options: {
+    query?: RequestOptions["query"];
+    token?: string | null;
+    etag?: string | null;
+    signal?: AbortSignal;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<ConditionalResult<T>> {
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (options.etag) headers["If-None-Match"] = options.etag;
 

@@ -400,3 +400,20 @@ export interface ShortfallBody extends ApiErrorBody {
   order: Order;
   shortfall: ShortfallLine[];
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Step 1.6b: the waiter pad.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** POST /short-code/verify: the person whose code it was, and the 10-minute acting session. */
+export interface ShortCodeVerified {
+  user: { id: number; name: string; photo_url: string | null; locale: Locale };
+  permissions: string[];
+  acting_session: { id: number; started_at: string; expires_at: string };
+}
+
+/** The 422 body of a refused line: `line_client_uuid` says which line it is about (orders.item.not_sellable ...). */
+export interface LineErrorBody extends ApiErrorBody {
+  line_client_uuid?: string;
+  field?: string;
+}

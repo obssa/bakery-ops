@@ -1,6 +1,6 @@
 import { conditionalGet } from "../api/client";
 import type { Line, LineStatus, Ticket, TicketOrder, TicketsPage } from "../api/types";
-import { useSession } from "../session";
+import { handleUnauthorized, useSession } from "../session";
 import { LiveFeed, type FeedSource, type FeedSpec } from "./feed";
 import { createTransport } from "./transport";
 
@@ -67,15 +67,31 @@ export const ticketsSpec: FeedSpec<TicketsPage, RailState> = {
   merge: mergeTickets,
 };
 
-/** The source of a cursor feed over the signed-in session: bearer token, `since`, If-None-Match; a 401 ends the session. */
-export function feedSource<Page>(path: string): FeedSource<Page> {
+export interface FeedSourceOptions {
+  /** query parameters every look carries (?mine=1, ?include_unavailable=1) */
+  query?: Record<string, string | number>;
+  /** extra headers per look, read at call time (the pad sends its acting session) */
+  headers?: () => Record<string, string>;
+  /** false for a feed that has no cursor (the menu answers whole, behind its ETag) */
+  cursor?: boolean;
+}
+
+/** The source of a cursor feed over the signed-in session: bearer token, `since`, If-None-Match; a 401 ends the session
+ * (or, for an ended acting session, locks the pad). */
+export function feedSource<Page>(path: string, options: FeedSourceOptions = {}): FeedSource<Page> {
   return {
     async fetchPage({ cursor, etag, signal }) {
-      const { token, expire } = useSession.getState();
+      const { token } = useSession.getState();
       try {
-        return await conditionalGet<Page>(path, { query: cursor ? { since: cursor } : undefined, token, etag, signal });
+        return await conditionalGet<Page>(path, {
+          query: { ...options.query, ...(cursor && options.cursor !== false ? { since: cursor } : {}) },
+          token,
+          etag,
+          signal,
+          headers: options.headers?.(),
+        });
       } catch (error) {
-        if (typeof error === "object" && error !== null && "status" in error && (error as { status: number }).status === 401) expire();
+        handleUnauthorized(error);
         throw error;
       }
     },

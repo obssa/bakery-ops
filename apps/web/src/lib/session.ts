@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { ApiError, request, type RequestOptions } from "./api/client";
+import { ApiError, isActingExpired, request, type RequestOptions } from "./api/client";
 import { uuid } from "./api/idempotency";
 import type { LoginResponse, Me } from "./api/types";
 
@@ -108,13 +108,26 @@ export const useSession = create<SessionState>()((set, get) => ({
   },
 }));
 
+/** Set by lib/acting.ts: what a 401 `identity.acting_session.expired` does (lock the pad). */
+export const actingHooks = { onExpired: () => {} };
+
+/**
+ * A 401 on a call. The acting session of the shared pad ending is not the device signing out: the pad locks and the
+ * next waiter enters their code. Any other 401 (token revoked, user switched off) signs this device out.
+ */
+export function handleUnauthorized(error: unknown): void {
+  if (!(error instanceof ApiError) || error.status !== 401) return;
+  if (isActingExpired(error)) actingHooks.onExpired();
+  else useSession.getState().expire();
+}
+
 /** A call with the current token; a 401 signs this device out (the guard then sends the user to the login page). */
 export async function authed<T>(path: string, options: Omit<RequestOptions, "token"> = {}): Promise<T> {
-  const { token, expire } = useSession.getState();
+  const { token } = useSession.getState();
   try {
     return await request<T>(path, { ...options, token });
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) expire();
+    handleUnauthorized(error);
     throw error;
   }
 }

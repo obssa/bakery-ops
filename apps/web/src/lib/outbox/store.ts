@@ -1,10 +1,11 @@
 "use client";
 
 import { create } from "zustand";
-import { ApiError, request } from "../api/client";
+import { ApiError, isActingExpired, request } from "../api/client";
 import { uuid } from "../api/idempotency";
-import type { NewOrder, RejectBody } from "../api/types";
-import { useSession } from "../session";
+import type { NewOrder, NewOrderLine, RejectBody } from "../api/types";
+import { actingHooks, useSession } from "../session";
+import { actingHeaders } from "../acting";
 
 // A minimal outbox (step 1.6a): the writes a screen must not lose to a bad connection, i.e. send an order, accept a
 // line, mark a line ready. Each is queued with its Idempotency-Key (and the order its client UUID) fixed at enqueue,
@@ -14,15 +15,32 @@ import { useSession } from "../session";
 const STORAGE_KEY = "bakery-ops.outbox.v1";
 const RETRY_MS = [2000, 4000, 8000, 10_000];
 
-export type OutboxKind = "send_order" | "accept_line" | "ready_line" | "reject_line";
+export type OutboxKind =
+  | "send_order"
+  | "accept_line"
+  | "ready_line"
+  | "reject_line"
+  // the waiter pad (step 1.6b)
+  | "replace_lines"
+  | "send_existing"
+  | "serve_line"
+  | "cancel_order";
 
 export interface OutboxItem {
   id: string;
   kind: OutboxKind;
-  method: "POST";
+  method: "POST" | "PUT";
   path: string;
   body: unknown;
   idempotencyKey: string;
+  /** extra headers fixed at enqueue: the pad X-Acting-Session and X-Device-Id (the waiter who tapped, not whoever acts at retry time) */
+  headers?: Record<string, string>;
+  /** the order client_uuid, so the pad finds the answer to its own send */
+  subjectUuid?: string | null;
+  /** the item that must succeed first; when it is refused this one is dropped with it (replace lines, then send) */
+  after?: string | null;
+  /** true: the screen shows the refusal itself (the shortfall on its line), so the shell strip stays quiet */
+  inline?: boolean;
   /** the account that queued it: only that account sends it */
   userId: number;
   /** the line or order the write is about, so a screen can show "sending" on it */
@@ -35,7 +53,10 @@ export interface OutboxFailure {
   id: string;
   kind: OutboxKind;
   subjectId: number | null;
-  /** the API's own error, kept whole: a refused send carries its shortfall in `body` */
+  subjectUuid: string | null;
+  /** shown by the screen that queued it, not by the shell strip */
+  inline: boolean;
+  /** the API own error, kept whole: a refused send carries its shortfall in `body` */
   error: ApiError;
   at: number;
 }
@@ -69,7 +90,8 @@ function save(items: OutboxItem[]): void {
   }
 }
 
-type Listener = (item: OutboxItem) => void;
+export type OutboxOutcome = "accepted" | "refused";
+type Listener = (item: OutboxItem, outcome: OutboxOutcome) => void;
 const appliedListeners = new Set<Listener>();
 
 /** Called after a queued write was accepted by the API (a screen then looks at its feed at once). */
@@ -98,6 +120,10 @@ export const useOutbox = create<OutboxState>()((set, get) => ({
       path: input.path,
       body: input.body,
       subjectId: input.subjectId,
+      headers: input.headers,
+      subjectUuid: input.subjectUuid ?? null,
+      after: input.after ?? null,
+      inline: input.inline ?? false,
       idempotencyKey: input.idempotencyKey ?? uuid(),
       userId: me.user.id,
       createdAt: Date.now(),
@@ -125,18 +151,36 @@ export const useOutbox = create<OutboxState>()((set, get) => ({
           return;
         }
         try {
-          await request(item.path, { method: item.method, body: item.body, idempotencyKey: item.idempotencyKey, token });
+          await request(item.path, { method: item.method, body: item.body, idempotencyKey: item.idempotencyKey, token, headers: item.headers });
         } catch (error) {
-          if (error instanceof ApiError && error.status === 401) {
+          if (error instanceof ApiError && error.status === 401 && !isActingExpired(error)) {
             useSession.getState().expire();
             return;
           }
           if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
-            // refused for good: drop it and say so
-            const items = get().items.filter((i) => i.id !== item.id);
+            // refused for good (an ended acting session included: the waiter enters their code and taps again):
+            // drop it, and whatever waited for it, and say so
+            const dropped = new Set<string>([item.id]);
+            for (let grown = true; grown; ) {
+              grown = false;
+              for (const other of get().items) {
+                if (other.after && dropped.has(other.after) && !dropped.has(other.id)) {
+                  dropped.add(other.id);
+                  grown = true;
+                }
+              }
+            }
+            const items = get().items.filter((i) => !dropped.has(i.id));
             save(items);
-            set({ items, failures: [...get().failures, { id: item.id, kind: item.kind, subjectId: item.subjectId, error, at: Date.now() }] });
-            appliedListeners.forEach((l) => l(item));
+            set({
+              items,
+              failures: [
+                ...get().failures,
+                { id: item.id, kind: item.kind, subjectId: item.subjectId, subjectUuid: item.subjectUuid ?? null, inline: item.inline ?? false, error, at: Date.now() },
+              ],
+            });
+            if (isActingExpired(error)) actingHooks.onExpired();
+            appliedListeners.forEach((l) => l(item, "refused"));
             continue;
           }
           // network or 5xx: keep it, same key, try again later
@@ -149,7 +193,7 @@ export const useOutbox = create<OutboxState>()((set, get) => ({
         const items = get().items.filter((i) => i.id !== item.id);
         save(items);
         set({ items });
-        appliedListeners.forEach((l) => l(item));
+        appliedListeners.forEach((l) => l(item, "accepted"));
       }
     } finally {
       set({ sending: false });
@@ -204,4 +248,58 @@ export function queueReadyLine(lineId: number): OutboxItem | null {
 
 export function queueRejectLine(lineId: number, body: RejectBody): OutboxItem | null {
   return useOutbox.getState().enqueue({ kind: "reject_line", method: "POST", path: `/order-lines/${lineId}/reject`, body, subjectId: lineId });
+}
+
+// The pad writes. Each carries the acting headers of the moment the waiter tapped; the sends are answered on the screen
+// (inline), so a refusal such as the shortfall lands on its line and not in the shell strip.
+
+/** POST /orders with send:true for a new cart. */
+export function queuePadSend(order: NewOrder): OutboxItem | null {
+  return useOutbox.getState().enqueue({
+    kind: "send_order",
+    method: "POST",
+    path: "/orders",
+    body: { ...order, send: true },
+    subjectId: null,
+    subjectUuid: order.client_uuid,
+    headers: actingHeaders(),
+    inline: true,
+  });
+}
+
+/** PUT /orders/{id}/lines: the open order lines become the cart lines (after a shortfall the waiter fixed a line). */
+export function queueReplaceLines(orderId: number, orderUuid: string, lines: NewOrderLine[]): OutboxItem | null {
+  return useOutbox.getState().enqueue({
+    kind: "replace_lines",
+    method: "PUT",
+    path: `/orders/${orderId}/lines`,
+    body: { lines },
+    subjectId: orderId,
+    subjectUuid: orderUuid,
+    headers: actingHeaders(),
+    inline: true,
+  });
+}
+
+/** POST /orders/{id}/send for an order that is already open on the server; `after` is the replace it waits for. */
+export function queueSendExisting(orderId: number, orderUuid: string, after: string | null): OutboxItem | null {
+  return useOutbox.getState().enqueue({
+    kind: "send_existing",
+    method: "POST",
+    path: `/orders/${orderId}/send`,
+    body: {},
+    subjectId: orderId,
+    subjectUuid: orderUuid,
+    headers: actingHeaders(),
+    after,
+    inline: true,
+  });
+}
+
+export function queueServeLine(lineId: number): OutboxItem | null {
+  return useOutbox.getState().enqueue({ kind: "serve_line", method: "POST", path: `/order-lines/${lineId}/served`, body: {}, subjectId: lineId, headers: actingHeaders() });
+}
+
+export function queueCancelOrder(orderId: number): OutboxItem | null {
+  return useOutbox.getState().enqueue({ kind: "cancel_order", method: "POST", path: `/orders/${orderId}/cancel`, body: {}, subjectId: orderId, headers: actingHeaders() });
 }
