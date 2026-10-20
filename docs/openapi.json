@@ -1357,6 +1357,215 @@
                 }
             }
         },
+        "/v1/orders": {
+            "post": {
+                "operationId": "orders.store",
+                "tags": [
+                    "Orders"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/orders/{order}/lines": {
+            "put": {
+                "operationId": "orders.lines.replace",
+                "tags": [
+                    "Orders"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "description": "The order ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReplaceLinesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/orders/{order}/send": {
+            "post": {
+                "operationId": "orders.send",
+                "tags": [
+                    "Orders"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "description": "The order ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/orders/{order}/cancel": {
+            "post": {
+                "operationId": "orders.cancel",
+                "tags": [
+                    "Orders"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "description": "The order ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CancelOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/items/{item}/recipe": {
             "get": {
                 "operationId": "catalog.items.recipe.show",
@@ -2090,6 +2299,20 @@
                 ],
                 "title": "BroadcastingAuthRequest"
             },
+            "CancelOrderRequest": {
+                "type": "object",
+                "description": "POST /orders/{order}/cancel: an optional reason (\"The customer left\"), kept on the order and in its timeline.",
+                "properties": {
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "title": "CancelOrderRequest"
+            },
             "CategoryResource": {
                 "type": "object",
                 "properties": {
@@ -2691,6 +2914,60 @@
                 ],
                 "title": "ReplaceItemStationsRequest"
             },
+            "ReplaceLinesRequest": {
+                "type": "object",
+                "description": "PUT /orders/{order}/lines: the whole list of the open cart's lines (ReadsLines); a line already on the order is\nsent again under its client UUID, a line left out is removed.",
+                "properties": {
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "client_uuid": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "item_id": {
+                                    "type": "integer"
+                                },
+                                "qty": {
+                                    "type": "string"
+                                },
+                                "modifier_ids": {
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ],
+                                    "items": {
+                                        "type": "integer"
+                                    },
+                                    "maxItems": 10,
+                                    "uniqueItems": true
+                                },
+                                "notes": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 500
+                                }
+                            },
+                            "required": [
+                                "client_uuid",
+                                "item_id",
+                                "qty"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "lines"
+                ],
+                "title": "ReplaceLinesRequest"
+            },
             "ReplaceUserStationsRequest": {
                 "type": "object",
                 "description": "PUT /users/{id}/stations: the user's complete set of station assignments (an empty list withdraws them all).",
@@ -3088,6 +3365,89 @@
                     "qty"
                 ],
                 "title": "StoreMovementRequest"
+            },
+            "StoreOrderRequest": {
+                "type": "object",
+                "description": "POST /orders: the order's client UUID (an offline replay with a lost Idempotency-Key reaches the same order, ADR\n0003), dine-in or takeaway (delivery and advance exist in the schema only, phase-1 plan section 10), a dining table\nfor a dine-in order only, a note, whether to send at once (default true: the pad's Send; false keeps the cart open),\nand the lines (ReadsLines).",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "dine_in",
+                            "takeaway"
+                        ]
+                    },
+                    "dining_table_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 1000
+                    },
+                    "send": {
+                        "type": "boolean"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "client_uuid": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "item_id": {
+                                    "type": "integer"
+                                },
+                                "qty": {
+                                    "type": "string"
+                                },
+                                "modifier_ids": {
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ],
+                                    "items": {
+                                        "type": "integer"
+                                    },
+                                    "maxItems": 10,
+                                    "uniqueItems": true
+                                },
+                                "notes": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 500
+                                }
+                            },
+                            "required": [
+                                "client_uuid",
+                                "item_id",
+                                "qty"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "client_uuid",
+                    "type",
+                    "lines"
+                ],
+                "title": "StoreOrderRequest"
             },
             "StoreStationRequest": {
                 "type": "object",

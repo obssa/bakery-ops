@@ -353,6 +353,79 @@ Small PRs, each green in CI before the next; a step that completes a module ends
    - 1.3b send: `POST /orders`, `PUT /orders/{id}/lines`, `POST /orders/{id}/send`, `POST /orders/{id}/cancel`;
      `SendOrder` (one transaction: number, price snapshot at `sent_at`, modifiers, `recipe_version`, routing,
      `reserveMany`, events); the shortfall body; the last-cake race;
+
+     As built (step 1.3b, `phase-1/orders-send`): the four endpoints of section 4, in `routes/modules/orders.php`
+     (loaded by `OrdersServiceProvider`): `auth:sanctum`, `actor`, `permission:orders.create`, `idempotency`;
+     `{order}` binds through the `BranchScoped` model, so another branch's order is 404. Where section 4 left a
+     detail open, the build settles it as follows:
+     - Who may act. The person acting by short code must hold `orders.create` too, not only the pad account the
+       route checked (a chef's code on the waiters' pad: 403 `auth.forbidden`). An existing order is changed, sent
+       or cancelled by its owner (the acting waiter, else the creator) or by a `stations.all` holder (admin,
+       manager); anyone else gets 403 `orders.order.not_owner` (new key). `created_via` is `waiter_pad` for an
+       acting session or a waiter's account, `admin` for `people.manage`, `till` for `payments.take`.
+     - `POST /orders` writes the cart in its own AuditedAction (`order.create`, event `order.created`), then, with
+       `send` true (the default), runs `SendOrder` in its own transaction. A refused send therefore answers 409
+       with the cart open, as the body in section 4 says. An order `client_uuid` already used answers 200 with
+       that order as it stands, under any key; it is not sent again (`POST /orders/{id}/send` does that). Client
+       UUIDs are stored in lower case. A line `client_uuid` used anywhere else in the branch, or by a line removed
+       from this order, is 422 `validation.failed` on `lines.N.client_uuid`.
+     - Every line is checked when it is written and again at send: `orders.item.not_sellable` (not an active
+       product of the branch), `orders.item.no_price`, `orders.item.no_recipe` (a to-order product without an
+       active recipe), `orders.item.no_location` (a to-order product without a station, or `Locations::forProduct`
+       null). When a line is written its modifiers must belong to its product (`orders.modifier.not_of_item`), and
+       a table must be an active table of the branch (`orders.table.unknown`).
+       The body names the line: `line_client_uuid`, `item_id`, `field` (`lines.N.item_id` or
+       `lines.N.modifier_ids`) and, at send, `line_id`. Nothing is written until every line passes.
+     - A cart line carries the price now, its station and stock location now, and its reservation ref (UUIDv5 of
+       `order-line:{branch_id}:{client_uuid}`, `Support\ReservationRef`). `recipe_version` stays null until the
+       send. Its modifiers are snapshotted once with the line (`order_line_modifiers`), and the send applies that
+       snapshot's price and recipe deltas. The send takes the base price (`Prices::at(sent_at)`), the route and
+       the recipe version again.
+     - `PUT /orders/{order}/lines` knows lines by client UUID. A line sent again keeps its row, takes the new
+       quantity and notes, and is priced and routed again now. Its product and modifiers are fixed: a change
+       there is 422 `orders.line.changed` (new key), and the client adds a new line instead. A line left out is
+       voided, never deleted, and stays in the resource with status `voided`. Event `order.lines_replaced`
+       `{added, updated, removed, total}`.
+     - `SendOrder` is one AuditedAction (`order.send`). It locks the order row and resolves every line at
+       `sent_at`. It then reserves all lines in ONE `reserveMany` (refs in line order, modifier deltas from the
+       snapshot). A `Shortfall` throws `SendRefused` and the transaction rolls back. Only then does it take the
+       day's number (`DailyNumbers`: one upsert that inserts the row of the branch's local date at 1 or adds 1 to
+       it, then a locking read), so the counter row is held only for the last writes. Then come the line
+       snapshots and the order (`sent`). A display-case line is `ready` with `ready_at = sent_at`; an order of
+       display-case lines only goes `sent -> ready` in the same write. Events: `order.sent`, `line.queued` per
+       station line (with its station), `line.ready` per display-case line, `order.ready`. `OrderSent` is
+       dispatched after the commit; its companion goes to `station.{id}` only when the order reaches a station.
+       A sent order answers 200 with itself and writes nothing; a cancelled or voided one is 409
+       `orders.order.not_open` with its `status`.
+     - The shortfall body has one entry per short ingredient of a short line, in line order. Each entry has the
+       line (`line_client_uuid`, `line_id`, `item_id`, `item_name_en|am`, `qty`), the ingredient
+       (`ingredient_item_id`, `ingredient_name_en|am`), `needed`, `available` (what earlier lines left),
+       `qty_short` and `unit` (base unit), `qty_short_display` ("120 g": the base quantity without trailing zeros
+       and the unit code, in both languages), `location_id`, the station (`station_id`, `station_name_en|am`),
+       and `message_en` / `message_am` ("Cannot add Chicken sandwich ×2: Chicken breast short by 120 g
+       (Kitchen)."). A refused send writes nothing at all, not even an `order.send_refused` event. That event
+       type stays in the schema for when a refusal is worth recording (Phase 2's "Notify chef?").
+     - The idempotency middleware stores every answer below 500, so a refused send replayed with its key is the
+       same 409; a new tap on Send is a new key.
+     - Cancel takes an open order only. It voids the order's lines, so the total becomes 0.00, and writes
+       `order.cancelled` `{reason, line_ids}`. It makes no Inventory call: nothing was reserved.
+     - Money: a line is qty x (unit price + modifier price), half-up to 2 dp (`OrderTotals`). Voided and rejected
+       lines are not charged; discount and tax are 0.
+
+     Tests (groups `module:orders`, `feature`, `unit`): `CreateOrderTest`, `ReplaceLinesTest`, `SendOrderTest`,
+     `CancelOrderTest`, `OrdersLangTest`, `Unit/Orders/{OrderTotals,ReservationRef}Test`. SendOrder is shown to be
+     one transaction in two ways. Connection events show every write of the send in the same outermost
+     transaction; under `RefreshDatabase` the idempotency middleware's key row has a savepoint of its own outside
+     the send. A failing `order_events` insert leaves no number, reservation, event or audit row. The fixture
+     menu is `Tests\Support\OrdersMenu`. Concurrency (`tests/Gate/SendOrderRaceTest.php`, groups `concurrency`,
+     `module:orders`, `feature`; `CommitsForConcurrency`; real processes through `Tests\Support\Forks`):
+     - the last cake: one 200, one 409, available never below zero;
+     - two sends at once take the numbers 1 and 2;
+     - one `POST /orders` sent twice at once under one key: one order (the database cache store shares the key
+       lock between the processes, as Redis does live).
+     Registries: four rows in `route_permissions.php` and `write_endpoints.php`; the matrix test gains the
+     `{order}` placeholder (an open cart of the caller's own). No schema change (ERD unchanged); the OpenAPI
+     export gains the four operations.
    - 1.3c station actions: accept, ready (consume), reject (release), served; `OrderProgress` (order status from line
      statuses); station permission;
    - 1.3d void: `POST /orders/{id}/void` with `verifyPinFor('orders.void')`, `releaseMany`, both actors audited;
