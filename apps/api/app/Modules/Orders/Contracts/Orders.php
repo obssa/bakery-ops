@@ -44,6 +44,38 @@ final class Orders
     }
 
     /**
+     * What Payments needs to decide whether it may take a payment: the order's status (its OrderStatus value), whether
+     * it is settled already (paid in full, perhaps before the food came) and its money. With $lock the order's row is
+     * locked (SELECT ... FOR UPDATE) for the rest of the caller's transaction, the same lock ApplyPayment takes, so two
+     * payments of one order run one after the other; call it inside the payment's transaction, and read the view
+     * again after the event when the new totals are wanted.
+     *
+     * @throws ModelNotFoundException an order that does not exist or belongs to another branch
+     */
+    public function forPayment(int $orderId, bool $lock = false): OrderPaymentView
+    {
+        $query = Order::query()->whereKey($orderId);
+        $order = ($lock ? $query->lockForUpdate() : $query)->firstOrFail();
+        $totals = new OrderTotals($order->subtotal, $order->discount, $order->tax, $order->total);
+        $money = $totals->toArray($order->paid_total);
+
+        return new OrderPaymentView(
+            $order->id,
+            $order->status->value,
+            $order->settled_at !== null,
+            new OrderTotalsView(
+                $money['subtotal'],
+                $money['discount'],
+                $money['tax'],
+                $money['total'],
+                $money['paid'],
+                $money['balance'],
+                $order->currency,
+            ),
+        );
+    }
+
+    /**
      * The orders that were open at $at as one station saw them (Phase 3 replays a shift from this). An order is open at
      * $at when it has at least one line at the station, it was sent at or before $at (its order.sent event) and no
      * order.closed, order.cancelled or order.voided event happened at or before $at: an order whose lines are all

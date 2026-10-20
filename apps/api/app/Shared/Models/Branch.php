@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Models;
 
+use App\Shared\Events\BranchCreated;
 use Carbon\CarbonImmutable;
 use Database\Factories\Shared\BranchFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -60,6 +61,18 @@ final class Branch extends Model
     public function stations(): HasMany
     {
         return $this->hasMany(Station::class, 'branch_id');
+    }
+
+    /**
+     * A new branch announces itself (BranchCreated, phase-1 plan section 5), synchronously and in the transaction that
+     * creates it, so the modules that give every branch its starting rows (Payments: the eight channels) do it
+     * wherever branches come from: the admin command, the seeders, the factories. Nothing is announced for an update.
+     */
+    protected static function booted(): void
+    {
+        self::created(static function (self $branch): void {
+            event(new BranchCreated($branch->id));
+        });
     }
 
     protected static function newFactory(): BranchFactory
