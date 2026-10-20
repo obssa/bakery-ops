@@ -298,6 +298,58 @@ Small PRs, each green in CI before the next; a step that completes a module ends
 3. **1.3 orders** (`module:orders`, `unit`, `feature`, `concurrency`), in five PRs:
    - 1.3a schema: the six Orders migrations, models, factories, `OrderStatus` / `LineStatus` with exhaustive
      transition tables, ERD, `AppendOnlyTest` for `order_events`;
+
+     As built (step 1.3a, `phase-1/orders-schema`): the six migrations have the columns, scales, keys and indexes of
+     section 3. Where section 3 left a detail open, the build settles it as follows:
+     - `orders.order_no` and `business_date` are null while the order is an open cart. SendOrder (1.3b) sets both from
+       `order_counters`. CHECK `orders_numbered_on_a_business_date` keeps them together, and the unique key keeps a
+       number once per branch and day.
+     - `order_lines.qty > 0` (CHECK `order_lines_qty_positive`).
+     - The type, status, channel, reject reason and event lists are named CHECKs. They mirror the enums `OrderType`,
+       `OrderStatus`, `CreatedVia`, `LineStatus`, `RejectReason` and `OrderEventType`, and the schema test keeps both
+       sides identical. The bilingual reject messages come with the reject action (1.3c).
+     - Defaults: `open` / `queued`, money `0.00`, `ETB`, `version` 1.
+     - The station, device, approver and actor-station columns have foreign keys. `shift_instance_id` has none until
+       Phase 3.
+     - `order_events.created_at` is DATETIME(6). Its triggers are `order_events_forbid_update_delete_{update,delete}`
+       on MySQL / MariaDB and `forbid_update_delete()` on PostgreSQL. The model guard is `OrderEventsAreAppendOnly`.
+
+     The transition tables (`App\Modules\Orders\Enums`):
+
+     | Order from | to | Line from | to |
+     |---|---|---|---|
+     | `open` | `sent`, `cancelled` | `queued` | `accepted`, `ready`, `rejected`, `voided` |
+     | `sent` | `in_progress`, `ready`, `cancelled`, `voided` | `accepted` | `ready`, `rejected`, `voided` |
+     | `in_progress` | `ready`, `served`, `cancelled`, `voided` | `ready` | `served`, `voided` |
+     | `ready` | `served`, `voided` | `served` | `voided` |
+     | `served` | `paid`, `voided` | `rejected` | (terminal) |
+     | `paid` | `closed` | `voided` | (terminal) |
+     | `closed`, `cancelled`, `voided` | (terminal) | | |
+
+     The order's progress states follow its lines (OrderProgress, 1.3c). They only move forward, and two skips come from
+     this plan's own assumptions:
+     - `sent -> ready`: an order of display-case lines is ready at send.
+     - `in_progress -> served`: a reject can leave only ready or served lines.
+
+     The other edges, also from section 10:
+     - `cancelled` is reached from `open` (cancel) and from `sent` / `in_progress` (every line rejected).
+     - `voided` is reached from `sent` to `served` only. An open order is cancelled instead. Refunds of paid orders
+       are Phase 4.
+     - `paid` follows `served` only: a payment before the food sets `settled_at`, which is a timestamp, not a status.
+     - Line `queued -> ready` is the display-case line at send. Whether a station may mark a line ready without
+       accepting it first is decided by the station action (1.3c), not by the table.
+     - A line is voided with its order from any state except `rejected`.
+
+     Models and factories:
+     - The six models are `BranchScoped` and cast money to `Money` and `qty` to `Quantity`.
+     - Only `DiningTable` soft-deletes. `SoftDeletesTest` allow-lists the others with a reason each.
+     - `OrderLine.location_id` is a plain id. A new arch rule says Orders never uses `Inventory\Models`, the `Ledger`,
+       `StockBalance` or Payments.
+     - Factories: `OrderFactory` (`sent()`, `atTable()`), `OrderLineFactory` (a display-case line by default,
+       `atStation()`), and one each for tables, counters, modifier snapshots and events.
+
+     Scope: no routes, actions or lang keys. The OpenAPI export is unchanged; the ERD gains the six tables. The
+     `gate:p1` `Phase1StateMachinesTest` is still to write (step 1.7).
    - 1.3b send: `POST /orders`, `PUT /orders/{id}/lines`, `POST /orders/{id}/send`, `POST /orders/{id}/cancel`;
      `SendOrder` (one transaction: number, price snapshot at `sent_at`, modifiers, `recipe_version`, routing,
      `reserveMany`, events); the shortfall body; the last-cake race;
