@@ -46,7 +46,7 @@ export interface StationFixture {
   worker: Staff;
   waiter: Staff & { api: Api; shortCode: string };
   table: { id: number; code: string };
-  ingredient: { id: number; name_en: string; unitId: number; stocked: string };
+  ingredient: { id: number; name_en: string; name_am: string; unitId: number; stocked: string };
   product: { id: number; name_en: string; name_am: string; price: string; ingredientPerUnit: string };
 }
 
@@ -90,6 +90,20 @@ export async function ensureStaff(admin: Api, adminPassword: string, role: keyof
   const found = users.find((u) => u.phone === phone);
   const user = found ?? (await admin.post<UserRow>("/users", { name, phone, password, role, locale: "en" }));
   return { id: user.id, name: user.name, phone, password };
+}
+
+/** The fixed waiter with a fresh short code, and a session of their own on the API (for the pad's lock tests). */
+export async function buildWaiter(adminCredentials: { phone: string; password: string }): Promise<{
+  admin: Api;
+  branchId: number;
+  waiter: Staff & { api: Api; shortCode: string };
+}> {
+  const { api: admin, login } = await Api.login(adminCredentials.phone, adminCredentials.password);
+  const branchId = login.user.branch_id;
+  const staff = await ensureStaff(admin, adminCredentials.password, "waiter");
+  const { short_code: shortCode } = await admin.post<{ short_code: string }>(`/users/${staff.id}/short-code/reset`);
+  const { api } = await Api.login(staff.phone, staff.password, branchId);
+  return { admin, branchId, waiter: { ...staff, api, shortCode } };
 }
 
 async function ensureTable(admin: Api, code: string): Promise<{ id: number; code: string }> {
@@ -141,10 +155,11 @@ export async function buildStationFixture(
     return found.id;
   };
 
+  const ingredientNameAm = `የሙከራ ግብዓት ${run}`;
   const ingredient = await admin.post<{ id: number; name_en: string }>("/items", {
     kind: "ingredient",
     name_en: `E2E ${kind} ingredient ${run}`,
-    name_am: `የሙከራ ግብዓት ${run}`,
+    name_am: ingredientNameAm,
     unit_id: unit("kg"),
   });
   await admin.post("/stock/movements", {
@@ -183,7 +198,7 @@ export async function buildStationFixture(
     worker,
     waiter: { ...waiterStaff, api: waiterApi, shortCode },
     table,
-    ingredient: { id: ingredient.id, name_en: ingredient.name_en, unitId: unit("kg"), stocked },
+    ingredient: { id: ingredient.id, name_en: ingredient.name_en, name_am: ingredientNameAm, unitId: unit("kg"), stocked },
     product: { id: product.id, name_en: nameEn, name_am: nameAm, price, ingredientPerUnit: perUnit },
   };
 }
