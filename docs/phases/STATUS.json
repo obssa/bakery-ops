@@ -60,7 +60,7 @@
       ],
       "modules": {
         "contracts": "done",
-        "shared.broadcast": "in_progress",
+        "shared.broadcast": "done",
         "orders": "todo",
         "payments": "todo",
         "read-models": "todo",
