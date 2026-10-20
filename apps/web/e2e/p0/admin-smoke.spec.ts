@@ -85,9 +85,10 @@ test.describe("p0 admin smoke", () => {
   });
 
   test("a screen of a later phase says when it arrives @live", async ({ page }) => {
-    await page.goto("en/pad/");
-    await expect(page.getByRole("heading", { level: 1, name: "Waiter pad" })).toBeVisible();
-    await expect(page.getByRole("main").getByText("Available in Phase 1")).toBeVisible();
+    // the production board is Phase 2 (the waiter pad and the till are live from Phase 1, so they cannot stand here)
+    await page.goto("en/production/");
+    await expect(page.getByRole("heading", { level: 1, name: "Production board" })).toBeVisible();
+    await expect(page.getByRole("main").getByText("Available in Phase 2")).toBeVisible();
   });
 
   test("admin creates an ingredient and a product and sees both in English and Amharic @live", async ({ page }) => {

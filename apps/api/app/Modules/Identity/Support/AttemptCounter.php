@@ -25,10 +25,10 @@ final class AttemptCounter
     public function lockedFor(string $key): int
     {
         $until = $this->cache->get($this->lockKey($key));
-        if (! is_int($until)) {
-            return 0;
+        if (! is_numeric($until)) {
+            return 0; // Redis hands whole numbers back as strings, so is_int() would never lock
         }
-        $remaining = $until - CarbonImmutable::now()->getTimestamp();
+        $remaining = (int) $until - CarbonImmutable::now()->getTimestamp();
         if ($remaining <= 0) {
             $this->cache->forget($this->lockKey($key));
 
@@ -43,7 +43,7 @@ final class AttemptCounter
     {
         $window = $this->lockMinutes * 60;
         $attempts = $this->cache->get($this->attemptsKey($key));
-        $attempts = (is_int($attempts) ? $attempts : 0) + 1;
+        $attempts = (is_numeric($attempts) ? (int) $attempts : 0) + 1;
         if ($attempts < $this->maxAttempts) {
             $this->cache->put($this->attemptsKey($key), $attempts, $window);
 

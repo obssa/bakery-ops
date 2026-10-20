@@ -62,6 +62,20 @@ function passwordFor(adminPassword: string, role: keyof typeof STAFF): string {
   return `${adminPassword}-${role}`;
 }
 
+// POST /login is throttled (10 a minute per address) and every flow signs in through the browser too, so the API
+// sessions of the fixtures (the admin, the waiter) are made once per process and shared by the flows that follow.
+const logins = new Map<string, ReturnType<typeof Api.login>>();
+function loginOnce(phone: string, password: string, branchId?: number): ReturnType<typeof Api.login> {
+  const key = `${phone}|${branchId ?? ""}`;
+  let pending = logins.get(key);
+  if (!pending) {
+    pending = Api.login(phone, password, branchId);
+    logins.set(key, pending);
+    pending.catch(() => logins.delete(key));
+  }
+  return pending;
+}
+
 async function findOrCreateStation(admin: Api, code: StationKind): Promise<Station> {
   const stations = (await admin.get<{ data: Station[] }>("/stations")).data;
   const found = stations.find((s) => s.code === code);
@@ -98,11 +112,11 @@ export async function buildWaiter(adminCredentials: { phone: string; password: s
   branchId: number;
   waiter: Staff & { api: Api; shortCode: string };
 }> {
-  const { api: admin, login } = await Api.login(adminCredentials.phone, adminCredentials.password);
+  const { api: admin, login } = await loginOnce(adminCredentials.phone, adminCredentials.password);
   const branchId = login.user.branch_id;
   const staff = await ensureStaff(admin, adminCredentials.password, "waiter");
   const { short_code: shortCode } = await admin.post<{ short_code: string }>(`/users/${staff.id}/short-code/reset`);
-  const { api } = await Api.login(staff.phone, staff.password, branchId);
+  const { api } = await loginOnce(staff.phone, staff.password, branchId);
   return { admin, branchId, waiter: { ...staff, api, shortCode } };
 }
 
@@ -132,7 +146,7 @@ export async function buildStationFixture(
   const perUnit = options.perUnit ?? "0.2000";
   const price = options.price ?? "120.00";
 
-  const { api: admin, login } = await Api.login(adminCredentials.phone, adminCredentials.password);
+  const { api: admin, login } = await loginOnce(adminCredentials.phone, adminCredentials.password);
   const branchId = login.user.branch_id;
 
   const station = await findOrCreateStation(admin, kind);
@@ -144,7 +158,7 @@ export async function buildStationFixture(
 
   const waiterStaff = await ensureStaff(admin, adminCredentials.password, "waiter");
   const { short_code: shortCode } = await admin.post<{ short_code: string }>(`/users/${waiterStaff.id}/short-code/reset`);
-  const { api: waiterApi } = await Api.login(waiterStaff.phone, waiterStaff.password, branchId);
+  const { api: waiterApi } = await loginOnce(waiterStaff.phone, waiterStaff.password, branchId);
 
   const table = await ensureTable(admin, "E2E-T1");
 
