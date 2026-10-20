@@ -26,13 +26,18 @@ declare(strict_types=1);
 use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Item;
+use App\Modules\Catalog\Services\PriceHistory;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Orders\Models\Order;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
+use App\Shared\Values\Money;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 $admin = static function (): User {
@@ -42,6 +47,17 @@ $admin = static function (): User {
     actInBranch($branch);
 
     return loginAs($admin);
+};
+
+// a display-case product of the admin's branch the till can sell at once: priced an hour ago, 10 in the display case
+$orderableCake = static function (User $me): Item {
+    withActor($me->id);
+    $display = Location::factory()->ofType(LocationType::DisplayCase)->create(['branch_id' => $me->branch_id]);
+    $cake = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'sku' => 'IDEM-ORDER-CAKE']);
+    app(PriceHistory::class)->open($cake, Money::of('45.00'), CarbonImmutable::now()->subHour()->startOfSecond());
+    stockIn($cake, $display, '10');
+
+    return $cake;
 };
 
 return [
@@ -357,5 +373,71 @@ return [
             'reason' => 'purchase_in',
             'qty' => '25',
         ],
+    ],
+
+    // Orders (step 1.3b): a priced display-case product with stock (IDEM-ORDER-CAKE) in the admin's branch; the
+    // first request writes one orders row (create) or one audit_log row (the AuditedAction of every other write)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders',
+        'module' => 'orders',
+        'table' => 'orders',
+        'setup' => function (TestCase $t) use ($admin, $orderableCake): array {
+            $orderableCake($admin());
+
+            return [];
+        },
+        'payload' => fn (): array => [
+            'client_uuid' => (string) Str::uuid(),
+            'type' => 'takeaway',
+            'lines' => [['client_uuid' => (string) Str::uuid(), 'item_id' => Item::query()->where('sku', 'IDEM-ORDER-CAKE')->latest('id')->firstOrFail()->id, 'qty' => '2']],
+        ],
+    ],
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/orders/{order}/lines',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin, $orderableCake): array {
+            $me = $admin();
+            $orderableCake($me);
+            $order = Order::factory()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+
+            return ['{order}' => (string) $order->id];
+        },
+        'payload' => fn (): array => [
+            'lines' => [['client_uuid' => (string) Str::uuid(), 'item_id' => Item::query()->where('sku', 'IDEM-ORDER-CAKE')->latest('id')->firstOrFail()->id, 'qty' => '1']],
+        ],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders/{order}/send',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin, $orderableCake): array {
+            $cake = $orderableCake($admin());
+            $order = $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson('/api/v1/orders', [
+                'client_uuid' => (string) Str::uuid(),
+                'type' => 'takeaway',
+                'send' => false,
+                'lines' => [['client_uuid' => (string) Str::uuid(), 'item_id' => $cake->id, 'qty' => '1']],
+            ]);
+
+            return ['{order}' => (string) $order->json('id')];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders/{order}/cancel',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $order = Order::factory()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+
+            return ['{order}' => (string) $order->id];
+        },
+        'payload' => fn (): array => ['reason' => 'The customer left'],
     ],
 ];

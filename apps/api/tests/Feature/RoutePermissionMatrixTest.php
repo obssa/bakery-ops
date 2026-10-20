@@ -7,6 +7,7 @@ use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Orders\Models\Order;
 use App\Shared\Models\Branch;
 
 /*
@@ -42,6 +43,10 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
     }
     if (str_contains($uri, '{location}')) {
         $params['{location}'] = (string) Location::factory()->create(['branch_id' => $branch->id])->id;
+    }
+    if (str_contains($uri, '{order}')) {
+        // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)
+        $params['{order}'] = (string) Order::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
     }
 
     return $params;

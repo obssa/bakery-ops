@@ -11,11 +11,12 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category} and {location} with a row of the right table in the caller's branch, and
+ * the matrix test substitutes {id}, {item}, {category}, {location} and {order} (an open cart of the caller's own) with a row of the right table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
  */
 $all = ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'];
 $floor = ['admin', 'manager', 'cashier', 'chef', 'barista', 'cake_baker', 'bread_baker'];
+$orderTakers = ['admin', 'manager', 'cashier', 'waiter'];
 
 return [
     // Identity (step 0.4)
@@ -62,4 +63,11 @@ return [
     'GET /api/v1/stock' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
     'POST /api/v1/stock/movements' => ['permission' => 'inventory.adjust', 'roles' => ['admin'], 'module' => 'inventory'],
     'GET /api/v1/ledger' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
+
+    // Orders (step 1.3b): the order-taking roles of the section 7 matrix; on an existing order the actions also need
+    // its ownership or stations.all (403 orders.order.not_owner, checked by the action, after this matrix)
+    'POST /api/v1/orders' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    'PUT /api/v1/orders/{order}/lines' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    'POST /api/v1/orders/{order}/send' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    'POST /api/v1/orders/{order}/cancel' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
 ];
