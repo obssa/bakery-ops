@@ -46,10 +46,38 @@ $ python scripts/gate_check.py --mode entry --phase 1 --no-tests   # at 494a9ac
 == result: FAIL (3 failed, 0 warnings, 20 checks)
 ```
 
-After step 1.1 (contract tests written, provider fixes in, tests run in Docker):
+After step 1.1 (contract tests written, provider fixes in, tests run in Docker), the entry gate passes:
 
 ```
-ENTRY_CHECK_WITH_TESTS
+$ python scripts/gate_check.py --mode entry --phase 1   # at 33f64c5, Pest in the app container
+== gate_check: entry phase 1 (Ordering and live KDS)
+  [PASS] phase 0 done                      status=done done_commit=e57b791878396338f12158b6737df4950e1ba491
+  [PASS] phase 0 commit in history         e57b79187839 is an ancestor of HEAD
+  [PASS] gate:p0 green                     group gate:p0: 303 passed (57695 assertions)
+  [PASS] clean working tree                clean
+  [PASS] phase plan exists                 docs/phases/phase-1-plan.md
+  [PASS] plan approved by Ramin            plan_approved=True by standing approval: Ramin, 2026-10-19
+  [PASS] approval author                   obssa77@gmail.com
+  [PASS] contract orders->inventory file   apps/api/tests/Contract/Orders/InventoryContractTest.php
+  [PASS] contract orders->inventory first  consumer unchanged since previous gate
+  [PASS] contract orders->inventory green  group contract:orders->inventory: 12 passed (263 assertions)
+  [PASS] contract orders->catalog file     apps/api/tests/Contract/Orders/CatalogContractTest.php
+  [PASS] contract orders->catalog first    consumer unchanged since previous gate
+  [PASS] contract orders->catalog green    group contract:orders->catalog: 5 passed (50 assertions)
+  [PASS] contract orders->identity file    apps/api/tests/Contract/Orders/IdentityContractTest.php
+  [PASS] contract orders->identity first   consumer unchanged since previous gate
+  [PASS] contract orders->identity green   group contract:orders->identity: 9 passed (89 assertions)
+  [SKIP] contract payments->orders         intra-phase: provider orders is built in phase 1; write it before step 'payments', checked by --mode module --module orders
+  [PASS] dep orders->inventory stable      stable
+  [PASS] dep orders->catalog stable        stable
+  [PASS] dep orders->identity stable       stable
+  [PASS] dep orders->shared stable         stable
+  [PASS] dep orders->audit stable          stable
+  [PASS] dep payments->identity stable     stable
+  [PASS] dep payments->shared stable       stable
+  [PASS] dep payments->audit stable        stable
+  [SKIP] Phase1Seeder                      not yet (created during the phase)
+== result: PASS (0 failed, 0 warnings, 26 checks)
 ```
 
 ## 2. Contract tests to write first (green before any Orders code)
