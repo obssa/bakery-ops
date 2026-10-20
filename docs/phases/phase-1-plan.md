@@ -78,6 +78,20 @@ Provider changes the contracts require (step 1.1, each with its own module tests
   needs (`orders.create`, `orders.accept`, `orders.void`, `orders.void_request`) exists since Phase 0.
 - **Catalog**: none expected.
 
+As built (step 1.1): the contracts were committed red first (`10f8fd3`); `orders->catalog` was green against Catalog
+as it is, `orders->inventory` and `orders->identity` failed exactly on the capabilities above. The provider fixes
+are `53c3371` (Inventory: `reserveMany` / `releaseMany` / `consumeMany` with one ascending lock pass over the union of
+the rows, `ReserveLine` per-unit deltas and `ReserveLine::withModifiers`, `Shortage::$ref`, `Shortfall::refs()` /
+`for()`, `Contracts\Locations`; module tests extended in `ReservationsTest.php` and the new `StockLocationsTest.php`,
+committed red first in `f37c51a`) and `2c74826` (Identity: `tables.manage`, `PermissionRegistryTest` row). Phase 0's
+`reserve` / `release` / `consume` behave as before (module, property and lock tests unchanged and green). The
+concurrency test was checked against a provider that locks line by line: it deadlocked in every one of the 50 rounds;
+with the single ascending pass it passes with the engine's deadlock counter unchanged. `tests/Pest.php` now gives
+`RefreshDatabase` to `Contract/*/*ContractTest.php`, so a `*ConcurrencyTest.php` contract file can commit its data.
+`tables.manage` reaches existing databases (the live site) in step 1.3e through a migration that adds the registry's
+missing permissions to spatie's tables and grants them to their default roles, never revoking anything; until then no
+route uses it.
+
 ## 3. Migrations (in order)
 
 All tables carry `branch_id` (FK, indexed); money is `DECIMAL(12,2)`, quantities `DECIMAL(14,4)` in base units;
@@ -233,7 +247,9 @@ Small PRs, each green in CI before the next; a step that completes a module ends
    - 1.3c station actions: accept, ready (consume), reject (release), served; `OrderProgress` (order status from line
      statuses); station permission;
    - 1.3d void: `POST /orders/{id}/void` with `verifyPinFor('orders.void')`, `releaseMany`, both actors audited;
-   - 1.3e provided capabilities: `Orders::totals`, `Tickets::since`, `Orders::openAt`; dining tables endpoints.
+   - 1.3e provided capabilities: `Orders::totals`, `Tickets::since`, `Orders::openAt`; dining tables endpoints; the
+     migration that adds permissions new to the registry (`tables.manage`) to existing databases and grants them to
+     their default roles (grant only, never revoke).
    Ends with `gate_check --mode module --module orders`, then `module-stable orders`.
 4. **1.4 payments** (skeleton, final schema): `contract:payments->orders` first, then the two migrations, `Channels`,
    `Payments::record` (cash only passes), the two endpoints, `PaymentRecorded` -> `ApplyPayment`, `BranchCreated` ->
