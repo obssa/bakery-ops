@@ -137,11 +137,15 @@ async function ensureTable(admin: Api, code: string): Promise<{ id: number; code
  * waiter with a short code, a table, an ingredient with stock, and a product routed to the station with a recipe and a
  * price. Returns what the flow needs to sign in and to check the ledger afterwards.
  */
+/** Counts the fixtures of this process: two flows of one run must not share item names. */
+let built = 0;
+
 export async function buildStationFixture(
   adminCredentials: { phone: string; password: string },
   kind: StationKind,
   options: { stock?: string; perUnit?: string; price?: string } = {},
 ): Promise<StationFixture> {
+  const tag = `${run}${++built}`;
   const stocked = options.stock ?? "10.0000";
   const perUnit = options.perUnit ?? "0.2000";
   const price = options.price ?? "120.00";
@@ -169,10 +173,10 @@ export async function buildStationFixture(
     return found.id;
   };
 
-  const ingredientNameAm = `የሙከራ ግብዓት ${run}`;
+  const ingredientNameAm = `የሙከራ ግብዓት ${tag}`;
   const ingredient = await admin.post<{ id: number; name_en: string }>("/items", {
     kind: "ingredient",
-    name_en: `E2E ${kind} ingredient ${run}`,
+    name_en: `E2E ${kind} ingredient ${tag}`,
     name_am: ingredientNameAm,
     unit_id: unit("kg"),
   });
@@ -183,11 +187,11 @@ export async function buildStationFixture(
     qty: stocked,
     unit_id: unit("kg"),
     client_uuid: uuid(),
-    note: `e2e ${run}`,
+    note: `e2e ${tag}`,
   });
 
-  const nameEn = kind === "kitchen" ? `E2E chicken sandwich ${run}` : `E2E latte ${run}`;
-  const nameAm = kind === "kitchen" ? `የሙከራ የዶሮ ሳንድዊች ${run}` : `የሙከራ ላቲ ${run}`;
+  const nameEn = kind === "kitchen" ? `E2E chicken sandwich ${tag}` : `E2E latte ${tag}`;
+  const nameAm = kind === "kitchen" ? `የሙከራ የዶሮ ሳንድዊች ${tag}` : `የሙከራ ላቲ ${tag}`;
   const product = await admin.post<{ id: number }>("/items", {
     kind: "product",
     fulfilment: "to_order",

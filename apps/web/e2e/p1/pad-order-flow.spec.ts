@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture } from "../support/fixture";
-import { openPadAndUnlock, signInAs, typeCode } from "../support/pad";
+import { openPad, openPadAndUnlock, typeCode } from "../support/pad";
 
 // Phase 1 gate project p1-order-flow, the pad lock screen (step 1.6b; the full flow arrives in step 1.6c). A shared pad
 // is signed in as the pad account and locked by a short code (docs/architecture.md section 6, "Waiter pad"):
@@ -18,7 +18,7 @@ test.describe("p1 order flow: pad lock", () => {
     const credentials = requireAdmin(test.skip);
     const fixture = await buildStationFixture(credentials, "kitchen");
 
-    await signInAs(page, fixture.waiter.phone, fixture.waiter.password, "/pad");
+    await openPad(page, fixture.waiter);
     await expect(page.getByRole("heading", { name: "Enter your short code" })).toBeVisible({ timeout: 30_000 });
 
     await typeCode(page, WRONG);
