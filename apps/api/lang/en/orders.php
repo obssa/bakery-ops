@@ -48,6 +48,7 @@ return [
     ],
     'table' => [
         'unknown' => 'This is not an open table of this branch.',
+        'code_taken' => 'Another table of this branch already has this code. Choose a different code.',
     ],
     'line' => [
         'changed' => 'A line keeps its product and options. To order something else, add it as a new line.',

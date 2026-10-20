@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Orders\Contracts;
+
+use App\Modules\Orders\Enums\LineStatus;
+use App\Modules\Orders\Enums\OrderEventType;
+use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderEvent;
+use App\Modules\Orders\Models\OrderLine;
+use App\Modules\Orders\Support\OrderTotals;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+
+/**
+ * What other modules may ask of Orders (manifest orders.provides; they reach Orders through App\Modules\Orders\Contracts
+ * only, tests/Arch/ModuleBoundariesTest.php). Reads, branch-scoped through the models (rule 8). Resolved per use.
+ */
+final class Orders
+{
+    /**
+     * An order's money (OrderTotals): subtotal, discount, tax and total from the order, paid from orders.paid_total
+     * (kept by the PaymentRecorded listener of step 1.4), balance = total - paid, all decimal strings.
+     *
+     * @throws ModelNotFoundException an order that does not exist or belongs to another branch
+     */
+    public function totals(int $orderId): OrderTotalsView
+    {
+        $order = Order::query()->findOrFail($orderId);
+        $totals = new OrderTotals($order->subtotal, $order->discount, $order->tax, $order->total);
+        $money = $totals->toArray($order->paid_total);
+
+        return new OrderTotalsView(
+            $money['subtotal'],
+            $money['discount'],
+            $money['tax'],
+            $money['total'],
+            $money['paid'],
+            $money['balance'],
+            $order->currency,
+        );
+    }
+
+    /**
+     * The orders that were open at $at as one station saw them (Phase 3 replays a shift from this). An order is open at
+     * $at when it has at least one line at the station, it was sent at or before $at (its order.sent event) and no
+     * order.closed, order.cancelled or order.voided event happened at or before $at: an order whose lines are all
+     * served is still open until it is closed, and a paid one until its order.closed. Everything is read from the
+     * append-only order_events timeline, never from the current status (which only says how things ended): each
+     * returned line is a line of the station with the status its last line.* event at or before $at gave it. Oldest
+     * sent first, then by order id. Orders and lines of another branch are never seen.
+     *
+     * @return list<OpenOrderView>
+     */
+    public function openAt(int $stationId, CarbonInterface $at): array
+    {
+        $cut = CarbonImmutable::instance($at)->setTimezone('UTC')->format('Y-m-d H:i:s.u');
+
+        // the lines of the station and the last thing that happened to each of them by $at, from the timeline
+        $lastStatus = [];
+        $lineOrder = [];
+        $lineEvents = OrderEvent::query()
+            ->where('station_id', $stationId)->whereNotNull('order_line_id')->where('created_at', '<=', $cut)
+            ->orderBy('id')->get(['id', 'order_id', 'order_line_id', 'event']);
+        foreach ($lineEvents as $event) {
+            $status = self::lineStatusOf($event->event);
+            if ($status !== null) {
+                $lastStatus[(int) $event->order_line_id] = $status;
+                $lineOrder[(int) $event->order_line_id] = $event->order_id;
+            }
+        }
+        $orderIds = array_values(array_unique($lineOrder));
+        if ($orderIds === []) {
+            return [];
+        }
+
+        $sentAt = [];
+        $over = [];
+        $lifeEvents = OrderEvent::query()
+            ->whereIn('order_id', $orderIds)->where('created_at', '<=', $cut)
+            ->whereIn('event', [OrderEventType::OrderSent->value, OrderEventType::OrderClosed->value, OrderEventType::OrderCancelled->value, OrderEventType::OrderVoided->value])
+            ->orderBy('id')->get(['id', 'order_id', 'event', 'created_at']);
+        foreach ($lifeEvents as $event) {
+            if ($event->event === OrderEventType::OrderSent) {
+                $sentAt[$event->order_id] ??= $event->created_at;
+            } else {
+                $over[$event->order_id] = true;
+            }
+        }
+        $openIds = array_values(array_filter($orderIds, static fn (int $id): bool => isset($sentAt[$id]) && ! isset($over[$id])));
+        if ($openIds === []) {
+            return [];
+        }
+
+        $linesByOrder = [];
+        foreach (OrderLine::query()->whereIn('order_id', $openIds)->whereIn('id', array_keys($lastStatus))->orderBy('id')->get() as $line) {
+            $linesByOrder[$line->order_id][] = new OpenLineView($line->id, $line->item_id, $line->qty->toString(), $lastStatus[$line->id]->value);
+        }
+
+        $views = [];
+        foreach (Order::query()->whereIn('id', $openIds)->get() as $order) {
+            $views[] = new OpenOrderView(
+                $order->id,
+                $order->order_no,
+                $order->type->value,
+                $order->table_code,
+                $order->owner_user_id,
+                $sentAt[$order->id],
+                $linesByOrder[$order->id] ?? [],
+            );
+        }
+        usort($views, static fn (OpenOrderView $a, OpenOrderView $b): int => [$a->sentAt->getTimestamp(), $a->sentAt->micro, $a->orderId] <=> [$b->sentAt->getTimestamp(), $b->sentAt->micro, $b->orderId]);
+
+        return $views;
+    }
+
+    /** The status a line has after this timeline row, null for rows that are not about a line status. */
+    private static function lineStatusOf(OrderEventType $event): ?LineStatus
+    {
+        return match ($event) {
+            OrderEventType::LineQueued => LineStatus::Queued,
+            OrderEventType::LineAccepted => LineStatus::Accepted,
+            OrderEventType::LineReady => LineStatus::Ready,
+            OrderEventType::LineServed => LineStatus::Served,
+            OrderEventType::LineRejected => LineStatus::Rejected,
+            OrderEventType::LineVoided => LineStatus::Voided,
+            default => null,
+        };
+    }
+}

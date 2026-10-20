@@ -117,6 +117,12 @@ final class OrderError extends RuntimeException
         return new self('orders.table.unknown', 422, ['field' => 'dining_table_id']);
     }
 
+    /** A table code is used once per branch, by an inactive table too: orders snapshot it. */
+    public static function tableCodeTaken(): self
+    {
+        return new self('orders.table.code_taken', 422, ['field' => 'code']);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

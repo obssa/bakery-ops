@@ -519,6 +519,50 @@ Small PRs, each green in CI before the next; a step that completes a module ends
    - 1.3e provided capabilities: `Orders::totals`, `Tickets::since`, `Orders::openAt`; dining tables endpoints; the
      migration that adds permissions new to the registry (`tables.manage`) to existing databases and grants them to
      their default roles (grant only, never revoke).
+
+     As built (step 1.3e, `phase-1/orders-capabilities`): three capabilities in `App\Modules\Orders\Contracts`, the dining
+     tables endpoints and one grant-only migration. Where the plan left a detail open:
+     - Shape. Like Catalog's and Inventory's, the contracts are `final` classes (`Orders`, `Tickets`) that the container
+       builds per use (they read the scoped branch, so no singleton and nothing to bind in `OrdersServiceProvider`), with
+       readonly view objects: `OrderTotalsView`, `TicketsPage` / `TicketView`, `OpenOrderView` / `OpenLineView`. A new arch
+       rule says Payments, Production, Shifts, Notifications and Analytics reach Orders through `Orders\Contracts` only.
+     - `Orders::totals(orderId)`: `subtotal, discount, tax, total, paid, balance, currency` as decimal strings, from the
+       order's own columns through `OrderTotals` (balance = total - `paid_total`, which Payments keeps in 1.4); another
+       branch's or an unknown order throws `ModelNotFoundException` (the endpoint that uses it answers 404).
+     - `Tickets::since(stationId, cursor)` returns a `TicketsPage` (`data`, `cursor` string, `serverTime`, `fingerprint`;
+       `toArray()` is the body of `GET /stations/{station}/tickets`, `etag(stationId)` its ETag from `ConditionalPoll`).
+       The feed is the station's `order_events` rows (`station_id`) through `OverlapCursor`. A first load (no cursor) is
+       the orders with a line in queued, accepted or ready at the station; a poll is every order with an event at the
+       station after the cursor, so a served, rejected or voided line comes back once with its new status and is gone on
+       the next first load. Each ticket holds all the order's lines at that station. Tickets are oldest first by their
+       first event at the station. The cursor handed back is the highest event id at least `overlap_seconds` old, never
+       below the one sent; a late commit below an id already served stays after the cursor and is delivered. A cursor that
+       is not a plain number counts as no cursor. `Tickets::fingerprint(stationId, cursor)` is the cheap read for a 304.
+       There is no page size yet: a station's rail is small and the cursor bounds a poll; the endpoint (1.5) may add one.
+     - `Orders::openAt(stationId, at)`: orders with a line at the station that were sent at or before `at` (their
+       `order.sent` event) and had no `order.closed`, `order.cancelled` or `order.voided` event at or before `at`, with the
+       station's lines and each line's status from its last `line.*` event at or before `at`. Read from the timeline only
+       (a test rewrites the live rows and the answer does not move). Served lines stay in an order that is not closed; a
+       paid but unclosed order is still open. Oldest sent first. Display-case lines (no station) are never listed.
+     - Dining tables. `GET /dining-tables` (`orders.create`) returns `{data: [{id, code, name_en, name_am, seats, sort,
+       is_active}]}` for the active tables in grid order (`sort`, `code`, `id`); the derived `state` of section 4 arrives
+       with the read models in 1.5, and `?include_inactive=1` lists the switched-off tables for a `tables.manage` holder.
+       `POST` (`tables.manage`, admin) takes `{code, name_en, name_am, seats?, sort?}` and answers 201; `PATCH` takes
+       `{name_en?, name_am?, seats?, sort?, is_active?}` (the code is fixed because orders snapshot it: 422 when sent) and
+       answers 200. A code is unique per branch, compared without regard to case and against inactive tables too: 422
+       `orders.table.code_taken` (new key, both languages) with `field: code`. Each write is one AuditedAction
+       (`dining_table.create`, `dining_table.update`). A table is switched off with `is_active`, not deleted.
+     - Permissions migration `2026_10_21_120100_grant_new_permissions`: reads `PermissionRegistry`, creates the permissions
+       the `web` guard lacks and attaches each registry permission to its default roles that exist and lack it. It never
+       revokes, deletes, renames or creates a role, never touches user roles or direct permissions, writes nothing the
+       second time and needs no seeder (on a fresh database it creates the permissions and no roles; RolesSeeder grants
+       them later). It works on the tables, not the Spatie models, with `insertOrIgnore` for the grants, and clears the
+       permission cache. `down()` does nothing: a permission or grant added here may be in use by then. A default grant
+       removed by hand from a role is put back (no screen edits a role).
+     - Tests (groups `module:orders`, `feature`): `OrdersTotalsTest`, `TicketsSinceTest`, `OrdersOpenAtTest`,
+       `DiningTablesTest`, `GrantNewPermissionsMigrationTest`; `OrdersLangTest` gains `table.code_taken`; the route matrix
+       gains the `{table}` placeholder. Registries: three rows in `route_permissions.php`, two in `write_endpoints.php`
+       (the GET is a read). No schema change (ERD unchanged); the OpenAPI export gains the three operations.
    Ends with `gate_check --mode module --module orders`, then `module-stable orders`.
 4. **1.4 payments** (skeleton, final schema): `contract:payments->orders` first, then the two migrations, `Channels`,
    `Payments::record` (cash only passes), the two endpoints, `PaymentRecorded` -> `ApplyPayment`, `BranchCreated` ->

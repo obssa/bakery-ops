@@ -544,6 +544,123 @@
                 }
             }
         },
+        "/v1/dining-tables": {
+            "get": {
+                "operationId": "orders.tables.index",
+                "tags": [
+                    "DiningTables"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "orders.tables.store",
+                "tags": [
+                    "DiningTables"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreDiningTableRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/dining-tables/{table}": {
+            "patch": {
+                "operationId": "orders.tables.update",
+                "tags": [
+                    "DiningTables"
+                ],
+                "parameters": [
+                    {
+                        "name": "table",
+                        "in": "path",
+                        "required": true,
+                        "description": "The table ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateDiningTableRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/health": {
             "get": {
                 "operationId": "health",
@@ -3377,6 +3494,44 @@
                 ],
                 "title": "StoreDeviceRequest"
             },
+            "StoreDiningTableRequest": {
+                "type": "object",
+                "description": "POST /dining-tables: a table of the admin branch with its code (what orders snapshot as table_code; letters, digits,\ndash and underscore, up to 16), both names (rule 9), optionally seats and a place in the grid. Whether the code is\nfree is checked by the controller (orders.table.code_taken), against inactive tables too.",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
+                        "maxLength": 16
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "seats": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "maximum": 255
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32767
+                    }
+                },
+                "required": [
+                    "code",
+                    "name_en",
+                    "name_am"
+                ],
+                "title": "StoreDiningTableRequest"
+            },
             "StoreItemPriceRequest": {
                 "type": "object",
                 "description": "POST /items/{item}/prices: the new price as a decimal string (ADR 0004) and, optionally, when it takes effect\n(ISO-8601 with an offset; default now). The currency is the branch's.",
@@ -3952,6 +4107,40 @@
                     }
                 },
                 "title": "UpdateCategoryRequest"
+            },
+            "UpdateDiningTableRequest": {
+                "type": "object",
+                "description": "PATCH /dining-tables/{table}: rename (both languages stay filled, rule 9), change the seats or the place in the grid,\nor switch the table off and on (is_active). The code is fixed: orders snapshot it.",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "seats": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "maximum": 255
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32767
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateDiningTableRequest"
             },
             "UpdateItemRequest": {
                 "type": "object",

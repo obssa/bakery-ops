@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Identity\Contracts\ShortCodes;
-use App\Modules\Orders\Contracts\OrderTotalsView;
 use App\Modules\Orders\Contracts\Orders;
+use App\Modules\Orders\Contracts\OrderTotalsView;
 use App\Modules\Orders\Models\Order;
 use App\Shared\Models\Branch;
 use Illuminate\Database\Eloquent\ModelNotFoundException;

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Identity\Contracts\PermissionRegistry;
+use App\Shared\Models\Branch;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
@@ -74,7 +75,7 @@ it('adds a permission the database lacks and grants it to its default roles', fu
 
 it('never revokes: a permission added by hand to a role, a direct permission and every role assignment survive', function () {
     seedRoles();
-    $branch = App\Shared\Models\Branch::factory()->create();
+    $branch = Branch::factory()->create();
     $waiter = makeUser($branch, 'waiter');
     $chef = makeUser($branch, 'chef');
     Role::findByName('waiter', 'web')->givePermissionTo(Permission::findOrCreate('reports.custom', 'web'));
@@ -112,6 +113,10 @@ it('is a no-op the second time and on a database that already matches the regist
 })->group('module:orders', 'feature');
 
 it('works on a database no seeder has run on: it creates the permissions and, with no roles, creates no roles', function () {
+    // the migration has already run once, when the test database was built: start from the state of a database that
+    // has the spatie tables and nothing in them
+    DB::table('permissions')->delete();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
     expect(Permission::query()->count())->toBe(0)->and(Role::query()->count())->toBe(0);
 
     grantMigration()->up();
@@ -153,7 +158,7 @@ it('clears the permission cache so the new grant is seen at once', function () {
     grantMigration()->up();
 
     expect($registrar->getPermissions()->pluck('name')->all())->toContain('tables.manage');
-    $branch = App\Shared\Models\Branch::factory()->create();
+    $branch = Branch::factory()->create();
     expect(makeUser($branch, 'admin')->fresh()?->can('tables.manage'))->toBeTrue();
 })->group('module:orders', 'feature');
 
