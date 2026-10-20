@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\Catalog\Support\BumpsCatalogVersion;
 use App\Shared\I18n\Bilingual;
 use App\Shared\Tenancy\BranchScoped;
 use App\Shared\Values\Money;
@@ -35,6 +36,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 final class Modifier extends Model
 {
     use BranchScoped;
+    use BumpsCatalogVersion;
 
     /** @use HasFactory<ModifierFactory> */
     use HasFactory;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\Catalog\Support\BumpsCatalogVersion;
 use App\Shared\Tenancy\BranchScoped;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
@@ -38,6 +39,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 final class Recipe extends Model
 {
     use BranchScoped;
+    use BumpsCatalogVersion;
 
     /** @use HasFactory<RecipeFactory> */
     use HasFactory;

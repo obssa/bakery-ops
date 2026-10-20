@@ -6,6 +6,7 @@ namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Enums\ItemKind;
+use App\Modules\Catalog\Support\BumpsCatalogVersion;
 use App\Shared\I18n\Bilingual;
 use App\Shared\Models\Station;
 use App\Shared\Tenancy\BranchScoped;
@@ -54,6 +55,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 final class Item extends Model
 {
     use BranchScoped;
+    use BumpsCatalogVersion;
 
     /** @use HasFactory<ItemFactory> */
     use HasFactory;

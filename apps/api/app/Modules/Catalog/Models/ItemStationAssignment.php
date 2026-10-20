@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\Catalog\Support\BumpsCatalogVersion;
 use App\Shared\Models\Station;
 use App\Shared\Tenancy\BranchScoped;
 use Carbon\CarbonImmutable;
@@ -30,6 +31,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 final class ItemStationAssignment extends Model
 {
     use BranchScoped;
+    use BumpsCatalogVersion;
 
     /** @use HasFactory<ItemStationAssignmentFactory> */
     use HasFactory;

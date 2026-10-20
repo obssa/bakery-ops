@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\Catalog\Support\BumpsCatalogVersion;
 use App\Shared\Tenancy\BranchScoped;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
@@ -37,6 +38,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class ItemPrice extends Model
 {
     use BranchScoped;
+    use BumpsCatalogVersion;
 
     /** @use HasFactory<ItemPriceFactory> */
     use HasFactory;

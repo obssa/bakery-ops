@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Models;
 
 use App\Modules\Catalog\Enums\ItemKind;
+use App\Modules\Catalog\Support\BumpsCatalogVersion;
 use App\Shared\I18n\Bilingual;
 use App\Shared\Tenancy\BranchScoped;
 use Carbon\CarbonImmutable;
@@ -34,6 +35,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 final class Category extends Model
 {
     use BranchScoped;
+    use BumpsCatalogVersion;
 
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
