@@ -100,7 +100,9 @@ Each one is an "As built" note in `docs/phases/phase-0-plan.md`:
 - CI after Phase 0 (this pull request): with `current_phase` 1 the phase-1 jobs run. `e2e.yml` lets a Playwright
   project pass with no specs (`--pass-with-no-tests`) only while its phase is `todo`, `planning` or `plan_approved`;
   once the phase is `in_progress` or later, each of its projects must list at least one test or the job fails.
-  `scripts/task.py e2e` applies the same rule locally.
+  `scripts/task.py e2e` applies the same rule locally. The `full` compose profile that `e2e-p1` and later start
+  (worker, Reverb, Caddy) no longer includes MinIO: the `minio/minio` image cannot be pulled any more and no phase
+  before 4 stores files, so MinIO has its own `s3` profile and the choice of file store is left to Phase 4.
 
 ## What Ramin needs to do
 

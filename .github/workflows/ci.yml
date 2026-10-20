@@ -313,6 +313,8 @@ jobs:
     with: { phase: 3, projects: "p3-handover p3-opening-prefill", profiles: "full" }
 
   e2e-p4:
+    # TODO(p4) receipt photos need a file store in e2e: add the `s3` compose profile once compose.yml names an
+    # S3-compatible image that can be pulled (minio/minio no longer can), or keep the local disk as the live host does.
     needs: [status, mod-analytics, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 4
     uses: ./.github/workflows/e2e.yml

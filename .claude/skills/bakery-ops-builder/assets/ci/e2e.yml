@@ -14,7 +14,7 @@ on:
         required: true
         type: string
       profiles:
-        description: compose profiles to enable (e.g. "full" for worker, ws, minio)
+        description: compose profiles to enable (e.g. "full" for worker, ws and the Caddy proxy; "s3" adds minio)
         required: false
         type: string
         default: ""
