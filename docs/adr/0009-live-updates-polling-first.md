@@ -49,7 +49,7 @@ changes.
    the window makes harmless.
 5. **Broadcasting stays in the code, switched by configuration.** The order events (`OrderSent`, `LineAccepted`,
    `LineReady`, `LineRejected`, `LineServed`, `OrderPaid`, `OrderVoided`, and Phase 0's `StockChanged`) are dispatched
-   after commit as now, each with a broadcast companion (`ShouldBroadcast`) on `station.{id}`, `user.{owner}` or
+   after commit, each with a broadcast companion (`ShouldBroadcast`) on `station.{id}`, `user.{owner}` or
    `branch.{id}.stock` whose `broadcastWhen()` is false while `broadcasting.default` is `null`. The live host runs
    `BROADCAST_CONNECTION=null`, so nothing is sent and, importantly, nothing is queued for a cron-drained queue.
    Switching to Reverb or a hosted Pusher-compatible service is `.env` only (`BROADCAST_CONNECTION=reverb|pusher` and
