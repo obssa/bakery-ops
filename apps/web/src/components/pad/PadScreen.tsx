@@ -3,24 +3,21 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { lockDue, useActing } from "@/lib/acting";
-import { addToCart, emptyCart, newOrderOf, orderLinesOf, useCarts, type Cart as CartState } from "@/lib/cart";
-import { useErrorText } from "@/lib/errors";
+import { useCarts } from "@/lib/cart";
 import { playChime, storeMuted, storedMuted, unlockAudio } from "@/lib/kds";
 import { createMenuFeed, createOrdersFeed, openOrdersOf, readyLineIds } from "@/lib/live/pad";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import type { Menu } from "@/lib/api/types";
 import type { FeedSnapshot } from "@/lib/live/feed";
 import type { OrdersState } from "@/lib/live/pad";
-import { queueCancelOrder, queuePadSend, queueReplaceLines, queueSendExisting, useOutbox } from "@/lib/outbox/store";
+import { useOutbox } from "@/lib/outbox/store";
 import { useSession } from "@/lib/session";
 import { PageHeader } from "../ui";
 import { focusRing } from "../styles";
-import { Cart } from "./Cart";
 import { LockScreen } from "./LockScreen";
-import { MenuPanel } from "./MenuPanel";
 import { MyOrders } from "./MyOrders";
+import { OrderingSurface } from "./OrderingSurface";
 import { usePadOutcomes } from "./outcomes";
-import { TablesPanel } from "./TablesPanel";
 
 // The waiter pad (/pad). Signed in as the pad account, it is locked until a waiter types their short code; the waiter
 // then has the pad for 10 minutes (the API acting session) and for as long as they keep touching it (60 s idle lock).
@@ -29,7 +26,6 @@ import { TablesPanel } from "./TablesPanel";
 type View = "order" | "orders";
 
 const IDLE_CHECK_MS = 1000;
-const EMPTY: CartState = emptyCart();
 const NOTICE_MS = 8000;
 
 /** Locks the pad when the waiter has been idle for 60 s or the 10-minute session is over; any touch resets the idle time. */
@@ -64,13 +60,7 @@ interface WorkspaceProps {
 
 function Workspace({ userId, userName, notice, onNoticeOff, orders, menu }: WorkspaceProps) {
   const t = useTranslations("pad");
-  const errorText = useErrorText();
   const [view, setView] = useState<View>("order");
-
-  const stored = useCarts((s) => s.carts[userId]);
-  const cart = stored ?? EMPTY;
-  const update = useCarts((s) => s.update);
-  const act = useCallback((change: (cart: CartState) => CartState) => update(userId, change), [update, userId]);
 
   const open = useMemo(() => (orders ? openOrdersOf(orders.state) : []), [orders]);
 
@@ -98,31 +88,6 @@ function Workspace({ userId, userName, notice, onNoticeOff, orders, menu }: Work
   }, [orders]);
 
   const readyCount = useMemo(() => open.reduce((n, order) => n + order.lines.filter((line) => line.status === "ready").length, 0), [open]);
-
-  function send() {
-    if (cart.sending) return;
-    act((c) => ({ ...c, sending: true, shortfall: [], lineErrors: {}, error: null }));
-    onNoticeOff();
-    if (cart.serverOrderId === null) {
-      queuePadSend(newOrderOf(cart));
-    } else {
-      const replaced = queueReplaceLines(cart.serverOrderId, cart.orderUuid, orderLinesOf(cart));
-      queueSendExisting(cart.serverOrderId, cart.orderUuid, replaced?.id ?? null);
-    }
-  }
-
-  function clear() {
-    if (cart.serverOrderId !== null) {
-      // the API holds it open: cancel it there too (an unsent order, nothing reserved)
-      queueCancelOrder(cart.serverOrderId);
-      return;
-    }
-    useCarts.getState().reset(userId);
-  }
-
-  const items = menu?.state?.items;
-  const currency = items?.[0]?.currency ?? "ETB";
-  const menuError = menu?.error ? t("stale") : null;
 
   return (
     <div className="space-y-4" onPointerDown={unlockAudio} onKeyDown={unlockAudio}>
@@ -174,26 +139,7 @@ function Workspace({ userId, userName, notice, onNoticeOff, orders, menu }: Work
       </p>
 
       {view === "order" ? (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-          <div className="space-y-5">
-            <TablesPanel
-              type={cart.type}
-              tableId={cart.tableId}
-              locked={cart.serverOrderId !== null || cart.sending}
-              onType={(type) => act((c) => ({ ...c, type }))}
-              onTable={(id) => act((c) => ({ ...c, tableId: id }))}
-            />
-            <MenuPanel
-              menu={menu?.state ?? null}
-              loading={!menu?.loaded}
-              error={menu?.loaded ? menuError : menu?.error ? errorText.message(menu.error) : null}
-              onAdd={(item, extra) => act((c) => addToCart(c, item, extra))}
-            />
-          </div>
-          <div className="lg:sticky lg:top-4 lg:self-start">
-            <Cart cart={cart} menu={items} currency={currency} onChange={act} onSend={send} onClear={clear} />
-          </div>
-        </div>
+        <OrderingSurface userId={userId} menu={menu} onSendStarted={onNoticeOff} />
       ) : (
         <MyOrders orders={open} loaded={!!orders?.loaded} stale={orders?.error ? t("stale") : null} />
       )}
