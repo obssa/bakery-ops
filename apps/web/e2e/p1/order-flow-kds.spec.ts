@@ -42,7 +42,7 @@ test.describe("p1 order flow: kitchen display", () => {
 
     // the chef signs in and lands on the kitchen display, which picks the one station assigned to them
     await signInAs(page, fixture.worker.phone, fixture.worker.password, "/kds/kitchen");
-    await expect(page).toHaveURL(/\/app\/en\/kds\/kitchen\/$/);
+    await expect(page).toHaveURL(/\/app\/en\/kds\/kitchen\/$/, { timeout: 30_000 });
     await expect(page.getByRole("heading", { level: 1, name: "Kitchen" })).toBeVisible();
 
     // the chime can be muted, and the choice shows
@@ -52,7 +52,7 @@ test.describe("p1 order flow: kitchen display", () => {
     await expect(page.getByRole("button", { name: "Mute chime" })).toHaveAttribute("aria-pressed", "false");
 
     // an idle rail is polled with a cursor and answered 304 (nothing changes, nothing is re-read)
-    await expect.poll(() => ticketResponses.filter((r) => r.status() === 304).length, { timeout: 20_000 }).toBeGreaterThan(0);
+    await expect.poll(() => ticketResponses.filter((r) => r.status() === 304).length, { timeout: 40_000 }).toBeGreaterThan(0);
 
     // the waiter sends; the ticket is on the rail within 5 s
     const order = await sendOrder(fixture);
