@@ -6,11 +6,12 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { RequireAuth } from "./RequireAuth";
 import { focusRing } from "./styles";
 
-// The admin console's own frame: signed-in only, with its sections as tabs. Phase 0 has Catalog and People; the
-// header's "Admin console" link is the overview.
+// The admin console's own frame: signed-in only, with its sections as tabs: Catalog and People (Phase 0), the live
+// Orders board (Phase 1). The header's "Admin console" link is the overview.
 const SECTIONS = [
   { href: "/admin/catalog", key: "catalog" },
   { href: "/admin/people", key: "people" },
+  { href: "/admin/orders", key: "orders" },
 ] as const;
 
 export function AdminFrame({ children }: { children: ReactNode }) {

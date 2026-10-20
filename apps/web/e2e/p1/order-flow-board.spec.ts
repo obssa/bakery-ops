@@ -23,7 +23,7 @@ test.describe("p1 order flow: admin orders board", () => {
 
     // sent while the board is open: it arrives through the live feed, in the Sent column
     const order = await sendOrder(fixture);
-    const sent = page.getByRole("region", { name: "Sent" });
+    const sent = page.getByRole("region", { name: "Sent", exact: true });
     const card = sent.getByRole("article").filter({ hasText: product });
     await expect(card).toBeVisible({ timeout: 10_000 });
     await expect(card).toContainText(fixture.waiter.name);

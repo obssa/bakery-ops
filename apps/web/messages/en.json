@@ -236,7 +236,7 @@
     "loading": "Loading the orders…",
     "stale": "Cannot reach the server. Showing what was loaded; it may be out of date.",
     "empty": "No orders.",
-    "board": "Orders by status",
+    "board": "Order columns",
     "col_empty": "None",
     "status_open": "Open",
     "status_sent": "Sent",
@@ -245,7 +245,7 @@
     "status_served": "Served",
     "status_paid": "Paid",
     "owner": "Waiter: {name}",
-    "age": "{time} old",
+    "age": "Age {time}",
     "unsent": "Not sent yet",
     "settled": "Paid in full",
     "total": "Total {total} {currency}",
@@ -277,7 +277,8 @@
     "ev_order_paid": "Order paid",
     "ev_order_closed": "Order closed",
     "ev_order_cancelled": "Order cancelled",
-    "ev_order_voided": "Order voided"
+    "ev_order_voided": "Order voided",
+    "display_case": "Display case"
   },
   "catalog": {
     "title": "Catalog",

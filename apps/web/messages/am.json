@@ -236,7 +236,7 @@
     "loading": "ትዕዛዞችን በመጫን ላይ…",
     "stale": "አገልጋዩን ማግኘት አልተቻለም። የተጫነው ይታያል፤ ያረጀ ሊሆን ይችላል።",
     "empty": "ምንም ትዕዛዝ የለም።",
-    "board": "ትዕዛዞች በሁኔታ",
+    "board": "የትዕዛዝ ዓምዶች",
     "col_empty": "ምንም የለም",
     "status_open": "ክፍት",
     "status_sent": "ተልኳል",
@@ -245,7 +245,7 @@
     "status_served": "ቀርቧል",
     "status_paid": "ተከፍሏል",
     "owner": "አስተናጋጅ፦ {name}",
-    "age": "{time} ሆኖታል",
+    "age": "የቆየው {time}",
     "unsent": "ገና አልተላከም",
     "settled": "ሙሉ በሙሉ ተከፍሏል",
     "total": "ድምር {total} {currency}",
@@ -277,7 +277,8 @@
     "ev_order_paid": "ትዕዛዙ ተከፍሏል",
     "ev_order_closed": "ትዕዛዙ ተዘግቷል",
     "ev_order_cancelled": "ትዕዛዙ ተሰርዟል",
-    "ev_order_voided": "ትዕዛዙ ውድቅ ተደርጓል"
+    "ev_order_voided": "ትዕዛዙ ውድቅ ተደርጓል",
+    "display_case": "የዕቃ ማሳያ"
   },
   "catalog": {
     "title": "ካታሎግ",

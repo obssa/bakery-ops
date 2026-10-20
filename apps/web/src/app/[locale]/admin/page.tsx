@@ -9,6 +9,7 @@ export const generateMetadata = titledBy("admin", "title");
 const CARDS = [
   { href: "/admin/catalog", title: "catalog", body: "catalog_desc" },
   { href: "/admin/people", title: "people", body: "people_desc" },
+  { href: "/admin/orders", title: "orders", body: "orders_desc" },
 ] as const;
 
 export default async function AdminHome(props: LocaleProps) {
