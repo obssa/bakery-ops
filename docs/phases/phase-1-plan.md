@@ -754,6 +754,73 @@ Small PRs, each green in CI before the next; a step that completes a module ends
      `order-flow.spec.ts` stays until 1.6c.
    - The repository has no web unit-test runner, so the merge and cursor logic is covered by that flow and kept in pure
      functions (`mergeTickets`, `railOf`, `backoffDelay`, `decimal.ts`) for a runner to pick up.
+   As built (step 1.6b, `phase-1/web-pad`): the two Playwright flows were committed red first (`e2e/p1/shortfall.spec.ts`
+   replaces the `p1-shortfall` placeholder, its `test.fixme` and `TODO(p1)` removed; `e2e/p1/pad-order-flow.spec.ts` is the
+   pad lock test in `p1-order-flow`; `order-flow.spec.ts` keeps its placeholder for 1.6c), then the foundations, then the
+   pad. No API change. Where the plan left a detail open:
+   - **The shared pad.** The device signs in as the pad account (a waiter account); `/pad` shows a numeric keypad (a
+     keyboard types too) and `POST /short-code/verify` with the code, `branch_id` from the account and `X-Device-Id`, a
+     random id made once per browser and kept in localStorage (the API ignores a fingerprint that is not enrolled until
+     Phase 5, and the lockout counts per branch and fingerprint). The answer starts the 10-minute acting session; every
+     pad call (`/orders*`, `/order-lines/*`) then carries `X-Acting-Session` and `X-Device-Id`. The session lives in
+     memory only (`lib/acting.ts`): a reload leaves the pad locked. A wrong code (401 `identity.short_code.invalid`) and
+     the lockout after five (423 `identity.short_code.locked`) show the API's own bilingual message; the typed code is
+     cleared after every try. The waiter's name stays in the corner ("Acting: name") with a Lock button.
+   - **Locking.** 60 s without a pointer, key, wheel or touch event, or the 10-minute session ending (the device clock
+     with the length the API reports, so a skewed clock does not matter), or a 401 `identity.acting_session.expired` from
+     any call, locks the pad. That 401 no longer signs the device out: `handleUnauthorized` (session.ts) locks the pad
+     for it and ends the sign-in for any other 401. The check runs every second and once on mount, so a screen left open
+     cannot stay unlocked. Signing the pad account out also locks it.
+   - **The cart is parked per waiter.** Each waiter's cart (lines, table, type, notes, the order's `client_uuid`, a
+     refused send's shortfall) lives in memory under their user id (`lib/cart.ts`). Locking hides everything of it; the
+     same waiter's code brings it back, another waiter sees an empty cart of their own; signing out drops all of them.
+     Nothing is kept in localStorage.
+   - **Ordering surface.** Dine-in or takeaway; the table grid from `GET /dining-tables` (polled every 5 s) coloured by
+     `state` with the word written too (free green, ordering blue, waiting amber, served violet, bill grey); a dine-in
+     order needs a table, a takeaway does not. The menu is a `LiveFeed` over `GET /menu?include_unavailable=1`
+     (ETag-gated, no cursor; poll 5 s visible, 20 s hidden, or `branch.{id}.stock` on a WebSocket transport). Tabs: "New"
+     first when any product `is_new`, then the categories that have products, then "Other" for products without a
+     category. A tile shows name, price, and "3 left" when `low`, "12 available" otherwise; greyed and disabled with the
+     reason (`out_of_stock`, `no_location`) when it cannot be sold. Tap adds one (the same plain product again raises
+     the quantity of its line); long-press (500 ms) or the visible "More" button opens a dialog with quantity,
+     modifiers and a note. Modifiers and product of a line are fixed at add time (the API refuses to change them under a
+     line's UUID), so only the quantity, the note and removal are editable in the cart.
+   - **Totals.** Line and cart totals are computed with the decimal helper (`multiplyDecimal`: scaled integers, half up
+     to 2 dp; no float anywhere); the API's totals show on "My orders" once the order exists (`totals.total` of the
+     order resource). The cart does not re-show a server total while it is open.
+   - **Send.** One big "Send order" button. A new cart goes `POST /orders` with `send: true` through the outbox (order and
+     line `client_uuid` fixed when the cart and the lines were made, the Idempotency-Key at enqueue, the acting headers
+     of the moment of the tap). A refused send is kept as an outbox failure marked `inline`: the shell strip stays quiet
+     and the pad takes it (`components/pad/outcomes.ts`): `409 orders.send.shortfall` keeps the cart as it was, stores the
+     order id (the API holds the order open) and puts the shortfall on the exact line, matched by `line_client_uuid`:
+     "ingredient: short by 1 kg at Kitchen" in the page language, plus a hint to reduce or remove the line; a `422` is
+     shown on the line it names (`line_client_uuid`, else `lines.N.*` by position), anything else above the cart. Fixing
+     the line and sending again queues `PUT /orders/{id}/lines` then `POST /orders/{id}/send` on the same order; the
+     second waits for the first (`after`) and is dropped with it if the first is refused. The cart is read-only while a
+     send is in flight, and while the API holds the order the type and table are fixed. The outbox also learned: `PUT`,
+     per-item headers, the `subjectUuid` of the order, a 401 `identity.acting_session.expired` is a refusal (the item is
+     dropped with that message and the pad locks) and not a sign-out. An accepted send clears the cart (keeping
+     dine-in/takeaway) and shows "Order sent" for 8 s. If the page closed mid-send, a cart left "sending" with nothing
+     queued becomes sendable again (the API answers the same order for the same client UUID).
+   - **Cancel.** A cart that the API holds open (after a shortfall) is cancelled with `POST /orders/{id}/cancel`
+     ("Cancel this order"); a cart the API never saw is just cleared. An open order on "My orders" has a Cancel button.
+     Void is not on the pad.
+   - **My orders.** `GET /orders?mine=1` through `LiveFeed` (cursor, ETag, merged by id and version; `user.{id}` channel
+     on a WebSocket transport), started when a waiter unlocks and stopped on lock, so the next waiter starts a fresh
+     feed. It lists the acting waiter's orders that are not closed, cancelled or voided, newest first, each line with
+     Sent (queued) / Cooking (accepted) / Ready / Served or the rejection message, a green "n ready" badge on the order
+     and on the tab, and a Served button per ready line (`POST /order-lines/{line}/served`, through the outbox). A line
+     turning ready after the first load plays the chime (generated tones from 1.6a, mute toggle shared with the kitchen
+     display) and vibrates for 200 ms where the device can.
+   - **Playwright.** `shortfall.spec.ts` (`@live`, `p1-shortfall`): an ingredient stocked for exactly 2 kg and a
+     product using 1 kg; the waiter signs in as the pad, unlocks, picks table `E2E-T1`, orders 3, sends, sees "ingredient:
+     short by 1 kg at <station>" inline on that line, switches to Amharic and sees it in Amharic (cart and unlocked pad
+     survive the language switch), back to English reduces to 2 and sends; then through the API: one order with that
+     product, `sent`, quantity 2, and the ledger `purchase_in, reservation` only (exactly one reservation). `pad-order-flow.spec.ts`
+     (`@live`, `p1-order-flow`): five wrong codes then the lockout message in English and Amharic (a six-digit wrong code,
+     so it can never be somebody's four-digit code); and with Playwright's clock, a touch at 40 s keeps the pad open, 61 s
+     without one locks it (no name, no cart text), and the same code restores the parked cart. Shared helpers:
+     `e2e/support/pad.ts`, and `buildWaiter` plus the ingredient's Amharic name in `fixture.ts`.
 7. **1.7 docs and seeds**: `Phase1Seeder`, ADR 0008 / 0009 accepted, OpenAPI, ERD, gate report.
 
 ## 7. Test list
