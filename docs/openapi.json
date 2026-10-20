@@ -1731,6 +1731,58 @@
                 }
             }
         },
+        "/v1/orders/{order}/void": {
+            "post": {
+                "operationId": "orders.void",
+                "summary": "The asker needs orders.void_request (the route checked the account, OrderAccess the person acting by short code);\nthe state is checked first, so a refused order does not spend a PIN attempt; then the PIN (a manager's or the\nadmin's) is verified, then the void is one transaction",
+                "tags": [
+                    "Orders"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "description": "The order ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/items/{item}/recipe": {
             "get": {
                 "operationId": "catalog.items.recipe.show",
@@ -4207,6 +4259,25 @@
                     "code"
                 ],
                 "title": "VerifyShortCodeRequest"
+            },
+            "VoidOrderRequest": {
+                "type": "object",
+                "description": "POST /orders/{order}/void: why (free text, required, up to 255 characters, the column's size) and the PIN of the\nmanager or admin who approves it (their short code: 4 to 6 digits, typed on the asker's screen). Blanks are no reason.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "pin": {
+                        "type": "string",
+                        "pattern": "^[0-9]{4,6}$"
+                    }
+                },
+                "required": [
+                    "reason",
+                    "pin"
+                ],
+                "title": "VoidOrderRequest"
             }
         },
         "responses": {

@@ -474,6 +474,48 @@ Small PRs, each green in CI before the next; a step that completes a module ends
        settle the reservation one way, once; the same ready twice at once under one key). Registries: four rows each in
        `route_permissions.php` and `write_endpoints.php`. No schema change; the OpenAPI export gains the four operations.
    - 1.3d void: `POST /orders/{id}/void` with `verifyPinFor('orders.void')`, `releaseMany`, both actors audited;
+
+     As built (step 1.3d, `phase-1/orders-void`): `POST /orders/{order}/void` in `routes/modules/orders.php` with
+     `auth:sanctum`, `actor`, `permission:orders.void_request` (admin, manager, cashier) and `idempotency`; `{order}` binds
+     through the `BranchScoped` model (another branch's order is 404). Where section 4 left a detail open:
+     - Who asks, who approves. The asker is the person acting (the waiter by short code, else the account) and must hold
+       `orders.void_request`; any holder may ask for any order of the branch (a cashier voids a waiter's order). The
+       approver is the owner of the PIN, verified by `Access::verifyPinFor('orders.void', pin)` (manager or admin, same
+       branch; a cashier's or another branch's code is 403 `identity.pin.rejected`; five wrong PINs of the asking account
+       lock the prompt, 423 `identity.short_code.locked`, even for the right PIN). A manager or the admin may approve their
+       own request. The PIN is verified before the transaction opens so a failed attempt still counts, and it is never
+       stored (not in the audit row, not in the timeline).
+     - Order of checks: permission, then the order's state (so an order that cannot be voided does not spend a PIN
+       attempt), then the PIN, then the transaction, which locks the order and checks the state again.
+     - Body `{reason, pin}`: `reason` is free text, required, trimmed, up to 255 characters (the column's size); `pin` 4 to 6
+       digits. 422 `validation.failed` with `errors.reason` / `errors.pin`, their required messages in
+       `orders.void.reason_required|pin_required`. The wrong-PIN and locked messages are Identity's
+       (`identity.pin.rejected`, `identity.short_code.locked`, both languages), not duplicated in `orders.php`.
+     - Voidable: `sent`, `in_progress`, `ready`, `served` with no `settled_at`. `paid`, `closed` and a settled order
+       (payment taken before the food) are 409 `orders.order.paid` (refunds: Phase 4); `open`, `cancelled`, `voided` are
+       409 `orders.order.not_voidable`; both carry the order's `status`. A repeat with a new key on a voided order is
+       the second.
+     - One `AuditedAction` (`order.void`: actor = the asker, acting user as stamped, context `{reason,
+       approved_by_user_id}`), one transaction: lock the order, lock its lines in id order, every line that is not
+       `rejected` or `voided` becomes `voided` (including `ready` and `served` ones, which the line table allows; rejected
+       lines stay rejected), `line.voided` per line, one `Reservations::releaseMany` over the refs of those lines, totals
+       again (0.00), the order `voided` with `voided_at`, `void_reason`, `voided_by_user_id` (the asker),
+       `void_approved_by_user_id`, version +1, then `order.voided` `{reason, by_user_id, approved_by_user_id, line_ids}`.
+       `order_events.user_id` / `acting_user_id` are the asker as stamped, `approved_by_user_id` the PIN's owner, on
+       `line.voided` and `order.voided` alike.
+     - The release covers every voided line, not only queued and accepted ones: a display-case line is `ready` at send but
+       still holds its reservation until its sale at payment, so it is released too. Lines made at a station were consumed
+       at ready; `releaseMany` skips settled refs, so what was consumed stays consumed and nothing is reversed.
+     - Event: `OrderVoided` (`App\Shared\Events`, after commit) with `order_id`, `reason`, `by_user_id`,
+       `approved_by_user_id`, `line_ids`, plus `station_ids` and `owner_user_id` for its companion
+       `Live\Broadcasts\OrderVoidedBroadcast` (`station.{id}` per station of the voided lines, then `user.{owner}`), inert
+       while `broadcasting.default` is `null`. A refused void announces nothing.
+     - Tests (groups `module:orders`, `feature`): `VoidOrderTest` (14 cases: happy path with consumed, reserved and display-case
+       lines and the ledger oracle; manager, admin and cashier asking; cashier / unknown / other-branch PIN; five wrong
+       PINs then locked; both actors audited and no PIN stored; idempotent replay; 403 per role; validation; every
+       non-voidable state; no PIN attempt spent on them; partly rejected order; branch isolation; rollback on a failed
+       write; event after commit). Registries: one row each in `route_permissions.php` and `write_endpoints.php`. No schema
+       change; the OpenAPI export gains the operation.
    - 1.3e provided capabilities: `Orders::totals`, `Tickets::since`, `Orders::openAt`; dining tables endpoints; the
      migration that adds permissions new to the registry (`tables.manage`) to existing databases and grants them to
      their default roles (grant only, never revoke).
