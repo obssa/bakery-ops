@@ -27,6 +27,7 @@ use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Catalog\Services\PriceHistory;
+use App\Modules\Identity\Contracts\ShortCodes;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Enums\LocationType;
@@ -454,6 +455,21 @@ return [
             return ['{order}' => (string) $order->id];
         },
         'payload' => fn (): array => ['reason' => 'The customer left'],
+    ],
+
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders/{order}/void',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            app(ShortCodes::class)->set($me, '864209');
+            $order = Order::factory()->sent()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+
+            return ['{order}' => (string) $order->id];
+        },
+        'payload' => fn (): array => ['reason' => 'Customer left', 'pin' => '864209'],
     ],
 
     // Station actions (step 1.3c): one AuditedAction each, so the first request writes one audit_log row

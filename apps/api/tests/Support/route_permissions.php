@@ -73,6 +73,9 @@ return [
     'PUT /api/v1/orders/{order}/lines' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
     'POST /api/v1/orders/{order}/send' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
     'POST /api/v1/orders/{order}/cancel' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    // void (step 1.3d): admin, manager and cashier may ask (cashier: request only); the PIN of a manager or the admin
+    // approves, checked by the action after this matrix (403 identity.pin.rejected)
+    'POST /api/v1/orders/{order}/void' => ['permission' => 'orders.void_request', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'orders'],
     // station actions (step 1.3c): accept / ready / reject need orders.accept (chef, barista; admin and manager hold
     // stations.all); the line's own station is checked by the action after this matrix (403 orders.station.forbidden).
     // Served is the waiter's: orders.create, on an order of their own or with stations.all (403 orders.order.not_owner)
