@@ -11,7 +11,7 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category}, {location}, {order} (an open cart of the caller's own) and {line}
+ * the matrix test substitutes {id}, {item}, {category}, {location}, {table}, {order} (an open cart of the caller's own) and {line}
  * (a queued line of a sent order of the caller's own, at a station the caller is assigned to) with a row of the right
  * table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
@@ -83,4 +83,9 @@ return [
     'POST /api/v1/order-lines/{line}/ready' => ['permission' => 'orders.accept', 'roles' => $stationStaff, 'module' => 'orders'],
     'POST /api/v1/order-lines/{line}/reject' => ['permission' => 'orders.accept', 'roles' => $stationStaff, 'module' => 'orders'],
     'POST /api/v1/order-lines/{line}/served' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+
+    // dining tables (step 1.3e): the order takers read the grid, only the admin (tables.manage) configures it
+    'GET /api/v1/dining-tables' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    'POST /api/v1/dining-tables' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],
+    'PATCH /api/v1/dining-tables/{table}' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],
 ];

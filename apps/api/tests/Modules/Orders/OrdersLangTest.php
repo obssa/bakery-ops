@@ -25,6 +25,7 @@ it('has an English and an Amharic text for every Orders message, with the same k
         'modifier.not_of_item', 'table.unknown', 'line.changed',
         'order.not_sent', 'station.forbidden',
         'order.paid', 'order.not_voidable', 'void.reason_required', 'void.pin_required',
+        'table.code_taken',
     ] as $key) {
         expect($en[$key] ?? null)->toBeString()->not->toBeEmpty("en {$key}")
             ->and($am[$key] ?? null)->toBeString()->not->toBeEmpty("am {$key}")

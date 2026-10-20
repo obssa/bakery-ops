@@ -32,6 +32,7 @@ use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
@@ -504,5 +505,30 @@ return [
         'table' => 'audit_log',
         'setup' => fn (TestCase $t): array => ['{line}' => $sentSandwichLine($t, $admin(), true)],
         'payload' => fn (): array => [],
+    ],
+    // Dining tables (step 1.3e): one AuditedAction each; the create adds the table row
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/dining-tables',
+        'module' => 'orders',
+        'table' => 'dining_tables',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => ['code' => 'IDEM-T1', 'name_en' => 'Table 1', 'name_am' => 'ጠረጴዛ 1', 'seats' => 4],
+    ],
+    [
+        'method' => 'PATCH',
+        'uri' => '/api/v1/dining-tables/{table}',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+
+            return ['{table}' => (string) DiningTable::factory()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id])->id];
+        },
+        'payload' => fn (): array => ['name_en' => 'Window', 'name_am' => 'መስኮት', 'sort' => 3],
     ],
 ];
