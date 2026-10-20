@@ -24,25 +24,32 @@ use Ramsey\Uuid\Uuid;
 
 /**
  * manifest inventory.provides: "Reservations::reserve(lines[], ref) -> ok | Shortfall{ingredient, qty_short, station}",
- * "Reservations::release(ref) idempotent", "Reservations::consume(ref, actual[])" (traps.md, Reserved accounting).
+ * "Reservations::release(ref) idempotent", "Reservations::consume(ref, actual[])", and for an order's lines in one
+ * lock pass reserveMany / releaseMany / consumeMany (traps.md, Reserved accounting; ADR 0008).
  *
- * reserve: every line is exploded (Exploder: a to-order product into its required ingredients in base units with
- *   waste; anything else as itself), what lines share is summed per (item, location), the balance rows are locked in
- *   ascending order (Ledger::lock) and either everything fits in `available` and one `reservation` row per (item,
- *   location) is written, or nothing is written and the Shortfall names every shortage. available never goes below
- *   zero. The ref is the reservation's key: reserving it again returns the reservation it already is.
- * release: one `reservation_release` per reserved (item, location); a second release, a release after consume and an
- *   unknown ref are no-ops.
- * consume: turns the reservation into `production_consume` (or `sale`, for counter products at payment) exactly once:
- *   per reserved (item, location) one consumption row carrying the ref (-qty from on_hand and reserved); when less was
- *   actually used the rest is released, when more was used the excess is a consumption without the ref and must fit in
- *   what is available. A second consume is a no-op; consuming a released reservation is refused.
+ * reserve / reserveMany: every line is exploded (Exploder: a to-order product into its required ingredients in base
+ *   units with waste; anything else as itself), the line's modifier deltas are applied (ReserveLine::needsWith), what a
+ *   ref's lines share is summed per (item, location), and the balance rows of every ref are locked in ONE ascending pass
+ *   (Ledger::lock), so two orders whose lines share ingredients in a different order never deadlock. The refs are then
+ *   covered in the order given: a ref that does not fit in what earlier refs left is short and takes nothing. Either
+ *   every ref fits and one `reservation` row per (item, location) per ref is written in one batch, or nothing is
+ *   written and the Shortfall names every shortage with the ref it belongs to. available never goes below zero. A ref
+ *   is the reservation's key: a ref already held is returned as it is (only the new refs are reserved), a settled one
+ *   is refused.
+ * release / releaseMany: one `reservation_release` per reserved (item, location) of every open ref, in one batch; a
+ *   second release, a release after consume and an unknown ref are no-ops.
+ * consume / consumeMany: turns the reservation into `production_consume` (station lines, at ready) or `sale` (counter
+ *   products, at payment) exactly once: per reserved (item, location) one consumption row carrying the ref (-qty from
+ *   on_hand and reserved). consume(ref, actual) also takes what was actually used: when less, the rest is released;
+ *   when more, the excess is a consumption without the ref and must fit in what is available. A second consume is a
+ *   no-op; consuming a released reservation (or an unknown one) is refused, for the whole batch.
  *
  * Every row says which operation wrote it (ref_type reservation, reservation_release or reservation_consume), which is
- * how a settled reservation tells "released" from "consumed". Exactly-once does not rest on reads or isolation levels: every row a reservation writes carries a client_uuid derived
- * from (ref, role, item, location), and the row that settles a reservation (its release, or its consumption) has the
- * same derived uuid either way, so the unique (branch_id, client_uuid) index lets only one of two racing settlements
- * in. The loser rolls back whole and reports the settled state.
+ * how a settled reservation tells "released" from "consumed". Exactly-once does not rest on reads or isolation levels:
+ * every row a reservation writes carries a client_uuid derived from (ref, role, item, location), and the row that
+ * settles a reservation (its release, or its consumption) has the same derived uuid either way, so the unique
+ * (branch_id, client_uuid) index lets only one of two racing settlements in. The loser rolls back whole and reports
+ * the settled state.
  */
 final class Reservations
 {
@@ -71,52 +78,105 @@ final class Reservations
      */
     public function reserve(array $lines, string $ref): Reserved|Shortfall
     {
-        self::assertRef($ref);
-        if ($lines === []) {
-            throw new InvalidArgumentException('A reservation needs at least one line.');
+        $result = $this->reserveMany([$ref => $lines]);
+
+        return $result instanceof Shortfall ? $result : $result[$ref];
+    }
+
+    /**
+     * Reserve several refs (for Orders: one per order line) in one lock pass, covered in the order given.
+     *
+     * @param  array<string, list<ReserveLine>>  $byRef  ref (a UUID) => its lines
+     * @return array<string, Reserved>|Shortfall every ref in the order given, or why nothing was reserved
+     *
+     * @throws InventoryError inventory.recipe.missing (422), inventory.reservation.closed (409)
+     */
+    public function reserveMany(array $byRef): array|Shortfall
+    {
+        if ($byRef === []) {
+            throw new InvalidArgumentException('A reservation needs at least one ref.');
         }
-        $existing = $this->stateOf($ref);
-        if ($existing !== null) {
-            return $this->existing($ref, $existing);
+        $held = [];
+        $new = [];
+        foreach ($byRef as $ref => $lines) {
+            $ref = (string) $ref;
+            self::assertRef($ref);
+            if ($lines === []) {
+                throw new InvalidArgumentException("Reservation {$ref} needs at least one line.");
+            }
+            $state = $this->stateOf($ref);
+            if ($state !== null) {
+                $held[$ref] = $this->existing($ref, $state);
+            } else {
+                $new[$ref] = $lines;
+            }
+        }
+        if ($new === []) {
+            return $this->inOrder($byRef, $held);
         }
 
-        $needs = $this->needs($lines);
-        $pairs = array_values(array_map(static fn (array $n): array => [$n[0], $n[1]], $needs));
+        $needs = [];
+        $union = [];
+        foreach ($new as $ref => $lines) {
+            $needs[$ref] = $this->needs($lines);
+            foreach ($needs[$ref] as $key => [$itemId, $locationId]) {
+                $union[$key] = [$itemId, $locationId];
+            }
+        }
 
         try {
-            /** @var Reserved|Shortfall $result */
-            $result = $this->connection()->transaction(function () use ($needs, $pairs, $ref): Reserved|Shortfall {
-                $levels = $this->ledger->lock($pairs);
+            /** @var array<string, Reserved>|Shortfall $result */
+            $result = $this->connection()->transaction(function () use ($needs, $union): array|Shortfall {
+                $left = [];
+                foreach ($this->ledger->lock(array_values($union)) as $key => $level) {
+                    $available = $level->available();
+                    $left[$key] = $available->isNegative() ? Quantity::zero() : $available;
+                }
+
                 $shortages = [];
-                foreach ($needs as $key => [$itemId, $locationId, $qty]) {
-                    $available = $levels[$key]->available();
-                    $available = $available->isNegative() ? Quantity::zero() : $available;
-                    if ($qty->isGreaterThan($available)) {
-                        $shortages[] = [$itemId, $locationId, $qty, $available];
+                $intents = [];
+                $reserved = [];
+                foreach ($needs as $ref => $refNeeds) {
+                    $short = [];
+                    foreach ($refNeeds as $key => [$itemId, $locationId, $qty]) {
+                        if ($qty->isGreaterThan($left[$key])) {
+                            $short[] = [$itemId, $locationId, $qty, $left[$key], $ref];
+                        }
                     }
+                    if ($short !== []) {
+                        array_push($shortages, ...$short); // a short ref takes nothing from the refs after it
+
+                        continue;
+                    }
+                    $lines = [];
+                    foreach ($refNeeds as $key => [$itemId, $locationId, $qty]) {
+                        $left[$key] = $left[$key]->minus($qty);
+                        $intents[] = MovementIntent::of($itemId, $locationId, $qty, MovementReason::Reservation, self::BY_RESERVE, null, $ref, self::uuid($ref, 'reserve', $itemId, $locationId));
+                        $lines[] = new ReservedLine($itemId, $locationId, $qty);
+                    }
+                    $reserved[$ref] = new Reserved($ref, $lines);
                 }
                 if ($shortages !== []) {
                     return $this->shortfall($shortages);
                 }
-
-                $intents = [];
-                $lines = [];
-                foreach ($needs as [$itemId, $locationId, $qty]) {
-                    $intents[] = MovementIntent::of($itemId, $locationId, $qty, MovementReason::Reservation, self::BY_RESERVE, null, $ref, self::uuid($ref, 'reserve', $itemId, $locationId));
-                    $lines[] = new ReservedLine($itemId, $locationId, $qty);
-                }
                 $this->ledger->appendMany($intents);
 
-                return new Reserved($ref, $lines);
+                return $reserved;
             }, 3);
-
-            return $result;
         } catch (UniqueConstraintViolationException $e) {
-            // the same ref reserved concurrently: the other one won, and this is that reservation
-            $state = $this->stateOf($ref);
+            // a ref reserved concurrently: the other call won, and if it holds every ref this is that reservation
+            foreach (array_keys($new) as $ref) {
+                $state = $this->stateOf($ref);
+                if ($state === null) {
+                    throw $e;
+                }
+                $held[$ref] = $this->existing($ref, $state);
+            }
 
-            return $state === null ? throw $e : $this->existing($ref, $state);
+            return $this->inOrder($byRef, $held);
         }
+
+        return $result instanceof Shortfall ? $result : $this->inOrder($byRef, $held + $result);
     }
 
     /**
@@ -124,21 +184,49 @@ final class Reservations
      */
     public function release(string $ref): array
     {
-        self::assertRef($ref);
-        $state = $this->stateOf($ref);
-        if ($state === null || $state['settled'] !== null) {
+        return $this->releaseMany([$ref]);
+    }
+
+    /**
+     * Release every open ref in one batch (for Orders: the open lines of a voided order); settled and unknown refs are
+     * skipped.
+     *
+     * @param  list<string>  $refs
+     * @return list<Movement> the release rows written
+     */
+    public function releaseMany(array $refs): array
+    {
+        $byRef = [];
+        foreach (array_values(array_unique($refs)) as $ref) {
+            self::assertRef($ref);
+            $state = $this->stateOf($ref);
+            if ($state === null || $state['settled'] !== null) {
+                continue;
+            }
+            foreach ($state['slots'] as [$itemId, $locationId, $qty]) {
+                $byRef[$ref][] = MovementIntent::of($itemId, $locationId, $qty->negated(), MovementReason::ReservationRelease, self::BY_RELEASE, null, $ref, self::uuid($ref, 'settle', $itemId, $locationId));
+            }
+        }
+        if ($byRef === []) {
             return [];
         }
 
-        $intents = [];
-        foreach ($state['slots'] as [$itemId, $locationId, $qty]) {
-            $intents[] = MovementIntent::of($itemId, $locationId, $qty->negated(), MovementReason::ReservationRelease, self::BY_RELEASE, null, $ref, self::uuid($ref, 'settle', $itemId, $locationId));
-        }
-
         try {
-            return $this->ledger->appendMany($intents);
+            return $this->ledger->appendMany(array_merge(...array_values($byRef)));
         } catch (UniqueConstraintViolationException) {
-            return []; // settled by a concurrent release or consume
+            // one of them was settled by a concurrent release or consume: release the others one by one
+            $rows = [];
+            if (count($byRef) > 1) {
+                foreach ($byRef as $intents) {
+                    try {
+                        array_push($rows, ...$this->ledger->appendMany($intents));
+                    } catch (UniqueConstraintViolationException) {
+                        // settled concurrently
+                    }
+                }
+            }
+
+            return $rows;
         }
     }
 
@@ -153,9 +241,7 @@ final class Reservations
      */
     public function consume(string $ref, ?array $actual = null, MovementReason $as = MovementReason::ProductionConsume): array
     {
-        if ($as !== MovementReason::ProductionConsume && $as !== MovementReason::Sale) {
-            throw new InvalidArgumentException("A reservation is consumed as production_consume or sale, not {$as->value}.");
-        }
+        self::assertConsumable($as);
         self::assertRef($ref);
         $state = $this->stateOf($ref);
         if ($state === null) {
@@ -209,14 +295,49 @@ final class Reservations
 
             return $rows;
         } catch (UniqueConstraintViolationException $e) {
+            return $this->settledConcurrently([$ref], $e);
+        }
+    }
+
+    /**
+     * Consume several refs as reserved, in one batch (for Orders: the display-case lines of a paid order, as sale).
+     * Refs already consumed are skipped; a released or unknown ref refuses the whole batch.
+     *
+     * @param  list<string>  $refs
+     * @return list<Movement> the rows written
+     *
+     * @throws InventoryError inventory.reservation.not_found (404), inventory.reservation.released (409)
+     */
+    public function consumeMany(array $refs, MovementReason $as = MovementReason::ProductionConsume): array
+    {
+        self::assertConsumable($as);
+        $intents = [];
+        $open = [];
+        foreach (array_values(array_unique($refs)) as $ref) {
+            self::assertRef($ref);
             $state = $this->stateOf($ref);
-            if ($state !== null && $state['settled'] === 'consumed') {
-                return [];
+            if ($state === null) {
+                throw InventoryError::reservationNotFound($ref);
             }
-            if ($state !== null && $state['settled'] === 'released') {
+            if ($state['settled'] === 'released') {
                 throw InventoryError::reservationReleased($ref);
             }
-            throw $e;
+            if ($state['settled'] === 'consumed') {
+                continue;
+            }
+            $open[] = $ref;
+            foreach ($state['slots'] as [$itemId, $locationId, $reserved]) {
+                $intents[] = MovementIntent::of($itemId, $locationId, $reserved->negated(), $as, self::BY_CONSUME, null, $ref, self::uuid($ref, 'settle', $itemId, $locationId));
+            }
+        }
+        if ($intents === []) {
+            return [];
+        }
+
+        try {
+            return $this->ledger->appendMany($intents);
+        } catch (UniqueConstraintViolationException $e) {
+            return $this->settledConcurrently($open, $e);
         }
     }
 
@@ -233,6 +354,28 @@ final class Reservations
         }
 
         return array_values(array_map(static fn (array $s): ReservedLine => new ReservedLine($s[0], $s[1], $s[2]), $state['slots']));
+    }
+
+    /**
+     * A consumption lost the race against a concurrent settlement: nothing was written. Consumed by the other side is
+     * a no-op, released is a refusal.
+     *
+     * @param  list<string>  $refs
+     * @return list<Movement> always empty
+     */
+    private function settledConcurrently(array $refs, UniqueConstraintViolationException $e): array
+    {
+        foreach ($refs as $ref) {
+            $state = $this->stateOf($ref);
+            if ($state !== null && $state['settled'] === 'released') {
+                throw InventoryError::reservationReleased($ref);
+            }
+            if ($state === null || $state['settled'] === null) {
+                throw $e;
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -274,7 +417,22 @@ final class Reservations
     }
 
     /**
-     * What the lines need, summed per (item, location), ascending.
+     * @param  array<array-key, list<ReserveLine>>  $byRef  the refs as the caller gave them
+     * @param  array<string, Reserved>  $reserved
+     * @return array<string, Reserved> in the caller's order
+     */
+    private function inOrder(array $byRef, array $reserved): array
+    {
+        $ordered = [];
+        foreach (array_keys($byRef) as $ref) {
+            $ordered[(string) $ref] = $reserved[(string) $ref];
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * What the lines need, with their modifier deltas, summed per (item, location), ascending.
      *
      * @param  list<ReserveLine>  $lines
      * @return array<string, array{0: int, 1: int, 2: Quantity}>
@@ -291,7 +449,7 @@ final class Reservations
                 throw new InvalidArgumentException("Item {$line->itemId} is not a live item of this branch.");
             }
             $explosion = $this->exploder->explode($item) ?? throw InventoryError::recipeMissing($item->id);
-            foreach ($explosion->needsFor($line->qty) as $itemId => $qty) {
+            foreach ($line->needsWith($explosion->needsFor($line->qty)) as $itemId => $qty) {
                 $key = Ledger::key($itemId, $line->locationId);
                 $needs[$key] = [$itemId, $line->locationId, isset($needs[$key]) ? $needs[$key][2]->plus($qty) : $qty];
             }
@@ -302,7 +460,7 @@ final class Reservations
     }
 
     /**
-     * @param  list<array{0: int, 1: int, 2: Quantity, 3: Quantity}>  $shortages  [item, location, needed, available]
+     * @param  list<array{0: int, 1: int, 2: Quantity, 3: Quantity, 4: string}>  $shortages  [item, location, needed, available, ref]
      */
     private function shortfall(array $shortages): Shortfall
     {
@@ -312,7 +470,7 @@ final class Reservations
         $stationOf = Location::query()->whereKey($locationIds)->pluck('station_id', 'id')->all();
 
         $lines = [];
-        foreach ($shortages as [$itemId, $locationId, $needed, $available]) {
+        foreach ($shortages as [$itemId, $locationId, $needed, $available, $ref]) {
             $station = $stationOf[$locationId] ?? null;
             $lines[] = new Shortage(
                 $itemId,
@@ -322,6 +480,7 @@ final class Reservations
                 $available,
                 $needed->minus($available),
                 $this->units->baseOf((int) ($unitOf[$itemId] ?? 0))->code,
+                $ref,
             );
         }
 
@@ -366,6 +525,13 @@ final class Reservations
     {
         if (! Str::isUuid($ref)) {
             throw new InvalidArgumentException('A reservation ref is a UUID.');
+        }
+    }
+
+    private static function assertConsumable(MovementReason $as): void
+    {
+        if ($as !== MovementReason::ProductionConsume && $as !== MovementReason::Sale) {
+            throw new InvalidArgumentException("A reservation is consumed as production_consume or sale, not {$as->value}.");
         }
     }
 
