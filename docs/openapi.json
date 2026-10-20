@@ -228,6 +228,61 @@
                 }
             }
         },
+        "/v1/broadcasting/auth": {
+            "post": {
+                "operationId": "identity.broadcasting.auth",
+                "summary": "Sign a private-channel subscription",
+                "tags": [
+                    "BroadcastingAuth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BroadcastingAuthRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "channel_name": {
+                                            "type": "string"
+                                        },
+                                        "auth": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "channel_name",
+                                        "auth"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/categories": {
             "get": {
                 "operationId": "catalog.categories.index",
@@ -2016,6 +2071,25 @@
     },
     "components": {
         "schemas": {
+            "BroadcastingAuthRequest": {
+                "type": "object",
+                "description": "What Laravel Echo (pusher-js) sends before it joins a private channel: the socket id the transport gave the\nconnection (\"1234.5678\") and the channel name (\"private-station.5\"), as JSON or form-encoded.",
+                "properties": {
+                    "socket_id": {
+                        "type": "string",
+                        "pattern": "^\\d+\\.\\d+$"
+                    },
+                    "channel_name": {
+                        "type": "string",
+                        "maxLength": 200
+                    }
+                },
+                "required": [
+                    "socket_id",
+                    "channel_name"
+                ],
+                "title": "BroadcastingAuthRequest"
+            },
             "CategoryResource": {
                 "type": "object",
                 "properties": {

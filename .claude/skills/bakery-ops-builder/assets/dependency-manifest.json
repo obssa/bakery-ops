@@ -48,7 +48,7 @@
         "Bilingual cast",
         "BranchScoped trait",
         "DomainEvent base",
-        "Broadcast channel registry station.{id} user.{id} branch.{id}.stock",
+        "Live updates (ADR 0009, step 1.2): Live\\Channels registry station.{id} user.{id} branch.{id}.stock branch.{id}.orders; BroadcastsDomainEvent (broadcastWhen false under null/log, nothing queued); ConditionalPoll (ETag, If-None-Match -> 304); OverlapCursor (cursor held back by the overlap window, fingerprint for the ETag, merge by id and version)",
         "Files::put/signedUrl (Phase 4)",
         "App\\Shared\\Events namespace for cross-module domain event classes (array payloads), so Notifications and Analytics never import producer modules"
       ],

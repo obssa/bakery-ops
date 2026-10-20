@@ -37,8 +37,13 @@ changes.
      errors or offline, and fetches at once on focus, on reconnect and right after the screen's own write.
    - `reverb` / `pusher` (later): Laravel Echo on the private channels; on every (re)connect, and on any event, the
      client still fetches the same cursor endpoint, so a missed message costs one fetch, never a lost ticket.
-3. **Cheap polls.** The ETag of a station feed is `"{station}:{max order_events.id for that station}"`, read from the
-   index `(branch_id, station_id, id)`; a matching `If-None-Match` returns 304 before any ticket is loaded. A changed
+3. **Cheap polls.** The ETag of a station feed is computed from the station, the client's cursor and three cheap
+   numbers read from the index `(branch_id, station_id, id)`: the cursor handed back (decision 4), the highest event
+   id, and how many events lie after the cursor handed back (`OverlapCursor::fingerprint`, hashed by
+   `ConditionalPoll::etag`). The highest id alone is not enough: an event that commits late, below an id already
+   served, leaves the maximum unchanged, and an ETag over the maximum alone would answer it 304 until the next change
+   (step 1.2). A matching `If-None-Match` (compared weakly: Cloudflare turns a strong ETag into `W/"..."` when it
+   compresses) returns 304 before any ticket is loaded; every answer says `Cache-Control: no-cache, private`. A changed
    feed is one indexed query over events after the cursor plus the lines they name. Budget on the live host: up to 10
    polling screens (about 4 requests a second), each answered in under 100 ms; the pilot measures it and raises idle
    intervals (5 s when a station has no active ticket) before anything else.
@@ -49,14 +54,18 @@ changes.
    the window makes harmless.
 5. **Broadcasting stays in the code, switched by configuration.** The order events (`OrderSent`, `LineAccepted`,
    `LineReady`, `LineRejected`, `LineServed`, `OrderPaid`, `OrderVoided`, and Phase 0's `StockChanged`) are dispatched
-   after commit, each with a broadcast companion (`ShouldBroadcast`) on `station.{id}`, `user.{owner}` or
-   `branch.{id}.stock` whose `broadcastWhen()` is false while `broadcasting.default` is `null`. The live host runs
+   after commit, each with a broadcast companion (`ShouldBroadcast`) on `station.{id}`, `user.{owner}`,
+   `branch.{id}.stock` or `branch.{id}.orders` whose `broadcastWhen()` is false while `broadcasting.default` is `null`
+   (or `log`, which only writes the log: `App\Shared\Live\LiveTransport`). The live host runs
    `BROADCAST_CONNECTION=null`, so nothing is sent and, importantly, nothing is queued for a cron-drained queue.
    Switching to Reverb or a hosted Pusher-compatible service is `.env` only (`BROADCAST_CONNECTION=reverb|pusher` and
-   its keys) plus `NEXT_PUBLIC_LIVE_TRANSPORT` in the web build. Channel authorization (`routes/channels.php`) is
-   written and tested now with the same rule as the endpoints: a station channel needs `orders.accept` and an
-   assignment to that station (or `stations.all`), a user channel is its own user, the stock channel is the user's
-   branch with `inventory.view`.
+   its keys) plus `NEXT_PUBLIC_LIVE_TRANSPORT` in the web build. Channel authorization is written and tested now with
+   the same rule as the endpoints (Identity's `Broadcasting\ChannelRules` on `Access`, applied by
+   `POST /api/v1/broadcasting/auth` before the transport signs, whichever transport is configured; the null
+   broadcaster never consults `Broadcast::channel()` registrations, so there is no `routes/channels.php`): a station
+   channel needs `orders.accept` and an assignment to that station (or `stations.all`) in the user's branch, a user
+   channel is its own user, the stock channel is the user's branch with `inventory.view`, the orders channel is the
+   user's branch for those who see every order (`payments.take` or `stations.all`).
 6. **CI tests what production runs.** `e2e-p1` runs the polling transport (no `ws` service needed); the Phase 1 gate
    asserts the ticket appears within 5 s through the configured transport and that after the initial load the KDS only
    issues `since=` requests with `If-None-Match`, answered 304 while nothing changes. A WebSocket e2e variant is added
@@ -74,9 +83,11 @@ changes.
 
 ## Enforcement
 
-Step 1.2 tests (group `feature`): channel authorization 403 for a foreign station, a non-assigned chef, another
-user's channel and another branch's stock channel; `broadcastWhen()` false and no job queued under the `null`
-broadcaster. Step 1.5 tests: ETag and 304 on the tickets and orders feeds, cursor monotonic and never past the overlap
+Step 1.2 tests (groups `module:shared`, `feature`): channel authorization per role and branch, 403 for a foreign
+station, a non-assigned chef, another user's channel and another branch's stock channel, 401 without a token;
+`broadcastWhen()` false and no job queued under the `null` (and `log`) broadcaster, one job per changed balance with a
+transport; `ConditionalPoll` 200 with ETag, 304 on a matching `If-None-Match`, new ETag after a change; the overlap
+cursor delivering a late-committed row and its fingerprint changing on it. Step 1.5 tests: ETag and 304 on the tickets and orders feeds, cursor monotonic and never past the overlap
 window, a late-committed event is still delivered. Gate `gate:p1` and Playwright `p1-order-flow` (ticket within 5 s,
 only `since=` polls after the initial load). `apps/web` ESLint rule (step 1.6): `setInterval` / `setTimeout` are
 banned outside `src/lib/live/`, so screens subscribe through `LiveFeed` instead of polling on a timer of their own.

@@ -266,6 +266,35 @@ Small PRs, each green in CI before the next; a step that completes a module ends
    `Access`, `POST /api/v1/broadcasting/auth`, the `BroadcastsDomainEvent` base with `broadcastWhen()`, the
    `ConditionalPoll` helper (ETag, `If-None-Match`, 304) and the overlap-window cursor helper. Groups `feature`,
    `module:shared`. CI: `e2e-p1` stops starting the `ws` service (polling).
+
+   As built (step 1.2, `phase-1/live-updates`): Shared gains `App\Shared\Live`: `Channels` (the registry: builders,
+   `parse`, `parseSubscription`, private channels only, ids positive without leading zeros) and `LiveChannel`;
+   `LiveTransport` (on unless the default connection's driver is `null` or `log`: `log` only writes the log and
+   would still queue jobs on the live host's cron-drained queue, which the runbook had set; env() reads
+   `BROADCAST_CONNECTION=null` as PHP null, which Laravel and `LiveTransport` both take as the null driver);
+   `BroadcastsDomainEvent` (`ShouldBroadcast` + `ShouldDispatchAfterCommit`, private channels of the registry only,
+   `broadcastAs` = the domain event's name, `broadcastWith` = its array, `broadcastWhen` = `LiveTransport::isOn()`) and
+   the first companion, `StockChangedBroadcast` on `branch.{id}.stock`, dispatched for every `StockChanged` by
+   `SharedServiceProvider`; `ConditionalPoll` (`etag(scope, parts)` = scope plus a hash, weak `If-None-Match`
+   comparison because Cloudflare weakens ETags it compresses, lists and `*`, 304 without building the body on GET and
+   HEAD, `Cache-Control: no-cache, private` on every answer; CORS exposes `ETag` to the web origin); `OverlapCursor`
+   (`after` = rows after the client's cursor in id order, `next` = the highest id at least 5 s old and never below the
+   client's cursor, `fingerprint` = `{since, next, max, pending}` for the ETag, `merge` = the client's de-dup by id and
+   version; window in `config('bakery.live.overlap_seconds')`). The ETag covers the unsettled tail, not only the
+   highest id: a late commit below the maximum leaves the maximum unchanged and would otherwise be answered 304 until
+   the next change (ADR 0009 decision 3 amended). Identity gains `Broadcasting\ChannelRules` (the rules of section 5
+   and ADR 0009 on `Access`; `branch.{id}.orders` for `payments.take` or `stations.all`, those who see every order) and
+   `POST /api/v1/broadcasting/auth` (`auth:sanctum`, `actor`, `can:identity.authenticated`; 403
+   `identity.channel.forbidden`; `{channel_name, auth}` with `auth` null under `null`/`log` and the transport's
+   signature under reverb/pusher). The rules are applied by the endpoint itself rather than registered in a
+   `routes/channels.php`: the null broadcaster never consults `Broadcast::channel()` registrations, so the endpoint
+   checks first and the transport only signs. The route writes nothing and takes no `Idempotency-Key`: it is the first
+   entry of `tests/Support/read_like_writes.php` (mirrored by `READ_LIKE_WRITES` in `scripts/check_invariants.py`),
+   which the idempotency coverage test honours and checks. Config: `config/broadcasting.php` (default `null`),
+   `BROADCAST_CONNECTION=null` in `.env.example`, `.env.ci` and compose. CI: `ws` is its own compose profile; `e2e-p1`
+   (profile `full`) starts the worker but no Reverb and runs `BROADCAST_CONNECTION=null`,
+   `NEXT_PUBLIC_LIVE_TRANSPORT=poll`; `e2e-p2..p5` list `full,ws` so their stacks stay as they were until their
+   phase plans settle the transport. No schema change (ERD unchanged); OpenAPI gains the endpoint.
 3. **1.3 orders** (`module:orders`, `unit`, `feature`, `concurrency`), in five PRs:
    - 1.3a schema: the six Orders migrations, models, factories, `OrderStatus` / `LineStatus` with exhaustive
      transition tables, ERD, `AppendOnlyTest` for `order_events`;
