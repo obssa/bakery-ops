@@ -10,13 +10,14 @@ use App\Modules\Orders\Http\Resources\OrderLineResource;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
 use App\Modules\Orders\Models\OrderLine;
+use App\Shared\Live\ConditionalPoll;
 use App\Shared\Live\OverlapCursor;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The rail of one station (manifest orders.provides: Tickets::since(station, cursor); ADR 0009; the HTTP endpoint
- * GET /stations/{station}/tickets is step 1.5). A ticket is an order with its lines at the station. The feed is the
+ * GET /stations/{station}/tickets is StationTicketsController). A ticket is an order with its lines at the station. The feed is the
  * append-only order_events rows of the station (station_id is the KDS cursor column), read through Shared Live
  * OverlapCursor:
  *
@@ -67,6 +68,17 @@ final class Tickets
         }
 
         return new TicketsPage($this->tickets($stationId, $first), (string) $next, $now, $fingerprint);
+    }
+
+    /**
+     * The ETag of a station's rail for a fingerprint (fingerprint(), or TicketsPage::$fingerprint): the same formula
+     * TicketsPage::etag uses, so GET /stations/{station}/tickets can answer 304 without building the page.
+     *
+     * @param  array{since: int|null, next: int, max: int|null, pending: int}  $fingerprint
+     */
+    public static function etag(int $stationId, array $fingerprint): string
+    {
+        return ConditionalPoll::etag(self::ETAG_SCOPE, ['station' => $stationId] + $fingerprint);
     }
 
     /**

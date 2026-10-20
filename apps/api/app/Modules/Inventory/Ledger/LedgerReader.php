@@ -158,4 +158,12 @@ final class LedgerReader
 
         throw new LogicException('A stock sum arrived from the database as something other than a decimal string.');
     }
+
+    /** The highest movement id of the branch (reservations included), null for an empty ledger: the stock part of the menu's ETag. */
+    public function lastMovementId(): ?int
+    {
+        $id = StockMovement::query()->max('id');
+
+        return is_numeric($id) ? (int) $id : null;
+    }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Contracts;
 
-use App\Shared\Live\ConditionalPoll;
 use Carbon\CarbonImmutable;
 
 /**
@@ -27,7 +26,7 @@ final readonly class TicketsPage
     /** The ETag of this answer: the station and the fingerprint (Shared\Live\ConditionalPoll). */
     public function etag(int $stationId): string
     {
-        return ConditionalPoll::etag(Tickets::ETAG_SCOPE, ['station' => $stationId] + $this->fingerprint);
+        return Tickets::etag($stationId, $this->fingerprint);
     }
 
     /**

@@ -7,7 +7,9 @@ namespace App\Modules\Orders\Http\Resources;
 use App\Modules\Identity\Models\User;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderEvent;
 use App\Modules\Orders\Support\OrderTotals;
+use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -16,22 +18,33 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * the table code as it was), status, where it was taken, whose it is and who wrote it, the money as decimal strings
  * (totals: subtotal, discount, tax, total, paid, balance; ADR 0004), the timestamps of its life, why it was cancelled
  * or voided, its version (the live feeds merge by it) and its lines (OrderLineResource), removed ones included with
- * their status (rule 4: nothing is deleted).
+ * their status (rule 4: nothing is deleted). With the events relation loaded (GET /orders/{order}) it also carries the
+ * `events` timeline.
  *
  * @mixin Order
  */
 final class OrderResource extends JsonResource
 {
-    /** The relations the resource reads, soft-deleted rows included (a product deleted since is still on the order). */
-    public static function load(Order $order): Order
+    /**
+     * The relations the resource reads, soft-deleted rows included (a product deleted since is still on the order);
+     * for eager loading a whole list (Order::with) in a fixed number of queries.
+     *
+     * @return array<int|string, Closure|string>
+     */
+    public static function relations(): array
     {
-        return $order->load([
+        return [
             'lines.item' => fn ($q) => $q->withTrashed(),
             'lines.modifiers',
             'lines.station' => fn ($q) => $q->withTrashed(),
             'diningTable' => fn ($q) => $q->withTrashed(),
             'owner' => fn ($q) => $q->withTrashed(),
-        ]);
+        ];
+    }
+
+    public static function load(Order $order): Order
+    {
+        return $order->load(self::relations());
     }
 
     /**
@@ -86,6 +99,26 @@ final class OrderResource extends JsonResource
             'version' => $order->version,
             'created_at' => $order->created_at?->toIso8601String(),
             'lines' => OrderLineResource::collection($order->lines)->resolve($request),
-        ];
+        ] + ($order->relationLoaded('events') ? ['events' => $this->events($order)] : []);
+    }
+
+    /**
+     * The timeline of GET /orders/{order} (load events first): every order_events row, oldest first, as written.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function events(Order $order): array
+    {
+        return array_values(array_map(static fn (OrderEvent $e): array => [
+            'id' => $e->id,
+            'event' => $e->event->value,
+            'order_line_id' => $e->order_line_id,
+            'station_id' => $e->station_id,
+            'user_id' => $e->user_id,
+            'acting_user_id' => $e->acting_user_id,
+            'approved_by_user_id' => $e->approved_by_user_id,
+            'payload' => $e->payload,
+            'at' => $e->created_at->toIso8601String(),
+        ], $order->events->all()));
     }
 }

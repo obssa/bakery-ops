@@ -6,6 +6,7 @@ namespace App\Modules\Inventory\Support;
 
 use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Catalog\Contracts\Recipes;
+use App\Modules\Catalog\Contracts\RecipeView;
 use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Enums\ItemKind;
 use App\Modules\Catalog\Models\Item;
@@ -29,11 +30,45 @@ final class Exploder
 
     public function explode(Item $item): ?Explosion
     {
-        if ($this->items->kind($item) !== ItemKind::Product || $this->items->fulfilment($item) !== Fulfilment::ToOrder) {
+        if (! $this->madeToOrder($item)) {
             return Explosion::self($item->id);
         }
 
-        $recipe = $this->recipes->activeFor($item);
+        return $this->fromRecipe($this->recipes->activeFor($item));
+    }
+
+    /**
+     * explode() for many items with a fixed number of queries (Availability::bulk, GET /menu): the recipes of the
+     * made-to-order ones are read together. Keyed by item id.
+     *
+     * @param  list<Item>  $items
+     * @return array<int, Explosion|null>
+     */
+    public function explodeMany(array $items): array
+    {
+        $answer = [];
+        $made = [];
+        foreach ($items as $item) {
+            if ($this->madeToOrder($item)) {
+                $made[] = $item;
+            } else {
+                $answer[$item->id] = Explosion::self($item->id);
+            }
+        }
+        foreach ($this->recipes->activeForMany($made) as $id => $recipe) {
+            $answer[$id] = $this->fromRecipe($recipe);
+        }
+
+        return $answer;
+    }
+
+    private function madeToOrder(Item $item): bool
+    {
+        return $this->items->kind($item) === ItemKind::Product && $this->items->fulfilment($item) === Fulfilment::ToOrder;
+    }
+
+    private function fromRecipe(?RecipeView $recipe): ?Explosion
+    {
         if ($recipe === null) {
             return null;
         }

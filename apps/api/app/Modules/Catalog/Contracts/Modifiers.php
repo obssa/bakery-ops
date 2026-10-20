@@ -53,4 +53,25 @@ final class Modifiers
 
         return $lines;
     }
+
+    /**
+     * What a menu offers for many products at once, in one query: the live modifiers of each in creation order, as
+     * Modifiers::for lists them, without recipe deltas. A product without modifiers has an empty list.
+     *
+     * @param  list<int>  $itemIds
+     * @return array<int, list<ModifierOffer>> item id => offers
+     */
+    public function offeredFor(array $itemIds): array
+    {
+        $ids = array_values(array_unique($itemIds));
+        $offers = array_fill_keys($ids, []);
+        if ($ids === []) {
+            return $offers;
+        }
+        foreach (Modifier::query()->whereIn('item_id', $ids)->orderBy('id')->get() as $m) {
+            $offers[$m->item_id][] = new ModifierOffer($m->id, $m->item_id, new Bilingual($m->name_en, $m->name_am), $m->price_delta);
+        }
+
+        return $offers;
+    }
 }

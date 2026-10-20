@@ -40,4 +40,34 @@ final class Prices
             ->orderByDesc('id')
             ->first();
     }
+
+    /**
+     * The prices in force at $at for many products at once, in one query (GET /menu): the same row Prices::at would
+     * pick for each. A product without a price at that instant is absent from the answer.
+     *
+     * @param  list<Item|int>  $items
+     * @return array<int, Money> item id => price
+     */
+    public function atMany(array $items, DateTimeInterface $at): array
+    {
+        $ids = array_values(array_unique(array_map(static fn (Item|int $i): int => $i instanceof Item ? $i->id : $i, $items)));
+        if ($ids === []) {
+            return [];
+        }
+        $instant = CarbonImmutable::instance($at)->utc();
+
+        $prices = [];
+        $rows = ItemPrice::query()
+            ->whereIn('item_id', $ids)
+            ->where('effective_from', '<=', $instant)
+            ->where(fn (Builder $q) => $q->whereNull('effective_to')->orWhere('effective_to', '>', $instant))
+            ->orderByDesc('effective_from')
+            ->orderByDesc('id')
+            ->get();
+        foreach ($rows as $row) {
+            $prices[$row->item_id] ??= $row->price;
+        }
+
+        return $prices;
+    }
 }

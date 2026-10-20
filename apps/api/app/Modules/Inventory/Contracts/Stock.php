@@ -94,4 +94,24 @@ final class Stock
     {
         return is_int($model) ? $model : $model->id;
     }
+
+    /**
+     * What the stock side of the pad's menu is computed from (GET /menu's ETag, with Catalog's Items::menuFingerprint):
+     * the highest ledger movement id of the branch (every receipt, sale, waste and reservation is a movement) and the
+     * state of its locations. Two cheap queries.
+     *
+     * @return array{last_movement_id: int|null, locations_n: int, locations_at: string|null}
+     */
+    public function fingerprint(): array
+    {
+        $row = Location::query()->withTrashed()->toBase()->selectRaw('count(*) as n, max(updated_at) as touched')->first();
+
+        $latest = $row?->touched;
+
+        return [
+            'last_movement_id' => $this->reader->lastMovementId(),
+            'locations_n' => (int) ($row?->n),
+            'locations_at' => is_string($latest) ? $latest : null,
+        ];
+    }
 }

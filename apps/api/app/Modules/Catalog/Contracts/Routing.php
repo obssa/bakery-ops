@@ -57,4 +57,50 @@ final class Routing
     {
         return $item instanceof Item ? $item : Item::query()->find($item);
     }
+
+    /**
+     * Routing::stationFor for many items at once, in three queries at most (GET /menu): the first station in station
+     * order of each product's assignments; null for a display-case product, an ingredient or an unknown id.
+     *
+     * @param  list<Item|int>  $items
+     * @return array<int, Station|null> item id => station
+     */
+    public function stationsForMany(array $items): array
+    {
+        $given = [];
+        $toLoad = [];
+        foreach ($items as $item) {
+            if ($item instanceof Item) {
+                $given[$item->id] = $item;
+            } else {
+                $toLoad[] = $item;
+            }
+        }
+        if ($toLoad !== []) {
+            foreach (Item::query()->whereKey($toLoad)->get() as $loaded) {
+                $given[$loaded->id] = $loaded;
+            }
+        }
+
+        $answer = [];
+        foreach ($items as $item) {
+            $answer[$item instanceof Item ? $item->id : $item] = null;
+        }
+        $productIds = array_keys(array_filter($given, static fn (Item $i): bool => $i->isProduct()));
+        if ($productIds === []) {
+            return $answer;
+        }
+
+        $assigned = [];
+        foreach (ItemStationAssignment::query()->whereIn('item_id', $productIds)->get(['item_id', 'station_id']) as $row) {
+            $assigned[$row->station_id][] = $row->item_id;
+        }
+        foreach (Station::query()->whereIn('id', array_keys($assigned))->orderBy('sort')->orderBy('id')->get() as $station) {
+            foreach ($assigned[$station->id] as $itemId) {
+                $answer[$itemId] ??= $station;
+            }
+        }
+
+        return $answer;
+    }
 }

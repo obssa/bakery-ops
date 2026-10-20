@@ -7,6 +7,7 @@ use App\Modules\Catalog\Contracts\Modifiers;
 use App\Modules\Catalog\Contracts\Prices;
 use App\Modules\Catalog\Contracts\Recipes;
 use App\Modules\Catalog\Contracts\Routing;
+use App\Modules\Catalog\Models\Item;
 use App\Modules\Catalog\Services\PriceHistory;
 use App\Modules\Inventory\Contracts\Availability;
 use App\Modules\Inventory\Contracts\Locations;
@@ -126,6 +127,6 @@ it('Items::menuFingerprint and Stock::fingerprint move when what the menu shows 
 
     // another branch's catalog and ledger are not part of this branch's fingerprints
     $theirs = Branch::factory()->create();
-    App\Modules\Catalog\Models\Item::factory()->product()->create(['branch_id' => $theirs->id]);
+    Item::factory()->product()->create(['branch_id' => $theirs->id]);
     expect($catalog())->toBe($afterModifier)->and($theirs->id)->not->toBe($f->branch->id);
 })->group('module:orders', 'feature');

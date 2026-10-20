@@ -82,4 +82,62 @@ final class Recipes
 
         return $item !== null && $item->isProduct() ? $item : null;
     }
+
+    /**
+     * Recipes::activeFor for many products at once, in a fixed number of queries (GET /menu, Inventory's Availability):
+     * the same view per product, null where activeFor answers null.
+     *
+     * @param  list<Item|int>  $products
+     * @return array<int, RecipeView|null> product id => view
+     */
+    public function activeForMany(array $products): array
+    {
+        $items = [];
+        $toLoad = [];
+        foreach ($products as $product) {
+            if ($product instanceof Item) {
+                $items[$product->id] = $product;
+            } else {
+                $toLoad[] = $product;
+            }
+        }
+        if ($toLoad !== []) {
+            foreach (Item::query()->whereKey($toLoad)->get() as $loaded) {
+                $items[$loaded->id] = $loaded;
+            }
+        }
+
+        $answer = [];
+        $made = [];
+        foreach ($products as $product) {
+            $id = $product instanceof Item ? $product->id : $product;
+            $item = $items[$id] ?? null;
+            $answer[$id] = null;
+            if ($item === null || ! $item->isProduct()) {
+                continue;
+            }
+            if ($item->isBoughtIn()) {
+                $answer[$id] = RecipeView::empty($id, $this->units->baseOf($item->unit_id)->code);
+
+                continue;
+            }
+            $made[] = $id;
+        }
+
+        if ($made !== []) {
+            $recipes = Recipe::query()
+                ->whereIn('product_item_id', $made)
+                ->where('is_active', true)
+                ->orderByDesc('version')
+                ->with(['lines'])
+                ->get();
+            foreach ($recipes as $recipe) {
+                if ($answer[$recipe->product_item_id] === null) {
+                    $answer[$recipe->product_item_id] = $this->view($recipe);
+                }
+            }
+        }
+
+        return $answer;
+    }
 }

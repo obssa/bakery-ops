@@ -11,6 +11,7 @@ use App\Modules\Orders\Http\Requests\StoreDiningTableRequest;
 use App\Modules\Orders\Http\Requests\UpdateDiningTableRequest;
 use App\Modules\Orders\Http\Resources\DiningTableResource;
 use App\Modules\Orders\Models\DiningTable;
+use App\Modules\Orders\Support\TableStates;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Tenancy\CurrentBranch;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -21,8 +22,8 @@ use Illuminate\Http\Request;
  * The dining tables of the caller's branch (orders.create to read the pad's grid, tables.manage to write). Every write
  * is one AuditedAction; another branch's table is 404 because route binding goes through the BranchScoped query
  * (rule 8). A code is used once per branch, an inactive table included (orders snapshot it), compared without regard
- * to case. Tables are switched off with is_active, never deleted from the API. GET returns the stored fields only, in
- * the grid's order (sort, code, id); the derived state arrives with step 1.5.
+ * to case. Tables are switched off with is_active, never deleted from the API. GET returns the stored fields and the
+ * derived state (Support\TableStates, one grouped query for the whole grid) in the grid's order (sort, code, id).
  */
 final class DiningTablesController
 {
@@ -31,6 +32,7 @@ final class DiningTablesController
         private readonly CurrentBranch $branch,
         private readonly Access $access,
         private readonly ActorContext $actor,
+        private readonly TableStates $states,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -43,7 +45,11 @@ final class DiningTablesController
             ->orderBy('sort')->orderBy('code')->orderBy('id')
             ->get();
 
-        return response()->json(['data' => DiningTableResource::collection($tables)->resolve($request)]);
+        $states = $this->states->for($tables);
+
+        return response()->json(['data' => $tables->map(
+            fn (DiningTable $t): array => (new DiningTableResource($t, $states[$t->id] ?? TableStates::FREE))->resolve($request),
+        )->values()->all()]);
     }
 
     public function store(StoreDiningTableRequest $request): JsonResponse
@@ -65,7 +71,7 @@ final class DiningTablesController
             throw OrderError::tableCodeTaken();
         }
 
-        return response()->json((new DiningTableResource($table->fresh() ?? $table))->resolve($request), 201);
+        return response()->json($this->one($request, $table->fresh() ?? $table), 201);
     }
 
     public function update(UpdateDiningTableRequest $request, DiningTable $table): JsonResponse
@@ -78,7 +84,13 @@ final class DiningTablesController
             return $t;
         }, $table, 'dining_table.update');
 
-        return response()->json((new DiningTableResource($table->fresh() ?? $table))->resolve($request));
+        return response()->json($this->one($request, $table->fresh() ?? $table));
+    }
+
+    /** @return array<string, mixed> */
+    private function one(Request $request, DiningTable $table): array
+    {
+        return (new DiningTableResource($table, $this->states->for([$table])[$table->id] ?? TableStates::FREE))->resolve($request);
     }
 
     private function assertCodeFree(string $code): void

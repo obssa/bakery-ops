@@ -49,12 +49,11 @@ final class Availability
         $items = Item::query()->whereKey($ids)->get()->keyBy('id');
 
         /** @var array<int, Explosion|null> $explosions */
-        $explosions = [];
+        $explosions = array_fill_keys($ids, null);
         $drawsOn = [];
-        foreach ($ids as $id) {
-            $item = $items->get($id);
-            $explosions[$id] = $item instanceof Item ? $this->exploder->explode($item) : null;
-            foreach ($explosions[$id]?->itemIds() ?? [] as $itemId) {
+        foreach ($this->exploder->explodeMany(array_values($items->all())) as $id => $explosion) {
+            $explosions[$id] = $explosion;
+            foreach ($explosion?->itemIds() ?? [] as $itemId) {
                 $drawsOn[$itemId] = true;
             }
         }

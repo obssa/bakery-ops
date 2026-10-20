@@ -54,4 +54,52 @@ final class Locations
     {
         return Location::query()->where('type', LocationType::DisplayCase->value)->orderBy('id')->first();
     }
+
+    /**
+     * Locations::forProduct for many products at once, in a few queries (GET /menu): the id of the location each draws
+     * on, null where the branch has not set one up. Only ids are answered: Orders never holds a Location.
+     *
+     * @param  list<Item|int>  $products
+     * @return array<int, int|null> product id => location id
+     */
+    public function idsForProducts(array $products): array
+    {
+        $stations = $this->routing->stationsForMany($products);
+        $stationIds = [];
+        foreach ($stations as $station) {
+            if ($station !== null) {
+                $stationIds[$station->id] = $station;
+            }
+        }
+
+        /** @var array<int, int|null> $location station id => its location id */
+        $location = [];
+        if ($stationIds !== []) {
+            $candidates = Location::query()
+                ->whereIn('station_id', array_keys($stationIds))
+                ->where('type', '!=', LocationType::CashDrawer->value)
+                ->orderBy('id')
+                ->get()
+                ->groupBy('station_id');
+            foreach ($stationIds as $id => $station) {
+                $own = $station->code === StationCode::Till ? LocationType::DisplayCase : LocationType::tryFrom($station->code->value);
+                $list = $candidates->get($id) ?? collect();
+                $location[$id] = ($list->first(fn (Location $l): bool => $l->type === $own) ?? $list->first())?->id;
+            }
+        }
+
+        $display = in_array(null, $stations, true) ? $this->displayCase()?->id : null;
+        $answer = [];
+        foreach ($stations as $productId => $station) {
+            $answer[$productId] = $station === null ? $display : ($location[$station->id] ?? null);
+        }
+
+        return $answer;
+    }
+
+    /** Is $id a live location of this branch? (GET /menu?location= validates through this; Orders never holds a Location.) */
+    public function has(int $id): bool
+    {
+        return Location::query()->whereKey($id)->exists();
+    }
 }

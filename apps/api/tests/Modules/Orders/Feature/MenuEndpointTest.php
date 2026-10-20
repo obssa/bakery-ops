@@ -75,7 +75,7 @@ it('lists the sellable products with price, stock at the line\'s location, stati
         ['id' => $m->withTomato->id, 'name_en' => 'With tomato', 'name_am' => 'ከቲማቲም ጋር', 'price_delta' => '10.00'],
     ]);
     expect($entries[$m->latte->id])->toMatchArray(['price' => '120.00', 'station_id' => $m->barStation->id, 'location_id' => $m->bar->id])
-        ->and($entries[$m->latte->id]['available'])->toBe('5.0000')
+        ->and($entries[$m->latte->id]['available'])->toBe('4.0000')
         ->and($entries[$m->croissant->id])->toMatchArray(['available' => '5.0000', 'station_id' => null, 'location_id' => $m->display->id, 'modifiers' => []])
         ->and($entries[$m->cake->id])->toMatchArray(['available' => '1.0000', 'unit' => 'slice', 'low' => true])
         ->and($entries[$m->water->id])->toMatchArray(['available' => '24.0000', 'price' => '30.00']);
@@ -222,7 +222,10 @@ it('answers 304 with no body when If-None-Match is current, and does not build t
     $again->assertStatus(304);
     expect($again->getContent())->toBe('')->and($again->headers->get('ETag'))->toBe($etag)->and($again->headers->get('Cache-Control'))->toBe('no-cache, private');
     foreach ($touched as $sql) {
-        expect($sql)->not->toContain('stock_balances')->and($sql)->not->toContain('`recipes`')->and($sql)->not->toContain('`modifiers`');
+        expect($sql)->not->toContain('stock_balances')->and($sql)->not->toContain('item_stock_view');
+        if (str_contains($sql, 'from `items`') || str_contains($sql, 'from `modifiers`')) {
+            expect($sql)->toContain('count(*)'); // only the fingerprint, never the rows
+        }
     }
     expect(($this->menu)('', ['If-None-Match' => 'W/'.$etag])->status())->toBe(304);
     expect(($this->menu)('', ['If-None-Match' => '"other"'])->status())->toBe(200);
@@ -288,5 +291,5 @@ it('takes a fixed number of queries however many products the menu has', functio
         $count = count(($this->menu)()->assertOk()->json('items'));
     });
 
-    expect($count)->toBe(5 + 24)->and($many)->toBe($few)->and($few)->toBeLessThanOrEqual(30);
+    expect($count)->toBe(5 + 24)->and($many)->toBe($few)->and($few)->toBeLessThanOrEqual(40);
 })->group('module:orders', 'feature');

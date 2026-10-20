@@ -95,10 +95,12 @@ it('takes whose orders they are from the waiter acting by short code on a shared
     loginAs($pad);
     $created = $this->withHeaders(idempotencyKey() + $headers)->postJson('/api/v1/orders', $m->order([$m->line($m->croissant)]));
     $created->assertCreated()->assertJsonPath('owner.id', $f->waiter->id);
+    $this->flushHeaders(); // withHeaders() sticks to the test: the acting session is only for the pad's own requests
     $other = $f->send([$m->line($m->water)], $this->bekele);
 
-    expect(($this->ids)(($this->list)([], $pad, $headers)))->toBe([$created->json('id')])
-        ->and(($this->ids)(($this->list)([], $pad)))->toBe([]); // the pad account on its own owns nothing
+    expect(($this->ids)(($this->list)([], $pad, $headers)))->toBe([$created->json('id')]);
+    $this->flushHeaders();
+    expect(($this->ids)(($this->list)([], $pad)))->toBe([]); // the pad account on its own owns nothing
     expect(($this->ids)(($this->list)([], $f->waiter)))->toBe([$created->json('id')])->and($other['id'])->not->toBe($created->json('id'));
 })->group('module:orders', 'feature');
 
@@ -289,6 +291,11 @@ it('takes a fixed number of queries however many orders it lists', function () {
 
         return $n;
     };
+    foreach ([$m->bread, $m->chicken, $m->lettuce, $m->onion, $m->butter, $m->tomato] as $ingredient) {
+        stockIn($ingredient, $m->kitchen, '5000');
+    }
+    stockIn($m->croissant, $m->display, '50');
+    stockIn($m->water, $m->display, '50');
     $f->send([$m->line($m->sandwich, '1', [$m->noOnion]), $m->line($m->croissant)]);
     ($this->list)();
     $few = $count();

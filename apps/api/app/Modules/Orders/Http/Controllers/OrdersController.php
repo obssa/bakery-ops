@@ -11,15 +11,21 @@ use App\Modules\Orders\Actions\SendOrder;
 use App\Modules\Orders\Actions\VoidOrder;
 use App\Modules\Orders\Exceptions\SendRefused;
 use App\Modules\Orders\Http\Requests\CancelOrderRequest;
+use App\Modules\Orders\Http\Requests\ListOrdersRequest;
 use App\Modules\Orders\Http\Requests\ReplaceLinesRequest;
 use App\Modules\Orders\Http\Requests\StoreOrderRequest;
 use App\Modules\Orders\Http\Requests\VoidOrderRequest;
 use App\Modules\Orders\Http\Resources\OrderResource;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Support\OrderAccess;
+use App\Modules\Orders\Support\OrderList;
+use App\Modules\Orders\Support\OrderListQuery;
 use App\Shared\Http\ApiError;
+use App\Shared\Live\ConditionalPoll;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * Taking and sending orders (phase-1 plan section 4; step 1.3b). Every route: auth:sanctum, actor, permission
@@ -36,11 +42,42 @@ use Illuminate\Http\Request;
  *   POST /orders/{order}/void    200 the voided order (step 1.3d; orders.void_request, approved by a manager's or the
  *                                admin's PIN); 403 identity.pin.rejected, 423 identity.short_code.locked,
  *                                409 orders.order.paid / orders.order.not_voidable
- *   POST /orders/{order}/void    200 the voided order (step 1.3d; orders.void_request + a manager PIN); 403 identity.pin.rejected, 423 identity.short_code.locked, 409 orders.order.paid / not_voidable
+ *
+ * The read models (step 1.5; orders.create, read only, no Idempotency-Key):
+ *   GET  /orders                 200 {data: [Order], cursor, server_time} + ETag, or 304 (OrderList: a waiter sees only the
+ *                                orders they own; ?mine=1 narrows anyone to their own; ?unpaid, ?status, ?dining_table_id,
+ *                                ?since=<cursor> as a poll over order_events)
+ *   GET  /orders/{order}         200 the Order with its `events` timeline; 404 for another branch's order and for a
+ *                                waiter's neighbour's
  */
 final class OrdersController
 {
     public function __construct(private readonly OrderAccess $access) {}
+
+    public function index(ListOrdersRequest $request, OrderList $list): SymfonyResponse
+    {
+        $person = $this->access->person();
+        $query = new OrderListQuery(
+            $person->id,
+            $request->wantsMine() || ! $this->access->seesEveryOrder($person),
+            $request->status(),
+            $request->wantsUnpaid(),
+            $request->diningTableId(),
+            $request->since(),
+            $request->limit(),
+        );
+        $now = CarbonImmutable::now();
+        $stamp = $list->stamp($query, $now);
+
+        return ConditionalPoll::respond($request, $stamp['etag'], fn (): array => $list->page($query, $stamp['next'], $now, $request));
+    }
+
+    public function show(Request $request, Order $order): JsonResponse
+    {
+        $this->access->assertMayRead($order);
+
+        return response()->json((new OrderResource(OrderResource::load($order)->load('events')))->resolve($request));
+    }
 
     public function store(StoreOrderRequest $request, CreateOrder $create, SendOrder $send): JsonResponse
     {

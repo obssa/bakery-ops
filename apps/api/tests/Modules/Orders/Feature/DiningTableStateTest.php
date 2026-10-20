@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Identity\Contracts\ShortCodes;
 use App\Modules\Orders\Models\DiningTable;
+use App\Modules\Orders\Models\Order;
 use App\Shared\Events\PaymentRecorded;
 use App\Shared\Models\Branch;
 use Illuminate\Database\Events\QueryExecuted;
@@ -89,7 +90,7 @@ it('moves a table through its life: free, ordering, waiting, served, free', func
     expect(($this->states)())->toBe(['T1' => 'served']);
 
     withActor($f->cashier->id);
-    $total = Illuminate\Support\Facades\DB::table('orders')->where('id', $cart['id'])->value('total');
+    $total = DB::table('orders')->where('id', $cart['id'])->value('total');
     DB::transaction(fn () => event(new PaymentRecorded($f->branch->id, 1, $cart['id'], 'cash', (string) $total, '0.00')));
     expect(($this->states)())->toBe(['T1' => 'free']);
 })->group('module:orders', 'feature');
@@ -110,7 +111,7 @@ it('counts only its own branch\'s orders and keeps an inactive table out of the 
     $mine = ($this->table)('T1');
     $other = Branch::factory()->create();
     $theirTable = DiningTable::factory()->create(['branch_id' => $other->id, 'code' => 'T1', 'created_by_user_id' => makeUser($other, 'admin')->id]);
-    App\Modules\Orders\Models\Order::factory()->sent(3)->atTable($theirTable)->create();
+    Order::factory()->sent(3)->atTable($theirTable)->create();
     $off = DiningTable::factory()->create(['branch_id' => $f->branch->id, 'code' => 'T2', 'is_active' => false]);
     ($this->at)($mine, [$m->line($m->croissant)], false);
 

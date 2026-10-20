@@ -13,6 +13,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Station;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
  * Who may do what to an order, beyond the route's permission middleware (rule 6; phase-1 plan section 4):
@@ -78,6 +79,47 @@ final class OrderAccess
             ? $this->access->can($person, 'orders.accept', $station)
             : $this->access->can($person, 'orders.accept') && $this->access->can($person, 'stations.all');
         if (! $allowed) {
+            throw OrderError::stationForbidden();
+        }
+
+        return $person;
+    }
+
+    /**
+     * Whose orders the person sees: all of the branch for those who work at every station (stations.all) or take
+     * payments (payments.take: cashier, manager, admin); everyone else, the waiters, only the orders they own.
+     */
+    public function seesEveryOrder(User $person): bool
+    {
+        return $this->access->can($person, 'stations.all') || $this->access->can($person, 'payments.take');
+    }
+
+    /**
+     * An order is read by its owner or by someone who sees every order; for anyone else it does not exist (404), so a
+     * waiter cannot even tell that a neighbour's order is there.
+     *
+     * @throws ModelNotFoundException
+     */
+    public function assertMayRead(Order $order): User
+    {
+        $person = $this->person();
+        if ($order->owner_user_id !== $person->id && ! $this->seesEveryOrder($person)) {
+            throw (new ModelNotFoundException)->setModel(Order::class, [$order->id]);
+        }
+
+        return $person;
+    }
+
+    /**
+     * The rail of a station is read by whoever may work it: orders.accept at that station, or at every station
+     * (stations.all); the person acting by short code on a shared kitchen screen is the one checked.
+     *
+     * @throws OrderError orders.station.forbidden (403), auth.forbidden (403) without orders.accept at all
+     */
+    public function assertAtStationRail(Station $station): User
+    {
+        $person = $this->person('orders.accept');
+        if (! $this->access->can($person, 'orders.accept', $station)) {
             throw OrderError::stationForbidden();
         }
 
