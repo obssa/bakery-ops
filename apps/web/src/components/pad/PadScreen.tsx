@@ -3,21 +3,19 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { lockDue, useActing } from "@/lib/acting";
-import { useCarts } from "@/lib/cart";
 import { playChime, storeMuted, storedMuted, unlockAudio } from "@/lib/kds";
 import { createMenuFeed, createOrdersFeed, openOrdersOf, readyLineIds } from "@/lib/live/pad";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import type { Menu } from "@/lib/api/types";
 import type { FeedSnapshot } from "@/lib/live/feed";
 import type { OrdersState } from "@/lib/live/pad";
-import { useOutbox } from "@/lib/outbox/store";
 import { useSession } from "@/lib/session";
 import { PageHeader } from "../ui";
 import { focusRing } from "../styles";
 import { LockScreen } from "./LockScreen";
 import { MyOrders } from "./MyOrders";
 import { OrderingSurface } from "./OrderingSurface";
-import { usePadOutcomes } from "./outcomes";
+import { usePadOutcomes, useReleaseStaleSends } from "./outcomes";
 
 // The waiter pad (/pad). Signed in as the pad account, it is locked until a waiter types their short code; the waiter
 // then has the pad for 10 minutes (the API acting session) and for as long as they keep touching it (60 s idle lock).
@@ -176,13 +174,7 @@ export function PadScreen() {
   const onChanged = useCallback(() => ordersFeed?.refresh(), [ordersFeed]);
   usePadOutcomes(onSent, onChanged);
 
-  // a cart left "sending" by a page that was closed mid-send: the send is not in the outbox any more, so it can be
-  // tapped again (the API answers the same order for the same client UUID)
-  useEffect(() => {
-    const queued = new Set(useOutbox.getState().items.map((item) => item.subjectUuid));
-    const { carts, update } = useCarts.getState();
-    for (const [id, cart] of Object.entries(carts)) if (cart.sending && !queued.has(cart.orderUuid)) update(Number(id), (c) => ({ ...c, sending: false }));
-  }, []);
+  useReleaseStaleSends();
 
   return (
     <div>

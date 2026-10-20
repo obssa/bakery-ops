@@ -1,7 +1,7 @@
 "use client";
 
 import { focusRing } from "./styles";
-import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useEffect, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 
 // The few building blocks every Phase 0 screen uses. Tablet-first (workflows-and-screens.md): every control is at
 // least 48 px tall, focus is always visible, text stays legible at arm's length. Plain and quiet on purpose.
@@ -121,4 +121,32 @@ const BADGE_TONES = {
 /** A small status label. The words carry the meaning; the tone only adds to it. */
 export function Badge({ tone = "neutral", children, className = "" }: { tone?: keyof typeof BADGE_TONES; children: ReactNode; className?: string }) {
   return <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${BADGE_TONES[tone]} ${className}`}>{children}</span>;
+}
+
+/**
+ * A dialog over the screen (the till's pay sheet and void form): named for screen readers, closed by Escape or a tap on
+ * the backdrop. The page behind stays as it was; the dialog holds what must be decided before going on.
+ */
+export function Modal({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-900/50 p-4 sm:items-center" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        className="max-h-full w-full max-w-lg space-y-4 overflow-y-auto rounded-lg bg-white p-5 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }

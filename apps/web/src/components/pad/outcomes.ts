@@ -85,3 +85,15 @@ export function usePadOutcomes(onSent: () => void, onChanged: () => void) {
     [onSent, onChanged],
   );
 }
+
+/**
+ * A cart left "sending" by a page that was closed mid-send: the send is not in the outbox any more, so it can be tapped
+ * again (the API answers the same order for the same client UUID). Run once when the pad or the till opens.
+ */
+export function useReleaseStaleSends() {
+  useEffect(() => {
+    const queued = new Set(useOutbox.getState().items.map((item) => item.subjectUuid));
+    const { carts, update } = useCarts.getState();
+    for (const [id, cart] of Object.entries(carts)) if (cart.sending && !queued.has(cart.orderUuid)) update(Number(id), (c) => ({ ...c, sending: false }));
+  }, []);
+}

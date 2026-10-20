@@ -1,26 +1,17 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import type { Line, Locale, RejectReason, Ticket } from "@/lib/api/types";
 import { REJECT_REASONS } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
 import { ageOf, clock, secondsSince, type TicketAge } from "@/lib/kds";
+import { useNow } from "@/lib/useNow";
 import { queueAcceptLine, queueReadyLine, queueRejectLine, useOutbox } from "@/lib/outbox/store";
 import { Button, Field, TextInput } from "../ui";
 
 // A ticket of the rail: the order, a live timer that turns amber and red (thresholds in lib/kds.ts), the notes, and
 // each line of this station with what can be done to it. Accept and ready go through the outbox.
-
-/** One clock for every ticket on the screen. */
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
-}
 
 const AGE_STYLE: Record<TicketAge, string> = {
   fresh: "border-neutral-200 bg-white",
