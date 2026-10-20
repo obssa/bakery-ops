@@ -38,6 +38,7 @@ use App\Shared\Models\Station;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
+use Tests\Support\OrdersMenu;
 use Tests\TestCase;
 
 $admin = static function (): User {
@@ -58,6 +59,20 @@ $orderableCake = static function (User $me): Item {
     stockIn($cake, $display, '10');
 
     return $cake;
+};
+
+// a chicken sandwich sent to the kitchen of the admin's branch (Tests\Support\OrdersMenu): the id of its queued line,
+// which the admin works on (stations.all), readied first when $ready
+$sentSandwichLine = static function (TestCase $t, User $me, bool $ready = false): string {
+    withActor($me->id);
+    $menu = OrdersMenu::build(currentBranch());
+    $order = $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson('/api/v1/orders', $menu->order([$menu->line($menu->sandwich)]));
+    $lineId = (string) $order->json('lines.0.id');
+    if ($ready) {
+        $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson("/api/v1/order-lines/{$lineId}/ready")->assertOk();
+    }
+
+    return $lineId;
 };
 
 return [
@@ -439,5 +454,39 @@ return [
             return ['{order}' => (string) $order->id];
         },
         'payload' => fn (): array => ['reason' => 'The customer left'],
+    ],
+
+    // Station actions (step 1.3c): one AuditedAction each, so the first request writes one audit_log row
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/order-lines/{line}/accept',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => fn (TestCase $t): array => ['{line}' => $sentSandwichLine($t, $admin())],
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/order-lines/{line}/ready',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => fn (TestCase $t): array => ['{line}' => $sentSandwichLine($t, $admin())],
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/order-lines/{line}/reject',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => fn (TestCase $t): array => ['{line}' => $sentSandwichLine($t, $admin())],
+        'payload' => fn (): array => ['reason' => 'equipment_down'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/order-lines/{line}/served',
+        'module' => 'orders',
+        'table' => 'audit_log',
+        'setup' => fn (TestCase $t): array => ['{line}' => $sentSandwichLine($t, $admin(), true)],
+        'payload' => fn (): array => [],
     ],
 ];

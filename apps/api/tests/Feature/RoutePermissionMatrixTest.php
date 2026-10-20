@@ -6,9 +6,13 @@ use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Models\Device;
+use App\Modules\Identity\Models\UserStationAssignment;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderLine;
+use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
+use App\Shared\Models\Station;
 
 /*
  * Rule 6, generated: tests/Support/route_permissions.php maps every protected api/v1 route to its permission and the
@@ -47,6 +51,14 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)
         $params['{order}'] = (string) Order::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
+    }
+    if (str_contains($uri, '{line}')) {
+        // a queued line of a sent order of the caller's own, at a station the caller is assigned to (another station is
+        // refused by the action, not by the matrix: orders.station.forbidden)
+        $station = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $branch->id]);
+        UserStationAssignment::factory()->create(['branch_id' => $branch->id, 'user_id' => $actorId, 'station_id' => $station->id]);
+        $order = Order::factory()->sent()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId]);
+        $params['{line}'] = (string) OrderLine::factory()->atStation($station)->create(['order_id' => $order->id])->id;
     }
 
     return $params;

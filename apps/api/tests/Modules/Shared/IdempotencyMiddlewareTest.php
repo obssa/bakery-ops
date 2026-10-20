@@ -5,11 +5,11 @@ declare(strict_types=1);
 use App\Shared\Http\Middleware\Idempotency;
 use App\Shared\Models\Branch;
 use App\Shared\Models\IdempotencyKey;
-use App\Shared\Tenancy\CurrentBranch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Tests\Support\ResolveTestContext;
 
 /*
  * Rule 7 / ADR 0003: Idempotency-Key on every write, scoped (branch, user, key), replayed from a stored snapshot,
@@ -17,14 +17,16 @@ use Illuminate\Support\Str;
  */
 
 beforeEach(function () {
-    Route::middleware('idempotency')->group(function (): void {
+    // Each request starts with no scoped context, as in production (tests/TestCase.php), so the branch and the user are
+    // resolved inside the request, the way authentication does, from what the test holds in ResolveTestContext.
+    Route::middleware([ResolveTestContext::class, 'idempotency'])->group(function (): void {
         Route::post('/_shared-test/echo', fn (Request $r) => response()->json(['received' => $r->all(), 'nonce' => Str::random(12)], 201));
         Route::post('/_shared-test/fail', fn () => response()->json(['nonce' => Str::random(12)], 500));
         Route::post('/_shared-test/plain', fn () => response('plain '.Str::random(6), 200, ['Content-Type' => 'text/plain']));
         Route::get('/_shared-test/read', fn () => response()->json(['ok' => true]));
     });
-    $this->branch = actInBranch(Branch::factory()->create());
-    actAsUserId(7);
+    $this->branch = Branch::factory()->create();
+    ResolveTestContext::reset($this->branch);
 });
 
 it('rejects a write without an Idempotency-Key with a bilingual 400', function () {
@@ -78,7 +80,7 @@ it('scopes keys per user', function () {
     $key = (string) Str::uuid();
     $first = $this->withHeader('Idempotency-Key', $key)->postJson('/_shared-test/echo', ['a' => 1]);
 
-    actAsUserId(8);
+    ResolveTestContext::$userId = 8;
     $other = $this->withHeader('Idempotency-Key', $key)->postJson('/_shared-test/echo', ['a' => 1]);
 
     $other->assertStatus(201)->assertHeaderMissing(Idempotency::REPLAYED_HEADER);
@@ -90,7 +92,7 @@ it('scopes keys per branch', function () {
     $key = (string) Str::uuid();
     $first = $this->withHeader('Idempotency-Key', $key)->postJson('/_shared-test/echo', ['a' => 1]);
 
-    actInBranch(Branch::factory()->create());
+    ResolveTestContext::$branch = Branch::factory()->create();
     $other = $this->withHeader('Idempotency-Key', $key)->postJson('/_shared-test/echo', ['a' => 1]);
 
     $other->assertStatus(201)->assertHeaderMissing(Idempotency::REPLAYED_HEADER);
@@ -148,7 +150,7 @@ it('replays non-JSON responses verbatim', function () {
 
 it('refuses to run before the branch and the actor are resolved', function () {
     $this->withoutExceptionHandling();
-    app(CurrentBranch::class)->clear();
+    ResolveTestContext::$resolved = false;
 
     expect(fn () => $this->withHeader('Idempotency-Key', 'k1')->postJson('/_shared-test/echo', []))
         ->toThrow(LogicException::class);

@@ -11,12 +11,15 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category}, {location} and {order} (an open cart of the caller's own) with a row of the right table in the caller's branch, and
+ * the matrix test substitutes {id}, {item}, {category}, {location}, {order} (an open cart of the caller's own) and {line}
+ * (a queued line of a sent order of the caller's own, at a station the caller is assigned to) with a row of the right
+ * table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
  */
 $all = ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'];
 $floor = ['admin', 'manager', 'cashier', 'chef', 'barista', 'cake_baker', 'bread_baker'];
 $orderTakers = ['admin', 'manager', 'cashier', 'waiter'];
+$stationStaff = ['admin', 'manager', 'chef', 'barista'];
 
 return [
     // Identity (step 0.4)
@@ -70,4 +73,11 @@ return [
     'PUT /api/v1/orders/{order}/lines' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
     'POST /api/v1/orders/{order}/send' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
     'POST /api/v1/orders/{order}/cancel' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    // station actions (step 1.3c): accept / ready / reject need orders.accept (chef, barista; admin and manager hold
+    // stations.all); the line's own station is checked by the action after this matrix (403 orders.station.forbidden).
+    // Served is the waiter's: orders.create, on an order of their own or with stations.all (403 orders.order.not_owner)
+    'POST /api/v1/order-lines/{line}/accept' => ['permission' => 'orders.accept', 'roles' => $stationStaff, 'module' => 'orders'],
+    'POST /api/v1/order-lines/{line}/ready' => ['permission' => 'orders.accept', 'roles' => $stationStaff, 'module' => 'orders'],
+    'POST /api/v1/order-lines/{line}/reject' => ['permission' => 'orders.accept', 'roles' => $stationStaff, 'module' => 'orders'],
+    'POST /api/v1/order-lines/{line}/served' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
 ];
