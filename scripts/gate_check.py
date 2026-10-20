@@ -294,7 +294,8 @@ def mode_done(root: str, man: dict, st: dict, n: int, a, rep: Report, pest: Pest
     if a.ci or a.no_e2e or not pest.enabled:
         rep.add(None, "playwright projects", f"{', '.join(projects)} (trusted to CI / skipped)")
     elif os.path.isdir(web) and shutil.which("pnpm"):
-        args = ["pnpm", "exec", "playwright", "test"] + [x for p in projects for x in ("--project", p)]
+        # the resolved path: on Windows it is pnpm.cmd, which CreateProcess does not find under the bare name "pnpm"
+        args = [shutil.which("pnpm"), "exec", "playwright", "test"] + [x for p in projects for x in ("--project", p)]
         proc = subprocess.run(args, cwd=web, text=True, capture_output=True)
         rep.add(proc.returncode == 0, "playwright projects", ", ".join(projects) + ("" if proc.returncode == 0 else "\n" + "\n".join((proc.stdout or "").splitlines()[-8:])))
     else:
