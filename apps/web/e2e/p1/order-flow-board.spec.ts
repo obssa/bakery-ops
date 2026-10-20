@@ -21,7 +21,8 @@ test.describe("p1 order flow: admin orders board", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("link", { name: "Orders", exact: true })).toHaveAttribute("aria-current", "page");
 
-    // sent while the board is open: it arrives through the live feed, in the Sent column
+    // sent while the board is open and loaded: it arrives through the live feed, in the Sent column
+    await expect(page.getByText("Loading the orders…")).toHaveCount(0, { timeout: 60_000 });
     const order = await sendOrder(fixture);
     const sent = page.getByRole("region", { name: "Sent", exact: true });
     const card = sent.getByRole("article").filter({ hasText: product });

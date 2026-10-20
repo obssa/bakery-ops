@@ -755,7 +755,7 @@ Small PRs, each green in CI before the next; a step that completes a module ends
    - The repository has no web unit-test runner, so the merge and cursor logic is covered by that flow and kept in pure
      functions (`mergeTickets`, `railOf`, `backoffDelay`, `decimal.ts`) for a runner to pick up.
    As built (step 1.6b, `phase-1/web-pad`): the two Playwright flows were committed red first (`e2e/p1/shortfall.spec.ts`
-   replaces the `p1-shortfall` placeholder, its `test.fixme` and `TODO(p1)` removed; `e2e/p1/pad-order-flow.spec.ts` is the
+   replaces the `p1-shortfall` placeholder, its `test.fixme` and its phase marker removed; `e2e/p1/pad-order-flow.spec.ts` is the
    pad lock test in `p1-order-flow`; `order-flow.spec.ts` keeps its placeholder for 1.6c), then the foundations, then the
    pad. No API change. Where the plan left a detail open:
    - **The shared pad.** The device signs in as the pad account (a waiter account); `/pad` shows a numeric keypad (a
@@ -825,6 +825,72 @@ Small PRs, each green in CI before the next; a step that completes a module ends
      hands whole numbers back as strings, so on Redis (CI and the VPS stack) failed short codes were never counted and
      the 15-minute lockout never happened; the database store of the live host was fine. It now reads numeric values
      (`tests/Modules/Identity/Feature/AttemptCounterStoresTest.php` runs it over a store that returns strings).
+   As built (step 1.6c, `phase-1/web-till`): the flows were committed red first (`e2e/p1/order-flow.spec.ts` is now the
+   full gate flow, its `test.fixme` and phase marker removed; `order-flow-till.spec.ts` and `order-flow-board.spec.ts` sit
+   beside it in `p1-order-flow`, all `@live`), then the shared ordering surface, the foundations, the till and the
+   board. No API change. After this step no `test.fixme` and no phase-1 TODO marker remains in `apps/`, `docs/` or
+   `.github/` (the 1.6b note above no longer spells the marker out, because `gate_check.py` greps `docs/` for it). Where
+   the plan left a detail open:
+   - **One ordering surface.** `components/pad/OrderingSurface.tsx` (tables panel, menu, cart, Send, clear or cancel)
+     is the pad's former order tab, extracted; the pad and the till both mount it, with a cart per user id (the unlocked
+     waiter on the pad, the signed-in cashier on the till). Outbox sends, the shortfall display and `usePadOutcomes`
+     are unchanged; `useReleaseStaleSends` (a cart left "sending" by a closed page) moved to `outcomes.ts` for both.
+     `ui.tsx` gains `Modal`; `lib/useNow.ts` is the one clock the KDS tickets, the queue and the board share.
+   - **Till.** `/till` needs `payments.take`. No short code and no acting session: the cashier's own account sends, so
+     the API stamps `created_via` itself (`till` for a cashier, `admin` when an admin uses the screen). Two tabs,
+     "Unpaid orders" (default, with a count) and "New order". The queue is a `LiveFeed` (`lib/live/orders.ts`): the first
+     load is `GET /orders?unpaid=1`, then `since=` with `If-None-Match`, pushed on `branch.{id}.orders` on a WebSocket
+     transport. Because a poll answers every order with a new event whatever its status, the list is derived on the
+     client: status sent, in progress, ready or served, oldest first by `sent_at`. A card shows the order number, table or
+     takeaway, the waiter, the lines, the time waiting (the kitchen display's amber and red thresholds, with the words
+     "Slow" and "Late"), and the balance. A paid order that is not served yet stays in the queue marked "Paid, waiting to
+     be served" (no buttons) and leaves when it closes.
+   - **Pay sheet** (`PaySheet.tsx`). A dialog with the amount due (the order's `balance`; the API refuses any other
+     amount), the enabled channels of `GET /payment-channels` in `sort` order, a cash keypad (digits, `00`, point with at
+     most two decimals, delete, clear, "Exact amount") and the change due computed with the string decimal helper
+     (`lib/payment.ts`: `pressKey`, `tenderedOf`, `changeDue`). Only cash can be chosen: a channel is usable when
+     `accepted_now` and its code is `cash`; every other enabled channel is listed, disabled, with "Photo required,
+     available in Phase 4" (Amharic too). The payment is online only, not in the outbox: the cashier needs the answer.
+     `POST /orders/{order}/payments` carries a `client_uuid` fixed for the sheet and an `Idempotency-Key` that follows the
+     payload (a double tap replays, a changed cash amount is a new request). After success the sheet shows "Payment
+     recorded" and "Give change" with the API's `change_amount`, which is what confirms the local figure. The API's
+     errors (`payments.amount.mismatch`, `payments.tendered.too_low`, `payments.order.not_payable`,
+     `payments.order.settled`) show inline in the page language and make the queue look again. No receipt, split,
+     reference or photo: Phase 4.
+   - **Void** (`VoidDialog.tsx`, shared with the board). Reason plus the PIN of a manager or admin (a password field of
+     4 to 6 digits). `POST /orders/{order}/void`; a refused PIN (403 `identity.pin.rejected`) or the lockout (423
+     `identity.short_code.locked`) shows the API's bilingual message, the reason is kept and the PIN is cleared. The till
+     has no separate order detail screen, so Void sits on each queue card; the board's timeline panel has it too.
+     Only an order that is sent and not settled can be voided (`isPayable`).
+   - **Admin Orders board** (`/admin/orders`, an "Orders" tab in the admin frame and a card on the console home;
+     `orders.create` in the page guard, the API decides). A `LiveFeed` over `GET /orders` (`limit=200` on the first
+     load, then the cursor), grouped in columns Open, Sent, In progress, Ready, Served and Paid (the API's definition of
+     active); each card has the order number, table, owner, age, every line with its station ("Display case" for a line
+     with none) and status, a "Paid in full" badge and the total; filters by status and by table. A click opens the
+     timeline panel (`GET /orders/{order}`, read again when the feed sees a new version of the order): the events oldest
+     first with a label, the line they are about and the time. The API gives user ids only, so the timeline shows no
+     person names; adding them is an API change left for a later step. Read-only apart from Void.
+   - **Playwright.** `fixture.ts` gains `buildFlowFixture` (kitchen and bar sides sharing one run tag, a display-case
+     location found by type or created, a `to_stock` croissant with no station and 5 in stock at the display case, the
+     waiter with a fresh short code, the chef, the barista and the cashier signed in on the API, prices 180.00, 90.00 and
+     60.00 for a total of 330.00), `buildTillStaff` (the cashier and a manager `+251911000205` whose short code is reset
+     to a fresh PIN each run), `ledgerReasonsOf` and `menuAvailable`; `pad.ts` gains `openAs` (any role starts signed in
+     by placing its API token, because `POST /login` is throttled). The full flow opens four contexts (pad, kitchen KDS,
+     bar KDS, till) with the project's tablet viewport and, on a failure, attaches a screenshot of each. Steps: the
+     waiter unlocks, picks the table, adds the three products (cart shows 330.00), sends; the kitchen and bar tickets
+     appear within 5 s (the latte is not on the kitchen rail); accept and ready on both; the pad's "My orders" tab shows
+     "3 ready" (the croissant is ready at send); the waiter serves the three lines; the till queue shows the order, the
+     cashier takes cash 400 and sees "Change due: 70.00 ETB" before and "Give change: 70.00 ETB" after (the API's
+     figure); the order is `closed` with total, paid and balance 330.00, 330.00, 0.00. Ledger: `purchase_in,
+     reservation, production_consume` for the sandwich's and the latte's ingredients and `purchase_in, reservation, sale`
+     for the croissant (the sale is written when the order closes, not at serve), and the menu's `available` is 49, 49
+     and 4 (stocked minus sold). Both rails are checked for the polling rule (first load without a cursor, every later
+     request with `since` and `If-None-Match`). The till test has the cashier take an order on the till (checks
+     `created_via = till`), try a PIN nobody has (the API's message appears), then the manager's PIN: voided with the
+     reason and the manager as approver, ledger `purchase_in, reservation, reservation_release`. The board test sends an
+     order through the API while the admin has the board open and checks the Sent column, owner, table, station, the
+     timeline, both filters and the Amharic heading. The admin smoke test keeps pointing at the production board as its
+     screen still to come.
 7. **1.7 docs and seeds**: `Phase1Seeder`, ADR 0008 / 0009 accepted, OpenAPI, ERD, gate report.
 
 ## 7. Test list
