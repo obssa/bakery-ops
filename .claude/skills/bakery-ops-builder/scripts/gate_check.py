@@ -130,8 +130,9 @@ class PestRunner:
             return None, f"pest --group={groups} not run (--no-tests/--ci)"
         if not self.cmd:
             return None, "no pest runner: start the stack (python scripts/task.py up) so tests can run in the app container"
+        # Pest and Playwright print UTF-8 (Amharic names, check marks); the Windows default code page cannot decode it
         proc = subprocess.run([*self.cmd, *[f"--group={g}" for g in groups.split(",")], "--colors=never"], cwd=self.root,
-                              text=True, capture_output=True)
+                              text=True, encoding="utf-8", errors="replace", capture_output=True)
         out = (proc.stdout or "") + (proc.stderr or "")
         if re.search(r"No tests (found|executed)", out):
             return False, f"group {groups}: no tests found"
@@ -296,7 +297,7 @@ def mode_done(root: str, man: dict, st: dict, n: int, a, rep: Report, pest: Pest
     elif os.path.isdir(web) and shutil.which("pnpm"):
         # the resolved path: on Windows it is pnpm.cmd, which CreateProcess does not find under the bare name "pnpm"
         args = [shutil.which("pnpm"), "exec", "playwright", "test"] + [x for p in projects for x in ("--project", p)]
-        proc = subprocess.run(args, cwd=web, text=True, capture_output=True)
+        proc = subprocess.run(args, cwd=web, text=True, encoding="utf-8", errors="replace", capture_output=True)
         rep.add(proc.returncode == 0, "playwright projects", ", ".join(projects) + ("" if proc.returncode == 0 else "\n" + "\n".join((proc.stdout or "").splitlines()[-8:])))
     else:
         rep.add(False, "playwright projects", "apps/web or pnpm missing")
