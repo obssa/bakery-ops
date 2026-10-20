@@ -52,6 +52,13 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
     if (str_contains($uri, '{table}')) {
         $params['{table}'] = (string) DiningTable::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
     }
+    if (str_contains($uri, '{station}')) {
+        // the station of the rail asked for, with the caller assigned to it (another station is refused by the
+        // endpoint, not by the matrix: orders.station.forbidden)
+        $station = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $branch->id]);
+        UserStationAssignment::factory()->create(['branch_id' => $branch->id, 'user_id' => $actorId, 'station_id' => $station->id]);
+        $params['{station}'] = (string) $station->id;
+    }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)
         $params['{order}'] = (string) Order::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;

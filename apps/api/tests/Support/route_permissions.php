@@ -84,6 +84,14 @@ return [
     'POST /api/v1/order-lines/{line}/reject' => ['permission' => 'orders.accept', 'roles' => $stationStaff, 'module' => 'orders'],
     'POST /api/v1/order-lines/{line}/served' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
 
+    // read models (step 1.5): the order takers read the menu, their order list and one order (a waiter only their own,
+    // 404 otherwise; checked by the endpoint after this matrix); the station rail needs orders.accept, and at that
+    // station (403 orders.station.forbidden; admin and manager hold stations.all)
+    'GET /api/v1/menu' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    'GET /api/v1/orders' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    'GET /api/v1/orders/{order}' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
+    'GET /api/v1/stations/{station}/tickets' => ['permission' => 'orders.accept', 'roles' => $stationStaff, 'module' => 'orders'],
+
     // dining tables (step 1.3e): the order takers read the grid, only the admin (tables.manage) configures it
     'GET /api/v1/dining-tables' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
     'POST /api/v1/dining-tables' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],

@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
  * The dining tables of the pad's grid (docs/phases/phase-1-plan.md section 4; step 1.3e): POST and PATCH need
  * tables.manage (admin), GET needs orders.create (the order takers). A table's code is unique per branch (also
  * against an inactive table: orders snapshot it), writes are idempotent and audited, another branch's table is 404.
- * GET returns the stored fields in the grid's order (sort, code, id); the derived state (free, ordering, waiting,
+ * GET returns the stored fields and the derived state in the grid's order (sort, code, id); see DiningTableStateTest for the state (free, ordering, waiting,
  * served, bill) arrives with the read models of step 1.5.
  */
 
@@ -128,7 +128,7 @@ it('lists the active tables of the branch in grid order for every order taker, i
         loginAs(makeUser($this->branch, $role));
         $rows = $this->getJson('/api/v1/dining-tables')->assertOk()->json('data');
         expect(array_column($rows, 'id'))->toBe([$first->id, $tieB->id, $second->id], $role)
-            ->and(array_keys($rows[0]))->toBe(['id', 'code', 'name_en', 'name_am', 'seats', 'sort', 'is_active'])
+            ->and(array_keys($rows[0]))->toBe(['id', 'code', 'name_en', 'name_am', 'seats', 'sort', 'is_active', 'state'])
             ->and(array_column($rows, 'id'))->not->toContain($foreign->id);
     }
 
