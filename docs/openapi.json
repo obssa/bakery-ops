@@ -1357,6 +1357,171 @@
                 }
             }
         },
+        "/v1/order-lines/{line}/served": {
+            "post": {
+                "operationId": "order-lines.served",
+                "tags": [
+                    "OrderLines"
+                ],
+                "parameters": [
+                    {
+                        "name": "line",
+                        "in": "path",
+                        "required": true,
+                        "description": "The line ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/order-lines/{line}/accept": {
+            "post": {
+                "operationId": "order-lines.accept",
+                "tags": [
+                    "OrderLines"
+                ],
+                "parameters": [
+                    {
+                        "name": "line",
+                        "in": "path",
+                        "required": true,
+                        "description": "The line ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/order-lines/{line}/ready": {
+            "post": {
+                "operationId": "order-lines.ready",
+                "tags": [
+                    "OrderLines"
+                ],
+                "parameters": [
+                    {
+                        "name": "line",
+                        "in": "path",
+                        "required": true,
+                        "description": "The line ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/order-lines/{line}/reject": {
+            "post": {
+                "operationId": "order-lines.reject",
+                "tags": [
+                    "OrderLines"
+                ],
+                "parameters": [
+                    {
+                        "name": "line",
+                        "in": "path",
+                        "required": true,
+                        "description": "The line ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RejectLineRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/orders": {
             "post": {
                 "operationId": "orders.store",
@@ -2896,6 +3061,32 @@
                     "lines"
                 ],
                 "title": "PutRecipeRequest"
+            },
+            "RejectLineRequest": {
+                "type": "object",
+                "description": "POST /order-lines/{line}/reject: why the station gives the line back, one of the fixed list (RejectReason:\ningredient_spoiled, equipment_down, out_of_stock, other) and a note, which `other` needs (up to 500 characters, the\ncolumn's size; blanks are no note).",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "ingredient_spoiled",
+                            "equipment_down",
+                            "out_of_stock",
+                            "other"
+                        ]
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "RejectLineRequest"
             },
             "ReplaceItemStationsRequest": {
                 "type": "object",

@@ -428,6 +428,51 @@ Small PRs, each green in CI before the next; a step that completes a module ends
      export gains the four operations.
    - 1.3c station actions: accept, ready (consume), reject (release), served; `OrderProgress` (order status from line
      statuses); station permission;
+
+     As built (step 1.3c, `phase-1/orders-station`): the four routes of section 4 in `routes/modules/orders.php`, all
+     with `auth:sanctum`, `actor`, `idempotency`; `{line}` binds through the `BranchScoped` model (another branch's line
+     is 404). Where section 4 left a detail open, the build settles it as follows:
+     - Who may act. accept, ready and reject: the route checks `orders.accept`; the controller then checks the person
+       doing it (the waiter or chef acting by short code, else the account) holds `orders.accept` at the line's
+       station, or `stations.all` (admin, manager). Anyone else gets 403 `orders.station.forbidden` (new key); a short
+       code that lacks `orders.accept` altogether is 403 `auth.forbidden`. A display-case line is at no station: only
+       `stations.all` reaches it, and its machine refuses accept and reject anyway. served: route `orders.create`, by
+       the order's owner or `stations.all` (403 `orders.order.not_owner`).
+     - One frame for all four (`Support\LineWork`): one `AuditedAction` (`order_line.accept|ready|reject|serve`); lock the
+       order row, then the line row; refuse a line of an open cart (409 `orders.order.not_sent`, new key); move the
+       line through its machine (an illegal move is 409 `state_machine.illegal_transition`, nothing written); the
+       action's writes; line version +1 and a `line.*` timeline row; `OrderProgress::apply`; totals again (a rejected
+       line is not charged); order version +1. Events are dispatched after the commit.
+     - accept: `queued -> accepted`, stamps `accepted_by`, `accepted_at` and `prepared_by`. Writes no stock.
+     - ready: `queued|accepted -> ready` (a station may ready a line it never accepted); stamps `prepared_by` and
+       `ready_at`; in the same transaction `Reservations::consume(ref)` writes one `production_consume` per ingredient
+       carrying the line's ref (what was reserved is what was used). Exactly once: the line is locked and `ready ->
+       ready` is refused (a replay with the same key gets the stored answer; a second tap with a new key, or two at
+       once, gets 200 then 409), and Inventory settles a ref once besides. The timeline row carries the movement ids.
+     - reject: `queued|accepted -> rejected` with `reason` of the fixed list and a `note` (required for `other`,
+       422 `validation.failed`); stamps `rejected_by`, `rejected_at`, reason and note; `Reservations::release(ref)`
+       writes the `reservation_release` rows. The line resource shows `rejected {reason, note, message_en, message_am}`
+       from `reject.reason.*` in `lang/{en,am}/orders.php`.
+     - served: `ready -> served` only (a queued, accepted, rejected or served line is 409); stamps `served_by`,
+       `served_at`. Writes no stock.
+     - Response: `200` the line as in section 4 plus `order {id, order_no, status, version, totals}`.
+     - `OrderProgress` (`derive` is a pure function, tested as a table in `Unit/Orders/OrderProgressTest.php`): no live
+       line (every line rejected) -> `cancelled` (`order.cancelled` with cause `every_line_rejected`); every live line
+       served -> `served`; every live line ready or served -> `ready`; work started on a station line -> `in_progress`;
+       otherwise it stays. Forward only, and only along an edge the `OrderStatus` table allows. `paid`/`closed` arrive
+       with Payments (1.4).
+     - Events (`App\Shared\Events`): `LineAccepted`, `LineReady`, `LineRejected` (with the reason), `LineServed`, one
+       base `OrderLineEvent`, one broadcast companion (`Live\Broadcasts\OrderLineBroadcast`) to `station.{id}` and
+       `user.{owner}`; dispatched after commit, inert while `broadcasting.default` is `null`.
+     - Test infrastructure. Inside one test, the scoped instances (`CurrentBranch`, `ActorContext`, the acting user from
+       `ResolveActor`) now reset between requests as they do in production, and a controller built by an earlier request
+       is not reused (`tests/TestCase.php`, `Feature/RequestScopeTest.php`). Tests that relied on the leak were fixed.
+     - Tests (groups `module:orders`, `feature`, `unit`, `concurrency`): `AcceptLineTest`, `ReadyLineTest`,
+       `RejectLineTest`, `ServeLineTest` (happy path, validation, 403 per role and station, idempotent replay, ledger
+       asserted through the Inventory contracts, events after commit, rollback of a failed write),
+       `Unit/Orders/OrderProgressTest`, `Gate/StationActionsRaceTest` (two readies at once and ready racing reject
+       settle the reservation one way, once; the same ready twice at once under one key). Registries: four rows each in
+       `route_permissions.php` and `write_endpoints.php`. No schema change; the OpenAPI export gains the four operations.
    - 1.3d void: `POST /orders/{id}/void` with `verifyPinFor('orders.void')`, `releaseMany`, both actors audited;
    - 1.3e provided capabilities: `Orders::totals`, `Tickets::since`, `Orders::openAt`; dining tables endpoints; the
      migration that adds permissions new to the registry (`tables.manage`) to existing databases and grants them to
