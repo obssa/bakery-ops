@@ -63,8 +63,8 @@
         "shared.broadcast": "done",
         "orders": "done",
         "payments": "done",
-        "read-models": "todo",
-        "web": "todo",
+        "read-models": "done",
+        "web": "in_progress",
         "docs": "todo"
       },
       "playwright_projects": [
