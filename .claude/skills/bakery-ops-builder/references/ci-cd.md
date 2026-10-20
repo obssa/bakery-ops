@@ -68,7 +68,7 @@ survive, only parallelism is lost.
 | `web-build` | `next build` (standalone) → artifact |
 | `i18n-check` | `node scripts/i18n-check.mjs` (`--strict` when phase ≥ 5) |
 | `docker-build` | `docker/build-push-action` with `cache-from/to: type=gha`, `outputs: type=docker,dest=api.tar` → artifact |
-| `e2e-p<N>` | download artifacts; `docker load`; `docker compose -f compose.yml -f compose.ci.yml up -d --wait`; `artisan migrate:fresh --seed --seeder=DemoSeeder -- --phase=N`; setup-node 24 + Playwright browser cache; `npx playwright test --project=p<N>-*`; upload `test-results` on failure |
+| `e2e-p<N>` | download artifacts; `docker load`; `docker compose -f compose.yml -f compose.ci.yml up -d --wait`; `artisan migrate:fresh --seed --seeder=DemoSeeder -- --phase=N`; setup-node 24 + Playwright browser cache; `npx playwright test --project=p<N>-*`, with `--pass-with-no-tests` only while phase N is `todo`/`planning`/`plan_approved` (once it is `in_progress` or later, each of its projects must list at least one test); upload `test-results` on failure |
 | `perf-dashboards` | k6 against compose with the 90-day seed, thresholds `p(95)<1000` |
 | `gate-p<N>` | `python scripts/gate_check.py --mode done --phase N --ci` |
 

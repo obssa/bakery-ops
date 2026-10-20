@@ -76,6 +76,32 @@ jobs:
         working-directory: apps/web
         if: steps.pw-cache.outputs.cache-hit == 'true'
 
+      # A project p<N>-<flow> belongs to phase N. While phase N has not started (STATUS.json todo, planning or
+      # plan_approved) its specs may not exist yet, so an empty project passes (--pass-with-no-tests). Once the phase is
+      # in_progress, gate_pending or done, every one of its projects must list at least one test: a phase that has
+      # started cannot hide missing e2e tests, and an empty project never rides along on another project's tests.
+      - name: Projects of started phases have tests
+        id: pw
+        working-directory: apps/web
+        run: |
+          started=0
+          for p in ${{ inputs.projects }}; do
+            n=$(echo "$p" | sed -nE 's/^p([0-9]+)-.*/\1/p')
+            if [ -z "$n" ]; then echo "::error::Playwright project '$p' is not named p<phase>-<flow>"; exit 1; fi
+            s=$(jq -r --arg n "$n" '.phases[$n].status // "todo"' ../../docs/phases/STATUS.json)
+            case "$s" in
+              todo|planning|plan_approved) echo "$p: phase $n is $s, no specs required yet" ;;
+              *)
+                started=1
+                if ! pnpm exec playwright test --list --project="$p" > /tmp/pw-list.txt 2>&1; then
+                  tail -5 /tmp/pw-list.txt
+                  echo "::error::phase $n is $s but Playwright project $p has no tests"; exit 1
+                fi
+                echo "$p: phase $n is $s, $(grep -E '^Total:' /tmp/pw-list.txt)" ;;
+            esac
+          done
+          if [ "$started" = 0 ]; then echo "allow=--pass-with-no-tests" >> "$GITHUB_OUTPUT"; else echo "allow=" >> "$GITHUB_OUTPUT"; fi
+
       - name: Run Playwright projects
         working-directory: apps/web
         env:
@@ -88,7 +114,7 @@ jobs:
         run: |
           args=""
           for p in ${{ inputs.projects }}; do args="$args --project=$p"; done
-          pnpm exec playwright test $args
+          pnpm exec playwright test $args ${{ steps.pw.outputs.allow }}
 
       - name: Stack logs on failure
         if: failure()

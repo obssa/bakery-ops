@@ -302,6 +302,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
+        # no app code changed after it, which a shallow clone cannot answer
+        with: { fetch-depth: 0 }
       - run: python3 scripts/gate_check.py --mode done --phase 0 --ci
 
   gate-p1:
@@ -310,6 +313,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
+        # no app code changed after it, which a shallow clone cannot answer
+        with: { fetch-depth: 0 }
       - run: python3 scripts/gate_check.py --mode done --phase 1 --ci
 
   gate-p2:
@@ -318,6 +324,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
+        # no app code changed after it, which a shallow clone cannot answer
+        with: { fetch-depth: 0 }
       - run: python3 scripts/gate_check.py --mode done --phase 2 --ci
 
   gate-p3:
@@ -326,6 +335,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
+        # no app code changed after it, which a shallow clone cannot answer
+        with: { fetch-depth: 0 }
       - run: python3 scripts/gate_check.py --mode done --phase 3 --ci
 
   gate-p4:
@@ -334,6 +346,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
+        # no app code changed after it, which a shallow clone cannot answer
+        with: { fetch-depth: 0 }
       - run: python3 scripts/gate_check.py --mode done --phase 4 --ci
 
   gate-p5:
@@ -342,4 +357,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
+        # no app code changed after it, which a shallow clone cannot answer
+        with: { fetch-depth: 0 }
       - run: python3 scripts/gate_check.py --mode done --phase 5 --ci

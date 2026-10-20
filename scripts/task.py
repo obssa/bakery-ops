@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -165,12 +166,32 @@ def task_web_build() -> None:
     sh([pnpm(), "build"], cwd=WEB, env={"NEXT_PUBLIC_API_URL": "http://localhost:8000"})
 
 
+NOT_STARTED = ("todo", "planning", "plan_approved")
+
+
 def task_e2e(projects: list[str]) -> None:
+    """Same rule as .github/workflows/e2e.yml: a project p<N>-<flow> of a phase that has not started (todo, planning,
+    plan_approved) may have no specs yet; once phase N is in_progress or later, each of its projects must list a test."""
     if not projects:
         with open(os.path.join(ROOT, ".claude", "skills", "bakery-ops-builder", "assets", "dependency-manifest.json"), encoding="utf-8") as fh:
             man = json.load(fh)
         projects = [p for n, ph in man["phases"].items() if int(n) <= current_phase() for p in ph["gate"]["playwright_projects"]]
-    args = [pnpm(), "exec", "playwright", "test"] + [f"--project={p}" for p in projects]
+    with open(os.path.join(ROOT, "docs", "phases", "STATUS.json"), encoding="utf-8") as fh:
+        phases = json.load(fh)["phases"]
+    started = False
+    for p in projects:
+        m = re.match(r"p(\d+)-", p)
+        if not m:
+            sys.exit(f"Playwright project {p!r} is not named p<phase>-<flow>")
+        status = phases.get(m.group(1), {}).get("status", "todo")
+        if status in NOT_STARTED:
+            print(f"   {p}: phase {m.group(1)} is {status}, no specs required yet")
+            continue
+        started = True
+        r = sh([pnpm(), "exec", "playwright", "test", "--list", f"--project={p}"], cwd=WEB, check=False, capture=True)
+        if r.returncode != 0:
+            sys.exit(f"phase {m.group(1)} is {status} but Playwright project {p} has no tests")
+    args = [pnpm(), "exec", "playwright", "test"] + [f"--project={p}" for p in projects] + ([] if started else ["--pass-with-no-tests"])
     sh(args, cwd=WEB, env={"NEXT_PUBLIC_API_URL": "http://localhost:8000", "PLAYWRIGHT_WEB_SERVER": "next-start"})
 
 
