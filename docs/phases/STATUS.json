@@ -62,7 +62,7 @@
         "contracts": "done",
         "shared.broadcast": "done",
         "orders": "done",
-        "payments": "todo",
+        "payments": "done",
         "read-models": "todo",
         "web": "todo",
         "docs": "todo"
@@ -227,8 +227,8 @@
     },
     "payments": {
       "phase": 1,
-      "status": "todo",
-      "stable_since": null
+      "status": "stable",
+      "stable_since": "2026-10-20T17:15:53Z"
     },
     "notifications": {
       "phase": 2,
