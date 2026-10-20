@@ -36,6 +36,8 @@ final class PermissionRegistry
         'orders.accept' => ['admin', 'manager', 'chef', 'barista'],
         'orders.void' => ['admin', 'manager'],
         'orders.void_request' => ['admin', 'manager', 'cashier'],
+        // the dining tables the pads show (Orders, Phase 1): configuration, admin only like catalog.manage
+        'tables.manage' => ['admin'],
         'payments.take' => ['admin', 'manager', 'cashier'],
         'payments.void' => ['admin', 'manager'],
         'production.request' => ['admin', 'manager', 'cashier', 'chef', 'barista'],
