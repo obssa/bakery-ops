@@ -46,6 +46,9 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
     if (str_contains($uri, '{item}')) {
         $params['{item}'] = (string) Item::factory()->product(Fulfilment::ToOrder)->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
     }
+    if (str_contains($uri, '{product}')) {
+        $params['{product}'] = (string) Item::factory()->product(Fulfilment::ToOrder)->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
+    }
     if (str_contains($uri, '{category}')) {
         $params['{category}'] = (string) Category::factory()->create(['branch_id' => $branch->id])->id;
     }

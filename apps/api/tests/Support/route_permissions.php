@@ -91,6 +91,8 @@ return [
     'GET /api/v1/inventory/costs' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'GET /api/v1/inventory/costs/{item}' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'POST /api/v1/inventory/costs/{item}/opening' => ['permission' => 'inventory.adjust', 'roles' => ['admin'], 'module' => 'inventory'],
+    // recipe cost and margin (step 2.4b): the whole endpoint is a cost figure, so costs.view (admin, manager)
+    'GET /api/v1/inventory/recipe-costs/{product}' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
 
     // Orders (step 1.3b): the order-taking roles of the section 7 matrix; on an existing order the actions also need
     // its ownership or stations.all (403 orders.order.not_owner, checked by the action, after this matrix)
