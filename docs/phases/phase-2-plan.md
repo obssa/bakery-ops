@@ -347,9 +347,9 @@ asking for a different state is `409 state_machine.illegal_transition`. Read end
 | `GET /stations/{station}/stock-strip` | `inventory.view` (assigned to the station, or `stations.all`) | read (polled, conditional) | `?limit=5` | `200 {location_id, data: [{item, unit, available, min_qty \| null, state: ok\|low\|out}]}`: the station location's ingredients, out first, then low, then by `available / min_qty` | `403 inventory.station.forbidden` |
 | `GET /display-case` | `inventory.view` | read (polled, conditional) | | `200 {location_id, data: [{item, unit, on_hand, reserved, available, low (1 to 3 left), state: ok\|low\|out, production_station_id \| null, producible: bool}]}`: the products held at the display case (`producible`: a `to_stock` product with an active recipe) | `403` |
 | **Catalog: recipe versions (2.4a)** | | | | | |
-| `GET /items/{item}/recipe/versions` | `catalog.view` | read | | `200 {data: [{version, is_active, yield_qty, yield_unit, line_count, published_at, published_by, change_note}]}` newest first | `404` |
+| `GET /items/{item}/recipe/versions` | `catalog.view` | read | | `200 {data: [{version, is_active, yield_qty, yield_unit (code), line_count, published_at, published_by {id, name} \| null, change_note}]}` newest first | `404` (an ingredient; a bought-in product answers an empty list) |
 | `GET /items/{item}/recipe/versions/{version}` | `catalog.view` | read | | `200` Recipe (the shape of `GET /items/{item}/recipe`) | `404 catalog.recipe.not_found` |
-| `POST /items/{item}/recipe/versions` | `catalog.manage` | key | `{yield_qty, yield_unit_id, lines: [{ingredient_item_id, qty, unit_id, is_optional?, waste_pct?}], steps?: [{text_en, text_am}], change_note?}` | `201` Recipe (the new version, active; the previous one `is_active = false`, still readable) | `409 catalog.recipe.no_base` (publish needs a version 1: use `PUT /items/{item}/recipe` first), `409 catalog.recipe.unchanged` (identical to the active version); `422` the `PUT` validation (`catalog.recipe.self_reference`, `catalog.unit.incompatible`, `validation.failed`) |
+| `POST /items/{item}/recipe/versions` | `catalog.manage` | key | `{yield_qty, yield_unit_id, lines: [{ingredient_item_id, qty, unit_id, is_optional?, waste_pct?}], steps?: [{text_en, text_am}], change_note?}` | `201` Recipe (the new version, active; the previous one `is_active = false`, still readable) | `409 catalog.recipe.no_base` (publish needs a version 1: use `PUT /items/{item}/recipe` first), `409 catalog.recipe.unchanged` (identical to the active version), `409 catalog.recipe.publish_conflict` (a second publish got past the lock and the unique key refused it); `422` the `PUT` validation (`catalog.recipe.self_reference`, `catalog.unit.incompatible`, `validation.failed`) |
 | `PUT /items/{item}/recipe` (exists) | `catalog.manage` | key | unchanged | unchanged | new: `409 catalog.recipe.published` once a second version exists (it replaces version 1 in place only while it is the only version) |
 | **Identity (2.7a)** | | | | | |
 | `PATCH /stations/{station}` | `people.manage` | key | `{name_en?, name_am?, requires_overseer?, sort?}` (the code is fixed) | `200` Station | `422`, `404` |
@@ -733,6 +733,47 @@ and 1.6a-c were in Phase 1.
      catalog.recipe.published`). `Recipes::activeFor` is unchanged and `Recipes::version(product, n)` is what orders already
      snapshot. Existing orders keep their `recipe_version`; reservations in flight are untouched because consumption at
      ready follows the reservation, not the recipe.
+     **As built (step 2.4a, `phase-2/recipe-versions`).** Done as planned, with these differences and decisions (the plan left them open or
+     the code is the fact; the section 4 rows and the migration 9 text above are corrected):
+     - *Red first, as run.* The contract case ("keeps version 1 readable ... exactly one version active") was committed with the other
+       new tests and failed on the publish call (`404`, the route did not exist); `RecipeVersionsSchemaTest` 4 of 4 on the missing
+       `published_at` column, `RecipeVersionsTest` 13 of 13 and `RecipeVersionGateTest` 2 of 2 on the same `404`, then green. The
+       fixes to the older schema tests were committed first, on their own.
+     - *Schema tests that passed with the table missing.* In `TransfersSchemaTest` ("refuses a location, item or user that does not
+       exist") and `StockAlertStatesSchemaTest` ("keeps the type and the open flag to their lists") every assertion was an insert that
+       must throw, which a missing table also does. Both now assert `Schema::hasTable` and insert one valid row first. The purchases
+       tests (parents, positive inserts and counts) and the item cost tests were checked and already failed on a missing table.
+     - *Publish* (`RecipeBook::publish(product, spec, changeNote, publishedByUserId)`, one `AuditedAction` `recipe.publish`, subject the
+       new row): lock the item row, then the branch row (below), `409 catalog.recipe.no_base` when the product has no version at all, the
+       `PUT` validation (`422`), `409 catalog.recipe.unchanged` when the recipe equals the active version, set the active version
+       inactive, insert `max(version) + 1` (soft-deleted versions count, the `(product, version)` key is unique over them) active with
+       its lines, steps and the publish stamp. `published_by` is the logged-in account; the audit row carries the acting person.
+     - *Unchanged* means the same as entered, not in base units: yield quantity and unit, each line's ingredient, quantity, unit, optional
+       flag and waste (2 dp), in any order of lines, and the steps in order. The change note is not compared. Opposite-decision style
+       repeats do not apply: a repeated publish of an identical recipe is `409 catalog.recipe.unchanged`, a fresh `Idempotency-Key` or not,
+       and the same key replays the stored `201`. 1000 g against 1 kg counts as a change.
+     - *A deadlock the race test found, and its fix.* Every Catalog save bumps `branches.catalog_version` (`BumpsCatalogVersion`) after it has
+       touched its own row; two publishes of different products, forked, were killed by the engine (`1213`, about a third of 30 rounds). `publish`
+       and `putVersionOne` therefore lock the item row and then the branch row before touching any recipe row, so recipe writes of one branch
+       queue on the branch row (rare, short) and none can deadlock. The race file has three tests: the same recipe twice (one `201`, one
+       `409 catalog.recipe.unchanged`, two versions, one active, one audit row), two different recipes (versions 2 and 3, one active), and two
+       products at once; the engine's deadlock counter must not move.
+     - *The unique key as backstop.* With the lock the key can only fire if code is wrong; a `UniqueConstraintViolationException` on the insert
+       becomes `409 catalog.recipe.publish_conflict` (new, bilingual) and rolls back. `RecipeVersionsSchemaTest` proves the key itself with raw inserts.
+     - *Migration 9* is `2026_10_22_130100_extend_recipes_for_versions`: `published_at`, `published_by_user_id` (FK to users), `change_note`
+       (255), the STORED generated column `active_product_key` under UNIQUE `recipes_one_active` (MariaDB and MySQL), the partial index on
+       PostgreSQL, `published_at` backfilled from `created_at`. `PUT` creating version 1 now sets `published_at`; its `published_by` stays null.
+     - *`PUT /items/{item}/recipe`* answers `409 catalog.recipe.published` once any version above 1 exists (soft-deleted ones included),
+       checked under the lock inside the action, so no audit row is written. Section 10.3's default is kept (open question 6 stays open).
+     - *Endpoints.* `GET /items/{item}/recipe/versions` (an ingredient is `404 catalog.recipe.not_found`, a bought-in product an empty list),
+       `GET .../versions/{version}`, `POST .../versions`. `Recipe` answers also carry `published_at`, `published_by {id, name} | null` and
+       `change_note` (the existing `GET` and `PUT` bodies grow the same three keys). The list rows are `{version, is_active, yield_qty,
+       yield_unit (code), line_count, published_at, published_by, change_note}`. The body of `POST` is the body of `PUT` plus `change_note`
+       (at most 255); the two requests share `ReadsRecipeSpec`.
+     - *Orders in flight.* `RecipeVersionGateTest` (`gate:p2`): a sandwich sent under version 1, version 2 published, then accept and ready:
+       the `production_consume` rows equal the `reservation` rows, the line keeps `recipe_version = 1`, and the next order snapshots version 2.
+     - *STATUS.* `catalog.recipe-versions` is marked done by this PR: the key names the Catalog half. 2.4b (`RecipeCost`, Inventory) has no
+       key of its own.
    - 2.4b Inventory `RecipeCost::rollUp(product, ?version)` (`Contracts\RecipeCost`, cycle 5: it lives in Inventory,
      the Catalog screen calls `GET /inventory/recipe-costs/{product}`): per line `qty_base x (1 + waste_pct / 100) x
      moving_avg_cost`, optional lines excluded, summed and divided by the yield; an ingredient without a cost but with its

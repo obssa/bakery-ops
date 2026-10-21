@@ -97,7 +97,7 @@
         "contracts": "done",
         "inventory.purchases": "done",
         "inventory.transfers": "done",
-        "catalog.recipe-versions": "todo",
+        "catalog.recipe-versions": "done",
         "notifications": "todo",
         "inventory.reorder": "todo",
         "production": "todo",
