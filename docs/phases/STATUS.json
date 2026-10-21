@@ -76,10 +76,10 @@
       ]
     },
     "2": {
-      "status": "planning",
+      "status": "plan_approved",
       "plan": "docs/phases/phase-2-plan.md",
-      "plan_approved": false,
-      "plan_approved_by": null,
+      "plan_approved": true,
+      "plan_approved_by": "standing approval: Ramin, 2026-10-19",
       "report": null,
       "gate_job": "gate-p2",
       "gate_run_url": null,
