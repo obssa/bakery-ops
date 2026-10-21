@@ -10,6 +10,7 @@ use App\Modules\Catalog\Models\Item;
 use App\Modules\Catalog\Models\ItemPrice;
 use App\Shared\Models\Branch;
 use App\Shared\Tenancy\CurrentBranch;
+use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class Items
 {
-    public function __construct(private readonly CurrentBranch $branch) {}
+    public function __construct(private readonly CurrentBranch $branch, private readonly Recipes $recipes) {}
 
     public function isNew(Item|int $item, ?DateTimeInterface $at = null): bool
     {
@@ -32,6 +33,26 @@ final class Items
         $today = CarbonImmutable::instance($at ?? CarbonImmutable::now())->setTimezone($this->timezoneOf($item))->toDateString();
 
         return $today <= $item->is_new_until->toDateString();
+    }
+
+    /**
+     * The batch size Production proposes for a product, in its base unit (an automatic request after a stock-out, the
+     * default on a card): the stored default_batch_qty when it is positive, else the active recipe's yield in base units,
+     * else null. Null for what is not produced (an ingredient, a bought-in product) and for an id this branch does not
+     * know, so a caller can skip it quietly; never zero or negative.
+     */
+    public function batchQty(Item|int $product): ?Quantity
+    {
+        $item = $product instanceof Item ? $product : Item::query()->find($product);
+        if ($item === null || ! $item->isProduct() || $item->isBoughtIn()) {
+            return null;
+        }
+        if ($item->default_batch_qty !== null && $item->default_batch_qty->isPositive()) {
+            return $item->default_batch_qty;
+        }
+        $view = $this->recipes->activeFor($item);
+
+        return $view !== null && $view->recipeId !== null && $view->yield->isPositive() ? $view->yield : null;
     }
 
     public function kind(Item|int $item): ItemKind

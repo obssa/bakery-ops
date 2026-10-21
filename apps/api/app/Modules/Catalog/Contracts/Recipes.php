@@ -7,6 +7,9 @@ namespace App\Modules\Catalog\Contracts;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Catalog\Models\Recipe;
 use App\Modules\Catalog\Models\RecipeLine;
+use App\Modules\Catalog\Models\RecipeStep;
+use App\Shared\I18n\Bilingual;
+use App\Shared\Values\Quantity;
 
 /**
  * manifest catalog.provides: "Recipes::activeFor(product) -> ?Recipe{version, yield, lines in base units}" and
@@ -14,6 +17,8 @@ use App\Modules\Catalog\Models\RecipeLine;
  *   - a bought-in product: the empty view (lines []), whatever rows exist;
  *   - a product with an active recipe: that version, lines converted to the ingredient's base unit;
  *   - an ingredient, a product without a recipe yet, an unknown id: null.
+ * scaled() is what a production card is made from (phase-2 plan section 2): the active version's lines for a target
+ * quantity of the product, see ScaledRecipe.
  */
 final class Recipes
 {
@@ -37,6 +42,35 @@ final class Recipes
             ->first();
 
         return $recipe === null ? null : $this->view($recipe);
+    }
+
+    /**
+     * The active recipe scaled to $target units of the product (its base unit): every non-optional line in base units with
+     * waste applied, qty x target / yield rounded once, plus the version, the yield and the live steps in order. Null for
+     * what has no recipe to scale: an ingredient, a bought-in product, a product with no active version, an unknown id.
+     *
+     * @throws \InvalidArgumentException a target that is not a positive quantity
+     */
+    public function scaled(Item|int $product, Quantity|string|int $target): ?ScaledRecipe
+    {
+        $item = $this->product($product);
+        if ($item === null || $item->isBoughtIn()) {
+            return null;
+        }
+        $view = $this->activeFor($item);
+        if ($view === null || $view->recipeId === null) {
+            return null;
+        }
+
+        $steps = RecipeStep::query()
+            ->where('recipe_id', $view->recipeId)
+            ->orderBy('step_order')
+            ->orderBy('id')
+            ->get()
+            ->map(static fn (RecipeStep $step): RecipeStepView => new RecipeStepView($step->step_order, Bilingual::of($step->text_en, $step->text_am)))
+            ->all();
+
+        return ScaledRecipe::from($view, $target, array_values($steps));
     }
 
     public function version(Item|int $product, int $version): ?RecipeView
