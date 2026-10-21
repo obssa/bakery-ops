@@ -10,16 +10,27 @@ ENV DEBIAN_FRONTEND=noninteractive \
     COMPOSER_ALLOW_SUPERUSER=1 \
     COMPOSER_HOME=/tmp/composer
 
+# phpredis is built from its tagged GitHub release, pinned by version and checksum, not fetched from pecl.php.net:
+# pecl was unreachable for hours on 2026-10-21 and every image build failed with it. The checksum also keeps the
+# build reproducible. To upgrade, change both values (sha256 of the release tarball).
+ARG PHPREDIS_VERSION=6.3.0
+ARG PHPREDIS_SHA256=cb8f81df1a275599e4f8ddcfec7e1f65ed1953e6f5673649149fd680ebff4cad
+
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
         git unzip ca-certificates \
         libpq-dev libzip-dev libicu-dev libpng-dev libjpeg-dev libfreetype6-dev libonig-dev \
  && docker-php-ext-configure gd --with-freetype --with-jpeg \
  && docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_pgsql pgsql intl bcmath gd zip pcntl opcache \
- && pecl install redis \
- && docker-php-ext-enable redis \
+ && mkdir -p /usr/src/php/ext/redis \
+ && curl -fsSL --retry 5 --retry-all-errors -o /tmp/phpredis.tar.gz \
+        "https://github.com/phpredis/phpredis/archive/refs/tags/${PHPREDIS_VERSION}.tar.gz" \
+ && echo "${PHPREDIS_SHA256}  /tmp/phpredis.tar.gz" | sha256sum -c - \
+ && tar -xzf /tmp/phpredis.tar.gz -C /usr/src/php/ext/redis --strip-components=1 \
+ && docker-php-ext-install redis \
+ && docker-php-source delete \
  && apt-get purge -y --auto-remove \
- && rm -rf /var/lib/apt/lists/* /tmp/pear
+ && rm -rf /var/lib/apt/lists/* /tmp/phpredis.tar.gz
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
