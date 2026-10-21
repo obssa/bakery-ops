@@ -150,6 +150,7 @@ it('reads a fixed number of queries however many requests there are', function (
     };
     $this->f->request();
     $this->f->request(['product_item_id' => $this->f->bread->id, 'station_id' => $this->f->bakeryStation->id], RequestStatus::Accepted);
+    $count(); // the first call also reads the caller's roles and permissions
     $few = $count();
     foreach (range(1, 8) as $i) {
         $this->f->request(['assigned_to_user_id' => $this->f->baker2->id, 'requested_by_user_id' => $this->f->chef->id], RequestStatus::Accepted);

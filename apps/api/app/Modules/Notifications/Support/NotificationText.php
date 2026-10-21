@@ -15,7 +15,7 @@ use LogicException;
  * decimal strings). Both languages are stored in the inbox row; the reader's locale picks one later.
  *
  * The templates are lang/{en,am}/notifications.php, text.<type>.title|body (a variant key where the wording differs:
- * body_no_table for a counter order, confirmed|rejected for a transfer decision). A placeholder without a value is a bug
+ * body_no_table for a counter order, confirmed|rejected for a transfer decision, body_stock_out for a request a stock-out made). A placeholder without a value is a bug
  * (LogicException), never a line with ":item" in it, and a payload without what the text needs is MissingPayloadKey.
  * Quantities are written without trailing zeros by string handling, never through a float (ADR 0004).
  */
@@ -50,6 +50,7 @@ final class NotificationText
     {
         return match ($type) {
             'line_ready', 'line_rejected' => ["text.{$type}", $this->optional($type, $payload, 'table_code') === null ? 'body_no_table' : 'body'],
+            'production_requested' => ['text.production_requested', $this->str($type, $payload, 'reason') === 'stock_out' ? 'body_stock_out' : 'body'],
             'transfer_decided' => ['text.transfer_decided.'.($this->str($type, $payload, 'status') === 'rejected' ? 'rejected' : 'confirmed'), 'body'],
             default => ["text.{$type}", 'body'],
         };
@@ -93,6 +94,12 @@ final class NotificationText
                 'from' => $this->str($type, $p, $in('from_location_name')),
                 'to' => $this->str($type, $p, $in('to_location_name')),
                 'reason' => $type === 'transfer_decided' ? ($this->optional($type, $p, 'reject_reason') ?? '-') : '',
+            ],
+            'production_requested', 'production_assigned' => [
+                'item' => $this->str($type, $p, $in('product_name')),
+                'qty' => $this->quantity($this->str($type, $p, 'qty')),
+                'unit' => $this->str($type, $p, 'unit'),
+                'station' => $this->str($type, $p, $in('station_name')),
             ],
             default => throw UnknownNotificationType::named($type),
         };

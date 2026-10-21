@@ -7,6 +7,7 @@ use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
+use App\Modules\Production\ProductionServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Shared\SharedServiceProvider;
 
@@ -20,4 +21,5 @@ return [
     OrdersServiceProvider::class,
     NotificationsServiceProvider::class,
     PaymentsServiceProvider::class,
+    ProductionServiceProvider::class,
 ];

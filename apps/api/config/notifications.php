@@ -81,6 +81,20 @@ return [
             'gate' => null,
             'deep_link' => '/inventory/transfers?transfer={transfer_id}',
         ],
+        'production_requested' => [
+            'severity' => 'info',
+            'channels' => ['in_app', 'push', 'telegram'],
+            'inbox_key' => 'production_requested:{request_id}',
+            'gate' => null,
+            'deep_link' => '/production?request={request_id}',
+        ],
+        'production_assigned' => [
+            'severity' => 'info',
+            'channels' => ['in_app', 'push'],
+            'inbox_key' => 'production_assigned:{request_id}:{version}',
+            'gate' => null,
+            'deep_link' => '/production?request={request_id}',
+        ],
         'line_ready' => [
             'severity' => 'info',
             'channels' => ['in_app'],

@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class Items
 {
-    public function __construct(private readonly CurrentBranch $branch, private readonly Recipes $recipes) {}
+    public function __construct(private readonly CurrentBranch $branch, private readonly Recipes $recipes, private readonly Units $units) {}
 
     public function isNew(Item|int $item, ?DateTimeInterface $at = null): bool
     {
@@ -53,6 +53,35 @@ final class Items
         $view = $this->recipes->activeFor($item);
 
         return $view !== null && $view->recipeId !== null && $view->yield->isPositive() ? $view->yield : null;
+    }
+
+    /**
+     * The items of the ids as ItemSummary, keyed by id and in id order: a deleted item is named too (a request made last week
+     * still shows its product) but is not active; another branch's ids and unknown ids are left out. One query for the items and one or two per distinct unit, however many ids.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, ItemSummary>
+     */
+    public function summaries(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $summaries = [];
+        foreach (Item::query()->withTrashed()->whereKey(array_values(array_unique($ids)))->orderBy('id')->get() as $item) {
+            $summaries[$item->id] = new ItemSummary(
+                $item->id,
+                $item->name_en,
+                $item->name_am,
+                $this->units->baseOf($item->unit_id)->code,
+                $item->kind->value,
+                $item->fulfilment->value,
+                $item->is_active && ! $item->trashed(),
+            );
+        }
+
+        return $summaries;
     }
 
     public function kind(Item|int $item): ItemKind

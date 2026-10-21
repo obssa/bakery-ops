@@ -31,6 +31,15 @@ return [
                 'body' => 'The request for :qty :unit of :item was rejected. Reason: :reason',
             ],
         ],
+        'production_requested' => [
+            'title' => 'Please make: :item',
+            'body' => ':qty :unit of :item requested at :station.',
+            'body_stock_out' => ':item ran out. Make :qty :unit at :station.',
+        ],
+        'production_assigned' => [
+            'title' => 'Assigned to you: :item',
+            'body' => 'Make :qty :unit of :item at :station.',
+        ],
         'line_ready' => [
             'title' => 'Ready: :item',
             'body' => 'Order #:order_no, table :table: :item is ready to serve.',

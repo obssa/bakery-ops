@@ -33,6 +33,22 @@ enum RequestStatus: string
     case Done = 'done';
     case Cancelled = 'cancelled';
 
+    /**
+     * The statuses of a request that is still being worked on: everything but the two final ones. A product has at most one
+     * open manual request at a time, and a stock-out request holds the open key while it is in one of these.
+     *
+     * @return list<self>
+     */
+    public static function open(): array
+    {
+        return [self::Requested, self::Accepted, self::InProgress, self::PendingConfirmation];
+    }
+
+    public function isOpen(): bool
+    {
+        return in_array($this, self::open(), true);
+    }
+
     /** @return array<string, list<self>> */
     public static function transitions(): array
     {

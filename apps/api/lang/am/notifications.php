@@ -29,6 +29,15 @@ return [
                 'body' => 'የ:qty :unit :item ጥያቄ ውድቅ ተደርጓል። ምክንያት፡ :reason',
             ],
         ],
+        'production_requested' => [
+            'title' => 'እባክዎ ያዘጋጁ፡ :item',
+            'body' => ':qty :unit :item በ:station ተጠይቋል።',
+            'body_stock_out' => ':item አልቋል። :qty :unit በ:station ያዘጋጁ።',
+        ],
+        'production_assigned' => [
+            'title' => 'ለእርስዎ ተሰጥቷል፡ :item',
+            'body' => ':qty :unit :item በ:station ያዘጋጁ።',
+        ],
         'line_ready' => [
             'title' => 'ተዘጋጅቷል፡ :item',
             'body' => 'ትዕዛዝ #:order_no፣ ጠረጴዛ :table፡ :item ለማቅረብ ዝግጁ ነው።',
