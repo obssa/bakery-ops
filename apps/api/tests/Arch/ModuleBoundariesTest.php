@@ -104,3 +104,59 @@ arch('every driver of Notifications sits behind the Driver interface')
     ->expect(['App\Modules\Notifications\Drivers\InAppDriver', 'App\Modules\Notifications\Drivers\PushDriver', 'App\Modules\Notifications\Drivers\TelegramDriver', 'App\Modules\Notifications\Drivers\ArrayDriver'])
     ->toImplement('App\Modules\Notifications\Drivers\Driver')
     ->group('arch', 'module:notifications');
+
+/*
+ * Production (step 2.7a) reaches the modules below it through their Contracts only. The forbidden list is read from the
+ * directories on disk, so a namespace added to a provider later is covered without touching this file; Inventory also allows
+ * the three Ledger classes that name a stock change (Ledger::appendMany, MovementIntent, MovementReason) and nothing else of
+ * the Ledger (never StockBalance, StockMovement, LedgerReader), and no model of any provider.
+ */
+$providerInternals = function (string $module, array $allowedClasses = []): array {
+    $root = dirname(__DIR__, 2).'/app/Modules/'.$module;
+    $forbidden = [];
+    foreach (glob($root.'/*', GLOB_ONLYDIR) ?: [] as $dir) {
+        $part = basename($dir);
+        if ($part === 'Contracts') {
+            continue;
+        }
+        if ($part === 'Ledger') {
+            foreach (glob($dir.'/*.php') ?: [] as $file) {
+                $class = basename($file, '.php');
+                if (! in_array($class, $allowedClasses, true)) {
+                    $forbidden[] = "App\Modules\{$module}\Ledger\{$class}";
+                }
+            }
+
+            continue;
+        }
+        $forbidden[] = "App\Modules\{$module}\{$part}";
+    }
+    foreach (glob($root.'/*.php') ?: [] as $file) {
+        $forbidden[] = "App\Modules\{$module}\\".basename($file, '.php');
+    }
+
+    return $forbidden;
+};
+
+arch('Production uses Inventory through its Contracts and the Ledger vocabulary (Ledger, MovementIntent, MovementReason) only, never a model, balance, movement or reader')
+    ->expect('App\Modules\Production')
+    ->not->toUse(array_merge(
+        $providerInternals('Inventory', ['Ledger', 'MovementIntent', 'MovementReason']),
+        ['App\Modules\Inventory\Ledger\StockBalance', 'App\Modules\Inventory\Ledger\StockMovement', 'App\Modules\Inventory\Models'],
+    ))
+    ->group('arch', 'module:production');
+
+arch('Production uses Catalog through its Contracts only (Recipes, Items, Routing), never its models, services, support or HTTP layer')
+    ->expect('App\Modules\Production')
+    ->not->toUse($providerInternals('Catalog'))
+    ->group('arch', 'module:production');
+
+arch('Production uses Identity through its Contracts only (Access, Stations, StationPresenceResolver, ShiftAttacher), never its models, resolvers, support or HTTP layer')
+    ->expect('App\Modules\Production')
+    ->not->toUse($providerInternals('Identity'))
+    ->group('arch', 'module:production');
+
+arch('Production never reaches Notifications (it emits events, Notifications listens) or Shifts (Identity interfaces stand in until Phase 3)')
+    ->expect('App\Modules\Production')
+    ->not->toUse(['App\Modules\Notifications', 'App\Modules\Shifts'])
+    ->group('arch', 'module:production');

@@ -190,6 +190,19 @@ return [
         'payload' => fn (): array => ['code' => 'bar', 'name_en' => 'Bar', 'name_am' => 'ባር', 'requires_overseer' => true, 'sort' => 2],
     ],
     [
+        'method' => 'PATCH',
+        'uri' => '/api/v1/stations/{station}',
+        'module' => 'identity',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $station = Station::factory()->forCode(StationCode::CakeRoom)->create(['branch_id' => $me->branch_id]);
+
+            return ['{station}' => (string) $station->id];
+        },
+        'payload' => fn (): array => ['requires_overseer' => true, 'sort' => 4],
+    ],
+    [
         'method' => 'POST',
         'uri' => '/api/v1/devices',
         'module' => 'identity',

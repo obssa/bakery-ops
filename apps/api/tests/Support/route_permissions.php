@@ -32,6 +32,7 @@ return [
     'PUT /api/v1/users/{id}/stations' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'GET /api/v1/stations' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/stations' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'PATCH /api/v1/stations/{station}' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'GET /api/v1/devices' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/devices' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/devices/{id}/revoke' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
