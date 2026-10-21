@@ -6,6 +6,7 @@ use App\Modules\Inventory\Http\Controllers\CostsController;
 use App\Modules\Inventory\Http\Controllers\LedgerController;
 use App\Modules\Inventory\Http\Controllers\LocationsController;
 use App\Modules\Inventory\Http\Controllers\PurchasesController;
+use App\Modules\Inventory\Http\Controllers\RecipeCostsController;
 use App\Modules\Inventory\Http\Controllers\StockController;
 use App\Modules\Inventory\Http\Controllers\SuppliersController;
 use App\Modules\Inventory\Http\Controllers\TransfersController;
@@ -24,6 +25,8 @@ use Illuminate\Support\Facades\Route;
  *
  * Step 2.3 adds transfers: the floor reads them (inventory.view), asks for stock (transfers.request) and the people who hold
  * transfers.confirm decide; the actions also check the person works at the destination's / source's station.
+ *
+ * Step 2.4b adds the recipe cost and margin read (costs.view): GET /inventory/recipe-costs/{product}.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:inventory.view')->group(function (): void {
@@ -70,5 +73,6 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     Route::middleware('permission:costs.view')->group(function (): void {
         Route::get('/inventory/costs', [CostsController::class, 'index'])->name('inventory.costs.index');
         Route::get('/inventory/costs/{item}', [CostsController::class, 'show'])->whereNumber('item')->name('inventory.costs.show');
+        Route::get('/inventory/recipe-costs/{product}', [RecipeCostsController::class, 'show'])->whereNumber('product')->name('inventory.recipe-costs.show');
     });
 });
