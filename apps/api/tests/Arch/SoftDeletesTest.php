@@ -27,6 +27,8 @@ $noSoftDeletes = [
     'App\Modules\Orders\Models\OrderLineModifier',  // a snapshot written once with its line, which is never deleted
     'App\Modules\Orders\Models\OrderEvent',  // the append-only order timeline (DB trigger + model guard), the live-update cursor
     'App\Modules\Orders\Models\OrderCounter',  // the daily order-number row: locked FOR UPDATE and incremented in place, never deleted
+    'App\Modules\Notifications\Models\Notification',  // the inbox: history that only ever changes read_at, kept so a person can look back
+    'App\Modules\Notifications\Models\NotificationDedupe',  // the delivery gate of an episodic alert: active, then cleared (cleared_at, is_active NULL), kept as history
     'App\Modules\Payments\Models\Payment',  // never deleted: recorded, then verified, disputed or voided by status (Phase 4); the till's money trail
 ];
 

@@ -11,7 +11,7 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {table}, {order} (an open cart of the caller's own) and {line}
+ * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {table}, {order} (an open cart of the caller's own) and {line}
  * (a queued line of a sent order of the caller's own, at a station the caller is assigned to) with a row of the right
  * table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
@@ -123,6 +123,11 @@ return [
     'GET /api/v1/dining-tables' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
     'POST /api/v1/dining-tables' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],
     'PATCH /api/v1/dining-tables/{table}' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],
+
+    // Notifications (step 2.5a): every role has its own inbox (notifications.view); the lines are always the caller's own
+    'GET /api/v1/notifications' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
+    'POST /api/v1/notifications/{notification}/read' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
+    'POST /api/v1/notifications/read-all' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
 
     // Payments (step 1.4): the till's roles (payments.take: admin, manager, cashier); the person acting by short code must
     // hold it too (403 auth.forbidden, checked by the action after this matrix)

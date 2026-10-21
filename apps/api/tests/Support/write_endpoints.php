@@ -35,6 +35,7 @@ use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Purchase;
 use App\Modules\Inventory\Models\Supplier;
 use App\Modules\Inventory\Models\Transfer;
+use App\Modules\Notifications\Models\Notification;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Shared\Enums\StationCode;
@@ -727,6 +728,33 @@ return [
         'payload' => fn (): array => ['unit_cost' => '80', 'unit_id' => catalogUnit('kg')->id],
     ],
 
+    // Notifications (step 2.5a): marking a line read is one AuditedAction, so the audit log is the table that grows
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/notifications/{notification}/read',
+        'module' => 'notifications',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $line = Notification::factory()->create(['branch_id' => $me->branch_id, 'user_id' => $me->id]);
+
+            return ['{notification}' => (string) $line->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/notifications/read-all',
+        'module' => 'notifications',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            Notification::factory()->count(2)->create(['branch_id' => $me->branch_id, 'user_id' => $me->id]);
+
+            return [];
+        },
+        'payload' => fn (): array => [],
+    ],
     // Transfers (step 2.3)
     [
         'method' => 'POST',

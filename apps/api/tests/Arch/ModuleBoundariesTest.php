@@ -16,7 +16,7 @@ $allowed = [
     'Inventory' => ['Catalog', 'Identity', 'Audit'],
     'Orders' => ['Inventory', 'Catalog', 'Identity', 'Audit'],
     'Production' => ['Inventory', 'Catalog', 'Identity', 'Audit'],
-    'Notifications' => ['Identity'],
+    'Notifications' => ['Identity', 'Audit'],
     'Payments' => ['Orders', 'Identity', 'Audit'],
     'Shifts' => ['Inventory', 'Identity', 'Payments', 'Catalog', 'Audit'],
     'Analytics' => ['Orders', 'Payments', 'Production', 'Inventory', 'Shifts', 'Catalog'],
@@ -50,6 +50,20 @@ arch('every other module reaches Orders through App\Modules\Orders\Contracts onl
         ['Models', 'Actions', 'Support', 'Http', 'Enums', 'Exceptions'],
     ))
     ->group('arch', 'module:orders');
+
+arch('Notifications uses Identity through its Contracts only (Recipients), never its models, resolvers, support or HTTP layer; no other module is allowed above')
+    ->expect('App\Modules\Notifications')
+    ->not->toUse(array_map(
+        fn (string $part) => "App\Modules\Identity\{$part}",
+        ['Models', 'Resolvers', 'Support', 'Http', 'Exceptions', 'Broadcasting', 'Console'],
+    ))
+    ->group('arch', 'module:notifications');
+
+arch('every Notifications listener is queued and waits for the commit, so it never slows or joins the request that caused the event')
+    ->expect('App\Modules\Notifications\Listeners')
+    ->toImplement(\Illuminate\Contracts\Queue\ShouldQueue::class)
+    ->toImplement(\Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit::class)
+    ->group('arch', 'module:notifications');
 
 arch('Shared is a leaf: it never imports a module')
     ->expect('App\Shared')
