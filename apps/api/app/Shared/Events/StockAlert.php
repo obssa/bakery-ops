@@ -12,7 +12,9 @@ use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
  * so a notification can be written without importing Inventory or Catalog, the three numbers of the balance as decimal
  * strings, the stock_alert_states episode that announced it, and the person whose movement caused it (the one who
  * physically did it: the acting user when there is one, else the logged-in user; null when no movement is known).
- * Dispatched after commit, like every event in this namespace.
+ * It also names the station that works from the place (station_id: where an ingredient is used up) and, for a product, the
+ * station that makes it (production_station_id), so Notifications can reach the people there without importing Inventory,
+ * Catalog or the station tables (provider change F7 of step 2.5a). Dispatched after commit, like every event in this namespace.
  */
 abstract class StockAlert extends DomainEvent implements ShouldDispatchAfterCommit
 {
@@ -31,13 +33,15 @@ abstract class StockAlert extends DomainEvent implements ShouldDispatchAfterComm
         public readonly string $reserved,
         public readonly int $alertId,
         public readonly ?int $causedByUserId,
+        public readonly ?int $stationId = null,
+        public readonly ?int $productionStationId = null,
         ?CarbonImmutable $occurredAt = null,
     ) {
         parent::__construct($branchId, $occurredAt);
     }
 
     /**
-     * @return array{item_id: int, location_id: int, item_name_en: string, item_name_am: string, location_name_en: string, location_name_am: string, item_kind: string, fulfilment: string|null, available: string, on_hand: string, reserved: string, alert_id: int, caused_by_user_id: int|null}
+     * @return array{item_id: int, location_id: int, item_name_en: string, item_name_am: string, location_name_en: string, location_name_am: string, item_kind: string, fulfilment: string|null, available: string, on_hand: string, reserved: string, alert_id: int, caused_by_user_id: int|null, station_id: int|null, production_station_id: int|null}
      */
     public function payload(): array
     {
@@ -55,6 +59,8 @@ abstract class StockAlert extends DomainEvent implements ShouldDispatchAfterComm
             'reserved' => $this->reserved,
             'alert_id' => $this->alertId,
             'caused_by_user_id' => $this->causedByUserId,
+            'station_id' => $this->stationId,
+            'production_station_id' => $this->productionStationId,
         ];
     }
 }

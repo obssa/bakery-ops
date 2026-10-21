@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Alerts;
 
+use App\Modules\Catalog\Contracts\Routing;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Inventory\Ledger\Ledger;
 use App\Modules\Inventory\Models\Location;
@@ -38,6 +39,7 @@ final class AlertEvaluator
         private readonly ConnectionResolverInterface $db,
         private readonly Dispatcher $events,
         private readonly ActorContext $actor,
+        private readonly Routing $routing,
     ) {}
 
     /** The `out` decision as a pure function of the available quantity and whether an `out` episode is open. */
@@ -131,6 +133,8 @@ final class AlertEvaluator
             reserved: $reserved->toString(),
             alertId: (int) $alertId,
             causedByUserId: $causedBy,
+            stationId: $location->station_id,
+            productionStationId: $item->isProduct() ? $this->routing->productionStationFor($item)?->id : null,
             occurredAt: $now,
         )];
     }

@@ -32,6 +32,8 @@ final class StockLow extends StockAlert
         string $reserved,
         int $alertId,
         ?int $causedByUserId,
+        ?int $stationId,
+        ?int $productionStationId,
         public readonly string $minQty,
         public readonly string $reorderQty,
         public readonly array $notifyRoles,
@@ -39,7 +41,7 @@ final class StockLow extends StockAlert
     ) {
         parent::__construct(
             $branchId, $itemId, $locationId, $itemNameEn, $itemNameAm, $locationNameEn, $locationNameAm,
-            $itemKind, $fulfilment, $available, $onHand, $reserved, $alertId, $causedByUserId, $occurredAt,
+            $itemKind, $fulfilment, $available, $onHand, $reserved, $alertId, $causedByUserId, $stationId, $productionStationId, $occurredAt,
         );
     }
 
