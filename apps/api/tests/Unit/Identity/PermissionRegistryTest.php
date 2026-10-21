@@ -25,6 +25,7 @@ it('uses dotted lowercase permission names and lists every permission exactly on
         'orders.create', 'orders.accept', 'orders.void', 'payments.take', 'payments.void',
         'production.request', 'production.fulfil', 'production.confirm', 'transfers.request', 'transfers.confirm',
         'shifts.count', 'shifts.approve', 'shifts.unlock', 'channels.manage', 'analytics.view', 'audit.view', 'tables.manage',
+        'production.view', 'production.plan', 'notifications.view', 'costs.view',
     );
 })->group('unit', 'module:identity');
 
@@ -65,6 +66,10 @@ it('follows the matrix row by row', function (string $permission, array $roles) 
     'view audit log' => ['audit.view', ['admin', 'manager']],
     'act at any station' => ['stations.all', ['admin', 'manager']],
     'manage the dining tables (Phase 1)' => ['tables.manage', ['admin']],
+    'read the production board (Phase 2)' => ['production.view', ['admin', 'manager', 'cashier', 'chef', 'barista', 'cake_baker', 'bread_baker']],
+    'plan production: due time, priority, assign, cancel (Phase 2)' => ['production.plan', ['admin', 'manager']],
+    'own notification inbox and channels (Phase 2)' => ['notifications.view', ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker']],
+    'see costs, margins and cost history (Phase 2)' => ['costs.view', ['admin', 'manager']],
 ])->group('unit', 'module:identity');
 
 it('knows no role outside the eight and no permission outside the matrix', function () {
