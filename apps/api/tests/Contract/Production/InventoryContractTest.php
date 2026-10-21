@@ -11,13 +11,17 @@ use App\Modules\Inventory\Contracts\Locations;
 use App\Modules\Inventory\Contracts\Reservations;
 use App\Modules\Inventory\Contracts\ReserveLine;
 use App\Modules\Inventory\Contracts\Stock;
+use App\Modules\Inventory\Contracts\Transfers;
+use App\Modules\Identity\Models\UserStationAssignment;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Exceptions\InventoryError;
 use App\Modules\Inventory\Jobs\EvaluateBalance;
 use App\Modules\Inventory\Ledger\Ledger;
 use App\Modules\Inventory\Ledger\MovementIntent;
 use App\Modules\Inventory\Ledger\MovementReason;
+use App\Modules\Inventory\Exceptions\TransferError;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Inventory\Models\Transfer;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Enums\StationCode;
 use App\Shared\Events\StockChanged;
@@ -40,7 +44,8 @@ use Illuminate\Support\Str;
  * the work that is queued behind that telling carrying the person whose sale caused it; when I put the finished goods
  * where the pad reads them the pad sees them at once".
  * It runs in Inventory's CI job (mod-inventory) for the life of the project. The transfer cases (Transfers::request /
- * confirm / reject) are added at step 2.3, before the code they prove, as the plan says.
+ * confirm / reject: "I ask the store for flour and it moves only when someone confirms there was enough") were added at
+ * step 2.3, before the code they prove, as the plan says.
  */
 
 beforeEach(function () {
@@ -297,4 +302,116 @@ it('restores the actor of the movement that caused a stock-out in queued work: t
     // and the worker is left as it was found: no leaked actor, no leaked branch
     expect(app(ActorContext::class)->isAuthenticated())->toBeFalse()
         ->and(app(CurrentBranch::class)->isResolved())->toBeFalse();
+})->group('contract:production->inventory', 'contract');
+
+it('writes a requested transfer and no movement when a transfer is requested, from the store by default', function () {
+    stockIn($this->flour, $this->store, '20000');
+    $movements = DB::table('stock_movements')->count();
+    $before = ledgerOracle($this->branch->id);
+
+    // the cake baker asks for 5 kg of flour for the cake room, where they work; no source named: the store
+    UserStationAssignment::factory()->create(['branch_id' => $this->branch->id, 'user_id' => $this->baker->id, 'station_id' => $this->cakeRoomStation->id]);
+    withActor($this->admin->id, $this->baker->id, $this->cakeRoomStation->id);
+    $transfer = app(Transfers::class)->request($this->flour, $this->cakeRoom, '5000', (string) Str::uuid(), null, 'for the wedding cake');
+
+    expect($transfer)->toBeInstanceOf(Transfer::class)
+        ->and($transfer->status->value)->toBe('requested')
+        ->and($transfer->from_location_id)->toBe($this->store->id)
+        ->and($transfer->to_location_id)->toBe($this->cakeRoom->id)
+        ->and($transfer->qty->toString())->toBe('5000.0000')
+        ->and($transfer->note)->toBe('for the wedding cake')
+        ->and($transfer->requested_by_user_id)->toBe($this->baker->id, 'the person who asked: the one acting, not the shared account')
+        ->and($transfer->out_movement_id)->toBeNull()
+        ->and($transfer->in_movement_id)->toBeNull()
+        ->and(DB::table('stock_movements')->count())->toBe($movements, 'a request moves nothing')
+        ->and(ledgerOracle($this->branch->id))->toBe($before)
+        ->and(app(Stock::class)->of($this->flour, $this->store)->available()->toString())->toBe('20000.0000')
+        ->and(app(Stock::class)->of($this->flour, $this->cakeRoom)->onHand->toString())->toBe('0.0000');
+})->group('contract:production->inventory', 'contract');
+
+it('writes the two transfer rows, out of the source and into the destination, in one appendMany when a transfer is confirmed', function () {
+    stockIn($this->flour, $this->store, '20000');
+    $transfer = app(Transfers::class)->request($this->flour, $this->cakeRoom, '5000', (string) Str::uuid());
+    $count = DB::table('stock_movements')->count();
+
+    // the store keeper confirms: one actor stamp on both rows
+    $confirmed = app(Transfers::class)->confirm($transfer);
+
+    expect($confirmed->status->value)->toBe('confirmed')
+        ->and($confirmed->decided_by_user_id)->toBe($this->admin->id)
+        ->and(DB::table('stock_movements')->count())->toBe($count + 2);
+    $rows = DB::table('stock_movements')->where('ref_type', 'transfer')->where('ref_id', $transfer->id)->orderBy('id')->get();
+    expect($rows)->toHaveCount(2)
+        ->and($rows->pluck('reason')->unique()->all())->toBe(['transfer'])
+        ->and($rows[0])->qty->toBe('-5000.0000')->from_location_id->toBe($this->store->id)->to_location_id->toBe($this->cakeRoom->id)
+        ->and($rows[1])->qty->toBe('5000.0000')->from_location_id->toBe($this->store->id)->to_location_id->toBe($this->cakeRoom->id)
+        ->and($rows->map(fn ($r) => [$r->user_id, $r->acting_user_id, $r->station_id])->unique()->values()->all())->toBe([[$this->admin->id, null, null]])
+        ->and($confirmed->out_movement_id)->toBe($rows[0]->id)
+        ->and($confirmed->in_movement_id)->toBe($rows[1]->id)
+        ->and(stockRow($this->flour, $this->store))->on_hand->toBe('15000.0000')
+        ->and(stockRow($this->flour, $this->cakeRoom))->on_hand->toBe('5000.0000');
+    $oracle = ledgerOracle($this->branch->id);
+    expect($oracle['balances'])->toBe($oracle['movements'])->toBe($oracle['view']);
+})->group('contract:production->inventory', 'contract');
+
+it('refuses to confirm more than the source has available, under the lock, and the row stays requested', function () {
+    stockIn($this->flour, $this->store, '10000');
+    ($this->reserve)($this->flour, '6000', $this->store); // 10 kg on hand, 6 kg held for orders: 4 kg available
+    $transfer = app(Transfers::class)->request($this->flour, $this->kitchen, '5000', (string) Str::uuid());
+    $count = DB::table('stock_movements')->count();
+    $before = ledgerOracle($this->branch->id);
+
+    try {
+        app(Transfers::class)->confirm($transfer);
+        $this->fail('5 kg were asked for and 4 kg are available');
+    } catch (TransferError $e) {
+        expect($e->messageKey)->toBe('inventory.transfer.insufficient')
+            ->and($e->status)->toBe(409)
+            ->and($e->extra)->toMatchArray(['available' => '4000.0000', 'requested' => '5000.0000']);
+    }
+
+    expect(Transfer::query()->findOrFail($transfer->id)->status->value)->toBe('requested')
+        ->and(DB::table('stock_movements')->count())->toBe($count)
+        ->and(ledgerOracle($this->branch->id))->toBe($before);
+
+    // what is available can be moved: 4 kg is exactly enough
+    $four = app(Transfers::class)->request($this->flour, $this->kitchen, '4000', (string) Str::uuid());
+    app(Transfers::class)->confirm($four);
+    expect(stockRow($this->flour, $this->store))->on_hand->toBe('6000.0000')->reserved->toBe('6000.0000')
+        ->and(app(Stock::class)->of($this->flour, $this->store)->available()->toString())->toBe('0.0000');
+})->group('contract:production->inventory', 'contract');
+
+it('writes no movement when a transfer is rejected, and keeps the reason', function () {
+    stockIn($this->flour, $this->store, '3000');
+    $transfer = app(Transfers::class)->request($this->flour, $this->kitchen, '1000', (string) Str::uuid());
+    $count = DB::table('stock_movements')->count();
+    $before = ledgerOracle($this->branch->id);
+
+    $rejected = app(Transfers::class)->reject($transfer, 'The sack is reserved for the wedding');
+
+    expect($rejected->status->value)->toBe('rejected')
+        ->and($rejected->reject_reason)->toBe('The sack is reserved for the wedding')
+        ->and($rejected->decided_by_user_id)->toBe($this->admin->id)
+        ->and($rejected->decided_at)->not->toBeNull()
+        ->and($rejected->out_movement_id)->toBeNull()
+        ->and(DB::table('stock_movements')->count())->toBe($count)
+        ->and(ledgerOracle($this->branch->id))->toBe($before);
+})->group('contract:production->inventory', 'contract');
+
+it('writes nothing on a second confirm of a confirmed transfer', function () {
+    stockIn($this->flour, $this->store, '8000');
+    $transfer = app(Transfers::class)->request($this->flour, $this->kitchen, '2000', (string) Str::uuid());
+    $first = app(Transfers::class)->confirm($transfer);
+    $count = DB::table('stock_movements')->count();
+    $audit = DB::table('audit_log')->count();
+
+    $second = app(Transfers::class)->confirm($transfer);
+
+    expect($second->status->value)->toBe('confirmed')
+        ->and($second->out_movement_id)->toBe($first->out_movement_id)
+        ->and($second->version)->toBe($first->version)
+        ->and(DB::table('stock_movements')->count())->toBe($count, 'one pair of rows, however often it is confirmed')
+        ->and(DB::table('audit_log')->count())->toBe($audit)
+        ->and(stockRow($this->flour, $this->store))->on_hand->toBe('6000.0000')
+        ->and(stockRow($this->flour, $this->kitchen))->on_hand->toBe('2000.0000');
 })->group('contract:production->inventory', 'contract');
