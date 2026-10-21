@@ -4,13 +4,14 @@ import { useTranslations } from "next-intl";
 import { Suspense, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useSession } from "@/lib/session";
+import { NotificationBell } from "./NotificationBell";
 import { PendingIndicator } from "./PendingIndicator";
 import { LanguageSwitcher, LanguageSwitcherWithQuery } from "./LanguageSwitcher";
 import { SCREENS } from "@/lib/screens";
 import { focusRing } from "./styles";
 
 // The frame around every page: brand, the screens of the system (later phases' screens say when they arrive), the
-// language switcher and the sign-in state. One row on a 1280 px tablet, wrapping on smaller screens.
+// notification bell, the language switcher and the sign-in state. One row on a 1280 px tablet, wrapping on smaller screens.
 
 
 const navLink = `inline-flex min-h-12 items-center rounded-t-md px-3 text-base text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 ${focusRing}`;
@@ -58,6 +59,7 @@ function Account() {
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations();
   const pathname = usePathname();
+  const signedIn = useSession((s) => s.status === "signed-in");
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -73,6 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {t("app.name")}
           </Link>
           <div className="flex items-center gap-2">
+            {signedIn ? <NotificationBell /> : null}
             <Suspense fallback={<LanguageSwitcher />}>
               <LanguageSwitcherWithQuery />
             </Suspense>

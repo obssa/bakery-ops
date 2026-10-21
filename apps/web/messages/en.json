@@ -386,5 +386,23 @@
     "kind_send_existing": "send order",
     "kind_serve_line": "mark served",
     "kind_cancel_order": "cancel order"
+  },
+  "bell": {
+    "bell": "Notifications",
+    "bell_unread": "Notifications, {count} unread",
+    "title": "Notifications",
+    "mark_all": "Mark all as read",
+    "mark_read": "Mark as read: {title}",
+    "mark_read_short": "Mark read",
+    "close": "Close",
+    "empty": "Nothing new.",
+    "loading": "Loading notifications…",
+    "stale": "Cannot reach the server. These notifications may be out of date.",
+    "severity_warning": "Warning",
+    "severity_critical": "Urgent",
+    "enable": "Enable notifications",
+    "enabled": "Notifications are on for this device.",
+    "enable_denied": "Notifications are blocked in this browser. Allow them in the browser settings.",
+    "enable_unsupported": "This device cannot receive push notifications."
   }
 }

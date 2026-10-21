@@ -386,5 +386,23 @@
     "kind_send_existing": "ትዕዛዝ መላክ",
     "kind_serve_line": "መቅረቡን ምልክት ማድረግ",
     "kind_cancel_order": "ትዕዛዝ መሰረዝ"
+  },
+  "bell": {
+    "bell": "ማሳወቂያዎች",
+    "bell_unread": "ማሳወቂያዎች፣ {count} ያልተነበቡ",
+    "title": "ማሳወቂያዎች",
+    "mark_all": "ሁሉንም እንደተነበበ አድርግ",
+    "mark_read": "እንደተነበበ አድርግ፦ {title}",
+    "mark_read_short": "ተነብቧል",
+    "close": "ዝጋ",
+    "empty": "አዲስ ነገር የለም።",
+    "loading": "ማሳወቂያዎች በመጫን ላይ…",
+    "stale": "ከአገልጋዩ ጋር መገናኘት አልተቻለም። እነዚህ ማሳወቂያዎች ያረጁ ሊሆኑ ይችላሉ።",
+    "severity_warning": "ማስጠንቀቂያ",
+    "severity_critical": "አስቸኳይ",
+    "enable": "ማሳወቂያዎችን አንቃ",
+    "enabled": "ማሳወቂያዎች በዚህ መሣሪያ ላይ በርተዋል።",
+    "enable_denied": "በዚህ አሳሽ ውስጥ ማሳወቂያዎች ታግደዋል። በአሳሹ ቅንብር ውስጥ ፍቀዱ።",
+    "enable_unsupported": "ይህ መሣሪያ የግፊት ማሳወቂያዎችን መቀበል አይችልም።"
   }
 }

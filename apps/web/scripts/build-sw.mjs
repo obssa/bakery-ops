@@ -14,7 +14,9 @@ const { count, size, warnings } = await generateSW({
   globDirectory: "out",
   swDest: "out/sw.js",
   globPatterns: ["**/*.{html,js,css,woff2,woff,svg,ico,png,webmanifest}"],
-  globIgnores: ["sw.js", "workbox-*.js", "**/*.map"],
+  globIgnores: ["sw.js", "workbox-*.js", "push-sw.js", "**/*.map"],
+  // the push and notification-click handlers of the inbox (public/push-sw.js); the worker still caches nothing at runtime
+  importScripts: ["push-sw.js"],
   // /app/en/admin/catalog/?kind=product is the same page as /app/en/admin/catalog/
   ignoreURLParametersMatching: [/.*/],
   directoryIndex: "index.html",

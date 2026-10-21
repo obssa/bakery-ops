@@ -453,3 +453,162 @@ export interface VoidBody {
   reason: string;
   pin: string;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Phase 2 (step 2.8a): the notification inbox and the production board. Typed by hand from docs/openapi.json and the
+// PHP resources (NotificationResource, RequestPresenter, RequestCard).
+// ---------------------------------------------------------------------------------------------------------------
+
+export type NotificationSeverity = "info" | "warning" | "critical";
+
+/** One inbox line (GET /notifications): title and body in the caller's language plus all four texts. */
+export interface AppNotification {
+  id: number;
+  type: string;
+  severity: NotificationSeverity;
+  title: string;
+  body: string;
+  title_en: string;
+  title_am: string;
+  body_en: string;
+  body_am: string;
+  payload: Record<string, unknown> | null;
+  deep_link: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+/** GET /notifications?since=: newest first, the cursor to send next, and the unread count. */
+export interface NotificationsPage {
+  data: AppNotification[];
+  unread_count: number;
+  cursor: string;
+  server_time: string;
+}
+
+/** GET /notifications/channels: what the web may offer. A channel whose driver is off is `enabled: false`. */
+export interface NotificationChannels {
+  in_app: true;
+  push: { enabled: boolean; public_key: string | null; subscribed: boolean };
+  telegram: { enabled: boolean; bot_username: string | null; linked: boolean };
+}
+
+export type RequestStatus = "requested" | "accepted" | "in_progress" | "pending_confirmation" | "done" | "cancelled";
+export type BatchStatus = "started" | "finished" | "confirmed";
+export type RequestPriority = "normal" | "high" | "urgent";
+export type RequestReason = "stock_out" | "manual" | "schedule";
+
+export interface PersonRef {
+  id: number;
+  name: string;
+}
+
+export interface ProductionBatch {
+  id: number;
+  client_uuid: string;
+  status: BatchStatus;
+  recipe_version: number;
+  planned_qty: DecimalString;
+  produced_qty: DecimalString | null;
+  waste_qty: DecimalString | null;
+  started_at: string;
+  finished_by: PersonRef | null;
+  finished_at: string | null;
+  confirmed_by: PersonRef | null;
+  confirmed_at: string | null;
+  send_back_note: string | null;
+  send_back_count: number;
+  version: number;
+}
+
+export interface ProductionRequest {
+  id: number;
+  client_uuid: string;
+  product: { id: number; name_en: string; name_am: string; unit: string };
+  requested_qty: DecimalString;
+  due_at: string | null;
+  priority: RequestPriority;
+  reason: RequestReason;
+  status: RequestStatus;
+  station: { id: number; code: StationCode; name_en: string; name_am: string; requires_overseer: boolean };
+  requested_by: PersonRef | null;
+  assigned_to: PersonRef | null;
+  note: string | null;
+  accepted_at: string | null;
+  done_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  batch: ProductionBatch | null;
+  created_at: string | null;
+  version: number;
+}
+
+/** GET /production/requests?view=board */
+export interface ProductionBoardPage {
+  data: ProductionRequest[];
+  counts: { requested: number; accepted: number; in_progress: number; pending_confirmation: number; done_today: number };
+  server_time: string;
+}
+
+export interface CardLine {
+  ingredient: { id: number; name_en: string; name_am: string; unit: string };
+  needed: DecimalString;
+  /** null when the station has no stock place: nothing can be said about stock that has no place */
+  on_hand: DecimalString | null;
+  available: DecimalString | null;
+  short: boolean | null;
+  short_qty: DecimalString | null;
+  transfer_hint: { from_location_id: number; store_available: DecimalString } | null;
+}
+
+export interface CardStep {
+  order: number;
+  text_en: string;
+  text_am: string;
+}
+
+export interface CardPlace {
+  id: number;
+  name_en: string;
+  name_am: string;
+}
+
+/** GET /production/requests/{request}: the request with its scaled recipe and the two places of the batch. */
+export interface ProductionCard extends ProductionRequest {
+  recipe: {
+    version: number;
+    yield: { qty: DecimalString; unit: string };
+    target_qty: DecimalString;
+    lines: CardLine[];
+    steps: CardStep[];
+  } | null;
+  consume_location: CardPlace | null;
+  output_location: CardPlace | null;
+}
+
+/** The answer of Done, Confirm and Send back: the batch plus the request it belongs to in short. */
+export interface BatchAnswer extends ProductionBatch {
+  request_id: number;
+  request: { id: number; status: RequestStatus; version: number };
+}
+
+/** One entry of the 409 `production.batch.ingredient_short` shortfall list. */
+export interface IngredientShort {
+  ingredient: { id: number; name_en: string; name_am: string; unit: string };
+  needed: DecimalString;
+  available: DecimalString;
+  short: DecimalString;
+  location_id: number;
+  location: string;
+}
+
+/** POST /transfers body (the minimal sheet of the card; step 2.8c builds the full one). */
+export interface NewTransfer {
+  client_uuid: string;
+  item_id: number;
+  to_location_id: number;
+  from_location_id?: number;
+  qty: DecimalString;
+  note?: string;
+  production_request_id?: number;
+}

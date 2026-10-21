@@ -87,6 +87,11 @@ export class LiveFeed<Page, State> {
     this.abort?.abort();
   }
 
+  /** Applies a change this screen made itself (the bell marking a line read) to the state at once, without a look. */
+  amend(change: (state: State) => State): void {
+    this.set({ state: change(this.snapshot.state) });
+  }
+
   /** Look again now. Safe to call from anywhere: a look already in flight is never doubled, only repeated after. */
   refresh(): void {
     if (this.handle) this.handle.kick();
