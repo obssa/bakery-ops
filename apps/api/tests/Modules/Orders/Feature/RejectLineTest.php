@@ -235,5 +235,5 @@ it('dispatches LineRejected once, after the commit, with the reason, to the owne
         ->and($companions[0]->broadcastAs())->toBe('line_rejected')
         ->and($companions[0]->broadcastWith()['payload']['reason'])->toBe('out_of_stock')
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');

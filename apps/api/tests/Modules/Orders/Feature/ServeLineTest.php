@@ -170,5 +170,5 @@ it('dispatches LineServed after the commit; its companion takes the ticket off t
         ->and(array_map(fn ($c): string => $c->name, $companions[0]->broadcastOn()))->toBe(["private-station.{$f->menu->kitchenStation->id}"])
         ->and($companions[0]->broadcastAs())->toBe('line_served')
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');

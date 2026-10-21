@@ -511,7 +511,7 @@ it('sends the OrderSent companion to each station of the order, and queues nothi
         ->and($companions[0]->broadcastAs())->toBe('order_sent')
         ->and($companions[0]->broadcastWith()['payload']['order_id'])->toBe($order['id'])
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 
     // an order of display-case lines reaches no station: no companion at all
     $counter = ($this->openOrder)([$m->line($m->croissant)]);

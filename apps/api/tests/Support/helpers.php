@@ -13,6 +13,7 @@ use App\Modules\Identity\Contracts\PermissionRegistry;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Contracts\Movement;
 use App\Modules\Inventory\Enums\LocationType;
+use App\Modules\Inventory\Jobs\EvaluateBalance;
 use App\Modules\Inventory\Ledger\Ledger;
 use App\Modules\Inventory\Ledger\MovementIntent;
 use App\Modules\Inventory\Ledger\MovementReason;
@@ -25,6 +26,7 @@ use Brick\Math\BigDecimal;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\PermissionRegistrar;
@@ -342,5 +344,18 @@ if (! function_exists('useLiveTransport')) {
             'broadcasting.connections.pusher.app_id' => 'test-app',
         ]);
         app(BroadcastManager::class)->forgetDrivers();
+    }
+}
+
+if (! function_exists('assertNothingQueuedButStockEvaluation')) {
+    /**
+     * What `Queue::assertNothingPushed()` meant for the live-update tests (a broadcast companion queues nothing under
+     * BROADCAST_CONNECTION=null), now that every stock change legitimately queues Inventory's EvaluateBalance (step 2.1,
+     * ADR 0011): nothing else may have been pushed.
+     */
+    function assertNothingQueuedButStockEvaluation(): void
+    {
+        $others = array_values(array_diff(array_keys(Queue::pushedJobs()), [EvaluateBalance::class]));
+        expect($others)->toBe([], 'a job other than the stock evaluation was queued');
     }
 }

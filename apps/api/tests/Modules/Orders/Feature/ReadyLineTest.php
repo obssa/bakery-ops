@@ -250,5 +250,5 @@ it('dispatches LineReady once, after the commit, with its companion on the owner
         ->and(array_map(fn ($c): string => $c->name, $companions[0]->broadcastOn()))->toBe(["private-station.{$f->menu->kitchenStation->id}", "private-user.{$f->waiter->id}"])
         ->and($companions[0]->broadcastAs())->toBe('line_ready')
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');

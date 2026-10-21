@@ -319,5 +319,5 @@ it('dispatches OrderVoided once, after the commit, with its companion on the sta
         ])
         ->and($companions[0]->broadcastAs())->toBe('order_voided')
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');

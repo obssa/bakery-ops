@@ -94,7 +94,7 @@ it('says broadcastWhen() false under the null broadcaster and queues nothing', f
     event($companion);
 
     expect($companion->broadcastWhen())->toBeFalse();
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 })->group('module:shared', 'feature');
 
 it('says broadcastWhen() false under the log broadcaster too: nothing piles up in a cron-drained queue', function () {
@@ -103,7 +103,7 @@ it('says broadcastWhen() false under the log broadcaster too: nothing piles up i
 
     event(new StockChangedBroadcast(liveStockChanged(7)));
 
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 })->group('module:shared', 'feature');
 
 it('queues the broadcast once a WebSocket transport is configured', function () {
@@ -128,7 +128,7 @@ it('follows every ledger write: nothing queued under null, one stock broadcast p
     Queue::fake();
     useLiveTransport('null');
     stockIn($flour, $store, '5.0000');
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 
     useLiveTransport('reverb');
     stockIn($flour, $store, '2.0000');

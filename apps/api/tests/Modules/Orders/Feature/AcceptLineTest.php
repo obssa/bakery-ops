@@ -222,5 +222,5 @@ it('dispatches LineAccepted once, after the commit, with its companion on the st
         ->and($companions[0]->broadcastAs())->toBe('line_accepted')
         ->and($companions[0]->broadcastWith()['payload']['line_id'])->toBe($this->sandwich['id'])
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');

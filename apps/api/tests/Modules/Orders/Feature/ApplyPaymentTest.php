@@ -149,5 +149,5 @@ it('announces OrderPaid once, after the commit, with its inert companion on the 
         ->and(array_map(fn ($c): string => $c->name, $companions[0]->broadcastOn()))->toBe(["private-branch.{$f->branch->id}.orders"])
         ->and($companions[0]->broadcastAs())->toBe('order_paid')
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    Queue::assertNothingPushed();
+    assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');
