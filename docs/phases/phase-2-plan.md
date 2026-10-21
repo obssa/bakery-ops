@@ -323,13 +323,13 @@ asking for a different state is `409 state_machine.illegal_transition`. Read end
 | `GET /purchases` | `purchases.record` | read | `?status=`, `?supplier_id=`, `?from=`, `?to=` (local dates), `?page=` | `200` paginated `{data: [Purchase without lines], meta}` | `403` |
 | `GET /purchases/{purchase}` | `purchases.record` | read | | `200` Purchase | `404` |
 | `POST /purchases` | `purchases.record` | key + `client_uuid` (a replay with a lost key returns the same purchase) | `{client_uuid, supplier_id, invoice_no?, purchase_date, location_id? (default: the store), notes?, allow_duplicate_invoice?, lines: [{client_uuid, item_id, qty, unit_id, unit_cost}]}` | `201` Purchase (`draft`) | `422 validation.failed`, `purchases.supplier.unknown`, `purchases.location.unknown`, `purchases.item.not_purchasable` (only ingredients and bought-in products are bought), `purchases.unit.incompatible`, `purchases.line.cost_too_small`; `409 purchases.invoice.duplicate` (same supplier and invoice number, unless `allow_duplicate_invoice`) |
-| `PUT /purchases/{purchase}/lines` | `purchases.record` | key | `{lines: [...]}` (replaces a draft's lines, by line `client_uuid`) | `200` Purchase | `409 purchases.purchase.not_draft`; the `422`s above |
-| `POST /purchases/{purchase}/confirm` | `purchases.record` | key; a confirmed purchase answers `200` with itself | `{}` | `200` Purchase (`confirmed`, lines carry `movement_id`) + `costs: [{item_id, cost_before, cost_after}]` | `409 purchases.purchase.cancelled`; `422 purchases.purchase.empty` |
+| `PUT /purchases/{purchase}/lines` | `purchases.record` | key | `{lines: [...]}` (replaces a draft's lines, by line `client_uuid`) | `200` Purchase | `409 purchases.purchase.not_draft` (also for a cancelled or confirmed one, with its `status`); the `422`s above |
+| `POST /purchases/{purchase}/confirm` | `purchases.record` | key; a confirmed purchase answers `200` with itself | `{}` | `200` Purchase (`confirmed`, lines carry `movement_id`) + `costs: [{item_id, cost_before, cost_after}]` | `409 purchases.purchase.cancelled`, `409 purchases.cost.currency_mismatch` (the item's average is kept in another currency); `422 purchases.purchase.empty`; the `costs` block (and every cost field) is left out for a caller without `costs.view`, and is rebuilt from the history rows, so a repeated confirm answers the same figures |
 | `POST /purchases/{purchase}/cancel` | `purchases.record` | key | `{reason?}` | `200` Purchase (`cancelled`) | `409 purchases.purchase.confirmed` (a confirmed purchase is corrected with a stock adjustment, never undone) |
 | **Inventory: costs (2.2b, 2.4b)** | | | | | |
-| `GET /inventory/costs` | `costs.view` | read | `?item_id=`, `?page=` | `200 {data: [{item: {id, name_en, name_am, unit}, moving_avg_cost, qty_basis, currency, as_of}]}` | `403` |
-| `GET /inventory/costs/{item}` | `costs.view` | read | `?limit=` | `200` the cost row plus `history: [{source, qty_before, cost_before, qty_in, unit_cost_in, cost_after, at, user_id}]` newest first | `404` (an item that never had a cost) |
-| `POST /inventory/costs/{item}/opening` | `inventory.adjust` | key | `{unit_cost, unit_id}` (cost of the stock already on hand when no purchase document exists) | `201` the cost row (history `source = opening`) | `409 inventory.cost.exists`; `422 purchases.unit.incompatible` |
+| `GET /inventory/costs` | `costs.view` | read | `?item_id=`, `?page=` | `200 {data: [{item: {id, name_en, name_am, unit}, moving_avg_cost, qty_basis, currency, as_of}], links, meta}` (paginated: `?per_page=`, default 50, at most 100; `unit` is the item's base unit; `?item_id=` must be an item of the branch, else `422`) | `403` |
+| `GET /inventory/costs/{item}` | `costs.view` | read | `?limit=` | `200` the cost row plus `history: [{source, qty_before, cost_before, qty_in, unit_cost_in, cost_after, at, user_id}]` newest first (`?limit=` 1 to 200, default 50) | `404 inventory.cost.not_found` (an item that never had a cost) |
+| `POST /inventory/costs/{item}/opening` | `inventory.adjust` | key | `{unit_cost, unit_id}` (cost of the stock already on hand when no purchase document exists) | `201` the cost row (history `source = opening`) | `409 inventory.cost.exists`; `422 purchases.unit.incompatible`, `purchases.item.not_purchasable`, `purchases.line.cost_too_small` (the cost is stated per `unit_id` and kept per base unit, 4 dp half-up) |
 | `GET /inventory/recipe-costs/{product}` | `costs.view` | read | `?version=` (default: the active one) | `200 {product_id, version, yield: {qty, unit}, complete: bool, missing_cost_item_ids: [..], total_cost, cost_per_unit (4 dp), price (Prices::at now) \| null, margin_amount, margin_pct (2 dp) \| null, lines: [{ingredient: {id, name_en, name_am}, qty_base, unit, waste_pct, unit_cost \| null, line_cost \| null, source: purchase\|recipe\|missing}]}` | `404 catalog.recipe.not_found` |
 | **Inventory: transfers (2.3)** | | | | | |
 | `GET /transfers` | `inventory.view` | read | `?status=`, `?location_id=` (either end), `?mine=1`, `?production_request_id=`, `?page=` | `200` paginated Transfers | `403` |
@@ -584,6 +584,69 @@ and 1.6a-c were in Phase 1.
      `PurchaseModelsTest`, `CostLedgerTest`, `LedgerLockItemsTest`, `LocationsStoreTest`, and `tests/Gate/CostLedgerRaceTest.php`
      (forked processes, groups `concurrency`, `module:inventory`; it fails without either lock). Run locally: those files, Arch,
      `NumericColumnsTest`, `AppendOnlyTest`, `BranchIdTest`, PHPStan and Pint; CI's `mod-inventory` is the rest of the evidence.
+
+   **As built (step 2.2b, `phase-2/purchases`).** Done as planned, with these differences and decisions (the plan left them open or the
+   code is the fact; section 4 rows are corrected above):
+   - *Red first, as run.* The two ledger race tests were committed red alone (both fail on `Illuminate\Database\DeadlockException` 1213 in
+     `insert ignore into stock_balances`, in most of the 30 rounds). Then the suppliers, draft, confirm, cancel and cost tests with the
+     registry rows and the race test for confirms: 57 of 66 failed, every one on a `404` (no route yet); the 9 that passed
+     were registry-coverage checks and one test a missing route satisfies (another branch's purchase is `404` either way). Green after the endpoints: 66 of 66, then the four confirm races.
+   - *The deadlock (found in 2.2a), fixed in `Ledger::lockRows`.* Cause: for a missing `(item, location)` the ledger ran `SELECT ... FOR
+     UPDATE` on the row (InnoDB locks the gap, and two gap locks do not conflict) and then `INSERT IGNORE`; two processes making the first
+     movement of one new pair each held the gap and then waited for the other's insert: error 1213 / SQLSTATE 40001. Laravel retries only an
+     outermost transaction, and every real caller is nested in an `AuditedAction`, so the request failed. Fix (the smallest one that
+     removes the cause rather than hides it): one plain read finds which of the batch's pairs exist; then, in the fixed lock order, each
+     missing pair is created with an upsert that changes nothing (`ON DUPLICATE KEY UPDATE branch_id = branch_id`) and each pair is locked
+     `FOR UPDATE`. A missing row is never locked, so no gap lock is ever taken; the upsert takes the row's exclusive lock whether it inserts
+     or finds the row the other process just committed (the former `INSERT IGNORE` took a shared lock on a duplicate, and two of those
+     cannot both upgrade). The lock order (`stock_balances` ascending `(item_id, location_id)`, then `item_costs` ascending `item_id`) is
+     unchanged; the cost is one extra `SELECT` per locking pass. Not a retry loop: a retry of a nested transaction is impossible and would
+     only hide the next deadlock. Tests: `tests/Gate/LedgerFirstMovementRaceTest.php` (forks, 30 rounds each: two first movements of one
+     new item at one place, and two batches creating the same two new rows in opposite order; each runs nested in one outer attempt
+     and also compares `Innodb_deadlocks` before and after); `PurchaseConfirmRaceTest` repeats it through HTTP. The Phase 0 ledger
+     property and lock tests, `CostLedgerRaceTest`, `ReservationLockTest` stay green. `references/traps.md` has the new row "First-row race".
+   - *Opening cost, same trap.* `CostLedger::open` never locks a missing `item_costs` row: it takes the balance locks, checks for a row,
+     then INSERTs the first one; the unique key `(branch_id, item_id)` decides a race (one `201`, one `409 inventory.cost.exists`,
+     proven by `PurchaseConfirmRaceTest`). Confirm needs no such care: the balance locks are taken first and the item has a balance row by then.
+   - *Confirm* is `ConfirmPurchase`: lock the purchase row (`PurchaseLock`), one `appendMany` of `purchase_in` intents at the purchase's
+     location (`ref_type = purchase`, `ref_id` = the purchase, `client_uuid` = UUIDv5 of `purchase-line:{branch_id}:{line client uuid}`,
+     pinned by a test), `CostLedger::receiveMany` (receipts grouped by item in line order), `movement_id` on the lines, status, version + 1.
+     The system-wide lock order is therefore purchases, `stock_balances`, `item_costs`. A confirm that finds the purchase already confirmed
+     under the lock unwinds through an internal exception, so a double tap writes no audit row either; a currency other than the item's
+     average is `409 purchases.cost.currency_mismatch` (new key) and rolls everything back.
+   - *Decisions the plan left open.* (1) No `DELETE /suppliers`: the plan counts twelve routes, a supplier is switched off with
+     `is_active = false` and an inactive supplier cannot start a purchase (`422 purchases.supplier.unknown`, also for another branch's
+     or a deleted one); the model still soft-deletes. (2) A draft may have no lines (`lines` is required but may be `[]`, at most 100),
+     so `422 purchases.purchase.empty` is reachable. (3) The receiving location is any live location of the branch, default the store;
+     no store and none named is `422 purchases.location.unknown`. (4) An item is purchasable when it is live, active and an ingredient or
+     a bought-in product; anything else, including another branch's item, is `422 purchases.item.not_purchasable` with `line` and `item_id`.
+     (5) The duplicate-invoice check (`409 purchases.invoice.duplicate`, with `purchase_id`) compares the supplier and the trimmed invoice
+     number among purchases that are not cancelled; `allow_duplicate_invoice: true` skips it; no invoice number, no check. (6) A replace
+     keeps a line by client UUID (item, quantity, unit and cost may change), soft-deletes the ones left out, and a line UUID is used once per
+     branch for ever, also by lines removed from a draft (`422 validation.failed` on `lines.N.client_uuid`). (7) Repeats: a second
+     confirm of a confirmed purchase and a second cancel of a cancelled one answer `200` with the purchase and write nothing; a replay of
+     `POST /purchases` with a used `client_uuid` answers `200` (the first answer was `201`); cancelling a confirmed purchase is
+     `409 purchases.purchase.confirmed`, confirming a cancelled one `409 purchases.purchase.cancelled`, lines of a non-draft
+     `409 purchases.purchase.not_draft`. (8) Cost fields are `total`, each line's `unit_cost`, `unit_cost_base` and `line_total`, and the
+     `costs` block of the confirm answer; a person who holds `purchases.record` without `costs.view` gets none of them. (9) A value that
+     does not fit its column (quantity over ten integer digits after conversion, a line total, the sum) is `422 validation.failed` on the
+     field, never a database error. (10) The opening cost needs `inventory.adjust` (admin only), works for an item with nothing on hand
+     (`qty_basis` 0.0000) and writes a history row with `qty_before` = the total on hand, `cost_before` null, `qty_in` 0, `unit_cost_in` =
+     `cost_after` = the cost per base unit; the next purchase averages over the stock that was on hand. The item must be purchasable and the
+     cost not round to zero. New keys: `inventory.cost.exists` (409), `inventory.cost.not_found` (404), `purchases.cost.currency_mismatch`
+     (409), `purchases.validation.too_large` (the message of an overflow), the other `purchases.*` of section 4; `lang/{en,am}/purchases.php`
+     is new and `PurchasesLangTest` keeps the pair in step.
+   - *Code map.* `Inventory\Purchases\{SaveDraft, ReplaceLines, ConfirmPurchase, CancelPurchase, LineResolver, PurchaseLines,
+     PurchaseLock, PurchaseMovementUuid}`, `Inventory\Costs\SetOpeningCost` and `CostLedger::open`, `Exceptions\PurchaseError`,
+     controllers `Suppliers`, `Purchases`, `Costs`; `DecimalString::rate()` (10 integer digits, 4 decimals); `PurchaseLine::item/unit` and
+     `Purchase::confirmedBy` relations. No migration and no ERD change. Registries: twelve rows in `route_permissions.php` (nine
+     `purchases.record` routes, two `costs.view`, one `inventory.adjust`), seven in `write_endpoints.php`; the matrix gained the
+     `{purchase}` and `{supplier}` placeholders. `docs/openapi.json` re-exported (10 new paths; the existing paths are unchanged).
+   - *Tests.* `SuppliersEndpointsTest`, `PurchaseDraftEndpointsTest`, `ConfirmPurchaseTest`, `CancelPurchaseTest`, `CostsEndpointsTest`
+     (module `inventory`, `feature`), `PurchasesLangTest`, the registry rows through `RoutePermissionMatrixTest` and
+     `IdempotencyCoverageTest`, and in `concurrency`: `LedgerFirstMovementRaceTest`, `PurchaseConfirmRaceTest` (the same purchase confirmed
+     twice at once, two purchases of one new item, opposite order over two new items, two opening costs). Run locally: those files, the
+     Arch and Invariants directories, PHPStan and Pint; CI's `mod-inventory` is the rest of the evidence.
 
 3. **2.3 transfers** (`inventory.transfers`, groups `module:inventory`, `concurrency`): the transfer cases appended to
    `Contract/Production/InventoryContractTest.php` first (red), then migration 8, `TransferStatus` (exhaustive table),

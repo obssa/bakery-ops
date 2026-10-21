@@ -95,7 +95,7 @@
       ],
       "modules": {
         "contracts": "done",
-        "inventory.purchases": "todo",
+        "inventory.purchases": "done",
         "inventory.transfers": "todo",
         "catalog.recipe-versions": "todo",
         "notifications": "todo",
