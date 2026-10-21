@@ -241,22 +241,33 @@ final class Ledger
     {
         uasort($pairs, static fn (array $a, array $b): int => $a <=> $b);
 
+        // A plain read (no lock) tells which rows are missing. A missing row is NEVER locked with SELECT ... FOR UPDATE: on
+        // InnoDB that locks the gap, gap locks do not conflict with each other, and two processes making the first movement
+        // of the same item at the same place would each hold the gap and then wait for the other's INSERT (deadlock 1213).
+        $existing = [];
+        $itemIds = array_values(array_unique(array_map(static fn (array $p): int => $p[0], $pairs)));
+        foreach (StockBalance::query()->withoutGlobalScope(BranchScope::class)->whereIn('item_id', $itemIds)->get(['item_id', 'location_id']) as $row) {
+            $existing[self::key($row->item_id, $row->location_id)] = true;
+        }
+
         $locked = [];
         foreach ($pairs as $key => [$itemId, $locationId]) {
-            $row = $this->balanceForUpdate($itemId, $locationId);
-            if ($row === null) {
-                // first movement of this item here: create the row at zero (a concurrent creator wins harmlessly)
-                StockBalance::query()->withoutGlobalScope(BranchScope::class)->insertOrIgnore([
+            if (! isset($existing[$key])) {
+                // First movement of this item here: create the row at zero, in the lock order, before locking it. The upsert
+                // takes the row's exclusive lock whether it inserts or finds a row another process just committed (an
+                // INSERT IGNORE would take a shared lock on the duplicate, and two shared locks cannot both upgrade). The
+                // update touches no value, so a concurrent creator wins harmlessly.
+                StockBalance::query()->withoutGlobalScope(BranchScope::class)->toBase()->upsert([
                     'branch_id' => $branches[$key],
                     'item_id' => $itemId,
                     'location_id' => $locationId,
                     'on_hand' => Quantity::zero()->toString(),
                     'reserved' => Quantity::zero()->toString(),
                     'updated_at' => CarbonImmutable::now(),
-                ]);
-                $row = $this->balanceForUpdate($itemId, $locationId) ?? throw new LogicException("stock_balances row {$key} could not be created.");
+                ], ['item_id', 'location_id'], ['branch_id']);
             }
-            $locked[$key] = $row;
+            $locked[$key] = $this->balanceForUpdate($itemId, $locationId)
+                ?? throw new LogicException("stock_balances row {$key} could not be created.");
         }
 
         return $locked;
