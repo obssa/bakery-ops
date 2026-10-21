@@ -176,7 +176,7 @@ it('answers 404 for a rule of another branch or one that was deleted', function 
     $this->withHeaders(idempotencyKey())->deleteJson("/api/v1/reorder-rules/{$theirs->id}")->assertNotFound();
     $this->withHeaders(idempotencyKey())->patchJson("/api/v1/reorder-rules/{$gone->id}", ['min_qty' => '1'])->assertNotFound();
     $this->withHeaders(idempotencyKey())->deleteJson("/api/v1/reorder-rules/{$gone->id}")->assertNotFound();
-    expect(ReorderRule::withTrashed()->findOrFail($theirs->id)->deleted_at)->toBeNull();
+    expect(ReorderRule::withTrashed()->withoutGlobalScopes()->findOrFail($theirs->id)->deleted_at)->toBeNull();
 });
 
 it('soft-deletes a rule, audited, and answers it', function () {

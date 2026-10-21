@@ -1,6 +1,6 @@
 # ADR 0011: Stock alerts fire once per episode, and queued work acts as the person who caused it
 
-- Status: accepted (Phase 2, step 2.1); the Notifications half was added when it was built (step 2.5a, decision 5)
+- Status: accepted (Phase 2, step 2.1); the Notifications half was added when it was built (step 2.5a, decision 5); the `low` level in step 2.6a (decision 6)
 - Date: 2026-10-21
 - Phase: 2
 
@@ -58,6 +58,16 @@ no request and so no actor; and a queued listener cannot be made unique, while a
      (`caused_by_user_id` for a stock-out, the maker of a line, the decider of a transfer) through `ActorContext::runAs`, putting
      back exactly what the worker had. The inbox is not an actor-stamped table, so the person lands in
      `payload.caused_by_user_id`.
+
+6. **The `low` level (step 2.6a).** A live, active reorder rule makes a second episode kind for the same balance: `low` opens when
+   `available <= min_qty` and closes when `available > min_qty` (no hysteresis: the plan default, open question 3), beside `out`
+   and independent of it (a fall from fine to zero opens both, recovery closes each on its own level). The key is the same
+   `(item_id, location_key, type, is_active)`; a rule with no place is branch-wide, `location_key` 0, and its number is the sum
+   of `available` over the stock places. The rule is read at every evaluation, so a changed minimum moves the episode and a deleted
+   or switched-off rule closes it; nothing but `AlertEvaluator` writes an episode, so a rule change queues the evaluation of the
+   balance it covers (after commit) instead of touching the table. The claim is an `INSERT` as for `out`; the only `FOR UPDATE` is
+   the balance row. Notifications gates `stock_low:{item}:{location}` apart from `stock_out`, cleared by `StockRecovered` of type
+   `low`, so neither alert uses up or re-arms the other.
 
 ## Consequences
 

@@ -79,6 +79,13 @@ final class NotificationText
                 'item' => $this->str($type, $p, $in('item_name')),
                 'place' => $this->str($type, $p, $in('location_name')),
             ],
+            'stock_low' => [
+                'item' => $this->str($type, $p, $in('item_name')),
+                'place' => $this->str($type, $p, $in('location_name')),
+                'available' => $this->withUnit($this->quantity($this->str($type, $p, 'available')), $this->optional($type, $p, 'unit')),
+                'min' => $this->withUnit($this->quantity($this->str($type, $p, 'min_qty')), $this->optional($type, $p, 'unit')),
+                'reorder' => $this->withUnit($this->quantity($this->str($type, $p, 'reorder_qty')), $this->optional($type, $p, 'unit')),
+            ],
             'transfer_requested', 'transfer_decided' => [
                 'item' => $this->str($type, $p, $in('item_name')),
                 'qty' => $this->quantity($this->str($type, $p, 'qty')),
@@ -99,6 +106,12 @@ final class NotificationText
         }
 
         return rtrim(rtrim($qty, '0'), '.');
+    }
+
+    /** 4000 and g -> "4000 g"; no unit in the payload -> "4000". */
+    private function withUnit(string $quantity, ?string $unit): string
+    {
+        return $unit === null || $unit === '' ? $quantity : $quantity.' '.$unit;
     }
 
     private function template(string $key, string $locale): string

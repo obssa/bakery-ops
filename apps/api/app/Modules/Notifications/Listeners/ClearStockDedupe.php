@@ -37,7 +37,7 @@ final class ClearStockDedupe implements ShouldHandleEventsAfterCommit, ShouldQue
             ? NotificationTypes::gateKey($type, $event->payload())
             : null;
 
-        // stock_low joins the registry at step 2.6; its gate is keyed the same way, per item and place
+        // stock_out and stock_low are gated the same way, per item and place (location 0: a branch-wide low rule)
         $this->dedupe->clear($event->branchId, $key ?? "{$type}:{$event->itemId}:{$event->locationId}");
     }
 }

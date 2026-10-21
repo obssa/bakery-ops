@@ -8,9 +8,12 @@ use Carbon\CarbonImmutable;
 
 /**
  * An item is at or below the minimum its reorder rule sets (phase-2 plan section 5). Declared in step 2.1 with
- * the other stock alerts; Inventory starts dispatching it at step 2.6, when reorder rules exist. Carries the rule it
+ * the other stock alerts; Inventory dispatches it from step 2.6a, when the rule exists. Carries the rule it
  * crossed: the minimum, the quantity to reorder and the roles to tell (a list from the permission registry's roles
- * plus the literal "station", meaning the people assigned to the station of the place).
+ * plus the literal "station", meaning the people assigned to the station of the place), and the code of the item's
+ * base unit that every quantity is in, so the text can say "4000 g" without importing Catalog (step 2.6a).
+ * For a branch-wide rule (a rule with no place) location_id is 0, the location names say "All places" and the
+ * numbers are the sum over the branch's stock places.
  */
 final class StockLow extends StockAlert
 {
@@ -38,6 +41,7 @@ final class StockLow extends StockAlert
         public readonly string $reorderQty,
         public readonly array $notifyRoles,
         ?CarbonImmutable $occurredAt = null,
+        public readonly string $unit = '',
     ) {
         parent::__construct(
             $branchId, $itemId, $locationId, $itemNameEn, $itemNameAm, $locationNameEn, $locationNameAm,
@@ -54,6 +58,7 @@ final class StockLow extends StockAlert
             'min_qty' => $this->minQty,
             'reorder_qty' => $this->reorderQty,
             'notify_roles' => $this->notifyRoles,
+            'unit' => $this->unit,
         ];
     }
 }

@@ -3644,6 +3644,182 @@
                 }
             }
         },
+        "/v1/reorder-rules": {
+            "get": {
+                "operationId": "inventory.reorder-rules.index",
+                "tags": [
+                    "ReorderRules"
+                ],
+                "parameters": [
+                    {
+                        "name": "item_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "location_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `ReorderRuleResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ReorderRuleResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "inventory.reorder-rules.store",
+                "tags": [
+                    "ReorderRules"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreReorderRuleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/reorder-rules/{rule}": {
+            "patch": {
+                "operationId": "inventory.reorder-rules.update",
+                "tags": [
+                    "ReorderRules"
+                ],
+                "parameters": [
+                    {
+                        "name": "rule",
+                        "in": "path",
+                        "required": true,
+                        "description": "The rule ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateReorderRuleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "inventory.reorder-rules.destroy",
+                "tags": [
+                    "ReorderRules"
+                ],
+                "parameters": [
+                    {
+                        "name": "rule",
+                        "in": "path",
+                        "required": true,
+                        "description": "The rule ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/short-code/verify": {
             "post": {
                 "operationId": "identity.short-code.verify",
@@ -5614,6 +5790,92 @@
                 ],
                 "title": "RejectTransferRequest"
             },
+            "ReorderRuleResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "item": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name_en": {
+                                "type": "string"
+                            },
+                            "name_am": {
+                                "type": "string"
+                            },
+                            "unit": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name_en",
+                            "name_am",
+                            "unit"
+                        ]
+                    },
+                    "location": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name_en": {
+                                "type": "string"
+                            },
+                            "name_am": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name_en",
+                            "name_am",
+                            "type"
+                        ]
+                    },
+                    "min_qty": {
+                        "type": "string"
+                    },
+                    "reorder_qty": {
+                        "type": "string"
+                    },
+                    "notify_roles": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "version": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "item",
+                    "location",
+                    "min_qty",
+                    "reorder_qty",
+                    "notify_roles",
+                    "is_active",
+                    "version"
+                ],
+                "title": "ReorderRuleResource"
+            },
             "ReplaceItemStationsRequest": {
                 "type": "object",
                 "description": "PUT /items/{item}/stations: the complete set of stations the item's order lines route to (an empty list makes it a\ndisplay-case item with no station step). Each a live station of the admin's branch, once.",
@@ -6344,6 +6606,47 @@
                 ],
                 "title": "StorePurchaseRequest"
             },
+            "StoreReorderRuleRequest": {
+                "type": "object",
+                "description": "POST /reorder-rules: when an item is running low and how much to order. min_qty and reorder_qty are decimal strings in the\nitem's base unit (never a float, ADR 0004): the minimum may be zero, the quantity to reorder must be above zero.\nlocation_id left out or null covers the whole branch. notify_roles left out is the default (admin and manager). Whether\nthe item and the place are live in this branch, whether every role exists and whether the place already has a rule is the\naction's question (Reorder\\ReorderRules).",
+                "properties": {
+                    "item_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "location_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1
+                    },
+                    "min_qty": {
+                        "type": "string"
+                    },
+                    "reorder_qty": {
+                        "type": "string"
+                    },
+                    "notify_roles": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 32
+                        },
+                        "minItems": 1,
+                        "maxItems": 20
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "item_id",
+                    "min_qty",
+                    "reorder_qty"
+                ],
+                "title": "StoreReorderRuleRequest"
+            },
             "StoreStationRequest": {
                 "type": "object",
                 "description": "POST /stations: one station per code per branch (Shared's stations table), named in both languages (rule 9).",
@@ -6919,6 +7222,31 @@
                     }
                 },
                 "title": "UpdateLocationRequest"
+            },
+            "UpdateReorderRuleRequest": {
+                "type": "object",
+                "description": "PATCH /reorder-rules/{rule}: any of the minimum, the quantity to reorder, the roles to tell and the switch; a field left out\nstays. The item and the place of a rule never change (a field naming them is ignored): delete the rule and make another.",
+                "properties": {
+                    "min_qty": {
+                        "type": "string"
+                    },
+                    "reorder_qty": {
+                        "type": "string"
+                    },
+                    "notify_roles": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "maxLength": 32
+                        },
+                        "minItems": 1,
+                        "maxItems": 20
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateReorderRuleRequest"
             },
             "UpdateSupplierRequest": {
                 "type": "object",

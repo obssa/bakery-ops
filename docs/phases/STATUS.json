@@ -99,7 +99,7 @@
         "inventory.transfers": "done",
         "catalog.recipe-versions": "done",
         "notifications": "done",
-        "inventory.reorder": "todo",
+        "inventory.reorder": "in_progress",
         "production": "todo",
         "web": "todo",
         "docs": "todo"

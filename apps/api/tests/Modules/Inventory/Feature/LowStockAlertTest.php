@@ -213,12 +213,12 @@ it('adds the branch-wide rule over the stock places, never the cash drawer, with
     $wide = ($this->rule)(['location_id' => null, 'location_key' => 0, 'min_qty' => '500', 'reorder_qty' => '3000']);
     Event::fake([StockLow::class, StockOut::class, StockRecovered::class]);
 
-    stockIn($this->flour, $this->store, '300');
-    stockIn($this->flour, $this->kitchen, '300');   // 600 across the branch
+    stockIn($this->flour, $this->store, '600');
+    stockIn($this->flour, $this->kitchen, '100');   // 700 across the branch
     stockIn($this->flour, $this->drawer, '1');      // the drawer is not stock
     Event::assertNotDispatched(StockLow::class);
 
-    ($this->waste)($this->kitchen, '150');          // 450 across the branch: low
+    ($this->waste)($this->store, '250');            // 450 across the branch: low
     Event::assertDispatchedTimes(StockLow::class, 1);
     $episode = ($this->episodes)('low', 0);
     expect($episode)->toHaveCount(1)
@@ -231,7 +231,7 @@ it('adds the branch-wide rule over the stock places, never the cash drawer, with
         ->and($payload['location_name_en'])->toBe(trans('inventory.reorder.all_places', [], 'en'))
         ->and($payload['location_name_am'])->toBe(trans('inventory.reorder.all_places', [], 'am'));
 
-    ($this->waste)($this->store, '10');             // 440: still the same episode
+    ($this->waste)($this->kitchen, '10');           // 440: still the same episode
     Event::assertDispatchedTimes(StockLow::class, 1);
 
     stockIn($this->flour, $this->store, '100');     // 540: recovered
@@ -327,7 +327,8 @@ it('claims the episode with an INSERT and never locks a row that may not exist (
     $locking = array_values(array_filter($statements, fn (string $sql): bool => str_contains($sql, 'for update')));
     expect(DB::table('stock_alert_states')->where('is_active', 1)->count())->toBe(2);
     foreach ($locking as $sql) {
-        expect($sql)->toContain('stock_balances', 'only the balance row (which exists) is locked FOR UPDATE')->not->toContain('stock_alert_states')->not->toContain('reorder_rules');
+        expect(str_contains($sql, 'stock_balances'))->toBeTrue("only the balance row (which exists) is locked FOR UPDATE: {$sql}")
+            ->and(str_contains($sql, 'stock_alert_states') || str_contains($sql, 'reorder_rules'))->toBeFalse($sql);
     }
     expect(array_filter($statements, fn (string $sql): bool => str_contains($sql, 'insert') && str_contains($sql, 'stock_alert_states')))->not->toBe([]);
 });

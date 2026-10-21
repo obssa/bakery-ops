@@ -38,4 +38,11 @@ return [
         'qty_too_large' => 'This quantity is too large.',
         'qty_too_small' => 'This quantity is too small: in the base unit it rounds to zero.',
     ],
+    'reorder' => [
+        'exists' => 'This item already has a reorder rule for this place. Change that rule instead of adding another.',
+        'role_unknown' => 'A role in the list is not one of the bakery roles. Use admin, manager, cashier, waiter, chef, barista, cake_baker, bread_baker, or station.',
+        'item_unknown' => 'Only items kept in stock can have a reorder rule, and the item must be live in this branch. A made-to-order product holds no stock.',
+        'location_unknown' => 'This place is not a stock location of this branch. Leave it out to cover the whole branch.',
+        'all_places' => 'All places',
+    ],
 ];

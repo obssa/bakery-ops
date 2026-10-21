@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Modules\Identity\Contracts\Recipients;
 use App\Modules\Identity\Contracts\Stations;
 use App\Modules\Identity\Models\User;
+use App\Modules\Notifications\Contracts\Notifier;
 use App\Modules\Notifications\Listeners\ClearStockDedupe;
 use App\Modules\Notifications\Listeners\NotifyStockLow;
+use App\Modules\Notifications\Listeners\NotifyStockOut;
 use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Models\NotificationDelivery;
 use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Notifications\Support\Dedupe;
+use App\Modules\Notifications\Support\EventScope;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -64,7 +68,7 @@ it('is queued after commit on the default queue and registered for StockLow', fu
         ->and($pushed->first()->queue)->toBeNull('the default queue: the cron worker drains only that one')
         ->and(is_subclass_of(NotifyStockLow::class, ShouldQueue::class))->toBeTrue()
         ->and(is_subclass_of(NotifyStockLow::class, ShouldHandleEventsAfterCommit::class))->toBeTrue()
-        ->and((new NotifyStockLow(app(\App\Modules\Notifications\Support\EventScope::class), app(\App\Modules\Identity\Contracts\Recipients::class), app(\App\Modules\Notifications\Contracts\Notifier::class)))->tries)->toBe(3);
+        ->and((new NotifyStockLow(app(EventScope::class), app(Recipients::class), app(Notifier::class)))->tries)->toBe(3);
     expect(Notification::query()->count())->toBe(0, 'nothing is written in the request that dispatched the event');
 });
 
@@ -136,7 +140,7 @@ it('holds a second low alert until the recovery, then tells again with a new lin
 
 it('keeps the low gate and the out gate apart: a stock-out does not use up a low alert, a recovery from out does not re-arm it', function () {
     app(NotifyStockLow::class)->handle(NotificationEvents::stockLow($this->branch->id, 12, 2, 31));
-    app(\App\Modules\Notifications\Listeners\NotifyStockOut::class)->handle(NotificationEvents::stockOut($this->branch->id, 12, 2, 41, ['kind' => 'ingredient', 'fulfilment' => 'bought_in']));
+    app(NotifyStockOut::class)->handle(NotificationEvents::stockOut($this->branch->id, 12, 2, 41, ['kind' => 'ingredient', 'fulfilment' => 'bought_in']));
 
     expect(Notification::query()->where('type', 'stock_low')->count())->toBe(2)
         ->and(Notification::query()->where('type', 'stock_out')->count())->toBe(2);

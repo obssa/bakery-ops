@@ -64,6 +64,26 @@ final class LedgerReader
     }
 
     /**
+     * Every balance row of one item at a stock place of the branch, never the cash drawer (it holds money, not stock), ascending
+     * by location id. The branch-wide reorder rule adds their `available` (Alerts\AlertEvaluator); a place nothing ever moved has
+     * no row and counts as nothing. Reads never lock.
+     *
+     * @return list<StockLevel>
+     */
+    public function levelsOfItem(int $itemId): array
+    {
+        $rows = StockBalance::query()
+            ->select('stock_balances.*')
+            ->join('locations', 'locations.id', '=', 'stock_balances.location_id')
+            ->where('locations.type', '!=', 'cash_drawer')
+            ->where('stock_balances.item_id', $itemId)
+            ->orderBy('stock_balances.location_id')
+            ->get();
+
+        return array_values($rows->map(fn (StockBalance $row): StockLevel => $row->toLevel())->all());
+    }
+
+    /**
      * The sum of the movements with created_at <= $at, per (item, location), optionally for one item and/or one
      * location (Stock::balanceAt).
      *

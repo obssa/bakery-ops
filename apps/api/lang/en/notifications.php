@@ -13,6 +13,10 @@ return [
             'title' => ':item is out of stock',
             'body' => 'None left at :place.',
         ],
+        'stock_low' => [
+            'title' => 'Running low: :item',
+            'body' => 'Only :available left at :place (minimum :min). Reorder :reorder.',
+        ],
         'transfer_requested' => [
             'title' => 'Stock requested: :item',
             'body' => ':qty :unit of :item, from :from to :to.',

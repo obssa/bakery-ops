@@ -269,7 +269,9 @@ and stays `DECIMAL(12,2)`; a rate is multiplied by a `Quantity` into `Money` (ha
     `notify_roles` JSON (a list from `PermissionRegistry::ROLES` plus the literal `station`, meaning the users assigned
     to the station of the location), `is_active` BOOL, the actor stamp, `version`, timestamps, `deleted_at`. One live
     rule per item and place: the same generated-column / partial-index technique as migration 9 (`active_key` over
-    `deleted_at IS NULL`, unique `(item_id, location_key, active_key)`).
+    `deleted_at IS NULL`, unique `(item_id, location_key, active_key)` on MariaDB and MySQL, the partial unique index
+    `reorder_rules_one_live` on PostgreSQL). Actor stamp: `created_by_user_id`, `acting_user_id`, `shift_instance_id`,
+    `actor_station_id`, `device_id`. An inactive rule still occupies its place (it is switched back on, not duplicated).
 15. `..._create_production_requests_table` (Production, 2.7a): `id`, `branch_id`, `client_uuid` UUID, `product_item_id` FK,
     `requested_qty` DECIMAL(14,4) (the product's base unit; CHECK > 0), `due_at` DATETIME NULL, `priority` (`normal |
     high | urgent`, CHECK), `station_id` FK (the producing station: `Routing::productionStationFor`), `reason`
@@ -340,8 +342,8 @@ asking for a different state is `409 state_machine.illegal_transition`. Read end
 | **Inventory: reorder and low stock (2.6)** | | | | | |
 | `GET /reorder-rules` | `inventory.view` | read | `?item_id=`, `?location_id=` | `200 {data: [Rule]}` Rule `{id, item, location \| null, min_qty, reorder_qty, notify_roles, is_active, version}` | `403` |
 | `POST /reorder-rules` | `inventory.manage` | key | `{item_id, location_id?, min_qty, reorder_qty, notify_roles: [..], is_active?}` | `201` Rule | `422 validation.failed`, `inventory.reorder.exists` (one live rule per item and place), `inventory.reorder.role_unknown` |
-| `PATCH /reorder-rules/{rule}` | `inventory.manage` | key | `{min_qty?, reorder_qty?, notify_roles?, is_active?}` | `200` Rule | `422`, `404` |
-| `DELETE /reorder-rules/{rule}` | `inventory.manage` | key | | `200` (soft-deleted; its open `low` episode is cleared) | `404` |
+| `PATCH /reorder-rules/{rule}` | `inventory.manage` | key | `{min_qty?, reorder_qty?, notify_roles?, is_active?}` (the item and the place never change) | `200` Rule | `422`, `404` |
+| `DELETE /reorder-rules/{rule}` | `inventory.manage` | key | | `200` the Rule as it was (soft-deleted; its open `low` episode is closed by the evaluation this queues) | `404` |
 | `GET /reorder-list` | `inventory.view` | read | `?location_id=` | `200 {data: [{item, location \| null, available, min_qty, reorder_qty, consumption_7d, days_of_cover \| null, suggested_qty, state: low\|out}], generated_at}` (consumption = the last 7 local days of `production_consume`, `sale` and `waste` for the item; `days_of_cover = available / (consumption_7d / 7)`, null when there was none) | `403` |
 | `GET /stock-alerts` | `inventory.view` | read | `?active=1`, `?type=` | `200 {data: [{id, type, item, location \| null, active_since, cleared_at, available_at_start, threshold_qty}]}` | `403` |
 | `GET /stations/{station}/stock-strip` | `inventory.view` (assigned to the station, or `stations.all`) | read (polled, conditional) | `?limit=5` | `200 {location_id, data: [{item, unit, available, min_qty \| null, state: ok\|low\|out}]}`: the station location's ingredients, out first, then low, then by `available / min_qty` | `403 inventory.station.forbidden` |
@@ -420,7 +422,7 @@ and, in Phase 4, Analytics subscribe without importing a producer. All are dispa
 |---|---|---|---|
 | `StockChanged` (exists) | item, location, on_hand, reserved, available, movement_ids | Inventory `QueueBalanceEvaluation` (dispatches the job `EvaluateBalance`); Shared broadcast companion (exists, inert under `null`) | the listener: no (it only dispatches); the job `EvaluateBalance`: **yes**, `ShouldBeUniqueUntilProcessing` keyed (branch, item, location): it reads the current balance, not the payload, so a pending job already covers any number of newer events |
 | `StockOut` (new) | branch_id, item_id, location_id, item_name_en/am, location_name_en/am, item_kind, fulfilment, available, on_hand, reserved, alert_id, caused_by_user_id, station_id (the station that works from the place), production_station_id (the station that makes a product; null for an ingredient) | Production `CreateAutoRequest`; Notifications `NotifyStockOut` | **yes**, both |
-| `StockLow` (new, 2.6) | the same plus min_qty, reorder_qty, notify_roles | Notifications `NotifyStockLow` | yes |
+| `StockLow` (new, 2.6a) | the same plus min_qty, reorder_qty, notify_roles and `unit` (the base unit code the numbers are in); a branch-wide rule has `location_id` 0 and the place name "All places" | Notifications `NotifyStockLow` | yes |
 | `StockRecovered` (new) | item_id, location_id, type (`low \| out`), alert_id | Notifications `ClearStockDedupe` | yes |
 | `TransferRequested` (new) | transfer_id, item ids and names, from and to location ids and names, qty, unit, requested_by_user_id, production_request_id | Notifications `NotifyTransferRequested` (the store's users) | yes |
 | `TransferDecided` (new) | transfer_id, status, reject_reason, item and location names, qty, requested_by_user_id, decided_by_user_id | Notifications `NotifyTransferDecided` (the requester) | yes |
@@ -898,6 +900,36 @@ and 1.6a-c were in Phase 1.
    scheduled in `routes/console.php` (the `schedule:run` cron line already exists on the live host): it re-queues an
    evaluation for every balance that has an open episode or a live rule, so a lost job heals within the hour. The manifest
    names the group `feature` for this step; the module group is added because the evaluator is Inventory's.
+
+   **As built (step 2.6a, `phase-2/reorder-rules`).** Done as planned, with these differences and decisions (the plan left them open or the code was the fact):
+   - *Red before green, as run.* The tests went in first and failed for the right reason (a missing table, class, route, event key or text): the schema (6), the language parity (2), the endpoints (15), the evaluator (16), the
+     listener (9), the end-to-end dedupe (4), two texts, the seeded property test (30 seeds) and the forked race test (4 scenarios x 30 rounds). The registries (`route_permissions.php`, `write_endpoints.php`) went in with the red commit.
+   - *One writer of episodes.* A change to a rule (create over a low balance, a new minimum, switched off, deleted) does not write an episode: `ReorderRules` queues the unique `EvaluateBalance` of the balance the rule covers (its place, or the
+     lowest-numbered stock balance of the item for a branch-wide rule) after the commit, and `AlertEvaluator` opens or closes from the rule as it then stands. So "its open `low` episode is cleared" happens one queue tick later (up to a minute on the live
+     host), the same lag as every alert. Only a change that can move an episode queues (`min_qty`, `is_active`, delete, create); `reorder_qty` and `notify_roles` do not, and a PATCH that changes nothing writes no audit row and counts no version.
+   - *Hysteresis (open question 3): the default stands.* A `low` episode opens when `available <= min_qty` and closes when `available > min_qty`; every crossing is an episode and a notification. `AlertEvaluator::decideLow` is the pure rule the tests pin.
+   - *Rule changed mid-episode.* The episode is not tied to a rule version: each evaluation reads the live, active rule for the key. Raising the minimum over the current available opens an episode, lowering it below closes the open one, a new `reorder_qty` or role
+     list changes nothing already announced and is what the next episode carries; `threshold_qty` on the episode is the minimum when it opened. A deleted or switched-off rule closes its open episode (`StockRecovered`, type `low`); bringing a rule back while stock is
+     still low opens a new episode with a new alert id (and so a new inbox line).
+   - *Branch-wide rule.* The key is `location_key` 0. The number is the sum of `available` over the branch's stock places (never the cash drawer), the other places as committed and the evaluated place as locked. Every evaluation of a balance looks at both its
+     place key and key 0, so a branch-wide rule needs no job of its own. The event carries `location_id` 0, the names "All places" / "ሁሉም ቦታዎች" (`inventory.reorder.all_places`) and on_hand = available, reserved = 0 (the sum is not split). `LedgerReader::levelsOfItem` is
+     the new read (the stock tables are named nowhere outside the Ledger namespace).
+   - *`low` and `out` are independent.* One movement that takes a balance from fine to zero opens both (StockLow and StockOut each once); recovery closes each when its own level no longer holds. A rule with `min_qty = 0` is low exactly when it is out and tells people
+     twice (two types): allowed, since the plan's CHECK is `>= 0`; the admin who wants one alert uses no rule.
+   - *`StockLow` gains `unit`.* The text cannot say "4000 g" without it and Notifications may not import Catalog; it is the last constructor argument, so nothing that built a `StockLow` changes.
+   - *Recipients (`NotifyStockLow`).* The rule's `notify_roles` are the roles told (the literal `station` is not a role). A PRODUCT also goes to the people on duty at the station that makes it (else the station of the place) and every `production.confirm` holder, as a
+     stock-out does; an INGREDIENT goes to the station of the place only when the rule lists `station`, in the inbox only (not by push or Telegram) unless a role already reaches them. The plan sentence "and to the assigned users of the location's station" for an ingredient is
+     therefore conditional on the literal, which is what the seeded rules ("admin, manager and the station") say. Default roles when the field is left out: `config/notifications.php` `stock_low.notify_roles` (admin, manager).
+   - *Registry.* `stock_low`: severity `warning`, channels in-app, push and Telegram, inbox key `stock_low:{item}:{location}:{alert}` (one line per person and episode), gate `stock_low:{item}:{location}` (cleared by `StockRecovered` of type `low`; a stock-out never uses it up and a
+     recovery from `out` never re-arms it), deep link `/inventory?item=&location=`. `ClearStockDedupe` already built the key from the registry, so it needed only a comment.
+   - *Endpoints.* All four errors of `POST` are 422 as the plan's table lists them (`exists` could have been 409; the plan's cell groups them under 422). No `client_uuid`: the plan's body has none, the Idempotency-Key covers a retry and the unique live key covers a
+     second tap under a new key (`exists`). `min_qty` accepts zero (`DecimalString::rate()`), `reorder_qty` must be above zero, both are decimal strings in the item's base unit; `notify_roles` needs at least one entry when given. `GET /reorder-rules?location_id=0` lists the branch-wide
+     rules. The item must be live and kept in stock (not a made-to-order product), the place a live stock location of the branch (not the cash drawer).
+   - *Tests of ADR 0011.* Low then out then recovery tells low once and out once (end to end, sync queue); a direct fall to zero tells both once; every recovery re-arms; the gate of `low` and of `out` are apart; a redelivered `StockLow` writes one line per person; the rule changed,
+     switched off and deleted mid-episode; the claim is an INSERT (the statements are recorded: the only `FOR UPDATE` is on the balance row); the forked race (two evaluations, two closers, a movement against an evaluation, two places crossing one branch-wide minimum) announces once per
+     episode and the engine's deadlock counter does not move; `LowAlertEpisodePropertyTest` (30 seeds, `LOW_ALERT_SEED=<n>` replays one, the seed is printed) walks two balances through random movements, reservations and edits of a place rule and a branch-wide rule and checks one
+     open episode per kind and key, open exactly while the rule holds, and one event per crossing.
+   - *STATUS.* `inventory.reorder` is `in_progress` (2.6b completes it). Inventory and Notifications stay `stable`: CI's `mod-inventory` and `mod-notifications` are the evidence.
 7. **2.7 production** (`production`, groups `module:production`, `unit`, `feature`, `property`, `concurrency`), three PRs:
    - 2.7a foundations: migrations 15-17, `RequestStatus` and `BatchStatus` with exhaustive transition tables (request:
      `requested -> accepted | cancelled`, `accepted -> in_progress | cancelled`, `in_progress -> pending_confirmation | done`,

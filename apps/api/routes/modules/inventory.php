@@ -7,6 +7,7 @@ use App\Modules\Inventory\Http\Controllers\LedgerController;
 use App\Modules\Inventory\Http\Controllers\LocationsController;
 use App\Modules\Inventory\Http\Controllers\PurchasesController;
 use App\Modules\Inventory\Http\Controllers\RecipeCostsController;
+use App\Modules\Inventory\Http\Controllers\ReorderRulesController;
 use App\Modules\Inventory\Http\Controllers\StockController;
 use App\Modules\Inventory\Http\Controllers\SuppliersController;
 use App\Modules\Inventory\Http\Controllers\TransfersController;
@@ -27,6 +28,8 @@ use Illuminate\Support\Facades\Route;
  * transfers.confirm decide; the actions also check the person works at the destination's / source's station.
  *
  * Step 2.4b adds the recipe cost and margin read (costs.view): GET /inventory/recipe-costs/{product}.
+ *
+ * Step 2.6a adds reorder rules: the floor reads them (inventory.view); inventory.manage (admin) creates, changes and deletes them.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:inventory.view')->group(function (): void {
@@ -34,11 +37,15 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/stock', [StockController::class, 'index'])->name('inventory.stock.index');
         Route::get('/ledger', [LedgerController::class, 'index'])->name('inventory.ledger.index');
         Route::get('/transfers', [TransfersController::class, 'index'])->name('inventory.transfers.index');
+        Route::get('/reorder-rules', [ReorderRulesController::class, 'index'])->name('inventory.reorder-rules.index');
     });
 
     Route::middleware(['permission:inventory.manage', 'idempotency'])->group(function (): void {
         Route::post('/locations', [LocationsController::class, 'store'])->name('inventory.locations.store');
         Route::patch('/locations/{location}', [LocationsController::class, 'update'])->whereNumber('location')->name('inventory.locations.update');
+        Route::post('/reorder-rules', [ReorderRulesController::class, 'store'])->name('inventory.reorder-rules.store');
+        Route::patch('/reorder-rules/{rule}', [ReorderRulesController::class, 'update'])->whereNumber('rule')->name('inventory.reorder-rules.update');
+        Route::delete('/reorder-rules/{rule}', [ReorderRulesController::class, 'destroy'])->whereNumber('rule')->name('inventory.reorder-rules.destroy');
     });
 
     Route::middleware(['permission:inventory.adjust', 'idempotency'])->group(function (): void {

@@ -11,6 +11,10 @@ return [
             'title' => ':item አልቋል',
             'body' => 'በ:place ምንም አልቀረም።',
         ],
+        'stock_low' => [
+            'title' => 'እያለቀ ነው፡ :item',
+            'body' => 'በ:place :available ብቻ ቀርቷል (ዝቅተኛው :min)። :reorder ያዝዙ።',
+        ],
         'transfer_requested' => [
             'title' => 'ክምችት ተጠይቋል፡ :item',
             'body' => ':item፣ :qty :unit፣ ከ:from ወደ :to።',
