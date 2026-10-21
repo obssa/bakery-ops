@@ -62,6 +62,17 @@ function seedAppendOnlyRow(string $table): int
                 'user_id' => $user->id, 'payload' => json_encode(['probe' => true]), 'created_at' => now(),
             ]);
         })(),
+        'item_cost_history' => (function (): int {
+            $branch = Branch::factory()->create();
+            $user = User::factory()->create(['branch_id' => $branch->id]);
+
+            return DB::table('item_cost_history')->insertGetId([
+                'branch_id' => $branch->id,
+                'item_id' => Item::factory()->ingredient('g')->create(['branch_id' => $branch->id, 'created_by_user_id' => $user->id])->id,
+                'source' => 'purchase', 'purchase_line_id' => null, 'qty_before' => '0.0000', 'cost_before' => null, 'qty_in' => '1.0000',
+                'unit_cost_in' => '5.0000', 'cost_after' => '5.0000', 'user_id' => $user->id, 'acting_user_id' => null, 'created_at' => now(),
+            ]);
+        })(),
         default => throw new LogicException("seedAppendOnlyRow(): add a seed row for append-only table {$table}"),
     };
 }
@@ -72,6 +83,7 @@ function appendOnlyTamper(string $table): array
     return match ($table) {
         'stock_movements' => ['qty' => '2.0000'],
         'order_events' => ['event' => 'order.voided'],
+        'item_cost_history' => ['cost_after' => '9.0000'],
         default => ['action' => 'tampered'],
     };
 }
@@ -85,14 +97,14 @@ function triggerEvents(string $table): array
 }
 
 it('names the append-only tables in scripts/check_invariants.py', function () {
-    expect(appendOnlyTables())->toContain('audit_log', 'stock_movements', 'order_events');
+    expect(appendOnlyTables())->toContain('audit_log', 'stock_movements', 'order_events', 'item_cost_history');
 })->group('invariants');
 
 it('rejects UPDATE and DELETE on every append-only table that exists, at the database level', function () {
     $checked = 0;
     foreach (appendOnlyTables() as $table) {
         if (! Schema::hasTable($table)) {
-            continue; // arrives with its module (stock_movements 0.6, order_events 1.3a)
+            continue; // arrives with its module (stock_movements 0.6, order_events 1.3a, item_cost_history 2.2a)
         }
         $checked++;
         $id = seedAppendOnlyRow($table);
