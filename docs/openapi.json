@@ -2893,6 +2893,206 @@
                 }
             }
         },
+        "/v1/items/{item}/recipe/versions": {
+            "get": {
+                "operationId": "catalog.items.recipe.versions.index",
+                "tags": [
+                    "RecipeVersions"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "version": {
+                                                        "type": "integer"
+                                                    },
+                                                    "is_active": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "yield_qty": {
+                                                        "type": "string"
+                                                    },
+                                                    "yield_unit": {
+                                                        "type": "string"
+                                                    },
+                                                    "line_count": {
+                                                        "type": "integer"
+                                                    },
+                                                    "published_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "published_by": {
+                                                        "type": [
+                                                            "object",
+                                                            "null"
+                                                        ],
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "name": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "name"
+                                                        ]
+                                                    },
+                                                    "change_note": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "version",
+                                                    "is_active",
+                                                    "yield_qty",
+                                                    "yield_unit",
+                                                    "line_count",
+                                                    "published_at",
+                                                    "published_by",
+                                                    "change_note"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "catalog.items.recipe.versions.store",
+                "tags": [
+                    "RecipeVersions"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublishRecipeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/items/{item}/recipe/versions/{version}": {
+            "get": {
+                "operationId": "catalog.items.recipe.versions.show",
+                "tags": [
+                    "RecipeVersions"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/items/{item}/recipe": {
             "get": {
                 "operationId": "catalog.items.recipe.show",
@@ -2935,6 +3135,15 @@
                                                 "is_active": {
                                                     "type": "boolean"
                                                 },
+                                                "published_at": {
+                                                    "type": "null"
+                                                },
+                                                "published_by": {
+                                                    "type": "null"
+                                                },
+                                                "change_note": {
+                                                    "type": "null"
+                                                },
                                                 "yield_qty": {
                                                     "type": "null"
                                                 },
@@ -2975,6 +3184,9 @@
                                                 "product_item_id",
                                                 "version",
                                                 "is_active",
+                                                "published_at",
+                                                "published_by",
+                                                "change_note",
                                                 "yield_qty",
                                                 "yield_unit_id",
                                                 "yield_unit_code",
@@ -4733,6 +4945,86 @@
                     "created_at"
                 ],
                 "title": "MovementResource"
+            },
+            "PublishRecipeRequest": {
+                "type": "object",
+                "description": "POST /items/{item}/recipe/versions: the whole next recipe (the body of PUT /items/{item}/recipe) plus an optional change\nnote of at most 255 characters that says why the version was published.",
+                "properties": {
+                    "yield_qty": {
+                        "type": "string"
+                    },
+                    "yield_unit_id": {
+                        "type": "integer"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "ingredient_item_id": {
+                                    "type": "integer"
+                                },
+                                "qty": {
+                                    "type": "string"
+                                },
+                                "unit_id": {
+                                    "type": "integer"
+                                },
+                                "is_optional": {
+                                    "type": "boolean"
+                                },
+                                "waste_pct": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "ingredient_item_id",
+                                "qty",
+                                "unit_id"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 100,
+                        "uniqueItems": true
+                    },
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "text_en": {
+                                    "type": "string",
+                                    "maxLength": 2000
+                                },
+                                "text_am": {
+                                    "type": "string",
+                                    "maxLength": 2000
+                                }
+                            },
+                            "required": [
+                                "text_en",
+                                "text_am"
+                            ]
+                        },
+                        "maxItems": 50
+                    },
+                    "change_note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "yield_qty",
+                    "yield_unit_id",
+                    "lines"
+                ],
+                "title": "PublishRecipeRequest"
             },
             "PurchaseResource": {
                 "type": "array",

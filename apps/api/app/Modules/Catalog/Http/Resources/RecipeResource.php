@@ -9,6 +9,7 @@ use App\Modules\Catalog\Models\Item;
 use App\Modules\Catalog\Models\Recipe;
 use App\Modules\Catalog\Models\RecipeLine;
 use App\Modules\Catalog\Models\RecipeStep;
+use App\Modules\Identity\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,7 +29,7 @@ final class RecipeResource extends JsonResource
     {
         /** @var Recipe $recipe */
         $recipe = $this->resource;
-        $recipe->loadMissing(['lines', 'steps']);
+        $recipe->loadMissing(['lines', 'steps', 'publishedBy']);
         $units = app(Units::class);
         $yieldUnit = $units->resolve($recipe->yield_unit_id);
 
@@ -37,6 +38,9 @@ final class RecipeResource extends JsonResource
             'product_item_id' => $recipe->product_item_id,
             'version' => $recipe->version,
             'is_active' => $recipe->is_active,
+            'published_at' => $recipe->published_at?->toIso8601String(),
+            'published_by' => self::person($recipe->publishedBy),
+            'change_note' => $recipe->change_note,
             'yield_qty' => $recipe->yield_qty->toString(),
             'yield_unit_id' => $recipe->yield_unit_id,
             'yield_unit_code' => $yieldUnit->code,
@@ -68,6 +72,16 @@ final class RecipeResource extends JsonResource
     }
 
     /**
+     * A person as the versions list shows them: id and name, null when nobody published (version 1 made by PUT).
+     *
+     * @return array{id: int, name: string}|null
+     */
+    public static function person(?User $user): ?array
+    {
+        return $user === null ? null : ['id' => $user->id, 'name' => $user->name];
+    }
+
+    /**
      * The recipe of a bought-in product, in the same shape: sold as it comes, nothing to make.
      *
      * @return array<string, mixed>
@@ -79,6 +93,9 @@ final class RecipeResource extends JsonResource
             'product_item_id' => $product->id,
             'version' => null,
             'is_active' => true,
+            'published_at' => null,
+            'published_by' => null,
+            'change_note' => null,
             'yield_qty' => null,
             'yield_unit_id' => null,
             'yield_unit_code' => null,
