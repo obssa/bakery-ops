@@ -8,6 +8,7 @@ use App\Modules\Inventory\Contracts\Reservations;
 use App\Modules\Inventory\Contracts\ReserveLine;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\Transfer;
+use App\Modules\Notifications\Listeners\NotifyTransferDecided;
 use App\Shared\Events\StockChanged;
 use App\Shared\Events\TransferDecided;
 use App\Shared\Models\Branch;
@@ -116,7 +117,7 @@ it('announces the change of both balances once each, and queues only the stock e
     ($this->confirm)($transfer)->assertOk();
 
     Event::assertDispatchedTimes(StockChanged::class, 2);
-    assertNothingQueuedButStockEvaluation();
+    assertNothingQueuedButStockEvaluation([NotifyTransferDecided::class]);
 })->group('module:inventory', 'feature');
 
 it('refuses a confirm for more than the source has available: 409, nothing written, the row stays requested', function () {

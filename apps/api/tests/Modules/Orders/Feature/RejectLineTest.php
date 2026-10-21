@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Orders\Enums\RejectReason;
+use App\Modules\Notifications\Listeners\NotifyLineRejected;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
 use App\Modules\Orders\Models\OrderLine;
@@ -243,5 +244,5 @@ it('dispatches LineRejected once, after the commit, with the reason, to the owne
         ->and($companions[0]->broadcastAs())->toBe('line_rejected')
         ->and($companions[0]->broadcastWith()['payload']['reason'])->toBe('out_of_stock')
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    assertNothingQueuedButStockEvaluation();
+    assertNothingQueuedButStockEvaluation([NotifyLineRejected::class]);
 })->group('module:orders', 'feature');

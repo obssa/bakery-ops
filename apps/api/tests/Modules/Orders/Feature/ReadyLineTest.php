@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Notifications\Listeners\NotifyLineReady;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
 use App\Modules\Orders\Models\OrderLine;
@@ -197,7 +198,7 @@ it('readies in one database transaction: the line, the order, the timeline, the 
 
     $f->act('ready', $this->sandwich['id'], $f->chef)->assertOk();
 
-    $readyWrites = collect($writes)->reject(fn (array $w): bool => $w[0] === 'idempotency_keys');
+    $readyWrites = collect($writes)->reject(fn (array $w): bool => in_array($w[0], ['idempotency_keys', 'notifications', 'notification_dedupe'], true)); // the owner's inbox line is written after the commit by the queued listener (run inline here), in its own transaction
     expect($readyWrites->pluck(0)->unique()->sort()->values()->all())
         ->toBe(['audit_log', 'order_events', 'order_lines', 'orders', 'stock_balances', 'stock_movements'])
         ->and($readyWrites->pluck(1)->contains(null))->toBeFalse('no write of the ready runs outside a transaction')
@@ -255,5 +256,5 @@ it('dispatches LineReady once, after the commit, with its companion on the owner
         ->and($companions[0]->broadcastAs())->toBe('line_ready')
         ->and($companions[0]->broadcastWith()['payload']['order_no'])->toBe($this->order['order_no'])
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    assertNothingQueuedButStockEvaluation();
+    assertNothingQueuedButStockEvaluation([NotifyLineReady::class]);
 })->group('module:orders', 'feature');

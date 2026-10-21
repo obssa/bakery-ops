@@ -62,7 +62,7 @@ beforeEach(function () {
     /** run every queued listener the fake caught, as a worker would */
     $this->drain = function (): void {
         foreach (Queue::pushed(CallQueuedListener::class) as $job) {
-            $job->handle(app());
+            app($job->class)->{$job->method}(...$job->data);
         }
     };
 });

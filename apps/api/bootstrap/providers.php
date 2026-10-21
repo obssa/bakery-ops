@@ -4,6 +4,7 @@ use App\Modules\Audit\AuditServiceProvider;
 use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Identity\IdentityServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
+use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
 use App\Providers\AppServiceProvider;
@@ -17,5 +18,6 @@ return [
     CatalogServiceProvider::class,
     InventoryServiceProvider::class,
     OrdersServiceProvider::class,
+    NotificationsServiceProvider::class,
     PaymentsServiceProvider::class,
 ];

@@ -25,6 +25,7 @@ use App\Shared\Tenancy\CurrentBranch;
 use Brick\Math\BigDecimal;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Broadcasting\BroadcastManager;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -351,11 +352,19 @@ if (! function_exists('assertNothingQueuedButStockEvaluation')) {
     /**
      * What `Queue::assertNothingPushed()` meant for the live-update tests (a broadcast companion queues nothing under
      * BROADCAST_CONNECTION=null), now that every stock change legitimately queues Inventory's EvaluateBalance (step 2.1,
-     * ADR 0011): nothing else may have been pushed.
+     * ADR 0011): nothing else may have been pushed. The Notifications listeners are queued too (step 2.5a): a test whose
+     * action legitimately tells somebody names the listeners it expects, and no other queued listener may appear.
+     *
+     * @param  list<class-string>  $listeners  the queued listeners the action is expected to have pushed
      */
-    function assertNothingQueuedButStockEvaluation(): void
+    function assertNothingQueuedButStockEvaluation(array $listeners = []): void
     {
-        $others = array_values(array_diff(array_keys(Queue::pushedJobs()), [EvaluateBalance::class]));
-        expect($others)->toBe([], 'a job other than the stock evaluation was queued');
+        $others = array_values(array_diff(array_keys(Queue::pushedJobs()), [EvaluateBalance::class, CallQueuedListener::class]));
+        expect($others)->toBe([], 'a job other than the stock evaluation and the expected listeners was queued');
+
+        $queued = Queue::pushed(CallQueuedListener::class)->map(fn (CallQueuedListener $job): string => $job->class)->sort()->values()->all();
+        $expected = $listeners;
+        sort($expected);
+        expect($queued)->toBe($expected, 'the queued listeners are not the expected ones');
     }
 }

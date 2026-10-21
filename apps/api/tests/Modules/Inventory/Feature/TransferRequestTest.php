@@ -6,6 +6,7 @@ use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\Transfer;
+use App\Modules\Notifications\Listeners\NotifyTransferRequested;
 use App\Shared\Events\TransferRequested;
 use App\Shared\Models\Branch;
 use Illuminate\Support\Facades\DB;
@@ -211,7 +212,7 @@ it('queues nothing but a stock evaluation', function () {
 
     ($this->post)(($this->flourForCakeRoom)())->assertCreated();
 
-    assertNothingQueuedButStockEvaluation();
+    assertNothingQueuedButStockEvaluation([NotifyTransferRequested::class]);
 })->group('module:inventory', 'feature');
 
 it('lists the transfers of the branch newest first, and filters by status, either end, the requester and the production request', function () {

@@ -1,6 +1,6 @@
 # ADR 0011: Stock alerts fire once per episode, and queued work acts as the person who caused it
 
-- Status: accepted (Phase 2, step 2.1); the Notifications half is added when it is built (step 2.5)
+- Status: accepted (Phase 2, step 2.1); the Notifications half was added when it was built (step 2.5a, decision 5)
 - Date: 2026-10-21
 - Phase: 2
 
@@ -34,10 +34,30 @@ no request and so no actor; and a queued listener cannot be made unique, while a
    No system user exists. `caused_by_user_id` on the episode and on `StockOut` is the person who physically did it (the
    acting user when there is one), and every row and event produced downstream of the alert is written as that person.
    A balance nothing ever moved has no one to act as and nothing to evaluate: the job does nothing.
-5. **Notifications keeps its own gate** (added in step 2.5, `notification_dedupe`): Notifications imports no producer
+5. **Notifications keeps its own gate** (step 2.5a, `notification_dedupe`): Notifications imports no producer
    (dependency-graph.md, cycle 7) and must be correct however often an event is redelivered or by whom it is produced.
    Inventory's table decides when an episode starts; Notifications' decides whether people have already been told about
    it, and clears on `StockRecovered`.
+   - *Key.* `stock_out:{item}:{location}` (the manifest's item, location, type), built from the event payload by the type
+     registry (`config/notifications.php`). `is_active` is 1 while the gate is closed to repeats and NULL once cleared, with the
+     unique key `(branch_id, dedupe_key, is_active)`, the same technique as the episodes: any number of cleared rows and one
+     active one, on both engines, no partial index.
+   - *A claim is one INSERT.* `Dedupe::claim` is `insertOrIgnore`: the unique key picks one winner when two deliveries race, and
+     nothing reads first or takes `SELECT ... FOR UPDATE` on a row that may not exist (traps.md, "First-row race"; the test
+     records the statements). `Dedupe::clear` closes the active row and keeps it as history.
+   - *Inbox line and gate in one transaction.* `Notifier::send` claims the gate and writes every recipient's inbox line in one
+     transaction, so a failed attempt leaves no gate behind and a retry is not held back. Nobody to tell claims nothing. A gate
+     claimed by a redelivery that wrote no new line (every line already existed) is given back, so a stale redelivery of an
+     old episode cannot swallow the next one.
+   - *The inbox line is keyed per episode.* `stock_out:{item}:{location}:{alert}` is the unique `(user_id, dedupe_key)` of the
+     line, so a redelivery writes one line per person and the next episode, after recovery, is a new line. The two layers are
+     different questions: the gate asks "were we already told about this run-out?", the line key "do I already have this
+     event?".
+   - *The actor of the listener.* Inventory's `RestoresActor` reads Inventory's ledger and Notifications may not import it, so
+     Notifications' own `Support\EventScope` resolves the event's branch and runs the listener as the person the event names
+     (`caused_by_user_id` for a stock-out, the maker of a line, the decider of a transfer) through `ActorContext::runAs`, putting
+     back exactly what the worker had. The inbox is not an actor-stamped table, so the person lands in
+     `payload.caused_by_user_id`.
 
 ## Consequences
 
