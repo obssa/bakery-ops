@@ -545,6 +545,46 @@ and 1.6a-c were in Phase 1.
      `SaveDraft` / `ReplaceLines`, `CancelPurchase`, suppliers, the cost reads and the opening cost. Registries: twelve rows
      in `route_permissions.php`, seven in `write_endpoints.php` (the GETs are reads). Groups add `feature`. Ends with `gate_check --mode module
      --module inventory`; the module stays `stable`, STATUS `inventory.purchases: done`.
+   **As built (step 2.2a, `phase-2/purchases-schema`).** Done as planned, with these differences and decisions:
+   - *Red first, as run.* The lint selftest (planted `decimal('unit_cost', 12, 2)` expected to be caught as a cost rate, and
+     `moving_avg_cost` / `cost_before` expected not to be flagged) and four `NumericColumnsTest` cases failed against the old rule; the
+     second commit changes the rule in the three places (`scripts/check_invariants.py`, its copy under the skill, the test) plus
+     `invariants.md`, ADR 0004 (note of 2026-10-21) and `invariants_version: 2`. The schema, cost-ledger, unit and race tests were
+     committed red (a missing class or table each) before any code.
+   - *The rule is by word, not by suffix.* A decimal column whose name has the word `cost` (`(^|_)cost(_|$)`) and does not end `_total`
+     is a rate and must be `DECIMAL(14,4)`; `unit_cost_base` and `cost_after` are caught by this, which `*_cost` / `cost_*` alone would
+     miss. `cost_total` and `line_total` stay money. The old `cost` in the money pattern is gone.
+   - *`UnitCost`* (`App\Shared\Values`, with `UnitCostCast`): `of`, `zero`, `times(Quantity, ?currency): Money` (half-up to 2 dp once),
+     `dividedBy` / `multipliedBy` (half-up to 4 dp, for unit conversion in 2.2b), comparisons. It refuses a negative rate and a value
+     over ten integer digits (`NumericOverflow`).
+   - *`CostLedger` runs after the movements.* The plan's order (`Ledger::appendMany` once, then `CostLedger`) means the stock it reads
+     already holds the receipts, so `old_qty` = the item's total `on_hand` minus the receipts' quantity; fewer than the receipts is a
+     `LogicException` ("write the movements first"). API: `receive(itemId, list<CostReceipt>)` and
+     `receiveMany(array<itemId, list<CostReceipt>>)` (what `ConfirmPurchase` calls: it sorts by item id and takes every lock before
+     writing anything), each receipt giving one `CostStep` and one `item_cost_history` row. `CostReceipt` carries the base-unit
+     quantity, the per-base-unit rate, the purchase line id and the currency; a currency other than the one the average is kept in
+     is `CurrencyMismatch`.
+   - *`Ledger::lockItems(list<int>)`* is new: only the `Ledger` namespace may name `stock_balances` (`LedgerIsSoleWriterTest`), so the
+     read-and-lock of "every balance row of these items, ascending `(item_id, location_id)`, total `on_hand` per item" lives there
+     and `CostLedger` calls it, then locks `item_costs` ascending `item_id`. Both refuse to run outside a transaction.
+   - *A missing `item_costs` row is the unvalued state.* No placeholder row is written. Two first purchases of one new item are
+     serialised by the balance locks taken first (the item has a balance row by then), so the `item_costs` insert cannot collide.
+   - *Constraints added beyond the plan's list:* `item_costs` CHECK `moving_avg_cost >= 0 AND qty_basis >= 0`; `item_cost_history`
+     CHECK on `source`; `purchase_lines` keeps the plan's two CHECKs only. `purchase_lines.movement_id` is a real foreign key to
+     `stock_movements`; `item_cost_history.purchase_line_id` to `purchase_lines`.
+   - *Models and factories:* `Supplier`, `PurchaseLine` soft-delete; `Purchase`, `ItemCost`, `ItemCostHistory` are allow-listed in
+     `SoftDeletesTest` with their reasons; `ItemCostHistory` refuses update and delete in the model (`CostHistoryIsAppendOnly`) as
+     the triggers do in the database, and `item_cost_history` joined `APPEND_ONLY_TABLES` (`AppendOnlyTest` seeds and tampers it).
+     `Locations::store()` is the first store by id, null when the branch has none. Suppliers have no `_en/_am` pair.
+   - *Known, not changed:* two processes creating the same missing `(item, location)` balance row in the same instant can deadlock
+     in the ledger's `insert ignore` (first movement of an item at a place). It predates this step; the race test therefore stocks
+     each item at the store first. It matters only for two simultaneous first-ever purchases of one new item.
+   - *Tests:* `UnitCostTest`, `MovingAverageTest` (16 table cases incl. rounding edges), `MovingAveragePropertyTest` (300 seeds,
+     exact `BigRational` oracle, rerun one with `MOVING_AVERAGE_SEED`), `PurchaseStatusTest` (+ the exhaustive table), `PurchasesSchemaTest`,
+     `PurchaseModelsTest`, `CostLedgerTest`, `LedgerLockItemsTest`, `LocationsStoreTest`, and `tests/Gate/CostLedgerRaceTest.php`
+     (forked processes, groups `concurrency`, `module:inventory`; it fails without either lock). Run locally: those files, Arch,
+     `NumericColumnsTest`, `AppendOnlyTest`, `BranchIdTest`, PHPStan and Pint; CI's `mod-inventory` is the rest of the evidence.
+
 3. **2.3 transfers** (`inventory.transfers`, groups `module:inventory`, `concurrency`): the transfer cases appended to
    `Contract/Production/InventoryContractTest.php` first (red), then migration 8, `TransferStatus` (exhaustive table),
    `Contracts\Transfers` (`request`, `confirm`, `reject`, final class built per use), `RequestTransfer`, `ConfirmTransfer`
