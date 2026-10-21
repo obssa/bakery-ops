@@ -27,7 +27,7 @@ use Database\Seeders\Phase0Seeder;
  * every line is multiplied once, in base units, and the card shows exactly the version and steps that were scaled; the
  * batch size I propose is always a positive number; I find the station that makes a product, which is not always the
  * station its order lines go to". It runs in Catalog's CI job (mod-catalog) for the life of the project. The case that a
- * published version 2 leaves version 1 readable and scaled as before is added at step 2.4, before the code that publishes.
+ * published version 2 leaves version 1 readable and scaled as before was added at step 2.4a, before the code that publishes.
  */
 
 beforeEach(function () {
@@ -185,4 +185,41 @@ it('finds the producing station: the cake room for a cake that has no order rout
         ->and($this->routing->productionStationFor($sandwich)?->id)->toBe($this->kitchen->id, 'no production_station_id: the station its lines route to')
         ->and($this->routing->productionStationFor($water))->toBeNull('a bought-in product is not produced')
         ->and($this->routing->productionStationFor(($this->ingredient)()))->toBeNull('an ingredient is not produced');
+})->group('contract:production->catalog', 'contract');
+
+it('keeps version 1 readable and scaled as it was after version 2 is published, with exactly one version active', function () {
+    $flour = ($this->ingredient)('g', 'Flour');
+    $milk = ($this->ingredient)('ml', 'Milk');
+    $rolls = ($this->product)('pcs');
+    $v1 = ($this->recipeFor)($rolls, '40', 'pcs', [[$flour, '2500', 'g', []], [$milk, '750', 'ml', ['waste_pct' => '2.00']]], [1 => ['Mix.', 'ቀላቅሉ።']]);
+    $before = $this->recipes->version($rolls, 1);
+    $scaledBefore = $this->recipes->scaled($rolls, '60');
+    expect($scaledBefore?->version)->toBe(1);
+
+    // Production only ever sees what Catalog publishes: version 2 goes in through the same endpoint the admin uses
+    loginAs(makeUser($this->branch, 'admin'));
+    $this->withHeaders(idempotencyKey())->postJson("/api/v1/items/{$rolls->id}/recipe/versions", [
+        'yield_qty' => '40', 'yield_unit_id' => catalogUnit('pcs')->id, 'change_note' => 'More flour',
+        'lines' => [
+            ['ingredient_item_id' => $flour->id, 'qty' => '3000', 'unit_id' => catalogUnit('g')->id],
+            ['ingredient_item_id' => $milk->id, 'qty' => '750', 'unit_id' => catalogUnit('ml')->id],
+        ],
+        'steps' => [['text_en' => 'Mix longer.', 'text_am' => 'ረዘም አድርገው ቀላቅሉ።']],
+    ])->assertCreated()->assertJsonPath('version', 2);
+
+    $after = $this->recipes->version($rolls, 1);
+    expect($after)->not->toBeNull()
+        ->and($after)->toEqual($before)
+        ->and($after?->recipeId)->toBe($v1->id)
+        ->and($this->recipes->activeFor($rolls)?->version)->toBe(2)
+        ->and($this->recipes->version($rolls, 2)?->recipeId)->toBe($this->recipes->activeFor($rolls)?->recipeId)
+        ->and(Recipe::query()->where('product_item_id', $rolls->id)->where('is_active', true)->count())->toBe(1)
+        ->and(Recipe::query()->where('product_item_id', $rolls->id)->count())->toBe(2);
+
+    // the new version is what a card is made from now; version 1 scaled by hand is what it was
+    $scaledNow = $this->recipes->scaled($rolls, '60');
+    expect($scaledNow?->version)->toBe(2)
+        ->and(collect($scaledNow?->lines)->firstWhere('ingredientItemId', $flour->id)?->qty->toString())->toBe('4500.0000')
+        ->and(collect($scaledBefore?->lines)->firstWhere('ingredientItemId', $flour->id)?->qty->toString())->toBe('3750.0000')
+        ->and($this->recipes->version($rolls, 3))->toBeNull();
 })->group('contract:production->catalog', 'contract');

@@ -337,6 +337,35 @@ return [
         ],
     ],
     [
+        'method' => 'POST',
+        'uri' => '/api/v1/items/{item}/recipe/versions',
+        'module' => 'catalog',
+        'table' => 'recipes',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $flour = Item::factory()->ingredient('kg')->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'sku' => 'IDEM-PUBLISH-FLOUR']);
+            $bread = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+            // version 1, as PUT /items/{item}/recipe makes it: a publish needs a base to change
+            $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->putJson("/api/v1/items/{$bread->id}/recipe", [
+                'yield_qty' => '40', 'yield_unit_id' => catalogUnit('pcs')->id,
+                'lines' => [['ingredient_item_id' => $flour->id, 'qty' => '5', 'unit_id' => catalogUnit('kg')->id]],
+            ])->assertCreated();
+
+            return ['{item}' => (string) $bread->id];
+        },
+        // one kilogram more flour than version 1: a changed recipe, so a new version is the one row that grows
+        'payload' => fn (): array => [
+            'yield_qty' => '40',
+            'yield_unit_id' => catalogUnit('pcs')->id,
+            'lines' => [[
+                'ingredient_item_id' => Item::query()->where('sku', 'IDEM-PUBLISH-FLOUR')->latest('id')->firstOrFail()->id,
+                'qty' => '6',
+                'unit_id' => catalogUnit('kg')->id,
+            ]],
+            'change_note' => 'More flour',
+        ],
+    ],
+    [
         'method' => 'PUT',
         'uri' => '/api/v1/items/{item}/stations',
         'module' => 'catalog',
