@@ -5,10 +5,13 @@ declare(strict_types=1);
 use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Catalog\Models\Recipe;
+use App\Modules\Inventory\Contracts\Reservations;
+use App\Modules\Inventory\Contracts\ReserveLine;
 use App\Modules\Production\Enums\BatchStatus;
 use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
 use App\Shared\Models\Branch;
+use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\CommitsForConcurrency;
@@ -209,7 +212,7 @@ it('never takes reserved stock: a confirm racing a reservation of the last of an
             ($this->settings)();
             withActor($this->f->cashier->id);
             try {
-                app(\App\Modules\Inventory\Contracts\Reservations::class)->reserve([new \App\Modules\Inventory\Contracts\ReserveLine($flour->id, '1000', $this->f->cakeRoom->id)], $ref);
+                app(Reservations::class)->reserve([new ReserveLine($flour->id, '1000', $this->f->cakeRoom->id)], $ref);
 
                 return ['status' => 200, 'message_key' => null];
             } catch (Throwable $e) {
@@ -225,7 +228,7 @@ it('never takes reserved stock: a confirm racing a reservation of the last of an
             ? $level->on_hand === '0.0000' && $level->reserved === '0.0000'
             : $level->on_hand === '1000.0000' && $level->reserved === '1000.0000';
         $oracle = ledgerOracle($this->branch->id);
-        if (! $consistent || $oracle['balances'] !== $oracle['movements'] || \Brick\Math\BigDecimal::of($level->on_hand)->isLessThan($level->reserved)) {
+        if (! $consistent || $oracle['balances'] !== $oracle['movements'] || BigDecimal::of($level->on_hand)->isLessThan($level->reserved)) {
             $failures[] = "round {$round}: ".json_encode($results).", on_hand {$level->on_hand}, reserved {$level->reserved}";
         }
     }
