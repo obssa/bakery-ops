@@ -36,6 +36,7 @@ function costRaceDeadlocks(): int
 }
 
 beforeEach(function () {
+    seedRoles();
     $this->branch = actInBranch(Branch::factory()->create());
     $this->user = makeUser($this->branch, 'admin');
     withActor($this->user->id);

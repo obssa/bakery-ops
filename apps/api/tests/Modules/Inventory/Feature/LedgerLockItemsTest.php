@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
  */
 
 beforeEach(function () {
+    seedRoles();
     $this->branch = actInBranch(Branch::factory()->create());
     withActor(makeUser($this->branch, 'admin')->id);
     $this->store = stockLocation($this->branch, LocationType::Store);

@@ -19,6 +19,7 @@ use App\Shared\Values\UnitCost;
  */
 
 beforeEach(function () {
+    seedRoles();
     $this->branch = actInBranch(Branch::factory()->create());
     withActor(makeUser($this->branch, 'admin')->id);
 });
