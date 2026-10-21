@@ -14,7 +14,7 @@ use Illuminate\Support\Arr;
 const TRANSFER_MESSAGE_KEYS = [
     'inventory.transfer.same_location', 'inventory.transfer.item_not_stockable', 'inventory.transfer.location_unknown',
     'inventory.transfer.destination_forbidden', 'inventory.transfer.source_forbidden', 'inventory.transfer.insufficient',
-    'inventory.transfer.confirmed', 'inventory.transfer.rejected',
+    'inventory.transfer.confirmed', 'inventory.transfer.rejected', 'inventory.transfer.qty_too_large', 'inventory.transfer.qty_too_small',
 ];
 
 it('has an English and an Amharic text for every transfer message, with the same keys in both files', function () {
