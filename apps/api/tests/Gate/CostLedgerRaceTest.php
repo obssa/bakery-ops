@@ -7,6 +7,9 @@ use App\Modules\Inventory\Costs\CostLedger;
 use App\Modules\Inventory\Costs\CostReceipt;
 use App\Modules\Inventory\Costs\MovingAverage;
 use App\Modules\Inventory\Enums\LocationType;
+use App\Modules\Inventory\Ledger\Ledger;
+use App\Modules\Inventory\Ledger\MovementIntent;
+use App\Modules\Inventory\Ledger\MovementReason;
 use App\Shared\Models\Branch;
 use App\Shared\Values\Quantity;
 use Illuminate\Support\Facades\DB;
@@ -47,11 +50,13 @@ beforeEach(function () {
     $this->confirm = fn (array $byItem): Closure => function () use ($byItem): string {
         DB::statement(DB::getDriverName() === 'pgsql' ? "set lock_timeout = '10s'" : 'set session innodb_lock_wait_timeout = 10');
         DB::transaction(function () use ($byItem): void {
+            $intents = [];
             $receipts = [];
             foreach ($byItem as $itemId => [$qty, $cost]) {
-                stockIn($itemId, $this->store, $qty);
+                $intents[] = MovementIntent::of($itemId, $this->store->id, $qty, MovementReason::PurchaseIn, 'test');
                 $receipts[$itemId] = [new CostReceipt($qty, $cost)];
             }
+            app(Ledger::class)->appendMany($intents);   // one batch, as ConfirmPurchase writes the lines
             app(CostLedger::class)->receiveMany($receipts);
         }, 1);
 
@@ -65,8 +70,11 @@ it('serializes two cost updates for one item: the history is a chain and the ave
 
     foreach (range(1, 20) as $round) {
         $item = Item::factory()->ingredient('g')->create(['branch_id' => $this->branch->id]);
-        // some unvalued stock on hand first, so the first purchase of the round has a quantity before it too
+        // some unvalued stock on hand first, so the first purchase of the round has a quantity before it too. It sits in
+        // two places, so both balance rows exist: two processes creating the same missing balance row at the same
+        // moment is the Ledger's own first-movement race (insert ignore), not what this test is about
         stockIn($item, $this->kitchen, '7');
+        stockIn($item, $this->store, '3');
 
         $results = Forks::together([
             ($this->confirm)([$item->id => ['10', '5']]),
@@ -85,16 +93,16 @@ it('serializes two cost updates for one item: the history is a chain and the ave
             continue;
         }
         [$first, $second] = $history;
-        // the first one to run saw the 7 unvalued units and no cost; the second saw the first's quantity and average
-        $chained = $first->qty_before === '7.0000' && $first->cost_before === null
+        // the first one to run saw the 10 unvalued units and no cost; the second saw the first's quantity and average
+        $chained = $first->qty_before === '10.0000' && $first->cost_before === null
             && $second->qty_before === Quantity::of($first->qty_before)->plus($first->qty_in)->toString() && $second->cost_before === $first->cost_after;
         if (! $chained) {
             $failures[] = "round {$round}: history is not a chain: ".json_encode($history);
         }
         $expected = MovingAverage::next($second->qty_before, $second->cost_before, $second->qty_in, $second->unit_cost_in)->toString();
         $row = DB::table('item_costs')->where('item_id', $item->id)->first();
-        if ($row === null || $row->moving_avg_cost !== $expected || $row->moving_avg_cost !== $second->cost_after || $row->qty_basis !== '47.0000' || (int) $row->version !== 2) {
-            $failures[] = "round {$round}: item_costs ".json_encode($row)." expected {$expected} over 47.0000, version 2";
+        if ($row === null || $row->moving_avg_cost !== $expected || $row->moving_avg_cost !== $second->cost_after || $row->qty_basis !== '50.0000' || (int) $row->version !== 2) {
+            $failures[] = "round {$round}: item_costs ".json_encode($row)." expected {$expected} over 50.0000, version 2";
         }
     }
 
@@ -108,6 +116,8 @@ it('never deadlocks when two purchases of the same two items name them in opposi
     foreach (range(1, 20) as $round) {
         $a = Item::factory()->ingredient('g')->create(['branch_id' => $this->branch->id]);
         $b = Item::factory()->ingredient('g')->create(['branch_id' => $this->branch->id]);
+        stockIn($a, $this->store, '1');   // the balance rows exist, see above
+        stockIn($b, $this->store, '1');
         $results = Forks::together([
             ($this->confirm)([$a->id => ['10', '2'], $b->id => ['10', '3']]),
             ($this->confirm)([$b->id => ['5', '4'], $a->id => ['5', '6']]),

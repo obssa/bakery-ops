@@ -186,6 +186,53 @@ final class Ledger
     }
 
     /**
+     * Lock every stock_balances row of the given items, across all their locations, for the rest of the caller's
+     * transaction, in ascending (item_id, location_id) order (the first half of the system-wide lock order: balances, then
+     * item_costs ascending item_id), and answer each item's total on_hand over those locations. An item that never moved
+     * has no row to lock and totals zero. The cost core reads the quantity the moving average is taken over through this
+     * (Costs\CostLedger); reserved stock is on hand and counts. Nothing is written.
+     *
+     * @param  list<int>  $itemIds
+     * @return array<int, Quantity> total on_hand per item id, ascending by item id
+     *
+     * @throws InvalidMovement an item that is not a live item of this branch
+     * @throws LogicException outside a transaction (a lock released at once protects nothing)
+     */
+    public function lockItems(array $itemIds): array
+    {
+        if ($itemIds === []) {
+            return [];
+        }
+        if ($this->connection()->transactionLevel() === 0) {
+            throw new LogicException('Ledger::lockItems() holds row locks for the rest of a transaction: call it inside one.');
+        }
+        $ids = array_values(array_unique(array_map(static fn (int $id): int => $id, $itemIds)));
+        sort($ids);
+
+        $branches = Item::query()->whereKey($ids)->pluck('branch_id', 'id')->all();
+        $current = $this->branch->idOrNull();
+        foreach ($ids as $id) {
+            if (! isset($branches[$id]) || ($current !== null && (int) $branches[$id] !== $current)) {
+                throw InvalidMovement::because("item {$id} is not a live item of this branch");
+            }
+        }
+
+        $totals = array_fill_keys($ids, Quantity::zero());
+        $rows = StockBalance::query()
+            ->withoutGlobalScope(BranchScope::class)
+            ->whereIn('item_id', $ids)
+            ->orderBy('item_id')
+            ->orderBy('location_id')
+            ->lockForUpdate()
+            ->get();
+        foreach ($rows as $row) {
+            $totals[$row->item_id] = $totals[$row->item_id]->plus($row->on_hand);
+        }
+
+        return $totals;
+    }
+
+    /**
      * @param  array<string, array{0: int, 1: int}>  $pairs
      * @param  array<string, int>  $branches  branch id per pair
      * @return array<string, StockBalance> keyed by Ledger::key(), ascending (item_id, location_id)

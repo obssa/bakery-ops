@@ -18,7 +18,8 @@ use App\Shared\Models\Station;
  *     product without a station (display-case cakes and bread, bottled drinks) on the branch's display case;
  *   - forStation: the live location the station works from, the one of the station's own type when it has several
  *     (the till works from the display case, never from the cash drawer); else its only stock location; else null;
- *   - displayCase: the branch's display case (the first, should there be several).
+ *   - displayCase: the branch's display case (the first, should there be several);
+ *   - store: the branch's store, where a purchase is received (the first, should there be several; step 2.2a).
  * Reads go through the branch-scoped Location model, so another branch's location is never an answer. Null means the
  * branch has not set the location up: Orders refuses the line rather than reserve somewhere else.
  */
@@ -53,6 +54,12 @@ final class Locations
     public function displayCase(): ?Location
     {
         return Location::query()->where('type', LocationType::DisplayCase->value)->orderBy('id')->first();
+    }
+
+    /** The branch's store, where a purchase is received; null when the branch has not set one up. */
+    public function store(): ?Location
+    {
+        return Location::query()->where('type', LocationType::Store->value)->orderBy('id')->first();
     }
 
     /**

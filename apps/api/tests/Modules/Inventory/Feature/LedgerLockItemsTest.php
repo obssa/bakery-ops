@@ -6,10 +6,12 @@ use App\Modules\Catalog\Models\Item;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Ledger\InvalidMovement;
 use App\Modules\Inventory\Ledger\Ledger;
+use App\Modules\Inventory\Ledger\MovementIntent;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Shared\Models\Branch;
 use App\Shared\Values\Quantity;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /*
  * Ledger::lockItems (step 2.2a): the cost core needs an item's total on_hand across the branch's locations, read under
@@ -45,7 +47,7 @@ it('sums on_hand across locations per item, keyed by item id ascending, zero for
 
 it('counts on_hand, not available: a reservation does not take stock out of the average', function () {
     stockIn($this->a, $this->store, '10');
-    app(Ledger::class)->append(App\Modules\Inventory\Ledger\MovementIntent::of($this->a->id, $this->store->id, '4', MovementReason::Reservation, 'test', null, 'ref-1'));
+    app(Ledger::class)->append(MovementIntent::of($this->a->id, $this->store->id, '4', MovementReason::Reservation, 'test', null, (string) Str::uuid()));
 
     $totals = DB::transaction(fn () => app(Ledger::class)->lockItems([$this->a->id]));
 

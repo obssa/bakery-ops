@@ -12,6 +12,8 @@ use App\Modules\Inventory\Ledger\InvalidMovement;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\ItemCost;
 use App\Modules\Inventory\Models\ItemCostHistory;
+use App\Modules\Inventory\Models\Purchase;
+use App\Modules\Inventory\Models\PurchaseLine;
 use App\Shared\Models\Branch;
 use App\Shared\Values\CurrencyMismatch;
 use App\Shared\Values\UnitCost;
@@ -97,19 +99,24 @@ it('counts the item on hand across every location of the branch, not only where 
 })->group('module:inventory', 'feature');
 
 it('applies several receipts for one item in order, each seeing what the earlier ones added', function () {
-    $steps = DB::transaction(function () {
+    $purchase = Purchase::factory()->create(['branch_id' => $this->branch->id]);
+    [$l1, $l2, $l3] = array_map(
+        fn (): int => PurchaseLine::factory()->create(['branch_id' => $this->branch->id, 'purchase_id' => $purchase->id, 'item_id' => $this->flour->id])->id,
+        [1, 2, 3],
+    );
+    $steps = DB::transaction(function () use ($l1, $l2, $l3) {
         stockIn($this->flour, $this->store, '10');
         stockIn($this->flour, $this->store, '10');
         stockIn($this->flour, $this->store, '10');
 
         return $this->costs->receive($this->flour->id, [
-            new CostReceipt('10', '2', 11), new CostReceipt('10', '4', 12), new CostReceipt('10', '6', 13),
+            new CostReceipt('10', '2', $l1), new CostReceipt('10', '4', $l2), new CostReceipt('10', '6', $l3),
         ]);
     });
 
     expect(array_map(fn (CostStep $s): string => $s->qtyBefore->toString(), $steps))->toBe(['0.0000', '10.0000', '20.0000'])
         ->and(array_map(fn (CostStep $s): string => $s->costAfter->toString(), $steps))->toBe(['2.0000', '3.0000', '4.0000'])
-        ->and(array_map(fn (CostStep $s): ?int => $s->purchaseLineId, $steps))->toBe([11, 12, 13]);
+        ->and(array_map(fn (CostStep $s): ?int => $s->purchaseLineId, $steps))->toBe([$l1, $l2, $l3]);
     expect(($this->cost)($this->flour))->moving_avg_cost->toBe('4.0000')->qty_basis->toBe('30.0000');
     $history = ($this->history)($this->flour);
     expect(array_map(fn ($h) => $h->cost_after, $history))->toBe(['2.0000', '3.0000', '4.0000'])
