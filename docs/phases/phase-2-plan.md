@@ -990,6 +990,7 @@ and 1.6a-c were in Phase 1.
      - *Provider additions (additive; Identity, Catalog and Inventory stay stable).* `People::isOverseer`, `Recipients::overseers(station)`, `Locations::find(id)`, `Recipes::scaled(..., ?int $version)`.
      - *Events and notifications.* `BatchDone` payload also carries unit, station names, `confirmed_by_user_id`, `requested_by_user_id`, `assigned_to_user_id` and `send_back_count`. Types `batch_pending_confirmation` (warning; overseers of the station and `production.confirm` holders, not the finisher; key `...:{batch}:{send_back_count}`) and `batch_done` (info; the requester and the baker, not the confirmer; key `batch_done:{batch}`), link `/production?request={id}`.
      - *The card.* A request with a batch is shown from the version and the places the batch recorded; a finished or confirmed one is scaled to produced plus waste.
+     - *Gate.* CI `mod-production` green on this PR (the module gate ran in CI, not locally); `module-stable production` committed with STATUS. `mod-inventory`, `mod-catalog`, `mod-identity` and `mod-notifications` stayed green with the additive provider changes.
      - *The request.* Done frees the stock-out key; the product's `StockRecovered` then closes the episode and a later run-out makes a new request (tested through HTTP).
 8. **2.8 web** (STATUS `web`; Playwright `p2-stockout-production`, `p2-purchase-transfer`), four PRs. Each flow is committed
    red first with its fixture helpers (section 7), then the screens. Strings are added to `messages/en.json` and
