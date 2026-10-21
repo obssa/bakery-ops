@@ -3820,6 +3820,1088 @@
                 }
             }
         },
+        "/v1/production/requests": {
+            "get": {
+                "operationId": "production.requests.index",
+                "tags": [
+                    "Requests"
+                ],
+                "parameters": [
+                    {
+                        "name": "view",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "board"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "requested",
+                                "accepted",
+                                "in_progress",
+                                "pending_confirmation",
+                                "done",
+                                "cancelled"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "station_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "product_item_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "mine",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 200
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "production.requests.store",
+                "tags": [
+                    "Requests"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreProductionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/production/requests/{request}": {
+            "get": {
+                "operationId": "production.requests.show",
+                "tags": [
+                    "Requests"
+                ],
+                "parameters": [
+                    {
+                        "name": "request",
+                        "in": "path",
+                        "required": true,
+                        "description": "The request ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/production/requests/{request}/assign": {
+            "post": {
+                "operationId": "production.requests.assign",
+                "tags": [
+                    "Requests"
+                ],
+                "parameters": [
+                    {
+                        "name": "request",
+                        "in": "path",
+                        "required": true,
+                        "description": "The request ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AssignProductionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "client_uuid": {
+                                            "type": "string"
+                                        },
+                                        "product": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name_en": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                },
+                                                "name_am": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                },
+                                                "unit": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name_en",
+                                                "name_am",
+                                                "unit"
+                                            ]
+                                        },
+                                        "requested_qty": {
+                                            "type": "string"
+                                        },
+                                        "due_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "priority": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "station": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "code": {
+                                                    "type": "string"
+                                                },
+                                                "name_en": {
+                                                    "type": "string"
+                                                },
+                                                "name_am": {
+                                                    "type": "string"
+                                                },
+                                                "requires_overseer": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "code",
+                                                "name_en",
+                                                "name_am",
+                                                "requires_overseer"
+                                            ]
+                                        },
+                                        "requested_by": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "assigned_to": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "note": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "accepted_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "done_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cancelled_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cancel_reason": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "batch": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "client_uuid": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "recipe_version": {
+                                                    "type": "integer"
+                                                },
+                                                "planned_qty": {
+                                                    "type": "string"
+                                                },
+                                                "produced_qty": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "waste_qty": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "started_at": {
+                                                    "type": "string"
+                                                },
+                                                "finished_by": {
+                                                    "type": "string"
+                                                },
+                                                "finished_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "confirmed_by": {
+                                                    "type": "string"
+                                                },
+                                                "confirmed_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "send_back_note": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "send_back_count": {
+                                                    "type": "integer"
+                                                },
+                                                "version": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "client_uuid",
+                                                "status",
+                                                "recipe_version",
+                                                "planned_qty",
+                                                "produced_qty",
+                                                "waste_qty",
+                                                "started_at",
+                                                "finished_by",
+                                                "finished_at",
+                                                "confirmed_by",
+                                                "confirmed_at",
+                                                "send_back_note",
+                                                "send_back_count",
+                                                "version"
+                                            ]
+                                        },
+                                        "created_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "version": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "client_uuid",
+                                        "product",
+                                        "requested_qty",
+                                        "due_at",
+                                        "priority",
+                                        "reason",
+                                        "status",
+                                        "station",
+                                        "requested_by",
+                                        "assigned_to",
+                                        "note",
+                                        "accepted_at",
+                                        "done_at",
+                                        "cancelled_at",
+                                        "cancel_reason",
+                                        "batch",
+                                        "created_at",
+                                        "version"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/production/requests/{request}/accept": {
+            "post": {
+                "operationId": "production.requests.accept",
+                "tags": [
+                    "Requests"
+                ],
+                "parameters": [
+                    {
+                        "name": "request",
+                        "in": "path",
+                        "required": true,
+                        "description": "The request ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "client_uuid": {
+                                            "type": "string"
+                                        },
+                                        "product": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name_en": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                },
+                                                "name_am": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                },
+                                                "unit": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name_en",
+                                                "name_am",
+                                                "unit"
+                                            ]
+                                        },
+                                        "requested_qty": {
+                                            "type": "string"
+                                        },
+                                        "due_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "priority": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "station": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "code": {
+                                                    "type": "string"
+                                                },
+                                                "name_en": {
+                                                    "type": "string"
+                                                },
+                                                "name_am": {
+                                                    "type": "string"
+                                                },
+                                                "requires_overseer": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "code",
+                                                "name_en",
+                                                "name_am",
+                                                "requires_overseer"
+                                            ]
+                                        },
+                                        "requested_by": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "assigned_to": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "note": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "accepted_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "done_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cancelled_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cancel_reason": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "batch": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "client_uuid": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "recipe_version": {
+                                                    "type": "integer"
+                                                },
+                                                "planned_qty": {
+                                                    "type": "string"
+                                                },
+                                                "produced_qty": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "waste_qty": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "started_at": {
+                                                    "type": "string"
+                                                },
+                                                "finished_by": {
+                                                    "type": "string"
+                                                },
+                                                "finished_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "confirmed_by": {
+                                                    "type": "string"
+                                                },
+                                                "confirmed_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "send_back_note": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "send_back_count": {
+                                                    "type": "integer"
+                                                },
+                                                "version": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "client_uuid",
+                                                "status",
+                                                "recipe_version",
+                                                "planned_qty",
+                                                "produced_qty",
+                                                "waste_qty",
+                                                "started_at",
+                                                "finished_by",
+                                                "finished_at",
+                                                "confirmed_by",
+                                                "confirmed_at",
+                                                "send_back_note",
+                                                "send_back_count",
+                                                "version"
+                                            ]
+                                        },
+                                        "created_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "version": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "client_uuid",
+                                        "product",
+                                        "requested_qty",
+                                        "due_at",
+                                        "priority",
+                                        "reason",
+                                        "status",
+                                        "station",
+                                        "requested_by",
+                                        "assigned_to",
+                                        "note",
+                                        "accepted_at",
+                                        "done_at",
+                                        "cancelled_at",
+                                        "cancel_reason",
+                                        "batch",
+                                        "created_at",
+                                        "version"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/production/requests/{request}/cancel": {
+            "post": {
+                "operationId": "production.requests.cancel",
+                "tags": [
+                    "Requests"
+                ],
+                "parameters": [
+                    {
+                        "name": "request",
+                        "in": "path",
+                        "required": true,
+                        "description": "The request ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CancelProductionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "client_uuid": {
+                                            "type": "string"
+                                        },
+                                        "product": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name_en": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                },
+                                                "name_am": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                },
+                                                "unit": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name_en",
+                                                "name_am",
+                                                "unit"
+                                            ]
+                                        },
+                                        "requested_qty": {
+                                            "type": "string"
+                                        },
+                                        "due_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "priority": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "station": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "code": {
+                                                    "type": "string"
+                                                },
+                                                "name_en": {
+                                                    "type": "string"
+                                                },
+                                                "name_am": {
+                                                    "type": "string"
+                                                },
+                                                "requires_overseer": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "code",
+                                                "name_en",
+                                                "name_am",
+                                                "requires_overseer"
+                                            ]
+                                        },
+                                        "requested_by": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "assigned_to": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "note": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "accepted_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "done_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cancelled_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cancel_reason": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "batch": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "client_uuid": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "recipe_version": {
+                                                    "type": "integer"
+                                                },
+                                                "planned_qty": {
+                                                    "type": "string"
+                                                },
+                                                "produced_qty": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "waste_qty": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "started_at": {
+                                                    "type": "string"
+                                                },
+                                                "finished_by": {
+                                                    "type": "string"
+                                                },
+                                                "finished_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "confirmed_by": {
+                                                    "type": "string"
+                                                },
+                                                "confirmed_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "send_back_note": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "send_back_count": {
+                                                    "type": "integer"
+                                                },
+                                                "version": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "client_uuid",
+                                                "status",
+                                                "recipe_version",
+                                                "planned_qty",
+                                                "produced_qty",
+                                                "waste_qty",
+                                                "started_at",
+                                                "finished_by",
+                                                "finished_at",
+                                                "confirmed_by",
+                                                "confirmed_at",
+                                                "send_back_note",
+                                                "send_back_count",
+                                                "version"
+                                            ]
+                                        },
+                                        "created_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "version": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "client_uuid",
+                                        "product",
+                                        "requested_qty",
+                                        "due_at",
+                                        "priority",
+                                        "reason",
+                                        "status",
+                                        "station",
+                                        "requested_by",
+                                        "assigned_to",
+                                        "note",
+                                        "accepted_at",
+                                        "done_at",
+                                        "cancelled_at",
+                                        "cancel_reason",
+                                        "batch",
+                                        "created_at",
+                                        "version"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/short-code/verify": {
             "post": {
                 "operationId": "identity.short-code.verify",
@@ -5254,6 +6336,20 @@
     },
     "components": {
         "schemas": {
+            "AssignProductionRequest": {
+                "type": "object",
+                "description": "POST /production/requests/{request}/assign: the person who makes it, by id. Whether they are an active person of this branch\nwho holds production.fulfil at the request's station is the action's question (AssignRequest).",
+                "properties": {
+                    "user_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "user_id"
+                ],
+                "title": "AssignProductionRequest"
+            },
             "BroadcastingAuthRequest": {
                 "type": "object",
                 "description": "What Laravel Echo (pusher-js) sends before it joins a private channel: the socket id the transport gave the\nconnection (\"1234.5678\") and the channel name (\"private-station.5\"), as JSON or form-encoded.",
@@ -5286,6 +6382,20 @@
                     }
                 },
                 "title": "CancelOrderRequest"
+            },
+            "CancelProductionRequest": {
+                "type": "object",
+                "description": "POST /production/requests/{request}/cancel: an optional reason of at most 255 characters, kept on the request.",
+                "properties": {
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "title": "CancelProductionRequest"
             },
             "CancelPurchaseRequest": {
                 "type": "object",
@@ -6850,6 +7960,57 @@
                     "lines"
                 ],
                 "title": "StoreOrderRequest"
+            },
+            "StoreProductionRequest": {
+                "type": "object",
+                "description": "POST /production/requests: ask for a to-stock product to be made. The request's client UUID (an offline replay with a lost\nIdempotency-Key reaches the same request, ADR 0003), the product, how many in its base unit as a positive decimal string with\nat most 4 decimals (never a float, ADR 0004; default: the product batch size), a due time and a priority (the planner's: the\naction refuses them without production.plan) and a note. Whether the product is one production makes is the action's\nquestion (CreateRequest).",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "product_item_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "qty": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "due_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "priority": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "normal",
+                            "high",
+                            "urgent",
+                            null
+                        ]
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "client_uuid",
+                    "product_item_id"
+                ],
+                "title": "StoreProductionRequest"
             },
             "StorePurchaseRequest": {
                 "type": "object",
