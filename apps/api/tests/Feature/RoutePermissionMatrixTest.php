@@ -8,6 +8,8 @@ use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\UserStationAssignment;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Inventory\Models\Purchase;
+use App\Modules\Inventory\Models\Supplier;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
@@ -48,6 +50,13 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
     }
     if (str_contains($uri, '{location}')) {
         $params['{location}'] = (string) Location::factory()->create(['branch_id' => $branch->id])->id;
+    }
+    if (str_contains($uri, '{supplier}')) {
+        $params['{supplier}'] = (string) Supplier::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
+    }
+    if (str_contains($uri, '{purchase}')) {
+        // a draft of the caller's branch (the matrix only proves the permission)
+        $params['{purchase}'] = (string) Purchase::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
     }
     if (str_contains($uri, '{table}')) {
         $params['{table}'] = (string) DiningTable::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;

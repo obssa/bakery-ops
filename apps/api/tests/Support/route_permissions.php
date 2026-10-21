@@ -67,6 +67,21 @@ return [
     'POST /api/v1/stock/movements' => ['permission' => 'inventory.adjust', 'roles' => ['admin'], 'module' => 'inventory'],
     'GET /api/v1/ledger' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
 
+    // suppliers, purchases and costs (step 2.2b): purchases.record (admin, manager) records and confirms purchases; costs.view
+    // (admin, manager) reads the moving averages; the opening cost is an adjustment of the books (inventory.adjust, admin)
+    'GET /api/v1/suppliers' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'POST /api/v1/suppliers' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'PATCH /api/v1/suppliers/{supplier}' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'GET /api/v1/purchases' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'GET /api/v1/purchases/{purchase}' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'POST /api/v1/purchases' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'PUT /api/v1/purchases/{purchase}/lines' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'POST /api/v1/purchases/{purchase}/confirm' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'POST /api/v1/purchases/{purchase}/cancel' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'GET /api/v1/inventory/costs' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'GET /api/v1/inventory/costs/{item}' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'POST /api/v1/inventory/costs/{item}/opening' => ['permission' => 'inventory.adjust', 'roles' => ['admin'], 'module' => 'inventory'],
+
     // Orders (step 1.3b): the order-taking roles of the section 7 matrix; on an existing order the actions also need
     // its ownership or stations.all (403 orders.order.not_owner, checked by the action, after this matrix)
     'POST /api/v1/orders' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],

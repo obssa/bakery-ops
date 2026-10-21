@@ -32,6 +32,8 @@ use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Inventory\Models\Purchase;
+use App\Modules\Inventory\Models\Supplier;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Shared\Enums\StationCode;
@@ -75,6 +77,14 @@ $sentSandwichLine = static function (TestCase $t, User $me, bool $ready = false)
     }
 
     return $lineId;
+};
+
+// a flour counted in kilograms (IDEM-PURCHASE-FLOUR), a store and a supplier in the admin current branch, for the purchase endpoints
+$purchasable = static function (User $me): void {
+    withActor($me->id);
+    Item::factory()->ingredient('kg')->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'sku' => 'IDEM-PURCHASE-FLOUR']);
+    Location::factory()->ofType(LocationType::Store)->create(['branch_id' => $me->branch_id]);
+    Supplier::factory()->create(['branch_id' => $me->branch_id]);
 };
 
 return [
@@ -549,5 +559,132 @@ return [
             return ['{order}' => (string) $order->json('id')];
         },
         'payload' => fn (): array => ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '90.00', 'tendered_amount' => '100.00'],
+    ],
+
+    // Suppliers and purchases (step 2.2b)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/suppliers',
+        'module' => 'inventory',
+        'table' => 'suppliers',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => ['name' => 'Idempotent Mill', 'phone' => '+251911777002'],
+    ],
+    [
+        'method' => 'PATCH',
+        'uri' => '/api/v1/suppliers/{supplier}',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            withActor($me->id);
+            $supplier = Supplier::factory()->create(['branch_id' => $me->branch_id]);
+
+            return ['{supplier}' => (string) $supplier->id];
+        },
+        'payload' => fn (): array => ['name' => 'Renamed Mill', 'is_active' => false],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/purchases',
+        'module' => 'inventory',
+        'table' => 'purchases',
+        'setup' => function (TestCase $t) use ($admin, $purchasable): array {
+            $purchasable($admin());
+
+            return [];
+        },
+        // the supplier and the flour created by setup, read in the admin current branch
+        'payload' => fn (): array => [
+            'client_uuid' => (string) Str::uuid(),
+            'supplier_id' => Supplier::query()->latest('id')->firstOrFail()->id,
+            'invoice_no' => 'IDEM-INV-1',
+            'purchase_date' => CarbonImmutable::now()->toDateString(),
+            'lines' => [[
+                'client_uuid' => (string) Str::uuid(),
+                'item_id' => Item::query()->where('sku', 'IDEM-PURCHASE-FLOUR')->latest('id')->firstOrFail()->id,
+                'qty' => '20',
+                'unit_id' => catalogUnit('kg')->id,
+                'unit_cost' => '80',
+            ]],
+        ],
+    ],
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/purchases/{purchase}/lines',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin, $purchasable): array {
+            $me = $admin();
+            $purchasable($me);
+            $purchase = Purchase::factory()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'supplier_id' => Supplier::query()->latest('id')->firstOrFail()->id]);
+
+            return ['{purchase}' => (string) $purchase->id];
+        },
+        'payload' => fn (): array => [
+            'lines' => [[
+                'client_uuid' => (string) Str::uuid(),
+                'item_id' => Item::query()->where('sku', 'IDEM-PURCHASE-FLOUR')->latest('id')->firstOrFail()->id,
+                'qty' => '5',
+                'unit_id' => catalogUnit('kg')->id,
+                'unit_cost' => '90',
+            ]],
+        ],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/purchases/{purchase}/confirm',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin, $purchasable): array {
+            $me = $admin();
+            $purchasable($me);
+            $draft = $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson('/api/v1/purchases', [
+                'client_uuid' => (string) Str::uuid(),
+                'supplier_id' => Supplier::query()->latest('id')->firstOrFail()->id,
+                'purchase_date' => CarbonImmutable::now()->toDateString(),
+                'lines' => [[
+                    'client_uuid' => (string) Str::uuid(),
+                    'item_id' => Item::query()->where('sku', 'IDEM-PURCHASE-FLOUR')->latest('id')->firstOrFail()->id,
+                    'qty' => '20',
+                    'unit_id' => catalogUnit('kg')->id,
+                    'unit_cost' => '80',
+                ]],
+            ]);
+
+            return ['{purchase}' => (string) $draft->json('id')];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/purchases/{purchase}/cancel',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            withActor($me->id);
+            $purchase = Purchase::factory()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+
+            return ['{purchase}' => (string) $purchase->id];
+        },
+        'payload' => fn (): array => ['reason' => 'Not delivered'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/inventory/costs/{item}/opening',
+        'module' => 'inventory',
+        'table' => 'item_costs',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $item = Item::factory()->ingredient('kg')->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+
+            return ['{item}' => (string) $item->id];
+        },
+        'payload' => fn (): array => ['unit_cost' => '80', 'unit_id' => catalogUnit('kg')->id],
     ],
 ];
