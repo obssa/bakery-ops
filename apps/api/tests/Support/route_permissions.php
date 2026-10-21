@@ -93,6 +93,12 @@ return [
     'POST /api/v1/reorder-rules' => ['permission' => 'inventory.manage', 'roles' => ['admin'], 'module' => 'inventory'],
     'PATCH /api/v1/reorder-rules/{rule}' => ['permission' => 'inventory.manage', 'roles' => ['admin'], 'module' => 'inventory'],
     'DELETE /api/v1/reorder-rules/{rule}' => ['permission' => 'inventory.manage', 'roles' => ['admin'], 'module' => 'inventory'],
+    // the low-stock views (step 2.6b): the floor reads them; the strip also needs the station (403 inventory.station.forbidden, checked
+    // by the action after this matrix; the matrix assigns the caller to the {station} it asks for)
+    'GET /api/v1/reorder-list' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
+    'GET /api/v1/stock-alerts' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
+    'GET /api/v1/stations/{station}/stock-strip' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
+    'GET /api/v1/display-case' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
     'GET /api/v1/inventory/costs' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'GET /api/v1/inventory/costs/{item}' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'POST /api/v1/inventory/costs/{item}/opening' => ['permission' => 'inventory.adjust', 'roles' => ['admin'], 'module' => 'inventory'],
