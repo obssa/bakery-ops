@@ -331,7 +331,7 @@ asking for a different state is `409 state_machine.illegal_transition`. Read end
 | `GET /inventory/costs` | `costs.view` | read | `?item_id=`, `?page=` | `200 {data: [{item: {id, name_en, name_am, unit}, moving_avg_cost, qty_basis, currency, as_of}], links, meta}` (paginated: `?per_page=`, default 50, at most 100; `unit` is the item's base unit; `?item_id=` must be an item of the branch, else `422`) | `403` |
 | `GET /inventory/costs/{item}` | `costs.view` | read | `?limit=` | `200` the cost row plus `history: [{source, qty_before, cost_before, qty_in, unit_cost_in, cost_after, at, user_id}]` newest first (`?limit=` 1 to 200, default 50) | `404 inventory.cost.not_found` (an item that never had a cost) |
 | `POST /inventory/costs/{item}/opening` | `inventory.adjust` | key | `{unit_cost, unit_id}` (cost of the stock already on hand when no purchase document exists) | `201` the cost row (history `source = opening`) | `409 inventory.cost.exists`; `422 purchases.unit.incompatible`, `purchases.item.not_purchasable`, `purchases.line.cost_too_small` (the cost is stated per `unit_id` and kept per base unit, 4 dp half-up) |
-| `GET /inventory/recipe-costs/{product}` | `costs.view` | read | `?version=` (default: the active one) | `200 {product_id, version, yield: {qty, unit}, complete: bool, missing_cost_item_ids: [..], total_cost, cost_per_unit (4 dp), price (Prices::at now) \| null, margin_amount, margin_pct (2 dp) \| null, lines: [{ingredient: {id, name_en, name_am}, qty_base, unit, waste_pct, unit_cost \| null, line_cost \| null, source: purchase\|recipe\|missing}]}` | `404 catalog.recipe.not_found` |
+| `GET /inventory/recipe-costs/{product}` | `costs.view` | read | `?version=` (default: the active one) | `200 {product_id, version, yield: {qty, unit}, complete: bool, missing_cost_item_ids: [..], total_cost (4 dp) \| null, cost_per_unit (4 dp) \| null, price (Prices::at now) \| null, margin_amount (4 dp) \| null, margin_pct (2 dp) \| null, lines: [{ingredient: {id, name_en, name_am}, qty_base, unit, waste_pct, unit_cost \| null, line_cost \| null, source: purchase\|recipe\|missing}]}` | `404 catalog.recipe.not_found` (unknown, another branch's, ingredient, bought-in, no recipe, no such version), `422` for a bad `version` |
 | **Inventory: transfers (2.3)** | | | | | |
 | `GET /transfers` | `inventory.view` | read | `?status=`, `?location_id=` (either end), `?mine=1`, `?production_request_id=`, `?page=`, `?per_page=` | `200` paginated Transfers, newest first | `403`, `422 validation.failed` |
 | `POST /transfers` | `transfers.request` | key + `client_uuid` | `{client_uuid, item_id, to_location_id, from_location_id? (default: the store), qty, unit_id? (default: the base unit), note?, production_request_id?}` | `201` Transfer (`requested`); `200` the same Transfer for a `client_uuid` already used | `403 inventory.transfer.destination_forbidden` (the requester is not assigned to the destination's station and holds no `stations.all`; a destination with no station needs `stations.all`); `422 validation.failed`, `inventory.transfer.same_location`, `inventory.transfer.item_not_stockable`, `inventory.transfer.location_unknown`, `catalog.unit.incompatible` |
@@ -781,6 +781,50 @@ and 1.6a-c were in Phase 1.
      missing cost makes `complete = false` and lists the item in `missing_cost_item_ids` and the margin is null; margin is
      `Prices::at(now) - cost_per_unit`, and `margin_pct` is half-up to 2 dp. Pure arithmetic on `UnitCost` / `Money`;
      table-tested.
+     **As built (step 2.4b, `phase-2/recipe-cost`).** Done as planned, with these differences and decisions (the plan left them open or the
+     code is the fact; the section 4 row above is corrected):
+     - *Red first, as run.* All the new tests were committed alone: `CostingTest` (29) and `CostingPropertyTest` (300 seeds) failed on the
+       missing class `Costs\Costing`, `RecipeCostTest` (17) and `RecipeCostPropertyTest` (25 seeds) on the missing contract, the endpoint
+       tests (11) on `404` where the route did not exist, and the matrix row for the new route on `404` instead of `403`. Green after, in three commits.
+     - *Arithmetic* (`Costs\Costing`, pure, on brick/math decimals). A line is `qty_base x (100 + waste) / 100 x rate`, kept **exact**;
+       the lines are summed exactly; `cost_per_unit` is the exact sum over the yield rounded once, half-up, to 4 dp (a `UnitCost`); that stored
+       4 dp value is what a sub-recipe passes to its parent and what the margin uses. `total_cost` and each `line_cost` are the exact values
+       shown at 4 dp, for display only (a displayed line may differ from the total by a unit in the last place). `margin_amount` is the price
+       less `cost_per_unit`, exact at 4 dp (not rounded to cents); `margin_pct` is `margin / price x 100` half-up to 2 dp, ties away from
+       zero, so a loss rounds like a profit; a price of zero gives no percentage. Nothing is rounded anywhere else.
+     - *Contract* `Contracts\RecipeCost::rollUp(Item|int $product, ?int $version = null, ?DateTimeInterface $at = null): ?RecipeCostView` (final,
+       built per use; `$at` defaults to now and only picks the price). It reads Catalog through `Recipes::activeFor` / `version` and
+       `Prices::at`, and Inventory's `item_costs`; no Catalog recipe model is imported. It returns null for an ingredient, a bought-in
+       product, a product without a recipe or without that version, an unknown id. `RecipeCostView` and `RecipeCostLine` are readonly.
+     - *Sub-recipes.* An item's own `item_costs` row wins (even at 0.0000: zero is a cost); only an ingredient with **no** row is costed from its
+       own **active** recipe, whatever version the root asked for (an old version of a sub-recipe is not what is being made today), its cost
+       per unit being the 4 dp value above. Levels count below the product: a sub-recipe at level 5 is costed, one at level 6 is not.
+     - *Incomplete.* A required line whose ingredient has no cost and no usable recipe (none, or a yield that is not positive), is in a cycle
+       (the item that comes round again is listed, a product that feeds itself lists itself), or is deeper than level 5 (the item at level 6 is
+       listed) makes `complete = false`. For an incomplete sub-recipe the **items that make it incomplete** are listed, not the sub-product.
+       The list has each id once, in id order. When incomplete `total_cost`, `cost_per_unit`, `margin_amount` and `margin_pct` are all null
+       (a partial sum would read as a real cost); the lines still carry what they have, the missing ones with `source = missing` and null
+       `unit_cost` / `line_cost`; the price is still shown.
+     - *Optional lines* are left out of the sum **and** of `lines` (their cost is not part of the product); an optional ingredient without a
+       cost never makes the roll-up incomplete.
+     - *Endpoint.* `GET /inventory/recipe-costs/{product}?version=` behind `costs.view` (admin, manager; the whole body is cost figures). The
+       product is read as a plain id, not a bound model, so every case the contract answers with null is one `404 catalog.recipe.not_found`
+       (the Catalog key and its two texts; no new key): unknown id, another branch's product, an ingredient, a bought-in product (it has no
+       recipe; its own cost is in `/inventory/costs/{item}`), a product with no recipe, a version it does not have. `version` that is not a
+       whole number from 1 is `422`. No `Idempotency-Key`, no write registry row, no audit row; one row in `route_permissions.php`, the matrix
+       gained the `{product}` placeholder. `docs/openapi.json` re-exported (1 new path; nothing else changed).
+     - *Price and unit.* The margin compares the price per unit sold with the cost per **base** unit of the product's yield; products are
+       counted in pieces everywhere in the seeds and tests, so the two agree. A product sold in a larger unit than its base would need a
+       conversion; none exists, so none is built.
+     - *Tests.* `CostingTest` (hand-computed table: lines, shown values, per-unit rounding on the half, margin and percentage on the half and
+       for losses), `CostingPropertyTest` (300 seeds against a rational oracle, `RECIPE_COST_SEED=<n>` reruns one), `RecipeCostTest` (flat,
+       sub-recipe, own cost wins, zero cost, missing, optional, incomplete sub-recipe, price now, loss, versions side by side, chain depth,
+       cycles, null cases, writes nothing), `RecipeCostPropertyTest` (25 seeds of whole random recipes in the database, with a sub-recipe,
+       missing costs and optional lines, against an oracle written separately; `RECIPE_COST_DB_SEED=<n>`), `RecipeCostEndpointTest` (shape,
+       incomplete, no price, versions, 404s, 422s, roles, writes nothing). Run locally: those files, the route matrix filtered to the route,
+       PHPStan and Pint; CI's `mod-inventory` is the rest of the evidence.
+     - *STATUS.* No key covers 2.4b: `catalog.recipe-versions` (done at 2.4a) names the Catalog half and the plan gave 2.4b none, so STATUS is
+       unchanged; Inventory stays `stable` through `mod-inventory`.
 5. **2.5 notifications** (`notifications`, groups `module:notifications`), two PRs:
    - 2.5a inbox: migrations 10 and 13, models, `Contracts\Notifier::send(users, type, payload, deepLink)` (final class built per
      use; writes the inbox rows for every user in one transaction with the dedupe row, in each recipient's locale for the
