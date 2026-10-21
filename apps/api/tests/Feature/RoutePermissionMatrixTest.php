@@ -9,6 +9,7 @@ use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\UserStationAssignment;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Purchase;
+use App\Modules\Inventory\Models\Transfer;
 use App\Modules\Inventory\Models\Supplier;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
@@ -57,6 +58,10 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
     if (str_contains($uri, '{purchase}')) {
         // a draft of the caller's branch (the matrix only proves the permission)
         $params['{purchase}'] = (string) Purchase::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
+    }
+    if (str_contains($uri, '{transfer}')) {
+        // a requested transfer of the caller's branch (the matrix only proves the permission; the decision itself is refused or not by the action)
+        $params['{transfer}'] = (string) Transfer::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId, 'requested_by_user_id' => $actorId])->id;
     }
     if (str_contains($uri, '{table}')) {
         $params['{table}'] = (string) DiningTable::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;

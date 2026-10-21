@@ -34,6 +34,7 @@ use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Purchase;
 use App\Modules\Inventory\Models\Supplier;
+use App\Modules\Inventory\Models\Transfer;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Shared\Enums\StationCode;
@@ -85,6 +86,15 @@ $purchasable = static function (User $me): void {
     Item::factory()->ingredient('kg')->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'sku' => 'IDEM-PURCHASE-FLOUR']);
     Location::factory()->ofType(LocationType::Store)->create(['branch_id' => $me->branch_id]);
     Supplier::factory()->create(['branch_id' => $me->branch_id]);
+};
+
+// a flour counted in kilograms (IDEM-TRANSFER-FLOUR) with a store and a kitchen in the admin current branch, for the transfer endpoints
+$transferable = static function (User $me): Item {
+    withActor($me->id);
+    Location::factory()->ofType(LocationType::Store)->create(['branch_id' => $me->branch_id]);
+    Location::factory()->ofType(LocationType::Kitchen)->create(['branch_id' => $me->branch_id]);
+
+    return Item::factory()->ingredient('kg')->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'sku' => 'IDEM-TRANSFER-FLOUR']);
 };
 
 return [
@@ -686,5 +696,65 @@ return [
             return ['{item}' => (string) $item->id];
         },
         'payload' => fn (): array => ['unit_cost' => '80', 'unit_id' => catalogUnit('kg')->id],
+    ],
+
+    // Transfers (step 2.3)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/transfers',
+        'module' => 'inventory',
+        'table' => 'transfers',
+        'setup' => function (TestCase $t) use ($admin, $transferable): array {
+            $transferable($admin());
+
+            return [];
+        },
+        // the flour, the store and the kitchen created by setup, read in the admin current branch
+        'payload' => fn (): array => [
+            'client_uuid' => (string) Str::uuid(),
+            'item_id' => Item::query()->where('sku', 'IDEM-TRANSFER-FLOUR')->latest('id')->firstOrFail()->id,
+            'to_location_id' => Location::query()->where('type', LocationType::Kitchen->value)->latest('id')->firstOrFail()->id,
+            'qty' => '2',
+            'unit_id' => catalogUnit('kg')->id,
+        ],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/transfers/{transfer}/confirm',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin, $transferable): array {
+            $me = $admin();
+            $flour = $transferable($me);
+            $store = Location::query()->where('type', LocationType::Store->value)->latest('id')->firstOrFail();
+            stockIn($flour, $store, '5000');
+            $transfer = Transfer::factory()->create([
+                'branch_id' => $me->branch_id, 'item_id' => $flour->id, 'from_location_id' => $store->id,
+                'to_location_id' => Location::query()->where('type', LocationType::Kitchen->value)->latest('id')->firstOrFail()->id,
+                'qty' => '2000', 'created_by_user_id' => $me->id, 'requested_by_user_id' => $me->id,
+            ]);
+
+            return ['{transfer}' => (string) $transfer->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/transfers/{transfer}/reject',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin, $transferable): array {
+            $me = $admin();
+            $flour = $transferable($me);
+            $transfer = Transfer::factory()->create([
+                'branch_id' => $me->branch_id, 'item_id' => $flour->id,
+                'from_location_id' => Location::query()->where('type', LocationType::Store->value)->latest('id')->firstOrFail()->id,
+                'to_location_id' => Location::query()->where('type', LocationType::Kitchen->value)->latest('id')->firstOrFail()->id,
+                'created_by_user_id' => $me->id, 'requested_by_user_id' => $me->id,
+            ]);
+
+            return ['{transfer}' => (string) $transfer->id];
+        },
+        'payload' => fn (): array => ['reason' => 'Not today'],
     ],
 ];

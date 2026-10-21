@@ -11,7 +11,7 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category}, {location}, {table}, {order} (an open cart of the caller's own) and {line}
+ * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {table}, {order} (an open cart of the caller's own) and {line}
  * (a queued line of a sent order of the caller's own, at a station the caller is assigned to) with a row of the right
  * table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
@@ -78,6 +78,13 @@ return [
     'PUT /api/v1/purchases/{purchase}/lines' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'POST /api/v1/purchases/{purchase}/confirm' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'POST /api/v1/purchases/{purchase}/cancel' => ['permission' => 'purchases.record', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+
+    // transfers (step 2.3): the floor reads them (inventory.view) and asks for stock (transfers.request, as the stations work);
+    // only transfers.confirm (admin, manager, or anyone granted it) decides, and then only at the source's station
+    'GET /api/v1/transfers' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
+    'POST /api/v1/transfers' => ['permission' => 'transfers.request', 'roles' => $floor, 'module' => 'inventory'],
+    'POST /api/v1/transfers/{transfer}/confirm' => ['permission' => 'transfers.confirm', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    'POST /api/v1/transfers/{transfer}/reject' => ['permission' => 'transfers.confirm', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'GET /api/v1/inventory/costs' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'GET /api/v1/inventory/costs/{item}' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'POST /api/v1/inventory/costs/{item}/opening' => ['permission' => 'inventory.adjust', 'roles' => ['admin'], 'module' => 'inventory'],
