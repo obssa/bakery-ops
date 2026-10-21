@@ -4374,7 +4374,11 @@
                                 "analytics.view",
                                 "analytics.view_own",
                                 "audit.view",
-                                "stations.all"
+                                "stations.all",
+                                "production.view",
+                                "production.plan",
+                                "notifications.view",
+                                "costs.view"
                             ]
                         }
                     },
@@ -4677,7 +4681,11 @@
                                 "analytics.view",
                                 "analytics.view_own",
                                 "audit.view",
-                                "stations.all"
+                                "stations.all",
+                                "production.view",
+                                "production.plan",
+                                "notifications.view",
+                                "costs.view"
                             ]
                         }
                     },
