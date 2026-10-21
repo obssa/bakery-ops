@@ -97,7 +97,9 @@ final class BatchStock
 
         $rows = $this->ledger->appendMany($intents);
 
-        return $makesOutput ? $rows[array_key_last($rows)]->id : null;
+        $output = $makesOutput ? end($rows) : false;
+
+        return $output === false ? null : $output->id;
     }
 
     /**
