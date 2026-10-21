@@ -177,3 +177,41 @@ it('is read by every floor role, refused to a waiter, and is 404 for another bra
     $this->getJson('/api/v1/production/requests/999999')->assertStatus(404);
     $this->getJson('/api/v1/production/requests/abc')->assertStatus(404);
 });
+
+it('shows a started batch from the version it recorded, not the active one, and with the places it fixed', function () {
+    stockIn($this->f->flour, $this->f->cakeRoom, '5000');
+    $batch = $this->f->startedBatch(null, '12');
+    $this->f->cakeRecipe->forceFill(['is_active' => false])->save();
+    $second = $this->f->recipe($this->f->cake, '12', [[$this->f->flour, '3']], [['New method', 'አዲስ ዘዴ']]);
+    $second->forceFill(['version' => 2])->save();
+
+    $response = ($this->card)($batch->request)->assertOk();
+
+    $response->assertJsonPath('recipe.version', 1)
+        ->assertJsonPath('recipe.target_qty', '12.0000')
+        ->assertJsonPath('recipe.lines.0.needed', '1200.0000')
+        ->assertJsonPath('recipe.steps.0.text_en', 'Cream the butter')
+        ->assertJsonPath('batch.status', 'started')
+        ->assertJsonPath('consume_location.id', $this->f->cakeRoom->id)
+        ->assertJsonPath('output_location.id', $this->f->display->id);
+});
+
+it('keeps the places a batch fixed when the configuration changes afterwards: a new location does not move an open batch', function () {
+    $batch = $this->f->startedBatch();
+    stockLocation($this->branch, \App\Modules\Inventory\Enums\LocationType::CakeRoom, $this->f->cakeRoomStation);
+
+    ($this->card)($batch->request)->assertOk()->assertJsonPath('consume_location.id', $this->f->cakeRoom->id);
+});
+
+it('scales a finished batch to produced plus waste, which is what Confirm will consume', function () {
+    stockIn($this->f->flour, $this->f->cakeRoom, '5000');
+    $batch = $this->f->finishedBatch(null, ['produced_qty' => '5', 'waste_qty' => '1']);
+
+    $response = ($this->card)($batch->request)->assertOk();
+
+    $response->assertJsonPath('batch.status', 'finished')
+        ->assertJsonPath('recipe.target_qty', '6.0000')
+        ->assertJsonPath('recipe.lines.0.needed', '600.0000')
+        ->assertJsonPath('recipe.lines.1.needed', '300.0000');
+});
+

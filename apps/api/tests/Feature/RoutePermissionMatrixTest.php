@@ -17,6 +17,8 @@ use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
+use App\Modules\Production\Enums\RequestStatus;
+use App\Modules\Production\Models\ProductionBatch;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
@@ -100,6 +102,16 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
         $params['{request}'] = (string) ProductionRequest::factory()->create([
             'branch_id' => $branch->id, 'station_id' => $station->id, 'created_by_user_id' => $actorId, 'requested_by_user_id' => $actorId,
         ])->id;
+    }
+    if (str_contains($uri, '{batch}')) {
+        // a finished batch of a request at a cake room where the caller is the flagged overseer (so the action's own rule, who may
+        // confirm, passes for every role the route lets in; that the caller finished it themselves is a 409, not a 403)
+        $station = Station::factory()->forCode(StationCode::CakeRoom)->create(['branch_id' => $branch->id]);
+        UserStationAssignment::factory()->overseer()->create(['branch_id' => $branch->id, 'user_id' => $actorId, 'station_id' => $station->id]);
+        $request = ProductionRequest::factory()->status(RequestStatus::PendingConfirmation)->create([
+            'branch_id' => $branch->id, 'station_id' => $station->id, 'created_by_user_id' => $actorId, 'requested_by_user_id' => $actorId, 'assigned_to_user_id' => $actorId,
+        ]);
+        $params['{batch}'] = (string) ProductionBatch::factory()->finished()->create(['branch_id' => $branch->id, 'request_id' => $request->id, 'created_by_user_id' => $actorId, 'started_by_user_id' => $actorId])->id;
     }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)

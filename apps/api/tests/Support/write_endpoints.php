@@ -52,6 +52,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Tests\Support\NotificationDrivers;
 use Tests\Support\OrdersMenu;
+use Tests\Support\ProductionFixture;
 use Tests\TestCase;
 
 $admin = static function (): User {
@@ -103,6 +104,16 @@ $transferable = static function (User $me): Item {
     Location::factory()->ofType(LocationType::Kitchen)->create(['branch_id' => $me->branch_id]);
 
     return Item::factory()->ingredient('kg')->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'sku' => 'IDEM-TRANSFER-FLOUR']);
+};
+
+// the cake room of a branch with its people and stock (Tests\Support\ProductionFixture), the admin of that branch logged in
+$productionFloor = static function () use ($admin): ProductionFixture {
+    $admin();
+    $f = ProductionFixture::build(currentBranch());
+    $f->stockCakeRoom();
+    loginAs($f->admin);
+
+    return $f;
 };
 
 return [
@@ -993,5 +1004,56 @@ return [
             return ['{request}' => (string) $request->id];
         },
         'payload' => fn (): array => ['reason' => 'Not needed today'],
+    ],
+    // Production batches (step 2.7c)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/production/requests/{request}/start',
+        'module' => 'production',
+        'table' => 'production_batches',
+        'setup' => function (TestCase $t) use ($productionFloor): array {
+            $f = $productionFloor();
+
+            return ['{request}' => (string) $f->acceptedRequest($f->admin)->id];
+        },
+        'payload' => fn (): array => ['client_uuid' => (string) Str::uuid()],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/production/batches/{batch}/done',
+        'module' => 'production',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($productionFloor): array {
+            $f = $productionFloor();
+
+            return ['{batch}' => (string) $f->startedBatch($f->admin)->id];
+        },
+        'payload' => fn (): array => ['produced_qty' => '10', 'waste_qty' => '2'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/production/batches/{batch}/confirm',
+        'module' => 'production',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($productionFloor): array {
+            $f = $productionFloor();
+            $f->requireOverseer();
+
+            return ['{batch}' => (string) $f->finishedBatch($f->baker)->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/production/batches/{batch}/send-back',
+        'module' => 'production',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($productionFloor): array {
+            $f = $productionFloor();
+            $f->requireOverseer();
+
+            return ['{batch}' => (string) $f->finishedBatch($f->baker)->id];
+        },
+        'payload' => fn (): array => ['note' => 'Count the tray again'],
     ],
 ];

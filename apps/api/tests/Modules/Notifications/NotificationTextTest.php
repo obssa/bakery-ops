@@ -27,6 +27,8 @@ function samplePayloads(): array
         'transfer_decided' => NotificationEvents::transferDecided(1, 5, 6)->payload(),
         'production_requested' => NotificationEvents::productionRequested(1, 5)->payload(),
         'production_assigned' => NotificationEvents::productionAssigned(1, 6, 5)->payload(),
+        'batch_pending_confirmation' => NotificationEvents::batchDone(1, 'pending_confirmation', 6, null, 5, 6)->payload(),
+        'batch_done' => NotificationEvents::batchDone(1, 'confirmed', 6, 7, 5, 6)->payload(),
     ];
 }
 

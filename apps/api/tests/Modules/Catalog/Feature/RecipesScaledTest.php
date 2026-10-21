@@ -99,3 +99,25 @@ it('reads only this branch: a product of another branch has no recipe here', fun
     expect($this->recipes->scaled($theirs->id, '3'))->toBeNull()
         ->and($this->items->batchQty($theirs->id))->toBeNull();
 })->group('module:catalog', 'feature');
+
+it('scales a named version, active or not, with the steps of that version (step 2.7c: a batch consumes the version it started on)', function () {
+    $first = ($this->recipe)($this->cake, 1, false, '1');
+    RecipeStep::factory()->create(['branch_id' => $this->branch->id, 'recipe_id' => $first->id, 'step_order' => 1, 'text_en' => 'Old method.', 'text_am' => 'የድሮ ዘዴ።']);
+    $second = ($this->recipe)($this->cake, 2, true, '2');
+    RecipeStep::factory()->create(['branch_id' => $this->branch->id, 'recipe_id' => $second->id, 'step_order' => 1, 'text_en' => 'New method.', 'text_am' => 'አዲስ ዘዴ።']);
+
+    $old = $this->recipes->scaled($this->cake, '6', 1);
+    $new = $this->recipes->scaled($this->cake, '6', 2);
+    $active = $this->recipes->scaled($this->cake, '6');
+
+    expect($old?->version)->toBe(1)
+        ->and($old?->recipeId)->toBe($first->id)
+        ->and($old?->lines[0]->qty->toString())->toBe('500.0000', '1 kg for 12, so 500 g for 6')
+        ->and($old?->steps[0]->toArray()['text_en'])->toBe('Old method.')
+        ->and($new?->version)->toBe(2)
+        ->and($new?->lines[0]->qty->toString())->toBe('1000.0000')
+        ->and($new?->steps[0]->toArray()['text_en'])->toBe('New method.')
+        ->and($active?->version)->toBe(2)
+        ->and($this->recipes->scaled($this->cake, '6', 3))->toBeNull('no such version')
+        ->and($this->recipes->scaled($this->flour, '6', 1))->toBeNull('an ingredient has none');
+})->group('module:catalog', 'feature');

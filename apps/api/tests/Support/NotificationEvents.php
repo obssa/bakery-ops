@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Shared\Events\BatchDone;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
 use App\Shared\Events\ProductionAssigned;
@@ -138,6 +139,19 @@ final class NotificationEvents
         return new ProductionAssigned(
             $branchId, $requestId, 17, 'Black forest cake', 'ብላክ ፎረስት ኬክ', $a['qty'], $a['unit'],
             $a['stationId'], 'Cake room', 'የኬክ ክፍል', $assigneeId, $assignerId, $a['version'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $over
+     */
+    public static function batchDone(int $branchId, string $status, int $finishedBy, ?int $confirmedBy, int $requestedBy, ?int $assignedTo, int $batchId = 71, array $over = []): BatchDone
+    {
+        $a = $over + ['requestId' => 51, 'produced' => '10.0000', 'waste' => '2.0000', 'unit' => 'pcs', 'stationId' => 1, 'sendBackCount' => 0];
+
+        return new BatchDone(
+            $branchId, $batchId, $a['requestId'], $status, 17, 'Black forest cake', 'ብላክ ፎረስት ኬክ', $a['produced'], $a['waste'], $a['unit'],
+            $a['stationId'], 'Cake room', 'የኬክ ክፍል', $finishedBy, $confirmedBy, $requestedBy, $assignedTo, $a['sendBackCount'],
         );
     }
 }

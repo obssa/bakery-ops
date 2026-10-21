@@ -146,6 +146,13 @@ return [
     'POST /api/v1/production/requests/{request}/assign' => ['permission' => 'production.plan', 'roles' => ['admin', 'manager'], 'module' => 'production'],
     'POST /api/v1/production/requests/{request}/accept' => ['permission' => 'production.fulfil', 'roles' => ['admin', 'cake_baker', 'bread_baker'], 'module' => 'production'],
     'POST /api/v1/production/requests/{request}/cancel' => ['permission' => 'production.view', 'roles' => $floor, 'module' => 'production'],
+    // production batches (step 2.7c): start and done are the assignee's (production.fulfil; the action also checks the station and the
+    // assignee); confirm and send-back are the overseer's or a production.confirm holder's, which depends on the station, so the
+    // route asks only for production.view and the action decides (403 production.confirm.forbidden)
+    'POST /api/v1/production/requests/{request}/start' => ['permission' => 'production.fulfil', 'roles' => ['admin', 'cake_baker', 'bread_baker'], 'module' => 'production'],
+    'POST /api/v1/production/batches/{batch}/done' => ['permission' => 'production.fulfil', 'roles' => ['admin', 'cake_baker', 'bread_baker'], 'module' => 'production'],
+    'POST /api/v1/production/batches/{batch}/confirm' => ['permission' => 'production.view', 'roles' => $floor, 'module' => 'production'],
+    'POST /api/v1/production/batches/{batch}/send-back' => ['permission' => 'production.view', 'roles' => $floor, 'module' => 'production'],
 
     // Notifications (step 2.5a): every role has its own inbox (notifications.view); the lines are always the caller's own
     'GET /api/v1/notifications' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],

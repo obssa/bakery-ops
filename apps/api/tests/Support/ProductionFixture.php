@@ -14,6 +14,7 @@ use App\Modules\Identity\Models\UserStationAssignment;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Production\Enums\RequestStatus;
+use App\Modules\Production\Models\ProductionBatch;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
@@ -181,6 +182,78 @@ final class ProductionFixture
             'requested_qty' => '12',
             'created_by_user_id' => $this->cashier->id,
             'requested_by_user_id' => $this->cashier->id,
+        ]);
+    }
+
+    /** Flour and sugar at the cake room, in grams (the cake of 12 takes 1200 g and 600 g). */
+    public function stockCakeRoom(string $flour = '5000', string $sugar = '5000'): void
+    {
+        stockIn($this->flour, $this->cakeRoom, $flour);
+        stockIn($this->sugar, $this->cakeRoom, $sugar);
+    }
+
+    /** The cake room asks for a second person to sign off every batch. */
+    public function requireOverseer(bool $on = true): void
+    {
+        $this->cakeRoomStation->forceFill(['requires_overseer' => $on])->save();
+    }
+
+    /**
+     * An accepted request of the cake (12 unless told otherwise), assigned to $baker, as Accept leaves it.
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public function acceptedRequest(?User $baker = null, array $over = []): ProductionRequest
+    {
+        return $this->request($over + ['assigned_to_user_id' => ($baker ?? $this->baker)->id], RequestStatus::Accepted);
+    }
+
+    /**
+     * A started batch of the cake for an in-progress request assigned to $baker: version 1 of the cake recipe, consuming at the
+     * cake room, output at the display case, as Start leaves it. $over reaches the batch row.
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public function startedBatch(?User $baker = null, string $qty = '12', array $over = []): ProductionBatch
+    {
+        $baker ??= $this->baker;
+        $request = $this->request(['assigned_to_user_id' => $baker->id, 'requested_qty' => $qty], RequestStatus::InProgress);
+
+        return ProductionBatch::factory()->create($over + [
+            'branch_id' => $this->branch->id,
+            'request_id' => $request->id,
+            'station_id' => $this->cakeRoomStation->id,
+            'recipe_id' => $this->cakeRecipe->id,
+            'recipe_version' => 1,
+            'planned_qty' => $qty,
+            'consume_location_id' => $this->cakeRoom->id,
+            'output_location_id' => $this->display->id,
+            'started_by_user_id' => $baker->id,
+            'created_by_user_id' => $baker->id,
+        ]);
+    }
+
+    /**
+     * A batch the baker finished and an overseer has not signed off: produced 12, waste 0, the request pending_confirmation.
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public function finishedBatch(?User $baker = null, array $over = []): ProductionBatch
+    {
+        $baker ??= $this->baker;
+        $request = $this->request(['assigned_to_user_id' => $baker->id], RequestStatus::PendingConfirmation);
+
+        return ProductionBatch::factory()->finished()->create($over + [
+            'branch_id' => $this->branch->id,
+            'request_id' => $request->id,
+            'station_id' => $this->cakeRoomStation->id,
+            'recipe_id' => $this->cakeRecipe->id,
+            'recipe_version' => 1,
+            'consume_location_id' => $this->cakeRoom->id,
+            'output_location_id' => $this->display->id,
+            'started_by_user_id' => $baker->id,
+            'created_by_user_id' => $baker->id,
+            'finished_by_user_id' => $baker->id,
         ]);
     }
 }

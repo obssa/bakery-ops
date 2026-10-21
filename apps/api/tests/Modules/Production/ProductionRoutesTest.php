@@ -28,7 +28,7 @@ it('subscribes the auto request to StockOut and nothing else of production to it
         ->and(method_exists(CreateAutoRequest::class, 'handle'))->toBeTrue();
 });
 
-it('registers the six routes with their permission and, for the writes, the idempotency middleware', function () {
+it('registers the ten routes with their permission and, for the writes, the idempotency middleware', function () {
     $expected = [
         'GET api/v1/production/requests' => ['permission:production.view', false],
         'GET api/v1/production/requests/{request}' => ['permission:production.view', false],
@@ -36,6 +36,10 @@ it('registers the six routes with their permission and, for the writes, the idem
         'POST api/v1/production/requests/{request}/assign' => ['permission:production.plan', true],
         'POST api/v1/production/requests/{request}/accept' => ['permission:production.fulfil', true],
         'POST api/v1/production/requests/{request}/cancel' => ['permission:production.view', true],
+        'POST api/v1/production/requests/{request}/start' => ['permission:production.fulfil', true],
+        'POST api/v1/production/batches/{batch}/done' => ['permission:production.fulfil', true],
+        'POST api/v1/production/batches/{batch}/confirm' => ['permission:production.view', true],
+        'POST api/v1/production/batches/{batch}/send-back' => ['permission:production.view', true],
     ];
     $found = [];
     foreach (Route::getRoutes()->getRoutes() as $route) {

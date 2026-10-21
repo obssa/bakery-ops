@@ -10,6 +10,7 @@ use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Jobs\EvaluateBalance;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Notifications\Listeners\ClearStockDedupe;
+use App\Modules\Notifications\Listeners\NotifyBatchDone;
 use App\Modules\Notifications\Listeners\NotifyLineReady;
 use App\Modules\Notifications\Listeners\NotifyLineRejected;
 use App\Modules\Notifications\Listeners\NotifyProductionAssigned;
@@ -82,6 +83,7 @@ it('queues every listener after commit on the default queue, and each is registe
         NotifyTransferDecided::class => NotificationEvents::transferDecided($this->branch->id, $this->chef->id, $this->admin->id),
         NotifyProductionRequested::class => NotificationEvents::productionRequested($this->branch->id, $this->cashier->id),
         NotifyProductionAssigned::class => NotificationEvents::productionAssigned($this->branch->id, $this->baker->id, $this->manager->id),
+        NotifyBatchDone::class => NotificationEvents::batchDone($this->branch->id, 'confirmed', $this->baker->id, $this->manager->id, $this->cashier->id, $this->baker->id),
     ];
 
     foreach ($events as $listener => $event) {
