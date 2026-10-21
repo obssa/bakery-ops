@@ -17,6 +17,7 @@ $noSoftDeletes = [
     'App\Modules\Catalog\Models\ItemPrice',  // price history: a price is closed by effective_to, never deleted (Prices::at reads it)
     'App\Modules\Inventory\Ledger\StockMovement',  // the append-only ledger (DB trigger + model guard): corrections are new movements
     'App\Modules\Inventory\Ledger\StockBalance',  // the running balance the Ledger keeps per (item, location): updated in place, never deleted
+    'App\Modules\Inventory\Models\StockAlertState',  // history of alert episodes: opened and cleared (cleared_at, is_active NULL), never deleted; the unique key lets one stay open
     'App\Modules\Orders\Models\Order',  // never deleted: cancelled or voided by status, kept for the till, the ledger refs and the audit
     'App\Modules\Orders\Models\OrderLine',  // never deleted: rejected or voided by status; its reservation_ref ties it to the ledger
     'App\Modules\Orders\Models\OrderLineModifier',  // a snapshot written once with its line, which is never deleted

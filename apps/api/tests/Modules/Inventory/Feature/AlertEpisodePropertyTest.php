@@ -74,7 +74,7 @@ it('opens and closes episodes exactly as available crosses 0, whatever the walk'
                 $note .= "in {$qty}";
                 break;
             case $choice === 3 && $available->isGreaterThan(0):
-                $qty = (string) $rng->getInt(1, (int) (string) $available->toScale(0, RoundingMode::DOWN));
+                $qty = (string) $rng->getInt(1, (int) (string) $available->toScale(0, RoundingMode::Down));
                 $ref = (string) Str::uuid();
                 $reservations->reserve([new ReserveLine($cake->id, $qty, $display->id)], $ref);
                 $open[$ref] = $qty;
@@ -88,12 +88,16 @@ it('opens and closes episodes exactly as available crosses 0, whatever the walk'
                 break;
             case $choice === 5 && $open !== []:
                 $ref = array_keys($open)[$rng->getInt(0, count($open) - 1)];
+                if ($onHand->isLessThan($open[$ref])) { // waste took stock that was reserved: the sale cannot be settled (the Ledger refuses)
+                    $note .= "sell {$open[$ref]} skipped, only {$onHand} on hand";
+                    break;
+                }
                 $reservations->consume($ref, null, MovementReason::Sale);
                 $note .= "sell {$open[$ref]}";
                 unset($open[$ref]);
                 break;
             case $choice === 6 && $onHand->isGreaterThan(0):
-                $qty = (string) $rng->getInt(1, (int) (string) $onHand->toScale(0, RoundingMode::DOWN));
+                $qty = (string) $rng->getInt(1, (int) (string) $onHand->toScale(0, RoundingMode::Down));
                 stockIn($cake, $display, '-'.$qty, MovementReason::Waste);
                 $note .= "waste {$qty}";
                 break;
