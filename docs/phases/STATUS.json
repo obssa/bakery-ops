@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "current_phase": 1,
+  "current_phase": 2,
   "invariants_version": 1,
   "phases": {
     "0": {
@@ -41,16 +41,19 @@
       ]
     },
     "1": {
-      "status": "gate_pending",
+      "status": "done",
       "plan": "docs/phases/phase-1-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
-      "report": null,
+      "report": "docs/phases/phase-1-report.md",
       "gate_job": "gate-p1",
-      "gate_run_url": null,
-      "done_commit": null,
-      "done_at": null,
-      "adrs": [],
+      "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/39518339551",
+      "done_commit": "d0f62a56f94eb8d03c1c7b07d5a9c35082608987",
+      "done_at": "2026-10-21T00:18:37Z",
+      "adrs": [
+        "0008-reserve-at-send-consume-at-ready-sale-at-pay",
+        "0009-live-updates-polling-first"
+      ],
       "adr_waiver": null,
       "contracts_required": [
         "orders->inventory",
@@ -73,7 +76,7 @@
       ]
     },
     "2": {
-      "status": "todo",
+      "status": "planning",
       "plan": "docs/phases/phase-2-plan.md",
       "plan_approved": false,
       "plan_approved_by": null,
