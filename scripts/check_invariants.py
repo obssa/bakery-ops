@@ -257,6 +257,11 @@ Schema::create('items', function (Blueprint $t) {
     $t->float('weight');
     $t->decimal('price', 10, 2);
     $t->decimal('qty', 14, 4);
+    $t->decimal('unit_cost', 12, 2);
+    $t->decimal('moving_avg_cost', 14, 4);
+    $t->decimal('cost_before', 14, 4)->nullable();
+    $t->decimal('line_total', 12, 2);
+    $t->decimal('cost_total', 12, 2);
 });
 Schema::create('stock_movements', function (Blueprint $t) {
     $t->id(); $t->foreignId('branch_id'); $t->decimal('qty', 14, 4);
@@ -283,6 +288,7 @@ Schema::create('stock_movements', function (Blueprint $t) {
     expected = [
         ("float column", lambda m: "weight uses float" in m),
         ("money scale", lambda m: "price is decimal(10,2)" in m),
+        ("cost rate scale", lambda m: "cost rate unit_cost is decimal(12,2)" in m),
         ("float cast", lambda m: "float cast" in m),
         ("branch_id", lambda m: "table items has no branch_id" in m),
         ("bilingual", lambda m: "items.name_en has no name_am" in m),
@@ -295,6 +301,7 @@ Schema::create('stock_movements', function (Blueprint $t) {
     bad = [name for name, pred in expected if not any(pred(m) for m in msgs)]
     false_pos = [m for m in msgs if "qty" in m and "decimal(14,4)" in m and "is decimal" in m]
     false_pos += [m for m in msgs if "broadcasting/auth" in m]
+    false_pos += [m for m in msgs if any(c in m for c in ("moving_avg_cost", "cost_before", "line_total", "cost_total"))]
     for m in msgs:
         print("  caught:", m)
     if bad or false_pos:
