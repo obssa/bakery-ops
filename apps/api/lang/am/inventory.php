@@ -37,6 +37,9 @@ return [
         'qty_too_large' => 'ይህ መጠን እጅግ ትልቅ ነው።',
         'qty_too_small' => 'ይህ መጠን እጅግ ትንሽ ነው፤ በመሠረታዊ አሃድ ወደ ዜሮ ይጠጋጋል።',
     ],
+    'station' => [
+        'forbidden' => 'የክምችት ማሳያውን ማየት የሚችሉት የሚሰሩበትን ጣቢያ ብቻ ነው።',
+    ],
     'reorder' => [
         'exists' => 'ይህ ዕቃ ለዚህ ቦታ አስቀድሞ የማዘዣ ደንብ አለው። ሌላ ከመጨመር ያንን ደንብ ይቀይሩ።',
         'role_unknown' => 'በዝርዝሩ ውስጥ ያለ አንድ ሚና ከዳቦ ቤቱ ሚናዎች አንዱ አይደለም። admin፣ manager፣ cashier፣ waiter፣ chef፣ barista፣ cake_baker፣ bread_baker ወይም station ይጠቀሙ።',

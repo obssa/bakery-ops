@@ -8,8 +8,8 @@ use App\Modules\Inventory\Jobs\EvaluateBalance;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\ReorderRule;
 use App\Shared\Models\Branch;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
@@ -41,7 +41,10 @@ beforeEach(function () {
 });
 
 it('is scheduled hourly', function () {
-    $this->artisan('schedule:list')->expectsOutputToContain('inventory:sweep-alerts')->expectsOutputToContain('0 * * * *')->assertSuccessful();
+    $this->artisan('schedule:list')->assertSuccessful();
+
+    $events = collect(app(Schedule::class)->events())->filter(fn ($event): bool => str_contains((string) $event->command, 'inventory:sweep-alerts'));
+    expect($events)->toHaveCount(1)->and($events->first()->expression)->toBe('0 * * * *');
 });
 
 it('heals an evaluation that was lost: the sweep queues it, the worker opens the episode', function () {
@@ -50,9 +53,9 @@ it('heals an evaluation that was lost: the sweep queues it, the worker opens the
     stockIn($this->flour, $this->store, '1000');
     stockIn($this->flour, $this->store, '-700', MovementReason::Waste); // 300 available, at or below the minimum
 
-    // the evaluation queued by the movement is lost: the row is gone and its lock has lapsed
+    // the evaluation queued by the movement is lost: the row is gone and its uniqueness lock (ten minutes) has lapsed
     DB::table('jobs')->delete();
-    Cache::flush();
+    $this->travel(11)->minutes();
     expect(DB::table('stock_alert_states')->count())->toBe(0);
 
     expect(($this->sweep)())->toBe(0)->and(DB::table('jobs')->count())->toBe(1);
@@ -73,7 +76,7 @@ it('is idempotent: a second sweep while the first jobs are pending queues nothin
     stockIn($this->flour, $this->store, '10');
     stockIn($sugar, $this->kitchen, '10');
     DB::table('jobs')->delete();
-    Cache::flush();
+    $this->travel(11)->minutes();
 
     ($this->sweep)();
     $afterFirst = DB::table('jobs')->count();
@@ -141,6 +144,7 @@ it('evaluates a branch-wide rule through the lowest-numbered stock place of the 
 });
 
 it('queues a balance once however many rules and episodes point at it', function () {
+    Queue::fake();
     ($this->rule)($this->flour, $this->store);
     ($this->rule)($this->flour, null);
     stockIn($this->flour, $this->store, '5');
@@ -148,7 +152,6 @@ it('queues a balance once however many rules and episodes point at it', function
         'branch_id' => $this->branch->id, 'item_id' => $this->flour->id, 'location_id' => $this->store->id, 'location_key' => $this->store->id, 'type' => 'low',
         'is_active' => 1, 'active_since' => now(), 'available_at_start' => '5', 'threshold_qty' => '500', 'created_at' => now(), 'updated_at' => now(),
     ]);
-    Queue::fake();
 
     ($this->sweep)();
 

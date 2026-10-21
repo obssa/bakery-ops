@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Models;
 
+use App\Modules\Catalog\Models\Item;
 use App\Shared\Tenancy\BranchScoped;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One episode of an item running out (type `out`) or low (type `low`) at a place (plan section 3; ADR 0011). Written
@@ -29,6 +31,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $caused_by_user_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
+ * @property-read Item|null $item
+ * @property-read Location|null $location
  */
 final class StockAlertState extends Model
 {
@@ -62,5 +66,25 @@ final class StockAlertState extends Model
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
         ];
+    }
+
+    /**
+     * The item, trashed or not: an episode outlives the item's deletion.
+     *
+     * @return BelongsTo<Item, $this>
+     */
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(Item::class, 'item_id')->withTrashed();
+    }
+
+    /**
+     * The place (null for a branch-wide `low` episode), trashed or not.
+     *
+     * @return BelongsTo<Location, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class, 'location_id')->withTrashed();
     }
 }

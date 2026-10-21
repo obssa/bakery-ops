@@ -83,6 +83,12 @@ final class InventoryError extends RuntimeException
         return new self('inventory.cost.not_found', 404, ['item_id' => $itemId]);
     }
 
+    /** The person asking for a station's stock strip neither works at that station nor at every station. */
+    public static function stationForbidden(): self
+    {
+        return new self('inventory.station.forbidden', 403);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

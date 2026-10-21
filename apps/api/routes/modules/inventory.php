@@ -9,6 +9,7 @@ use App\Modules\Inventory\Http\Controllers\PurchasesController;
 use App\Modules\Inventory\Http\Controllers\RecipeCostsController;
 use App\Modules\Inventory\Http\Controllers\ReorderRulesController;
 use App\Modules\Inventory\Http\Controllers\StockController;
+use App\Modules\Inventory\Http\Controllers\StockViewsController;
 use App\Modules\Inventory\Http\Controllers\SuppliersController;
 use App\Modules\Inventory\Http\Controllers\TransfersController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,9 @@ use Illuminate\Support\Facades\Route;
  * Step 2.4b adds the recipe cost and margin read (costs.view): GET /inventory/recipe-costs/{product}.
  *
  * Step 2.6a adds reorder rules: the floor reads them (inventory.view); inventory.manage (admin) creates, changes and deletes them.
+ *
+ * Step 2.6b adds the low-stock reads (inventory.view, no key): the reorder list, the stock alerts, a station's stock strip (polled, ETag) and
+ * the till's display-case panel (polled, ETag). The strip also checks the station (403 inventory.station.forbidden).
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:inventory.view')->group(function (): void {
@@ -38,6 +42,10 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/ledger', [LedgerController::class, 'index'])->name('inventory.ledger.index');
         Route::get('/transfers', [TransfersController::class, 'index'])->name('inventory.transfers.index');
         Route::get('/reorder-rules', [ReorderRulesController::class, 'index'])->name('inventory.reorder-rules.index');
+        Route::get('/reorder-list', [StockViewsController::class, 'reorderList'])->name('inventory.reorder-list');
+        Route::get('/stock-alerts', [StockViewsController::class, 'alerts'])->name('inventory.stock-alerts');
+        Route::get('/stations/{station}/stock-strip', [StockViewsController::class, 'strip'])->whereNumber('station')->name('inventory.stations.stock-strip');
+        Route::get('/display-case', [StockViewsController::class, 'displayCase'])->name('inventory.display-case');
     });
 
     Route::middleware(['permission:inventory.manage', 'idempotency'])->group(function (): void {

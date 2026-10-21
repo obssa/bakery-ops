@@ -38,6 +38,9 @@ return [
         'qty_too_large' => 'This quantity is too large.',
         'qty_too_small' => 'This quantity is too small: in the base unit it rounds to zero.',
     ],
+    'station' => [
+        'forbidden' => 'You can see the stock strip only of the station you work at.',
+    ],
     'reorder' => [
         'exists' => 'This item already has a reorder rule for this place. Change that rule instead of adding another.',
         'role_unknown' => 'A role in the list is not one of the bakery roles. Use admin, manager, cashier, waiter, chef, barista, cake_baker, bread_baker, or station.',

@@ -193,6 +193,7 @@ it('answers in a fixed number of queries however many items are low', function (
         }
     };
     $make(2);
+    $count(); // the first request of a test also warms the permission and role caches
     $few = $count();
     $make(8);
 

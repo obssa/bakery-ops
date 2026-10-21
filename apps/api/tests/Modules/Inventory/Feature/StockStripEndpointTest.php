@@ -190,6 +190,7 @@ it('does the work in a fixed number of queries as the items grow, and almost non
     foreach (range(1, 3) as $i) {
         ($this->ingredient)('A'.$i, 'አ'.$i, (string) ($i * 100), '150');
     }
+    $count(); // the first request of a test also warms the permission and role caches
     $few = $count();
     foreach (range(4, 20) as $i) {
         ($this->ingredient)('A'.$i, 'አ'.$i, (string) ($i * 100), $i % 2 === 0 ? '500' : null);

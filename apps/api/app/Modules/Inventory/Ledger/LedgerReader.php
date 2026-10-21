@@ -6,6 +6,7 @@ namespace App\Modules\Inventory\Ledger;
 
 use App\Modules\Inventory\Contracts\Movement;
 use App\Modules\Inventory\Contracts\StockLevel;
+use App\Shared\Tenancy\BranchScope;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -81,6 +82,96 @@ final class LedgerReader
             ->get();
 
         return array_values($rows->map(fn (StockBalance $row): StockLevel => $row->toLevel())->all());
+    }
+
+    /**
+     * Every balance row of several items at the branch's stock places (never the cash drawer), grouped by item id, ascending by
+     * location id, in one query: the reorder list reads a whole page of rules with it. An item no place ever held is absent.
+     *
+     * @param  list<int>  $itemIds
+     * @return array<int, list<StockLevel>>
+     */
+    public function levelsOfItems(array $itemIds): array
+    {
+        if ($itemIds === []) {
+            return [];
+        }
+        $rows = StockBalance::query()
+            ->select('stock_balances.*')
+            ->join('locations', 'locations.id', '=', 'stock_balances.location_id')
+            ->where('locations.type', '!=', 'cash_drawer')
+            ->whereIn('stock_balances.item_id', $itemIds)
+            ->orderBy('stock_balances.item_id')
+            ->orderBy('stock_balances.location_id')
+            ->get();
+
+        $levels = [];
+        foreach ($rows as $row) {
+            $levels[$row->item_id][] = $row->toLevel();
+        }
+
+        return $levels;
+    }
+
+    /**
+     * How much of each item left the branch's stock since $from (UTC-comparable instant): the sum of the outgoing rows (qty < 0) of
+     * production_consume, sale and waste at any place, as positive decimal strings keyed by item id; an item with none is absent.
+     * Transfers, returns, count adjustments and reservations are not consumption.
+     *
+     * @param  list<int>  $itemIds
+     * @return array<int, string>
+     */
+    public function consumedSince(DateTimeInterface $from, array $itemIds): array
+    {
+        if ($itemIds === []) {
+            return [];
+        }
+        $rows = StockMovement::query()
+            ->toBase()
+            ->selectRaw('item_id, SUM(-qty) as used')
+            ->whereIn('reason', [MovementReason::ProductionConsume->value, MovementReason::Sale->value, MovementReason::Waste->value])
+            ->where('qty', '<', 0)
+            ->where('created_at', '>=', CarbonImmutable::instance($from)->utc()->format('Y-m-d H:i:s'))
+            ->whereIn('item_id', $itemIds)
+            ->groupBy('item_id')
+            ->get();
+
+        $used = [];
+        foreach ($rows as $row) {
+            $used[(int) $row->item_id] = self::decimal($row->used);
+        }
+
+        return $used;
+    }
+
+    /**
+     * The lowest-numbered stock place (never the cash drawer) that holds a balance row of each item, across every branch and without
+     * the branch scope: the alert sweep evaluates a branch-wide rule through it, in a process that has no current branch.
+     *
+     * @param  list<int>  $itemIds
+     * @return array<int, int> item id => location id
+     */
+    public function lowestStockPlaces(array $itemIds): array
+    {
+        if ($itemIds === []) {
+            return [];
+        }
+        $rows = StockBalance::query()
+            ->withoutGlobalScope(BranchScope::class)
+            ->toBase()
+            ->join('locations', 'locations.id', '=', 'stock_balances.location_id')
+            ->where('locations.type', '!=', 'cash_drawer')
+            ->whereIn('stock_balances.item_id', $itemIds)
+            ->groupBy('stock_balances.item_id')
+            ->selectRaw('stock_balances.item_id as item_id, MIN(stock_balances.location_id) as place')
+            ->get();
+
+        $places = [];
+        foreach ($rows as $row) {
+            $places[(int) $row->item_id] = (int) $row->place;
+        }
+
+        return $places;
     }
 
     /**
