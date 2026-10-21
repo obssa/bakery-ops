@@ -28,64 +28,70 @@ closes: shared, audit, identity, catalog, inventory (since Phase 0), orders and 
 Notifications reach Orders only through `Orders\Contracts` and `App\Shared\Events`, the arch rule from step 1.3e).
 Production's dependencies are inventory, catalog, identity, shared, audit; Notifications' are identity and shared;
 `shifts` is `interface_only` and is never imported. Phase 1 is `done` when this runs (its `done_commit` is an
-ancestor of HEAD). The `<p1-done>`, `<hash>` and counts below are filled in by the real run; the shape is what to
-expect.
+ancestor of HEAD). The two runs below are the real ones of step 2.1.
 
 At plan approval (after the standing-approval commit, before step 2.1; `--no-tests`, so Pest groups are not run). The
-four failures are the contract files step 2.1 writes, as expected at this point:
+four failures are the contract files step 2.1 writes, as expected at this point (real run at 0fd1265):
 
 ```
-$ python scripts/gate_check.py --mode entry --phase 2 --no-tests   # at <hash>
+$ python scripts/gate_check.py --mode entry --phase 2 --no-tests
 == gate_check: entry phase 2 (Inventory and production)
-  [PASS] phase 1 done                          status=done done_commit=<p1-done>
-  [PASS] phase 1 commit in history             <p1-done:12> is an ancestor of HEAD
-  [SKIP] gate:p1 green                         pest --group=gate:p1 not run (--no-tests/--ci)
-  [PASS] clean working tree                    clean
-  [PASS] phase plan exists                     docs/phases/phase-2-plan.md
-  [PASS] plan approved by Ramin                plan_approved=True by standing approval: Ramin, 2026-10-19
-  [PASS] approval author                       obssa77@gmail.com
-  [FAIL] contract production->inventory file   missing apps/api/tests/Contract/Production/InventoryContractTest.php
-  [FAIL] contract production->catalog file     missing apps/api/tests/Contract/Production/CatalogContractTest.php
-  [FAIL] contract production->identity file    missing apps/api/tests/Contract/Production/IdentityContractTest.php
-  [FAIL] contract notifications->identity file missing apps/api/tests/Contract/Notifications/IdentityContractTest.php
-  [PASS] dep production->inventory stable      stable
-  [PASS] dep production->catalog stable        stable
-  [PASS] dep production->identity stable       stable
-  [PASS] dep production->shared stable         stable
-  [PASS] dep production->audit stable          stable
-  [PASS] dep notifications->identity stable    stable
-  [PASS] dep notifications->shared stable      stable
-  [SKIP] Phase2Seeder                          not yet (created during the phase)
+  [PASS] phase 1 done                           status=done done_commit=d0f62a56f94eb8d03c1c7b07d5a9c35082608987
+  [PASS] phase 1 commit in history              d0f62a56f94e is an ancestor of HEAD
+  [SKIP] gate:p1 green                          pest --group=gate:p1 not run (--no-tests/--ci)
+  [PASS] clean working tree                     clean
+  [PASS] phase plan exists                      docs/phases/phase-2-plan.md
+  [PASS] plan approved by Ramin                 plan_approved=True by standing approval: Ramin, 2026-10-19
+  [PASS] approval author                        obssa77@gmail.com
+  [FAIL] contract production->inventory file    missing apps/api/tests/Contract/Production/InventoryContractTest.php
+  [FAIL] contract production->catalog file      missing apps/api/tests/Contract/Production/CatalogContractTest.php
+  [FAIL] contract production->identity file     missing apps/api/tests/Contract/Production/IdentityContractTest.php
+  [FAIL] contract notifications->identity file  missing apps/api/tests/Contract/Notifications/IdentityContractTest.php
+  [PASS] dep notifications->identity stable     stable
+  [PASS] dep notifications->shared stable       stable
+  [PASS] dep production->inventory stable       stable
+  [PASS] dep production->catalog stable         stable
+  [PASS] dep production->identity stable        stable
+  [PASS] dep production->shared stable          stable
+  [PASS] dep production->audit stable           stable
+  [SKIP] Phase2Seeder                           not yet (created during the phase)
 == result: FAIL (4 failed, 0 warnings, 19 checks)
 ```
 
-After step 2.1 (contract tests written, provider fixes in, tests run in Docker) the entry gate passes. The "first"
-lines are the ordering proof: `apps/api/app/Modules/Production` and `apps/api/app/Modules/Notifications` are still
-exactly as Phase 0 left them (a `.gitkeep`), which is what "contracts before consumers" means mechanically:
+After step 2.1 (contract tests written, provider fixes in, tests run in Docker) the entry gate passes. The "first" lines
+are the ordering proof: `apps/api/app/Modules/Production` and `apps/api/app/Modules/Notifications` are still exactly as
+Phase 0 left them (a `.gitkeep`), which is what "contracts before consumers" means mechanically (real run, Pest in the
+app container, at c8a714a, the last commit before the STATUS change of step 2.1):
 
 ```
-$ python scripts/gate_check.py --mode entry --phase 2   # at <hash>, Pest in the app container
+$ python scripts/gate_check.py --mode entry --phase 2
 == gate_check: entry phase 2 (Inventory and production)
-  [PASS] phase 1 done                            status=done done_commit=<p1-done>
-  [PASS] phase 1 commit in history               <p1-done:12> is an ancestor of HEAD
-  [PASS] gate:p1 green                           group gate:p1: <n> passed (<m> assertions)
+  [PASS] phase 1 done                            status=done done_commit=d0f62a56f94eb8d03c1c7b07d5a9c35082608987
+  [PASS] phase 1 commit in history               d0f62a56f94e is an ancestor of HEAD
+  [PASS] gate:p1 green                           group gate:p1: 109 passed (64239 assertions)
   [PASS] clean working tree                      clean
   [PASS] phase plan exists                       docs/phases/phase-2-plan.md
   [PASS] plan approved by Ramin                  plan_approved=True by standing approval: Ramin, 2026-10-19
   [PASS] approval author                         obssa77@gmail.com
   [PASS] contract production->inventory file     apps/api/tests/Contract/Production/InventoryContractTest.php
   [PASS] contract production->inventory first    consumer unchanged since previous gate
-  [PASS] contract production->inventory green    group contract:production->inventory: ~10 passed
+  [PASS] contract production->inventory green    group contract:production->inventory: 7 passed (98 assertions)
   [PASS] contract production->catalog file       apps/api/tests/Contract/Production/CatalogContractTest.php
   [PASS] contract production->catalog first      consumer unchanged since previous gate
-  [PASS] contract production->catalog green      group contract:production->catalog: ~8 passed
+  [PASS] contract production->catalog green      group contract:production->catalog: 5 passed (72 assertions)
   [PASS] contract production->identity file      apps/api/tests/Contract/Production/IdentityContractTest.php
   [PASS] contract production->identity first     consumer unchanged since previous gate
-  [PASS] contract production->identity green     group contract:production->identity: ~8 passed
+  [PASS] contract production->identity green     group contract:production->identity: 10 passed (79 assertions)
   [PASS] contract notifications->identity file   apps/api/tests/Contract/Notifications/IdentityContractTest.php
   [PASS] contract notifications->identity first  consumer unchanged since previous gate
-  [PASS] contract notifications->identity green  group contract:notifications->identity: ~9 passed
-  [PASS] dep production->inventory stable        stable   (7 dependency lines in the real output: production->inventory|catalog|identity|shared|audit, notifications->identity|shared)
+  [PASS] contract notifications->identity green  group contract:notifications->identity: 7 passed (38 assertions)
+  [PASS] dep notifications->identity stable      stable
+  [PASS] dep notifications->shared stable        stable
+  [PASS] dep production->inventory stable        stable
+  [PASS] dep production->catalog stable          stable
+  [PASS] dep production->identity stable         stable
+  [PASS] dep production->shared stable           stable
+  [PASS] dep production->audit stable            stable
   [SKIP] Phase2Seeder                            not yet (created during the phase)
 == result: PASS (0 failed, 0 warnings, 27 checks)
 ```
@@ -479,6 +485,47 @@ and 1.6a-c were in Phase 1.
    Shared: `ActorRunAsTest`); the `e2e-p2` profile change and the two `test.fixme` placeholders. Groups
    `contract:production->inventory|catalog|identity`, `contract:notifications->identity`, `module:inventory|catalog|identity`,
    `unit`, `feature`. The entry gate passes with tests. Phase `in_progress`.
+   **As built (step 2.1).** Done as planned, with these differences (the code was the fact, the plan text was wrong):
+   - *Red before green, as run.* Against the code as it was after Phase 1 the four contract files had 18 failing and 11
+     passing cases. Red: `production->inventory` StockOut (twice), StockRecovered and the queued-actor case (4 of 7);
+     `production->catalog` scaling, qty x target / yield once, the card's version / yield / steps, and `batchQty` (4 of 5);
+     `production->identity` the four new registry permissions (4 of 10); `notifications->identity` all 7 (no `Recipients`).
+     Green on arrival, pinning behaviour that already held: `appendMany` all-or-nothing with one actor stamp, `Stock::of`
+     after a purchase_in, `Availability` where `Locations::forProduct` says (two cases), `productionStationFor`,
+     `assignedUsers`, `isOverseer` per station, both presence bindings, `production.fulfil` / `production.confirm` with the
+     overseer rule, and `ShiftAttacher` answering null. Every red case failed for the right reason (a missing method, class
+     or event, or `dispatched 0 times`); one expected id order in a notifications case was my mistake and was corrected.
+   - *No per-user withhold.* Section 2 and 10.5 said the admin can "grant or withhold" a permission per user and that
+     `Recipients::byPermission` honours overrides "in both directions". Spatie direct permissions are additive: there is no
+     deny, and the app has no such feature. The contract now pins grant (a cashier granted `production.confirm` is in) and
+     role removal (a manager whose role was taken away is out), plus inactive users out. A real deny would be a new
+     feature and a new open question.
+   - *Events.* `StockOut` / `StockLow` share the base `StockAlert`; `branch_id` is on the event envelope
+     (`toArray()['branch_id']`, `$event->branchId`), not repeated in `payload()`. `fulfilment` is a string for ingredients
+     too (`bought_in`). `caused_by_user_id` is the person who physically did it (the acting user, else the logged-in user).
+   - *Job and actor.* `EvaluateBalance` (public `branchId`, `itemId`, `locationId`) does nothing when no movement ever touched
+     the balance or the branch is not the item's; `uniqueFor` is 600 s so a lost job cannot hold its lock forever;
+     `RestoresActor` restores the branch as well as the actor, and puts both back. Migration is
+     `2026_10_22_100200_create_stock_alert_states_table`; the erd entry already existed as PLANNED and is now real.
+   - *Existing tests.* Every stock change now queues an `EvaluateBalance`, so the `Queue::assertNothingPushed()` calls in the
+     Orders and Shared live-update tests became `assertNothingQueuedButStockEvaluation()` (nothing else may be queued).
+   - *Identity.* `Recipients` reads the branch from `CurrentBranch` (`BranchNotResolved` when none) and `forStation` takes a
+     station or a list; the grant migration is a thin caller of `Identity\Support\GrantRegistryPermissions` and the Phase 1
+     migration was left alone.
+   - *Catalog.* `Recipes::scaled` returns null for a bought-in product as well as for an ingredient and an unknown id;
+     `Items::batchQty` returns null for an unknown id (it does not throw), ignores a stored value of 0, and is the only change
+     to `Items` (its constructor now takes `Recipes`). `ScaledRecipe::from(RecipeView, target, steps)` is the pure arithmetic.
+   - *ADRs.* ADR 0010 (presence resolver) and ADR 0011 (stock alert dedupe, queued actor) were written here, not in 2.9,
+     because the code cites them; ADR 0011's Notifications half is added in 2.5. Also added: `AlertEpisodePropertyTest` (30
+     seeds) and `ScaledRecipeTest` (a seeded 300-case replay).
+   - *F5* (Orders event payloads) is not needed by any 2.1 contract and stays in step 2.5a. The transfer contract cases and the
+     recipe-version case stay with 2.3 and 2.4.
+   - *CI.* `e2e-p2` runs `full` (no Reverb); the skill's `assets/ci/ci.yml` and `references/ci-cd.md` were changed the same
+     way. The two placeholders are `apps/web/e2e/p2/stockout-production.spec.ts` and `purchase-transfer.spec.ts`.
+   - *Run locally:* the four contract groups, the new module / unit / property tests, `module:inventory|orders|payments`, the
+     Phase 0 ledger property tests, the Orders lock-order contract, the Shared and Arch groups, PHPStan and Pint, and the full
+     entry gate with `gate:p1` (109 tests, about 25 minutes). CI's `mod-*` jobs are the rest of the evidence.
+
 2. **2.2 purchases and costs** (`inventory.purchases`, groups `module:inventory`, `property`, `concurrency`), two PRs:
    - 2.2a schema and cost core: migrations 3-7, the cost-rate rule in the three numeric checks (red first against a
      planted `decimal('unit_cost', 12, 2)`), `UnitCost`, models and factories, `Contracts\Locations::store()`, `Costs\MovingAverage`

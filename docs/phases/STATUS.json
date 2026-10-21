@@ -76,7 +76,7 @@
       ]
     },
     "2": {
-      "status": "plan_approved",
+      "status": "in_progress",
       "plan": "docs/phases/phase-2-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
@@ -94,7 +94,7 @@
         "notifications->identity"
       ],
       "modules": {
-        "contracts": "todo",
+        "contracts": "done",
         "inventory.purchases": "todo",
         "inventory.transfers": "todo",
         "catalog.recipe-versions": "todo",
