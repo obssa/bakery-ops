@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Models;
 
+use App\Modules\Catalog\Models\Item;
+use App\Modules\Catalog\Models\Unit;
 use App\Shared\Tenancy\BranchScoped;
 use App\Shared\Values\Money;
 use App\Shared\Values\Quantity;
@@ -37,6 +39,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property CarbonImmutable|null $updated_at
  * @property CarbonImmutable|null $deleted_at
  * @property-read Purchase $purchase
+ * @property-read Item $item
+ * @property-read Unit $unit
  */
 final class PurchaseLine extends Model
 {
@@ -80,6 +84,22 @@ final class PurchaseLine extends Model
     public function purchase(): BelongsTo
     {
         return $this->belongsTo(Purchase::class, 'purchase_id');
+    }
+
+    /**
+     * @return BelongsTo<Item, $this>
+     */
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(Item::class, 'item_id')->withTrashed();
+    }
+
+    /**
+     * @return BelongsTo<Unit, $this>
+     */
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class, 'unit_id')->withTrashed();
     }
 
     protected static function newFactory(): PurchaseLineFactory

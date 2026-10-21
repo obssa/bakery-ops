@@ -40,6 +40,12 @@ final class DecimalString implements ValidationRule
         return new self(10, 2, 'not_negative');
     }
 
+    /** A cost rate per unit, zero or more: NUMERIC(14,4) (ADR 0004, the cost-rate rule). */
+    public static function rate(): self
+    {
+        return new self(10, 4, 'not_negative');
+    }
+
     /** A price delta, either sign: NUMERIC(12,2). */
     public static function signedMoney(): self
     {

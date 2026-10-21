@@ -71,6 +71,18 @@ final class InventoryError extends RuntimeException
         return new self('inventory.movement.client_uuid_reused', 409, ['movement_id' => $movementId]);
     }
 
+    /** The item already has a valued average: the opening cost only states the cost of stock that has none. */
+    public static function costExists(int $itemId): self
+    {
+        return new self('inventory.cost.exists', 409, ['item_id' => $itemId]);
+    }
+
+    /** The item never had a cost (no purchase, no opening cost). */
+    public static function costNotFound(int $itemId): self
+    {
+        return new self('inventory.cost.not_found', 404, ['item_id' => $itemId]);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Models;
 
+use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Enums\PurchaseStatus;
 use App\Shared\Tenancy\BranchScoped;
 use App\Shared\Values\Money;
@@ -45,6 +46,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  * @property-read Supplier $supplier
  * @property-read Location $location
+ * @property-read User|null $confirmedBy
  * @property-read Collection<int, PurchaseLine> $lines
  */
 final class Purchase extends Model
@@ -107,6 +109,14 @@ final class Purchase extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class, 'location_id')->withTrashed();
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function confirmedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'confirmed_by_user_id');
     }
 
     /**

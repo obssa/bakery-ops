@@ -22,4 +22,8 @@ return [
     'movement' => [
         'client_uuid_reused' => 'This record was already saved with different details.',
     ],
+    'cost' => [
+        'exists' => 'This item already has a cost. Opening cost is only for stock that has no recorded cost yet.',
+        'not_found' => 'This item has no recorded cost yet.',
+    ],
 ];

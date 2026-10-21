@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Costs;
 
 use App\Modules\Catalog\Models\Item;
+use App\Modules\Inventory\Exceptions\InventoryError;
 use App\Modules\Inventory\Ledger\Ledger;
 use App\Modules\Inventory\Models\ItemCost;
 use App\Modules\Inventory\Models\ItemCostHistory;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Tenancy\BranchScope;
 use App\Shared\Values\CurrencyMismatch;
+use App\Shared\Values\Money;
 use App\Shared\Values\Quantity;
+use App\Shared\Values\UnitCost;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use InvalidArgumentException;
 use LogicException;
 
@@ -138,5 +142,59 @@ final class CostLedger
         }
 
         return $steps;
+    }
+
+    /**
+     * State the cost of the stock an item already has (POST /inventory/costs/{item}/opening): no purchase document exists for
+     * it, so there is no receipt. Locks the item's stock_balances rows (Ledger::lockItems), takes the total on hand as the
+     * quantity basis and writes the item's FIRST item_costs row plus one history row with source = opening (qty_in 0,
+     * cost_after = the stated cost). Stock with a recorded cost never gets an opening cost: the second one, however it
+     * arrives, is inventory.cost.exists (409). The row is INSERTed, never locked while missing (a FOR UPDATE on a missing
+     * row locks the gap and two of them deadlock, traps.md, "First-row race"); the unique key decides a race.
+     *
+     * @throws InventoryError inventory.cost.exists (409)
+     * @throws LogicException outside a transaction
+     */
+    public function open(int $itemId, UnitCost $cost, string $currency = Money::DEFAULT_CURRENCY): ItemCost
+    {
+        $userId = $this->actor->requireUserId();
+        $onHand = $this->ledger->lockItems([$itemId])[$itemId];
+        if (ItemCost::query()->where('item_id', $itemId)->exists()) {
+            throw InventoryError::costExists($itemId);
+        }
+        $branchId = (int) Item::query()->whereKey($itemId)->value('branch_id');
+        $now = CarbonImmutable::now();
+
+        $row = (new ItemCost)->forceFill([
+            'branch_id' => $branchId,
+            'item_id' => $itemId,
+            'moving_avg_cost' => $cost,
+            'qty_basis' => $onHand,
+            'currency' => strtoupper($currency),
+            'as_of' => $now,
+            'version' => 1,
+        ]);
+        try {
+            $row->save();
+        } catch (UniqueConstraintViolationException) {
+            throw InventoryError::costExists($itemId);
+        }
+
+        (new ItemCostHistory)->forceFill([
+            'branch_id' => $branchId,
+            'item_id' => $itemId,
+            'source' => ItemCostHistory::SOURCE_OPENING,
+            'purchase_line_id' => null,
+            'qty_before' => $onHand,
+            'cost_before' => null,
+            'qty_in' => Quantity::zero(),
+            'unit_cost_in' => $cost,
+            'cost_after' => $cost,
+            'user_id' => $userId,
+            'acting_user_id' => $this->actor->actingUserId(),
+            'created_at' => $now,
+        ])->save();
+
+        return $row;
     }
 }
