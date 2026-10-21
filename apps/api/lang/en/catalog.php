@@ -25,6 +25,10 @@ return [
         'bought_in' => 'A bought-in product is sold as it comes and has no recipe.',
         'not_found' => 'This product has no recipe yet.',
         'self_reference' => 'A product cannot be an ingredient of its own recipe.',
+        'no_base' => 'Publish needs a first version: save the recipe once with PUT before publishing a new version.',
+        'unchanged' => 'This recipe is the same as the active version; change something to publish a new version.',
+        'published' => 'This recipe already has published versions; publish a new version instead of replacing it.',
+        'publish_conflict' => 'Another version was published at the same moment; open the recipe again and retry.',
     ],
     'validation' => [
         'decimal' => 'The :attribute must be a decimal number written as text, with at most :scale decimals.',

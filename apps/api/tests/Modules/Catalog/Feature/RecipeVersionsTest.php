@@ -244,13 +244,15 @@ it('keeps PUT replacing version 1 in place while it is the only version, and ref
 it('does the swap in one transaction, so a failure afterwards leaves version 1 active and no version 2', function () {
     ($this->putV1)()->assertCreated();
     $product = Item::query()->findOrFail($this->cake->id);
+    // RecipeBook takes the normalised spec the request builds: every line carries its optional flag and waste
+    $full = fn (array $spec): array => ['steps' => []] + array_replace($spec, ['lines' => array_map(fn (array $line): array => $line + ['is_optional' => false, 'waste_pct' => '0'], $spec['lines'])]);
     $began = 0;
     Event::listen(TransactionBeginning::class, function () use (&$began): void {
         $began++;
     });
 
     app(AuditedAction::class)->run(
-        fn () => app(RecipeBook::class)->publish($product, ($this->moreFlour)(), 'direct', $this->admin->id),
+        fn () => app(RecipeBook::class)->publish($product, $full(($this->moreFlour)()), 'direct', $this->admin->id),
         null,
         'recipe.publish',
     );
@@ -259,8 +261,8 @@ it('does the swap in one transaction, so a failure afterwards leaves version 1 a
         ->and($this->recipes->activeFor($this->cake)?->version)->toBe(2);
 
     // a failure after the publish rolls the whole swap back: never two active, never none
-    expect(fn () => app(AuditedAction::class)->run(function () use ($product): void {
-        app(RecipeBook::class)->publish($product, ($this->spec)(), 'doomed', $this->admin->id);
+    expect(fn () => app(AuditedAction::class)->run(function () use ($product, $full): void {
+        app(RecipeBook::class)->publish($product, $full(($this->spec)()), 'doomed', $this->admin->id);
         throw new RuntimeException('after the swap');
     }, null, 'recipe.publish'))->toThrow(RuntimeException::class, 'after the swap');
     expect(Recipe::query()->where('product_item_id', $this->cake->id)->count())->toBe(2)

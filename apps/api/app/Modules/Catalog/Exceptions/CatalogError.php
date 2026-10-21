@@ -75,6 +75,30 @@ final class CatalogError extends RuntimeException
         return new self('catalog.recipe.self_reference', 422);
     }
 
+    /** A publish needs a version 1 to change; PUT /items/{item}/recipe makes it. */
+    public static function recipeNoBase(): self
+    {
+        return new self('catalog.recipe.no_base', 409);
+    }
+
+    /** The recipe sent is the active version as it stands (the change note does not count). */
+    public static function recipeUnchanged(): self
+    {
+        return new self('catalog.recipe.unchanged', 409);
+    }
+
+    /** PUT /items/{item}/recipe replaces version 1 only while it is the only version; later changes are published. */
+    public static function recipePublished(): self
+    {
+        return new self('catalog.recipe.published', 409);
+    }
+
+    /** A second publish got past the lock (the unique key refused it): nothing was written, try again. */
+    public static function recipePublishConflict(): self
+    {
+        return new self('catalog.recipe.publish_conflict', 409);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);
