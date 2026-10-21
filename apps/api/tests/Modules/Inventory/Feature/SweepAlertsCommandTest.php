@@ -58,14 +58,14 @@ it('heals an evaluation that was lost: the sweep queues it, the worker opens the
     $this->travel(11)->minutes();
     expect(DB::table('stock_alert_states')->count())->toBe(0);
 
-    expect(($this->sweep)())->toBe(0)->and(DB::table('jobs')->count())->toBe(1);
+    expect(($this->sweep)())->toBe(0)->and(DB::table('jobs')->where('payload', 'like', '%EvaluateBalance%')->count())->toBe(1);
     Artisan::call('queue:work', ['--stop-when-empty' => true, '--tries' => 1]);
 
     $episodes = DB::table('stock_alert_states')->where('item_id', $this->flour->id)->get();
     expect($episodes)->toHaveCount(1)
         ->and($episodes[0]->type)->toBe('low')
         ->and($episodes[0]->is_active)->toBe(1)
-        ->and(DB::table('jobs')->count())->toBe(0);
+        ->and(DB::table('jobs')->where('payload', 'like', '%EvaluateBalance%')->count())->toBe(0); // whatever else the evaluation told people is not the sweep's business
 });
 
 it('is idempotent: a second sweep while the first jobs are pending queues nothing new', function () {
@@ -79,11 +79,12 @@ it('is idempotent: a second sweep while the first jobs are pending queues nothin
     $this->travel(11)->minutes();
 
     ($this->sweep)();
-    $afterFirst = DB::table('jobs')->count();
+    $evaluations = fn (): int => DB::table('jobs')->where('payload', 'like', '%EvaluateBalance%')->count();
+    $afterFirst = $evaluations();
     ($this->sweep)();
     ($this->sweep)();
 
-    expect($afterFirst)->toBe(2)->and(DB::table('jobs')->count())->toBe($afterFirst);
+    expect($afterFirst)->toBe(2)->and($evaluations())->toBe($afterFirst);
 });
 
 it('queues a balance with an open episode and one with a live rule, and nothing for a balance with neither', function () {
