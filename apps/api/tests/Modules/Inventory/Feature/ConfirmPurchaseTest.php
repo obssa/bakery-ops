@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Inventory\Costs\MovingAverage;
+use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\ItemCost;
 use App\Modules\Inventory\Models\Purchase;
 use App\Modules\Inventory\Models\PurchaseLine;
@@ -88,7 +89,7 @@ it('moves the moving average to 4 dp over purchases, taking in the stock on hand
     expect(($this->avg)($this->f->flour))->toBe('0.0850');
 
     // 7 kg left the store and 3 kg are in the kitchen: the average is still taken over everything on hand (26000 g here)
-    stockIn($this->f->flour, $this->f->store, '-4000', App\Modules\Inventory\Ledger\MovementReason::Waste);
+    stockIn($this->f->flour, $this->f->store, '-4000', MovementReason::Waste);
     stockIn($this->f->flour, $this->f->kitchen, '1000');
     $third = ($this->draft)([$this->f->line($this->f->flour, '4', '100.123')]);
     $expected = MovingAverage::next('27000', '0.0850', '4000', '0.1001')->toString();

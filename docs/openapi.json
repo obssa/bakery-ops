@@ -438,6 +438,288 @@
                 }
             }
         },
+        "/v1/inventory/costs/{item}/opening": {
+            "post": {
+                "operationId": "inventory.costs.opening",
+                "tags": [
+                    "Costs"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetOpeningCostRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/inventory/costs": {
+            "get": {
+                "operationId": "inventory.costs.index",
+                "tags": [
+                    "Costs"
+                ],
+                "parameters": [
+                    {
+                        "name": "item_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `ItemCostResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ItemCostResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/inventory/costs/{item}": {
+            "get": {
+                "operationId": "inventory.costs.show",
+                "tags": [
+                    "Costs"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 200
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/devices": {
             "get": {
                 "operationId": "identity.devices.index",
@@ -2191,6 +2473,426 @@
                 }
             }
         },
+        "/v1/purchases": {
+            "get": {
+                "operationId": "inventory.purchases.index",
+                "tags": [
+                    "Purchases"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "draft",
+                                "confirmed",
+                                "cancelled"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "supplier_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `PurchaseResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PurchaseResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "inventory.purchases.store",
+                "tags": [
+                    "Purchases"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StorePurchaseRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/purchases/{purchase}": {
+            "get": {
+                "operationId": "inventory.purchases.show",
+                "tags": [
+                    "Purchases"
+                ],
+                "parameters": [
+                    {
+                        "name": "purchase",
+                        "in": "path",
+                        "required": true,
+                        "description": "The purchase ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/purchases/{purchase}/lines": {
+            "put": {
+                "operationId": "inventory.purchases.lines",
+                "tags": [
+                    "Purchases"
+                ],
+                "parameters": [
+                    {
+                        "name": "purchase",
+                        "in": "path",
+                        "required": true,
+                        "description": "The purchase ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReplacePurchaseLinesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/purchases/{purchase}/confirm": {
+            "post": {
+                "operationId": "inventory.purchases.confirm",
+                "tags": [
+                    "Purchases"
+                ],
+                "parameters": [
+                    {
+                        "name": "purchase",
+                        "in": "path",
+                        "required": true,
+                        "description": "The purchase ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/purchases/{purchase}/cancel": {
+            "post": {
+                "operationId": "inventory.purchases.cancel",
+                "tags": [
+                    "Purchases"
+                ],
+                "parameters": [
+                    {
+                        "name": "purchase",
+                        "in": "path",
+                        "required": true,
+                        "description": "The purchase ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CancelPurchaseRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/items/{item}/recipe": {
             "get": {
                 "operationId": "catalog.items.recipe.show",
@@ -2650,6 +3352,148 @@
                 }
             }
         },
+        "/v1/suppliers": {
+            "get": {
+                "operationId": "inventory.suppliers.index",
+                "tags": [
+                    "Suppliers"
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": [
+                                "string",
+                                "null"
+                            ],
+                            "maxLength": 100
+                        }
+                    },
+                    {
+                        "name": "active",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Array of `SupplierResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SupplierResource"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "inventory.suppliers.store",
+                "tags": [
+                    "Suppliers"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreSupplierRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/suppliers/{supplier}": {
+            "patch": {
+                "operationId": "inventory.suppliers.update",
+                "tags": [
+                    "Suppliers"
+                ],
+                "parameters": [
+                    {
+                        "name": "supplier",
+                        "in": "path",
+                        "required": true,
+                        "description": "The supplier ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateSupplierRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/units": {
             "get": {
                 "operationId": "catalog.units.index",
@@ -2982,6 +3826,20 @@
                 },
                 "title": "CancelOrderRequest"
             },
+            "CancelPurchaseRequest": {
+                "type": "object",
+                "description": "POST /purchases/{purchase}/cancel: an optional reason (\"Supplier did not deliver\"), kept on the purchase and in the audit row.",
+                "properties": {
+                    "reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "title": "CancelPurchaseRequest"
+            },
             "CategoryResource": {
                 "type": "object",
                 "properties": {
@@ -3069,6 +3927,59 @@
                     "revoked_at"
                 ],
                 "title": "DeviceResource"
+            },
+            "ItemCostResource": {
+                "type": "object",
+                "properties": {
+                    "item": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name_en": {
+                                "type": "string"
+                            },
+                            "name_am": {
+                                "type": "string"
+                            },
+                            "unit": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name_en",
+                            "name_am",
+                            "unit"
+                        ]
+                    },
+                    "moving_avg_cost": {
+                        "type": "string"
+                    },
+                    "qty_basis": {
+                        "type": "string"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "as_of": {
+                        "type": "string"
+                    },
+                    "history": {
+                        "type": "array",
+                        "items": {}
+                    }
+                },
+                "required": [
+                    "item",
+                    "moving_avg_cost",
+                    "qty_basis",
+                    "currency",
+                    "as_of",
+                    "history"
+                ],
+                "title": "ItemCostResource"
             },
             "ItemPriceResource": {
                 "type": "object",
@@ -3493,6 +4404,11 @@
                 ],
                 "title": "MovementResource"
             },
+            "PurchaseResource": {
+                "type": "array",
+                "items": {},
+                "title": "PurchaseResource"
+            },
             "PutRecipeRequest": {
                 "type": "object",
                 "description": "PUT /items/{item}/recipe: the whole recipe (version 1 in Phase 0): yield quantity and unit, at least one line\n(a live item of the branch, each ingredient once, a positive quantity in a unit, optional flag, waste 0 <= w < 100)\nand optional bilingual steps (rule 9). Quantities are decimal strings (ADR 0004). Unit convertibility and\nself-reference are checked by RecipeBook against the database.",
@@ -3701,6 +4617,49 @@
                 ],
                 "title": "ReplaceLinesRequest"
             },
+            "ReplacePurchaseLinesRequest": {
+                "type": "object",
+                "description": "PUT /purchases/{purchase}/lines: the draft's lines become exactly this list (ReadsPurchaseLines), matched by line client UUID.",
+                "properties": {
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "client_uuid": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "item_id": {
+                                    "type": "integer"
+                                },
+                                "qty": {
+                                    "type": "string"
+                                },
+                                "unit_id": {
+                                    "type": "integer"
+                                },
+                                "unit_cost": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "client_uuid",
+                                "item_id",
+                                "qty",
+                                "unit_id",
+                                "unit_cost"
+                            ]
+                        },
+                        "maxItems": 100,
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "lines"
+                ],
+                "title": "ReplacePurchaseLinesRequest"
+            },
             "ReplaceUserStationsRequest": {
                 "type": "object",
                 "description": "PUT /users/{id}/stations: the user's complete set of station assignments (an empty list withdraws them all).",
@@ -3733,6 +4692,23 @@
                     "assignments"
                 ],
                 "title": "ReplaceUserStationsRequest"
+            },
+            "SetOpeningCostRequest": {
+                "type": "object",
+                "description": "POST /inventory/costs/{item}/opening: the cost of the stock already on hand, per $unit_id (a decimal string with at most 4\ndecimals, never a float). SetOpeningCost converts it to a cost per base unit.",
+                "properties": {
+                    "unit_cost": {
+                        "type": "string"
+                    },
+                    "unit_id": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "unit_cost",
+                    "unit_id"
+                ],
+                "title": "SetOpeningCostRequest"
             },
             "StationResource": {
                 "type": "object",
@@ -4220,6 +5196,86 @@
                 ],
                 "title": "StoreOrderRequest"
             },
+            "StorePurchaseRequest": {
+                "type": "object",
+                "description": "POST /purchases: a draft purchase. The purchase's client UUID (an offline replay with a lost Idempotency-Key reaches the\nsame purchase, ADR 0003), the supplier, the invoice number (optional), the invoice date (the branch's local date), where\nthe goods are received (default: the branch store), notes, whether a repeated supplier + invoice number is intended, and\nthe lines (ReadsPurchaseLines). Whether the supplier and location are live in this branch is the action's question.",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "supplier_id": {
+                        "type": "integer"
+                    },
+                    "invoice_no": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "purchase_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "location_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    },
+                    "allow_duplicate_invoice": {
+                        "type": "boolean"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "client_uuid": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "item_id": {
+                                    "type": "integer"
+                                },
+                                "qty": {
+                                    "type": "string"
+                                },
+                                "unit_id": {
+                                    "type": "integer"
+                                },
+                                "unit_cost": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "client_uuid",
+                                "item_id",
+                                "qty",
+                                "unit_id",
+                                "unit_cost"
+                            ]
+                        },
+                        "maxItems": 100,
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "client_uuid",
+                    "supplier_id",
+                    "purchase_date",
+                    "lines"
+                ],
+                "title": "StorePurchaseRequest"
+            },
             "StoreStationRequest": {
                 "type": "object",
                 "description": "POST /stations: one station per code per branch (Shared's stations table), named in both languages (rule 9).",
@@ -4258,6 +5314,41 @@
                     "name_am"
                 ],
                 "title": "StoreStationRequest"
+            },
+            "StoreSupplierRequest": {
+                "type": "object",
+                "description": "POST /suppliers: who a purchase is bought from. The name is a proper noun, shown as typed (no _en / _am pair); phone,\nTIN and notes are optional.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "StoreSupplierRequest"
             },
             "StoreUnitRequest": {
                 "type": "object",
@@ -4409,6 +5500,47 @@
                     "role"
                 ],
                 "title": "StoreUserRequest"
+            },
+            "SupplierResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "phone",
+                    "tin",
+                    "notes",
+                    "is_active"
+                ],
+                "title": "SupplierResource"
             },
             "UnitResource": {
                 "type": "object",
@@ -4607,6 +5739,41 @@
                     }
                 },
                 "title": "UpdateLocationRequest"
+            },
+            "UpdateSupplierRequest": {
+                "type": "object",
+                "description": "PATCH /suppliers/{supplier}: any of the supplier fields; a field left out stays, null clears an optional one. A\nsupplier is switched off with is_active = false (a purchase can no longer be started with it); there is no delete.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 160
+                    },
+                    "phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "notes": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 500
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "UpdateSupplierRequest"
             },
             "UpdateUserRequest": {
                 "type": "object",

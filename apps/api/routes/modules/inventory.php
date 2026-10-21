@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Modules\Inventory\Http\Controllers\CostsController;
 use App\Modules\Inventory\Http\Controllers\LedgerController;
 use App\Modules\Inventory\Http\Controllers\LocationsController;
+use App\Modules\Inventory\Http\Controllers\PurchasesController;
 use App\Modules\Inventory\Http\Controllers\StockController;
+use App\Modules\Inventory\Http\Controllers\SuppliersController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,6 +17,9 @@ use Illuminate\Support\Facades\Route;
  * inventory.manage (admin) to configure locations, inventory.adjust (admin) for the Phase 0 manual movements; every
  * write also carries idempotency (rule 7). {location} binds through the BranchScoped model, so another branch's row is
  * 404. Every route is listed in tests/Support/route_permissions.php and every write in tests/Support/write_endpoints.php.
+ *
+ * Step 2.2b adds suppliers and purchases (purchases.record: admin, manager) and the cost reads (costs.view: admin, manager);
+ * the opening cost is an adjustment of the books (inventory.adjust).
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:inventory.view')->group(function (): void {
@@ -29,5 +35,26 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
 
     Route::middleware(['permission:inventory.adjust', 'idempotency'])->group(function (): void {
         Route::post('/stock/movements', [StockController::class, 'storeMovement'])->name('inventory.stock.movements.store');
+        Route::post('/inventory/costs/{item}/opening', [CostsController::class, 'opening'])->whereNumber('item')->name('inventory.costs.opening');
+    });
+
+    Route::middleware('permission:purchases.record')->group(function (): void {
+        Route::get('/suppliers', [SuppliersController::class, 'index'])->name('inventory.suppliers.index');
+        Route::get('/purchases', [PurchasesController::class, 'index'])->name('inventory.purchases.index');
+        Route::get('/purchases/{purchase}', [PurchasesController::class, 'show'])->whereNumber('purchase')->name('inventory.purchases.show');
+    });
+
+    Route::middleware(['permission:purchases.record', 'idempotency'])->group(function (): void {
+        Route::post('/suppliers', [SuppliersController::class, 'store'])->name('inventory.suppliers.store');
+        Route::patch('/suppliers/{supplier}', [SuppliersController::class, 'update'])->whereNumber('supplier')->name('inventory.suppliers.update');
+        Route::post('/purchases', [PurchasesController::class, 'store'])->name('inventory.purchases.store');
+        Route::put('/purchases/{purchase}/lines', [PurchasesController::class, 'replaceLines'])->whereNumber('purchase')->name('inventory.purchases.lines');
+        Route::post('/purchases/{purchase}/confirm', [PurchasesController::class, 'confirm'])->whereNumber('purchase')->name('inventory.purchases.confirm');
+        Route::post('/purchases/{purchase}/cancel', [PurchasesController::class, 'cancel'])->whereNumber('purchase')->name('inventory.purchases.cancel');
+    });
+
+    Route::middleware('permission:costs.view')->group(function (): void {
+        Route::get('/inventory/costs', [CostsController::class, 'index'])->name('inventory.costs.index');
+        Route::get('/inventory/costs/{item}', [CostsController::class, 'show'])->whereNumber('item')->name('inventory.costs.show');
     });
 });

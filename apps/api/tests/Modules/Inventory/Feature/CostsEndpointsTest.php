@@ -49,7 +49,7 @@ it('lists the items that have a cost with their unit and as_of, of this branch o
         ->and($response->json('meta.total'))->toBe(2);
 
     $one = $this->getJson('/api/v1/inventory/costs?item_id='.$this->f->juice->id)->assertOk();
-    expect(array_column($one->json('data'), 'item.id'))->toBe([$this->f->juice->id]);
+    expect(array_map(fn (array $row): int => $row['item']['id'], $one->json('data')))->toBe([$this->f->juice->id]);
     $this->getJson('/api/v1/inventory/costs?item_id='.$theirs->id)->assertStatus(422)->assertJsonValidationErrors(['item_id']);
 })->group('module:inventory', 'feature');
 
