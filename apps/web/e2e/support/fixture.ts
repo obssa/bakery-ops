@@ -8,13 +8,13 @@ import { run } from "./env";
 
 export type StationKind = "kitchen" | "bar";
 
-interface Station {
+export interface Station {
   id: number;
   code: string;
   name_en: string;
   name_am: string;
 }
-interface Location {
+export interface Location {
   id: number;
   type: string;
   station_id: number | null;
@@ -56,6 +56,9 @@ const STAFF = {
   waiter: { phone: "+251911000203", name: "E2E Waiter" },
   cashier: { phone: "+251911000204", name: "E2E Cashier" },
   manager: { phone: "+251911000205", name: "E2E Manager" },
+  // Phase 2 (step 2.8a): the bakers of the production board
+  cake_baker: { phone: "+251911000206", name: "E2E Cake Baker" },
+  bread_baker: { phone: "+251911000207", name: "E2E Bread Baker" },
 } as const;
 
 /** The password of a fixed e2e account: derived from the admin's, so no credential is written in the repository. */
@@ -77,15 +80,20 @@ export function loginOnce(phone: string, password: string, branchId?: number): R
   return pending;
 }
 
-async function findOrCreateStation(admin: Api, code: StationKind): Promise<Station> {
+export async function findOrCreateStation(admin: Api, code: StationKind | "cake_room"): Promise<Station> {
   const stations = (await admin.get<{ data: Station[] }>("/stations")).data;
   const found = stations.find((s) => s.code === code);
   if (found) return found;
-  const names = code === "kitchen" ? { name_en: "Kitchen", name_am: "ኩሽና" } : { name_en: "Bar", name_am: "ባር" };
+  const names =
+    code === "kitchen"
+      ? { name_en: "Kitchen", name_am: "ኩሽና" }
+      : code === "bar"
+        ? { name_en: "Bar", name_am: "ባር" }
+        : { name_en: "Cake room", name_am: "የኬክ ክፍል" };
   return admin.post<Station>("/stations", { code, ...names });
 }
 
-async function findOrCreateLocation(admin: Api, station: Station): Promise<Location> {
+export async function findOrCreateLocation(admin: Api, station: Station): Promise<Location> {
   const locations = (await admin.get<{ data: Location[] }>("/locations")).data;
   const found = locations.find((l) => l.type === station.code && l.station_id === station.id);
   if (found) return found;
@@ -121,7 +129,7 @@ export async function buildWaiter(adminCredentials: { phone: string; password: s
   return { admin, branchId, waiter: { ...staff, api, shortCode } };
 }
 
-async function ensureTable(admin: Api, code: string): Promise<{ id: number; code: string }> {
+export async function ensureTable(admin: Api, code: string): Promise<{ id: number; code: string }> {
   const tables = (await admin.get<{ data: { id: number; code: string }[] }>("/dining-tables")).data;
   const found = tables.find((t) => t.code === code);
   if (found) return found;
@@ -146,11 +154,11 @@ export interface StationSide {
   product: { id: number; name_en: string; name_am: string; price: string; ingredientPerUnit: string };
 }
 
-interface Units {
+export interface Units {
   (code: string): number;
 }
 
-async function unitLookup(admin: Api): Promise<Units> {
+export async function unitLookup(admin: Api): Promise<Units> {
   const units = (await admin.get<{ data: Unit[] }>("/units")).data;
   return (code: string): number => {
     const found = units.find((u) => u.code === code);
@@ -281,7 +289,7 @@ export async function buildTillStaff(adminCredentials: { phone: string; password
   return { admin, branchId, cashier: { ...cashierStaff, api }, manager: { ...managerStaff, pin } };
 }
 
-async function findOrCreateDisplayCase(admin: Api): Promise<Location> {
+export async function findOrCreateDisplayCase(admin: Api): Promise<Location> {
   const locations = (await admin.get<{ data: Location[] }>("/locations")).data;
   const found = locations.find((l) => l.type === "display_case");
   if (found) return found;

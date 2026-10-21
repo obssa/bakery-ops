@@ -69,6 +69,10 @@ export class Api {
     return this.send<T>("PUT", path, body);
   }
 
+  patch<T>(path: string, body: unknown): Promise<T> {
+    return this.send<T>("PATCH", path, body);
+  }
+
   /** A write that is allowed to fail: returns the failure instead of throwing it. */
   async tryPost<T>(path: string, body: unknown = {}): Promise<{ ok: true; data: T } | { ok: false; failure: ApiFailure }> {
     try {
