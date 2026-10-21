@@ -225,7 +225,8 @@ and stays `DECIMAL(12,2)`; a rate is multiplied by a `Quantity` into `Money` (ha
    `note` VARCHAR(255) NULL, `reject_reason` VARCHAR(255) NULL, `production_request_id` BIGINT UNSIGNED NULL (set when
    raised from a production card; a plain id, Inventory never reads Production), `requested_by_user_id` FK,
    `requested_at`, `decided_by_user_id` FK NULL, `decided_at` NULL, `out_movement_id` / `in_movement_id` BIGINT UNSIGNED
-   NULL (the two `transfer` rows, set at confirm), the actor stamp, `version`, timestamps. CHECKs: `qty > 0`,
+   NULL (the two `transfer` rows, set at confirm; real foreign keys to `stock_movements`), the actor stamp (`created_by_user_id` is the
+   logged-in account, `requested_by_user_id` the person who asked: the one acting by short code, else the account), `version`, timestamps. CHECKs: `qty > 0`,
    `from_location_id <> to_location_id`, decided columns set exactly when status is not `requested`. Unique
    `(branch_id, client_uuid)`; indexes `(branch_id, status, from_location_id)`, `(to_location_id, status)`. No soft delete.
 9. `..._extend_recipes_for_versions` (Catalog, 2.4a): `recipes` gains `published_at` DATETIME NULL, `published_by_user_id`
@@ -332,10 +333,10 @@ asking for a different state is `409 state_machine.illegal_transition`. Read end
 | `POST /inventory/costs/{item}/opening` | `inventory.adjust` | key | `{unit_cost, unit_id}` (cost of the stock already on hand when no purchase document exists) | `201` the cost row (history `source = opening`) | `409 inventory.cost.exists`; `422 purchases.unit.incompatible`, `purchases.item.not_purchasable`, `purchases.line.cost_too_small` (the cost is stated per `unit_id` and kept per base unit, 4 dp half-up) |
 | `GET /inventory/recipe-costs/{product}` | `costs.view` | read | `?version=` (default: the active one) | `200 {product_id, version, yield: {qty, unit}, complete: bool, missing_cost_item_ids: [..], total_cost, cost_per_unit (4 dp), price (Prices::at now) \| null, margin_amount, margin_pct (2 dp) \| null, lines: [{ingredient: {id, name_en, name_am}, qty_base, unit, waste_pct, unit_cost \| null, line_cost \| null, source: purchase\|recipe\|missing}]}` | `404 catalog.recipe.not_found` |
 | **Inventory: transfers (2.3)** | | | | | |
-| `GET /transfers` | `inventory.view` | read | `?status=`, `?location_id=` (either end), `?mine=1`, `?production_request_id=`, `?page=` | `200` paginated Transfers | `403` |
-| `POST /transfers` | `transfers.request` | key + `client_uuid` | `{client_uuid, item_id, to_location_id, from_location_id? (default: the store), qty, unit_id? (default: the base unit), note?, production_request_id?}` | `201` Transfer (`requested`) | `403 inventory.transfer.destination_forbidden` (the requester is not assigned to the destination's station and holds no `stations.all`); `422 validation.failed`, `inventory.transfer.same_location`, `inventory.transfer.item_not_stockable` |
-| `POST /transfers/{transfer}/confirm` | `transfers.confirm` (and assigned to the source's station or `stations.all`) | key | `{}` | `200` Transfer (`confirmed`, both movement ids) | `409 inventory.transfer.insufficient` `{available, requested}` (the row stays `requested`); `409 state_machine.illegal_transition`; `403 inventory.transfer.source_forbidden` |
-| `POST /transfers/{transfer}/reject` | `transfers.confirm` | key | `{reason}` (required) | `200` Transfer (`rejected`) | `422 validation.failed`; `409 state_machine.illegal_transition` |
+| `GET /transfers` | `inventory.view` | read | `?status=`, `?location_id=` (either end), `?mine=1`, `?production_request_id=`, `?page=`, `?per_page=` | `200` paginated Transfers, newest first | `403`, `422 validation.failed` |
+| `POST /transfers` | `transfers.request` | key + `client_uuid` | `{client_uuid, item_id, to_location_id, from_location_id? (default: the store), qty, unit_id? (default: the base unit), note?, production_request_id?}` | `201` Transfer (`requested`); `200` the same Transfer for a `client_uuid` already used | `403 inventory.transfer.destination_forbidden` (the requester is not assigned to the destination's station and holds no `stations.all`; a destination with no station needs `stations.all`); `422 validation.failed`, `inventory.transfer.same_location`, `inventory.transfer.item_not_stockable`, `inventory.transfer.location_unknown`, `catalog.unit.incompatible` |
+| `POST /transfers/{transfer}/confirm` | `transfers.confirm` (and assigned to the source's station or `stations.all`) | key | `{}` | `200` Transfer (`confirmed`, both movement ids) | `409 inventory.transfer.insufficient` `{available, requested}` (the row stays `requested`); `409 inventory.transfer.rejected` `{status}`; `403 inventory.transfer.source_forbidden`. Confirming a confirmed transfer is `200` and writes nothing |
+| `POST /transfers/{transfer}/reject` | `transfers.confirm` (and assigned to the source's station or `stations.all`) | key | `{reason}` (required, at most 255) | `200` Transfer (`rejected`); a repeat is `200` and keeps the first reason | `422 validation.failed`; `409 inventory.transfer.confirmed` `{status}`; `403 inventory.transfer.source_forbidden` |
 | **Inventory: reorder and low stock (2.6)** | | | | | |
 | `GET /reorder-rules` | `inventory.view` | read | `?item_id=`, `?location_id=` | `200 {data: [Rule]}` Rule `{id, item, location \| null, min_qty, reorder_qty, notify_roles, is_active, version}` | `403` |
 | `POST /reorder-rules` | `inventory.manage` | key | `{item_id, location_id?, min_qty, reorder_qty, notify_roles: [..], is_active?}` | `201` Rule | `422 validation.failed`, `inventory.reorder.exists` (one live rule per item and place), `inventory.reorder.role_unknown` |
@@ -376,7 +377,7 @@ asking for a different state is `409 state_machine.illegal_transition`. Read end
 Resources.
 
 - **Purchase**: `{id, client_uuid, supplier {id, name}, invoice_no, purchase_date, location {id, name_en, name_am}, status, currency, total, lines: [{id, client_uuid, item {id, name_en, name_am}, qty, unit {id, code}, qty_base, unit_cost, unit_cost_base, line_total, movement_id | null}], confirmed_at, confirmed_by, cancelled_at, cancel_reason, notes, version}`. Cost fields are omitted for a caller without `costs.view` (a manager keeps them; the admin screen is the only one that shows them).
-- **Transfer**: `{id, client_uuid, item {id, name_en, name_am, unit}, from_location, to_location, qty, status, note, reject_reason, requested_by {id, name}, requested_at, decided_by, decided_at, production_request_id, source_available}` (`source_available`, live, only while `requested`: what the store could give now).
+- **Transfer**: `{id, client_uuid, item {id, name_en, name_am, unit}, from_location {id, name_en, name_am}, to_location, qty, status, note, reject_reason, requested_by {id, name}, requested_at, decided_by {id, name} | null, decided_at, production_request_id, out_movement_id, in_movement_id, source_available, version}` (`unit` is the item's base unit, the one `qty` is in; `source_available`, live, only while `requested`: what the source could give now, `available` = on hand minus reserved; the two movement ids are null until confirmed).
 - **ProductionRequest**: `{id, client_uuid, product {id, name_en, name_am, unit}, requested_qty, due_at, priority, reason, status, station {id, code, name_en, name_am, requires_overseer}, requested_by {id, name}, assigned_to {id, name} | null, note, batch: Batch | null, created_at, version}`. **Batch**: `{id, client_uuid, status, recipe_version, planned_qty, produced_qty, waste_qty, started_at, finished_by, finished_at, confirmed_by, confirmed_at, send_back_note, send_back_count, version}`.
 - **The card** (`GET /production/requests/{request}`): `recipe {version, yield {qty, unit}, target_qty, lines: [{ingredient {id, name_en, name_am, unit}, needed, on_hand, available, short, short_qty}], steps: [{order, text_en, text_am}]}` from `Recipes::scaled` for the requested quantity (for a started batch: the batch's recorded version, so a newer version published meanwhile does not change the card; for a finished one: scaled to produced plus waste), `consume_location`, `output_location`, `transfer_hint {from_location_id (the store), store_available}` per short ingredient. "Needed" is what `Done` would consume.
 - **Notification**: `{id, type, severity, title, body, title_en, title_am, body_en, body_am, payload, deep_link, read_at, created_at}`; `title` and `body` are already in the caller's locale (`Recipients::localeOf`).
@@ -657,6 +658,72 @@ and 1.6a-c were in Phase 1.
    four endpoints. Concurrency: two confirms of different transfers racing for the last stock (one wins, the other 409
    with the row still `requested`), the same confirm twice at once (one pair of rows). No negative stock is introduced
    anywhere (section 10.4).
+   **As built (step 2.3, `phase-2/transfers`).** Done as planned, with these differences and decisions (the plan left them open or the
+   code is the fact; the section 4 rows and the migration 8 text above are corrected):
+   - *Red first, as run.* The five contract cases were committed alone and failed on `Target class [Contracts\Transfers] does not exist`
+     (5 red, the 7 older cases green). The module tests followed, red before any code: `TransferStatusTest` (3 of 3, class missing),
+     `TransfersSchemaTest` (5 of 6; the sixth, "refuses a location, item or user that does not exist", passes while the table is
+     missing because every insert fails), `TransfersLangTest` (2 of 2), `TransferRequestTest` (15 of 15, the first on a `404` for
+     the missing route), plus the decisions and race files and the registry rows, committed red without a separate run (they need the same routes). Green after the code: the contract file 12 of 12,
+     request 15, decisions 14, races 4; the three commits in between each build and pass what they claim.
+   - *Contract* `Contracts\Transfers` (final, built per use): `request(item, to, qty (base units), clientUuid, from = null, note = null,
+     productionRequestId = null): Transfer`, `confirm(Transfer|int)`, `reject(Transfer|int, reason)`. It returns the `Transfer` model
+     (as `Locations` returns a `Location`), reads the transfer fresh by id (a stale model cannot decide what a faster caller already
+     decided), and shares its three actions with the endpoints. The endpoint takes the quantity in a `unit_id`; the contract takes it
+     in base units.
+   - *Confirm* (`ConfirmTransfer`): the person is checked first (403), then one `AuditedAction` (`transfer.confirm`): `TransferLock` (the
+     transfer row `FOR UPDATE`), the status is re-read under it, `Ledger::lock` of the source and destination balance rows in the
+     ledger's ascending order (a missing destination row is created by the 2.2b upsert, never gap-locked), the source's `available`
+     read under those locks (less than the quantity: `409 inventory.transfer.insufficient` `{item_id, location_id, available, requested}`,
+     which rolls everything back, so no audit row and no event), one `Ledger::appendMany` of `MovementIntent::transfer`
+     (`ref_type = transfer`, `ref_id` = the transfer; `client_uuid` null: the transfer row lock, not a derived UUID, is what makes it
+     once), then the status, the decision, both movement ids and `version + 1`. A transfer touches no `item_costs` row: the average is per
+     item, whatever the place. Lock order of the system is unchanged: purchases or the transfer, `stock_balances` ascending, `item_costs`
+     ascending.
+   - *Repeats and opposites (2.2b conventions).* A second confirm of a confirmed transfer and a second reject of a rejected one answer
+     `200` with the transfer and write nothing, not even an audit row or an event (the first reason is kept); a double tap that loses the
+     lock unwinds through an internal exception, as `ConfirmPurchase` does. The opposite decision is `409` with the status, under
+     specific keys instead of the plan's `state_machine.illegal_transition`: `inventory.transfer.rejected` (confirm a rejected one) and
+     `inventory.transfer.confirmed` (reject a confirmed one), each with `{status}`. A create replay with a used `client_uuid` is `200`
+     (first answer `201`), checked before anything else, so it needs no permission and announces nothing.
+   - *Who may do what.* `TransferAccess` reads the person who physically acts (the short-code actor, else the account) and goes through
+     Identity's `Access`: a request needs `transfers.request` and an assignment to the destination's station; a confirm or reject needs
+     `transfers.confirm` and an assignment to the source's station; `stations.all` (admin, manager) replaces the assignment. A place with
+     no station can only be dealt with by someone who holds `stations.all` (the rule `OrderAccess` uses for a line with no station);
+     every location of the demo bakery has a station, so this only guards a half-configured branch. The plan listed the source check on
+     confirm only; **reject has it too** (`403 inventory.transfer.source_forbidden`): a person who cannot hand the stock over should not be
+     able to refuse it either. Order of refusals on a request: replay, then the 422s (unknown place, same place, item not stocked, unit,
+     quantity), then the 403.
+   - *Decisions the plan left open.* (1) A request does not look at the stock; "is there enough" is answered only at the confirm. The list
+     shows the live `source_available` while a transfer is requested. (2) "Stockable" is an active item whose fulfilment is not `to_order`
+     (ingredients, `to_stock` and `bought_in` products); anything else, an unknown id or another branch's item is `422
+     inventory.transfer.item_not_stockable`. (3) The source defaults to `Locations::store()`; an unknown place or no store when none is named
+     is `422 inventory.transfer.location_unknown` `{field}`. (4) The quantity is typed in `unit_id` (any unit that converts to the item's) or,
+     with no unit, is already in base units; a result that overflows `NUMERIC(14,4)` or rounds to zero is `422` on `qty`. (5) Reserved stock
+     cannot be moved away: the check is `available`, and the ledger's own refusal of a negative `on_hand` stays behind it. Nothing in this
+     step creates negative stock; section 10.4's open question is untouched. (6) `TransferRequested` and `TransferDecided` (section 5) are
+     implemented now with a shared `TransferEvent` base: both carry the item and the two places in both languages, `from_station_id` /
+     `to_station_id` (so Notifications can pick recipients without Inventory), the quantity and its unit, the requester, and, per event,
+     `production_request_id` or `status`, `reject_reason`, `decided_by_user_id`. They are dispatched after the commit, by `TransferAnnouncer`
+     inside the action's transaction. Nobody listens yet (step 2.5). (7) `mine=1` is the requests of the person acting.
+   - *Code map.* `Inventory\Transfers\{RequestTransfer, ConfirmTransfer, RejectTransfer, TransferLock, TransferAccess, TransferAnnouncer,
+     AlreadyDecided}`, `Contracts\Transfers`, `Enums\TransferStatus`, `Models\Transfer` + `TransferFactory`, `Exceptions\TransferError`,
+     `TransfersController`, `StoreTransferRequest`, `RejectTransferRequest`, `ListTransfersRequest`, `TransferResource`; `Shared\Events\{
+     TransferEvent, TransferRequested, TransferDecided}`; migration `2026_10_22_120100_create_transfers_table`; `Units::toBaseOf` gained its
+     `@throws NumericOverflow`. New lang keys in `inventory.php`: `transfer.{same_location, item_not_stockable, location_unknown,
+     destination_forbidden, source_forbidden, insufficient, confirmed, rejected, qty_too_large, qty_too_small}`. Registries: four rows in
+     `route_permissions.php` (one `inventory.view`, one `transfers.request`, two `transfers.confirm`), three in `write_endpoints.php`; the
+     matrix gained the `{transfer}` placeholder. `Transfer` is allow-listed in `SoftDeletesTest`. `docs/erd.dbml` has the table;
+     `docs/openapi.json` was re-exported against the test database (3 new paths; nothing else changed).
+   - *Tests.* `TransferStatusTest`, `TransfersSchemaTest`, `TransfersLangTest`, `TransferRequestTest`, `TransferDecisionsTest` (module `inventory`),
+     the five transfer cases of `Contract/Production/InventoryContractTest`, and in `concurrency`: `Gate/TransferRaceTest` (forked processes
+     through HTTP, 30 rounds each, comparing `Innodb_deadlocks` before and after): two transfers racing for the last stock (one `200`, one
+     `409 inventory.transfer.insufficient` with its row still `requested`, the store left at exactly the remainder), the same confirm twice at
+     once (one pair of rows, one audit row, version 2), two transfers into a place the item has never been at, and two transfers in opposite
+     directions between the same two places. With `TransferLock::refresh` taken out the same-confirm race fails in every round (four
+     movements, a double debit), so the test proves the lock. Run locally: those files, Arch, Invariants and the inventory part of the route
+     matrix, PHPStan and Pint; CI's `mod-inventory` is the rest of the evidence.
+
 4. **2.4 recipe versions and cost** (`catalog.recipe-versions`, groups `module:catalog`, `module:inventory`), two PRs:
    - 2.4a Catalog: the contract case for version 1 staying readable (red first), migration 9, `RecipeBook::publish`
      (one `AuditedAction`, one transaction: lock the product's item row, refuse an unchanged recipe, set the active
