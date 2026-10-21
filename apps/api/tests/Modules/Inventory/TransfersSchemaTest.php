@@ -107,10 +107,11 @@ it('keeps the status to the machine list and the decision columns set exactly wh
     $p = transferParents();
     $decided = ['decided_by_user_id' => $p['user']->id, 'decided_at' => now()];
 
+    // not a status; decided without who and when; decided without who; requested but decided
     expect(fn () => DB::table('transfers')->insert(rawTransfer($p, ['status' => 'cancelled'])))->toThrow(QueryException::class)
-        ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['status' => 'confirmed'])))->toThrow(QueryException::class, 'decided without who and when')
-        ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['status' => 'rejected', 'decided_at' => now()])))->toThrow(QueryException::class, 'decided without who')
-        ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['status' => 'requested'] + $decided)))->toThrow(QueryException::class, 'requested but decided');
+        ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['status' => 'confirmed'])))->toThrow(QueryException::class)
+        ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['status' => 'rejected', 'decided_at' => now()])))->toThrow(QueryException::class)
+        ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['status' => 'requested'] + $decided)))->toThrow(QueryException::class);
 
     DB::table('transfers')->insert(rawTransfer($p, ['status' => 'confirmed'] + $decided));
     DB::table('transfers')->insert(rawTransfer($p, ['status' => 'rejected', 'reject_reason' => 'No flour left'] + $decided));

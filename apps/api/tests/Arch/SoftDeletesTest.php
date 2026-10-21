@@ -19,6 +19,7 @@ $noSoftDeletes = [
     'App\Modules\Inventory\Ledger\StockBalance',  // the running balance the Ledger keeps per (item, location): updated in place, never deleted
     'App\Modules\Inventory\Models\StockAlertState',  // history of alert episodes: opened and cleared (cleared_at, is_active NULL), never deleted; the unique key lets one stay open
     'App\Modules\Inventory\Models\Purchase',  // never deleted: draft, then confirmed or cancelled by status; a confirmed one is the invoice behind its purchase_in movements
+    'App\Modules\Inventory\Models\Transfer',  // never deleted: requested, then confirmed or rejected by status; a confirmed one names the two transfer movements it wrote
     'App\Modules\Inventory\Models\ItemCost',  // derived state: the moving average CostLedger keeps per item, updated in place under its row lock, never deleted
     'App\Modules\Inventory\Models\ItemCostHistory',  // the append-only history of every average (DB trigger + model guard): the average can be replayed from it
     'App\Modules\Orders\Models\Order',  // never deleted: cancelled or voided by status, kept for the till, the ledger refs and the audit
