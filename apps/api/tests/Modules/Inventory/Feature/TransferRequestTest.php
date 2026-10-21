@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Inventory\Enums\LocationType;
+use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\Transfer;
 use App\Shared\Events\TransferRequested;
 use App\Shared\Models\Branch;
@@ -26,7 +28,7 @@ beforeEach(function () {
     loginAs($this->f->baker);
     $this->post = fn (array $body) => $this->withHeaders(idempotencyKey())->postJson('/api/v1/transfers', $body);
     // the baker asks the store for 5 kg of flour for the cake room, typed in kilograms
-    $this->flourForCakeRoom = fn (array $over = []): array => $this->f->body($this->f->flour, $this->f->cakeRoom, '5', ['unit_id' => catalogUnit('kg')->id] + $over);
+    $this->flourForCakeRoom = fn (array $over = []): array => $this->f->body($this->f->flour, $this->f->cakeRoom, '5', $over + ['unit_id' => catalogUnit('kg')->id]);
 });
 
 it('writes a requested transfer and no movement, from the store by default, in base units', function () {
@@ -150,7 +152,7 @@ it('lets a person ask for their own station only, and a stations.all holder for 
 })->group('module:inventory', 'feature');
 
 it('refuses a destination with no station to anyone who does not work at every station', function () {
-    $nowhere = stockLocation($this->branch, App\Modules\Inventory\Enums\LocationType::Bar);
+    $nowhere = stockLocation($this->branch, LocationType::Bar);
 
     ($this->post)($this->f->body($this->f->flour, $nowhere, '1000'))->assertForbidden()->assertJsonPath('message_key', 'inventory.transfer.destination_forbidden');
     loginAs($this->f->manager);
@@ -227,8 +229,9 @@ it('lists the transfers of the branch newest first, and filters by status, eithe
     expect($ids())->toBe([$kitchen, $mine])
         ->and($ids('?status=requested'))->toBe([$mine])
         ->and($ids('?status=rejected'))->toBe([$kitchen])
-        ->and($ids('?location_id='.$this->f->store->id))->toBe([$mine], 'the store is the source of the flour request only')
-        ->and($ids('?location_id='.$this->f->kitchen->id))->toBe([$kitchen], 'the destination counts too')
+        ->and($ids('?location_id='.$this->f->store->id))->toBe([$kitchen, $mine], 'the store is the source of both')
+        ->and($ids('?location_id='.$this->f->cakeRoom->id))->toBe([$mine], 'the destination counts too')
+        ->and($ids('?location_id='.$this->f->kitchen->id))->toBe([$kitchen])
         ->and($ids('?production_request_id=7'))->toBe([$mine])
         ->and($ids('?per_page=1'))->toBe([$kitchen]);
 
@@ -245,7 +248,7 @@ it('shows the live source_available only while a transfer is requested', functio
     $list = fn () => collect($this->getJson('/api/v1/transfers')->assertOk()->json('data'))->firstWhere('id', $id);
 
     expect($list()['source_available'])->toBe('9000.0000');
-    stockIn($this->f->flour, $this->f->store, '-4000', App\Modules\Inventory\Ledger\MovementReason::Waste);
+    stockIn($this->f->flour, $this->f->store, '-4000', MovementReason::Waste);
     expect($list()['source_available'])->toBe('5000.0000');
 
     loginAs($this->f->manager);

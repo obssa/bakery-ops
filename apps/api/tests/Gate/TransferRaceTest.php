@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Models\Item;
 use App\Modules\Inventory\Models\Transfer;
 use App\Shared\Models\Branch;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,7 @@ it('lets one of two transfers racing for the last stock win and refuses the othe
     $deadlocksBefore = transferRaceDeadlocks();
     $failures = [];
     foreach (range(1, TRANSFER_RACE_ROUNDS) as $round) {
-        $item = App\Modules\Catalog\Models\Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'created_by_user_id' => $this->f->admin->id]);
+        $item = Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'created_by_user_id' => $this->f->admin->id]);
         stockIn($item, $this->f->store, '5000');
         // 4 kg each from a 5 kg stock, to two places: the kitchen has never held this item, the cake room neither
         $a = ($this->requested)($item, $this->f->store, $this->f->kitchen, '4000');
@@ -99,7 +100,7 @@ it('lets one of two transfers racing for the last stock win and refuses the othe
 it('writes one pair of rows when the same transfer is confirmed twice at the same moment (30 rounds)', function () {
     $failures = [];
     foreach (range(1, TRANSFER_RACE_ROUNDS) as $round) {
-        $item = App\Modules\Catalog\Models\Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'created_by_user_id' => $this->f->admin->id]);
+        $item = Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'created_by_user_id' => $this->f->admin->id]);
         stockIn($item, $this->f->store, '9000');
         $id = ($this->requested)($item, $this->f->store, $this->f->kitchen, '4000');
 
@@ -126,7 +127,7 @@ it('moves two transfers of one item into a place it has never been at, deadlock-
     $deadlocksBefore = transferRaceDeadlocks();
     $failures = [];
     foreach (range(1, TRANSFER_RACE_ROUNDS) as $round) {
-        $item = App\Modules\Catalog\Models\Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'created_by_user_id' => $this->f->admin->id]);
+        $item = Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'created_by_user_id' => $this->f->admin->id]);
         stockIn($item, $this->f->store, '9000');
         $a = ($this->requested)($item, $this->f->store, $this->f->kitchen, '2000');
         $b = ($this->requested)($item, $this->f->store, $this->f->kitchen, '3000');
@@ -150,7 +151,7 @@ it('never deadlocks when two transfers move the same item in opposite directions
     $deadlocksBefore = transferRaceDeadlocks();
     $failures = [];
     foreach (range(1, TRANSFER_RACE_ROUNDS) as $round) {
-        $item = App\Modules\Catalog\Models\Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'created_by_user_id' => $this->f->admin->id]);
+        $item = Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'created_by_user_id' => $this->f->admin->id]);
         stockIn($item, $this->f->store, '5000');
         stockIn($item, $this->f->cakeRoom, '5000');
         $out = ($this->requested)($item, $this->f->store, $this->f->cakeRoom, '1000');

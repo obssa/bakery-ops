@@ -8,6 +8,7 @@ use App\Modules\Inventory\Http\Controllers\LocationsController;
 use App\Modules\Inventory\Http\Controllers\PurchasesController;
 use App\Modules\Inventory\Http\Controllers\StockController;
 use App\Modules\Inventory\Http\Controllers\SuppliersController;
+use App\Modules\Inventory\Http\Controllers\TransfersController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -20,12 +21,16 @@ use Illuminate\Support\Facades\Route;
  *
  * Step 2.2b adds suppliers and purchases (purchases.record: admin, manager) and the cost reads (costs.view: admin, manager);
  * the opening cost is an adjustment of the books (inventory.adjust).
+ *
+ * Step 2.3 adds transfers: the floor reads them (inventory.view), asks for stock (transfers.request) and the people who hold
+ * transfers.confirm decide; the actions also check the person works at the destination's / source's station.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:inventory.view')->group(function (): void {
         Route::get('/locations', [LocationsController::class, 'index'])->name('inventory.locations.index');
         Route::get('/stock', [StockController::class, 'index'])->name('inventory.stock.index');
         Route::get('/ledger', [LedgerController::class, 'index'])->name('inventory.ledger.index');
+        Route::get('/transfers', [TransfersController::class, 'index'])->name('inventory.transfers.index');
     });
 
     Route::middleware(['permission:inventory.manage', 'idempotency'])->group(function (): void {
@@ -51,6 +56,15 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::put('/purchases/{purchase}/lines', [PurchasesController::class, 'replaceLines'])->whereNumber('purchase')->name('inventory.purchases.lines');
         Route::post('/purchases/{purchase}/confirm', [PurchasesController::class, 'confirm'])->whereNumber('purchase')->name('inventory.purchases.confirm');
         Route::post('/purchases/{purchase}/cancel', [PurchasesController::class, 'cancel'])->whereNumber('purchase')->name('inventory.purchases.cancel');
+    });
+
+    Route::middleware(['permission:transfers.request', 'idempotency'])->group(function (): void {
+        Route::post('/transfers', [TransfersController::class, 'store'])->name('inventory.transfers.store');
+    });
+
+    Route::middleware(['permission:transfers.confirm', 'idempotency'])->group(function (): void {
+        Route::post('/transfers/{transfer}/confirm', [TransfersController::class, 'confirm'])->whereNumber('transfer')->name('inventory.transfers.confirm');
+        Route::post('/transfers/{transfer}/reject', [TransfersController::class, 'reject'])->whereNumber('transfer')->name('inventory.transfers.reject');
     });
 
     Route::middleware('permission:costs.view')->group(function (): void {

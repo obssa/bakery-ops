@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\Audit\Models\AuditLog;
+use App\Modules\Identity\Models\UserStationAssignment;
+use App\Modules\Inventory\Contracts\Reservations;
+use App\Modules\Inventory\Contracts\ReserveLine;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\Transfer;
 use App\Shared\Events\StockChanged;
@@ -11,6 +14,8 @@ use App\Shared\Models\Branch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Support\TransferFixture;
 
 /*
@@ -144,7 +149,7 @@ it('refuses a confirm for more than the source has available: 409, nothing writt
 
 it('counts only what is available: stock held for orders cannot be moved away', function () {
     stockIn($this->f->flour, $this->f->store, '10000');
-    app(App\Modules\Inventory\Contracts\Reservations::class)->reserve([new App\Modules\Inventory\Contracts\ReserveLine($this->f->flour->id, '6000', $this->f->store->id)], (string) Illuminate\Support\Str::uuid());
+    app(Reservations::class)->reserve([new ReserveLine($this->f->flour->id, '6000', $this->f->store->id)], (string) Str::uuid());
     $five = ($this->request)('5000');
     $four = ($this->request)('4000');
 
@@ -269,14 +274,14 @@ it('decides only for the people who hold transfers.confirm, and who work at the 
 
     // a chef granted the permission by hand still works at the kitchen, not at the store that holds the flour
     $this->f->chef->givePermissionTo('transfers.confirm');
-    app(Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
     loginAs($this->f->chef->fresh());
     ($this->confirm)($transfer)->assertForbidden()->assertJsonPath('message_key', 'inventory.transfer.source_forbidden');
     ($this->reject)($transfer)->assertForbidden()->assertJsonPath('message_key', 'inventory.transfer.source_forbidden');
     expect(Transfer::query()->findOrFail($transfer->id)->status->value)->toBe('requested');
 
     // assigned to the store as well, they decide it
-    App\Modules\Identity\Models\UserStationAssignment::factory()->create(['branch_id' => $this->branch->id, 'user_id' => $this->f->chef->id, 'station_id' => $this->f->storeStation->id]);
+    UserStationAssignment::factory()->create(['branch_id' => $this->branch->id, 'user_id' => $this->f->chef->id, 'station_id' => $this->f->storeStation->id]);
     ($this->confirm)($transfer)->assertOk()->assertJsonPath('decided_by.id', $this->f->chef->id);
 })->group('module:inventory', 'feature');
 

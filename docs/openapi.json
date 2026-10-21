@@ -3494,6 +3494,336 @@
                 }
             }
         },
+        "/v1/transfers": {
+            "get": {
+                "operationId": "inventory.transfers.index",
+                "tags": [
+                    "Transfers"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "requested",
+                                "confirmed",
+                                "rejected"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "location_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "mine",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "production_request_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated set of `TransferResource`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/TransferResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "properties": {
+                                                "first": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "last": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "prev": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "next": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "first",
+                                                "last",
+                                                "prev",
+                                                "next"
+                                            ]
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "from": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "minimum": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "minimum": 1
+                                                },
+                                                "links": {
+                                                    "type": "array",
+                                                    "description": "Generated paginator links.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "active": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "url",
+                                                            "label",
+                                                            "active"
+                                                        ]
+                                                    }
+                                                },
+                                                "path": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "description": "Base path for paginator generated URLs."
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "description": "Number of items shown per page.",
+                                                    "minimum": 0
+                                                },
+                                                "to": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ],
+                                                    "description": "Number of the last item in the slice.",
+                                                    "minimum": 1
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Total number of items being paginated.",
+                                                    "minimum": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "current_page",
+                                                "from",
+                                                "last_page",
+                                                "links",
+                                                "path",
+                                                "per_page",
+                                                "to",
+                                                "total"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "inventory.transfers.store",
+                "tags": [
+                    "Transfers"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreTransferRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/transfers/{transfer}/confirm": {
+            "post": {
+                "operationId": "inventory.transfers.confirm",
+                "tags": [
+                    "Transfers"
+                ],
+                "parameters": [
+                    {
+                        "name": "transfer",
+                        "in": "path",
+                        "required": true,
+                        "description": "The transfer ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/transfers/{transfer}/reject": {
+            "post": {
+                "operationId": "inventory.transfers.reject",
+                "tags": [
+                    "Transfers"
+                ],
+                "parameters": [
+                    {
+                        "name": "transfer",
+                        "in": "path",
+                        "required": true,
+                        "description": "The transfer ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RejectTransferRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/units": {
             "get": {
                 "operationId": "catalog.units.index",
@@ -4546,6 +4876,20 @@
                 ],
                 "title": "RejectLineRequest"
             },
+            "RejectTransferRequest": {
+                "type": "object",
+                "description": "POST /transfers/{transfer}/reject: the reason is required (\"The sack is for the wedding cake\"), kept on the transfer and\nin the audit row, and shown to the person who asked.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "RejectTransferRequest"
+            },
             "ReplaceItemStationsRequest": {
                 "type": "object",
                 "description": "PUT /items/{item}/stations: the complete set of stations the item's order lines route to (an empty list makes it a\ndisplay-case item with no station step). Each a live station of the admin's branch, once.",
@@ -5350,6 +5694,58 @@
                 ],
                 "title": "StoreSupplierRequest"
             },
+            "StoreTransferRequest": {
+                "type": "object",
+                "description": "POST /transfers: ask for stock to be moved. The transfer's client UUID (an offline replay with a lost Idempotency-Key\nreaches the same transfer, ADR 0003), the item, where it goes, where it comes from (default: the branch store), how much as a\npositive decimal string with at most 4 decimals in `unit_id` (default: the item's base unit; never a float, ADR 0004), a\nnote, and the production request it was raised from. Whether the item and the places are live in this branch, whether the\nunit converts and whether the requester works at the destination is the action's question (RequestTransfer).",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "to_location_id": {
+                        "type": "integer"
+                    },
+                    "from_location_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "qty": {
+                        "type": "string"
+                    },
+                    "unit_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "production_request_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "client_uuid",
+                    "item_id",
+                    "to_location_id",
+                    "qty"
+                ],
+                "title": "StoreTransferRequest"
+            },
             "StoreUnitRequest": {
                 "type": "object",
                 "description": "POST /units: a global unit (every branch shares it), named in both languages (rule 9). A derived unit names a base\nunit (one without a base of its own) and a positive factor as a decimal string; a base unit has factor 1.",
@@ -5541,6 +5937,11 @@
                     "is_active"
                 ],
                 "title": "SupplierResource"
+            },
+            "TransferResource": {
+                "type": "array",
+                "items": {},
+                "title": "TransferResource"
             },
             "UnitResource": {
                 "type": "object",

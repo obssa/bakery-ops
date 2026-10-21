@@ -6,6 +6,7 @@ namespace App\Modules\Catalog\Contracts;
 
 use App\Modules\Catalog\Exceptions\CatalogError;
 use App\Modules\Catalog\Models\Unit;
+use App\Shared\Values\NumericOverflow;
 use App\Shared\Values\Quantity;
 
 /**
@@ -51,6 +52,7 @@ final class Units
      * not convert, naming the request field it came from.
      *
      * @throws CatalogError catalog.unit.incompatible (422)
+     * @throws NumericOverflow when the base quantity does not fit NUMERIC(14,4)
      */
     public function toBaseOf(Quantity|string|int $qty, Unit|int|string $unit, Unit|int|string $target, string $field): Quantity
     {
