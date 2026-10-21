@@ -11,6 +11,8 @@ use App\Modules\Catalog\Contracts\ScaledRecipe;
 use App\Modules\Inventory\Contracts\Locations;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Contracts\StockLevel;
+use App\Modules\Production\Enums\BatchStatus;
+use App\Modules\Production\Models\ProductionBatch;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Shared\Models\Station;
 use App\Shared\Values\Quantity;
@@ -26,8 +28,8 @@ use App\Shared\Values\Quantity;
  * Two answers are deliberately null rather than a guess: recipe is null when the product no longer has an active recipe, and,
  * when the station has no stock place, consume_location is null and every ingredient says needed only (on_hand, available,
  * short, short_qty and transfer_hint are null: nothing can be said about stock that has no place). The card of a request that
- * has a batch is still made from the active recipe; the version a batch recorded at start and the produced-plus-waste scaling of a
- * finished one arrive with the batches (step 2.7c). Each ingredient is read once: a fixed number of queries however long the
+ * has a batch (step 2.7c) is made from the version the batch recorded at start and the places it fixed, scaled to its planned
+ * quantity while it is started and to produced plus waste once it is finished or confirmed (what Confirm takes). Each ingredient is read once: a fixed number of queries however long the
  * recipe. Resolved per use.
  */
 final class RequestCard
@@ -44,10 +46,22 @@ final class RequestCard
      */
     public function build(ProductionRequest $request): array
     {
-        $station = Station::query()->withTrashed()->find($request->station_id);
-        $consume = $station instanceof Station ? $this->locations->forStation($station) : null;
-        $output = $this->locations->forProduct($request->product_item_id);
-        $scaled = $this->recipes->scaled($request->product_item_id, $request->requested_qty);
+        $batch = $request->batch;
+        if ($batch instanceof ProductionBatch) {
+            // a batch fixed its places and its recipe version at Start: the card shows those, whatever was configured or published since,
+            // and for a finished one the quantity Confirm will take: produced plus waste
+            $consume = $this->locations->find($batch->consume_location_id);
+            $output = $this->locations->find($batch->output_location_id);
+            $target = $batch->status === BatchStatus::Started || $batch->produced_qty === null || $batch->waste_qty === null
+                ? $batch->planned_qty
+                : $batch->produced_qty->plus($batch->waste_qty);
+            $scaled = $this->recipes->scaled($request->product_item_id, $target, $batch->recipe_version);
+        } else {
+            $station = Station::query()->withTrashed()->find($request->station_id);
+            $consume = $station instanceof Station ? $this->locations->forStation($station) : null;
+            $output = $this->locations->forProduct($request->product_item_id);
+            $scaled = $this->recipes->scaled($request->product_item_id, $request->requested_qty);
+        }
 
         return [
             'recipe' => $scaled === null ? null : $this->recipe($scaled, $consume?->id),

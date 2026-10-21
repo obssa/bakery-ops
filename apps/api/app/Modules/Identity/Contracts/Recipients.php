@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Collection;
  *   byIds: named people, for an event about one person (the owner of an order line, the requester of a transfer): those of
  *     the ids who are active users of the branch, so a deactivated or foreign id is simply not told;
  *   forStation: the people assigned to one station or to any of a list of stations;
+ *   overseers: the people flagged as the overseer at one station (step 2.7c: who is asked to sign off a finished batch);
  *   onDuty: StationPresenceResolver::onDuty (the Phase 2 binding says "assigned", Phase 3 rebinds it to the roster),
  *     and when nobody is on duty the assigned people, so an alert is never addressed to nobody while someone could act;
  *   localeOf: 'am' or 'en' (a Bilingual pair renders for it with Bilingual::in()).
@@ -95,6 +96,18 @@ final class Recipients
 
         return $this->active($branchId)
             ->whereHas('stationAssignments', fn (Builder $q) => $q->whereIn('station_id', $ids))
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function overseers(Station $station): Collection
+    {
+        $branchId = $this->branch->id();
+
+        return $this->active($branchId)
+            ->whereHas('stationAssignments', fn (Builder $q) => $q->where('station_id', $station->id)->where('is_overseer', true))
             ->get();
     }
 

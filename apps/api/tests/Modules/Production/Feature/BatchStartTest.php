@@ -65,7 +65,7 @@ it('records the version the baker sees: a newer version published later does not
     $request = $this->f->acceptedRequest();
     ($this->start)($request)->assertOk();
     $this->f->cakeRecipe->forceFill(['is_active' => false])->save();
-    $this->f->recipe($this->f->cake, '12', [[$this->f->flour, '9']])->forceFill(['version' => 2])->save();
+    $this->f->recipe($this->f->cake, '12', [[$this->f->flour, '9']], [], 2);
 
     expect(ProductionBatch::query()->sole()->recipe_version)->toBe(1);
 });

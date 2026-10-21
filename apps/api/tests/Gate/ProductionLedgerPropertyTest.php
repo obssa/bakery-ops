@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\Recipe;
 use App\Modules\Catalog\Models\RecipeLine;
 use App\Modules\Inventory\Contracts\Reservations;
 use App\Modules\Inventory\Contracts\ReserveLine;
+use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Production\Enums\BatchStatus;
 use App\Modules\Production\Enums\RequestStatus;
@@ -79,7 +80,7 @@ it('keeps the ledger honest through random request and batch sequences: oracle, 
         $at = "seed {$seed}, op {$op} (after: ".implode(', ', array_slice($trace, -4)).')';
         $requests = ProductionRequest::query()->orderBy('id')->get();
         $batches = ProductionBatch::query()->orderBy('id')->get()->keyBy('request_id');
-        $busy = $requests->whereIn('status', array_map(fn (RequestStatus $s): string => $s->value, RequestStatus::open()))->pluck('product_item_id')->all();
+        $busy = $requests->filter(fn (ProductionRequest $r): bool => $r->status->isOpen())->pluck('product_item_id')->all();
 
         $candidates = [['restock'], ['restock'], ['spoil'], ['reserve'], ['request'], ['request']];
         foreach ($requests as $request) {
@@ -152,7 +153,7 @@ it('keeps the ledger honest through random request and batch sequences: oracle, 
                     break;
                 case 'spoil':
                     $item = $ingredients[$rng->getInt(0, 2)];
-                    $level = app(\App\Modules\Inventory\Contracts\Stock::class)->of($item, $f->cakeRoom)->available();
+                    $level = app(Stock::class)->of($item, $f->cakeRoom)->available();
                     $take = BigDecimal::of((string) $rng->getInt(1, 800));
                     if ($level->toBigDecimal()->isGreaterThanOrEqualTo($take)) {
                         stockIn($item, $f->cakeRoom, '-'.$take, MovementReason::Waste);

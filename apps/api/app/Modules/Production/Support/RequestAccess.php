@@ -20,6 +20,8 @@ use App\Shared\Models\Station;
  *   - assertAtStation(): production.fulfil at the request's station (assigned there, or working at every station), 403
  *     production.station.forbidden.
  *   - mayCancel(): a planner (production.plan), or the person who asked.
+ *   - assertMayConfirm(): production.confirm (admin, manager), or the overseer flagged at the batch's station (step 2.7c), 403
+ *     production.confirm.forbidden.
  * Resolved per use: it reads the request-scoped ActorContext.
  */
 final class RequestAccess
@@ -68,6 +70,16 @@ final class RequestAccess
         $station = Station::query()->withTrashed()->find($request->station_id);
         if (! $station instanceof Station || ! $this->people->can($personId, 'production.fulfil', $station)) {
             throw ProductionError::stationForbidden();
+        }
+    }
+
+    /**
+     * @throws ProductionError production.confirm.forbidden (403)
+     */
+    public function assertMayConfirm(int $personId, Station $station): void
+    {
+        if (! $this->people->can($personId, 'production.confirm') && ! $this->people->isOverseer($personId, $station)) {
+            throw ProductionError::confirmForbidden();
         }
     }
 

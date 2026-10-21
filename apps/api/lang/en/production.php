@@ -20,6 +20,18 @@ return [
         'already_open' => 'This product already has an open production request. Use that one.',
         'taken' => 'This production request was given to, or taken by, someone else.',
         'in_progress' => 'This production has started. Finish it or send it back; it cannot be cancelled.',
+        'not_accepted' => 'Accept this production request before you start it.',
+    ],
+    'locations' => [
+        'unresolved' => 'This station or product has no stock place set up yet. Ask the admin to set it up before starting.',
+    ],
+    'batch' => [
+        'ingredient_short' => 'Not enough :ingredient at :place: :short :unit short.:more',
+        'more_short' => ' Other ingredients are short too.',
+        'self_confirm' => 'The person who finished a batch cannot confirm it. Ask someone else to sign it off.',
+    ],
+    'confirm' => [
+        'forbidden' => 'Only a manager, an admin or the overseer of this station can confirm a batch or send it back.',
     ],
     'product' => [
         'not_producible' => 'Only a product kept in stock that has an active recipe can be produced.',
@@ -30,5 +42,7 @@ return [
     ],
     'validation' => [
         'quantity' => 'The quantity must be a number above zero with at most four decimals.',
+        'batch_quantity' => 'The quantity must be a number, zero or more, with at most four decimals.',
+        'batch_empty' => 'A batch makes or wastes something: made and wasted cannot both be zero.',
     ],
 ];

@@ -67,6 +67,27 @@ final class RequestPresenter
     }
 
     /**
+     * A batch on its own (the answer of Done, Confirm and Send back): the batch as the request resource carries it, plus the request
+     * it belongs to in short, so a screen moves the card without reading the board again.
+     *
+     * @return array<string, mixed>
+     */
+    public function batch(ProductionBatch $batch): array
+    {
+        $request = $batch->request;
+        $names = $this->people->names(array_values(array_filter(
+            array_unique([(int) $batch->finished_by_user_id, (int) $batch->confirmed_by_user_id]),
+            static fn (int $id): bool => $id > 0,
+        )));
+        $person = static fn (?int $id): ?array => $id === null ? null : ['id' => $id, 'name' => $names[$id] ?? ''];
+
+        return $this->batchRow($batch, $person) + [
+            'request_id' => $request->id,
+            'request' => ['id' => $request->id, 'status' => $request->status->value, 'version' => $request->version],
+        ];
+    }
+
+    /**
      * @param  array<int, ItemSummary>  $products
      * @param  array<int, string>  $names
      * @return array<string, mixed>
@@ -105,7 +126,7 @@ final class RequestPresenter
             'done_at' => $request->done_at?->toIso8601String(),
             'cancelled_at' => $request->cancelled_at?->toIso8601String(),
             'cancel_reason' => $request->cancel_reason,
-            'batch' => $request->batch instanceof ProductionBatch ? $this->batch($request->batch, $person) : null,
+            'batch' => $request->batch instanceof ProductionBatch ? $this->batchRow($request->batch, $person) : null,
             'created_at' => $request->created_at?->toIso8601String(),
             'version' => $request->version,
         ];
@@ -115,7 +136,7 @@ final class RequestPresenter
      * @param  callable(?int): ?array{id: int, name: string}  $person
      * @return array<string, mixed>
      */
-    private function batch(ProductionBatch $batch, callable $person): array
+    private function batchRow(ProductionBatch $batch, callable $person): array
     {
         return [
             'id' => $batch->id,

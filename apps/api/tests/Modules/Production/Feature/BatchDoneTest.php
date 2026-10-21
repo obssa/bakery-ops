@@ -7,9 +7,11 @@ use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Inventory\Contracts\Reservations;
 use App\Modules\Inventory\Contracts\ReserveLine;
+use App\Modules\Notifications\Listeners\NotifyBatchDone;
 use App\Modules\Production\Enums\BatchStatus;
 use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
+use App\Shared\Events\BatchDone;
 use App\Shared\Models\Branch;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -114,8 +116,7 @@ it('scales to four places: a yield of 7, 4 made and 1 wasted takes 714.2857 g of
 it('consumes the version recorded at start even when a newer one was published', function () {
     $batch = $this->f->startedBatch();
     $this->f->cakeRecipe->forceFill(['is_active' => false])->save();
-    $v2 = $this->f->recipe($this->f->cake, '12', [[$this->f->flour, '3']]);
-    $v2->forceFill(['version' => 2])->save();
+    $this->f->recipe($this->f->cake, '12', [[$this->f->flour, '3']], [], 2);
 
     ($this->done)($batch)->assertOk();
 
@@ -195,7 +196,7 @@ it('lists every short ingredient: stock at zero is refused, negative stock stays
 
     $response = ($this->done)($batch)->assertStatus(409)->assertJsonCount(2, 'shortfall');
 
-    expect(collect($response->json('shortfall'))->pluck('short')->sort()->values()->all())->toBe(['1200.0000', '600.0000'])
+    expect(collect($response->json('shortfall'))->pluck('short')->sort()->values()->all())->toBe(['600.0000', '1200.0000'])
         ->and(collect($response->json('shortfall'))->pluck('available')->unique()->all())->toBe(['0.0000'])
         ->and($batch->fresh()->status)->toBe(BatchStatus::Started);
 });
@@ -281,27 +282,27 @@ it('refuses a finished batch that is past it, and another branch batch is 404', 
 });
 
 it('announces BatchDone after commit: confirmed on the combined path, pending where an overseer must sign', function () {
-    Event::fake([\App\Shared\Events\BatchDone::class]);
+    Event::fake([BatchDone::class]);
     $batch = $this->f->startedBatch();
     ($this->done)($batch, '10', '2')->assertOk();
 
-    Event::assertDispatched(\App\Shared\Events\BatchDone::class, fn ($e) => $e->status === 'confirmed' && $e->batchId === $batch->id && $e->producedQty === '10.0000' && $e->wasteQty === '2.0000'
+    Event::assertDispatched(BatchDone::class, fn ($e) => $e->status === 'confirmed' && $e->batchId === $batch->id && $e->producedQty === '10.0000' && $e->wasteQty === '2.0000'
         && $e->productNameEn === 'Black forest cake' && $e->stationId === $this->f->cakeRoomStation->id && $e->finishedByUserId === $this->f->baker->id);
 
     $this->f->requireOverseer();
     $second = $this->f->startedBatch();
     ($this->done)($second)->assertOk();
-    Event::assertDispatched(\App\Shared\Events\BatchDone::class, fn ($e) => $e->status === 'pending_confirmation' && $e->batchId === $second->id);
+    Event::assertDispatched(BatchDone::class, fn ($e) => $e->status === 'pending_confirmation' && $e->batchId === $second->id);
 });
 
 it('announces nothing when the write is refused', function () {
-    Event::fake([\App\Shared\Events\BatchDone::class]);
+    Event::fake([BatchDone::class]);
     $batch = $this->f->startedBatch();
     DB::table('stock_balances')->where('item_id', $this->f->flour->id)->update(['on_hand' => '1.0000']);
 
     ($this->done)($batch)->assertStatus(409);
 
-    Event::assertNotDispatched(\App\Shared\Events\BatchDone::class);
+    Event::assertNotDispatched(BatchDone::class);
 });
 
 it('queues nothing but the stock evaluations and the notification', function () {
@@ -309,5 +310,5 @@ it('queues nothing but the stock evaluations and the notification', function () 
     $this->f->requireOverseer();
     ($this->done)($this->f->startedBatch())->assertOk();
 
-    assertNothingQueuedButStockEvaluation([\App\Modules\Notifications\Listeners\NotifyBatchDone::class]);
+    assertNothingQueuedButStockEvaluation([NotifyBatchDone::class]);
 });

@@ -228,6 +228,459 @@
                 }
             }
         },
+        "/v1/production/requests/{request}/start": {
+            "post": {
+                "operationId": "production.requests.start",
+                "tags": [
+                    "Batches"
+                ],
+                "parameters": [
+                    {
+                        "name": "request",
+                        "in": "path",
+                        "required": true,
+                        "description": "The request ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StartBatchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "client_uuid": {
+                                            "type": "string"
+                                        },
+                                        "product": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name_en": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                },
+                                                "name_am": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                },
+                                                "unit": {
+                                                    "type": "string",
+                                                    "const": ""
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name_en",
+                                                "name_am",
+                                                "unit"
+                                            ]
+                                        },
+                                        "requested_qty": {
+                                            "type": "string"
+                                        },
+                                        "due_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "priority": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "station": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "code": {
+                                                    "type": "string"
+                                                },
+                                                "name_en": {
+                                                    "type": "string"
+                                                },
+                                                "name_am": {
+                                                    "type": "string"
+                                                },
+                                                "requires_overseer": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "code",
+                                                "name_en",
+                                                "name_am",
+                                                "requires_overseer"
+                                            ]
+                                        },
+                                        "requested_by": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "assigned_to": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "note": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "accepted_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "done_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cancelled_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cancel_reason": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "batch": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "client_uuid": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "recipe_version": {
+                                                    "type": "integer"
+                                                },
+                                                "planned_qty": {
+                                                    "type": "string"
+                                                },
+                                                "produced_qty": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "waste_qty": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "started_at": {
+                                                    "type": "string"
+                                                },
+                                                "finished_by": {
+                                                    "type": "string"
+                                                },
+                                                "finished_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "confirmed_by": {
+                                                    "type": "string"
+                                                },
+                                                "confirmed_at": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "send_back_note": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "send_back_count": {
+                                                    "type": "integer"
+                                                },
+                                                "version": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "client_uuid",
+                                                "status",
+                                                "recipe_version",
+                                                "planned_qty",
+                                                "produced_qty",
+                                                "waste_qty",
+                                                "started_at",
+                                                "finished_by",
+                                                "finished_at",
+                                                "confirmed_by",
+                                                "confirmed_at",
+                                                "send_back_note",
+                                                "send_back_count",
+                                                "version"
+                                            ]
+                                        },
+                                        "created_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "version": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "client_uuid",
+                                        "product",
+                                        "requested_qty",
+                                        "due_at",
+                                        "priority",
+                                        "reason",
+                                        "status",
+                                        "station",
+                                        "requested_by",
+                                        "assigned_to",
+                                        "note",
+                                        "accepted_at",
+                                        "done_at",
+                                        "cancelled_at",
+                                        "cancel_reason",
+                                        "batch",
+                                        "created_at",
+                                        "version"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/production/batches/{batch}/done": {
+            "post": {
+                "operationId": "production.batches.done",
+                "tags": [
+                    "Batches"
+                ],
+                "parameters": [
+                    {
+                        "name": "batch",
+                        "in": "path",
+                        "required": true,
+                        "description": "The batch ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DoneBatchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/production/batches/{batch}/confirm": {
+            "post": {
+                "operationId": "production.batches.confirm",
+                "tags": [
+                    "Batches"
+                ],
+                "parameters": [
+                    {
+                        "name": "batch",
+                        "in": "path",
+                        "required": true,
+                        "description": "The batch ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/production/batches/{batch}/send-back": {
+            "post": {
+                "operationId": "production.batches.send_back",
+                "tags": [
+                    "Batches"
+                ],
+                "parameters": [
+                    {
+                        "name": "batch",
+                        "in": "path",
+                        "required": true,
+                        "description": "The batch ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendBackBatchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/broadcasting/auth": {
             "post": {
                 "operationId": "identity.broadcasting.auth",
@@ -6499,6 +6952,23 @@
                 ],
                 "title": "DeviceResource"
             },
+            "DoneBatchRequest": {
+                "type": "object",
+                "description": "POST /production/batches/{batch}/done: how many were made and how many were wasted, in the product base unit, as decimal strings\n(never floats, ADR 0004), each zero or more with at most four decimals, the two together above zero. Whether the baker may press\nDone on this batch, and whether the stock is there, are the action's questions (FinishBatch).",
+                "properties": {
+                    "produced_qty": {
+                        "type": "string"
+                    },
+                    "waste_qty": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "produced_qty",
+                    "waste_qty"
+                ],
+                "title": "DoneBatchRequest"
+            },
             "ItemCostResource": {
                 "type": "object",
                 "properties": {
@@ -7458,6 +7928,21 @@
                 ],
                 "title": "ReplaceUserStationsRequest"
             },
+            "SendBackBatchRequest": {
+                "type": "object",
+                "description": "POST /production/batches/{batch}/send-back: the note the baker reads on the card, required, at most 255 characters, not blank.",
+                "properties": {
+                    "note": {
+                        "type": "string",
+                        "pattern": "\\S",
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "note"
+                ],
+                "title": "SendBackBatchRequest"
+            },
             "SetOpeningCostRequest": {
                 "type": "object",
                 "description": "POST /inventory/costs/{item}/opening: the cost of the stock already on hand, per $unit_id (a decimal string with at most 4\ndecimals, never a float). SetOpeningCost converts it to a cost per base unit.",
@@ -7474,6 +7959,20 @@
                     "unit_id"
                 ],
                 "title": "SetOpeningCostRequest"
+            },
+            "StartBatchRequest": {
+                "type": "object",
+                "description": "POST /production/requests/{request}/start: the client UUID of the batch (an offline replay with a lost Idempotency-Key reaches the\nsame batch, ADR 0003). Whether the request can be started, and by whom, is the action's question (StartBatch).",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "client_uuid"
+                ],
+                "title": "StartBatchRequest"
             },
             "StationResource": {
                 "type": "object",

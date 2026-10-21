@@ -101,6 +101,13 @@ final class NotificationText
                 'unit' => $this->str($type, $p, 'unit'),
                 'station' => $this->str($type, $p, $in('station_name')),
             ],
+            'batch_pending_confirmation', 'batch_done' => [
+                'item' => $this->str($type, $p, $in('product_name')),
+                'produced' => $this->quantity($this->str($type, $p, 'produced_qty')),
+                'waste' => $this->quantity($this->str($type, $p, 'waste_qty')),
+                'unit' => $this->str($type, $p, 'unit'),
+                'station' => $this->str($type, $p, $in('station_name')),
+            ],
             default => throw UnknownNotificationType::named($type),
         };
     }

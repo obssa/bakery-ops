@@ -10,6 +10,7 @@ use App\Modules\Notifications\Console\VapidKeysCommand;
 use App\Modules\Notifications\Drivers\DriverRegistry;
 use App\Modules\Notifications\Drivers\SentLog;
 use App\Modules\Notifications\Listeners\ClearStockDedupe;
+use App\Modules\Notifications\Listeners\NotifyBatchDone;
 use App\Modules\Notifications\Listeners\NotifyLineReady;
 use App\Modules\Notifications\Listeners\NotifyLineRejected;
 use App\Modules\Notifications\Listeners\NotifyProductionAssigned;
@@ -18,6 +19,7 @@ use App\Modules\Notifications\Listeners\NotifyStockLow;
 use App\Modules\Notifications\Listeners\NotifyStockOut;
 use App\Modules\Notifications\Listeners\NotifyTransferDecided;
 use App\Modules\Notifications\Listeners\NotifyTransferRequested;
+use App\Shared\Events\BatchDone;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
 use App\Shared\Events\ProductionAssigned;
@@ -58,6 +60,7 @@ final class NotificationsServiceProvider extends ServiceProvider
         Event::listen(TransferDecided::class, [NotifyTransferDecided::class, 'handle']);
         Event::listen(ProductionRequested::class, [NotifyProductionRequested::class, 'handle']);
         Event::listen(ProductionAssigned::class, [NotifyProductionAssigned::class, 'handle']);
+        Event::listen(BatchDone::class, [NotifyBatchDone::class, 'handle']);
 
         $this->loadRoutesFrom(base_path('routes/modules/notifications.php'));
 

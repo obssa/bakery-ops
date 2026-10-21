@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Inventory\Contracts\Reservations;
 use App\Modules\Inventory\Contracts\ReserveLine;
+use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
 use App\Modules\Production\Models\ProductionRequest;
@@ -182,8 +183,7 @@ it('shows a started batch from the version it recorded, not the active one, and 
     stockIn($this->f->flour, $this->f->cakeRoom, '5000');
     $batch = $this->f->startedBatch(null, '12');
     $this->f->cakeRecipe->forceFill(['is_active' => false])->save();
-    $second = $this->f->recipe($this->f->cake, '12', [[$this->f->flour, '3']], [['New method', 'አዲስ ዘዴ']]);
-    $second->forceFill(['version' => 2])->save();
+    $this->f->recipe($this->f->cake, '12', [[$this->f->flour, '3']], [['New method', 'አዲስ ዘዴ']], 2);
 
     $response = ($this->card)($batch->request)->assertOk();
 
@@ -198,7 +198,7 @@ it('shows a started batch from the version it recorded, not the active one, and 
 
 it('keeps the places a batch fixed when the configuration changes afterwards: a new location does not move an open batch', function () {
     $batch = $this->f->startedBatch();
-    stockLocation($this->branch, \App\Modules\Inventory\Enums\LocationType::CakeRoom, $this->f->cakeRoomStation);
+    stockLocation($this->branch, LocationType::CakeRoom, $this->f->cakeRoomStation);
 
     ($this->card)($batch->request)->assertOk()->assertJsonPath('consume_location.id', $this->f->cakeRoom->id);
 });
@@ -214,4 +214,3 @@ it('scales a finished batch to produced plus waste, which is what Confirm will c
         ->assertJsonPath('recipe.lines.0.needed', '600.0000')
         ->assertJsonPath('recipe.lines.1.needed', '300.0000');
 });
-

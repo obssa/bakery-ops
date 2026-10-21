@@ -17,11 +17,13 @@ final class ProductionError extends RuntimeException
 {
     /**
      * @param  array<string, mixed>  $extra
+     * @param  array<string, array{en: string, am: string}|string>  $messageParams  values filled into the message's :placeholders, per language
      */
     private function __construct(
         public readonly string $messageKey,
         public readonly int $status,
         public readonly array $extra = [],
+        public readonly array $messageParams = [],
     ) {
         parent::__construct($messageKey);
     }
@@ -86,8 +88,70 @@ final class ProductionError extends RuntimeException
         return new self('production.assignee.invalid', 422, ['user_id' => $userId]);
     }
 
+    /** The baker presses Start on a request nobody accepted yet. */
+    public static function notAccepted(string $status): self
+    {
+        return new self('production.request.not_accepted', 409, ['status' => $status]);
+    }
+
+    /** The station or the product has no stock location, so a batch could not say where it takes from or puts to. */
+    public static function locationsUnresolved(int $stationId, int $productId): self
+    {
+        return new self('production.locations.unresolved', 422, ['station_id' => $stationId, 'product_item_id' => $productId]);
+    }
+
+    /** Who finished a batch cannot sign it off (the database CHECK refuses it too, except in the write that finishes it). */
+    public static function selfConfirm(): self
+    {
+        return new self('production.batch.self_confirm', 409);
+    }
+
+    /** Neither production.confirm nor the overseer flag at the batch's station. */
+    public static function confirmForbidden(): self
+    {
+        return new self('production.confirm.forbidden', 403);
+    }
+
+    /**
+     * One or more ingredients are not available (on hand minus reserved) at the consume place for what the batch would take: nothing
+     * is written. The message names the first short ingredient, how much is short and where, in both languages.
+     *
+     * @param  list<array{ingredient: array{id: int, name_en: string, name_am: string, unit: string}, needed: string, available: string, short: string, location_id: int, location: array{id: int, name_en: string, name_am: string}|null}>  $shortfall
+     */
+    public static function ingredientShort(array $shortfall): self
+    {
+        $first = $shortfall[0];
+        $place = $first['location'];
+        $more = ['en' => '', 'am' => ''];
+        if (count($shortfall) > 1) {
+            $more = ['en' => (string) trans('production.batch.more_short', [], 'en'), 'am' => (string) trans('production.batch.more_short', [], 'am')];
+        }
+
+        return new self('production.batch.ingredient_short', 409, ['shortfall' => $shortfall], [
+            'ingredient' => ['en' => $first['ingredient']['name_en'], 'am' => $first['ingredient']['name_am']],
+            'short' => self::trimmed($first['short']),
+            'unit' => $first['ingredient']['unit'],
+            'place' => ['en' => $place['name_en'] ?? '', 'am' => $place['name_am'] ?? ''],
+            'more' => $more,
+        ]);
+    }
+
     public function render(): JsonResponse
     {
-        return ApiError::json($this->messageKey, $this->status, $this->extra);
+        $body = ApiError::body($this->messageKey, $this->extra);
+        if ($this->messageParams !== []) {
+            foreach (['en', 'am'] as $locale) {
+                $values = array_map(static fn (array|string $v): string => is_array($v) ? $v[$locale] : $v, $this->messageParams);
+                $body['message_'.$locale] = (string) trans($this->messageKey, $values, $locale);
+            }
+        }
+
+        return response()->json($body, $this->status);
+    }
+
+    /** 300.0000 -> 300, 0.5000 -> 0.5: zeros after the decimal point only, by string handling. */
+    private static function trimmed(string $qty): string
+    {
+        return str_contains($qty, '.') ? rtrim(rtrim($qty, '0'), '.') : $qty;
     }
 }

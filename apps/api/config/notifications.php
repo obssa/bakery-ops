@@ -95,6 +95,20 @@ return [
             'gate' => null,
             'deep_link' => '/production?request={request_id}',
         ],
+        'batch_pending_confirmation' => [
+            'severity' => 'warning',
+            'channels' => ['in_app', 'push', 'telegram'],
+            'inbox_key' => 'batch_pending_confirmation:{batch_id}:{send_back_count}',
+            'gate' => null,
+            'deep_link' => '/production?request={request_id}',
+        ],
+        'batch_done' => [
+            'severity' => 'info',
+            'channels' => ['in_app', 'push'],
+            'inbox_key' => 'batch_done:{batch_id}',
+            'gate' => null,
+            'deep_link' => '/production?request={request_id}',
+        ],
         'line_ready' => [
             'severity' => 'info',
             'channels' => ['in_app'],

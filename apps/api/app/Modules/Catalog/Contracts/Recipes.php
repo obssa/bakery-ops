@@ -49,15 +49,18 @@ final class Recipes
      * waste applied, qty x target / yield rounded once, plus the version, the yield and the live steps in order. Null for
      * what has no recipe to scale: an ingredient, a bought-in product, a product with no active version, an unknown id.
      *
+     * With $version the named version is scaled instead, active or not (step 2.7c: a production batch consumes the version it
+     * started on, and its card shows that version's steps); null when the product has no such version.
+     *
      * @throws \InvalidArgumentException a target that is not a positive quantity
      */
-    public function scaled(Item|int $product, Quantity|string|int $target): ?ScaledRecipe
+    public function scaled(Item|int $product, Quantity|string|int $target, ?int $version = null): ?ScaledRecipe
     {
         $item = $this->product($product);
         if ($item === null || $item->isBoughtIn()) {
             return null;
         }
-        $view = $this->activeFor($item);
+        $view = $version === null ? $this->activeFor($item) : $this->version($item, $version);
         if ($view === null || $view->recipeId === null) {
             return null;
         }

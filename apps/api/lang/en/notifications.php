@@ -40,6 +40,14 @@ return [
             'title' => 'Assigned to you: :item',
             'body' => 'Make :qty :unit of :item at :station.',
         ],
+        'batch_pending_confirmation' => [
+            'title' => 'Waiting for sign-off: :item',
+            'body' => ':produced :unit of :item made at :station, :waste :unit wasted. Confirm it or send it back.',
+        ],
+        'batch_done' => [
+            'title' => 'Batch done: :item',
+            'body' => ':produced :unit of :item made at :station, :waste :unit wasted.',
+        ],
         'line_ready' => [
             'title' => 'Ready: :item',
             'body' => 'Order #:order_no, table :table: :item is ready to serve.',

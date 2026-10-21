@@ -110,7 +110,7 @@ it('refuses a batch that is not finished, naming the transition', function () {
         ->assertJsonPath('from', 'started')
         ->assertJsonPath('to', 'started');
 
-    $confirmed = ProductionBatch::factory()->confirmed()->create(['branch_id' => $this->branch->id]);
+    $confirmed = $this->f->confirmedBatch();
     ($this->back)($confirmed)->assertStatus(409)->assertJsonPath('from', 'confirmed');
     expect($started->fresh()->send_back_count)->toBe(0);
 });

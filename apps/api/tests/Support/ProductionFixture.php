@@ -130,15 +130,15 @@ final class ProductionFixture
     }
 
     /**
-     * An active version 1 recipe of $product yielding $yield pieces, every line in kilograms.
+     * An active version 1 recipe (or the given version) of $product yielding $yield pieces, every line in kilograms.
      *
      * @param  list<array{0: Item, 1: string}>  $lines
      * @param  list<array{0: string, 1: string}>  $steps
      */
-    public function recipe(Item $product, string $yield, array $lines, array $steps = []): Recipe
+    public function recipe(Item $product, string $yield, array $lines, array $steps = [], int $version = 1, bool $active = true): Recipe
     {
         $b = $this->branch->id;
-        $recipe = Recipe::factory()->create(['branch_id' => $b, 'product_item_id' => $product->id, 'version' => 1, 'is_active' => true, 'yield_qty' => $yield, 'yield_unit_id' => catalogUnit('pcs')->id]);
+        $recipe = Recipe::factory()->create(['branch_id' => $b, 'product_item_id' => $product->id, 'version' => $version, 'is_active' => $active, 'yield_qty' => $yield, 'yield_unit_id' => catalogUnit('pcs')->id]);
         foreach ($lines as [$ingredient, $qty]) {
             RecipeLine::factory()->create(['branch_id' => $b, 'recipe_id' => $recipe->id, 'ingredient_item_id' => $ingredient->id, 'qty' => $qty, 'unit_id' => catalogUnit('kg')->id]);
         }
@@ -254,6 +254,31 @@ final class ProductionFixture
             'started_by_user_id' => $baker->id,
             'created_by_user_id' => $baker->id,
             'finished_by_user_id' => $baker->id,
+        ]);
+    }
+
+    /**
+     * A batch the baker finished and the manager signed off, the request done (a row, not the work of the actions).
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public function confirmedBatch(?User $baker = null, array $over = []): ProductionBatch
+    {
+        $baker ??= $this->baker;
+        $request = $this->request(['assigned_to_user_id' => $baker->id], RequestStatus::Done);
+
+        return ProductionBatch::factory()->confirmed()->create($over + [
+            'branch_id' => $this->branch->id,
+            'request_id' => $request->id,
+            'station_id' => $this->cakeRoomStation->id,
+            'recipe_id' => $this->cakeRecipe->id,
+            'recipe_version' => 1,
+            'consume_location_id' => $this->cakeRoom->id,
+            'output_location_id' => $this->display->id,
+            'started_by_user_id' => $baker->id,
+            'created_by_user_id' => $baker->id,
+            'finished_by_user_id' => $baker->id,
+            'confirmed_by_user_id' => $this->manager->id,
         ]);
     }
 }

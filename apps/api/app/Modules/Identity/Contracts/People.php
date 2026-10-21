@@ -15,6 +15,8 @@ use App\Shared\Models\Station;
  *   attachShift: ShiftAttacher::attach for that person at the station, the shift instance id their writes should now carry or
  *     null (Phase 3 rebinds the attacher; until then it is always null); null, without calling the attacher, for a person who
  *     cannot act;
+ *   isOverseer: the active person of this branch who is flagged as the overseer at that station (Stations::isOverseer; step 2.7c,
+ *     for the rule of who may confirm a production batch); false for anyone else;
  *   names: the display names of the ids, for a card or a list that names a requester or a baker who has since left, so
  *     inactive and deleted people are named too, but never another branch's (the branch scope of the model).
  * A final class resolved per use: it carries nothing of its own, the branch scope reads the scoped CurrentBranch (traps.md, Octane).
@@ -24,6 +26,7 @@ final class People
     public function __construct(
         private readonly Access $access,
         private readonly ShiftAttacher $shifts,
+        private readonly Stations $stations,
     ) {}
 
     public function can(int $userId, string $permission, ?Station $station = null): bool
@@ -31,6 +34,13 @@ final class People
         $user = $this->active($userId);
 
         return $user !== null && $this->access->can($user, $permission, $station);
+    }
+
+    public function isOverseer(int $userId, Station $station): bool
+    {
+        $user = $this->active($userId);
+
+        return $user !== null && $this->stations->isOverseer($user, $station);
     }
 
     public function attachShift(int $userId, Station $station): ?int

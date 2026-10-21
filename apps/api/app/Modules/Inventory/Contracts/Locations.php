@@ -19,6 +19,7 @@ use App\Shared\Models\Station;
  *   - forStation: the live location the station works from, the one of the station's own type when it has several
  *     (the till works from the display case, never from the cash drawer); else its only stock location; else null;
  *   - displayCase: the branch's display case (the first, should there be several);
+ *   - find: a live location of the branch by id (step 2.7c: Production fixes the two places of a batch at Start and names them again later);
  *   - store: the branch's store, where a purchase is received (the first, should there be several; step 2.2a).
  * Reads go through the branch-scoped Location model, so another branch's location is never an answer. Null means the
  * branch has not set the location up: Orders refuses the line rather than reserve somewhere else.
@@ -102,6 +103,12 @@ final class Locations
         }
 
         return $answer;
+    }
+
+    /** A live location of this branch by id; null for an unknown, a deleted or another branch's. */
+    public function find(int $id): ?Location
+    {
+        return Location::query()->find($id);
     }
 
     /** Is $id a live location of this branch? (GET /menu?location= validates through this; Orders never holds a Location.) */

@@ -38,6 +38,14 @@ return [
             'title' => 'ለእርስዎ ተሰጥቷል፡ :item',
             'body' => ':qty :unit :item በ:station ያዘጋጁ።',
         ],
+        'batch_pending_confirmation' => [
+            'title' => 'ማረጋገጫ ይጠብቃል፡ :item',
+            'body' => ':produced :unit :item በ:station ተዘጋጅቷል፣ :waste :unit ባከነ። ያረጋግጡ ወይም ይመልሱ።',
+        ],
+        'batch_done' => [
+            'title' => 'ምርት ተጠናቀቀ፡ :item',
+            'body' => ':produced :unit :item በ:station ተዘጋጅቷል፣ :waste :unit ባከነ።',
+        ],
         'line_ready' => [
             'title' => 'ተዘጋጅቷል፡ :item',
             'body' => 'ትዕዛዝ #:order_no፣ ጠረጴዛ :table፡ :item ለማቅረብ ዝግጁ ነው።',
