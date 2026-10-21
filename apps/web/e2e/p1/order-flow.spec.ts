@@ -1,6 +1,6 @@
 import { test, expect, type Browser, type Page, type Request } from "@playwright/test";
 import { requireAdmin } from "../support/env";
-import { buildFlowFixture, ledgerReasonsOf, menuAvailable, type FlowFixture } from "../support/fixture";
+import { buildFlowFixture, clearStaleOrders, ledgerReasonsOf, menuAvailable, type FlowFixture } from "../support/fixture";
 import { openAs, openPadAndUnlock } from "../support/pad";
 
 // Phase 1 gate project p1-order-flow (manifest phases.1.gate.criteria; docs/phases/phase-1-plan.md section 7), the full
@@ -143,6 +143,7 @@ test.describe("p1 order flow", () => {
   test("pad to kitchen and bar displays to ready, served, cash paid and closed @live", async ({ browser }, testInfo) => {
     test.setTimeout(240_000);
     const credentials = requireAdmin(test.skip);
+    await clearStaleOrders(credentials);
     const fixture = await buildFlowFixture(credentials);
     const { contexts, pages } = await openContexts(browser, testInfo.project.use.baseURL);
     try {

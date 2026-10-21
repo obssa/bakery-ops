@@ -87,7 +87,7 @@ let built = 0;
 /**
  * The stock-out to production fixture of docs/phases/phase-2-plan.md section 7: the cake room set to require an overseer, a
  * cake (to_stock, made in the cake room, batch size 6, recipe 0.9 kg of a run-unique ingredient per 3 cakes, so a batch of 6
- * uses 1.8 kg) with exactly 1 on hand in the display case, the ingredient stocked at the cake room location, the cake baker
+ * uses 1.8 kg, which the ledger and the card state in the base unit: 1800 g) with exactly 1 on hand in the display case, the ingredient stocked at the cake room location, the cake baker
  * assigned to the cake room and the manager assigned there as its overseer.
  */
 export async function buildProductionFixture(credentials: { phone: string; password: string }): Promise<ProductionFixture> {
@@ -163,7 +163,7 @@ export async function buildProductionFixture(credentials: { phone: string; passw
     waiter: { ...waiterStaff, api: waiter, shortCode },
     table: await ensureTable(admin, "E2E-T1"),
     ingredient: { id: ingredient.id, name_en: ingredientEn, name_am: ingredientAm, stocked },
-    cake: { id: cake.id, name_en: cakeEn, name_am: cakeAm, price, batch: "6.0000", yield: "3.0000", perYield: "0.9000", consumedForBatch: "1.8000" },
+    cake: { id: cake.id, name_en: cakeEn, name_am: cakeAm, price, batch: "6.0000", yield: "3.0000", perYield: "0.9000", consumedForBatch: "1800.0000" },
   };
 }
 

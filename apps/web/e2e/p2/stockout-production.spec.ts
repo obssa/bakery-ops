@@ -57,8 +57,8 @@ async function runFlow(f: ProductionFixture, pages: { pad: Page; baker: Page; ov
   const detail = baker.getByRole("region", { name: `Request card: ${cake}` });
   await expect(detail).toBeVisible();
   const recipeLine = detail.getByRole("row").filter({ hasText: f.ingredient.name_en });
-  await expect(recipeLine).toContainText("1.8"); // 0.9 kg per 3 cakes, 6 cakes
-  await expect(recipeLine).toContainText("10"); // on hand in the cake room
+  await expect(recipeLine).toContainText("1800 g"); // 0.9 kg per 3 cakes, 6 cakes, in the base unit
+  await expect(recipeLine).toContainText("10000 g"); // 10 kg on hand in the cake room
   await expect(detail.getByText("Short", { exact: true })).toHaveCount(0);
 
   // accept: the card stays in Requested and shows who took it

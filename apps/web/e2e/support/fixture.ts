@@ -409,3 +409,36 @@ export async function ledgerReasons(fixture: StationFixture): Promise<string[]> 
   });
   return [...page.data].sort((a, b) => a.id - b.id).map((m) => m.reason);
 }
+
+// --- order numbers restart each business day ---------------------------------------------------------------------
+
+/** Today's business date (Africa/Addis_Ababa) as YYYY-MM-DD, the day the API numbers orders in. */
+export function businessToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(new Date());
+}
+
+/**
+ * How the till and the admin board name an order in English: the plain number for an order of today, "3 of 21 Oct" for one
+ * of an earlier business day (numbers restart daily, so two orders can share one). Same Intl call as the app's.
+ */
+export function orderLabel(order: { order_no: string | number; business_date: string | null }): string {
+  const no = String(order.order_no);
+  if (!order.business_date || order.business_date === businessToday()) return no;
+  const date = new Date(`${order.business_date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${no} of ${date}`;
+}
+
+/**
+ * Voids every unpaid order an earlier business day left in the E2E Test Branch (with the fixture manager's PIN, through the
+ * cashier), so a number of today never meets the same number of an old day in the till queue.
+ */
+export async function clearStaleOrders(adminCredentials: { phone: string; password: string }): Promise<number> {
+  const staff = await buildTillStaff(adminCredentials);
+  const today = businessToday();
+  const open = await staff.cashier.api.get<{ data: { id: number; status: string; business_date: string | null; totals: { balance: string } }[] }>("/orders", { limit: 200 });
+  const stale = open.data.filter((o) => o.business_date !== null && o.business_date < today && ["sent", "in_progress", "ready", "served"].includes(o.status));
+  for (const order of stale) {
+    await staff.cashier.api.tryPost(`/orders/${order.id}/void`, { reason: "E2E cleanup of an earlier business day", pin: staff.manager.pin });
+  }
+  return stale.length;
+}
