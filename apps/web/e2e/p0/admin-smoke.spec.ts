@@ -84,11 +84,12 @@ test.describe("p0 admin smoke", () => {
     }
   });
 
-  test("a screen of a later phase says when it arrives @live", async ({ page }) => {
-    // the production board is Phase 2 (the waiter pad and the till are live from Phase 1, so they cannot stand here)
+  test("a screen that needs a sign-in sends a signed-out visitor to the login page @live", async ({ page }) => {
+    // no screen is left that says "available in a later phase" (the production board was the last, step 2.8a), so this
+    // stands for the guard of the screens the other flows only visit signed in
     await page.goto("en/production/");
-    await expect(page.getByRole("heading", { level: 1, name: "Production board" })).toBeVisible();
-    await expect(page.getByRole("main").getByText("Available in Phase 2")).toBeVisible();
+    await expect(page).toHaveURL(/\/app\/en\/login\/\?next=/, { timeout: 30_000 });
+    await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
   });
 
   test("admin creates an ingredient and a product and sees both in English and Amharic @live", async ({ page }) => {

@@ -20,7 +20,7 @@ export default async function Home(props: LocaleProps) {
           {t("home.screens")}
         </h2>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SCREENS.map(({ href, key, coming }) => {
+          {SCREENS.map(({ href, key }) => {
             return (
               <li key={href}>
                 <Link
@@ -28,9 +28,7 @@ export default async function Home(props: LocaleProps) {
                   className={`flex min-h-24 flex-col justify-between gap-2 rounded-lg border border-neutral-200 bg-white p-4 hover:border-neutral-400 ${focusRing}`}
                 >
                   <span className="text-lg font-medium text-neutral-900">{t(`nav.${key}`)}</span>
-                  <span className={coming ? "text-sm text-neutral-500" : "text-sm font-medium text-blue-800"}>
-                    {coming ? t(`${coming}.coming`) : t("home.open")}
-                  </span>
+                  <span className="text-sm font-medium text-blue-800">{t("home.open")}</span>
                 </Link>
               </li>
             );

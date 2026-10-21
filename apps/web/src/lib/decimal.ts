@@ -68,3 +68,8 @@ export function trimDecimal(value: string): string {
   const text = trimmed ? `${whole}.${trimmed}` : whole;
   return negative && /[1-9]/.test(text) ? `-${text}` : text;
 }
+
+/** Is it a plain non-negative decimal string with at most `dp` decimals ("6", "2.5", "0.0625")? Typed quantities are checked with this, never parsed. */
+export function isQuantityText(value: string, dp = 4): boolean {
+  return new RegExp(`^\d+(\.\d{1,${dp}})?$`).test(value.trim());
+}
