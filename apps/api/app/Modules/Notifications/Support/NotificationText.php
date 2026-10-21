@@ -49,7 +49,7 @@ final class NotificationText
     private function keys(string $type, array $payload): array
     {
         return match ($type) {
-            'line_ready', 'line_rejected' => ["text.{$type}", $this->str($type, $payload, 'table_code', true) === null ? 'body_no_table' : 'body'],
+            'line_ready', 'line_rejected' => ["text.{$type}", $this->optional($type, $payload, 'table_code') === null ? 'body_no_table' : 'body'],
             'transfer_decided' => ['text.transfer_decided.'.($this->str($type, $payload, 'status') === 'rejected' ? 'rejected' : 'confirmed'), 'body'],
             default => ["text.{$type}", 'body'],
         };
@@ -67,13 +67,13 @@ final class NotificationText
             'line_ready' => [
                 'item' => $this->str($type, $p, $in('item_name')),
                 'order_no' => (string) $this->int($type, $p, 'order_no'),
-                'table' => $this->str($type, $p, 'table_code', true) ?? '',
+                'table' => $this->optional($type, $p, 'table_code') ?? '',
             ],
             'line_rejected' => [
                 'item' => $this->str($type, $p, $in('item_name')),
                 'order_no' => (string) $this->int($type, $p, 'order_no'),
-                'table' => $this->str($type, $p, 'table_code', true) ?? '',
-                'reason' => trim($this->str($type, $p, $in('reason_message')).' '.($this->str($type, $p, 'note', true) ?? '')),
+                'table' => $this->optional($type, $p, 'table_code') ?? '',
+                'reason' => trim($this->str($type, $p, $in('reason_message')).' '.($this->optional($type, $p, 'note') ?? '')),
             ],
             'stock_out' => [
                 'item' => $this->str($type, $p, $in('item_name')),
@@ -85,7 +85,7 @@ final class NotificationText
                 'unit' => $this->str($type, $p, 'unit'),
                 'from' => $this->str($type, $p, $in('from_location_name')),
                 'to' => $this->str($type, $p, $in('to_location_name')),
-                'reason' => $type === 'transfer_decided' ? ($this->str($type, $p, 'reject_reason', true) ?? '-') : '',
+                'reason' => $type === 'transfer_decided' ? ($this->optional($type, $p, 'reject_reason') ?? '-') : '',
             ],
             default => throw UnknownNotificationType::named($type),
         };
@@ -124,14 +124,21 @@ final class NotificationText
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function str(string $type, array $payload, string $key, bool $nullable = false): ?string
+    private function str(string $type, array $payload, string $key): string
     {
         $value = $payload[$key] ?? null;
-        if (is_string($value)) {
+
+        return is_string($value) ? $value : throw MissingPayloadKey::for($type, $key);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function optional(string $type, array $payload, string $key): ?string
+    {
+        $value = $payload[$key] ?? null;
+        if ($value === null || is_string($value)) {
             return $value;
-        }
-        if ($value === null && $nullable) {
-            return null;
         }
 
         throw MissingPayloadKey::for($type, $key);

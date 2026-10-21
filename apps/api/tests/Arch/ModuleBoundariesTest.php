@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
 /*
  * The module dependency graph as executable rules (dependency-graph.md, ADR 0001).
@@ -61,8 +63,8 @@ arch('Notifications uses Identity through its Contracts only (Recipients), never
 
 arch('every Notifications listener is queued and waits for the commit, so it never slows or joins the request that caused the event')
     ->expect('App\Modules\Notifications\Listeners')
-    ->toImplement(\Illuminate\Contracts\Queue\ShouldQueue::class)
-    ->toImplement(\Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit::class)
+    ->toImplement(ShouldQueue::class)
+    ->toImplement(ShouldHandleEventsAfterCommit::class)
     ->group('arch', 'module:notifications');
 
 arch('Shared is a leaf: it never imports a module')

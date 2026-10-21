@@ -55,7 +55,7 @@ final class NotifyStockOut implements ShouldHandleEventsAfterCommit, ShouldQueue
     }
 
     /**
-     * @return Collection<int, Model>
+     * @return Collection<int, covariant Model>
      */
     private function audience(StockOut $event): Collection
     {

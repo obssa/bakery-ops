@@ -13,9 +13,9 @@ use App\Shared\Actor\ActorContext;
 use App\Shared\Tenancy\BranchScope;
 use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Database\ConnectionResolverInterface;
 
 /**
  * manifest notifications.provides: "Notifier::send(users, type, payload, deepLink)" (phase-2 plan section 5). Writes the inbox

@@ -834,6 +834,42 @@ and 1.6a-c were in Phase 1.
      `LineRejected`, `StockOut`, `StockRecovered`; `StockOut` and `StockRecovered` are dispatched from 2.1), provider change
      F5 (Orders payloads, Orders tests extended), `GET /notifications` with `OverlapCursor`, `read`, `read-all`. The arch rule:
      Notifications uses only `App\Modules\Identity\Contracts`, `App\Shared` and its own namespace.
+     **As built (step 2.5a, `phase-2/notifications-inbox`).** Done as planned, with these differences and decisions (the plan left them open or the code was the fact):
+     - *Red before green, as run.* Provider tests first, red: the two Orders event payload cases, `Recipients::byIds` (contract and module) and the station ids on `StockOut`
+       (each failed for the missing key, method or parameter). Then the Notifications tests (68 cases, red for the missing classes and tables). The registries
+       (`route_permissions.php`, `write_endpoints.php`, the matrix `{notification}` placeholder), the `SoftDeletesTest` allowlist and the arch rules went in with the red commit.
+     - *Three provider changes, not one.* F5 as planned: `LineReady` and `LineRejected` extend a new `NamedLineEvent` and gain `order_no`, `table_code`, `item_name_en/am`; a reject also
+       `reason_message_en/am` and `note` (the plan said "its bilingual message"). F6 (new, `notifications->identity`): `Recipients::byIds`, because the owner of an order line and the requester of a
+       transfer are named people and Identity had no way to answer "this user, if active in the branch". F7 (new): `StockOut` / `StockLow` carry `station_id` (the station of the place) and
+       `production_station_id` (the station that makes a product, from Catalog `Routing`, read by `AlertEvaluator`), because the plan sends a product stock-out to its producing station and the
+       payload had no station. Orders stays `stable`; the Inventory and Shared tests were extended (`EvaluateBalanceTest`, `ActorRunAsTest`).
+     - *Inbox key and gate are different keys.* The gate is `stock_out:{item}:{location}` (the plan); the unique `(user_id, dedupe_key)` of the inbox line is `stock_out:{item}:{location}:{alert}`,
+       otherwise the second run-out of the same item, after recovery, would be swallowed by the first line. Every key and the deep link come from `config/notifications.php`
+       (`inbox_key`, `gate`, `deep_link` templates filled from the payload); ADR 0011 decision 5 records the rest.
+     - *`Notifier::send(users, type, payload, deepLink = null)`* takes the people Identity answered (only their keys are read, so Notifications names no Identity model) and returns the lines it wrote.
+       Gate claimed and lines written in one transaction; nobody to tell claims nothing; a gate claimed by a redelivery that wrote no line is given back. Lines are written one at a time under a
+       savepoint so a lost race on the unique key is a no-op rather than an aborted transaction (a plain `insertOrIgnore` would also hide foreign-key errors). `Dedupe::claim` is one `insertOrIgnore`; the test
+       records the statements and finds no `FOR UPDATE`.
+     - *Types in the registry: five.* `stock_out`, `line_ready`, `line_rejected` and, because the transfer events from 2.3 already exist and say "nobody listens yet (step 2.5)", `transfer_requested` and
+       `transfer_decided`. The migration's CHECK lists all ten of the plan so 2.6 and 2.7 need no migration; their registry rows, texts and listeners arrive with their steps. `stock_low` has no row yet
+       (`ClearStockDedupe` already clears a `low` gate with the same key shape).
+     - *Recipients.* Product stock-out: on duty at the producing station (else the station of the place), `production.confirm` holders, and the registry roles (admin, manager). Ingredient: the registry roles and the
+       people assigned to the station of the place. Transfer request: the source station's people and `transfers.confirm` holders, not the requester. Decisions and lines: the one named person. "In-app only for the station-only
+       people" is a per-recipient channel choice that belongs to the drivers (2.5b); the inbox tells everyone.
+     - *Queued, and why.* All six listeners are `ShouldQueue` and `ShouldHandleEventsAfterCommit` on the default queue, `$tries = 3`, backoff 30 s / 120 s: they look people up (`byPermission` loads the branch's users) and write
+       rows, which the tap that caused them must not wait for; the live host drains the database queue once a minute, so a notification can be up to a minute late and the pad's own badge still shows at once. All are idempotent.
+       An arch rule enforces it for the whole namespace.
+     - *The actor of a listener.* Inventory's `RestoresActor` reads the ledger, which Notifications may not import, so `Support/EventScope` resolves the event's branch and runs the listener as the person the event
+       names through `ActorContext::runAs` (user only: an event carries a person, not a shift or device), putting back the worker's branch and actor. The inbox writes no stamped row, so the person is `payload.caused_by_user_id`.
+     - *Arch.* The allowed list gives Notifications `Identity` and `Audit` (the read endpoints are `AuditedAction`s: rule 4 and the idempotency registry want an audit row); a rule keeps it out of every Identity namespace
+       but `Contracts`. The plan's wording "only Identity Contracts, Shared and itself" is therefore "plus Audit Contracts".
+     - *Endpoints.* `GET /notifications` (`unread`, `since`, `limit` 1 to 100, 30 default; newest first; the cursor stops at the last line returned when the answer was cut, so nothing is skipped; the ETag covers the unsettled tail
+       and the unread count; lines carry no version, so a line read on another device shows as read at the next full load), `POST /notifications/{notification}/read` and `POST /notifications/read-all {before_id?}`.
+       Someone else's line is 404; reading a line twice, or read-all with nothing unread, writes no second audit row. Write registry rows: 2; route rows: 3; the matrix gained `{notification}`.
+       `lang/{en,am}/notifications.php` holds the texts (parity test). `docs/openapi.json` re-exported.
+     - *Existing tests touched.* `assertNothingQueuedButStockEvaluation` takes the queued listeners a test expects (Ready, Reject, Transfer request and decision); `ReadyLineTest`'s one-transaction case ignores the owner's inbox write, which the
+       listener makes after the commit.
+     - *STATUS.* `notifications` is `in_progress`; it becomes `stable` in 2.5b.
    - 2.5b drivers and endpoints: migrations 11 and 12, the `Driver` interface (`name()`, `enabled()`, `send(Delivery)`),
      `InAppDriver` (the inbox itself, always on), `PushDriver` (VAPID, `minishlink/web-push` pinned exactly in
      `composer.json`, loaded only when the driver is on), `TelegramDriver` (Laravel `Http` client, the Bot API's

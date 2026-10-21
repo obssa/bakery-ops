@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Inventory\Ledger\MovementReason;
-use App\Modules\Orders\Enums\RejectReason;
 use App\Modules\Notifications\Listeners\NotifyLineRejected;
+use App\Modules\Orders\Enums\RejectReason;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
 use App\Modules\Orders\Models\OrderLine;

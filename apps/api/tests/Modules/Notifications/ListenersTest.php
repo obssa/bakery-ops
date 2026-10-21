@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Enums\Fulfilment;
+use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Contracts\Stations;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Enums\LocationType;
@@ -254,7 +256,7 @@ it('does nothing for a branch that no longer exists', function () {
 it('follows a stock-out from the movement to the inbox as the person who made the movement, whoever the worker is by then', function () {
     $till = Station::factory()->forCode(StationCode::Till)->create(['branch_id' => $this->branch->id]);
     $display = stockLocation($this->branch, LocationType::DisplayCase, $till);
-    $cake = App\Modules\Catalog\Models\Item::factory()->product(App\Modules\Catalog\Enums\Fulfilment::ToStock, 'pcs')->create([
+    $cake = Item::factory()->product(Fulfilment::ToStock, 'pcs')->create([
         'branch_id' => $this->branch->id, 'name_en' => 'Honey cake', 'name_am' => 'የማር ኬክ', 'production_station_id' => $this->cakeRoom->id,
     ]);
     stockIn($cake, $display, '1');

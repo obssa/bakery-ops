@@ -14,8 +14,8 @@ use Illuminate\Database\Eloquent\Model;
 final class Audience
 {
     /**
-     * @param  Collection<int, Model>  ...$groups
-     * @return Collection<int, Model>
+     * @param  Collection<int, covariant Model>  ...$groups
+     * @return Collection<int, covariant Model>
      */
     public static function of(Collection ...$groups): Collection
     {
@@ -31,8 +31,8 @@ final class Audience
     }
 
     /**
-     * @param  Collection<int, Model>  $people
-     * @return Collection<int, Model>
+     * @param  Collection<int, covariant Model>  $people
+     * @return Collection<int, covariant Model>
      */
     public static function without(Collection $people, int $userId): Collection
     {
