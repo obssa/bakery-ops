@@ -60,7 +60,7 @@ it('matches the exact rational oracle over random purchase sequences', function 
     $exact = null;                             // the unrounded chain
     $drift = BigRational::of('0');
     $bound = BigRational::of('0');
-    $half = BigRational::nd(5, 100000);        // 0.00005
+    $half = BigRational::of('0.00005');        // 0.00005
 
     for ($i = 1; $i <= $steps; $i++) {
         // sometimes the stock arrives without a cost (unvalued), sometimes on top of nothing
@@ -95,7 +95,7 @@ it('matches the exact rational oracle over random purchase sequences', function 
         $stored = $next->toString();
         $qty = $qty->plus($qtyIn);
         $bound = $bound->plus($half);
-        $drift = BigRational::of($stored)->minus($exact)->simplified();
+        $drift = BigRational::of($stored)->minus($exact);
         if ($drift->isNegative()) {
             $drift = $drift->negated();
         }
