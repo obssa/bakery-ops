@@ -23,7 +23,7 @@ use Carbon\CarbonImmutable;
  * reserved both down by what was reserved (Phase 1 has no screen for actual use, so what was reserved is what was
  * used). Exactly once: the line row is locked and moves through its machine first (ready -> ready is refused, 409), and
  * Inventory settles a ref once whatever happens (a second consume writes nothing). prepared_by is the person who made
- * it, ready_at now. A display-case line is ready at send and never comes here (409). LineReady after the commit.
+ * it, ready_at now. A display-case line is ready at send and never comes here (409). LineReady after the commit, naming the order, its table and the item in both languages (F5).
  */
 final class MarkLineReady
 {
@@ -47,7 +47,11 @@ final class MarkLineReady
         });
         /** @var Order $order */
         $order = $line->order;
-        event(new LineReady($line->branch_id, $line->id, $line->order_id, $line->station_id, $person->id, $order->owner_user_id));
+        $item = $line->item()->withTrashed()->firstOrFail();
+        event(new LineReady(
+            $line->branch_id, $line->id, $line->order_id, $line->station_id, $person->id, $order->owner_user_id,
+            $order->order_no, $order->table_code, $item->name_en, $item->name_am,
+        ));
 
         return $line;
     }
