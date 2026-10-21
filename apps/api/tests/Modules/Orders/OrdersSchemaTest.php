@@ -44,7 +44,7 @@ const ORDERS_COLUMNS = [
     'orders' => [
         'id', 'branch_id', 'client_uuid', 'order_no', 'business_date', 'type', 'dining_table_id', 'table_code', 'status',
         'created_via', 'owner_user_id', 'created_by_user_id', 'acting_user_id', 'shift_instance_id', 'station_id',
-        'device_id', 'subtotal', 'discount', 'tax', 'total', 'paid_total', 'currency', 'notes', 'sent_at', 'settled_at',
+        'device_id', 'subtotal', 'discount', 'tax', 'total', 'paid_total', 'deposit_amount', 'currency', 'notes', 'sent_at', 'settled_at',
         'paid_at', 'closed_at', 'cancelled_at', 'cancel_reason', 'voided_at', 'void_reason', 'voided_by_user_id',
         'void_approved_by_user_id', 'due_at', 'version', 'created_at', 'updated_at',
     ],
@@ -229,7 +229,7 @@ it('gives every Orders table branch_id NOT NULL with a foreign key to branches a
 it('stores money as DECIMAL(12,2) and line quantities as DECIMAL(14,4) in units of the product', function () {
     $expected = [
         'orders.subtotal' => '12,2', 'orders.discount' => '12,2', 'orders.tax' => '12,2', 'orders.total' => '12,2',
-        'orders.paid_total' => '12,2', 'order_lines.qty' => '14,4', 'order_lines.unit_price_snapshot' => '12,2',
+        'orders.paid_total' => '12,2', 'orders.deposit_amount' => '12,2', 'order_lines.qty' => '14,4', 'order_lines.unit_price_snapshot' => '12,2',
         'order_lines.modifier_price_snapshot' => '12,2', 'order_lines.line_total' => '12,2',
         'order_line_modifiers.price_delta_snapshot' => '12,2',
     ];

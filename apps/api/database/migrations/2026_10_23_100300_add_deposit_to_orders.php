@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
  * Advance-order deposit (phase-2 plan section 3, migration 17; Orders, step 2.7a, schema only: "advance order schema fields
  * land in Phase 2, UI later"). orders gains deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0 with a CHECK that it is never
  * negative. due_at already exists. Nothing reads or writes it in Phase 2: OrderTotals and the Order resource are unchanged, so
- * the Orders module tests and the Phase 1 gate cannot move. A deposit larger than the total is a rule for the advance-order
+ * the Orders module tests move only in the exact column list of OrdersSchemaTest, and the Phase 1 gate does not. A deposit larger than the total is a rule for the advance-order
  * feature that will use the column.
  */
 return new class extends Migration
