@@ -67,6 +67,7 @@ it('hands out a one-time code, its expiry ten minutes ahead and the link that op
 
 it('hands out a different code every time and replays the same answer for the same key', function () {
     $this->tg = NotificationDrivers::telegram();
+    $this->postJson('/api/v1/notifications/telegram/link')->assertStatus(400)->assertJsonPath('message_key', 'idempotency.key_required');
     $headers = idempotencyKey();
 
     $a = $this->withHeaders($headers)->postJson('/api/v1/notifications/telegram/link')->assertCreated();
@@ -74,8 +75,7 @@ it('hands out a different code every time and replays the same answer for the sa
     $b = ($this->link)()->assertCreated();
 
     expect($replay->json())->toBe($a->json())
-        ->and($b->json('code'))->not->toBe($a->json('code'))
-        ->and($this->postJson('/api/v1/notifications/telegram/link')->assertStatus(400)->json('message_key'))->toBe('idempotency.key_required');
+        ->and($b->json('code'))->not->toBe($a->json('code'));
 });
 
 it('links the chat to the person who asked when Telegram calls the webhook with /start and the code, and tells them in their language', function () {
@@ -99,7 +99,7 @@ it('links the chat to the person who asked when Telegram calls the webhook with 
     expect($audit->actor_id)->toBe($this->me->id)->and($audit->branch_id)->toBe($this->branch->id)->and($audit->after)->not->toContain('4815162342');
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/sendMessage')
         && $request['chat_id'] === '4815162342'
-        && str_contains($request['text'], 'linked'));
+        && str_contains($request['text'], 'Linked'));
 });
 
 it('answers an Amharic reader in Amharic', function () {

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Notifications\Http\Controllers\EndpointsController;
 use App\Modules\Notifications\Http\Controllers\NotificationsController;
+use App\Modules\Notifications\Http\Controllers\TelegramWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -12,7 +14,9 @@ use Illuminate\Support\Facades\Route;
  * ask. The writes also carry idempotency (rule 7). Every route is listed in tests/Support/route_permissions.php and every
  * write in tests/Support/write_endpoints.php.
  *
- * Step 2.5b adds the channels, the endpoints and the Telegram link and webhook beside these.
+ * Step 2.5b adds the channels, the endpoints and the Telegram link beside these, and the one public route: the Telegram webhook,
+ * which Telegram calls without a bearer token and which is guarded by the secret in its path and header instead (listed in
+ * tests/Support/public_routes.php; it is not a user write).
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor', 'permission:notifications.view'])->group(function (): void {
     Route::get('/notifications', [NotificationsController::class, 'index'])->name('notifications.index');
@@ -20,5 +24,14 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor', 'permission
     Route::middleware('idempotency')->group(function (): void {
         Route::post('/notifications/read-all', [NotificationsController::class, 'readAll'])->name('notifications.read-all');
         Route::post('/notifications/{notification}/read', [NotificationsController::class, 'read'])->whereNumber('notification')->name('notifications.read');
+        Route::post('/notifications/endpoints', [EndpointsController::class, 'store'])->name('notifications.endpoints.store');
+        Route::delete('/notifications/endpoints/{endpoint}', [EndpointsController::class, 'destroy'])->whereNumber('endpoint')->name('notifications.endpoints.destroy');
+        Route::post('/notifications/telegram/link', [EndpointsController::class, 'link'])->name('notifications.telegram.link');
     });
+
+    Route::get('/notifications/channels', [EndpointsController::class, 'channels'])->name('notifications.channels');
+});
+
+Route::prefix('api/v1')->middleware(['api'])->group(function (): void {
+    Route::post('/telegram/webhook/{secret}', TelegramWebhookController::class)->name('telegram.webhook');
 });

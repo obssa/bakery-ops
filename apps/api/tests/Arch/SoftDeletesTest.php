@@ -29,6 +29,7 @@ $noSoftDeletes = [
     'App\Modules\Orders\Models\OrderCounter',  // the daily order-number row: locked FOR UPDATE and incremented in place, never deleted
     'App\Modules\Notifications\Models\Notification',  // the inbox: history that only ever changes read_at, kept so a person can look back
     'App\Modules\Notifications\Models\NotificationDedupe',  // the delivery gate of an episodic alert: active, then cleared (cleared_at, is_active NULL), kept as history
+    'App\Modules\Notifications\Models\NotificationDelivery',  // history of what was sent outside the app: pending, then sent, failed or gone by status, never deleted
     'App\Modules\Payments\Models\Payment',  // never deleted: recorded, then verified, disputed or voided by status (Phase 4); the till's money trail
 ];
 

@@ -29,7 +29,7 @@ beforeEach(function () {
         'subscription' => ['endpoint' => $endpoint, 'keys' => ['p256dh' => 'BPublicKeyOfTheBrowser_example-only', 'auth' => 'authSecretExample']],
         'user_agent' => 'Mozilla/5.0 (Linux; Android 14) Chrome/130',
     ];
-    $this->subscribe = fn (array $body = null) => $this->withHeaders(idempotencyKey())->postJson('/api/v1/notifications/endpoints', $body ?? ($this->subscription)());
+    $this->subscribe = fn (?array $body = null) => $this->withHeaders(idempotencyKey())->postJson('/api/v1/notifications/endpoints', $body ?? ($this->subscription)());
     $this->audits = fn (string $action): int => DB::table('audit_log')->where('action', $action)->count();
     loginAs($this->me);
 });

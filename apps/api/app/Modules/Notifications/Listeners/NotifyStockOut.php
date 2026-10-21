@@ -22,8 +22,8 @@ use Illuminate\Database\Eloquent\Model;
  *    place), everybody who holds production.confirm, and the roles the registry names (admin, manager);
  *  - an INGREDIENT that ran out: the roles the registry names and the people assigned to the station of the place (the chef
  *    must hear that the kitchen's flour is gone).
- * The in-app line goes to all of them. (Plan section 5 makes the station-only people in-app only for push and Telegram; that
- * is a per-recipient choice of the drivers of step 2.5b, not of the inbox.)
+ * The in-app line goes to all of them. Push and Telegram do not go to the station-only people of an ingredient (plan section
+ * 5: "in-app only for the latter"): they see it in the bell, the roles are reached wherever they are (Notifier $inAppOnly).
  *
  * Queued after commit on the default queue; the delivery gate (Support\Dedupe, per item and place, cleared by StockRecovered)
  * makes it fire once per run-out however often the event is delivered. Runs as the person whose movement caused the
@@ -50,28 +50,37 @@ final class NotifyStockOut implements ShouldHandleEventsAfterCommit, ShouldQueue
     public function handle(StockOut $event): void
     {
         $this->scope->run($event->branchId, $event->causedByUserId, function () use ($event): void {
-            $this->notifier->send($this->audience($event), 'stock_out', $event->payload());
+            [$audience, $inAppOnly] = $this->audience($event);
+            $this->notifier->send($audience, 'stock_out', $event->payload(), null, $inAppOnly);
         });
     }
 
     /**
-     * @return Collection<int, covariant Model>
+     * The people to tell, and the ones among them who are told in the inbox only (not by push or Telegram): the people of the
+     * station of the place when an INGREDIENT ran out, unless a role or the like already puts them in the first group.
+     *
+     * @return array{0: Collection<int, covariant Model>, 1: list<int>}
      */
-    private function audience(StockOut $event): Collection
+    private function audience(StockOut $event): array
     {
         $roles = $this->recipients->byRoles(NotificationTypes::notifyRoles('stock_out'));
         if ($event->itemKind === 'product') {
             $station = $this->station($event->productionStationId ?? $event->stationId);
 
-            return Audience::of(
+            return [Audience::of(
                 $station === null ? new Collection : $this->recipients->onDuty($station),
                 $this->recipients->byPermission('production.confirm'),
                 $roles,
-            );
+            ), []];
         }
         $station = $this->station($event->stationId);
+        $atStation = $station === null ? new Collection : $this->recipients->forStation($station);
+        $inAppOnly = array_values(array_diff(
+            $atStation->map(static fn (Model $person): int => (int) $person->getKey())->all(),
+            $roles->map(static fn (Model $person): int => (int) $person->getKey())->all(),
+        ));
 
-        return Audience::of($roles, $station === null ? new Collection : $this->recipients->forStation($station));
+        return [Audience::of($roles, $atStation), $inAppOnly];
     }
 
     private function station(?int $id): ?Station

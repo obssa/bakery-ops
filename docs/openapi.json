@@ -946,6 +946,214 @@
                 }
             }
         },
+        "/v1/notifications/endpoints": {
+            "post": {
+                "operationId": "notifications.endpoints.store",
+                "tags": [
+                    "Endpoints"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SubscribePushRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/notifications/endpoints/{endpoint}": {
+            "delete": {
+                "operationId": "notifications.endpoints.destroy",
+                "tags": [
+                    "Endpoints"
+                ],
+                "parameters": [
+                    {
+                        "name": "endpoint",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "driver": {
+                                            "type": "string"
+                                        },
+                                        "revoked_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "driver",
+                                        "revoked_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/notifications/telegram/link": {
+            "post": {
+                "operationId": "notifications.telegram.link",
+                "tags": [
+                    "Endpoints"
+                ],
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "const": ""
+                                        },
+                                        "expires_at": {
+                                            "type": "string"
+                                        },
+                                        "deep_link": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "expires_at",
+                                        "deep_link"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/notifications/channels": {
+            "get": {
+                "operationId": "notifications.channels",
+                "tags": [
+                    "Endpoints"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "in_app": {
+                                            "type": "boolean"
+                                        },
+                                        "push": {
+                                            "type": "object",
+                                            "properties": {
+                                                "enabled": {
+                                                    "type": "boolean"
+                                                },
+                                                "public_key": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "subscribed": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "enabled",
+                                                "public_key",
+                                                "subscribed"
+                                            ]
+                                        },
+                                        "telegram": {
+                                            "type": "object",
+                                            "properties": {
+                                                "enabled": {
+                                                    "type": "boolean"
+                                                },
+                                                "bot_username": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "linked": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "enabled",
+                                                "bot_username",
+                                                "linked"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "in_app",
+                                        "push",
+                                        "telegram"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/health": {
             "get": {
                 "operationId": "health",
@@ -3883,6 +4091,39 @@
                 }
             }
         },
+        "/v1/telegram/webhook/{secret}": {
+            "post": {
+                "operationId": "telegram.webhook",
+                "tags": [
+                    "TelegramWebhook"
+                ],
+                "parameters": [
+                    {
+                        "name": "secret",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/v1/transfers": {
             "get": {
                 "operationId": "inventory.transfers.index",
@@ -6379,6 +6620,61 @@
                     "role"
                 ],
                 "title": "StoreUserRequest"
+            },
+            "SubscribePushRequest": {
+                "type": "object",
+                "description": "POST /notifications/endpoints {driver: \"push\", subscription: {endpoint, keys: {p256dh, auth}}, user_agent?}: what the\nbrowser's PushManager.subscribe() returns (its toJSON()). Only push subscribes this way; a Telegram chat is linked with a\none-time code instead (POST /notifications/telegram/link). The endpoint must be an https URL, as the Web Push protocol\nrequires.",
+                "properties": {
+                    "driver": {
+                        "type": "string",
+                        "enum": [
+                            "push"
+                        ]
+                    },
+                    "subscription": {
+                        "type": "object",
+                        "properties": {
+                            "endpoint": {
+                                "type": "string",
+                                "format": "uri",
+                                "maxLength": 2000
+                            },
+                            "keys": {
+                                "type": "object",
+                                "properties": {
+                                    "p256dh": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    },
+                                    "auth": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                    }
+                                },
+                                "required": [
+                                    "p256dh",
+                                    "auth"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "endpoint",
+                            "keys"
+                        ]
+                    },
+                    "user_agent": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "driver",
+                    "subscription"
+                ],
+                "title": "SubscribePushRequest"
             },
             "SupplierResource": {
                 "type": "object",

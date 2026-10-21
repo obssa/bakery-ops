@@ -123,7 +123,7 @@ it('recognises the shapes it guards against', function () {
         ->and(secretsIn("TELEGRAM_BOT_TOKEN={$token}"))->toBe(['a Telegram bot token'])
         ->and(secretsIn("VAPID_PRIVATE_KEY={$privateKey}"))->toBe(['a VAPID key'])
         ->and(secretsIn("'vapid_public_key' => '{$publicKey}'"))->toBe(['a VAPID key'])
-        ->and(secretsIn('-----BEGIN EC PRIVATE KEY-----'))->toBe(['a PEM block'])
+        ->and(secretsIn(str_repeat('-', 5).'BEGIN EC PRIVATE KEY'.str_repeat('-', 5)))->toBe(['a PEM block'])
         ->and(secretsIn("VAPID_PRIVATE_KEY=<printed by the command>\nTELEGRAM_BOT_TOKEN=<from BotFather>"))->toBe([])
         ->and(secretsIn('a 43 character hash '.$privateKey.' that has nothing to do with it'))->toBe([]);
 })->group('invariants', 'module:notifications');

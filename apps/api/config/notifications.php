@@ -14,8 +14,42 @@ declare(strict_types=1);
  * StockRecovered: people are told once per run-out, however often the event is redelivered. Texts live in
  * lang/{en,am}/notifications.php and are written from the payload alone (Support\NotificationText).
  * The types the inbox table accepts are listed in its migration (CHECK); Phase 3 extends them in its own migration.
+ *
+ * `drivers` (step 2.5b, plan section 10.1): every external driver ships OFF and every key is null. A driver counts as on only
+ * when its flag is true AND every setting it needs is present (Drivers/DriverRegistry); the values come from the server's
+ * .env only, never from the repository (tests/Invariants/NoSecretsInEnvExampleTest.php). The array driver is for CI: it
+ * stands in for push and telegram and records instead of sending. There is no sms entry: no gateway has been chosen.
  */
+$flag = static fn (string $name): bool => filter_var(env($name, false), FILTER_VALIDATE_BOOLEAN);
+$text = static function (string $name): ?string {
+    $value = env($name);
+
+    return is_string($value) && trim($value) !== '' ? $value : null;
+};
+
 return [
+    'drivers' => [
+        'push' => [
+            'enabled' => $flag('NOTIFY_PUSH_ENABLED'),
+            'subject' => $text('VAPID_SUBJECT'),
+            'public_key' => $text('VAPID_PUBLIC_KEY'),
+            'private_key' => $text('VAPID_PRIVATE_KEY'),
+        ],
+        'telegram' => [
+            'enabled' => $flag('NOTIFY_TELEGRAM_ENABLED'),
+            'bot_token' => $text('TELEGRAM_BOT_TOKEN'),
+            'bot_username' => $text('TELEGRAM_BOT_USERNAME'),
+            'webhook_secret' => $text('TELEGRAM_WEBHOOK_SECRET'),
+            'api_base' => 'https://api.telegram.org',
+        ],
+        'array' => [
+            'enabled' => $flag('NOTIFY_ARRAY_ENABLED'),
+        ],
+    ],
+
+    /** How long the one-time code that links a Telegram chat to a person stays valid, in minutes (kept in the cache only). */
+    'telegram_link_minutes' => 10,
+
     'types' => [
         'stock_out' => [
             'severity' => 'critical',

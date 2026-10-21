@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Notifications\Contracts\Notifier;
 use App\Modules\Notifications\Drivers\DriverRegistry;
 use App\Modules\Notifications\Drivers\PushDriver;
+use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Models\NotificationDelivery;
 use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Shared\Models\Branch;
@@ -118,7 +119,7 @@ it('records any other refusal on the delivery and keeps it for a retry', functio
         ->and($row->attempts)->toBe(1)
         ->and($row->last_error)->toContain('503')
         ->and($endpoint->fresh()->revoked_at)->toBeNull()
-        ->and(\App\Modules\Notifications\Models\Notification::query()->count())->toBe(1);
+        ->and(Notification::query()->count())->toBe(1);
 });
 
 it('never puts the VAPID private key in an error', function () {

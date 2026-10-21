@@ -37,6 +37,13 @@ beforeEach(function () {
     $this->endpoint = fn ($user, string $driver = 'push', array $over = []): NotificationEndpoint => NotificationEndpoint::factory()
         ->{$driver}()->create($over + ['branch_id' => $this->branch->id, 'user_id' => $user->id]);
     $this->deliveries = fn () => NotificationDelivery::query()->orderBy('id')->get();
+    /** a delivery row planned by hand, so that nothing has run it yet */
+    $this->planned = function ($user): NotificationDelivery {
+        $line = Notification::factory()->create(['branch_id' => $this->branch->id, 'user_id' => $user->id]);
+        $endpoint = NotificationEndpoint::factory()->push()->create(['branch_id' => $this->branch->id, 'user_id' => $user->id]);
+
+        return NotificationDelivery::factory()->create(['branch_id' => $this->branch->id, 'notification_id' => $line->id, 'endpoint_id' => $endpoint->id, 'driver' => 'push']);
+    };
 });
 
 it('plans one delivery per endpoint on every channel the type allows and queues a job for each, after commit', function () {
@@ -230,10 +237,7 @@ it('lets one failing driver leave the others to deliver', function () {
 
 it('records a delivery as failed, without retrying, when its driver was switched off after it was planned', function () {
     NotificationDrivers::array();
-    Queue::fake();
-    ($this->endpoint)($this->admin, 'push');
-    ($this->notifier)()->send(new Collection([$this->admin]), 'stock_out', ($this->out)());
-    $delivery = ($this->deliveries)()->first();
+    $delivery = ($this->planned)($this->admin);
 
     NotificationDrivers::allOff();
     DeliverNotification::dispatchSync($delivery->id, $this->branch->id);
@@ -247,10 +251,7 @@ it('records a delivery as failed, without retrying, when its driver was switched
 
 it('does not send to a person who is no longer active, and records why', function () {
     $log = NotificationDrivers::array();
-    Queue::fake();
-    ($this->endpoint)($this->manager, 'push');
-    ($this->notifier)()->send(new Collection([$this->manager]), 'stock_out', ($this->out)());
-    $delivery = ($this->deliveries)()->first();
+    $delivery = ($this->planned)($this->manager);
     $this->manager->forceFill(['is_active' => false])->save();
 
     DeliverNotification::dispatchSync($delivery->id, $this->branch->id);

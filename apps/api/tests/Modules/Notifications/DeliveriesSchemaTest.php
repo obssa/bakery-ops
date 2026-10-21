@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Identity\Models\User;
 use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Models\NotificationDelivery;
 use App\Modules\Notifications\Models\NotificationEndpoint;
@@ -34,7 +35,7 @@ function endpointRow(array $over = []): array
     static $branch = null, $user = null;
     if (! ($over['_reuse'] ?? false) || $branch === null) {
         $branch = Branch::factory()->create();
-        $user = App\Modules\Identity\Models\User::factory()->create(['branch_id' => $branch->id]);
+        $user = User::factory()->create(['branch_id' => $branch->id]);
     }
     unset($over['_reuse']);
 
@@ -71,7 +72,7 @@ it('refuses a second row for the same person, driver and address, but allows the
 
     expect(fn () => DB::table('notification_endpoints')->insert(endpointRow(['_reuse' => true])))->toThrow(QueryException::class);
     DB::table('notification_endpoints')->insert(endpointRow(['_reuse' => true, 'driver' => 'telegram']));
-    $other = App\Modules\Identity\Models\User::factory()->create(['branch_id' => DB::table('notification_endpoints')->value('branch_id')]);
+    $other = User::factory()->create(['branch_id' => DB::table('notification_endpoints')->value('branch_id')]);
     DB::table('notification_endpoints')->insert(endpointRow(['_reuse' => true, 'user_id' => $other->id]));
 
     expect(DB::table('notification_endpoints')->count())->toBe(3);

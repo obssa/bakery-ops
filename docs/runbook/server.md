@@ -137,6 +137,67 @@ demo branch is refused anyway). `--branch="<name>"` loads a second, separate dem
 branch. To retire the demo, deactivate its users under People (soft deletes only; nothing is ever removed from the
 ledger).
 
+## Turning on web push and Telegram
+
+Every notification is in the in-app inbox (the bell) whatever happens here: the inbox needs no setting and cannot be switched
+off. Web push and Telegram are extra ways to reach people outside the app, and both ship **off**. Nothing below goes in
+GitHub, the repository or a chat: the values live only in the server `.env` (`~/bakery-ops.orcamind.dev/.env`, mode 600, which
+a deploy never overwrites). A driver is on only when its flag is `true` **and** every setting it needs is present;
+`php artisan notifications:status` prints which drivers are on and, for those that are not, which settings are missing (names
+only, never a value). SMS has an interface slot and no driver: no gateway has been chosen.
+
+Run the commands from the site folder: `cd ~/bakery-ops.orcamind.dev` and use `/opt/alt/php83/usr/bin/php artisan ...`.
+
+### Web push (VAPID)
+
+1. Make a key pair: `php artisan notifications:vapid-keys`. It prints two lines **once** and stores nothing; if the pair is
+   lost, make another and have people switch push on again.
+2. Add to the server `.env` (the contact address is yours, any `https:` or `mailto:` address that reaches you):
+
+   ```
+   NOTIFY_PUSH_ENABLED=true
+   VAPID_SUBJECT=<https address of the site, or mailto: your address>
+   VAPID_PUBLIC_KEY=<the public line printed by the command>
+   VAPID_PRIVATE_KEY=<the private line printed by the command>
+   ```
+
+3. Rebuild the cached configuration, because a release caches it and an `.env` edit is not read until then:
+   `php artisan config:cache`. Then `php artisan notifications:status` must say `push` is `on`.
+4. Each person switches push on from the bell (the browser asks for permission). The public key reaches the browser from
+   `GET /api/v1/notifications/channels`, so the web build needs no variable.
+
+### Telegram
+
+1. In Telegram, talk to @BotFather: `/newbot`, choose a name, and keep the token it gives you secret.
+2. Make a long random string for the webhook secret (for example `openssl rand -hex 32`) and add to the server `.env`:
+
+   ```
+   NOTIFY_TELEGRAM_ENABLED=true
+   TELEGRAM_BOT_TOKEN=<the token from BotFather>
+   TELEGRAM_BOT_USERNAME=<the bot name, without the @>
+   TELEGRAM_WEBHOOK_SECRET=<the long random string>
+   ```
+
+3. `php artisan config:cache`, then `php artisan notifications:telegram-webhook`: it tells Telegram to send the bot's messages
+   to the site's `/api/v1/telegram/webhook/{secret}`, with the secret also as the header token, and prints what Telegram
+   answered (never the token or the secret). Run it again if the secret or the address of the site ever changes.
+   `php artisan notifications:status` must say `telegram` is `on`.
+4. Each person links their chat from their profile: the app shows a one-time code (valid 10 minutes) and a link that opens the
+   bot, and the bot answers that the chat is linked. A person can remove the link from the same place.
+
+### Turning one off, and what to expect
+
+- Set the flag to `false` (or remove it), run `php artisan config:cache`: nothing more is planned or sent for that driver, the
+  controls disappear from the app, and a delivery that was already planned ends as failed with `driver_disabled`. People keep
+  every inbox line.
+- The queue is drained once a minute, so a push or Telegram message can arrive up to about a minute after the event.
+  A failed send is tried three times (after 30 s, then 120 s) and then marked `failed` on its delivery row; a subscription or
+  a chat that no longer exists is marked `gone` and removed from the plans.
+- **Not verified until the keys exist:** that the shared host lets PHP reach `api.telegram.org` and the browsers' push services
+  over HTTPS, and that `openssl`, `curl` and `mbstring` are present for `alt-php83` for the push library (check:
+  `/opt/alt/php83/usr/bin/php -m | grep -E 'openssl|curl|mbstring'`). If either fails the inbox still works; the deliveries show the error.
+- CI never sends anything: its `.env.ci` switches on only the `array` driver, which records what it was asked to send.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.

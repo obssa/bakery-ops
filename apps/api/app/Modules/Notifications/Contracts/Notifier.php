@@ -7,6 +7,7 @@ namespace App\Modules\Notifications\Contracts;
 use App\Modules\Notifications\Exceptions\UnknownNotificationType;
 use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Support\Dedupe;
+use App\Modules\Notifications\Support\DeliveryPlanner;
 use App\Modules\Notifications\Support\NotificationText;
 use App\Modules\Notifications\Support\NotificationTypes;
 use App\Shared\Actor\ActorContext;
@@ -16,6 +17,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Throwable;
 
 /**
  * manifest notifications.provides: "Notifier::send(users, type, payload, deepLink)" (phase-2 plan section 5). Writes the inbox
@@ -30,6 +32,11 @@ use Illuminate\Database\UniqueConstraintViolationException;
  *  - A redelivered event writes one line per person, not two: the unique (user_id, dedupe_key); only the people who have no
  *    line for it yet get one. The cause of the event (payload.caused_by_user_id) is the actor the worker runs as.
  *
+ * Once the lines are committed, the people who can be reached outside the app are planned and queued (DeliveryPlanner, step
+ * 2.5b): the type's channels, the drivers that are on, the person's endpoints. $inAppOnly names the recipients the listener
+ * wants told in the inbox only (the station-only people of an ingredient stock-out). Planning can fail or be slow without
+ * costing anyone their line: it runs after the commit and an error in it is reported, never thrown.
+ *
  * Returns the lines it wrote (none when the gate held or every line already existed). Resolved per use: it carries the scoped
  * CurrentBranch and ActorContext (traps.md, Octane). $users are the recipients Identity\Contracts\Recipients answered;
  * only their keys are read.
@@ -42,14 +49,16 @@ final class Notifier
         private readonly Dedupe $dedupe,
         private readonly ActorContext $actor,
         private readonly CurrentBranch $branch,
+        private readonly DeliveryPlanner $planner,
     ) {}
 
     /**
      * @param  iterable<Model>  $users
      * @param  array<string, mixed>  $payload
+     * @param  list<int>  $inAppOnly  ids of recipients who are told in the inbox and nowhere else
      * @return list<Notification>
      */
-    public function send(iterable $users, string $type, array $payload, ?string $deepLink = null): array
+    public function send(iterable $users, string $type, array $payload, ?string $deepLink = null, array $inAppOnly = []): array
     {
         if (! NotificationTypes::has($type)) {
             throw UnknownNotificationType::named($type);
@@ -84,7 +93,7 @@ final class Notifier
         ];
         $gate = NotificationTypes::gateKey($type, $payload);
 
-        return $this->db->connection()->transaction(function () use ($ids, $row, $gate, $type, $branchId): array {
+        $lines = $this->db->connection()->transaction(function () use ($ids, $row, $gate, $type, $branchId): array {
             if ($gate !== null && ! $this->dedupe->claim($gate, $type)) {
                 return [];
             }
@@ -101,6 +110,16 @@ final class Notifier
 
             return $written;
         });
+
+        if ($lines !== []) {
+            try {
+                $this->planner->plan($lines, $inAppOnly);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $lines;
     }
 
     /**

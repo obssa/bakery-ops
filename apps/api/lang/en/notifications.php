@@ -38,4 +38,15 @@ return [
             'body_no_table' => 'Order #:order_no: :item was sent back. Reason: :reason',
         ],
     ],
+
+    // Step 2.5b: the refusal of a driver that is not switched on (message_key notifications.driver.disabled), and the few
+    // lines the Telegram bot answers with (written in the language of the person when it knows them, else in both).
+    'driver' => [
+        'disabled' => 'This way of being notified is not switched on for this bakery.',
+    ],
+    'telegram' => [
+        'linked' => 'Linked. You will receive the bakery alerts here.',
+        'unknown_code' => 'That code is not valid or has expired. Open the app and ask for a new one.',
+        'help' => 'To link this chat, ask for a code in the app and send it here as: /start CODE',
+    ],
 ];
