@@ -33,6 +33,7 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Purchase;
+use App\Modules\Inventory\Models\ReorderRule;
 use App\Modules\Inventory\Models\Supplier;
 use App\Modules\Inventory\Models\Transfer;
 use App\Modules\Notifications\Models\Notification;
@@ -860,5 +861,53 @@ return [
             return ['{transfer}' => (string) $transfer->id];
         },
         'payload' => fn (): array => ['reason' => 'Not today'],
+    ],
+    // Reorder rules (step 2.6a)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/reorder-rules',
+        'module' => 'inventory',
+        'table' => 'reorder_rules',
+        'setup' => function (TestCase $t) use ($admin, $transferable): array {
+            $transferable($admin());
+
+            return [];
+        },
+        // the flour and the store created by setup, read in the admin current branch
+        'payload' => fn (): array => [
+            'item_id' => Item::query()->where('sku', 'IDEM-TRANSFER-FLOUR')->latest('id')->firstOrFail()->id,
+            'location_id' => Location::query()->where('type', LocationType::Store->value)->latest('id')->firstOrFail()->id,
+            'min_qty' => '5000',
+            'reorder_qty' => '25000',
+            'notify_roles' => ['admin', 'manager'],
+        ],
+    ],
+    [
+        'method' => 'PATCH',
+        'uri' => '/api/v1/reorder-rules/{rule}',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            withActor($me->id);
+            $rule = ReorderRule::factory()->create(['branch_id' => $me->branch_id]);
+
+            return ['{rule}' => (string) $rule->id];
+        },
+        'payload' => fn (): array => ['min_qty' => '1234', 'is_active' => false],
+    ],
+    [
+        'method' => 'DELETE',
+        'uri' => '/api/v1/reorder-rules/{rule}',
+        'module' => 'inventory',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            withActor($me->id);
+            $rule = ReorderRule::factory()->create(['branch_id' => $me->branch_id]);
+
+            return ['{rule}' => (string) $rule->id];
+        },
+        'payload' => fn (): array => [],
     ],
 ];

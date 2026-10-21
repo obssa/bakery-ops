@@ -88,6 +88,11 @@ return [
     'POST /api/v1/transfers' => ['permission' => 'transfers.request', 'roles' => $floor, 'module' => 'inventory'],
     'POST /api/v1/transfers/{transfer}/confirm' => ['permission' => 'transfers.confirm', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'POST /api/v1/transfers/{transfer}/reject' => ['permission' => 'transfers.confirm', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
+    // reorder rules (step 2.6a): the floor reads them (inventory.view); configuring them is inventory.manage (admin), like locations
+    'GET /api/v1/reorder-rules' => ['permission' => 'inventory.view', 'roles' => $floor, 'module' => 'inventory'],
+    'POST /api/v1/reorder-rules' => ['permission' => 'inventory.manage', 'roles' => ['admin'], 'module' => 'inventory'],
+    'PATCH /api/v1/reorder-rules/{rule}' => ['permission' => 'inventory.manage', 'roles' => ['admin'], 'module' => 'inventory'],
+    'DELETE /api/v1/reorder-rules/{rule}' => ['permission' => 'inventory.manage', 'roles' => ['admin'], 'module' => 'inventory'],
     'GET /api/v1/inventory/costs' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'GET /api/v1/inventory/costs/{item}' => ['permission' => 'costs.view', 'roles' => ['admin', 'manager'], 'module' => 'inventory'],
     'POST /api/v1/inventory/costs/{item}/opening' => ['permission' => 'inventory.adjust', 'roles' => ['admin'], 'module' => 'inventory'],

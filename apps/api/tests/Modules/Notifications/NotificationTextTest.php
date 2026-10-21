@@ -22,6 +22,7 @@ function samplePayloads(): array
         'line_ready' => NotificationEvents::lineReady(1, 5)->payload(),
         'line_rejected' => NotificationEvents::lineRejected(1, 5)->payload(),
         'stock_out' => NotificationEvents::stockOut(1)->payload(),
+        'stock_low' => NotificationEvents::stockLow(1)->payload(),
         'transfer_requested' => NotificationEvents::transferRequested(1, 5)->payload(),
         'transfer_decided' => NotificationEvents::transferDecided(1, 5, 6)->payload(),
     ];
@@ -85,6 +86,34 @@ it('says a stock-out with the item and the place in both languages', function ()
         ->and($rendered->body->en)->toBe('None left at Display case.')
         ->and($rendered->title->am)->toBe('ብላክ ፎረስት ኬክ አልቋል')
         ->and($rendered->body->am)->toBe('በየማሳያ ሣጥን ምንም አልቀረም።');
+})->group('module:notifications', 'unit');
+
+it('says a low-stock alert with the quantity, the minimum and what to reorder, units included', function () {
+    $text = app(NotificationText::class);
+
+    $rendered = $text->render('stock_low', NotificationEvents::stockLow(1)->payload());
+    expect($rendered->title->en)->toBe('Running low: Flour')
+        ->and($rendered->body->en)->toBe('Only 4000 g left at Store (minimum 5000 g). Reorder 25000 g.')
+        ->and($rendered->title->am)->toBe('እያለቀ ነው፡ ዱቄት')
+        ->and($rendered->body->am)->toBe('በመጋዘን 4000 g ብቻ ቀርቷል (ዝቅተኛው 5000 g)። 25000 g ያዝዙ።');
+
+    $half = $text->render('stock_low', NotificationEvents::stockLow(1, 12, 1, 31, ['available' => '2.5000', 'minQty' => '3.0000', 'reorderQty' => '10.0000', 'unit' => 'kg'])->payload());
+    expect($half->body->en)->toBe('Only 2.5 kg left at Store (minimum 3 kg). Reorder 10 kg.');
+
+    $noUnit = $text->render('stock_low', NotificationEvents::stockLow(1, 12, 1, 31, ['unit' => ''])->payload());
+    expect($noUnit->body->en)->toBe('Only 4000 left at Store (minimum 5000). Reorder 25000.');
+})->group('module:notifications', 'unit');
+
+it('registers stock_low as an episodic warning with the gate and the inbox key of a stock-out', function () {
+    $low = NotificationEvents::stockLow(1, 12, 1, 31)->payload();
+
+    expect(NotificationTypes::has('stock_low'))->toBeTrue()
+        ->and(NotificationTypes::severity('stock_low'))->toBe('warning')
+        ->and(NotificationTypes::channels('stock_low'))->toBe(['in_app', 'push', 'telegram'])
+        ->and(NotificationTypes::notifyRoles('stock_low'))->toBe(['admin', 'manager'])
+        ->and(NotificationTypes::inboxKey('stock_low', $low))->toBe('stock_low:12:1:31')
+        ->and(NotificationTypes::gateKey('stock_low', $low))->toBe('stock_low:12:1')
+        ->and(NotificationTypes::deepLink('stock_low', $low))->toBe('/inventory?item=12&location=1');
 })->group('module:notifications', 'unit');
 
 it('says a transfer request and its decision, writing the quantity without trailing zeros and never through a float', function () {

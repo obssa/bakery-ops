@@ -6,6 +6,7 @@ namespace Tests\Support;
 
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
+use App\Shared\Events\StockLow;
 use App\Shared\Events\StockOut;
 use App\Shared\Events\StockRecovered;
 use App\Shared\Events\TransferDecided;
@@ -58,6 +59,26 @@ final class NotificationEvents
             locationNameEn: $a['placeEn'], locationNameAm: $a['placeAm'], itemKind: $a['kind'], fulfilment: $a['fulfilment'],
             available: '0.0000', onHand: '0.0000', reserved: '0.0000', alertId: $alertId, causedByUserId: $a['causedBy'],
             stationId: $a['stationId'], productionStationId: $a['productionStationId'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $over
+     */
+    public static function stockLow(int $branchId, int $itemId = 12, int $locationId = 1, int $alertId = 31, array $over = []): StockLow
+    {
+        $a = $over + [
+            'kind' => 'ingredient', 'fulfilment' => 'bought_in', 'causedBy' => null, 'stationId' => null, 'productionStationId' => null,
+            'itemEn' => 'Flour', 'itemAm' => 'ዱቄት', 'placeEn' => 'Store', 'placeAm' => 'መጋዘን',
+            'available' => '4000.0000', 'minQty' => '5000.0000', 'reorderQty' => '25000.0000', 'roles' => ['admin', 'manager'], 'unit' => 'g',
+        ];
+
+        return new StockLow(
+            branchId: $branchId, itemId: $itemId, locationId: $locationId, itemNameEn: $a['itemEn'], itemNameAm: $a['itemAm'],
+            locationNameEn: $a['placeEn'], locationNameAm: $a['placeAm'], itemKind: $a['kind'], fulfilment: $a['fulfilment'],
+            available: $a['available'], onHand: $a['available'], reserved: '0.0000', alertId: $alertId, causedByUserId: $a['causedBy'],
+            stationId: $a['stationId'], productionStationId: $a['productionStationId'],
+            minQty: $a['minQty'], reorderQty: $a['reorderQty'], notifyRoles: $a['roles'], unit: $a['unit'],
         );
     }
 
