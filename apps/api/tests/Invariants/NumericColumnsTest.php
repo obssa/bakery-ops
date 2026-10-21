@@ -38,7 +38,12 @@ function numericColumnProblem(string $table, string $name, int $precision, int $
     if (preg_match('/(^qty$|_qty$|quantity)/i', $name) === 1) {
         return $scaleOf !== '(14,4)' ? "{$table}.{$name} is decimal{$scaleOf}, quantities are decimal(14,4)" : null;
     }
-    if (preg_match('/(price|amount|total|cost|subtotal|discount|tax|deposit|float)/i', $name) === 1
+    // a rate per base unit: a name that has the word `cost` in it (unit_cost, unit_cost_base, moving_avg_cost, cost_after)
+    // unless it is a total of money (line_total, cost_total), which stays money
+    if (preg_match('/(^|_)cost(_|$)/i', $name) === 1 && ! str_ends_with($name, '_total')) {
+        return $scaleOf !== '(14,4)' ? "{$table}.{$name} is decimal{$scaleOf}, a cost rate (per base unit) is decimal(14,4); a total of money is named *_total" : null;
+    }
+    if (preg_match('/(price|amount|total|subtotal|discount|tax|deposit|float)/i', $name) === 1
         && ! str_ends_with($name, '_pct') && $scaleOf !== '(12,2)') {
         return "{$table}.{$name} is decimal{$scaleOf}, money is decimal(12,2)";
     }

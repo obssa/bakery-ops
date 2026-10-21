@@ -37,7 +37,10 @@ APPEND_ONLY_TABLES = ["stock_movements", "audit_log", "order_events"]
 PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify"}
 # write-method routes that write nothing (mirrors apps/api/tests/Support/read_like_writes.php)
 READ_LIKE_WRITES = {"POST api/v1/broadcasting/auth"}
-MONEY_RX = re.compile(r"(price|amount|total|cost|subtotal|discount|tax|deposit|float)", re.I)
+MONEY_RX = re.compile(r"(price|amount|total|subtotal|discount|tax|deposit|float)", re.I)
+# invariants version 2: a column with the word `cost` in its name (unit_cost, moving_avg_cost, cost_after) is a rate per
+# base unit, decimal(14,4); a total of money is named *_total and stays decimal(12,2)
+COST_RATE_RX = re.compile(r"(^|_)cost(_|$)", re.I)
 QTY_RX = re.compile(r"(^qty$|_qty$|quantity)", re.I)
 FORBIDDEN_COL_RX = re.compile(r"->\s*(float|double|unsignedFloat|unsignedDouble)\s*\(\s*['\"](\w+)['\"]")
 RAW_FORBIDDEN_RX = re.compile(r"\b(real|double precision|float4|float8)\b", re.I)
@@ -89,7 +92,7 @@ def check_numeric(root: str, f: Findings) -> None:
         rel = os.path.relpath(path, root)
         src = read(path)
         for m in FORBIDDEN_COL_RX.finditer(src):
-            f.add("numeric", f"{rel}: column {m.group(2)} uses {m.group(1)}(); use decimal(12,2) for money or decimal(14,4) for quantities")
+            f.add("numeric", f"{rel}: column {m.group(2)} uses {m.group(1)}(); use decimal(12,2) for money or decimal(14,4) for quantities and cost rates")
         for m in RAW_FORBIDDEN_RX.finditer(src):
             if "DB::statement" in src or "DB::unprepared" in src:
                 f.add("numeric", f"{rel}: raw SQL uses {m.group(1)}")
@@ -97,6 +100,9 @@ def check_numeric(root: str, f: Findings) -> None:
             col, prec, scale = m.group(1), int(m.group(2)), int(m.group(3))
             if QTY_RX.search(col) and (prec, scale) != (14, 4):
                 f.add("numeric", f"{rel}: quantity column {col} is decimal({prec},{scale}); quantities are decimal(14,4)")
+            elif COST_RATE_RX.search(col) and not col.endswith("_total"):
+                if (prec, scale) != (14, 4):
+                    f.add("numeric", f"{rel}: cost rate {col} is decimal({prec},{scale}); a cost rate (per base unit) is decimal(14,4); a total of money is named *_total")
             elif MONEY_RX.search(col) and not QTY_RX.search(col) and (prec, scale) != (12, 2) and not col.endswith("_pct"):
                 f.add("numeric", f"{rel}: money column {col} is decimal({prec},{scale}); money is decimal(12,2)")
     for base in ("apps/api/app/Modules", "apps/api/app/Shared"):
@@ -257,6 +263,11 @@ Schema::create('items', function (Blueprint $t) {
     $t->float('weight');
     $t->decimal('price', 10, 2);
     $t->decimal('qty', 14, 4);
+    $t->decimal('unit_cost', 12, 2);
+    $t->decimal('moving_avg_cost', 14, 4);
+    $t->decimal('cost_before', 14, 4)->nullable();
+    $t->decimal('line_total', 12, 2);
+    $t->decimal('cost_total', 12, 2);
 });
 Schema::create('stock_movements', function (Blueprint $t) {
     $t->id(); $t->foreignId('branch_id'); $t->decimal('qty', 14, 4);
@@ -283,6 +294,7 @@ Schema::create('stock_movements', function (Blueprint $t) {
     expected = [
         ("float column", lambda m: "weight uses float" in m),
         ("money scale", lambda m: "price is decimal(10,2)" in m),
+        ("cost rate scale", lambda m: "cost rate unit_cost is decimal(12,2)" in m),
         ("float cast", lambda m: "float cast" in m),
         ("branch_id", lambda m: "table items has no branch_id" in m),
         ("bilingual", lambda m: "items.name_en has no name_am" in m),
@@ -295,6 +307,7 @@ Schema::create('stock_movements', function (Blueprint $t) {
     bad = [name for name, pred in expected if not any(pred(m) for m in msgs)]
     false_pos = [m for m in msgs if "qty" in m and "decimal(14,4)" in m and "is decimal" in m]
     false_pos += [m for m in msgs if "broadcasting/auth" in m]
+    false_pos += [m for m in msgs if any(c in m for c in ("moving_avg_cost", "cost_before", "line_total", "cost_total"))]
     for m in msgs:
         print("  caught:", m)
     if bad or false_pos:

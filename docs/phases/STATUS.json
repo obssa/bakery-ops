@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "current_phase": 2,
-  "invariants_version": 1,
+  "invariants_version": 2,
   "phases": {
     "0": {
       "status": "done",

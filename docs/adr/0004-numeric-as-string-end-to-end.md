@@ -38,3 +38,14 @@ precision; `parseFloat` in the browser does the same.
 
 - Integers in minor units (cents, milligrams): exact, but recipes and units need four decimals and
   conversions, and every display needs a divisor. Rejected in favour of NUMERIC with explicit scale.
+
+## Note, 2026-10-21: cost rates (invariants version 2)
+
+A cost per gram (0.0850 ETB) cannot be held in two decimals, and the moving average of a purchase cost is a rate, not a
+total. The rule therefore has two kinds of money column. A **total of money** (`total`, `line_total`, `paid_total`,
+`cost_total`) stays `DECIMAL(12,2)`. A **cost rate**, a price per base unit, is any column with the word `cost` in its name
+(`unit_cost`, `unit_cost_base`, `moving_avg_cost`, `cost_before`, `cost_after`; a name ending `_total` is a total) and is
+`DECIMAL(14,4)`, held in PHP as `App\Shared\Values\UnitCost` (brick/math, half-up at the fourth decimal). A rate multiplied by
+a `Quantity` gives `Money`, rounded half-up to two decimals once (`UnitCost::times`). The three checks changed together
+(`scripts/check_invariants.py --numeric` and its selftest, `NumericColumnsTest`, the skill's copy of the script); the failing
+case was written first against a planted `decimal('unit_cost', 12, 2)`. `invariants_version` in `STATUS.json` is now 2.
