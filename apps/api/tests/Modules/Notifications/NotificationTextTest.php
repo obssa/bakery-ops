@@ -25,6 +25,8 @@ function samplePayloads(): array
         'stock_low' => NotificationEvents::stockLow(1)->payload(),
         'transfer_requested' => NotificationEvents::transferRequested(1, 5)->payload(),
         'transfer_decided' => NotificationEvents::transferDecided(1, 5, 6)->payload(),
+        'production_requested' => NotificationEvents::productionRequested(1, 5)->payload(),
+        'production_assigned' => NotificationEvents::productionAssigned(1, 6, 5)->payload(),
     ];
 }
 
@@ -183,4 +185,41 @@ it('derives the inbox key, the delivery gate and the deep link of an event from 
         ->and(NotificationTypes::deepLink('stock_out', $out))->toBe('/inventory?item=11&location=4')
         ->and(NotificationTypes::deepLink('line_ready', NotificationEvents::lineReady(1, 5)->payload()))->toBe('/orders/21')
         ->and(fn () => NotificationTypes::inboxKey('stock_out', ['item_id' => 1]))->toThrow(MissingPayloadKey::class);
+})->group('module:notifications', 'unit');
+
+it('says a production request and an assignment with the product, the quantity and the station, each side in its own language', function () {
+    $text = app(NotificationText::class);
+
+    $asked = $text->render('production_requested', NotificationEvents::productionRequested(1, 5)->payload());
+    expect($asked->title->en)->toBe('Please make: Black forest cake')
+        ->and($asked->body->en)->toBe('12 pcs of Black forest cake requested at Cake room.')
+        ->and($asked->title->am)->toBe('እባክዎ ያዘጋጁ፡ ብላክ ፎረስት ኬክ')
+        ->and($asked->body->am)->toBe('12 pcs ብላክ ፎረስት ኬክ በየኬክ ክፍል ተጠይቋል።');
+
+    $ranOut = $text->render('production_requested', NotificationEvents::productionRequested(1, 5, 52, ['reason' => 'stock_out', 'qty' => '40.0000'])->payload());
+    expect($ranOut->body->en)->toBe('Black forest cake ran out. Make 40 pcs at Cake room.')
+        ->and($ranOut->body->am)->toBe('ብላክ ፎረስት ኬክ አልቋል። 40 pcs በየኬክ ክፍል ያዘጋጁ።');
+
+    $given = $text->render('production_assigned', NotificationEvents::productionAssigned(1, 6, 5, 51, ['qty' => '2.5000'])->payload());
+    expect($given->title->en)->toBe('Assigned to you: Black forest cake')
+        ->and($given->body->en)->toBe('Make 2.5 pcs of Black forest cake at Cake room.')
+        ->and($given->title->am)->toBe('ለእርስዎ ተሰጥቷል፡ ብላክ ፎረስት ኬክ')
+        ->and($given->body->am)->toBe('2.5 pcs ብላክ ፎረስት ኬክ በየኬክ ክፍል ያዘጋጁ።');
+})->group('module:notifications', 'unit');
+
+it('registers the production types: informational, their channels, one inbox line per request (per assignment), the link to the board', function () {
+    $asked = NotificationEvents::productionRequested(1, 5, 51)->payload();
+    $given = NotificationEvents::productionAssigned(1, 6, 5, 51, ['version' => 4])->payload();
+
+    expect(NotificationTypes::has('production_requested'))->toBeTrue()
+        ->and(NotificationTypes::severity('production_requested'))->toBe('info')
+        ->and(NotificationTypes::channels('production_requested'))->toBe(['in_app', 'push', 'telegram'])
+        ->and(NotificationTypes::severity('production_assigned'))->toBe('info')
+        ->and(NotificationTypes::channels('production_assigned'))->toBe(['in_app', 'push'])
+        ->and(NotificationTypes::inboxKey('production_requested', $asked))->toBe('production_requested:51')
+        ->and(NotificationTypes::inboxKey('production_assigned', $given))->toBe('production_assigned:51:4', 'a second assignment is a new line')
+        ->and(NotificationTypes::gateKey('production_requested', $asked))->toBeNull()
+        ->and(NotificationTypes::gateKey('production_assigned', $given))->toBeNull()
+        ->and(NotificationTypes::deepLink('production_requested', $asked))->toBe('/production?request=51')
+        ->and(NotificationTypes::deepLink('production_assigned', $given))->toBe('/production?request=51');
 })->group('module:notifications', 'unit');

@@ -12,6 +12,8 @@ use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Notifications\Listeners\ClearStockDedupe;
 use App\Modules\Notifications\Listeners\NotifyLineReady;
 use App\Modules\Notifications\Listeners\NotifyLineRejected;
+use App\Modules\Notifications\Listeners\NotifyProductionAssigned;
+use App\Modules\Notifications\Listeners\NotifyProductionRequested;
 use App\Modules\Notifications\Listeners\NotifyStockOut;
 use App\Modules\Notifications\Listeners\NotifyTransferDecided;
 use App\Modules\Notifications\Listeners\NotifyTransferRequested;
@@ -78,6 +80,8 @@ it('queues every listener after commit on the default queue, and each is registe
         ClearStockDedupe::class => NotificationEvents::stockRecovered($this->branch->id),
         NotifyTransferRequested::class => NotificationEvents::transferRequested($this->branch->id, $this->chef->id),
         NotifyTransferDecided::class => NotificationEvents::transferDecided($this->branch->id, $this->chef->id, $this->admin->id),
+        NotifyProductionRequested::class => NotificationEvents::productionRequested($this->branch->id, $this->cashier->id),
+        NotifyProductionAssigned::class => NotificationEvents::productionAssigned($this->branch->id, $this->baker->id, $this->manager->id),
     ];
 
     foreach ($events as $listener => $event) {

@@ -26,10 +26,13 @@ declare(strict_types=1);
 use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Item;
+use App\Modules\Catalog\Models\Recipe;
+use App\Modules\Catalog\Models\RecipeLine;
 use App\Modules\Catalog\Services\PriceHistory;
 use App\Modules\Identity\Contracts\ShortCodes;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Models\UserStationAssignment;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Purchase;
@@ -40,6 +43,7 @@ use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Production\Models\ProductionRequest;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -922,5 +926,72 @@ return [
             return ['{rule}' => (string) $rule->id];
         },
         'payload' => fn (): array => [],
+    ],
+    // Production requests (step 2.7b)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/production/requests',
+        'module' => 'production',
+        'table' => 'production_requests',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            withActor($me->id);
+            $station = Station::factory()->forCode(StationCode::CakeRoom)->create(['branch_id' => $me->branch_id]);
+            $flour = Item::factory()->ingredient('kg')->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+            $cake = Item::factory()->product(Fulfilment::ToStock, 'pcs')->create([
+                'branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'sku' => 'IDEM-PRODUCTION-CAKE', 'production_station_id' => $station->id,
+            ]);
+            $recipe = Recipe::factory()->create(['branch_id' => $me->branch_id, 'product_item_id' => $cake->id, 'yield_qty' => '12']);
+            RecipeLine::factory()->create(['branch_id' => $me->branch_id, 'recipe_id' => $recipe->id, 'ingredient_item_id' => $flour->id, 'qty' => '1', 'unit_id' => catalogUnit('kg')->id]);
+
+            return [];
+        },
+        'payload' => fn (): array => [
+            'client_uuid' => (string) Str::uuid(),
+            'product_item_id' => Item::query()->where('sku', 'IDEM-PRODUCTION-CAKE')->latest('id')->firstOrFail()->id,
+        ],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/production/requests/{request}/assign',
+        'module' => 'production',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $station = Station::factory()->forCode(StationCode::CakeRoom)->create(['branch_id' => $me->branch_id]);
+            $request = ProductionRequest::factory()->create(['branch_id' => $me->branch_id, 'station_id' => $station->id, 'created_by_user_id' => $me->id, 'requested_by_user_id' => $me->id]);
+            $baker = makeUser($me->branch, 'cake_baker');
+            UserStationAssignment::factory()->create(['branch_id' => $me->branch_id, 'user_id' => $baker->id, 'station_id' => $station->id]);
+
+            return ['{request}' => (string) $request->id];
+        },
+        // the baker setup assigned to the cake room, read in the admin current branch
+        'payload' => fn (): array => ['user_id' => UserStationAssignment::query()->latest('id')->firstOrFail()->user_id],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/production/requests/{request}/accept',
+        'module' => 'production',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $request = ProductionRequest::factory()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'requested_by_user_id' => $me->id]);
+
+            return ['{request}' => (string) $request->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/production/requests/{request}/cancel',
+        'module' => 'production',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $request = ProductionRequest::factory()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'requested_by_user_id' => $me->id]);
+
+            return ['{request}' => (string) $request->id];
+        },
+        'payload' => fn (): array => ['reason' => 'Not needed today'],
     ],
 ];

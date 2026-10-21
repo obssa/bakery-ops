@@ -17,6 +17,7 @@ use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
+use App\Modules\Production\Models\ProductionRequest;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -90,6 +91,15 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
         $station = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $branch->id]);
         UserStationAssignment::factory()->create(['branch_id' => $branch->id, 'user_id' => $actorId, 'station_id' => $station->id]);
         $params['{station}'] = (string) $station->id;
+    }
+    if (str_contains($uri, '{request}')) {
+        // a request the caller asked for, at a cake room they are assigned to (the baker's station check and the requester's
+        // right to cancel are the action's questions, not the matrix's)
+        $station = Station::factory()->forCode(StationCode::CakeRoom)->create(['branch_id' => $branch->id]);
+        UserStationAssignment::factory()->create(['branch_id' => $branch->id, 'user_id' => $actorId, 'station_id' => $station->id]);
+        $params['{request}'] = (string) ProductionRequest::factory()->create([
+            'branch_id' => $branch->id, 'station_id' => $station->id, 'created_by_user_id' => $actorId, 'requested_by_user_id' => $actorId,
+        ])->id;
     }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)

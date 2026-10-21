@@ -6,6 +6,8 @@ namespace Tests\Support;
 
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
+use App\Shared\Events\ProductionAssigned;
+use App\Shared\Events\ProductionRequested;
 use App\Shared\Events\StockLow;
 use App\Shared\Events\StockOut;
 use App\Shared\Events\StockRecovered;
@@ -110,6 +112,32 @@ final class NotificationEvents
         return new TransferDecided(
             $branchId, $transferId, 12, 'Flour', 'ዱቄት', 1, 'Store', 'መጋዘን', $a['fromStationId'],
             2, 'Kitchen', 'ወጥ ቤት', $a['toStationId'], $a['qty'], $a['unit'], $requesterId, $status, $a['reason'], $deciderId,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $over
+     */
+    public static function productionRequested(int $branchId, int $requesterId, int $requestId = 51, array $over = []): ProductionRequested
+    {
+        $a = $over + ['stationId' => 1, 'reason' => 'manual', 'priority' => 'normal', 'dueAt' => null, 'qty' => '12.0000', 'unit' => 'pcs'];
+
+        return new ProductionRequested(
+            $branchId, $requestId, 17, 'Black forest cake', 'ብላክ ፎረስት ኬክ', $a['qty'], $a['unit'],
+            $a['stationId'], 'Cake room', 'የኬክ ክፍል', $a['reason'], $a['priority'], $a['dueAt'], $requesterId,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $over
+     */
+    public static function productionAssigned(int $branchId, int $assigneeId, int $assignerId, int $requestId = 51, array $over = []): ProductionAssigned
+    {
+        $a = $over + ['stationId' => 1, 'qty' => '12.0000', 'unit' => 'pcs', 'version' => 2];
+
+        return new ProductionAssigned(
+            $branchId, $requestId, 17, 'Black forest cake', 'ብላክ ፎረስት ኬክ', $a['qty'], $a['unit'],
+            $a['stationId'], 'Cake room', 'የኬክ ክፍል', $assigneeId, $assignerId, $a['version'],
         );
     }
 }

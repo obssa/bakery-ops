@@ -46,3 +46,10 @@ it('keeps the stored values the production CHECK constraints list', function () 
         ->and($values(RequestPriority::class))->toBe(['normal', 'high', 'urgent'])
         ->and($values(RequestReason::class))->toBe(['schedule', 'stock_out', 'manual']);
 })->group('unit', 'module:production');
+
+it('calls every request status open except the two final ones (step 2.7b: one open manual request per product)', function () {
+    expect(RequestStatus::open())->toBe([RequestStatus::Requested, RequestStatus::Accepted, RequestStatus::InProgress, RequestStatus::PendingConfirmation]);
+    foreach (RequestStatus::cases() as $status) {
+        expect($status->isOpen())->toBe(! $status->isTerminal(), $status->value);
+    }
+})->group('unit', 'module:production');
