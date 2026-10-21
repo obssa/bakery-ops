@@ -65,6 +65,34 @@ final class ActorContext
         $this->deviceId = null;
     }
 
+    /**
+     * Run $callback as the person in $stamp (the shape of toArray(), and of the actor columns of a stock movement), then
+     * put back exactly the state that was there, even when the callback throws. Queued work has no request and so no
+     * actor: it borrows the stamp of the row that caused it (ADR 0011), and a worker that runs many jobs in one process
+     * must not carry one person into the next.
+     *
+     * @template T
+     *
+     * @param  array{user_id: int|null, acting_user_id: int|null, shift_instance_id: int|null, station_id: int|null, device_id: int|null}  $stamp
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public function runAs(array $stamp, callable $callback): mixed
+    {
+        $previous = [$this->userId, $this->actingUserId, $this->shiftInstanceId, $this->stationId, $this->deviceId];
+        $this->userId = $stamp['user_id'];
+        $this->actingUserId = $stamp['acting_user_id'];
+        $this->shiftInstanceId = $stamp['shift_instance_id'];
+        $this->stationId = $stamp['station_id'];
+        $this->deviceId = $stamp['device_id'];
+
+        try {
+            return $callback();
+        } finally {
+            [$this->userId, $this->actingUserId, $this->shiftInstanceId, $this->stationId, $this->deviceId] = $previous;
+        }
+    }
+
     public function isAuthenticated(): bool
     {
         return $this->userId !== null;
