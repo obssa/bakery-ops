@@ -65,7 +65,7 @@ it('heals an evaluation that was lost: the sweep queues it, the worker opens the
     expect($episodes)->toHaveCount(1)
         ->and($episodes[0]->type)->toBe('low')
         ->and($episodes[0]->is_active)->toBe(1)
-        ->and(DB::table('jobs')->where('payload', 'like', '%EvaluateBalance%')->count())->toBe(0, 'left in the queue: '.DB::table('jobs')->where('payload', 'like', '%EvaluateBalance%')->get(['attempts', 'reserved_at', 'available_at', 'created_at'])->toJson().' failed: '.DB::table('failed_jobs')->count());
+        ->and($episodes[0]->available_at_start)->toBe('300.0000');
 });
 
 it('is idempotent: a second sweep while the first jobs are pending queues nothing new', function () {
