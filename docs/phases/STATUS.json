@@ -98,7 +98,7 @@
         "inventory.purchases": "done",
         "inventory.transfers": "done",
         "catalog.recipe-versions": "done",
-        "notifications": "in_progress",
+        "notifications": "done",
         "inventory.reorder": "todo",
         "production": "todo",
         "web": "todo",
@@ -235,8 +235,8 @@
     },
     "notifications": {
       "phase": 2,
-      "status": "in_progress",
-      "stable_since": null
+      "status": "stable",
+      "stable_since": "2026-10-21T12:35:19Z"
     },
     "production": {
       "phase": 2,
