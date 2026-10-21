@@ -75,8 +75,8 @@ survive, only parallelism is lost.
 Live updates in e2e (ADR 0009): `e2e-p1` and later run the polling transport, as the live host does
 (`BROADCAST_CONNECTION=null`, `NEXT_PUBLIC_LIVE_TRANSPORT=poll`), so no `ws` service is needed. Reverb is its own
 compose profile, `ws` (not part of `full`); `e2e.yml` sets `BROADCAST_CONNECTION=reverb` and
-`NEXT_PUBLIC_LIVE_TRANSPORT=reverb` only when the job's `profiles` include `ws`. `e2e-p1` runs `full` (worker, no
-Reverb); `e2e-p2..p5` list `full,ws`, the stack they had before step 1.2, until their phase plans settle the
+`NEXT_PUBLIC_LIVE_TRANSPORT=reverb` only when the job's `profiles` include `ws`. `e2e-p1` and `e2e-p2` run `full` (worker, no
+Reverb); `e2e-p3..p5` list `full,ws`, the stack they had before step 1.2, until their phase plans settle the
 transport. When a WebSocket transport is switched on, Reverb inside compose: the app container reaches `ws:8080`;
 the browser reaches `localhost:8080`. These are two env vars (`REVERB_HOST` vs `NEXT_PUBLIC_REVERB_HOST`), never one.
 

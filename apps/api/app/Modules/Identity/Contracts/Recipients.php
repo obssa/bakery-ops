@@ -46,7 +46,7 @@ final class Recipients
         }
 
         return $this->active($branchId)
-            ->whereHas('roles', fn (Builder $q) => $q->where('guard_name', 'web')->whereIn('name', array_values($roles)))
+            ->whereHas('roles', fn (Builder $q) => $q->where('guard_name', 'web')->whereIn('name', $roles))
             ->get();
     }
 
