@@ -88,7 +88,7 @@ it('describes a stock-out in ids, decimal strings and both languages, and is dis
         branchId: 3, itemId: 11, locationId: 4,
         itemNameEn: 'Black forest cake', itemNameAm: 'ብላክ ፎረስት', locationNameEn: 'Display case', locationNameAm: 'የማሳያ ሣጥን',
         itemKind: 'product', fulfilment: 'to_stock', available: '0.0000', onHand: '5.0000', reserved: '5.0000',
-        alertId: 21, causedByUserId: 8, occurredAt: $at,
+        alertId: 21, causedByUserId: 8, stationId: 2, productionStationId: 5, occurredAt: $at,
     );
 
     expect($event)->toBeInstanceOf(ShouldDispatchAfterCommit::class)
@@ -100,7 +100,7 @@ it('describes a stock-out in ids, decimal strings and both languages, and is dis
             'location_name_en' => 'Display case', 'location_name_am' => 'የማሳያ ሣጥን',
             'item_kind' => 'product', 'fulfilment' => 'to_stock',
             'available' => '0.0000', 'on_hand' => '5.0000', 'reserved' => '5.0000',
-            'alert_id' => 21, 'caused_by_user_id' => 8,
+            'alert_id' => 21, 'caused_by_user_id' => 8, 'station_id' => 2, 'production_station_id' => 5,
         ])
         ->and($event->toArray()['event'])->toBe('stock_out')
         ->and($event->toArray()['branch_id'])->toBe(3)
@@ -117,7 +117,7 @@ it('describes a recovery and a low-stock alert, the latter with the rule it cros
         branchId: 3, itemId: 12, locationId: 1,
         itemNameEn: 'Flour', itemNameAm: 'ዱቄት', locationNameEn: 'Store', locationNameAm: 'መጋዘን',
         itemKind: 'ingredient', fulfilment: 'bought_in', available: '4000.0000', onHand: '4000.0000', reserved: '0.0000',
-        alertId: 22, causedByUserId: null, minQty: '5000.0000', reorderQty: '25000.0000', notifyRoles: ['admin', 'manager'],
+        alertId: 22, causedByUserId: null, stationId: null, productionStationId: null, minQty: '5000.0000', reorderQty: '25000.0000', notifyRoles: ['admin', 'manager'],
     );
     expect($low)->toBeInstanceOf(ShouldDispatchAfterCommit::class)
         ->and($low->name())->toBe('stock_low')

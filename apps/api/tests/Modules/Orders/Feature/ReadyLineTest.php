@@ -245,10 +245,15 @@ it('dispatches LineReady once, after the commit, with its companion on the owner
             'station_id' => $f->menu->kitchenStation->id,
             'by_user_id' => $f->chef->id,
             'owner_user_id' => $f->waiter->id,
+            'order_no' => $this->order['order_no'],
+            'table_code' => $this->order['table_code'],
+            'item_name_en' => $f->menu->sandwich->name_en,
+            'item_name_am' => $f->menu->sandwich->name_am,
         ])
         ->and($companions)->toHaveCount(1)
         ->and(array_map(fn ($c): string => $c->name, $companions[0]->broadcastOn()))->toBe(["private-station.{$f->menu->kitchenStation->id}", "private-user.{$f->waiter->id}"])
         ->and($companions[0]->broadcastAs())->toBe('line_ready')
+        ->and($companions[0]->broadcastWith()['payload']['order_no'])->toBe($this->order['order_no'])
         ->and($companions[0]->broadcastWhen())->toBeFalse();
     assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');

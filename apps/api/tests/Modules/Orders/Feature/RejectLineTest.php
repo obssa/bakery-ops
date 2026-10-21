@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Inventory\Ledger\MovementReason;
+use App\Modules\Orders\Enums\RejectReason;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
 use App\Modules\Orders\Models\OrderLine;
@@ -228,7 +229,14 @@ it('dispatches LineRejected once, after the commit, with the reason, to the owne
             'station_id' => $f->menu->kitchenStation->id,
             'by_user_id' => $f->chef->id,
             'owner_user_id' => $f->waiter->id,
+            'order_no' => $this->order['order_no'],
+            'table_code' => $this->order['table_code'],
+            'item_name_en' => $f->menu->sandwich->name_en,
+            'item_name_am' => $f->menu->sandwich->name_am,
             'reason' => 'out_of_stock',
+            'reason_message_en' => RejectReason::OutOfStock->message('en'),
+            'reason_message_am' => RejectReason::OutOfStock->message('am'),
+            'note' => null,
         ])
         ->and($companions)->toHaveCount(1)
         ->and(array_map(fn ($c): string => $c->name, $companions[0]->broadcastOn()))->toBe(["private-station.{$f->menu->kitchenStation->id}", "private-user.{$f->waiter->id}"])

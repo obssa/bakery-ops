@@ -152,6 +152,22 @@ it('names the item and the place in both languages and says what kind of item it
     ]);
 })->group('module:inventory', 'feature');
 
+it('names the station that works from the place and the station that makes a product, so a notification can reach the people there (F7)', function () {
+    $cakeRoom = Station::factory()->forCode(StationCode::CakeRoom)->create(['branch_id' => $this->branch->id]);
+    $this->cake->forceFill(['production_station_id' => $cakeRoom->id])->save();
+    Event::fake([StockOut::class, StockRecovered::class]);
+    stockIn($this->cake, $this->display, '1');
+    stockIn($this->flour, $this->store, '100');
+
+    stockIn($this->cake, $this->display, '-1', MovementReason::Waste);
+    stockIn($this->flour, $this->store, '-100', MovementReason::Waste);
+
+    $events = Event::dispatched(StockOut::class)->map(fn (array $args): StockOut => $args[0])->values();
+    expect($events)->toHaveCount(2)
+        ->and($events[0]->payload())->toMatchArray(['item_id' => $this->cake->id, 'station_id' => $this->tillStation->id, 'production_station_id' => $cakeRoom->id])
+        ->and($events[1]->payload())->toMatchArray(['item_id' => $this->flour->id, 'station_id' => null, 'production_station_id' => null]);
+})->group('module:inventory', 'feature');
+
 it('keeps one episode per place: the same item running out in two places is two episodes', function () {
     Event::fake([StockOut::class, StockRecovered::class]);
     $kitchen = stockLocation($this->branch, LocationType::Kitchen);

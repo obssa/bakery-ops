@@ -58,7 +58,18 @@ it('asks in the branch the request is resolved to, and refuses to guess when non
 
     app(CurrentBranch::class)->clear();
     expect(fn () => app(Recipients::class)->byRoles(['admin']))->toThrow(BranchNotResolved::class)
-        ->and(fn () => app(Recipients::class)->byPermission('production.view'))->toThrow(BranchNotResolved::class);
+        ->and(fn () => app(Recipients::class)->byPermission('production.view'))->toThrow(BranchNotResolved::class)
+        ->and(fn () => app(Recipients::class)->byIds([$this->admin->id]))->toThrow(BranchNotResolved::class);
+})->group('module:identity', 'feature');
+
+it('answers byIds as a Collection of User models in id order, reads current data, and takes nothing for no ids', function () {
+    $recipients = app(Recipients::class);
+
+    expect($recipients->byIds([$this->baker->id, $this->admin->id])->pluck('id')->all())->toBe([$this->admin->id, $this->baker->id])
+        ->and($recipients->byIds([])->isEmpty())->toBeTrue();
+
+    $this->baker->forceFill(['is_active' => false])->save();
+    expect($recipients->byIds([$this->baker->id, $this->admin->id])->pluck('id')->all())->toBe([$this->admin->id]);
 })->group('module:identity', 'feature');
 
 it('reads current data: a user deactivated, a role removed or an assignment replaced is reflected at once', function () {

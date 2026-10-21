@@ -206,3 +206,20 @@ it('never returns a user of another branch, whatever the question', function () 
     }
     expect(recipientIds($this->recipients->byRoles(PermissionRegistry::ROLES)))->toBe(array_map(fn (User $u): int => $u->id, array_values($this->people)));
 })->group('contract:notifications->identity', 'contract');
+
+it('finds named people for an event about one person (the owner of an order, the requester of a transfer): active users of the branch only, each once, in id order', function () {
+    $inactive = makeUser($this->branch, 'cashier');
+    $inactive->forceFill(['is_active' => false])->save();
+    $gone = makeUser($this->branch, 'cashier');
+    $gone->delete();
+    $waiter = $this->people['waiter'];
+    $chef = $this->people['chef'];
+    $foreign = $this->foreign['waiter'];
+
+    expect(recipientIds($this->recipients->byIds([$waiter->id])))->toBe([$waiter->id])
+        ->and(recipientIds($this->recipients->byIds([$waiter->id, $chef->id, $waiter->id])))->toBe([$chef->id, $waiter->id], 'once each, in id order')
+        ->and(recipientIds($this->recipients->byIds([$inactive->id, $gone->id, $waiter->id])))->toBe([$waiter->id], 'inactive and deleted people are not told')
+        ->and(recipientIds($this->recipients->byIds([$foreign->id])))->toBe([], 'a person of another branch is never returned')
+        ->and(recipientIds($this->recipients->byIds([])))->toBe([])
+        ->and(recipientIds($this->recipients->byIds([999999])))->toBe([]);
+})->group('contract:notifications->identity', 'contract');
