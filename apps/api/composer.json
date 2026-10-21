@@ -17,6 +17,7 @@
         "laravel/reverb": "^1.12",
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
+        "minishlink/web-push": "11.0.0",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-permission": "^8.3"
     },

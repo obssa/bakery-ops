@@ -34,7 +34,7 @@ BRANCH_ALLOWLIST = {
     "pulse_values", "pulse_entries", "pulse_aggregates", "activity_log", "notifications_dedupe",
 }
 APPEND_ONLY_TABLES = ["stock_movements", "audit_log", "order_events", "item_cost_history"]
-PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify"}
+PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify", "api/v1/telegram/webhook/{secret}"}
 # write-method routes that write nothing (mirrors apps/api/tests/Support/read_like_writes.php)
 READ_LIKE_WRITES = {"POST api/v1/broadcasting/auth"}
 MONEY_RX = re.compile(r"(price|amount|total|subtotal|discount|tax|deposit|float)", re.I)

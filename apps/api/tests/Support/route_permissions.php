@@ -11,7 +11,7 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {table}, {order} (an open cart of the caller's own) and {line}
+ * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {endpoint}, {table}, {order} (an open cart of the caller's own) and {line}
  * (a queued line of a sent order of the caller's own, at a station the caller is assigned to) with a row of the right
  * table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
@@ -128,6 +128,12 @@ return [
     'GET /api/v1/notifications' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
     'POST /api/v1/notifications/{notification}/read' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
     'POST /api/v1/notifications/read-all' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
+    // Notifications (step 2.5b): the caller's own channels and endpoints (push subscription, Telegram link); the Telegram webhook is public
+    // (tests/Support/public_routes.php) and guarded by its secret, so it is not here
+    'GET /api/v1/notifications/channels' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
+    'POST /api/v1/notifications/endpoints' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
+    'DELETE /api/v1/notifications/endpoints/{endpoint}' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
+    'POST /api/v1/notifications/telegram/link' => ['permission' => 'notifications.view', 'roles' => $all, 'module' => 'notifications'],
 
     // Payments (step 1.4): the till's roles (payments.take: admin, manager, cashier); the person acting by short code must
     // hold it too (403 auth.forbidden, checked by the action after this matrix)

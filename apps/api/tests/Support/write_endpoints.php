@@ -36,6 +36,7 @@ use App\Modules\Inventory\Models\Purchase;
 use App\Modules\Inventory\Models\Supplier;
 use App\Modules\Inventory\Models\Transfer;
 use App\Modules\Notifications\Models\Notification;
+use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Shared\Enums\StationCode;
@@ -45,6 +46,7 @@ use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Tests\Support\OrdersMenu;
+use Tests\Support\NotificationDrivers;
 use Tests\TestCase;
 
 $admin = static function (): User {
@@ -750,6 +752,51 @@ return [
         'setup' => function (TestCase $t) use ($admin): array {
             $me = $admin();
             Notification::factory()->count(2)->create(['branch_id' => $me->branch_id, 'user_id' => $me->id]);
+
+            return [];
+        },
+        'payload' => fn (): array => [],
+    ],
+    // Notifications (step 2.5b): a push subscription creates one endpoint row; revoking and asking for a Telegram code are one AuditedAction each
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/notifications/endpoints',
+        'module' => 'notifications',
+        'table' => 'notification_endpoints',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+            NotificationDrivers::allOff();
+            NotificationDrivers::push();
+
+            return [];
+        },
+        'payload' => fn (): array => [
+            'driver' => 'push',
+            'subscription' => ['endpoint' => 'https://push.example.test/send/idem', 'keys' => ['p256dh' => 'BExamplePublicKeyOfTheBrowser', 'auth' => 'exampleAuthSecret']],
+        ],
+    ],
+    [
+        'method' => 'DELETE',
+        'uri' => '/api/v1/notifications/endpoints/{endpoint}',
+        'module' => 'notifications',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $endpoint = NotificationEndpoint::factory()->push()->create(['branch_id' => $me->branch_id, 'user_id' => $me->id]);
+
+            return ['{endpoint}' => (string) $endpoint->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/notifications/telegram/link',
+        'module' => 'notifications',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+            NotificationDrivers::allOff();
+            NotificationDrivers::telegram();
 
             return [];
         },

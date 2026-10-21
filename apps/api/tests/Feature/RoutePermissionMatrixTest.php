@@ -12,6 +12,7 @@ use App\Modules\Inventory\Models\Purchase;
 use App\Modules\Inventory\Models\Supplier;
 use App\Modules\Inventory\Models\Transfer;
 use App\Modules\Notifications\Models\Notification;
+use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
@@ -70,6 +71,10 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
     if (str_contains($uri, '{notification}')) {
         // an unread line of the caller's own (a line of someone else is 404, not 403)
         $params['{notification}'] = (string) Notification::factory()->create(['branch_id' => $branch->id, 'user_id' => $actorId])->id;
+    }
+    if (str_contains($uri, '{endpoint}')) {
+        // a push subscription of the caller's own (an endpoint of someone else is 404, not 403)
+        $params['{endpoint}'] = (string) NotificationEndpoint::factory()->push()->create(['branch_id' => $branch->id, 'user_id' => $actorId])->id;
     }
     if (str_contains($uri, '{table}')) {
         $params['{table}'] = (string) DiningTable::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;

@@ -86,3 +86,21 @@ arch('modules declare strict types')
     ->expect(['App\Modules', 'App\Shared'])
     ->toUseStrictTypes()
     ->group('arch');
+
+arch('only the push driver and the VAPID command touch the web push library, so it is loaded only when push is on')
+    ->expect('Minishlink')
+    ->toOnlyBeUsedIn([
+        'App\Modules\Notifications\Drivers\PushDriver',
+        'App\Modules\Notifications\Console\VapidKeysCommand',
+    ])
+    ->group('arch', 'module:notifications');
+
+arch('every Notifications job is queued and runs after the commit, so a send never joins the transaction of the inbox line')
+    ->expect('App\Modules\Notifications\Jobs')
+    ->toImplement(ShouldQueue::class)
+    ->group('arch', 'module:notifications');
+
+arch('every driver of Notifications sits behind the Driver interface')
+    ->expect(['App\Modules\Notifications\Drivers\InAppDriver', 'App\Modules\Notifications\Drivers\PushDriver', 'App\Modules\Notifications\Drivers\TelegramDriver', 'App\Modules\Notifications\Drivers\ArrayDriver'])
+    ->toImplement('App\Modules\Notifications\Drivers\Driver')
+    ->group('arch', 'module:notifications');
