@@ -90,8 +90,12 @@ it('allows any number of cleared episodes beside one open one, and an open one o
 })->group('module:inventory', 'feature');
 
 it('keeps the type and the open flag to their lists', function () {
+    // the table must exist for these refusals to mean anything: every insert into a missing table fails too
+    expect(Schema::hasTable('stock_alert_states'))->toBeTrue();
+    DB::table('stock_alert_states')->insert(alertRow(['type' => 'low', 'threshold_qty' => '5000.0000']));
+
     expect(fn () => DB::table('stock_alert_states')->insert(alertRow(['type' => 'broken'])))->toThrow(QueryException::class)
         ->and(fn () => DB::table('stock_alert_states')->insert(alertRow(['_reuse' => true, 'is_active' => 0])))->toThrow(QueryException::class)
         ->and(fn () => DB::table('stock_alert_states')->insert(alertRow(['_reuse' => true, 'is_active' => 2])))->toThrow(QueryException::class);
-    expect(DB::table('stock_alert_states')->count())->toBe(0);
+    expect(DB::table('stock_alert_states')->count())->toBe(1);
 })->group('module:inventory', 'feature');

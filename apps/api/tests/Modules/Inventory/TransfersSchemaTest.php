@@ -120,9 +120,13 @@ it('keeps the status to the machine list and the decision columns set exactly wh
 })->group('module:inventory', 'feature');
 
 it('refuses a location, item or user that does not exist', function () {
+    // the table must exist for these refusals to mean anything: every insert into a missing table fails too
+    expect(Schema::hasTable('transfers'))->toBeTrue();
     $p = transferParents();
+    DB::table('transfers')->insert(rawTransfer($p));
 
-    expect(fn () => DB::table('transfers')->insert(rawTransfer($p, ['from_location_id' => 999999])))->toThrow(QueryException::class)
+    expect(DB::table('transfers')->count())->toBe(1)
+        ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['from_location_id' => 999999])))->toThrow(QueryException::class)
         ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['item_id' => 999999])))->toThrow(QueryException::class)
         ->and(fn () => DB::table('transfers')->insert(rawTransfer($p, ['requested_by_user_id' => 999999])))->toThrow(QueryException::class);
 })->group('module:inventory', 'feature');
