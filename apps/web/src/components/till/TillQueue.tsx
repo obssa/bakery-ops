@@ -6,6 +6,7 @@ import { ageOf, clock, secondsSince, type TicketAge } from "@/lib/kds";
 import { trimDecimal } from "@/lib/decimal";
 import { isSettled } from "@/lib/live/orders";
 import { visibleLines } from "@/lib/live/pad";
+import { useOrderNo } from "@/lib/orderNo";
 import { useNow } from "@/lib/useNow";
 import { Badge, Button } from "../ui";
 
@@ -26,7 +27,7 @@ function QueueCard({ order, now, onPay, onVoid }: { order: Order; now: number; o
   const settled = isSettled(order);
   const seconds = secondsSince(order.sent_at, now);
   const age = ageOf(seconds);
-  const no = String(order.order_no);
+  const no = useOrderNo(order);
   const where = order.type === "takeaway" ? k("takeaway") : order.dining_table ? k("table", { code: order.dining_table.code }) : "";
 
   return (

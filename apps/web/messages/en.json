@@ -447,7 +447,8 @@
     "amharic": "Amharic",
     "loading": "Loading…",
     "saving": "Saving…",
-    "retry": "Try again"
+    "retry": "Try again",
+    "order_no_dated": "{no} of {date}"
   },
   "errors": {
     "network": "Cannot reach the server. Check the connection and try again.",

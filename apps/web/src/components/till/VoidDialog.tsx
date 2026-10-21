@@ -6,6 +6,7 @@ import { uuid } from "@/lib/api/idempotency";
 import { voidOrder } from "@/lib/api/till";
 import type { Order } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
+import { useOrderNo } from "@/lib/orderNo";
 import { Alert, Button, Field, Modal, TextInput } from "../ui";
 
 // Voiding an unpaid order that was sent: a reason, and the PIN of a manager or admin (their short code) typed on this
@@ -16,6 +17,7 @@ const PIN = /^\d{4,6}$/;
 
 export function VoidDialog({ order, onClose, onVoided }: { order: Order; onClose: () => void; onVoided: () => void }) {
   const t = useTranslations("till");
+  const no = useOrderNo(order);
   const errorText = useErrorText();
   const [reason, setReason] = useState("");
   const [pin, setPin] = useState("");
@@ -44,9 +46,9 @@ export function VoidDialog({ order, onClose, onVoided }: { order: Order; onClose
   }
 
   return (
-    <Modal label={t("void_title", { no: String(order.order_no) })} onClose={onClose}>
+    <Modal label={t("void_title", { no: no })} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <h2 className="text-lg font-semibold text-neutral-900">{t("void_title", { no: String(order.order_no) })}</h2>
+        <h2 className="text-lg font-semibold text-neutral-900">{t("void_title", { no: no })}</h2>
         <p className="text-base text-neutral-700">{t("void_intro")}</p>
         {error ? <Alert>{errorText.message(error)}</Alert> : null}
         <Field label={t("void_reason")}>

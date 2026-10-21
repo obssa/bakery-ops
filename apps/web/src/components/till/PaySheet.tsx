@@ -6,6 +6,7 @@ import { useIdempotencyKey, uuid } from "@/lib/api/idempotency";
 import { recordPayment, usePaymentChannels } from "@/lib/api/till";
 import type { Locale, Order, PaymentResult } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
+import { useOrderNo } from "@/lib/orderNo";
 import { CASH, changeDue, pressKey, tenderedOf, type KeypadKey } from "@/lib/payment";
 import { Alert, Button, Modal } from "../ui";
 import { focusRing } from "../styles";
@@ -22,6 +23,7 @@ const keyClass = `inline-flex min-h-16 items-center justify-center rounded-md bo
 
 export function PaySheet({ order, onClose, onChanged }: { order: Order; onClose: () => void; onChanged: () => void }) {
   const t = useTranslations("till");
+  const no = useOrderNo(order);
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
   const channels = usePaymentChannels();
@@ -59,8 +61,8 @@ export function PaySheet({ order, onClose, onChanged }: { order: Order; onClose:
   }
 
   return (
-    <Modal label={t("pay_title", { no: String(order.order_no) })} onClose={onClose}>
-      <h2 className="text-lg font-semibold text-neutral-900">{t("pay_title", { no: String(order.order_no) })}</h2>
+    <Modal label={t("pay_title", { no: no })} onClose={onClose}>
+      <h2 className="text-lg font-semibold text-neutral-900">{t("pay_title", { no: no })}</h2>
       <p className="flex items-baseline justify-between rounded-md bg-neutral-100 px-4 py-3 text-xl font-semibold text-neutral-900">
         <span>{t("amount_due")}</span>
         <span>

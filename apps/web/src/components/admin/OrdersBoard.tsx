@@ -7,6 +7,7 @@ import type { Line, LineStatus, Locale, Order, OrderStatus } from "@/lib/api/typ
 import { trimDecimal } from "@/lib/decimal";
 import { clock, secondsSince } from "@/lib/kds";
 import { useErrorText } from "@/lib/errors";
+import { useOrderNo } from "@/lib/orderNo";
 import { BOARD_STATUSES, boardOf, createBoardFeed, isPayable, isSettled, type BoardFilters } from "@/lib/live/orders";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useSession } from "@/lib/session";
@@ -72,7 +73,7 @@ function LineRow({ line }: { line: Line }) {
 function OrderCard({ order, now, selected, onOpen }: { order: Order; now: number; selected: boolean; onOpen: (order: Order) => void }) {
   const t = useTranslations("adminOrders");
   const k = useTranslations("kds");
-  const no = String(order.order_no);
+  const no = useOrderNo(order);
   const where = order.type === "takeaway" ? k("takeaway") : order.dining_table ? k("table", { code: order.dining_table.code }) : "";
   const seconds = secondsSince(order.sent_at ?? order.created_at, now);
   return (
@@ -106,7 +107,7 @@ function Timeline({ order, onClose, onVoid }: { order: Order; onClose: () => voi
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
   const detail = useOrderDetail(order.id, order.version);
-  const no = String(order.order_no);
+  const no = useOrderNo(order);
   const lines = new Map(order.lines.map((line) => [line.id, line]));
   const via = detail.data ? t(`via_${detail.data.created_via}` as "via_till") : "";
 
