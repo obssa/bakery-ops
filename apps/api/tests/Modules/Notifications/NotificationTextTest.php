@@ -108,7 +108,7 @@ it('says a transfer request and its decision, writing the quantity without trail
         ->and($refused->title->am)->toBe('ዝውውር ተቀባይነት አላገኘም፡ ዱቄት')
         ->and($refused->body->am)->toBe('የ5 kg ዱቄት ጥያቄ ውድቅ ተደርጓል። ምክንያት፡ The sack is for the wedding cake');
 
-    foreach (['5.0000' => '5', '2.5000' => '2.5', '1250.0000' => '1250', '0.0500' => '0.05', '10' => '10', '100' => '100', '0.1000' => '0.1'] as $stored => $written) {
+    foreach ([['5.0000', '5'], ['2.5000', '2.5'], ['1250.0000', '1250'], ['0.0500', '0.05'], ['10', '10'], ['100', '100'], ['0.1000', '0.1']] as [$stored, $written]) {
         $rendered = $text->render('transfer_requested', NotificationEvents::transferRequested(1, 5, 41, ['qty' => $stored])->payload());
         expect($rendered->body->en)->toStartWith("{$written} kg of Flour")
             ->and($rendered->body->am)->toContain("{$written} kg");
