@@ -100,7 +100,7 @@
         "catalog.recipe-versions": "done",
         "notifications": "done",
         "inventory.reorder": "done",
-        "production": "todo",
+        "production": "in_progress",
         "web": "todo",
         "docs": "todo"
       },
@@ -240,7 +240,7 @@
     },
     "production": {
       "phase": 2,
-      "status": "todo",
+      "status": "in_progress",
       "stable_since": null
     },
     "shifts": {

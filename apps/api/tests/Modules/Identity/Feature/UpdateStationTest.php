@@ -108,7 +108,7 @@ it('needs the people.manage permission and an Idempotency-Key', function () {
     $this->withHeaders(idempotencyKey())->patchJson("/api/v1/stations/{$this->cakeRoom->id}", ['requires_overseer' => true])->assertForbidden();
 
     loginAs($this->admin);
-    $this->patchJson("/api/v1/stations/{$this->cakeRoom->id}", ['requires_overseer' => true])->assertStatus(400)->assertJsonPath('message_key', 'idempotency.key_required');
+    $this->withoutHeader('Idempotency-Key')->patchJson("/api/v1/stations/{$this->cakeRoom->id}", ['requires_overseer' => true])->assertStatus(400)->assertJsonPath('message_key', 'idempotency.key_required');
     expect(Station::query()->findOrFail($this->cakeRoom->id)->requires_overseer)->toBeFalse();
 });
 

@@ -37,6 +37,7 @@ Route::prefix('api/v1')->middleware('api')->group(function (): void {
 
             Route::get('/stations', [StationsController::class, 'index'])->name('identity.stations.index');
             Route::post('/stations', [StationsController::class, 'store'])->middleware('idempotency')->name('identity.stations.store');
+            Route::patch('/stations/{station}', [StationsController::class, 'update'])->middleware('idempotency')->whereNumber('station')->name('identity.stations.update');
 
             Route::get('/devices', [DevicesController::class, 'index'])->name('identity.devices.index');
             Route::post('/devices', [DevicesController::class, 'store'])->middleware('idempotency')->name('identity.devices.store');

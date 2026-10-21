@@ -123,16 +123,16 @@ $providerInternals = function (string $module, array $allowedClasses = []): arra
             foreach (glob($dir.'/*.php') ?: [] as $file) {
                 $class = basename($file, '.php');
                 if (! in_array($class, $allowedClasses, true)) {
-                    $forbidden[] = "App\Modules\{$module}\Ledger\{$class}";
+                    $forbidden[] = 'App\Modules\\'.$module.'\Ledger\\'.$class;
                 }
             }
 
             continue;
         }
-        $forbidden[] = "App\Modules\{$module}\{$part}";
+        $forbidden[] = 'App\Modules\\'.$module.'\\'.$part;
     }
     foreach (glob($root.'/*.php') ?: [] as $file) {
-        $forbidden[] = "App\Modules\{$module}\\".basename($file, '.php');
+        $forbidden[] = 'App\Modules\\'.$module.'\\'.basename($file, '.php');
     }
 
     return $forbidden;

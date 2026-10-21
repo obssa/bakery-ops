@@ -4027,6 +4027,56 @@
                 }
             }
         },
+        "/v1/stations/{station}": {
+            "patch": {
+                "operationId": "identity.stations.update",
+                "summary": "PATCH /stations/{station}: names, requires_overseer and sort of a station of the branch (the route binding is the branch\nscope: another branch's station, or a deleted one, is a 404). The code never changes",
+                "tags": [
+                    "Stations"
+                ],
+                "parameters": [
+                    {
+                        "name": "station",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateStationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/stock": {
             "get": {
                 "operationId": "inventory.stock.index",
@@ -7522,6 +7572,32 @@
                     }
                 },
                 "title": "UpdateReorderRuleRequest"
+            },
+            "UpdateStationRequest": {
+                "type": "object",
+                "description": "PATCH /stations/{station}: any subset of the names (both languages, rule 9), requires_overseer and sort. The code is fixed\nonce a station exists (routing, permissions and the seeders name stations by it), so sending one is refused rather than\nignored.",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "requires_overseer": {
+                        "type": "boolean"
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                    }
+                },
+                "title": "UpdateStationRequest"
             },
             "UpdateSupplierRequest": {
                 "type": "object",
