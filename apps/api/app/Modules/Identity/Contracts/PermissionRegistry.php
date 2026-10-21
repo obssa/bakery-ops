@@ -54,6 +54,12 @@ final class PermissionRegistry
         'analytics.view_own' => self::EVERYONE,
         'audit.view' => ['admin', 'manager'],
         'stations.all' => ['admin', 'manager'],
+        // Phase 2 (step 2.1; plan section 10.5). They reach a live database through the grant-only migration
+        // 2026_10_22_100100_grant_phase_2_permissions, because a deploy never runs seeders.
+        'production.view' => self::FLOOR,
+        'production.plan' => ['admin', 'manager'],
+        'notifications.view' => self::EVERYONE,
+        'costs.view' => ['admin', 'manager'],
     ];
 
     /**

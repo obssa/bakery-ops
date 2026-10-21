@@ -92,7 +92,7 @@ it('finds recipients by station assignment: the assigned active users, each once
     expect(recipientIds($this->recipients->forStation($this->cakeRoom)))->toBe([$baker->id, $second->id])
         ->and(recipientIds($this->recipients->forStation($this->bakery)))->toBe([$baker->id])
         ->and(recipientIds($this->recipients->forStation([$this->cakeRoom, $this->bakery])))->toBe([$baker->id, $second->id], 'the baker matches twice and is listed once')
-        ->and(recipientIds($this->recipients->forStation([$this->bakery, $this->cakeRoom, $this->kitchen])))->toBe([$baker->id, $this->people['chef']->id, $second->id])
+        ->and(recipientIds($this->recipients->forStation([$this->bakery, $this->cakeRoom, $this->kitchen])))->toBe([$this->people['chef']->id, $baker->id, $second->id], 'in id order')
         ->and(recipientIds($this->recipients->forStation([])))->toBe([]);
 })->group('contract:notifications->identity', 'contract');
 
