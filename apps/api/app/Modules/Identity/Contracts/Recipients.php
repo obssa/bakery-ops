@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Collection;
  *   byRoles: the holders of any of the roles;
  *   byPermission: the holders of the permission, role or direct grant (Access::can); with a station, only those assigned
  *     to it plus those who hold stations.all (Access::can with a station);
+ *   byIds: named people, for an event about one person (the owner of an order line, the requester of a transfer): those of
+ *     the ids who are active users of the branch, so a deactivated or foreign id is simply not told;
  *   forStation: the people assigned to one station or to any of a list of stations;
  *   onDuty: StationPresenceResolver::onDuty (the Phase 2 binding says "assigned", Phase 3 rebinds it to the roster),
  *     and when nobody is on duty the assigned people, so an alert is never addressed to nobody while someone could act;
@@ -48,6 +50,20 @@ final class Recipients
         return $this->active($branchId)
             ->whereHas('roles', fn (Builder $q) => $q->where('guard_name', 'web')->whereIn('name', $roles))
             ->get();
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return Collection<int, User>
+     */
+    public function byIds(array $ids): Collection
+    {
+        $branchId = $this->branch->id();
+        if ($ids === []) {
+            return new Collection;
+        }
+
+        return $this->active($branchId)->whereKey(array_values(array_unique($ids)))->get();
     }
 
     /**

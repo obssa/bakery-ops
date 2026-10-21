@@ -217,7 +217,7 @@ it('finds named people for an event about one person (the owner of an order, the
     $foreign = $this->foreign['waiter'];
 
     expect(recipientIds($this->recipients->byIds([$waiter->id])))->toBe([$waiter->id])
-        ->and(recipientIds($this->recipients->byIds([$waiter->id, $chef->id, $waiter->id])))->toBe([$chef->id, $waiter->id], 'once each, in id order')
+        ->and(recipientIds($this->recipients->byIds([$chef->id, $waiter->id, $chef->id])))->toBe([$waiter->id, $chef->id], 'once each, in id order')
         ->and(recipientIds($this->recipients->byIds([$inactive->id, $gone->id, $waiter->id])))->toBe([$waiter->id], 'inactive and deleted people are not told')
         ->and(recipientIds($this->recipients->byIds([$foreign->id])))->toBe([], 'a person of another branch is never returned')
         ->and(recipientIds($this->recipients->byIds([])))->toBe([])
