@@ -31,7 +31,7 @@ final class NotificationTypes
      * The severity of the type; for the two Phase 3 types the payload decides: a count with lines that differ and a rejection are
      * `warning` (somebody must act), a count that matches and an approval are `info`.
      *
-     * \param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $payload
      */
     public static function severity(string $type, array $payload = []): string
     {

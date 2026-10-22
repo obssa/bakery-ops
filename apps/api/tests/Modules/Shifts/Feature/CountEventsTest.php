@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Notifications\Models\Notification;
 use App\Shared\Events\CountSubmitted;
 use App\Shared\Events\VarianceDecided;
 use App\Shared\Models\Branch;
@@ -184,14 +185,14 @@ it('reaches the right inboxes through the real events when the queue runs inline
     $this->f->kitchen->forceFill(['requires_overseer' => true])->save();
     $this->f->overseer($this->f->cashier2, $this->f->kitchen);
     ($this->fill)();
-    $heard = fn (string $type): array => \App\Modules\Notifications\Models\Notification::query()->where('type', $type)->orderBy('user_id')->pluck('user_id')->all();
+    $heard = fn (string $type): array => Notification::query()->where('type', $type)->orderBy('user_id')->pluck('user_id')->all();
     $ids = fn (\App\Modules\Identity\Models\User ...$users): array => collect($users)->map(fn ($u): int => $u->id)->sort()->values()->all();
 
     $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'awaiting_cosign');
     expect($heard('count_submitted'))->toBe($ids($this->f->admin, $this->f->manager, $this->f->cashier2));
 
     $this->f->cosign($this->f->cashier2, $this->count)->assertOk();
-    expect(\App\Modules\Notifications\Models\Notification::query()->where('type', 'count_submitted')->count())->toBe(5);
+    expect(Notification::query()->where('type', 'count_submitted')->count())->toBe(5);
 
     $this->f->approve($this->f->admin, $this->count)->assertOk();
     expect($heard('variance_decided'))->toBe($ids($this->f->chef));

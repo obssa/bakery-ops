@@ -76,13 +76,24 @@ final class CountQueue
             return [];
         }
 
-        $shifts = ShiftInstance::query()->whereKey(array_values(array_unique(array_map(static fn (StockCount $c): int => $c->shift_instance_id, $counts))))->get()->keyBy('id');
-        $stations = Station::query()->withTrashed()->whereKey($shifts->pluck('station_id')->unique()->values()->all())->get()->keyBy('id');
+        /** @var array<int, ShiftInstance> $shifts */
+        $shifts = [];
+        foreach (ShiftInstance::query()->whereKey(array_values(array_unique(array_map(static fn (StockCount $c): int => $c->shift_instance_id, $counts))))->get() as $shift) {
+            $shifts[$shift->id] = $shift;
+        }
+        /** @var array<int, Station> $stations */
+        $stations = [];
+        foreach (Station::query()->withTrashed()->whereKey(array_values(array_unique(array_map(static fn (ShiftInstance $s): int => $s->station_id, $shifts))))->get() as $station) {
+            $stations[$station->id] = $station;
+        }
 
         $out = [];
         foreach ($this->presenter->many($counts) as $row) {
-            $shift = $shifts[$row['shift_id']];
-            $station = $stations[$shift->station_id];
+            $shift = $shifts[$row['shift_id']] ?? null;
+            $station = $shift === null ? null : ($stations[$shift->station_id] ?? null);
+            if ($shift === null || $station === null) {
+                continue;
+            }
             $varying = array_values(array_filter(
                 $row['lines'],
                 static fn (array $line): bool => is_string($line['variance_qty']) && ! Quantity::of($line['variance_qty'])->isZero(),

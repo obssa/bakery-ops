@@ -139,7 +139,7 @@ final class NotificationText
      * The variance items of a count as one phrase ("Flour -500 g, Sugar +300 g", then "and 3 more" when the event carried fewer
      * than the count has), in the reader's language. Signed decimal strings without trailing zeros; no float.
      *
-     * \param  array<string, mixed>  $p
+     * @param  array<string, mixed>  $p
      */
     private function varianceItems(string $type, array $p, string $locale): string
     {
