@@ -60,6 +60,10 @@ beforeEach(function () {
     }
     $this->ledger = fn (): Ledger => app(Ledger::class);
     $this->actor = app(ActorContext::class);
+    // every shift id the cases stamp, cover with or write a row under: since step 3.2a a stamp needs the shift_instances row behind it
+    foreach ([600, 601, 602, 650, 700, 801, ENF_ACTOR_SHIFT, ENF_CLOSED_ACTOR_SHIFT] as $shiftId) {
+        shiftRow($shiftId, $this->branch->id, $this->admin->id);
+    }
 });
 
 /** Put the flag and the OpenShifts double in place. */

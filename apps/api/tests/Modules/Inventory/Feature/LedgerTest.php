@@ -73,7 +73,7 @@ it('writes the movement and upserts the balance in one transaction', function ()
 it('stamps every movement with the actor, acting-as, station, device and shift from ActorContext', function () {
     $waiter = makeUser($this->branch, 'waiter');
     $bar = Station::factory()->forCode(StationCode::Bar)->create(['branch_id' => $this->branch->id]);
-    withActor($this->admin->id, $waiter->id, $bar->id, null, 77);
+    withActor($this->admin->id, $waiter->id, $bar->id, null, shiftRow(77, $this->branch->id));
 
     $movement = stockIn($this->flour, $this->store, '10');
     $row = DB::table('stock_movements')->where('id', $movement->id)->first();

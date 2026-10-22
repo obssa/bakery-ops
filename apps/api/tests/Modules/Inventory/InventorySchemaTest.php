@@ -72,7 +72,7 @@ it('carries the columns the ledger, the lock and the reconciliation rely on', fu
         ]))->toBeTrue()
         ->and(Schema::hasColumns('stock_balances', ['id', 'branch_id', 'item_id', 'location_id', 'on_hand', 'reserved', 'updated_at']))->toBeTrue();
 
-    // the actor stamp of a movement: who (NOT NULL), acting-as, shift (no FK until Phase 3), station, device
+    // the actor stamp of a movement: who (NOT NULL), acting-as, shift (FK to shift_instances since step 3.2a), station, device
     expect(strtoupper((string) inventoryColumn('stock_movements', 'user_id')?->nullable))->toBe('NO');
     foreach (['acting_user_id', 'shift_instance_id', 'station_id', 'device_id', 'client_uuid', 'reservation_ref', 'from_location_id', 'to_location_id'] as $nullable) {
         expect(strtoupper((string) inventoryColumn('stock_movements', $nullable)?->nullable))->toBe('YES', "stock_movements.{$nullable}");
@@ -82,7 +82,7 @@ it('carries the columns the ledger, the lock and the reconciliation rely on', fu
           where table_schema = ? and table_name = 'stock_movements' and column_name = 'shift_instance_id' and referenced_table_name is not null",
         [dbSchema()],
     );
-    expect($shiftFk)->toBeNull('shift_instance_id gets its foreign key with Shifts (Phase 3, dependency-graph.md cycle 1)');
+    expect($shiftFk)->not->toBeNull('shift_instance_id has its foreign key to shift_instances since step 3.2a (dependency-graph.md cycle 1)');
 })->group('module:inventory', 'invariants');
 
 it('stores every quantity as DECIMAL(14,4)', function () {

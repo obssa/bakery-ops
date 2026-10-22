@@ -41,7 +41,7 @@ beforeEach(function () {
             'amount' => $amount,
             'tendered_amount' => $channel === 'cash' ? $amount : null,
             'change_amount' => $channel === 'cash' ? '0.00' : null,
-            'shift_instance_id' => $shift,
+            'shift_instance_id' => $shift === null ? null : shiftRow($shift, $branch->id),
         ] + $extra);
 
         return $row;
@@ -63,7 +63,7 @@ it('sums only the non-voided cash payments carrying that shift, as a 2 dp decima
 })->group('contract:shifts->payments', 'contract');
 
 it('keys the total on the payment\'s own shift: a payment taken in shift B for an order of shift A counts for B only', function () {
-    $orderInA = Payment::factory()->create(['branch_id' => $this->branch->id, 'shift_instance_id' => 21, 'amount' => '80.00'])->order_id;
+    $orderInA = Payment::factory()->create(['branch_id' => $this->branch->id, 'shift_instance_id' => shiftRow(21, $this->branch->id), 'amount' => '80.00'])->order_id;
     // the same order is paid later, in shift 22 (or at a pad with no shift at all)
     ($this->take)('cash', '120.00', 22, ['order_id' => $orderInA]);
     ($this->take)('cash', '30.00', null, ['order_id' => $orderInA]);
@@ -139,7 +139,7 @@ it('equals the sum of the same payments read through Orders::totals, with no sec
             $f->act('served', $line['id'], $f->waiter)->assertOk();
         }
         // two of the three are paid in shift 61, one in shift 62
-        withActor($f->cashier->id, null, null, null, $product === 'croissant' ? 62 : 61);
+        withActor($f->cashier->id, null, null, null, shiftRow($product === 'croissant' ? 62 : 61, $this->branch->id));
         app(Payments::class)->record($order['id'], (string) Str::uuid(), 'cash', $order['totals']['total'], null, null, $f->cashier);
         $paid[$product] = [$order['id'], $order['totals']['total']];
     }
@@ -168,7 +168,7 @@ it('stamps a payment recorded through Payments::record with the shift the actor 
     $withShift = $serve();
     $without = $serve();
 
-    withActor($f->cashier->id, null, null, null, 71);
+    withActor($f->cashier->id, null, null, null, shiftRow(71, $this->branch->id));
     $a = app(Payments::class)->record($withShift['id'], (string) Str::uuid(), 'cash', $withShift['totals']['total'], null, null, $f->cashier);
     withActor($f->cashier->id);
     $b = app(Payments::class)->record($without['id'], (string) Str::uuid(), 'cash', $without['totals']['total'], null, null, $f->cashier);

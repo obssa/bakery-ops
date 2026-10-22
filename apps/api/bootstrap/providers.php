@@ -8,6 +8,7 @@ use App\Modules\Notifications\NotificationsServiceProvider;
 use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
 use App\Modules\Production\ProductionServiceProvider;
+use App\Modules\Shifts\ShiftsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Shared\SharedServiceProvider;
 
@@ -22,4 +23,5 @@ return [
     NotificationsServiceProvider::class,
     PaymentsServiceProvider::class,
     ProductionServiceProvider::class,
+    ShiftsServiceProvider::class,
 ];

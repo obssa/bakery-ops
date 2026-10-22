@@ -188,7 +188,7 @@ it('keeps open_key in step with the status: set while opening, open or counting,
     expect(fn () => DB::table('shift_instances')->insert($next(runningShift($p, ['open_key' => 2]))))->toThrow(QueryException::class, '', 'only 1 means running');
 
     foreach (['opening', 'open', 'counting'] as $status) {
-        DB::table('shift_instances')->insert($next(rawShift($p, ['status' => $status, 'open_key' => 1, 'opened_at' => $status === 'opening' ? null : now(), 'station_id' => Station::factory()->forCode(StationCode::Till)->create(['branch_id' => $p['branch']->id])->id])));
+        DB::table('shift_instances')->insert($next(rawShift($p, ['status' => $status, 'open_key' => 1, 'opened_at' => $status === 'opening' ? null : now(), 'station_id' => Station::factory()->forCode(['opening' => StationCode::CakeRoom, 'open' => StationCode::Bakery, 'counting' => StationCode::Store][$status])->create(['branch_id' => $p['branch']->id])->id])));
     }
     expect(DB::table('shift_instances')->count())->toBe(3);
 });

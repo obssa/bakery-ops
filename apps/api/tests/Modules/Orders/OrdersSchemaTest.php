@@ -27,7 +27,7 @@ use Illuminate\Support\Str;
  * The Orders tables exactly as docs/phases/phase-1-plan.md section 3 (migrations 1-6) states them, asked of the
  * database itself (MariaDB 10.11 locally, in CI and live; portable to PostgreSQL, ADR 0006): the columns, money
  * DECIMAL(12,2) and quantities DECIMAL(14,4), branch_id on every table, the bilingual snapshots, the actor stamp
- * (shift_instance_id without a foreign key until Phase 3), client_uuid unique per branch, the indexes the pad, KDS
+ * (shift_instance_id with its foreign key to shift_instances since step 3.2a), client_uuid unique per branch, the indexes the pad, KDS
  * and till feeds read, the CHECK lists that mirror the enums, soft deletes on dining_tables only, and order_events
  * append-only through triggers named order_events_forbid_update_delete_*. Rows are written raw on purpose: the test
  * probes the database's own guards, not the models.
@@ -270,7 +270,7 @@ it('stamps the actor on orders, lines and events: who NOT NULL, acting-as, stati
     }
     foreach (['orders', 'order_lines', 'order_events'] as $table) {
         expect(strtoupper((string) ordersColumn($table, 'shift_instance_id')?->nullable))->toBe('YES', "{$table}.shift_instance_id")
-            ->and(ordersReferencedTable($table, 'shift_instance_id'))->toBeNull("{$table}.shift_instance_id gets its foreign key with Shifts (Phase 3)");
+            ->and(ordersReferencedTable($table, 'shift_instance_id'))->toBe('shift_instances', "{$table}.shift_instance_id has its foreign key to shift_instances since step 3.2a");
     }
 })->group('module:orders', 'invariants');
 

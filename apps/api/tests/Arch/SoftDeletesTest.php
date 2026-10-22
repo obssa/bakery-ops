@@ -33,6 +33,7 @@ $noSoftDeletes = [
     'App\Modules\Payments\Models\Payment',  // never deleted: recorded, then verified, disputed or voided by status (Phase 4); the till's money trail
     'App\Modules\Production\Models\ProductionRequest',  // never deleted: requested, accepted, in progress, pending confirmation, then done or cancelled by status; a done one is the reason behind its batch's movements
     'App\Modules\Production\Models\ProductionBatch',  // never deleted: started, finished, then confirmed by status; a confirmed one names the production_output movement it wrote
+    'App\Modules\Shifts\Models\ShiftInstance',  // never deleted: scheduled, opening, open, counting, pending approval, then locked or cancelled by status; the stamps, counts and cash of other rows point at it
 ];
 
 it('every mutable tenant model soft-deletes', function () use ($noSoftDeletes) {

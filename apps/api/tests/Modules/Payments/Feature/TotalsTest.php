@@ -25,7 +25,7 @@ beforeEach(function () {
         'branch_id' => ($in ?? $this->branch)->id,
         'channel_id' => PaymentChannel::query()->withoutGlobalScopes()->where('branch_id', ($in ?? $this->branch)->id)->where('code', $channel)->value('id'),
         'amount' => $amount,
-        'shift_instance_id' => $shift,
+        'shift_instance_id' => $shift === null ? null : shiftRow($shift, ($in ?? $this->branch)->id),
     ]);
 });
 

@@ -55,6 +55,10 @@ beforeEach(function () {
     $this->flour = Item::factory()->ingredient('kg')->create(['branch_id' => $b, 'name_en' => 'Flour']);
     $this->sugar = Item::factory()->ingredient('kg')->create(['branch_id' => $b, 'name_en' => 'Sugar']);
     $this->butter = Item::factory()->ingredient('kg')->create(['branch_id' => $b, 'name_en' => 'Butter']);
+    // shift ids the cases below stamp or cover with: since step 3.2a a stamp needs the shift_instances row behind it
+    foreach ([111, 222, 301, 302, 501, 502, 503, 601, 701, 702] as $shiftId) {
+        shiftRow($shiftId, $this->branch->id);
+    }
     $this->t0 = CarbonImmutable::now()->startOfSecond();
     $this->at = fn (int $seconds): CarbonImmutable => $this->t0->addSeconds($seconds);
     $this->go = fn (int $seconds) => $this->travelTo(($this->at)($seconds));

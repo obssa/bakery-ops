@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Shifts\Enums\RosterSource;
 use App\Modules\Shifts\Enums\ShiftOrigin;
 use App\Modules\Shifts\Enums\ShiftStatus;
-use App\Modules\Shifts\Enums\RosterSource;
 use App\Shared\StateMachine\IllegalTransition;
 
 /*

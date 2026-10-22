@@ -59,6 +59,37 @@ if (! function_exists('actAsUserId')) {
     }
 }
 
+if (! function_exists('shiftRow')) {
+    /**
+     * The shift_instances row a stamp points at. Since step 3.2a every shift_instance_id column outside audit_log has a foreign
+     * key, so a test that stamps a row with "shift 77" first makes shift 77: one scheduled ad-hoc row with that id (its date
+     * is unique per id, so any number of them can share a station), created once; a later call returns the same id. The row
+     * belongs to $branchId, else to the branch of $userId, else to a fresh branch. Tests that care about the shift's state make
+     * it with ShiftInstance::factory() instead.
+     */
+    function shiftRow(int $id, ?int $branchId = null, ?int $userId = null): int
+    {
+        if (DB::table('shift_instances')->where('id', $id)->exists()) {
+            return $id;
+        }
+        $branchId ??= $userId !== null ? (DB::table('users')->where('id', $userId)->value('branch_id') ?? null) : null;
+        $branchId ??= Branch::factory()->create()->id;
+        $stationId = DB::table('stations')->where('branch_id', $branchId)->orderBy('id')->value('id')
+            ?? Station::factory()->create(['branch_id' => $branchId])->id;
+        $creator = ($userId !== null && DB::table('users')->where('id', $userId)->exists())
+            ? $userId
+            : (DB::table('users')->where('branch_id', $branchId)->orderBy('id')->value('id') ?? User::factory()->create(['branch_id' => $branchId])->id);
+
+        DB::table('shift_instances')->insert([
+            'id' => $id, 'branch_id' => $branchId, 'client_uuid' => (string) Str::uuid(), 'station_id' => $stationId, 'template_id' => null,
+            'slot_key' => 0, 'sequence' => 1, 'date' => date('Y-m-d', 946684800 + $id * 86400), 'origin' => 'started', 'status' => 'scheduled',
+            'created_by_user_id' => $creator, 'version' => 1, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+}
+
 if (! function_exists('withActor')) {
     /**
      * Resolve the request-scoped ActorContext fully: user plus (optionally) the short-code actor, station, device and
