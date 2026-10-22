@@ -207,5 +207,9 @@ return [
     // reject route used to ask for shifts.approve (3.3b). GET /stock-counts is the approval queue, read at the stations one works at.
     'POST /api/v1/stock-counts/{count}/reject' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
     'POST /api/v1/stock-counts/{count}/cosign' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    // Step 3.4: the unlock is the admin's (shifts.unlock); the chain of a place is read and verified with shifts.replay
+    'POST /api/v1/stock-counts/{count}/unlock' => ['permission' => 'shifts.unlock', 'roles' => ['admin'], 'module' => 'shifts'],
+    'GET /api/v1/locations/{location}/chain' => ['permission' => 'shifts.replay', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
+    'GET /api/v1/locations/{location}/chain/verify' => ['permission' => 'shifts.replay', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
     'GET /api/v1/stock-counts' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
 ];

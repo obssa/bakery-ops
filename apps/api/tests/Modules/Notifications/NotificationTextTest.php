@@ -31,6 +31,7 @@ function samplePayloads(): array
         'batch_done' => NotificationEvents::batchDone(1, 'confirmed', 6, 7, 5, 6)->payload(),
         'count_submitted' => NotificationEvents::countSubmitted(1, 5)->payload(),
         'variance_decided' => NotificationEvents::varianceDecided(1, 5, 6, 'rejected')->payload(),
+        'chain_broken' => NotificationEvents::chainBroken(1)->payload(),
     ];
 }
 

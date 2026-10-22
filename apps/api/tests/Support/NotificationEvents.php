@@ -194,4 +194,16 @@ final class NotificationEvents
             $a['type'], $decision, $decidedBy, $a['note'], $countedBy, $a['adjusted'], $a['recount'],
         );
     }
+
+    /**
+     * The chain of the kitchen shelf failed at link $seq (the person $causedBy made that link).
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public static function chainBroken(int $branchId, ?int $causedBy = 6, int $seq = 2, string $kind = 'hash_mismatch', int $countId = 61, array $over = []): ChainBroken
+    {
+        $a = $over + ['locationId' => 3, 'locationEn' => 'Kitchen shelf', 'locationAm' => 'የወጥ ቤት መደርደሪያ'];
+
+        return new ChainBroken($branchId, $a['locationId'], $a['locationEn'], $a['locationAm'], $seq, $kind, $countId, $causedBy);
+    }
 }
