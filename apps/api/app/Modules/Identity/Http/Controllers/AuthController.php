@@ -6,10 +6,13 @@ namespace App\Modules\Identity\Http\Controllers;
 
 use App\Modules\Identity\Contracts\ActingAsSession;
 use App\Modules\Identity\Contracts\Authenticate;
+use App\Modules\Identity\Contracts\Stations;
 use App\Modules\Identity\Http\Requests\LoginRequest;
 use App\Modules\Identity\Http\Resources\UserResource;
 use App\Modules\Identity\Models\User;
 use App\Shared\Actor\ActorContext;
+use App\Shared\Models\Station;
+use App\Shared\Shifts\OpenShifts;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,6 +25,8 @@ final class AuthController
         private readonly Authenticate $auth,
         private readonly ActingAsSession $sessions,
         private readonly ActorContext $actor,
+        private readonly Stations $stations,
+        private readonly OpenShifts $shifts,
     ) {}
 
     public function login(LoginRequest $request): JsonResponse
@@ -53,6 +58,15 @@ final class AuthController
                 'user' => UserResource::brief($session->user),
             ],
             'device' => $deviceId === null ? null : ['id' => $deviceId],
+            'work_stations' => $this->stations->workStationsOf($user)->map(fn (Station $s): array => [
+                'station_id' => $s->id,
+                'code' => $s->code->value,
+                'name_en' => $s->name_en,
+                'name_am' => $s->name_am,
+                'tracks_shifts' => $s->tracks_shifts,
+                'requires_overseer' => $s->requires_overseer,
+                'current_shift' => $this->shifts->currentFor($s->id),
+            ])->values()->all(),
         ]);
     }
 

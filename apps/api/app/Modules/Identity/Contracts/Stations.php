@@ -48,6 +48,56 @@ final class Stations
     }
 
     /**
+     * The station a request works at (step 3.1a, F4; ResolveActor stamps it): the one X-Station-Id names when the user may
+     * work there (assigned to it, or holding `stations.all`), else their only live assignment, else null. Two assignments and
+     * no usable header is null, never a guess; a header naming a station of another branch, a deleted one, or one the
+     * user may not work at is ignored (the answer then falls back as if it were absent).
+     */
+    public function workStationFor(User $user, ?int $headerStationId): ?Station
+    {
+        if (! $user->is_active || $user->trashed()) {
+            return null;
+        }
+        if ($headerStationId !== null) {
+            $named = Station::query()->where('branch_id', $user->branch_id)->find($headerStationId);
+            if ($named instanceof Station && ($user->can('stations.all') || $this->isAssigned($user, $named))) {
+                return $named;
+            }
+        }
+
+        $assigned = UserStationAssignment::query()
+            ->withoutGlobalScope(BranchScope::class)
+            ->where('user_id', $user->id)
+            ->pluck('station_id')
+            ->all();
+        if ($assigned === []) {
+            return null;
+        }
+        $stations = Station::query()->where('branch_id', $user->branch_id)->whereIn('id', $assigned)->get();
+
+        return $stations->count() === 1 ? $stations->first() : null;
+    }
+
+    /**
+     * Every station the user may work at, in station order: their live assignments, or every station of the branch for a
+     * user who holds `stations.all` (GET /me work_stations); nothing for an inactive or deleted user.
+     *
+     * @return Collection<int, Station>
+     */
+    public function workStationsOf(User $user): Collection
+    {
+        if (! $user->is_active || $user->trashed()) {
+            return new Collection;
+        }
+        $query = Station::query()->where('branch_id', $user->branch_id)->orderBy('sort')->orderBy('id');
+        if (! $user->can('stations.all')) {
+            $query->whereIn('id', UserStationAssignment::query()->withoutGlobalScope(BranchScope::class)->where('user_id', $user->id)->select('station_id'));
+        }
+
+        return $query->get();
+    }
+
+    /**
      * Make $assignments the user's complete set: rows that go are soft-deleted, rows that come back are restored,
      * flags are updated in place. Returns the live assignments in station order.
      *

@@ -29,6 +29,7 @@ final class StationFactory extends Factory
             'name_en' => $code->defaultName()->en,
             'name_am' => $code->defaultName()->am,
             'requires_overseer' => false,
+            'tracks_shifts' => true,
             'sort' => 0,
         ];
     }
@@ -42,6 +43,8 @@ final class StationFactory extends Factory
             'code' => $code,
             'name_en' => $code->defaultName()->en,
             'name_am' => $code->defaultName()->am,
+            // the warehouse is the one station that does not run shifts (migration add_tracks_shifts_to_stations)
+            'tracks_shifts' => $code !== StationCode::Store,
             'sort' => $sort === false ? 0 : $sort,
         ]);
     }

@@ -28,6 +28,7 @@ final class StationResource extends JsonResource
             'name_en' => $station->name_en,
             'name_am' => $station->name_am,
             'requires_overseer' => $station->requires_overseer,
+            'tracks_shifts' => $station->tracks_shifts,
             'sort' => $station->sort,
         ];
     }

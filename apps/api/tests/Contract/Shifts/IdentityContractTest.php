@@ -295,7 +295,9 @@ it('puts the shift the attacher answered into ActorContext, and leaves it alone 
 it('carries work_stations on GET /me: the assigned stations, or every station for stations.all, with tracks_shifts, requires_overseer and the running shift', function () {
     $this->kitchen->forceFill(['requires_overseer' => true])->save();
     ($this->assign)($this->people['chef'], $this->kitchen);
-    app()->instance(App\Shared\Shifts\OpenShifts::class, new FakeOpenShifts([$this->kitchen->id => 9001]));
+    // scoped(), not instance(): the app forgets scoped instances at the start of every request and would drop an instance
+    $double = new FakeOpenShifts([$this->kitchen->id => 9001]);
+    app()->scoped(App\Shared\Shifts\OpenShifts::class, fn () => $double);
 
     loginAs($this->people['chef']);
     $mine = $this->getJson('/api/v1/me')->assertOk()->json('work_stations');

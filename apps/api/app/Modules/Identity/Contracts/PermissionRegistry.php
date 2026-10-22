@@ -60,6 +60,11 @@ final class PermissionRegistry
         'production.plan' => ['admin', 'manager'],
         'notifications.view' => self::EVERYONE,
         'costs.view' => ['admin', 'manager'],
+        // Phase 3 (step 3.1a; plan section 10.6). They reach a live database through the grant-only migration
+        // 2026_10_24_100100_grant_phase_3_permissions. shifts.count, .cosign, .approve and .unlock are older (above).
+        'shifts.view' => self::FLOOR,
+        'shifts.manage' => ['admin'],
+        'shifts.replay' => ['admin', 'manager'],
     ];
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Contracts;
 
 use App\Modules\Identity\Models\User;
+use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Station;
 
 /**
@@ -13,7 +14,8 @@ use App\Shared\Models\Station;
  *   can: the active person of this branch who holds the permission, at the station when one is given (Access::can: assigned
  *     there, or working at every station); false for anyone who cannot act (inactive, deleted, another branch, unknown);
  *   attachShift: ShiftAttacher::attach for that person at the station, the shift instance id their writes should now carry or
- *     null (Phase 3 rebinds the attacher; until then it is always null); null, without calling the attacher, for a person who
+ *     null (Phase 3 rebinds the attacher; until then it is always null), and puts that id into ActorContext so that the rest
+ *     of the request is stamped with it (an answer of null leaves the context alone); null, without calling the attacher, for a person who
  *     cannot act;
  *   isOverseer: the active person of this branch who is flagged as the overseer at that station (Stations::isOverseer; step 2.7c,
  *     for the rule of who may confirm a production batch); false for anyone else;
@@ -27,6 +29,7 @@ final class People
         private readonly Access $access,
         private readonly ShiftAttacher $shifts,
         private readonly Stations $stations,
+        private readonly ActorContext $actor,
     ) {}
 
     public function can(int $userId, string $permission, ?Station $station = null): bool
@@ -46,8 +49,16 @@ final class People
     public function attachShift(int $userId, Station $station): ?int
     {
         $user = $this->active($userId);
+        if ($user === null) {
+            return null;
+        }
+        $shiftId = $this->shifts->attach($user, $station);
+        if ($shiftId !== null) {
+            // the rest of this request is written under the shift the person now works in (step 3.1a, F4)
+            $this->actor->inShift($shiftId);
+        }
 
-        return $user === null ? null : $this->shifts->attach($user, $station);
+        return $shiftId;
     }
 
     /**
