@@ -22,11 +22,13 @@ export interface InventoryFixture {
   store: Place;
   supplier: { id: number; name: string };
   ingredient: { id: number; name_en: string; name_am: string; unitId: number };
-  /** the purchase made through the API: 10 kg at 40 each, confirmed */
-  first: { invoice: string; qty: string; unitCost: string };
-  /** the purchase the flow makes on screen: 10 kg at 50 each, so the average becomes 45 */
+  /** the purchase made through the API: 10 kg at 40 a kilogram, confirmed; the ledger keeps grams and the cost 0.0400 a gram */
+  first: { invoice: string; qty: string; unitCost: string; onHand: string; rate: string };
+  /** the purchase the flow makes on screen: 10 kg at 50 a kilogram, so the average becomes 0.0450 a gram over 20 kg */
   second: { invoice: string; qty: string; unitCost: string; total: string };
-  after: { onHand: string; movingAverage: string };
+  after: { onHand: string; onHandText: string; movingAverage: string };
+  /** a rule above the balance, typed in the item base unit (grams) */
+  rule: { min: string; reorder: string; reorderText: string };
 }
 
 let built = 0;
@@ -55,7 +57,7 @@ export async function buildInventoryFixture(credentials: { phone: string; passwo
   const ingredientAm = `የሙከራ ስኳር ${tag}`;
   const ingredient = await admin.post<{ id: number }>("/items", { kind: "ingredient", name_en: ingredientEn, name_am: ingredientAm, unit_id: unit("kg") });
 
-  const first = { invoice: `E2E-${tag}-A`, qty: "10.0000", unitCost: "40.0000" };
+  const first = { invoice: `E2E-${tag}-A`, qty: "10.0000", unitCost: "40.0000", onHand: "10000.0000", rate: "0.0400" };
   const draft = await admin.post<PurchaseView>("/purchases", {
     client_uuid: uuid(),
     supplier_id: supplier.id,
@@ -74,7 +76,8 @@ export async function buildInventoryFixture(credentials: { phone: string; passwo
     ingredient: { id: ingredient.id, name_en: ingredientEn, name_am: ingredientAm, unitId: unit("kg") },
     first,
     second: { invoice: `E2E-${tag}-B`, qty: "10", unitCost: "50", total: "500.00" },
-    after: { onHand: "20.0000", movingAverage: "45.0000" },
+    after: { onHand: "20000.0000", onHandText: "20000 g", movingAverage: "0.0450" },
+    rule: { min: "25000", reorder: "50000", reorderText: "50000 g" },
   };
 }
 

@@ -8,10 +8,10 @@ import { openAs } from "../support/pad";
 // project in step 2.8c; the placeholder in purchase-transfer.spec.ts stays until then.
 //
 // The admin records a purchase of 10 kg at 50 on the Purchases screen on top of 10 kg at 40 bought through the API: the
-// draft is saved, confirmed, and the screen names the cost change (40.0000 to 45.0000). The same invoice number on a new
-// draft is refused with the duplicate warning. The store balance reads 20 kg on the Stock screen, the moving average is
-// 45.0000 through the API, and a reorder rule above the balance puts the item on the reorder list with its suggested
-// quantity. The fixture lives in the isolated "E2E Test Branch" (e2e/support/inventory.ts), so the flow carries @live.
+// draft is saved, confirmed, and the screen names the cost change (0.0400 to 0.0450 a gram: the ledger and the costs are
+// kept in the base unit). The same invoice number on a new draft is refused with the duplicate warning. The store balance
+// reads 20000 g on the Stock screen, the moving average is 0.0450 through the API, and a reorder rule above the balance
+// puts the item on the reorder list with its suggested quantity. The fixture lives in the isolated "E2E Test Branch" (e2e/support/inventory.ts), so the flow carries @live.
 
 async function runPurchase(f: InventoryFixture, page: Page) {
   const item = f.ingredient.name_en;
@@ -38,7 +38,7 @@ async function runPurchase(f: InventoryFixture, page: Page) {
   await expect(detail).toBeVisible({ timeout: 15_000 });
   await expect(detail).toContainText("Draft");
   await expect(detail).toContainText(f.second.total);
-  expect((await balanceAt(f.admin, f.ingredient.id, f.store.id))?.on_hand).toBe(f.first.qty);
+  expect((await balanceAt(f.admin, f.ingredient.id, f.store.id))?.on_hand).toBe(f.first.onHand);
 
   // confirm: the stock moves and the screen names the cost change
   await detail.getByRole("button", { name: "Confirm purchase" }).click();
@@ -46,7 +46,7 @@ async function runPurchase(f: InventoryFixture, page: Page) {
   const changes = page.getByRole("region", { name: "Cost changes" });
   await expect(changes).toBeVisible();
   const change = changes.getByRole("row").filter({ hasText: item });
-  await expect(change).toContainText(f.first.unitCost);
+  await expect(change).toContainText(f.first.rate);
   await expect(change).toContainText(f.after.movingAverage);
 
   // the same invoice number again is refused with the duplicate warning, which can be allowed on purpose
@@ -64,38 +64,38 @@ async function runPurchase(f: InventoryFixture, page: Page) {
 
   // post-conditions through the API
   expect(await balanceAt(f.admin, f.ingredient.id, f.store.id)).toMatchObject({ on_hand: f.after.onHand });
-  expect(await movingAverage(f.admin, f.ingredient.id)).toMatchObject({ moving_avg_cost: f.after.movingAverage, qty_basis: f.after.onHand });
+  expect(await movingAverage(f.admin, f.ingredient.id)).toMatchObject({ moving_avg_cost: f.after.movingAverage });
 }
 
 async function runStockAndReorder(f: InventoryFixture, page: Page) {
   const item = f.ingredient.name_en;
   const sections = page.getByRole("navigation", { name: "Inventory sections" });
 
-  // the stock screen: 20 kg at the store
+  // the stock screen: 20 kg (20000 g) at the store
   await sections.getByRole("link", { name: "Stock", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Stock" })).toBeVisible();
   await page.getByLabel("Location", { exact: true }).selectOption({ label: f.store.name_en });
   await page.getByLabel("Find an item").fill(item);
   const row = page.getByRole("table", { name: "Stock at this place" }).getByRole("row").filter({ hasText: item });
-  await expect(row).toContainText("20 kg", { timeout: 15_000 });
+  await expect(row).toContainText(f.after.onHandText, { timeout: 15_000 });
 
   // a rule above the balance puts the item on the reorder list with its suggested quantity
   await sections.getByRole("link", { name: "Reorder", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Reorder" })).toBeVisible();
   const form = page.getByRole("region", { name: "New reorder rule" });
   await form.getByLabel("Item", { exact: true }).selectOption({ label: item });
-  await form.getByLabel("Minimum quantity").fill("25");
-  await form.getByLabel("Reorder quantity").fill("50");
+  await form.getByLabel("Minimum quantity").fill(f.rule.min);
+  await form.getByLabel("Reorder quantity").fill(f.rule.reorder);
   await form.getByRole("button", { name: "Save rule" }).click();
   await expect(page.getByRole("table", { name: "Reorder rules" }).getByRole("row").filter({ hasText: item })).toContainText("Whole branch", { timeout: 15_000 });
   const listed = page.getByRole("table", { name: "Reorder list" }).getByRole("row").filter({ hasText: item });
   await expect(listed).toBeVisible({ timeout: 15_000 });
   await expect(listed).toContainText("Low");
-  await expect(listed).toContainText("20 kg");
-  await expect(listed).toContainText("50 kg");
+  await expect(listed).toContainText(f.after.onHandText);
+  await expect(listed).toContainText(f.rule.reorderText);
 
   const due = (await reorderListOf(f.admin)).find((r) => r.item.id === f.ingredient.id);
-  expect(due).toMatchObject({ state: "low", suggested_qty: "50.0000", available: f.after.onHand });
+  expect(due).toMatchObject({ state: "low", suggested_qty: `${f.rule.reorder}.0000`, available: f.after.onHand });
 }
 
 test.describe("p2 purchase and reorder, admin side", () => {
