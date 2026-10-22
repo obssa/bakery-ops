@@ -9,6 +9,7 @@ use App\Modules\Payments\Contracts\Totals;
 use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Models\PaymentChannel;
 use App\Shared\Models\Branch;
+use Brick\Math\BigDecimal;
 use Illuminate\Support\Str;
 use Tests\Support\OrderFloor;
 
@@ -145,7 +146,7 @@ it('equals the sum of the same payments read through Orders::totals, with no sec
 
     $viaOrders = fn (string ...$products): string => array_reduce(
         $products,
-        fn (string $carry, string $p): string => (string) Brick\Math\BigDecimal::of($carry)->plus(app(Orders::class)->totals($paid[$p][0])->paid)->toScale(2),
+        fn (string $carry, string $p): string => (string) BigDecimal::of($carry)->plus(app(Orders::class)->totals($paid[$p][0])->paid)->toScale(2),
         '0.00',
     );
 

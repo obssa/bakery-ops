@@ -17,6 +17,7 @@ use App\Shared\Actor\ActorContext;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
+use App\Shared\Shifts\OpenShifts;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -227,7 +228,7 @@ it('answers workStationFor: the station X-Station-Id names when the user works t
 it('stamps ActorContext with the resolved station and the running shift of OpenShifts, and no shift when none runs', function () {
     ($this->assign)($this->people['chef'], $this->kitchen);
     $double = new FakeOpenShifts([$this->kitchen->id => 9001]);
-    app()->instance(App\Shared\Shifts\OpenShifts::class, $double);
+    app()->instance(OpenShifts::class, $double);
 
     $run = function (User $user, array $headers = []): ActorContext {
         app(ActorContext::class)->reset();
@@ -257,7 +258,7 @@ it('stamps ActorContext with the resolved station and the running shift of OpenS
 
 it('does not consult OpenShifts for an unauthenticated request', function () {
     $double = new FakeOpenShifts([$this->kitchen->id => 9001]);
-    app()->instance(App\Shared\Shifts\OpenShifts::class, $double);
+    app()->instance(OpenShifts::class, $double);
     app(ActorContext::class)->reset();
     $request = Request::create('/api/v1/anything', 'GET', server: ['HTTP_X_STATION_ID' => (string) $this->kitchen->id]);
     $request->setUserResolver(fn () => null);
@@ -297,7 +298,7 @@ it('carries work_stations on GET /me: the assigned stations, or every station fo
     ($this->assign)($this->people['chef'], $this->kitchen);
     // scoped(), not instance(): the app forgets scoped instances at the start of every request and would drop an instance
     $double = new FakeOpenShifts([$this->kitchen->id => 9001]);
-    app()->scoped(App\Shared\Shifts\OpenShifts::class, fn () => $double);
+    app()->scoped(OpenShifts::class, fn () => $double);
 
     loginAs($this->people['chef']);
     $mine = $this->getJson('/api/v1/me')->assertOk()->json('work_stations');
