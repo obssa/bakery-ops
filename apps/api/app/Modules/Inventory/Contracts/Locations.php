@@ -134,6 +134,26 @@ final class Locations
         return $drawer instanceof Location ? self::view($drawer) : null;
     }
 
+    /**
+     * The locations of the ids as plain views, keyed by id (step 3.3a; Shifts names the place of a count). A deleted location is
+     * named too (a count made last month still shows its place); another branch's ids and unknown ids are left out.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, LocationView>
+     */
+    public function views(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $views = [];
+        foreach (Location::query()->withTrashed()->whereKey(array_values(array_unique($ids)))->orderBy('id')->get() as $location) {
+            $views[$location->id] = self::view($location);
+        }
+
+        return $views;
+    }
+
     private static function view(Location $l): LocationView
     {
         return new LocationView($l->id, $l->name_en, $l->name_am, $l->type->value, $l->station_id);

@@ -10,7 +10,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * POST /stations/{station}/shifts/start: the client UUID of the shift the start may make (an offline replay with a lost
  * Idempotency-Key reaches the same shift, ADR 0003), optionally the scheduled instance (`shift_id`) or the template (`template_id`)
- * to start, `carry` (open without counting: every start is carried until step 3.3a) and `force` (outside the window; the admin's,
+ * to start, `carry` (open without counting) and `force` (outside the window; the admin's,
  * checked by the action).
  */
 final class StartShiftRequest extends FormRequest

@@ -17,6 +17,7 @@ return [
         'not_scheduled' => 'This shift is not waiting to be started.',
         'outside_window' => 'This shift cannot be started now. It runs from its start time to its end time.',
         'not_running' => 'This shift is not running.',
+        'not_open' => 'Only a shift that is open can be closed.',
         'not_cancellable' => 'Only a shift that has not started, or is just starting, can be cancelled.',
     ],
     'start' => [
@@ -32,5 +33,22 @@ return [
     ],
     'roster' => [
         'user_invalid' => 'Everyone on a shift must be an active person who works at its station.',
+    ],
+    'count' => [
+        'not_draft' => 'This count has already been handed in, so it can no longer be changed.',
+        'item_unknown' => 'This item cannot be counted here.',
+        'qty_invalid' => 'The counted amount must be a number that is not negative, with at most four decimals.',
+        'incomplete' => 'Every line must be checked before the count is handed in, and every item that has stock must be on the count.',
+        'reason_required' => 'Choose a reason for every line whose counted amount differs from the expected amount.',
+        'note_required' => 'The reason you chose needs a short note. Write what happened.',
+        'blocked_by_pending' => 'An earlier count at this place is still waiting for a decision. Only one count at a place can wait at a time.',
+        'shift_not_ready' => 'This shift is not taking this count right now.',
+    ],
+    'reason' => [
+        'unknown' => 'This reason does not exist or is switched off.',
+        'code_taken' => 'A reason with this code already exists.',
+    ],
+    'adjustment' => [
+        'insufficient' => 'The correction would leave less than nothing in stock, because stock left after the count. Reject the count and count again.',
     ],
 ];

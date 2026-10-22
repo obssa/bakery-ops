@@ -47,8 +47,9 @@ final class ShiftRows
     }
 
     /**
-     * Insert a shift that has not been opened by anyone before: `scheduled` (nobody holds the station), or `open` (a start or a
-     * call-in: carried, the person who opens it is both starter and opener).
+     * Insert a shift that has not been opened by anyone before: `scheduled` (nobody holds the station), `opening` (a start with
+     * counts: the person is counting in, nothing is open yet), or `open` (a start without counts or a call-in: carried, the person
+     * who opens it is both starter and opener).
      */
     public function insert(
         Station $station,
@@ -64,6 +65,7 @@ final class ShiftRows
         $stamp = $this->actor->stamp();
         $now = CarbonImmutable::now()->startOfSecond();
         $open = $status === ShiftStatus::Open;
+        $started = $open || $status === ShiftStatus::Opening;
 
         $shift = new ShiftInstance;
         $shift->forceFill([
@@ -80,8 +82,8 @@ final class ShiftRows
             'status' => $status,
             'open_key' => $status->openKey(),
             'opening_mode' => $open ? ShiftOpeningMode::Carried : null,
-            'started_by_user_id' => $open ? $openedBy : null,
-            'started_at' => $open ? $now : null,
+            'started_by_user_id' => $started ? $openedBy : null,
+            'started_at' => $started ? $now : null,
             'opened_by_user_id' => $open ? $openedBy : null,
             'opened_at' => $open ? $now : null,
             'created_by_user_id' => $stamp['created_by_user_id'],

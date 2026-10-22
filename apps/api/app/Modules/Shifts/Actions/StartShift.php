@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
+use App\Modules\Inventory\Contracts\Locations;
+use App\Modules\Shifts\Counts\DraftBuilder;
+use App\Modules\Shifts\Enums\CountType;
 use App\Modules\Shifts\Enums\RosterSource;
 use App\Modules\Shifts\Enums\ShiftOpeningMode;
 use App\Modules\Shifts\Enums\ShiftOrigin;
@@ -26,8 +29,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 
 /**
- * POST /stations/{station}/shifts/start (phase-3 plan section 4, "How a start works"). In step 3.2 there are no counts yet, so a
- * start opens the shift at once, carried (step 3.3a changes the default to `opening` with prefilled counts, and `carry` keeps this).
+ * POST /stations/{station}/shifts/start (phase-3 plan section 4, "How a start works").
  *   1. The client UUID of a repeat answers the shift already made (200).
  *   2. A shift that already runs at the station (opening, open or counting): the person who started the `opening` one resumes it
  *      (200); anyone else gets 409 shifts.shift.already_open naming it, and the screen offers Join.
@@ -39,7 +41,9 @@ use Illuminate\Support\Collection;
  *   4. One AuditedAction (shift.start) writes the row and puts the starter on the roster. A scheduled instance is locked FOR UPDATE
  *      by id; a new row is an INSERT, and the unique (station_id, open_key) decides a race: the loser's insert is refused and it
  *      answers 409 shifts.shift.already_open. A missing row is never locked (traps.md, "First-row race").
- *   5. ShiftOpened is dispatched after the commit.
+ *   5. The status (step 3.3a): a station with places to count and no `carry` goes to `opening` with one prefilled opening draft per
+ *      place (the shift opens when they are submitted: SubmitCount); a station with nothing to count, `carry`, and every call-in
+ *      open at once, carried. ShiftOpened is dispatched after the commit, when the status reaches `open`.
  * The person acting needs shifts.count at the station (403 shifts.station.forbidden); a station that tracks no shifts is 422.
  */
 final class StartShift
@@ -53,6 +57,8 @@ final class StartShift
         private readonly ShiftRosters $rosters,
         private readonly ShiftAnnouncer $announcer,
         private readonly CurrentBranch $branch,
+        private readonly Locations $locations,
+        private readonly DraftBuilder $drafts,
     ) {}
 
     /**
@@ -87,8 +93,8 @@ final class StartShift
 
             try {
                 $shift = $plan['scheduled'] instanceof ShiftInstance
-                    ? $this->startScheduled($plan['scheduled'], $person)
-                    : $this->startNew($station, $options->clientUuid, $plan['template'], $plan['window'], $person);
+                    ? $this->startScheduled($plan['scheduled'], $person, $options->carry)
+                    : $this->startNew($station, $options->clientUuid, $plan['template'], $plan['window'], $person, $options->carry);
             } catch (UniqueConstraintViolationException $e) {
                 // another start won the unique running key a moment ago, or made the same client UUID: ask again
                 $other = $this->rows->byClientUuid($options->clientUuid);
@@ -190,49 +196,66 @@ final class StartShift
     }
 
     /**
-     * A scheduled instance opens: locked by id, checked again, the starter joins.
+     * A scheduled instance starts: locked by id, checked again, the starter joins. With places to count (and no `carry`) it goes to
+     * `opening` and gets its opening drafts; otherwise it opens at once, carried.
      */
-    private function startScheduled(ShiftInstance $scheduled, int $person): ShiftInstance
+    private function startScheduled(ShiftInstance $scheduled, int $person, bool $carry): ShiftInstance
     {
-        return $this->audit->run(function (ShiftInstance $s) use ($person): ShiftInstance {
+        return $this->audit->run(function (ShiftInstance $s) use ($person, $carry): ShiftInstance {
             ShiftLock::refresh($s);
             if ($s->status !== ShiftStatus::Scheduled) {
                 throw $s->status->isRunning() ? ShiftError::alreadyOpen($s->id, $s->status->value) : ShiftError::notScheduled($s->status->value);
             }
             $now = CarbonImmutable::now()->startOfSecond();
-            $to = $s->status->transitionTo(ShiftStatus::Open);
+            $counting = $this->countsIn($s->station_id, $carry);
+            $to = $s->status->transitionTo($counting ? ShiftStatus::Opening : ShiftStatus::Open);
             $s->forceFill([
                 'status' => $to,
                 'open_key' => $to->openKey(),
-                'opening_mode' => ShiftOpeningMode::Carried,
+                'opening_mode' => $counting ? null : ShiftOpeningMode::Carried,
                 'started_by_user_id' => $person,
                 'started_at' => $now,
-                'opened_by_user_id' => $person,
-                'opened_at' => $now,
+                'opened_by_user_id' => $counting ? null : $person,
+                'opened_at' => $counting ? null : $now,
                 'version' => $s->version + 1,
             ])->save();
             $this->rosters->join($s, $person, RosterSource::Started);
-            $this->announcer->opened($s);
+            if ($counting) {
+                $this->drafts->build($s, CountType::Opening);
+            } else {
+                $this->announcer->opened($s);
+            }
 
             return $s;
         }, $scheduled, 'shift.start');
     }
 
-    /** A new row, `open` at once: from a template window, or ad hoc. */
-    private function startNew(Station $station, string $clientUuid, ?ShiftTemplate $template, ?ShiftWindow $window, int $person): ShiftInstance
+    /** A new row from a template window, or ad hoc: `opening` with its opening drafts, or `open` at once (carried). */
+    private function startNew(Station $station, string $clientUuid, ?ShiftTemplate $template, ?ShiftWindow $window, int $person, bool $carry): ShiftInstance
     {
         $clock = new LocalClock($this->branch->timezone());
         $date = $window instanceof ShiftWindow ? $window->date : ShiftWindow::adHocDate(CarbonImmutable::now(), $clock);
 
-        return $this->audit->run(function () use ($station, $clientUuid, $template, $window, $person, $date): ShiftInstance {
+        return $this->audit->run(function () use ($station, $clientUuid, $template, $window, $person, $date, $carry): ShiftInstance {
+            $counting = $this->countsIn($station->id, $carry);
             $shift = $this->rows->insert(
-                $station, $clientUuid, $date, $template, $window, ShiftOrigin::Started, ShiftStatus::Open, $person,
+                $station, $clientUuid, $date, $template, $window, ShiftOrigin::Started, $counting ? ShiftStatus::Opening : ShiftStatus::Open, $person,
                 $this->rows->nextSequence($station->id, $date, $template->id ?? 0),
             );
             $this->rosters->join($shift, $person, RosterSource::Started);
-            $this->announcer->opened($shift);
+            if ($counting) {
+                $this->drafts->build($shift, CountType::Opening);
+            } else {
+                $this->announcer->opened($shift);
+            }
 
             return $shift;
         }, null, 'shift.start');
+    }
+
+    /** Does the start count first? A station with a place to count does, unless the person starts without counting. */
+    private function countsIn(int $stationId, bool $carry): bool
+    {
+        return ! $carry && $this->locations->stockLocationsOf($stationId) !== [];
     }
 }

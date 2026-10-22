@@ -122,6 +122,90 @@ final class ShiftError extends RuntimeException
         return new self('shifts.roster.user_invalid', 422, ['user_ids' => $userIds]);
     }
 
+    /** Close needs an open shift. */
+    public static function notOpen(string $status): self
+    {
+        return new self('shifts.shift.not_open', 409, ['status' => $status]);
+    }
+
+    /** The lines of a count change, and a count is handed in, only while it is a draft. */
+    public static function countNotDraft(string $status): self
+    {
+        return new self('shifts.count.not_draft', 409, ['status' => $status]);
+    }
+
+    /** The shift is not taking this kind of count now (an opening count needs an opening shift, a closing count a counting one). */
+    public static function countShiftNotReady(string $status): self
+    {
+        return new self('shifts.count.shift_not_ready', 409, ['status' => $status]);
+    }
+
+    /** The item is not an item of the branch, or cannot be stocked (switched off, deleted, made to order). */
+    public static function itemUnknown(int $itemId): self
+    {
+        return new self('shifts.count.item_unknown', 422, ['item_id' => $itemId]);
+    }
+
+    /** A counted figure that is negative, has more than four decimals, more than ten integer digits, or is not a decimal number. */
+    public static function qtyInvalid(int $itemId): self
+    {
+        return new self('shifts.count.qty_invalid', 422, ['item_id' => $itemId]);
+    }
+
+    /**
+     * A line was not looked at, or an item with stock is not on the count yet.
+     *
+     * @param  list<int>  $itemIds
+     */
+    public static function incomplete(array $itemIds): self
+    {
+        return new self('shifts.count.incomplete', 422, ['item_ids' => $itemIds]);
+    }
+
+    /**
+     * Lines whose counted figure differs from the ledger and that carry no reason.
+     *
+     * @param  list<int>  $itemIds
+     */
+    public static function reasonRequired(array $itemIds): self
+    {
+        return new self('shifts.count.reason_required', 422, ['item_ids' => $itemIds]);
+    }
+
+    /**
+     * Lines whose reason asks for a note and carry none.
+     *
+     * @param  list<int>  $itemIds
+     */
+    public static function noteRequired(array $itemIds): self
+    {
+        return new self('shifts.count.note_required', 422, ['item_ids' => $itemIds]);
+    }
+
+    /** Rule R-A: another count at this place is awaiting a co-signature or a decision. */
+    public static function blockedByPending(int $countId): self
+    {
+        return new self('shifts.count.blocked_by_pending', 409, ['count_id' => $countId]);
+    }
+
+    /** The reason does not exist in the branch, or is switched off. */
+    public static function reasonUnknown(int $reasonId): self
+    {
+        return new self('shifts.reason.unknown', 422, ['reason_id' => $reasonId]);
+    }
+
+    /** The branch already has a reason with this code (switched off or not). */
+    public static function reasonCodeTaken(string $code): self
+    {
+        return new self('shifts.reason.code_taken', 409, ['code' => $code]);
+    }
+
+    /** A count's adjustment would take on_hand below zero (negative stock stays refused, plan section 10.4). */
+    public static function adjustmentInsufficient(int $itemId, int $locationId, string $onHand, string $adjustment): self
+    {
+        return new self('shifts.adjustment.insufficient', 409, ['item_id' => $itemId, 'location_id' => $locationId, 'on_hand' => $onHand, 'adjustment' => $adjustment]);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

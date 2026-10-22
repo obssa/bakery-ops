@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Support;
 
 use App\Modules\Identity\Contracts\People;
+use App\Modules\Shifts\Counts\CountPresenter;
+use App\Modules\Shifts\Counts\CountReads;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\ShiftRoster;
 use App\Shared\Actor\ActorContext;
@@ -14,8 +16,8 @@ use Illuminate\Database\Eloquent\Collection;
 
 /**
  * The Shift and ShiftSummary of the API (phase-3 plan section 4, "Resources"). A summary is the same without `roster`, `counts` and
- * `notes_count`. Times are UTC ISO-8601 (the screens show Africa/Addis_Ababa), `date` is the local start date. `counts` is empty
- * until step 3.3 and `notes_count` is 0 until step 3.6. Names come from Identity's People in one query per page. `me_on_roster` is
+ * `notes_count`. Times are UTC ISO-8601 (the screens show Africa/Addis_Ababa), `date` is the local start date. `counts` are
+ * the CountSummary of every revision (step 3.3a) and `notes_count` is 0 until step 3.6. Names come from Identity's People in one query per page. `me_on_roster` is
  * about the person acting (the short-code actor, else the logged-in account): on the roster, not removed. Resolved per use.
  */
 final class ShiftPresenter
@@ -23,6 +25,8 @@ final class ShiftPresenter
     public function __construct(
         private readonly People $people,
         private readonly ActorContext $actor,
+        private readonly CountReads $countReads,
+        private readonly CountPresenter $countPresenter,
     ) {}
 
     /**
@@ -141,7 +145,7 @@ final class ShiftPresenter
                     'joined_at' => self::time($r->joined_at),
                     'left_at' => self::time($r->left_at),
                 ])->all();
-                $row['counts'] = [];
+                $row['counts'] = $this->countPresenter->summaries($this->countReads->all($shift));
                 $row['notes_count'] = 0;
             }
             $out[] = $row;

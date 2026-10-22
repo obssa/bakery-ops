@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Contracts;
 
 use App\Modules\Shifts\Actions\CancelShift;
+use App\Modules\Shifts\Actions\CloseShift;
 use App\Modules\Shifts\Actions\JoinShift;
 use App\Modules\Shifts\Actions\LeaveShift;
 use App\Modules\Shifts\Actions\OpenAdHocShift;
@@ -22,16 +23,20 @@ use Illuminate\Support\Str;
 
 /**
  * manifest shifts.provides, as the plan splits it (phase-3 plan section 6 item 2, step 3.2b): current(station), start, openAdHoc,
- * join, leave, cancel, schedule and roster. The endpoints (POST /stations/{station}/shifts/start, open-ad-hoc, /shifts/{shift}/join,
+ * join, leave, cancel, schedule and roster; close arrives with step 3.3a. The endpoints (POST /stations/{station}/shifts/start, open-ad-hoc, /shifts/{shift}/join,
  * leave, cancel, POST /shifts, PUT /shifts/{shift}/roster) are thin callers of the same actions (Actions\StartShift and its
  * siblings), so every rule is one rule, and every method is one AuditedAction run as the person acting (ActorContext: the short-code
  * actor, else the logged-in account) under the same permissions and the same errors as its endpoint.
  *   current: the shift that holds the station (opening, open or counting), or null. A read: no actor needed.
- *   start: opens a shift at the station (in step 3.2 at once, carried): the scheduled instance asked for or whose window holds now,
- *     else a template window of the station, else an ad-hoc one; a repeat of the client UUID answers the shift made (created false).
+ *   start: starts a shift at the station: the scheduled instance asked for or whose window holds now, else a template window of the
+ *     station, else an ad-hoc one. A station with places to count goes to `opening` with prefilled draft opening counts (the shift
+ *     opens when they are submitted); a station with nothing to count, or `carry`, opens at once, carried. A repeat of the client UUID
+ *     answers the shift made (created false).
  *   openAdHoc: the call-in; the person joins the running shift when there is one (created false).
  *   join / leave: the person acting goes on or off duty on a running shift; a repeat writes nothing.
  *   cancel: a scheduled or opening shift is cancelled (the admin, or the starter of an opening one); a repeat writes nothing.
+ *   close: an open shift goes to `counting` and the station is frozen; one draft closing count per stock place (the Counts contract
+ *     reads and works them); a repeat on a counting shift writes nothing.
  *   schedule / roster: the admin schedules a template on a local date and replaces the roster of a scheduled shift.
  * Stations, shifts and templates are given by model or id. A final class resolved per use: the actions carry the scoped
  * ActorContext and CurrentBranch, so it keeps nothing.
@@ -46,6 +51,7 @@ final class Shifts
         private readonly CancelShift $cancelShift,
         private readonly ScheduleShift $scheduleShift,
         private readonly ReplaceRoster $replaceRoster,
+        private readonly CloseShift $closeShift,
         private readonly ShiftRows $rows,
     ) {}
 
@@ -95,6 +101,14 @@ final class Shifts
     public function cancel(ShiftInstance|int $shift, ?string $reason = null): ShiftInstance
     {
         return $this->cancelShift->handle($this->shift($shift), $reason);
+    }
+
+    /**
+     * @throws ShiftError auth.forbidden, shifts.station.forbidden (403); shifts.shift.not_open (409)
+     */
+    public function close(ShiftInstance|int $shift): ShiftInstance
+    {
+        return $this->closeShift->handle($this->shift($shift));
     }
 
     /**
