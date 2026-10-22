@@ -143,7 +143,7 @@ it('asks Locks for the previous closing: the newest approved closing of the plac
     $old = ($this->previousClosing)(CountStatus::Approved, '2026-10-30', []);
     $new = ($this->previousClosing)(CountStatus::Approved, '2026-10-31', []);
     ($this->previousClosing)(CountStatus::PendingApproval, '2026-11-01', []);
-    ($this->previousClosing)(CountStatus::Draft, '2026-11-01', []);
+    ($this->previousClosing)(CountStatus::Draft, '2026-10-29', []);
 
     $locks = app(Locks::class);
 
