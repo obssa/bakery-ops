@@ -54,6 +54,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\DemoBakery;
 use Database\Seeders\Demo\DemoPhaseTwo;
 use Database\Seeders\Demo\DemoSeedRefused;
+use Database\Seeders\Demo\DemoShifts;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -119,6 +120,7 @@ final class Phase2Seeder extends Seeder
             DB::transaction(function () use ($branch, $current): void {
                 $current->set($branch);
                 $this->actAs('admin');
+                DemoShifts::ensureOpen($branch);
                 $this->suppliers($branch);
                 $this->openingCosts();
                 $this->gateProduct($branch);

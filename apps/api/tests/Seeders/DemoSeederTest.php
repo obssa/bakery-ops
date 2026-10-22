@@ -277,3 +277,25 @@ it('seeds the role matrix and then the demo bakery with `db:seed`', function () 
     expect(Role::query()->count())->toBe(8)
         ->and(Branch::query()->where('name', DemoBakery::DEFAULT_BRANCH)->count())->toBe(1);
 })->group('feature', 'seeds');
+
+it('seeds Phases 0 to 2 with the shift rule on, opening one shift at each tracked station and none at the store, and a second run writes nothing', function () {
+    config(['ledger.require_shift_for_station_locations' => true]);
+    putenv('SEED_PHASE=2');
+    config(['queue.default' => 'database']);
+    $this->seed(DemoSeeder::class);
+
+    $branch = Branch::query()->where('name', DemoBakery::DEFAULT_BRANCH)->sole();
+    $stations = DB::table('stations')->where('branch_id', $branch->id)->pluck('tracks_shifts', 'code')->map(fn ($v) => (bool) $v)->all();
+    expect($stations)->toBe(['till' => true, 'kitchen' => true, 'bar' => true, 'cake_room' => true, 'bakery' => true, 'store' => false]);
+
+    $shifts = DB::table('shift_instances')->where('shift_instances.branch_id', $branch->id)->join('stations', 'stations.id', '=', 'shift_instances.station_id')->orderBy('shift_instances.id')->get(['stations.code', 'shift_instances.status', 'shift_instances.opening_mode']);
+    expect($shifts->pluck('code')->sort()->values()->all())->toBe(['bakery', 'bar', 'cake_room', 'kitchen', 'till'])
+        ->and($shifts->every(fn (object $s): bool => $s->status === 'open' && $s->opening_mode === 'carried'))->toBeTrue();
+    // the opening stock, the sample orders' consumption and the batches were all written under those shifts
+    expect(DB::table('stock_movements')->where('branch_id', $branch->id)->whereNotNull('shift_instance_id')->count())->toBeGreaterThan(0);
+
+    $first = phaseTwoRows($branch->id) + ['shift_instances' => DB::table('shift_instances')->where('branch_id', $branch->id)->count(), 'shift_roster' => DB::table('shift_roster')->count()];
+    $this->seed(DemoSeeder::class);
+
+    expect(phaseTwoRows($branch->id) + ['shift_instances' => DB::table('shift_instances')->where('branch_id', $branch->id)->count(), 'shift_roster' => DB::table('shift_roster')->count()])->toBe($first);
+})->group('feature', 'seeds');

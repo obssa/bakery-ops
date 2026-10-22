@@ -148,6 +148,7 @@ final class OrdersMenu
             $prices->open($item, Money::of($price), $pricesFrom);
         }
 
+        Shifts::ensureOpenAll($menu->kitchenStation, $menu->barStation, $menu->tillStation);
         foreach ([[$menu->bread, '20'], [$menu->chicken, '1000'], [$menu->lettuce, '300'], [$menu->onion, '200'], [$menu->tomato, '100'], [$menu->butter, '500']] as [$item, $qty]) {
             stockIn($item, $menu->kitchen, $qty);
         }

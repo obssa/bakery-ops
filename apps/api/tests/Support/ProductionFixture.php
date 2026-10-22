@@ -122,6 +122,8 @@ final class ProductionFixture
         $this->cakeRecipe = $this->recipe($this->cake, '12', [[$this->flour, '1.2'], [$this->sugar, '0.6']], [['Cream the butter', 'ቅቤውን ይምቱ'], ['Bake for 40 minutes', 'ለ40 ደቂቃ ይጋግሩ']]);
         $this->recipe($this->bread, '20', [[$this->flour, '5']]);
         $this->recipe($this->orphanCake, '12', [[$this->flour, '1']]);
+
+        Shifts::ensureOpenAll($this->cakeRoomStation, $this->bakeryStation, $this->tillStation);
     }
 
     public static function build(Branch $branch): self

@@ -37,6 +37,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\DemoBakery;
 use Database\Seeders\Demo\DemoCredentials;
 use Database\Seeders\Demo\DemoSeedRefused;
+use Database\Seeders\Demo\DemoShifts;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -146,6 +147,7 @@ final class Phase0Seeder extends Seeder
                 $this->admin($branch, $password, $codes);
                 $this->stations($branch);
                 $this->locations($branch);
+                DemoShifts::ensureOpen($branch);
                 $this->categories($branch);
                 $this->items($branch);
                 $this->prices($branch);
@@ -227,6 +229,7 @@ final class Phase0Seeder extends Seeder
                     'name_en' => $name->en,
                     'name_am' => $name->am,
                     'requires_overseer' => $spec['requires_overseer'],
+                    'tracks_shifts' => $code !== StationCode::Store->value, // the warehouse runs no shifts, as POST /stations decides
                     'sort' => $spec['sort'],
                 ]), null, 'station.create', self::SOURCE);
             }

@@ -57,6 +57,9 @@ final class PurchaseFixture
         $this->flour = Item::factory()->ingredient('kg')->create(['branch_id' => $branch->id, 'created_by_user_id' => $this->admin->id, 'name_en' => 'Flour']);
         $this->sugar = Item::factory()->ingredient('kg')->create(['branch_id' => $branch->id, 'created_by_user_id' => $this->admin->id, 'name_en' => 'Sugar']);
         $this->juice = Item::factory()->product(Fulfilment::BoughtIn)->create(['branch_id' => $branch->id, 'created_by_user_id' => $this->admin->id, 'name_en' => 'Juice']);
+
+        Shifts::ensureOpenAt($this->store);
+        Shifts::ensureOpenAt($this->kitchen);
     }
 
     public static function build(Branch $branch): self

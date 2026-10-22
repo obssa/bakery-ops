@@ -88,6 +88,8 @@ final class TransferFixture
         $this->sugar = Item::factory()->ingredient('kg')->create(['branch_id' => $branch->id, 'created_by_user_id' => $this->admin->id, 'name_en' => 'Sugar']);
         $this->cake = Item::factory()->product(Fulfilment::ToStock, 'pcs')->create(['branch_id' => $branch->id, 'created_by_user_id' => $this->admin->id, 'name_en' => 'Cake']);
         $this->sandwich = Item::factory()->product(Fulfilment::ToOrder)->create(['branch_id' => $branch->id, 'created_by_user_id' => $this->admin->id, 'name_en' => 'Sandwich']);
+
+        Shifts::ensureOpenAll($this->kitchenStation, $this->cakeRoomStation, $this->tillStation);
     }
 
     public static function build(Branch $branch): self

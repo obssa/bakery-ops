@@ -34,6 +34,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\DemoBakery;
 use Database\Seeders\Demo\DemoCredentials;
 use Database\Seeders\Demo\DemoSeedRefused;
+use Database\Seeders\Demo\DemoShifts;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -108,6 +109,7 @@ final class Phase1Seeder extends Seeder
             DB::transaction(function () use ($branch, $password, $current): void {
                 $current->set($branch);
                 $this->asAdmin();
+                DemoShifts::ensureOpen($branch);
                 $this->tables($branch);
                 app(Channels::class)->ensureDefaults($branch);
                 $this->pad = $this->device($branch);
