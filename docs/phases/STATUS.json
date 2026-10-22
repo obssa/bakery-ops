@@ -131,7 +131,7 @@
         "shifts->orders"
       ],
       "modules": {
-        "contracts": "in_progress",
+        "contracts": "done",
         "shifts.instances": "todo",
         "shifts.counts": "todo",
         "shifts.locks": "todo",

@@ -654,6 +654,26 @@ live ledger in a state where a shift can be opened only through the API.
      - `GET /me` is the only response that grew; `ERD` and `docs/openapi.json` were re-exported against the test database.
        The `enforced-gates` job and the `seeds` group move stay in 3.2c, as section 6 says (the manifest `ci.module_jobs` are
        untouched here); `mod-orders` gained `contract:shifts->orders`.
+   - **As built (step 3.1b, `phase-3/ledger-enforcement-dark`).** Commits: tests first (cases 12 to 14 unskipped, `LedgerEnforcementTest`;
+     red: `contract:shifts->inventory` 3 failed + 13 passed, `InventoryError` not thrown; the new file 40 of 101 failed), then F2, then
+     the planner e2e fix, then this note and STATUS. Where the code settled what the plan left open:
+     - **`config/ledger.php`** reads `LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` with default `false`; the variable is also written
+       as `false` in `.env.example` and `.env.ci`, and documented in `docs/runbook/server.md` (not set on the host).
+       `DeployableCachesTest` passes. `config/payments.php` and its rule stay in 3.5.
+     - **The check** is `Ledger::shiftCover`, called inside the transaction before `lockRows`. It looks first without locks
+       (`isOpen` for the actor's shift, `openAt` once per station), then re-reads every shift relied on with `isOpen($id, true)` in
+       ascending id order and refuses if one closed meanwhile. `OpenShifts` is resolved lazily with `app()`, so with the flag off it is
+       not even resolved. The error names the station and location of the first uncovered intent, in intent order.
+     - **Stamp:** an actor whose shift is open keeps the actor's stamp; otherwise each enforced row carries its own station's open
+       shift (a transfer across two stations stamps each side with its own). Exempt and untracked rows keep the actor's stamp as
+       before, even if that shift is not open.
+     - **A cash drawer location is enforced like any other** place of a tracking station (the rule looks at the station, not the type);
+       `reservation` and `reservation_release` are exempt because their `on_hand` effect is zero, while a `production_consume` or `sale`
+       settling a reservation is enforced.
+     - `LedgerEnforcementTest` is one dataset of 16 reasons by 6 places, each run through 7 states of cover with the flag off and on
+       (about 3 minutes in Docker), plus batch, lock order, close-in-between and config/lang cases.
+     - Carry-over: `stockout-catalog-planning.spec.ts` now polls the API for the assignee instead of reading it right after the click.
+       No other p2 spec asserted a select's own value as a saved result.
 2. **3.2 shifts.instances** (groups `module:shifts`, `unit`; STATUS `shifts.instances`), three PRs:
    - **3.2a `phase-3/shifts-schema`**: ADR 0013 (proposed: the code cites it); migrations 3-7; models and factories;
      `ShiftStatus` with its exhaustive transition table (picked up by `StateMachineExhaustiveTest`):

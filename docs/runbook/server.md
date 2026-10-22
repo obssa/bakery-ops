@@ -240,6 +240,13 @@ Run the commands from the site folder: `cd ~/bakery-ops.orcamind.dev` and use `/
   `/opt/alt/php83/usr/bin/php -m | grep -E 'openssl|curl|mbstring'`). If either fails the inbox still works; the deliveries show the error.
 - CI never sends anything: its `.env.ci` switches on only the `array` driver, which records what it was asked to send.
 
+## Shift enforcement in the ledger (Phase 3, off)
+
+`LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` (read by `config/ledger.php`) makes the stock ledger refuse a movement at a station
+that tracks shifts when no shift is open there (`409 inventory.shift.required`). It ships `false` in the code, `.env.example` and
+`.env.ci`, and stays unset (so off) on the live host until step 3.7e of Phase 3. Do not set it before then: no screen starts a
+shift yet. Nothing to do now; the switch-on and the kill switch are written in the Phase 3 plan, section 10.1.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.
