@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Ledger;
 
 use App\Modules\Inventory\Contracts\Movement;
+use App\Modules\Inventory\Contracts\ShiftMovementTotal;
 use App\Modules\Inventory\Contracts\StockLevel;
 use App\Shared\Tenancy\BranchScope;
 use App\Shared\Values\Quantity;
@@ -207,6 +208,64 @@ final class LedgerReader
         }
 
         return $levels;
+    }
+
+    /**
+     * What the movements stamped with a shift add up to, per place, item and reason (Stock::shiftSummary).
+     *
+     * @return list<ShiftMovementTotal>
+     */
+    public function shiftSummary(int $shiftId): array
+    {
+        $place = self::PLACE_SQL;
+        $rows = StockMovement::query()
+            ->toBase()
+            ->selectRaw("({$place}) as place_id, item_id, reason, SUM(qty) as total, COUNT(*) as n")
+            ->where('shift_instance_id', $shiftId)
+            ->groupByRaw("({$place}), item_id, reason")
+            ->orderBy('place_id')
+            ->orderBy('item_id')
+            ->orderBy('reason')
+            ->get();
+
+        $totals = [];
+        foreach ($rows as $row) {
+            $totals[] = new ShiftMovementTotal((int) $row->place_id, (int) $row->item_id, (string) $row->reason, Quantity::of(self::decimal($row->total))->toString(), (int) $row->n);
+        }
+
+        return $totals;
+    }
+
+    /**
+     * The signed on_hand change per item at a place since a movement id (Stock::netChangeSince): rows above $afterId, minus
+     * the excluded ones, a transfer counted at the side its sign picks; zero nets are left out.
+     *
+     * @param  list<int>  $excludeIds
+     * @return array<int, Quantity>
+     */
+    public function netChangeSince(int $locationId, int $afterId, array $excludeIds): array
+    {
+        $place = self::PLACE_SQL;
+        $rows = StockMovement::query()
+            ->toBase()
+            ->selectRaw('item_id, SUM('.self::ON_HAND_SQL.') as total')
+            ->where('id', '>', $afterId)
+            ->when($excludeIds !== [], fn ($q) => $q->whereNotIn('id', $excludeIds))
+            ->where(fn ($w) => $w->where('from_location_id', $locationId)->orWhere('to_location_id', $locationId))
+            ->whereRaw("({$place}) = ?", [$locationId])
+            ->groupBy('item_id')
+            ->orderBy('item_id')
+            ->get();
+
+        $changes = [];
+        foreach ($rows as $row) {
+            $change = Quantity::of(self::decimal($row->total));
+            if (! $change->isZero()) {
+                $changes[(int) $row->item_id] = $change;
+            }
+        }
+
+        return $changes;
     }
 
     /**

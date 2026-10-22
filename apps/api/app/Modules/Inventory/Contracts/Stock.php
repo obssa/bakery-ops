@@ -7,6 +7,7 @@ namespace App\Modules\Inventory\Contracts;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Inventory\Ledger\LedgerReader;
 use App\Modules\Inventory\Models\Location;
+use App\Shared\Values\Quantity;
 use DateTimeInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -74,6 +75,30 @@ final class Stock
         }
 
         return $levels;
+    }
+
+    /**
+     * What the movements stamped with $shiftId add up to, per place, item and reason, ordered by place, item and reason
+     * (step 3.1a, F1; the review before a closing count). Shift ids are plain ints: Inventory names no Shifts table.
+     *
+     * @return list<ShiftMovementTotal>
+     */
+    public function shiftSummary(int $shiftId): array
+    {
+        return $this->reader->shiftSummary($shiftId);
+    }
+
+    /**
+     * The signed on_hand change per item at a location since a movement id (rows with an id above $afterMovementId), without
+     * the rows named in $excludeMovementIds; an item whose net change is zero is left out. It lets an opening count prove
+     * "previous closing plus what moved since equals the ledger" (step 3.1a, F1).
+     *
+     * @param  list<int>  $excludeMovementIds
+     * @return array<int, Quantity> item id => signed change (4 dp), ascending by item id
+     */
+    public function netChangeSince(Location|int $location, int $afterMovementId, array $excludeMovementIds = []): array
+    {
+        return $this->reader->netChangeSince(self::id($location), $afterMovementId, $excludeMovementIds);
     }
 
     /**

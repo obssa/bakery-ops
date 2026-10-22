@@ -105,6 +105,40 @@ final class Locations
         return $answer;
     }
 
+    /**
+     * The places a station's stock is counted at (step 3.1a, F1; Shifts): every live location of the station except its
+     * cash drawer, in id order, as plain views. Another branch's locations are never an answer.
+     *
+     * @return list<LocationView>
+     */
+    public function stockLocationsOf(Station|int $station): array
+    {
+        $rows = Location::query()
+            ->where('station_id', $station instanceof Station ? $station->id : $station)
+            ->where('type', '!=', LocationType::CashDrawer->value)
+            ->orderBy('id')
+            ->get();
+
+        return array_values($rows->map(fn (Location $l): LocationView => self::view($l))->all());
+    }
+
+    /** The station's cash drawer (the lowest id should there be several), or null when it has none. */
+    public function cashDrawerOf(Station|int $station): ?LocationView
+    {
+        $drawer = Location::query()
+            ->where('station_id', $station instanceof Station ? $station->id : $station)
+            ->where('type', LocationType::CashDrawer->value)
+            ->orderBy('id')
+            ->first();
+
+        return $drawer instanceof Location ? self::view($drawer) : null;
+    }
+
+    private static function view(Location $l): LocationView
+    {
+        return new LocationView($l->id, $l->name_en, $l->name_am, $l->type->value, $l->station_id);
+    }
+
     /** A live location of this branch by id; null for an unknown, a deleted or another branch's. */
     public function find(int $id): ?Location
     {
