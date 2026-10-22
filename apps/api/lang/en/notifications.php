@@ -58,7 +58,41 @@ return [
             'body' => 'Order #:order_no, table :table: :item was sent back. Reason: :reason',
             'body_no_table' => 'Order #:order_no: :item was sent back. Reason: :reason',
         ],
+        // Phase 3, step 3.3c: a count handed in (the wording follows the state it waits in) and the decision on it
+        'count_submitted' => [
+            'awaiting_cosign' => [
+                'title' => 'Please co-sign: :station count',
+                'body_differ' => ':place, :type count: :varied of :lines lines differ. :items.',
+                'body_match' => ':place, :type count: all :lines lines match.',
+            ],
+            'pending_approval' => [
+                'title' => 'Approval needed: :station count',
+                'body_differ' => ':place, :type count: :varied of :lines lines differ. :items.',
+                'body_match' => ':place, :type count: all :lines lines match.',
+            ],
+            'done' => [
+                'title' => 'Count handed in: :station count',
+                'body_differ' => ':place, :type count: :varied of :lines lines differ. :items.',
+                'body_match' => ':place, :type count: all :lines lines match.',
+            ],
+        ],
+        'variance_decided' => [
+            'approved' => [
+                'title' => 'Count approved: :station',
+                'body' => 'Your :type count at :place was approved. Lines adjusted: :adjusted.',
+            ],
+            'rejected' => [
+                'title' => 'Count rejected: :station',
+                'body' => 'Your :type count at :place was rejected: :note Please count again.',
+            ],
+        ],
     ],
+
+    'count_type' => [
+        'opening' => 'opening',
+        'closing' => 'closing',
+    ],
+    'count_more' => 'and :more more',
 
     // Step 2.5b: the refusal of a driver that is not switched on (message_key notifications.driver.disabled), and the few
     // lines the Telegram bot answers with (written in the language of the person when it knows them, else in both).

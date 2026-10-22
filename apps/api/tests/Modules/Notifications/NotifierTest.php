@@ -131,7 +131,7 @@ it('does not claim the gate when there is nobody to tell, so the people assigned
 })->group('module:notifications', 'feature');
 
 it('refuses a type that is not in the registry and works only in a resolved branch', function () {
-    expect(fn () => $this->notifier->send(($this->people)(), 'count_submitted', []))->toThrow(UnknownNotificationType::class);
+    expect(fn () => $this->notifier->send(($this->people)(), 'shift_opened', []))->toThrow(UnknownNotificationType::class);
 
     app(CurrentBranch::class)->clear();
     expect(fn () => $this->notifier->send(($this->people)(), 'stock_out', ($this->out)()))->toThrow(BranchNotResolved::class)

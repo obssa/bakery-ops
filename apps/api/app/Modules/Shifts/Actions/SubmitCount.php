@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
+use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Contracts\StockLevel;
 use App\Modules\Inventory\Ledger\Ledger;
@@ -34,7 +35,8 @@ use Carbon\CarbonImmutable;
  * from the movements could include a movement written after it; the locked balance rows cannot), snapshot_at is now, and
  * ledger_movement_id the newest movement of the branch; variance_qty is counted minus expected in exact decimals. Nothing here
  * writes a movement: a count with a variance waits in pending_approval (approval is step 3.3b), one without goes to approved, and
- * at a station that requires an overseer every count first waits in awaiting_cosign (step 3.3c).
+ * at a station that requires an overseer every count first waits in awaiting_cosign (CosignCount, step 3.3c). CountSubmitted is
+ * announced after commit (3.3c); a line for an item deleted since the draft is 409 shifts.count.item_unavailable.
  *
  * Refused, and nothing changed: 409 shifts.count.not_draft (a rejected count), 409 shifts.count.shift_not_ready (the shift is not
  * taking this kind of count: an opening count needs an `opening` shift, a closing count a `counting` one), 409
@@ -55,6 +57,8 @@ final class SubmitCount
         private readonly Stock $stock,
         private readonly Locks $locks,
         private readonly ShiftAnnouncer $announcer,
+        private readonly CountAnnouncer $counts,
+        private readonly Items $items,
     ) {}
 
     /**
@@ -95,6 +99,10 @@ final class SubmitCount
                 }
 
                 $lines = StockCountLine::query()->where('count_id', $c->id)->orderBy('item_id')->get();
+                $deleted = $this->items->deleted(array_values($lines->pluck('item_id')->map(static fn (mixed $id): int => (int) $id)->all()));
+                if ($deleted !== []) {
+                    throw ShiftError::itemUnavailable($deleted);
+                }
                 $this->assertComplete($c, $lines);
 
                 // under the balance locks: the figures the count is measured against
@@ -137,6 +145,7 @@ final class SubmitCount
                 ])->save();
 
                 $this->moveShift($shift, $c, $person);
+                $this->counts->submitted($c);
 
                 return $c;
             }, $count, 'count.submit');
@@ -177,9 +186,17 @@ final class SubmitCount
                 $missing[$line->item_id] = true;
             }
         }
+        $others = [];
         foreach ($this->stock->at($count->location_id) as $level) {
             if (! $level->onHand->isZero() && ! isset($onCount[$level->itemId])) {
-                $missing[$level->itemId] = true;
+                $others[] = $level->itemId;
+            }
+        }
+        // an item deleted from the catalog while it still has stock cannot be counted (it is no longer an item the count may add)
+        $gone = array_flip($this->items->deleted($others));
+        foreach ($others as $itemId) {
+            if (! isset($gone[$itemId])) {
+                $missing[$itemId] = true;
             }
         }
         if ($missing !== []) {

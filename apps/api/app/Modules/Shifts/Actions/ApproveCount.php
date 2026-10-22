@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
+use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Inventory\Contracts\StockLevel;
 use App\Modules\Inventory\Ledger\Ledger;
 use App\Modules\Inventory\Ledger\MovementIntent;
@@ -14,7 +15,6 @@ use App\Modules\Shifts\Counts\VarianceMath;
 use App\Modules\Shifts\Enums\CountDecision;
 use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Enums\ReasonStatus;
-use App\Modules\Shifts\Enums\ShiftStatus;
 use App\Modules\Shifts\Exceptions\ShiftError;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
@@ -45,10 +45,11 @@ use Ramsey\Uuid\Uuid;
  * Locks::previousClosing already carries it). The shift moves to `locked` when it is `pending_approval` and the newest revision of
  * every count it has, opening and closing, is approved (or locked): its last count resolves.
  *
- * Refused: 409 shifts.count.not_pending naming the status (only `pending_approval` is decided; an `awaiting_cosign` count first
- * needs its co-signature, 3.3c; a count that went straight to `approved` has nothing to decide), 409 shifts.count.approve_self (the
+ * Refused: 409 shifts.count.item_unavailable naming the items (a variance line is for an item deleted from the catalog since the
+ * count, which the Ledger cannot lock; reject and count again), 409 shifts.count.not_pending naming the status (only `pending_approval`
+ * is decided; an `awaiting_cosign` count first needs its co-signature, CosignCount; a count that went straight to `approved` has nothing to decide), 409 shifts.count.approve_self (the
  * person who counted never approves their own count, whoever they are, a sole admin included). A count already approved by a
- * decision answers itself and writes nothing, not even an audit row, for anyone who may approve. Needs shifts.approve at the station.
+ * decision answers itself and writes nothing, not even an audit row, for anyone who may approve. VarianceDecided is announced after commit. Needs shifts.approve at the station.
  */
 final class ApproveCount
 {
@@ -57,6 +58,8 @@ final class ApproveCount
         private readonly ShiftAccess $access,
         private readonly Ledger $ledger,
         private readonly ActorContext $actor,
+        private readonly CountAnnouncer $announcer,
+        private readonly Items $items,
     ) {}
 
     /**
@@ -89,6 +92,10 @@ final class ApproveCount
 
                 $lines = StockCountLine::query()->where('count_id', $c->id)->orderBy('item_id')->get();
                 $varying = $lines->filter(static fn (StockCountLine $line): bool => $line->variance_qty instanceof Quantity && ! $line->variance_qty->isZero())->values();
+                $deleted = $this->items->deleted(array_values($varying->pluck('item_id')->map(static fn (mixed $id): int => (int) $id)->all()));
+                if ($deleted !== []) {
+                    throw ShiftError::itemUnavailable($deleted);
+                }
                 $written = $this->adjust($c, $shift, array_values($varying->all()));
 
                 $now = CarbonImmutable::now()->startOfSecond();
@@ -108,7 +115,8 @@ final class ApproveCount
                     'version' => $c->version + 1,
                 ])->save();
 
-                $this->lockShiftWhenResolved($shift, $now);
+                ShiftResolution::lockWhenResolved($shift, $now);
+                $this->announcer->decided($c, count($written));
 
                 return $c;
             }, $count, 'count.approve');
@@ -169,31 +177,5 @@ final class ApproveCount
         }
 
         return $byLine;
-    }
-
-    /** The shift is `locked` once it waits for approval and every count it has, the newest revision of each, is approved. */
-    private function lockShiftWhenResolved(ShiftInstance $shift, CarbonImmutable $now): void
-    {
-        if ($shift->status !== ShiftStatus::PendingApproval) {
-            return;
-        }
-        /** @var array<string, StockCount> $latest */
-        $latest = [];
-        foreach (StockCount::query()->where('shift_instance_id', $shift->id)->orderBy('seq')->orderBy('id')->get() as $row) {
-            $latest[$row->location_id.':'.$row->type->value] = $row;
-        }
-        foreach ($latest as $row) {
-            if (! in_array($row->status, [CountStatus::Approved, CountStatus::Locked], true)) {
-                return;
-            }
-        }
-
-        $to = $shift->status->transitionTo(ShiftStatus::Locked);
-        $shift->forceFill([
-            'status' => $to,
-            'open_key' => $to->openKey(),
-            'locked_at' => $now,
-            'version' => $shift->version + 1,
-        ])->save();
     }
 }

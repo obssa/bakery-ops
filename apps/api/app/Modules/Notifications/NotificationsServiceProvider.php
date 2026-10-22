@@ -11,6 +11,7 @@ use App\Modules\Notifications\Drivers\DriverRegistry;
 use App\Modules\Notifications\Drivers\SentLog;
 use App\Modules\Notifications\Listeners\ClearStockDedupe;
 use App\Modules\Notifications\Listeners\NotifyBatchDone;
+use App\Modules\Notifications\Listeners\NotifyCountSubmitted;
 use App\Modules\Notifications\Listeners\NotifyLineReady;
 use App\Modules\Notifications\Listeners\NotifyLineRejected;
 use App\Modules\Notifications\Listeners\NotifyProductionAssigned;
@@ -19,7 +20,9 @@ use App\Modules\Notifications\Listeners\NotifyStockLow;
 use App\Modules\Notifications\Listeners\NotifyStockOut;
 use App\Modules\Notifications\Listeners\NotifyTransferDecided;
 use App\Modules\Notifications\Listeners\NotifyTransferRequested;
+use App\Modules\Notifications\Listeners\NotifyVarianceDecided;
 use App\Shared\Events\BatchDone;
+use App\Shared\Events\CountSubmitted;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
 use App\Shared\Events\ProductionAssigned;
@@ -29,6 +32,7 @@ use App\Shared\Events\StockOut;
 use App\Shared\Events\StockRecovered;
 use App\Shared\Events\TransferDecided;
 use App\Shared\Events\TransferRequested;
+use App\Shared\Events\VarianceDecided;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -61,6 +65,8 @@ final class NotificationsServiceProvider extends ServiceProvider
         Event::listen(ProductionRequested::class, [NotifyProductionRequested::class, 'handle']);
         Event::listen(ProductionAssigned::class, [NotifyProductionAssigned::class, 'handle']);
         Event::listen(BatchDone::class, [NotifyBatchDone::class, 'handle']);
+        Event::listen(CountSubmitted::class, [NotifyCountSubmitted::class, 'handle']);
+        Event::listen(VarianceDecided::class, [NotifyVarianceDecided::class, 'handle']);
 
         $this->loadRoutesFrom(base_path('routes/modules/notifications.php'));
 

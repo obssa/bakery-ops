@@ -63,6 +63,27 @@ final class ShiftAccess
         }
     }
 
+    /**
+     * May the person co-sign (and, while a count waits for it, reject) a count at the station: the overseer flagged there, or a
+     * holder of shifts.cosign at that station (admin, manager). Whether they counted it themselves is the action's question.
+     */
+    public function mayCosign(int $personId, Station $station): bool
+    {
+        return $this->people->isOverseer($personId, $station) || $this->people->can($personId, 'shifts.cosign', $station);
+    }
+
+    /** Does the person hold the permission at all (any station, no exception)? */
+    public function has(int $personId, string $permission): bool
+    {
+        return $this->people->can($personId, $permission);
+    }
+
+    /** Does the person hold the permission at the station (no exception)? */
+    public function mayAt(int $personId, string $permission, Station $station): bool
+    {
+        return $this->people->can($personId, $permission, $station);
+    }
+
     public function mayManage(int $personId): bool
     {
         return $this->people->can($personId, 'shifts.manage');

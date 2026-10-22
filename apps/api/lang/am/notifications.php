@@ -56,7 +56,41 @@ return [
             'body' => 'ትዕዛዝ #:order_no፣ ጠረጴዛ :table፡ :item ተመልሷል። ምክንያት፡ :reason',
             'body_no_table' => 'ትዕዛዝ #:order_no፡ :item ተመልሷል። ምክንያት፡ :reason',
         ],
+        // ደረጃ 3.3c፡ የገባ ቆጠራ (አገላለጹ ቆጠራው በሚጠብቅበት ደረጃ ይለያያል) እና በእሱ ላይ የተሰጠ ውሳኔ
+        'count_submitted' => [
+            'awaiting_cosign' => [
+                'title' => 'እባክዎ አብረው ይፈርሙ፡ የ:station ቆጠራ',
+                'body_differ' => ':place፣ :type ቆጠራ፡ ከ:lines መስመሮች ውስጥ :varied ይለያያሉ። :items።',
+                'body_match' => ':place፣ :type ቆጠራ፡ ሁሉም :lines መስመሮች ይዛመዳሉ።',
+            ],
+            'pending_approval' => [
+                'title' => 'ማጽደቅ ያስፈልጋል፡ የ:station ቆጠራ',
+                'body_differ' => ':place፣ :type ቆጠራ፡ ከ:lines መስመሮች ውስጥ :varied ይለያያሉ። :items።',
+                'body_match' => ':place፣ :type ቆጠራ፡ ሁሉም :lines መስመሮች ይዛመዳሉ።',
+            ],
+            'done' => [
+                'title' => 'ቆጠራ ገብቷል፡ የ:station ቆጠራ',
+                'body_differ' => ':place፣ :type ቆጠራ፡ ከ:lines መስመሮች ውስጥ :varied ይለያያሉ። :items።',
+                'body_match' => ':place፣ :type ቆጠራ፡ ሁሉም :lines መስመሮች ይዛመዳሉ።',
+            ],
+        ],
+        'variance_decided' => [
+            'approved' => [
+                'title' => 'ቆጠራ ጸድቋል፡ :station',
+                'body' => 'የእርስዎ :type ቆጠራ በ:place ጸድቋል። የተስተካከሉ መስመሮች፡ :adjusted።',
+            ],
+            'rejected' => [
+                'title' => 'ቆጠራ ውድቅ ተደርጓል፡ :station',
+                'body' => 'የእርስዎ :type ቆጠራ በ:place ውድቅ ተደርጓል፡ :note እባክዎ እንደገና ይቁጠሩ።',
+            ],
+        ],
     ],
+
+    'count_type' => [
+        'opening' => 'የመክፈቻ',
+        'closing' => 'የመዝጊያ',
+    ],
+    'count_more' => 'እና ሌሎች :more',
 
     // ደረጃ 2.5b፡ ያልበራ የማሳወቂያ መንገድ ሲጠየቅ የሚሰጥ መልስ፣ እና የቴሌግራም ቦት የሚመልሳቸው አጫጭር መልዕክቶች።
     'driver' => [

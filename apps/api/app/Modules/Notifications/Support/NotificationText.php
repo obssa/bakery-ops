@@ -51,6 +51,14 @@ final class NotificationText
         return match ($type) {
             'line_ready', 'line_rejected' => ["text.{$type}", $this->optional($type, $payload, 'table_code') === null ? 'body_no_table' : 'body'],
             'production_requested' => ['text.production_requested', $this->str($type, $payload, 'reason') === 'stock_out' ? 'body_stock_out' : 'body'],
+            'count_submitted' => [
+                'text.count_submitted.'.match ($this->str($type, $payload, 'status_after')) {
+                    'awaiting_cosign', 'pending_approval' => $this->str($type, $payload, 'status_after'),
+                    default => 'done',
+                },
+                $this->int($type, $payload, 'variance_lines') > 0 ? 'body_differ' : 'body_match',
+            ],
+            'variance_decided' => ['text.variance_decided.'.($this->str($type, $payload, 'decision') === 'rejected' ? 'rejected' : 'approved'), 'body'],
             'transfer_decided' => ['text.transfer_decided.'.($this->str($type, $payload, 'status') === 'rejected' ? 'rejected' : 'confirmed'), 'body'],
             default => ["text.{$type}", 'body'],
         };
@@ -108,8 +116,57 @@ final class NotificationText
                 'unit' => $this->str($type, $p, 'unit'),
                 'station' => $this->str($type, $p, $in('station_name')),
             ],
+            'count_submitted' => [
+                'station' => $this->str($type, $p, $in('station_name')),
+                'place' => $this->str($type, $p, $in('location_name')),
+                'type' => $this->template('count_type.'.$this->str($type, $p, 'type'), $locale),
+                'lines' => (string) $this->int($type, $p, 'lines'),
+                'varied' => (string) $this->int($type, $p, 'variance_lines'),
+                'items' => $this->varianceItems($type, $p, $locale),
+            ],
+            'variance_decided' => [
+                'station' => $this->str($type, $p, $in('station_name')),
+                'place' => $this->str($type, $p, $in('location_name')),
+                'type' => $this->template('count_type.'.$this->str($type, $p, 'type'), $locale),
+                'adjusted' => (string) $this->int($type, $p, 'adjusted_lines'),
+                'note' => $this->optional($type, $p, 'note') ?? '-',
+            ],
             default => throw UnknownNotificationType::named($type),
         };
+    }
+
+    /**
+     * The variance items of a count as one phrase ("Flour -500 g, Sugar +300 g", then "and 3 more" when the event carried fewer
+     * than the count has), in the reader's language. Signed decimal strings without trailing zeros; no float.
+     *
+     * \param  array<string, mixed>  $p
+     */
+    private function varianceItems(string $type, array $p, string $locale): string
+    {
+        $items = $p['items'] ?? [];
+        if (! is_array($items)) {
+            throw MissingPayloadKey::for($type, 'items');
+        }
+        $parts = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                throw MissingPayloadKey::for($type, 'items');
+            }
+            $name = $item['item_name_'.$locale] ?? null;
+            $variance = $item['variance_qty'] ?? null;
+            if (! is_string($name) || ! is_string($variance)) {
+                throw MissingPayloadKey::for($type, 'items');
+            }
+            $unit = $item['unit'] ?? '';
+            $signed = $this->quantity($variance);
+            $parts[] = $name.' '.($signed !== '' && $signed[0] !== '-' ? '+' : '').$this->withUnit($signed, is_string($unit) ? $unit : null);
+        }
+        $more = $this->int($type, $p, 'variance_lines') - count($parts);
+        if ($more > 0) {
+            $parts[] = str_replace(':more', (string) $more, $this->template('count_more', $locale));
+        }
+
+        return implode(', ', $parts);
     }
 
     /** 5.0000 -> 5, 2.5000 -> 2.5, 100 -> 100: strip zeros only after a decimal point, as a string. */

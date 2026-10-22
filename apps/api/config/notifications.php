@@ -123,5 +123,30 @@ return [
             'gate' => null,
             'deep_link' => '/orders/{order_id}',
         ],
+        // Phase 3 (step 3.3c). The severity of count_submitted is `warning` when lines differ and `info` otherwise (the Notifier asks
+        // NotificationTypes::severityFor); the key carries the state the count is in, so the move from awaiting_cosign to
+        // pending_approval is a new line for the people who now decide. A decision opens the screen of the station that counted.
+        'count_submitted' => [
+            'severity' => 'warning',
+            'channels' => ['in_app', 'push', 'telegram'],
+            'inbox_key' => 'count_submitted:{count_id}:{status_after}',
+            'gate' => null,
+            'deep_link' => '/admin/shifts?count={count_id}',
+        ],
+        'variance_decided' => [
+            'severity' => 'info',
+            'channels' => ['in_app', 'push'],
+            'inbox_key' => 'variance_decided:{count_id}:{decision}',
+            'gate' => null,
+            'deep_link' => '/admin/shifts?count={count_id}',
+            'deep_link_by_station' => [
+                'kitchen' => '/kds/kitchen?shift={shift_id}',
+                'bar' => '/kds/bar?shift={shift_id}',
+                'till' => '/till?shift={shift_id}',
+                'cake_room' => '/production?shift={shift_id}',
+                'bakery' => '/production?shift={shift_id}',
+                'store' => '/admin/inventory?shift={shift_id}',
+            ],
+        ],
     ],
 ];

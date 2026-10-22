@@ -82,7 +82,7 @@ final class Notifier
         $row = [
             'branch_id' => $branchId,
             'type' => $type,
-            'severity' => NotificationTypes::severity($type),
+            'severity' => NotificationTypes::severity($type, $payload),
             'title_en' => $rendered->title->en,
             'title_am' => $rendered->title->am,
             'body_en' => $rendered->body->en,

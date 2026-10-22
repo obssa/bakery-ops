@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace App\Modules\Shifts\Http\Controllers;
 
+use App\Modules\Identity\Contracts\People;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Shifts\Actions\ApproveCount;
+use App\Modules\Shifts\Actions\CosignCount;
 use App\Modules\Shifts\Actions\RejectCount;
 use App\Modules\Shifts\Actions\SetCountLines;
 use App\Modules\Shifts\Actions\SubmitCount;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Counts\CountPresenter;
+use App\Modules\Shifts\Counts\CountQueue;
 use App\Modules\Shifts\Counts\CountReads;
 use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Http\Requests\ApproveCountRequest;
+use App\Modules\Shifts\Http\Requests\CosignCountRequest;
+use App\Modules\Shifts\Http\Requests\ListCountsRequest;
 use App\Modules\Shifts\Http\Requests\RejectCountRequest;
 use App\Modules\Shifts\Http\Requests\SetCountLinesRequest;
 use App\Modules\Shifts\Models\ShiftInstance;
@@ -21,6 +26,7 @@ use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Shared\Live\ConditionalPoll;
 use App\Shared\Models\Station;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,13 +42,18 @@ use Symfony\Component\HttpFoundation\Response;
  *   PUT /stock-counts/{count}/lines     200 the Count; 409 shifts.count.not_draft; 422 shifts.count.qty_invalid, item_unknown, reason.unknown
  *   POST /stock-counts/{count}/submit   200 the Count; a repeat answers it; 409 / 422 as SubmitCount says
  *   POST /stock-counts/{count}/approve  200 the Count (step 3.3b; shifts.approve): the adjustments are written, a repeat answers it; 409 as ApproveCount says
- *   POST /stock-counts/{count}/reject   200 the rejected Count plus `recount`, the prefilled draft revision (shifts.approve); 409 / 422 as RejectCount says
+ *   POST /stock-counts/{count}/reject   200 the rejected Count plus `recount`, the prefilled draft revision (the action decides: a co-signer while the count
+ *                                       waits for a co-signature, shifts.approve while it waits for a decision); 409 / 422 as RejectCount says
+ *   POST /stock-counts/{count}/cosign   200 the Count (step 3.3c; the overseer of the station or a shifts.cosign holder, never the counter); 403 / 409 as CosignCount says
+ *   GET  /stock-counts                  200 {data: [CountSummary + station, shift, variance_lines], counts: {awaiting_cosign, pending_approval}, server_time}: the approval
+ *                                       queue of the stations the caller works at; ?status=, ?station_id=, ?mine=1, ?limit=; polled (ETag, 304)
  */
 final class CountsController
 {
     public function __construct(
         private readonly CountPresenter $presenter,
         private readonly ShiftAccess $access,
+        private readonly People $people,
     ) {}
 
     public function forShift(Request $input, ShiftInstance $shift, CountReads $reads): JsonResponse
@@ -50,6 +61,26 @@ final class CountsController
         $this->assertCanRead($shift);
 
         return response()->json(['data' => $this->presenter->many($reads->all($shift))]);
+    }
+
+    public function index(ListCountsRequest $input, CountQueue $queue, Stock $stock): Response
+    {
+        $person = $this->access->person('shifts.view');
+        $stationIds = $this->people->workStationIds($person);
+        $scope = $queue->scope($stationIds, $input->stationId(), $input->mine() ? $person : null);
+
+        // the polled feed: a few cheap numbers say whether anything changed, the ledger included (moved_since reads it) (ADR 0009)
+        $stamp = (clone $scope)->toBase()->selectRaw('count(*) as total, max(updated_at) as moved, coalesce(sum(version), 0) as versions')->first();
+        $etag = ConditionalPoll::etag('shifts.queue', [
+            $person, implode(',', $stationIds), $input->stationId(), $input->status()?->value, $input->mine(), $input->limit(),
+            (int) ($stamp->total ?? 0), (string) ($stamp->moved ?? ''), (int) ($stamp->versions ?? 0), $stock->fingerprint()['last_movement_id'],
+        ]);
+
+        return ConditionalPoll::respond($input, $etag, fn (): array => [
+            'data' => $queue->rows($scope, $input->status(), $input->limit()),
+            'counts' => $queue->totals($scope),
+            'server_time' => CarbonImmutable::now()->toIso8601ZuluString(),
+        ]);
     }
 
     public function show(Request $input, StockCount $count, Stock $stock, Locks $locks): Response
@@ -83,6 +114,11 @@ final class CountsController
     public function approve(ApproveCountRequest $input, StockCount $count, ApproveCount $approve): JsonResponse
     {
         return response()->json($this->presenter->one($approve->handle($count, $input->note())));
+    }
+
+    public function cosign(CosignCountRequest $input, StockCount $count, CosignCount $cosign): JsonResponse
+    {
+        return response()->json($this->presenter->one($cosign->handle($count, $input->note())));
     }
 
     public function reject(RejectCountRequest $input, StockCount $count, RejectCount $reject): JsonResponse

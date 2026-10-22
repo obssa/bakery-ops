@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
+use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Shifts\Counts\CountLock;
 use App\Modules\Shifts\Counts\DraftBuilder;
 use App\Modules\Shifts\Enums\CountDecision;
@@ -42,8 +43,9 @@ use Illuminate\Validation\ValidationException;
  *
  * Refused: 409 shifts.count.not_pending naming the status (a count waiting for a decision, `pending_approval`, or for a co-signature,
  * `awaiting_cosign`, is rejected), 422 validation.failed for a line that is not on the count. A count already rejected answers itself
- * and its recount and writes nothing. Needs shifts.approve at the station; the person who counted may reject their own count (it is a
- * recount, not a decision on stock).
+ * and its recount and writes nothing. The route asks for shifts.view; the action decides (assertMayReject): a co-signer rejects while the count waits for a co-signature, shifts.approve
+ * while it waits for a decision. The person who counted may reject their own count (it is a recount, not a decision on stock). VarianceDecided is
+ * announced after commit. A line for an item deleted from the catalog is not copied into the recount.
  */
 final class RejectCount
 {
@@ -51,6 +53,8 @@ final class RejectCount
         private readonly AuditedAction $audit,
         private readonly ShiftAccess $access,
         private readonly ActorContext $actor,
+        private readonly CountAnnouncer $announcer,
+        private readonly Items $items,
     ) {}
 
     /**
@@ -62,15 +66,20 @@ final class RejectCount
      */
     public function handle(StockCount $count, string $note, ?array $lineIds = null): array
     {
-        $person = $this->access->person('shifts.approve');
+        $person = $this->access->person('shifts.view');
+        if ($count->status === CountStatus::PendingApproval && ! $this->access->has($person, 'shifts.approve')) {
+            throw ShiftError::forbidden();
+        }
         $shift = ShiftInstance::query()->findOrFail($count->shift_instance_id);
-        $this->access->assertAt($person, 'shifts.approve', Station::query()->withTrashed()->findOrFail($shift->station_id));
+        $station = Station::query()->withTrashed()->findOrFail($shift->station_id);
+        $this->access->assertAt($person, 'shifts.view', $station);
         if ($count->status === CountStatus::Rejected) {
             return [$count, $this->recountOf($count)];
         }
+        $this->assertMayReject($person, $station, $count->status);
 
         try {
-            return $this->audit->run(function (StockCount $c) use ($person, $shift, $note, $lineIds): array {
+            return $this->audit->run(function (StockCount $c) use ($person, $shift, $station, $note, $lineIds): array {
                 CountLock::refresh($c);
                 if ($c->status === CountStatus::Rejected) {
                     throw AlreadyReached::here();
@@ -78,6 +87,7 @@ final class RejectCount
                 if (! in_array($c->status, [CountStatus::PendingApproval, CountStatus::AwaitingCosign], true)) {
                     throw ShiftError::countNotPending($c->status->value);
                 }
+                $this->assertMayReject($person, $station, $c->status);
                 ShiftLock::refresh($shift);
 
                 $lines = StockCountLine::query()->where('count_id', $c->id)->orderBy('item_id')->get();
@@ -107,6 +117,7 @@ final class RejectCount
                 ])->save();
 
                 $this->sendShiftBack($shift, $c);
+                $this->announcer->decided($c, 0, $recount);
 
                 return [$c, $recount];
             }, $count, 'count.reject');
@@ -114,6 +125,23 @@ final class RejectCount
             $fresh = StockCount::query()->findOrFail($count->id);
 
             return [$fresh, $this->recountOf($fresh)];
+        }
+    }
+
+    /**
+     * Who may reject depends on where the count waits: a count that waits for a co-signature is rejected by whoever may co-sign it
+     * (the overseer of the station, an admin, a manager; 403 shifts.count.cosign_forbidden), one that waits for a decision by
+     * shifts.approve (403 auth.forbidden). A count in any other state is refused by the caller as not pending, for anyone who can see it.
+     *
+     * @throws ShiftError
+     */
+    private function assertMayReject(int $person, Station $station, CountStatus $status): void
+    {
+        if ($status === CountStatus::AwaitingCosign && ! $this->access->mayCosign($person, $station)) {
+            throw ShiftError::cosignForbidden();
+        }
+        if ($status === CountStatus::PendingApproval && ! $this->access->mayAt($person, 'shifts.approve', $station)) {
+            throw ShiftError::forbidden();
         }
     }
 
@@ -186,8 +214,12 @@ final class RejectCount
             'version' => 1,
         ])->save();
 
+        $gone = array_flip($this->items->deleted(array_map(static fn (StockCountLine $l): int => $l->item_id, $lines)));
         $rows = [];
         foreach ($lines as $line) {
+            if (isset($gone[$line->item_id])) {
+                continue; // deleted from the catalog since: the recount is counted without it
+            }
             $rows[] = [
                 'branch_id' => $rejected->branch_id,
                 'count_id' => $recount->id,

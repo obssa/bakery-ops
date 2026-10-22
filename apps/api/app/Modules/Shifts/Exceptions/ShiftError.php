@@ -200,6 +200,34 @@ final class ShiftError extends RuntimeException
         return new self('shifts.count.approve_self', 409);
     }
 
+    /** Only a co-signer (the overseer flagged at the station, or a holder of shifts.cosign) co-signs or rejects a count that waits for one. */
+    public static function cosignForbidden(): self
+    {
+        return new self('shifts.count.cosign_forbidden', 403);
+    }
+
+    /** The person who counted never co-signs their own count. */
+    public static function cosignSelf(): self
+    {
+        return new self('shifts.count.cosign_self', 409);
+    }
+
+    /** A co-signature is asked of a count that does not wait for one. */
+    public static function notAwaitingCosign(string $status): self
+    {
+        return new self('shifts.count.not_awaiting_cosign', 409, ['status' => $status]);
+    }
+
+    /**
+     * A line of the count is for an item that was deleted from the catalog since the count was drafted, so the Ledger cannot lock it.
+     *
+     * @param  list<int>  $itemIds
+     */
+    public static function itemUnavailable(array $itemIds): self
+    {
+        return new self('shifts.count.item_unavailable', 409, ['item_ids' => $itemIds]);
+    }
+
     /** The reason does not exist in the branch, or is switched off. */
     public static function reasonUnknown(int $reasonId): self
     {

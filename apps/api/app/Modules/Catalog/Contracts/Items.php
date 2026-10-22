@@ -84,6 +84,23 @@ final class Items
         return $summaries;
     }
 
+    /**
+     * The ids among $ids that are soft-deleted (step 3.3c; Shifts asks before a count's lines are locked in the Ledger, which only
+     * takes live items). Unknown ids and another branch's are not reported.
+     *
+     * @param  list<int>  $ids
+     * @return list<int> ascending
+     */
+    public function deleted(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $found = Item::query()->onlyTrashed()->whereKey(array_values(array_unique($ids)))->orderBy('id')->pluck('id')->all();
+
+        return array_values(array_map('intval', $found));
+    }
+
     public function kind(Item|int $item): ItemKind
     {
         return $this->item($item)->kind;

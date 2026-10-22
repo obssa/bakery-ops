@@ -45,6 +45,10 @@ return [
         'shift_not_ready' => 'This shift is not taking this count right now.',
         'not_pending' => 'This count is not waiting for a decision.',
         'approve_self' => 'You counted this yourself, so someone else must approve it. You can reject it and count again.',
+        'cosign_forbidden' => 'You cannot co-sign this count. Only the overseer of this station, an admin or a manager can.',
+        'cosign_self' => 'You counted this yourself, so someone else must co-sign it. You can reject it and count again.',
+        'not_awaiting_cosign' => 'This count is not waiting for a co-signature.',
+        'item_unavailable' => 'An item on this count was removed from the catalog. Reject the count and count again without it.',
     ],
     'reason' => [
         'unknown' => 'This reason does not exist or is switched off.',

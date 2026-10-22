@@ -51,6 +51,7 @@ beforeEach(function () {
 
 it('moves a count with a variance to pending approval when the station overseer co-signs it', function () {
     ($this->submitShort)();
+    $version = ($this->row)()->version;
     $this->travelTo(CarbonImmutable::parse('2026-11-02 12:10:00', 'UTC'));
 
     $this->f->cosign($this->overseer, $this->count, ['note' => 'Saw the sacks'])->assertOk()
@@ -63,7 +64,7 @@ it('moves a count with a variance to pending approval when the station overseer 
     expect($row->status)->toBe(CountStatus::PendingApproval)
         ->and($row->cosigned_by_user_id)->toBe($this->overseer->id)
         ->and($row->cosigned_at?->toIso8601String())->toBe('2026-11-02T12:10:00+00:00')
-        ->and($row->version)->toBe(3, 'draft, submitted, co-signed')
+        ->and($row->version)->toBe($version + 1, 'the co-signature moves the version once')
         ->and(($this->adjustments)())->toBe(0, 'a co-signature writes no stock');
     $audit = AuditLog::query()->where('action', 'count.cosign')->sole();
     expect($audit->user_id)->toBe($this->overseer->id)
@@ -180,11 +181,12 @@ it('answers a repeat by the same co-signer with the count and writes nothing aga
     ($this->submitShort)();
     $this->f->cosign($this->overseer, $this->count)->assertOk();
     $audit = AuditLog::query()->where('action', 'count.cosign')->count();
+    $version = ($this->row)()->version;
 
     $this->f->cosign($this->overseer, $this->count)->assertOk()->assertJsonPath('status', 'pending_approval')->assertJsonPath('cosigned_by.id', $this->overseer->id);
 
     expect(AuditLog::query()->where('action', 'count.cosign')->count())->toBe($audit)
-        ->and(($this->row)()->version)->toBe(3);
+        ->and(($this->row)()->version)->toBe($version);
 });
 
 it('refuses a second person once the count has been co-signed', function () {

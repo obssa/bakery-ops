@@ -27,8 +27,20 @@ final class NotificationTypes
         return array_key_exists($type, self::registry());
     }
 
-    public static function severity(string $type): string
+    /**
+     * The severity of the type; for the two Phase 3 types the payload decides: a count with lines that differ and a rejection are
+     * `warning` (somebody must act), a count that matches and an approval are `info`.
+     *
+     * \param  array<string, mixed>  $payload
+     */
+    public static function severity(string $type, array $payload = []): string
     {
+        if ($type === 'count_submitted' && $payload !== []) {
+            return (int) ($payload['variance_lines'] ?? 0) > 0 ? 'warning' : 'info';
+        }
+        if ($type === 'variance_decided' && $payload !== []) {
+            return ($payload['decision'] ?? null) === 'rejected' ? 'warning' : 'info';
+        }
         $severity = self::entry($type)['severity'] ?? null;
 
         return is_string($severity) ? $severity : 'info';
@@ -81,6 +93,12 @@ final class NotificationTypes
      */
     public static function deepLink(string $type, array $payload): string
     {
+        $byStation = self::entry($type)['deep_link_by_station'] ?? null;
+        $code = $payload['station_code'] ?? null;
+        if (is_array($byStation) && is_string($code) && is_string($byStation[$code] ?? null)) {
+            return self::expand($type, $byStation[$code], $payload);
+        }
+
         return self::expand($type, (string) (self::entry($type)['deep_link'] ?? '/'), $payload);
     }
 

@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Route;
  * who may cancel depends on the shift (the admin, or the person who started it while it is opening), which the action decides
  * (403 shifts.cancel.forbidden). Step 3.3a adds the counts: shifts.view reads the summary, the counts and the variance reasons (the
  * action checks the station), shifts.count closes the shift and works a count (it checks the station too), shifts.manage keeps the
- * variance reasons. Step 3.3b adds approve and reject (shifts.approve). {count} and {reason} bind through the BranchScoped models. Cash, notes, handover and replay come with the later steps.
+ * variance reasons. Step 3.3b adds approve and reject (shifts.approve); step 3.3c adds cosign and the queue, and the reject moves to shifts.view with the action deciding. {count} and {reason} bind through the BranchScoped models. Cash, notes, handover and replay come with the later steps.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:shifts.view')->group(function (): void {
@@ -30,6 +30,7 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/stations/{station}/shifts/current', [StationShiftsController::class, 'current'])->whereNumber('station')->name('shifts.current');
         Route::get('/shifts/{shift}/summary', [ShiftsController::class, 'summary'])->whereNumber('shift')->name('shifts.summary');
         Route::get('/shifts/{shift}/counts', [CountsController::class, 'forShift'])->whereNumber('shift')->name('shifts.counts.index');
+        Route::get('/stock-counts', [CountsController::class, 'index'])->name('shifts.counts.queue');
         Route::get('/stock-counts/{count}', [CountsController::class, 'show'])->whereNumber('count')->name('shifts.counts.show');
         Route::get('/variance-reasons', [VarianceReasonsController::class, 'index'])->name('shifts.reasons.index');
     });
@@ -58,9 +59,16 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::post('/stock-counts/{count}/submit', [CountsController::class, 'submit'])->whereNumber('count')->name('shifts.counts.submit');
     });
 
-    // Step 3.3b: shifts.approve (admin, manager) decides a count; that the person who counted cannot approve it is the action's rule
+    // Step 3.3b: shifts.approve (admin, manager) approves a count; that the person who counted cannot approve it is the action's rule
     Route::middleware(['permission:shifts.approve', 'idempotency'])->group(function (): void {
         Route::post('/stock-counts/{count}/approve', [CountsController::class, 'approve'])->whereNumber('count')->name('shifts.counts.approve');
+    });
+
+    // Step 3.3c: co-signing is the overseer's of the station or a shifts.cosign holder's, and the reject belongs to the co-signer while a
+    // count waits for a co-signature and to shifts.approve while it waits for a decision, so both ask only for shifts.view here and the
+    // action decides (403 shifts.count.cosign_forbidden / auth.forbidden)
+    Route::middleware(['permission:shifts.view', 'idempotency'])->group(function (): void {
+        Route::post('/stock-counts/{count}/cosign', [CountsController::class, 'cosign'])->whereNumber('count')->name('shifts.counts.cosign');
         Route::post('/stock-counts/{count}/reject', [CountsController::class, 'reject'])->whereNumber('count')->name('shifts.counts.reject');
     });
 });
