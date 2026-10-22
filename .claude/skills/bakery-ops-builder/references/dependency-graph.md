@@ -22,7 +22,7 @@ L5  Orders         → Inventory, Catalog, Identity, Shared, Audit          (Pay
     Production     → Inventory, Catalog, Identity, Shared, Audit          (Notifications: events; Shifts: interfaces)
     Notifications  → Identity, Shared                                      (inbound: events only)
 L6  Payments       → Orders, Identity, Shared(Files), Audit
-    Shifts         → Inventory, Identity, Payments(read), Catalog, Shared, Audit
+    Shifts         → Inventory, Identity, Payments(read), Orders(read: openAt), Catalog, Shared, Audit
 L7  Analytics      → read-only Facts ports of Orders, Payments, Production, Inventory, Shifts, Catalog
 ```
 
@@ -59,7 +59,8 @@ These are the contract surfaces. Expose each as a final service class (or interf
 | Notifications | Identity | recipients by role / station, `StationPresenceResolver`, user locale |
 | Shifts | Inventory | `Stock::balanceAt(location, now)`, `Ledger::append(count_adjustment)`, movements by `shift_instance_id` |
 | Shifts | Identity | `canCount`, `isOverseer`, roster users, `can('shifts.approve')` |
-| Shifts | Payments | `Totals::cash(shift)`, `Totals::byChannel(shift)` |
+| Shifts | Payments | `Totals::cash(shift)` (keyed on the payment's own shift), `Totals::byChannel(shift)` |
+| Shifts | Orders | `Orders::openAt(station, time)` for the replay |
 | Analytics | all | provider-owned `Facts` query classes only; listens to `ShiftLocked` |
 
 ## Frontend surfaces and what they consume

@@ -127,7 +127,8 @@
       "contracts_required": [
         "shifts->inventory",
         "shifts->identity",
-        "shifts->payments"
+        "shifts->payments",
+        "shifts->orders"
       ],
       "modules": {
         "contracts": "todo",

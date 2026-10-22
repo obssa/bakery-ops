@@ -442,6 +442,7 @@
         "inventory",
         "identity",
         "payments",
+        "orders",
         "catalog",
         "shared",
         "audit"
@@ -450,23 +451,29 @@
         "inventory": [
           "Stock::balanceAt(location, now) for expected closing",
           "Ledger::append(count_adjustment)",
-          "movements by shift_instance_id for review summary"
+          "movements by shift_instance_id for review summary",
+          "Stock::shiftSummary(shift), Stock::netChangeSince(location, afterMovementId, exclude), Locations::stockLocationsOf(station) / cashDrawerOf(station)"
         ],
         "identity": [
           "canCount",
           "isOverseer",
           "roster users",
-          "can('shifts.approve')"
+          "can('shifts.approve')",
+          "Stations::workStationFor, ResolveActor stamps station and shift through Shared OpenShifts, People::attachShift, shifts.view / shifts.manage / shifts.replay"
         ],
         "payments": [
-          "Totals::cash(shift)",
+          "Totals::cash(shift) keyed on the payment's own shift_instance_id",
           "Totals::byChannel(shift)"
         ],
+        "orders": [
+          "Orders::openAt(station, time) for the replay (read through Orders\\Contracts only)"
+        ],
         "catalog": [
-          "items held at a location type"
+          "item names and units for the lines of a count (the lines themselves come from the ledger, not from Catalog)"
         ],
         "shared": [
-          "writes ActorContext.shift_instance_id via middleware"
+          "writes ActorContext.shift_instance_id via middleware",
+          "OpenShifts (interface, default NoOpenShifts) rebound by Shifts"
         ]
       },
       "provides": [
@@ -739,7 +746,14 @@
       "file": "apps/api/tests/Contract/Shifts/InventoryContractTest.php",
       "cases": [
         "balanceAt(location, t) equals the sum of movements with created_at <= t",
-        "Ledger::append accepts count_adjustment with ref_type=stock_count_line"
+        "Ledger::append accepts count_adjustment with ref_type=stock_count_line",
+        "Stock::locationAt / itemAt, a movement at exactly t counts, an uncommitted one is invisible",
+        "appendMany of count adjustments is all-or-nothing; an over-large negative adjustment is refused whole (inventory.stock.insufficient)",
+        "an adjustment carries the shift of the ActorContext stamp (ADR 0013)",
+        "Ledger::lock(pairs) snapshot equals balanceAt(now)",
+        "Stock::shiftSummary(shiftId) and Stock::netChangeSince(location, afterMovementId, exclude)",
+        "Locations::stockLocationsOf(station) and cashDrawerOf(station) as plain views",
+        "ledger.require_shift_for_station_locations: refusal inventory.shift.required, exemptions, the two ways of being covered, flag off never consults OpenShifts (step 3.1b)"
       ]
     },
     "shifts->identity": {
@@ -747,15 +761,22 @@
       "file": "apps/api/tests/Contract/Shifts/IdentityContractTest.php",
       "cases": [
         "canCount and isOverseer per station",
-        "StationPresenceResolver can be rebound to the Shifts implementation and the Production contract still passes"
+        "StationPresenceResolver can be rebound to the Shifts implementation and the Production contract still passes",
+        "can('shifts.count' | 'shifts.approve' | 'shifts.unlock') per role and station; the overseer co-sign rule",
+        "shifts.view, shifts.manage, shifts.replay held by the default roles only",
+        "Stations::workStationFor(user, header)",
+        "ResolveActor stamps station and shift through OpenShifts; People::attachShift stamps ActorContext; GET /me work_stations",
+        "ShiftAttacher under NullShiftAttacher answers null; other-branch and inactive users never appear in presence answers"
       ]
     },
     "shifts->payments": {
       "phase": 3,
       "file": "apps/api/tests/Contract/Shifts/PaymentsContractTest.php",
       "cases": [
-        "Totals::cash(shift) sums only non-voided cash payments whose order carries that shift",
-        "Totals::byChannel(shift) counts and sums per channel"
+        "Totals::cash(shift) sums only non-voided cash payments whose own shift_instance_id is that shift (a payment is keyed on the shift it was taken in, not on its order's)",
+        "Totals::byChannel(shift) counts and sums per channel",
+        "other channels, shifts, voided payments and branches are left out; amount is summed, not tendered or change",
+        "Payments::record stamps the actor's shift"
       ]
     },
     "analytics->facts": {
@@ -764,6 +785,17 @@
       "cases": [
         "every Facts port returns stable shapes bucketed by Africa/Addis_Ababa day",
         "facts exclude voided payments and cancelled orders"
+      ]
+    },
+    "shifts->orders": {
+      "phase": 3,
+      "file": "apps/api/tests/Contract/Shifts/OrdersContractTest.php",
+      "cases": [
+        "Orders::openAt(station, t) reads the timeline, never the current status",
+        "a paid but not yet closed order is open",
+        "lines carry the status of their last line.* event at or before t, for the asked station only",
+        "oldest sent first, then by order id",
+        "another branch's orders are never seen"
       ]
     }
   },
@@ -1076,18 +1108,19 @@
       "entry": [
         "gate-p2 green on main",
         "phase-3-plan.md approved",
-        "contract:shifts->* green with no Shifts code yet"
+        "contract:shifts->* green with no Shifts code yet (the cases of the ledger enforcement, step 3.1b, are skipped until it lands)"
       ],
       "contracts_required": [
         "shifts->inventory",
         "shifts->identity",
-        "shifts->payments"
+        "shifts->payments",
+        "shifts->orders"
       ],
       "steps": [
         {
           "id": "3.1",
           "module": "contracts",
-          "builds": "tests/Contract/Shifts/{Inventory,Identity,Payments}ContractTest.php"
+          "builds": "tests/Contract/Shifts/{Inventory,Identity,Payments,Orders}ContractTest.php"
         },
         {
           "id": "3.2",

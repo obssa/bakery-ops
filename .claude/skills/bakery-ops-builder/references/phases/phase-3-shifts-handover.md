@@ -7,13 +7,13 @@ presence resolution for production).
 
 ## Entry criteria (`gate_check.py --mode entry --phase 3`)
 - `gate-p2` green on `main`; plan approved.
-- `contract:shifts->inventory|identity|payments` green with no Shifts code yet.
+- `contract:shifts->inventory|identity|payments|orders` green with no Shifts code yet.
 
 ## Scope in build order
 
 | Step | Module | Builds | Consumes | Groups |
 |---|---|---|---|---|
-| 3.1 | contracts | `tests/Contract/Shifts/{Inventory,Identity,Payments}ContractTest.php` | | `contract:shifts->*` |
+| 3.1 | contracts | `tests/Contract/Shifts/{Inventory,Identity,Payments,Orders}ContractTest.php` | | `contract:shifts->*` |
 | 3.2 | shifts.instances | `shift_templates`, `shift_instances` (`date` = local start date for cross-midnight), `shift_roster`, state machine, `Shifts::current(station)`, ActorContext middleware filling `shift_instance_id`, `openAdHoc`, rebind `StationPresenceResolver` / `ShiftAttacher` to Shifts, flip `ledger.require_shift_for_station_locations=true`, update Phase 0–2 seeds to open shifts for every station the earlier e2e touches | Identity, Shared | `module:shifts`, `unit` |
 | 3.3 | shifts.counts | `stock_counts`, `stock_count_lines`; opening expected = previous locked closing; closing expected = `balanceAt(now)`; bilingual `variance_reasons`; lines immutable after submit; approve → `count_adjustment` movement; reject → recount with both attempts kept; overseer co-sign | Inventory, Identity | `feature` |
 | 3.4 | shifts.locks | `payload_hash`, `previous_hash` per `(branch, location)`; canonical JSON; DB trigger forbids UPDATE on locked rows except `superseded_by_id`; admin unlock creates a new version; `HashChain::verify` | Audit | `invariants`, `unit` |
@@ -27,8 +27,9 @@ presence resolution for production).
   `Ledger::append` accepts `count_adjustment` with `ref_type=stock_count_line`.
 - Identity: `canCount`, `isOverseer` per station; `StationPresenceResolver` can be rebound to the Shifts
   implementation and the Production contract still passes.
-- Payments: `Totals::cash(shift)` sums only non-voided cash payments whose order carries that shift;
+- Payments: `Totals::cash(shift)` sums only non-voided cash payments carrying that shift themselves (the money enters the drawer when the payment is taken, so the key is the payment's own `shift_instance_id`, not its order's);
   `Totals::byChannel(shift)` counts and sums per channel.
+- Orders: `Orders::openAt(station, t)` reads the timeline, never the current status (the replay of 3.6 builds on it).
 
 ## Functional tests
 Instance state machine exhaustive; `Shifts::current` with overlapping templates; middleware fills
