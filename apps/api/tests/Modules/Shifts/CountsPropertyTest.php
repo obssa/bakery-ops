@@ -14,6 +14,7 @@ use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Shared\Models\Branch;
 use Brick\Math\BigDecimal;
+use Brick\Math\RoundingMode;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -80,7 +81,7 @@ it('keeps counted minus expected exact and at most one unresolved count per plac
                 $f->stock($item, $place, $qty);
                 $note .= "stock in {$qty}";
             } else {
-                $qty = (string) $onHand->multipliedBy($rng->getInt(1, 100))->dividedBy(100, 4);
+                $qty = (string) $onHand->multipliedBy($rng->getInt(1, 100))->dividedBy(100, 4, RoundingMode::Down);
                 $f->stock($item, $place, '-'.$qty, MovementReason::Waste);
                 $note .= "waste {$qty}";
             }
