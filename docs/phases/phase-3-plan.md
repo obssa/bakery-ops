@@ -720,6 +720,48 @@ live ledger in a state where a shift can be opened only through the API.
      commit order is the proof: first commit turns the flag on in `compose.ci.yml` and in `enforced-gates` and the earlier
      e2e and gate jobs go red on the PR (listed in the PR description), then the fixtures turn them green; the PR merges only
      when everything is green. Ends with `shifts.instances: done` in STATUS.
+   - **As built (step 3.2a, `phase-3/shifts-schema`).** Commits: tests first (`ShiftWindowTest`, `ShiftStatusTest`, `ShiftsSchemaTest`,
+     `ShiftStampForeignKeysTest` and the Shifts arch rules, red: the classes and tables did not exist), then the code (ADR 0013
+     proposed, migrations 3 to 7, `ShiftStatus` and its siblings, `ShiftWindow`, `TemplateWindow`, `LocalClock`, models, factories,
+     `ShiftsServiceProvider`), then ERD, STATUS (`shifts.instances` in progress) and this note. Where the build settled what the
+     plan left open:
+     - **No engine-specific DDL for the unique keys.** "At most one running shift per station" is the plain unique key
+       `(station_id, open_key)` of section 3 (ADR 0011's technique), the same on MariaDB and PostgreSQL, so there is no generated
+       column and no partial index in these migrations. The one engine branch is migration 7: on PostgreSQL it adds an index on
+       `shift_instance_id` where none starts with the column (MariaDB creates it with the foreign key). It looks the existing
+       keys up with `Schema::getForeignKeys`, so a rerun is a no-op.
+     - **Names the plan did not fix.** Migration files are `2026_10_24_110100` to `110500`. The actor station column on
+       `shift_templates` and `shift_instances` is `actor_station_id` (the plan's "where `station_id` already means something
+       else"; `shift_instances.station_id` is the shift's own station). The unique keys are named `shift_instances_one_running_per_station`,
+       `shift_instances_slot_unique`, `shift_instances_client_uuid_unique`, `shift_template_stations_pair_unique`,
+       `shift_roster_person_unique`; the CHECKs are `shift_templates_days_mask_check`, `shift_templates_window_check`,
+       `shift_instances_{status,origin,opening_mode,sequence,slot_key,open_key,locked_at,cancelled_at,opened_at}_check` and
+       `shift_roster_{source,left}_check`.
+     - **Two small CHECKs beyond the plan's list:** `sequence >= 1`, and `open_key` is NULL or 1 (not just "in step with the
+       status"), so a stray key value cannot slip past the unique key.
+     - **Migration 7 covers the 14 tables the plan names and `shift_roster.shift_instance_id` is its own parent key** (made with
+       the table, NOT NULL), so `ShiftStampForeignKeysTest` skips it when it asks "nullable and has a key". It also asserts the
+       key exists on every table found in `information_schema`, so a table of a later step cannot forget it.
+     - **Pure time logic.** `TemplateWindow` (id, `start_time`, `end_time`, `days_mask`; refuses equal times, a mask outside 1 to
+       127 and a malformed time; reads `HH:MM:SS` as the database gives it) is the value `ShiftWindow` works on, so the
+       pure code never sees a model. `ShiftWindow::containing($instant, $templates)` answers the best window or null,
+       `matching()` every window newest start first (ties: lower id), `forDate($template, $date)` the window of a scheduled
+       instance, `adHocDate($instant)` the local date of an ad-hoc shift. `LocalClock` is `final readonly` and takes a timezone
+       name (default `Africa/Addis_Ababa`, the branch's `timezone` once 3.2b reads it), so a branch in another zone needs no
+       change. "A running shift wins" over a later start (the section 10.2 table, last overlap row) is not decided here: it
+       needs the database, so 3.2b's `Shifts::start` picks among `matching()` with it.
+     - **Enums.** `ShiftStatus` (with `isRunning`, `openKey`, `hasOpened`, which the CHECKs repeat), `ShiftOrigin`,
+       `ShiftOpeningMode`, `RosterSource`. `ShiftInstance` and `ShiftRoster` have an empty `$fillable` (written by the actions,
+       like `ProductionBatch`); `ShiftTemplate` and `ShiftTemplateStation` are fillable for the 3.2b endpoints.
+     - **Arch.** The "downward only" matrix gained `Orders` for Shifts (the plan lists `Orders\Contracts` among its allowed
+       uses). The new rules, group `module:shifts`: Shifts uses Inventory, Identity, Payments, Orders, Catalog and Audit through
+       their Contracts (and the three Ledger vocabulary classes of Inventory) only, reaches no Production, Notifications or
+       Analytics, and nothing but Analytics (and not Shared) imports Shifts. `ShiftInstance` is allow-listed in `SoftDeletesTest`.
+     - **Tests beyond the list:** `ShiftModelsTest` (every status from the factories satisfies the CHECKs, the on-duty
+       reading, soft deletes). The unique-key tests start from `Schema::hasTable`, so a missing table cannot pass as a refusal.
+       Local runs: `tests/Unit/Shifts`, `tests/Modules/Shifts`, `StateMachineExhaustiveTest`, groups `arch` and `invariants`; CI ran the rest.
+     - ADR 0013 is `proposed`; STATUS keeps `adrs` empty until the gate report accepts it. The provider is registered and does
+       nothing: no binding, no route, no listener. Every default of Phases 0 to 2 is unchanged.
 3. **3.3 shifts.counts** (groups `module:shifts`, `unit`, `feature`, `property`, `concurrency`; STATUS `shifts.counts`), three PRs:
    - **3.3a `phase-3/counts-core`**: migrations 8-10 (with the lines' freeze triggers and `DefaultVarianceReasons`, the backfill for
      existing branches), `CountStatus` and its exhaustive table (`draft -> awaiting_cosign | pending_approval | approved`,
