@@ -20,7 +20,7 @@ $allowed = [
     'Production' => ['Inventory', 'Catalog', 'Identity', 'Audit'],
     'Notifications' => ['Identity', 'Audit'],
     'Payments' => ['Orders', 'Identity', 'Audit'],
-    'Shifts' => ['Inventory', 'Identity', 'Payments', 'Catalog', 'Audit'],
+    'Shifts' => ['Inventory', 'Identity', 'Payments', 'Orders', 'Catalog', 'Audit'],
     'Analytics' => ['Orders', 'Payments', 'Production', 'Inventory', 'Shifts', 'Catalog'],
 ];
 
@@ -160,3 +160,52 @@ arch('Production never reaches Notifications (it emits events, Notifications lis
     ->expect('App\Modules\Production')
     ->not->toUse(['App\Modules\Notifications', 'App\Modules\Shifts'])
     ->group('arch', 'module:production');
+
+/*
+ * Shifts (step 3.2a) reaches the modules below it through their Contracts only; the Inventory exception is the three Ledger
+ * classes that name a stock change (Ledger, MovementIntent, MovementReason: the count adjustment of 3.3b). Nothing imports
+ * Shifts but Analytics: the rest of the system reaches it through Shared's OpenShifts, which Shifts binds in its own
+ * provider (3.2b), never the other way round.
+ */
+arch('Shifts uses Inventory through its Contracts and the Ledger vocabulary (Ledger, MovementIntent, MovementReason) only, never a model, balance, movement or reader')
+    ->expect('App\Modules\Shifts')
+    ->not->toUse(array_merge(
+        $providerInternals('Inventory', ['Ledger', 'MovementIntent', 'MovementReason']),
+        ['App\Modules\Inventory\Ledger\StockBalance', 'App\Modules\Inventory\Ledger\StockMovement', 'App\Modules\Inventory\Models'],
+    ))
+    ->group('arch', 'module:shifts');
+
+arch('Shifts uses Identity through its Contracts only, never its models, resolvers, support or HTTP layer')
+    ->expect('App\Modules\Shifts')
+    ->not->toUse($providerInternals('Identity'))
+    ->group('arch', 'module:shifts');
+
+arch('Shifts uses Payments through its Contracts only (Totals), never its models, actions, support or HTTP layer')
+    ->expect('App\Modules\Shifts')
+    ->not->toUse($providerInternals('Payments'))
+    ->group('arch', 'module:shifts');
+
+arch('Shifts uses Orders through its Contracts only, never its models, actions, support, enums or HTTP layer')
+    ->expect('App\Modules\Shifts')
+    ->not->toUse($providerInternals('Orders'))
+    ->group('arch', 'module:shifts');
+
+arch('Shifts uses Catalog through its Contracts only, never its models, services, support or HTTP layer')
+    ->expect('App\Modules\Shifts')
+    ->not->toUse($providerInternals('Catalog'))
+    ->group('arch', 'module:shifts');
+
+arch('Shifts uses Audit through its Contracts only, never the audit models or the snapshot')
+    ->expect('App\Modules\Shifts')
+    ->not->toUse($providerInternals('Audit'))
+    ->group('arch', 'module:shifts');
+
+arch('Shifts never reaches Production, Notifications or Analytics (they listen to events; Shifts raises them)')
+    ->expect('App\Modules\Shifts')
+    ->not->toUse(['App\Modules\Production', 'App\Modules\Notifications', 'App\Modules\Analytics'])
+    ->group('arch', 'module:shifts');
+
+arch('no module but Analytics imports Shifts, and Shared never does: the ledger asks the OpenShifts of Shared, which Shifts binds')
+    ->expect(['App\Modules\Identity', 'App\Modules\Catalog', 'App\Modules\Inventory', 'App\Modules\Orders', 'App\Modules\Payments', 'App\Modules\Production', 'App\Modules\Notifications', 'App\Modules\Audit', 'App\Shared'])
+    ->not->toUse('App\Modules\Shifts')
+    ->group('arch', 'module:shifts');
