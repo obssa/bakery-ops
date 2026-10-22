@@ -200,6 +200,19 @@ jobs:
     uses: ./.github/workflows/module-tests.yml
     with: { module: shifts, groups: "module:shifts" }
 
+  # The enforcement rehearsal (phase-3-plan.md 10.1): the Phase 0-2 exit-gate tests again with
+  # ledger.require_shift_for_station_locations ON. Their fixtures open the shifts they write at (Tests\Support\Shifts), so
+  # the same tests pass with the flag off (the module jobs above) and on (here). Dropped in 3.7e, when the default flips.
+  enforced-gates:
+    needs: [status, mod-payments, mod-production, mod-notifications]
+    if: fromJSON(needs.status.outputs.phase) >= 3
+    uses: ./.github/workflows/module-tests.yml
+    with:
+      module: enforced-gates
+      groups: "gate:p0,gate:p1,gate:p2"
+      env: |
+        LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS=true
+
   mod-analytics:
     needs: [status, mod-shifts, mod-production, mod-notifications]
     if: fromJSON(needs.status.outputs.phase) >= 4
@@ -381,7 +394,7 @@ jobs:
       - run: python3 scripts/gate_check.py --mode done --phase 2 --ci
 
   gate-p3:
-    needs: [status, gate-p2, mod-shifts, e2e-p3]
+    needs: [status, gate-p2, mod-shifts, enforced-gates, e2e-p3]
     if: fromJSON(needs.status.outputs.phase) >= 3
     runs-on: ubuntu-24.04
     steps:

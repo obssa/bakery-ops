@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: ""
+      env:
+        description: Extra environment for the Pest steps, one KEY=VALUE per line (the enforced-gates job turns a rollout flag on)
+        required: false
+        type: string
+        default: ""
 
 jobs:
   pest:
@@ -60,6 +65,11 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           if [ "$status" = "todo" ]; then echo "allow=--allow-empty" >> "$GITHUB_OUTPUT"; else echo "allow=" >> "$GITHUB_OUTPUT"; fi
           echo "module ${{ inputs.module }} is $status"
+      - name: Extra environment
+        if: inputs.env != ''
+        env:
+          EXTRA_ENV: ${{ inputs.env }}
+        run: printf '%s\n' "$EXTRA_ENV" >> "$GITHUB_ENV"
       - name: Module tests (${{ inputs.groups }})
         run: bash scripts/ci/pest-groups.sh "${{ inputs.groups }}" ${{ steps.st.outputs.allow }}
       - name: Consumer contracts against ${{ inputs.module }}

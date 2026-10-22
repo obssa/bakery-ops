@@ -13,6 +13,9 @@ services:
       APP_DEBUG: "false"
       APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
       OCTANE_WORKERS: "1"
+      # Phase 3 enforcement rehearsal (phase-3-plan.md 10.1): CI runs the Phase 0-2 e2e flows with the shift rule ON; the
+      # default in code, .env.example and .env.ci stays false until step 3.7e, and the live host never sets it.
+      LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS: "true"
       BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-null}
       REVERB_APP_ID: ci
       REVERB_APP_KEY: ci-key
@@ -24,6 +27,7 @@ services:
     image: bakery-ops-api:ci
     environment:
       APP_ENV: testing
+      LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS: "true"
       APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
 
   ws:
