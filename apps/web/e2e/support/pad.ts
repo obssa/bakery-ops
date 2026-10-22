@@ -48,3 +48,19 @@ export async function openPadAndUnlock(page: Page, who: { api: { token: string |
   await typeCode(page, who.shortCode);
   await expect(page.getByText(`Acting: ${who.name}`)).toBeVisible({ timeout: 30_000 });
 }
+
+/**
+ * Unlocks the pad again when it idle-locked while the test waited (the pad locks after 60 s without a touch, IDLE_LOCK_MS in
+ * src/lib/acting.ts; on the live host a flow waits longer than that for the cron-drained queue). Types the short code only
+ * when the lock screen shows, so it is safe to call whenever the pad may or may not have locked. Call it right before a pad
+ * assertion that follows a long wait.
+ */
+export async function ensureUnlocked(page: Page, who: { name: string; shortCode: string }) {
+  const lock = page.getByRole("heading", { name: "Enter your short code" });
+  const acting = page.getByText(`Acting: ${who.name}`);
+  await expect(lock.or(acting)).toBeVisible({ timeout: 30_000 });
+  if (await lock.isVisible()) {
+    await typeCode(page, who.shortCode);
+    await expect(acting).toBeVisible({ timeout: 30_000 });
+  }
+}

@@ -3,7 +3,7 @@ import { uuid } from "../support/api";
 import { live, requireAdmin } from "../support/env";
 import { buildStationFixture, menuAvailable, sendOrder } from "../support/fixture";
 import { transfersOf } from "../support/inventory";
-import { openAs, openPadAndUnlock } from "../support/pad";
+import { ensureUnlocked, openAs, openPadAndUnlock } from "../support/pad";
 import { buildProductionFixture, stockAlertsOf, inboxOf, movementsOf, pushOffered, requestById, requestsOf, waitForQueue, type ProductionFixture } from "../support/production";
 
 // Phase 2 gate project p2-stockout-production (manifest phases.2.gate.criteria; docs/phases/phase-2-plan.md section 7),
@@ -96,6 +96,7 @@ async function runFlow(f: ProductionFixture, pages: { pad: Page; baker: Page; ov
 
   // the pad shows the cake with 6 available (the menu is polled every 5 s)
   await expect.poll(() => menuAvailable(f.waiter.api, f.cake.id), { timeout: 30_000 }).toBe("6.0000");
+  await ensureUnlocked(pad, f.waiter); // the flow waited longer than the pad's 60 s idle lock
   await expect(pad.getByRole("button", { name: new RegExp(`^Add ${cake}.*6 available`) })).toBeVisible({ timeout: 30_000 });
 
   // post-conditions through the API
