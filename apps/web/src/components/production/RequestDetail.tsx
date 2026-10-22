@@ -11,9 +11,9 @@ import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { canCancel, canSignOff } from "@/lib/live/production";
 import { can, useSession } from "@/lib/session";
+import { RequestTransferSheet } from "../inventory/RequestTransferSheet";
 import { Alert, Badge, Button, Field, TextInput } from "../ui";
 import { formatWhen } from "./RequestCard";
-import { TransferSheet } from "./TransferSheet";
 
 // The request card of the board (docs/architecture.md section 6): the recipe scaled to the quantity, what is on hand
 // against what is needed with the shortfalls in red (and a way to ask the store), the steps, and the one next move for
@@ -353,11 +353,19 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
         ) : null}
       </div>
 
-      {transfer && card.data?.consume_location ? (
-        <TransferSheet
-          request={request}
-          line={transfer}
-          place={card.data.consume_location}
+      {transfer && card.data?.consume_location && transfer.transfer_hint ? (
+        <RequestTransferSheet
+          subject={{
+            itemId: transfer.ingredient.id,
+            name: locale === "am" ? transfer.ingredient.name_am : transfer.ingredient.name_en,
+            unit: transfer.ingredient.unit,
+            toLocationId: card.data.consume_location.id,
+            toName: place(card.data.consume_location),
+            fromLocationId: transfer.transfer_hint.from_location_id,
+            sourceAvailable: transfer.transfer_hint.store_available,
+            suggested: transfer.short_qty ?? transfer.needed,
+            productionRequestId: request.id,
+          }}
           onClose={() => setTransfer(null)}
           onRequested={() => {
             setTransferred(true);

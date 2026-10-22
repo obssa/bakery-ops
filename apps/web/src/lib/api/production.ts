@@ -46,7 +46,12 @@ export function cancelRequest(id: number, reason: string, idempotencyKey: string
   return authed<ProductionRequest>(`/production/requests/${id}/cancel`, { method: "POST", body: reason ? { reason } : {}, idempotencyKey });
 }
 
-/** POST /transfers: the minimal sheet of the card asks the store for a short ingredient (step 2.8c builds the full sheet). */
+/** POST /transfers: the request sheet (kitchen strip, production card) asks the store for an ingredient. */
 export function requestTransfer(body: NewTransfer, idempotencyKey: string): Promise<{ id: number; status: string }> {
   return authed<{ id: number; status: string }>("/transfers", { method: "POST", body, idempotencyKey });
+}
+
+/** POST /production/requests: the till asks for a batch of a product by hand (qty left out: the product's batch size). */
+export function requestProduction(body: { client_uuid: string; product_item_id: number }, idempotencyKey: string): Promise<ProductionRequest> {
+  return authed<ProductionRequest>("/production/requests", { method: "POST", body, idempotencyKey });
 }

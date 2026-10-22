@@ -12,6 +12,7 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { onOutboxApplied } from "@/lib/outbox/store";
 import { Alert, Field, PageHeader, Select } from "../ui";
 import { focusRing } from "../styles";
+import { StockStrip } from "./StockStrip";
 import { TicketCard } from "./TicketCard";
 
 // One display for a station kind (/kds/kitchen, /kds/bar): the user own station of that kind (a picker when there are
@@ -119,42 +120,47 @@ export function KdsScreen({ kind }: { kind: "kitchen" | "bar" }) {
         </button>
       </div>
 
-      {loading ? (
-        <p role="status" className="text-base text-neutral-600">
-          {t("loading")}
-        </p>
-      ) : stationId === null ? (
-        <Alert>{kind === "kitchen" ? t("no_kitchen_station") : t("no_bar_station")}</Alert>
-      ) : !snapshot?.loaded ? (
-        snapshot?.error ? (
-          <Alert>{errorText.message(snapshot.error)}</Alert>
-        ) : (
-          <p role="status" className="text-base text-neutral-600">
-            {t("loading")}
-          </p>
-        )
-      ) : (
-        <>
-          {snapshot.error ? (
-            <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
-              {t("stale")}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div>
+          {loading ? (
+            <p role="status" className="text-base text-neutral-600">
+              {t("loading")}
             </p>
-          ) : null}
-          {rail.length === 0 ? (
-            <p role="status" className="rounded-md border border-neutral-200 bg-white px-4 py-6 text-base text-neutral-700">
-              {t("no_tickets")}
-            </p>
+          ) : stationId === null ? (
+            <Alert>{kind === "kitchen" ? t("no_kitchen_station") : t("no_bar_station")}</Alert>
+          ) : !snapshot?.loaded ? (
+            snapshot?.error ? (
+              <Alert>{errorText.message(snapshot.error)}</Alert>
+            ) : (
+              <p role="status" className="text-base text-neutral-600">
+                {t("loading")}
+              </p>
+            )
           ) : (
-            <ul aria-label={t("tickets")} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {rail.map((ticket) => (
-                <li key={ticket.order.id}>
-                  <TicketCard ticket={ticket} />
-                </li>
-              ))}
-            </ul>
+            <>
+              {snapshot.error ? (
+                <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+                  {t("stale")}
+                </p>
+              ) : null}
+              {rail.length === 0 ? (
+                <p role="status" className="rounded-md border border-neutral-200 bg-white px-4 py-6 text-base text-neutral-700">
+                  {t("no_tickets")}
+                </p>
+              ) : (
+                <ul aria-label={t("tickets")} className="grid gap-4 md:grid-cols-2">
+                  {rail.map((ticket) => (
+                    <li key={ticket.order.id}>
+                      <TicketCard ticket={ticket} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
-        </>
-      )}
+        </div>
+        {stationId !== null ? <StockStrip stationId={stationId} /> : null}
+      </div>
     </div>
   );
 }

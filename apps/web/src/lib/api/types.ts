@@ -602,7 +602,7 @@ export interface IngredientShort {
   location: string;
 }
 
-/** POST /transfers body (the minimal sheet of the card; step 2.8c builds the full one). */
+/** POST /transfers body (the request sheet of the kitchen display's stock strip and of the production card). */
 export interface NewTransfer {
   client_uuid: string;
   item_id: number;
@@ -611,4 +611,40 @@ export interface NewTransfer {
   qty: DecimalString;
   note?: string;
   production_request_id?: number;
+}
+
+// --- the station screens (Phase 2, step 2.8c) ---------------------------------------------------------------------
+
+export type StockState = "ok" | "low" | "out";
+
+/** One ingredient row of GET /stations/{station}/stock-strip: available is in the item's base unit. */
+export interface StripRow {
+  item: { id: number; name_en: string; name_am: string };
+  unit: string;
+  available: DecimalString;
+  min_qty: DecimalString | null;
+  state: StockState;
+}
+
+export interface StockStripPage {
+  location_id: number | null;
+  data: StripRow[];
+}
+
+/** One product row of GET /display-case. */
+export interface CaseRow {
+  item: { id: number; name_en: string; name_am: string };
+  unit: string;
+  on_hand: DecimalString;
+  reserved: DecimalString;
+  available: DecimalString;
+  low: boolean;
+  state: StockState;
+  production_station_id: number | null;
+  producible: boolean;
+}
+
+export interface DisplayCasePage {
+  location_id: number | null;
+  data: CaseRow[];
 }

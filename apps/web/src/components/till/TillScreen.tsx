@@ -11,6 +11,7 @@ import { OrderingSurface } from "../pad/OrderingSurface";
 import { usePadOutcomes, useReleaseStaleSends } from "../pad/outcomes";
 import { PageHeader } from "../ui";
 import { focusRing } from "../styles";
+import { DisplayCasePanel } from "./DisplayCasePanel";
 import { PaySheet } from "./PaySheet";
 import { TillQueue } from "./TillQueue";
 import { VoidDialog } from "./VoidDialog";
@@ -80,7 +81,10 @@ export function TillScreen() {
       </p>
 
       {view === "queue" ? (
-        <TillQueue orders={orders} loaded={!!queue?.loaded} stale={queue?.error ? t("stale") : null} onPay={setPaying} onVoid={setVoiding} />
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <TillQueue orders={orders} loaded={!!queue?.loaded} stale={queue?.error ? t("stale") : null} onPay={setPaying} onVoid={setVoiding} />
+          <DisplayCasePanel />
+        </div>
       ) : (
         <OrderingSurface userId={userId} menu={menu} onSendStarted={() => setNotice(false)} />
       )}
