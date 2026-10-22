@@ -18,7 +18,9 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const path = event.notification.data && event.notification.data.url;
+  const raw = event.notification.data && event.notification.data.url;
+  // the stock paths of the API's notification registry live under the admin console in the web (lib/deeplink.ts)
+  const path = raw ? raw.replace(/^\/inventory(?=\/|\?|$)/, "/admin/inventory") : raw;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
       const open = windows.map((w) => /\/app\/(en|am)\//.exec(w.url)).find(Boolean);
