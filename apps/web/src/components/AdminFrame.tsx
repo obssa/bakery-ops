@@ -7,11 +7,12 @@ import { RequireAuth } from "./RequireAuth";
 import { focusRing } from "./styles";
 
 // The admin console's own frame: signed-in only, with its sections as tabs: Catalog and People (Phase 0), the live
-// Orders board (Phase 1). The header's "Admin console" link is the overview.
+// Orders board (Phase 1), Inventory with its own sub-tabs (Phase 2). The header's "Admin console" link is the overview.
 const SECTIONS = [
   { href: "/admin/catalog", key: "catalog" },
   { href: "/admin/people", key: "people" },
   { href: "/admin/orders", key: "orders" },
+  { href: "/admin/inventory", key: "inventory" },
 ] as const;
 
 export function AdminFrame({ children }: { children: ReactNode }) {
@@ -22,7 +23,7 @@ export function AdminFrame({ children }: { children: ReactNode }) {
     <RequireAuth>
       <nav aria-label={t("sections")} className="mb-6 flex gap-1 border-b border-neutral-200">
         {SECTIONS.map(({ href, key }) => {
-          const current = pathname === href;
+          const current = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}
