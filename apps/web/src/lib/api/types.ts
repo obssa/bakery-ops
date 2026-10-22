@@ -496,6 +496,9 @@ export interface NotificationChannels {
 export type RequestStatus = "requested" | "accepted" | "in_progress" | "pending_confirmation" | "done" | "cancelled";
 export type BatchStatus = "started" | "finished" | "confirmed";
 export type RequestPriority = "normal" | "high" | "urgent";
+
+/** The priorities in the order a planner lists them. */
+export const REQUEST_PRIORITIES: readonly RequestPriority[] = ["normal", "high", "urgent"];
 export type RequestReason = "stock_out" | "manual" | "schedule";
 
 export interface PersonRef {
@@ -647,4 +650,109 @@ export interface CaseRow {
 export interface DisplayCasePage {
   location_id: number | null;
   data: CaseRow[];
+}
+
+// --- admin Catalog and planning (Phase 2, step 2.8d) ---------------------------------------------------------------
+
+/** One period of GET /items/{item}/prices. */
+export interface ItemPrice {
+  id: number;
+  item_id: number;
+  price: DecimalString;
+  currency: string;
+  effective_from: string;
+  effective_to: string | null;
+  is_current: boolean;
+}
+
+/** A row of GET /items/{item}/recipe/versions. */
+export interface RecipeVersionRow {
+  version: number;
+  is_active: boolean;
+  yield_qty: DecimalString;
+  yield_unit: string;
+  line_count: number;
+  published_at: string | null;
+  published_by: PersonRef | null;
+  change_note: string | null;
+}
+
+export interface RecipeLine {
+  id: number;
+  ingredient_item_id: number;
+  qty: DecimalString;
+  unit_id: number;
+  unit_code: string;
+  qty_base: DecimalString;
+  base_unit_code: string;
+  is_optional: boolean;
+  waste_pct: DecimalString;
+}
+
+export interface RecipeStep {
+  id: number;
+  step_order: number;
+  text_en: string;
+  text_am: string;
+}
+
+/** GET /items/{item}/recipe/versions/{version}, and the answer of PUT and POST. */
+export interface Recipe {
+  id: number | null;
+  product_item_id: number;
+  version: number | null;
+  is_active: boolean;
+  published_at: string | null;
+  published_by: PersonRef | null;
+  change_note: string | null;
+  yield_qty: DecimalString | null;
+  yield_unit_id: number | null;
+  yield_unit_code: string | null;
+  base_unit_code: string;
+  lines: RecipeLine[];
+  steps: RecipeStep[];
+}
+
+/** The body of PUT /items/{item}/recipe and (with change_note) of POST /items/{item}/recipe/versions. */
+export interface RecipeSpec {
+  yield_qty: DecimalString;
+  yield_unit_id: number;
+  lines: { ingredient_item_id: number; qty: DecimalString; unit_id: number; is_optional: boolean; waste_pct: DecimalString }[];
+  steps: { text_en: string; text_am: string }[];
+  change_note?: string;
+}
+
+export interface RecipeCostLine {
+  ingredient: { id: number; name_en: string | null; name_am: string | null };
+  qty_base: DecimalString;
+  unit: string;
+  waste_pct: DecimalString;
+  unit_cost: DecimalString | null;
+  line_cost: DecimalString | null;
+  source: string;
+}
+
+/** GET /inventory/recipe-costs/{product}?version= (costs.view). Every figure is null while the roll-up is incomplete. */
+export interface RecipeCost {
+  product_id: number;
+  version: number;
+  yield: { qty: DecimalString; unit: string };
+  complete: boolean;
+  missing_cost_item_ids: number[];
+  total_cost: DecimalString | null;
+  cost_per_unit: DecimalString | null;
+  price: DecimalString | null;
+  margin_amount: DecimalString | null;
+  margin_pct: DecimalString | null;
+  lines: RecipeCostLine[];
+}
+
+/** POST /production/requests as the planner sends it. */
+export interface NewScheduledRequest {
+  client_uuid: string;
+  product_item_id: number;
+  qty?: DecimalString;
+  due_at: string;
+  priority: RequestPriority;
+  note?: string;
 }

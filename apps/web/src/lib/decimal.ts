@@ -73,3 +73,14 @@ export function trimDecimal(value: string): string {
 export function isQuantityText(value: string, dp = 4): boolean {
   return new RegExp(String.raw`^\d+(\.\d{1,${dp}})?$`).test(value.trim());
 }
+
+/**
+ * `quantity x target / base` for the scaled preview of a recipe: exact on scaled integers (4 decimals), rounded half up to 4.
+ * All three are non-negative decimal strings and `base` must be above zero. Never a float.
+ */
+export function scaleDecimal(quantity: string, target: string, base: string): string {
+  const divisor = scaled(base, 4);
+  if (divisor <= BigInt(0)) throw new Error("the base quantity must be above zero");
+  const numerator = scaled(quantity, 4) * scaled(target, 4);
+  return unscaled((BigInt(2) * numerator + divisor) / (BigInt(2) * divisor), 4);
+}

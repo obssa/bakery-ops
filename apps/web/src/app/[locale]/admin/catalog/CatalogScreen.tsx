@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { focusRing } from "@/components/styles";
 import { Alert, Button, Field, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
+import { ItemPage } from "@/components/catalog/ItemPage";
 import { Link } from "@/i18n/navigation";
 import { useCategories, useCreateCategory, useCreateItem, useItems, useUnits } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
@@ -30,7 +31,12 @@ export function CatalogScreen() {
   const t = useTranslations("catalog");
   const me = useSession((s) => s.me);
   const manage = can(me, "catalog.manage");
-  const kind = kindFrom(useSearchParams().get("kind"));
+  const params = useSearchParams();
+  const kind = kindFrom(params.get("kind"));
+  // one product's page (recipe versions, cost and margin) is the same route with ?item=<id>: a static export has no
+  // dynamic segment for an id the build does not know
+  const itemId = Number(params.get("item"));
+  if (Number.isInteger(itemId) && itemId > 0) return <ItemPage id={itemId} />;
 
   return (
     <>
@@ -125,7 +131,16 @@ function ItemsPanel({ kind }: { kind: ItemKind | null }) {
                   return (
                     <tr key={item.id} className="border-b border-neutral-100 align-top last:border-0">
                       <td className="py-3 pr-4">
-                        <span className="block font-medium text-neutral-900">{name.primary}</span>
+                        {item.kind === "product" ? (
+                          <Link
+                            href={{ pathname: "/admin/catalog", query: { item: item.id } }}
+                            className={`block rounded-md font-medium text-blue-800 underline ${focusRing}`}
+                          >
+                            {name.primary}
+                          </Link>
+                        ) : (
+                          <span className="block font-medium text-neutral-900">{name.primary}</span>
+                        )}
                         <span className="block text-sm text-neutral-500" lang={locale === "am" ? "en" : "am"}>
                           {name.secondary}
                         </span>

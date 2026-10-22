@@ -1,11 +1,12 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 import { Alert, Button, Field, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
+import { usePatchStation, useStations } from "@/lib/api/catalog";
 import { useCreateUser, useUsers } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
-import { ROLES, type Locale, type NewUser, type Role } from "@/lib/api/types";
+import { ROLES, type Locale, type NewUser, type Role, type Station } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
 import { RequireAuth } from "@/components/RequireAuth";
 
@@ -20,7 +21,10 @@ export function PeopleScreen() {
     <RequireAuth permission="people.manage">
       <PageHeader title={t("title")} intro={t("intro")} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
-        <PeoplePanel />
+        <div className="space-y-6">
+          <PeoplePanel />
+          <StationsPanel />
+        </div>
         <NewPersonPanel />
       </div>
     </RequireAuth>
@@ -178,5 +182,101 @@ function NewPersonPanel() {
         </Button>
       </form>
     </Panel>
+  );
+}
+
+// The stations of the branch and the one switch they carry: whether a batch made there must be signed off by an overseer
+// (PATCH /stations/{id}, people.manage). The switch moves at once and goes back if the server refuses.
+function StationsPanel() {
+  const t = useTranslations("people");
+  const tc = useTranslations("common");
+  const errorText = useErrorText();
+  const stations = useStations();
+  const [saved, setSaved] = useState<string | null>(null);
+
+  return (
+    <Panel title={t("stations")}>
+      <p className="mb-4 text-base text-neutral-600">{t("stations_intro")}</p>
+      {stations.isPending ? (
+        <p className="text-base text-neutral-600">{tc("loading")}</p>
+      ) : stations.isError ? (
+        <div className="space-y-3">
+          <Alert>{errorText.message(stations.error)}</Alert>
+          <Button variant="secondary" onClick={() => void stations.refetch()}>
+            {tc("retry")}
+          </Button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-base">
+            <caption className="sr-only">{t("stations")}</caption>
+            <thead>
+              <tr className="border-b border-neutral-200 text-sm text-neutral-600">
+                <th scope="col" className="py-2 pr-4 font-medium">{t("col_station")}</th>
+                <th scope="col" className="py-2 pr-4 font-medium">{t("col_overseer")}</th>
+                <th scope="col" className="py-2 font-medium">{t("col_state")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stations.data.map((station) => (
+                <StationRow key={station.id} station={station} onSaved={setSaved} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="mt-4">
+        <Status>{saved}</Status>
+      </div>
+    </Panel>
+  );
+}
+
+function StationRow({ station, onSaved }: { station: Station; onSaved: (message: string | null) => void }) {
+  const t = useTranslations("people");
+  const locale = useLocale() as Locale;
+  const errorText = useErrorText();
+  const patch = usePatchStation();
+  const idempotency = useIdempotencyKey();
+  const name = locale === "am" ? station.name_am : station.name_en;
+  const [shown, setShown] = useState<boolean | null>(null);
+  const required = shown ?? station.requires_overseer;
+
+  function toggle(next: boolean) {
+    const body = { requires_overseer: next };
+    setShown(next);
+    onSaved(null);
+    patch.mutate(
+      { id: station.id, body, idempotencyKey: idempotency.keyFor({ id: station.id, ...body }) },
+      {
+        onSuccess: () => {
+          idempotency.done();
+          setShown(null);
+          onSaved(t("station_saved", { name }));
+        },
+        onError: () => setShown(null),
+      },
+    );
+  }
+
+  return (
+    <tr className="border-b border-neutral-100 align-top last:border-0">
+      <td className="py-3 pr-4">
+        <span className="block font-medium text-neutral-900">{name}</span>
+        <span className="block font-mono text-sm text-neutral-500">{station.code}</span>
+      </td>
+      <td className="py-3 pr-4">
+        <input
+          type="checkbox"
+          className="size-6"
+          aria-label={t("require_overseer", { name })}
+          checked={required}
+          disabled={patch.isPending}
+          onChange={(event) => toggle(event.target.checked)}
+        />
+        {patch.isError ? <span role="alert" className="mt-1 block text-sm font-medium text-red-700">{errorText.message(patch.error)}</span> : null}
+      </td>
+      <td className="py-3">{required ? t("overseer_required") : t("overseer_not_required")}</td>
+    </tr>
   );
 }
