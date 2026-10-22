@@ -200,4 +200,7 @@ return [
     'POST /api/v1/shifts/{shift}/close' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
     'PUT /api/v1/stock-counts/{count}/lines' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
     'POST /api/v1/stock-counts/{count}/submit' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    // Decisions (step 3.3b): shifts.approve (admin, manager) approves and rejects; that the person who counted cannot approve is the action's rule (409).
+    'POST /api/v1/stock-counts/{count}/approve' => ['permission' => 'shifts.approve', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
+    'POST /api/v1/stock-counts/{count}/reject' => ['permission' => 'shifts.approve', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
 ];

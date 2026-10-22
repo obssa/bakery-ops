@@ -1272,4 +1272,42 @@ return [
         },
         'payload' => fn (): array => [],
     ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/stock-counts/{count}/approve',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+            $item = $f->ingredient();
+            $f->stock($item, $f->place($f->kitchen), '100');
+            $shift = $f->running($f->kitchen, $f->chef);
+            $count = (int) $f->close($f->chef, $shift->id)->json('counts.0.id');
+            $f->lines($f->chef, $count, ['lines' => [['item_id' => $item->id, 'counted_qty' => '90', 'reason_id' => $f->reasonId('spoilage')]]])->assertOk();
+            $f->submit($f->chef, $count)->assertOk();
+            loginAs($f->admin);
+
+            return ['{count}' => (string) $count];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/stock-counts/{count}/reject',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+            $item = $f->ingredient();
+            $f->stock($item, $f->place($f->kitchen), '100');
+            $shift = $f->running($f->kitchen, $f->chef);
+            $count = (int) $f->close($f->chef, $shift->id)->json('counts.0.id');
+            $f->lines($f->chef, $count, ['lines' => [['item_id' => $item->id, 'counted_qty' => '90', 'reason_id' => $f->reasonId('spoilage')]]])->assertOk();
+            $f->submit($f->chef, $count)->assertOk();
+            loginAs($f->admin);
+
+            return ['{count}' => (string) $count];
+        },
+        'payload' => fn (): array => ['note' => 'Count the flour again'],
+    ],
 ];

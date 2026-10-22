@@ -177,6 +177,28 @@ final class ShiftsFixture
         return $this->send('POST', "/api/v1/stock-counts/{$countId}/submit", $as, [], $headers);
     }
 
+    /**
+     * POST /stock-counts/{count}/approve as $as.
+     *
+     * @param  array<string, mixed>  $body
+     * @param  array<string, string>  $headers
+     */
+    public function approve(User $as, int $countId, array $body = [], array $headers = []): TestResponse
+    {
+        return $this->send('POST', "/api/v1/stock-counts/{$countId}/approve", $as, $body, $headers);
+    }
+
+    /**
+     * POST /stock-counts/{count}/reject as $as.
+     *
+     * @param  array<string, mixed>  $body
+     * @param  array<string, string>  $headers
+     */
+    public function reject(User $as, int $countId, array $body, array $headers = []): TestResponse
+    {
+        return $this->send('POST', "/api/v1/stock-counts/{$countId}/reject", $as, $body, $headers);
+    }
+
     /** The id of the branch's variance reason with this code (the five defaults come with the branch). */
     public function reasonId(string $code): int
     {

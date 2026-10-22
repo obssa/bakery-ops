@@ -15,6 +15,7 @@ if (! function_exists('countsMessageKeys')) {
             'shifts.shift.not_open',
             'shifts.count.not_draft', 'shifts.count.item_unknown', 'shifts.count.qty_invalid', 'shifts.count.incomplete',
             'shifts.count.reason_required', 'shifts.count.note_required', 'shifts.count.blocked_by_pending', 'shifts.count.shift_not_ready',
+            'shifts.count.not_pending', 'shifts.count.approve_self',
             'shifts.reason.unknown', 'shifts.reason.code_taken',
             'shifts.adjustment.insufficient',
         ];
