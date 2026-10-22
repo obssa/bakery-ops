@@ -76,7 +76,7 @@ it('writes one purchase_in per line at the store in base units, moves the averag
     expect($purchase->confirmed_by_user_id)->toBe($this->f->admin->id)->and($purchase->version)->toBe(2);
     $oracle = ledgerOracle($this->branch->id);
     expect($oracle['movements'])->toBe($oracle['balances'])->and($oracle['balances'])->toBe($oracle['view']);
-})->group('module:inventory', 'feature');
+})->group('module:inventory', 'feature', 'gate:p2');
 
 it('moves the moving average to 4 dp over purchases, taking in the stock on hand at every place', function () {
     $first = ($this->draft)([$this->f->line($this->f->flour, '20', '80')]);

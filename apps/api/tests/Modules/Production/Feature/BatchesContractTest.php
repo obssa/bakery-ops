@@ -95,4 +95,4 @@ it('rolls the whole write back when the last movement fails: no rows, no balance
         ->and($batch->fresh()->output_movement_id)->toBeNull()
         ->and($batch->request->fresh()->status)->toBe(RequestStatus::InProgress)
         ->and(DB::table('audit_log')->where('action', 'production_batch.done')->count())->toBe(0);
-});
+})->group('gate:p2');

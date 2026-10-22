@@ -101,4 +101,4 @@ it('matches the exact rational oracle over random purchase sequences', function 
         }
         expect($drift->isLessThanOrEqualTo($bound))->toBeTrue("seed {$seed}, step {$i}: drift {$drift->getNumerator()}/{$drift->getDenominator()} exceeds {$i} x 0.00005");
     }
-})->with(movingAverageSeeds())->group('unit', 'property', 'module:inventory');
+})->with(movingAverageSeeds())->group('unit', 'property', 'module:inventory', 'gate:p2');

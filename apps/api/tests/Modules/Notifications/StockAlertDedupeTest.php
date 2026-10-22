@@ -10,7 +10,7 @@ use App\Modules\Notifications\Models\Notification;
 use App\Shared\Models\Branch;
 use Illuminate\Support\Facades\DB;
 
-pest()->group('module:notifications', 'module:inventory', 'feature');
+pest()->group('module:notifications', 'module:inventory', 'feature', 'gate:p2');
 
 /*
  * Step 2.6a, ADR 0011 (alert dedupe), end to end on the synchronous queue: a real balance walks through real movements, the

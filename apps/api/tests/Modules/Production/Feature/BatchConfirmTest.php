@@ -70,7 +70,7 @@ it('confirms a finished batch for a manager: N consume rows and one output row, 
     expect($oracle['balances'])->toBe($oracle['movements'])->toBe($oracle['view']);
     $audit = AuditLog::query()->where('action', 'production_batch.confirm')->where('subject_id', $batch->id)->sole();
     expect($audit->actor_id)->toBe($this->f->manager->id)->and($audit->before['status'])->toBe('finished')->and($audit->after['status'])->toBe('confirmed');
-});
+})->group('gate:p2');
 
 it('lets the admin and the overseer flagged at the station confirm, and nobody else', function () {
     foreach ([$this->f->admin, $this->overseer] as $person) {

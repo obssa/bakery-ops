@@ -73,7 +73,7 @@ it('makes one request for the batch size at the producing station when a product
     Event::assertDispatchedTimes(ProductionRequested::class, 1);
     $event = Event::dispatched(ProductionRequested::class)->first()[0];
     expect($event->payload())->toMatchArray(['request_id' => $request->id, 'reason' => 'stock_out', 'qty' => '12.0000', 'station_id' => $this->f->cakeRoomStation->id, 'requested_by_user_id' => $this->f->cashier->id]);
-});
+})->group('gate:p2');
 
 it('uses the stored batch size of a product that has one', function () {
     stockIn($this->f->bread, $this->f->display, '2');
@@ -98,7 +98,7 @@ it('makes nothing for an ingredient, a bought-in product, a made-to-order produc
 
     expect(($this->requests)())->toHaveCount(0);
     Event::assertNotDispatched(ProductionRequested::class);
-});
+})->group('gate:p2');
 
 it('makes nothing for a run-out in a place the product is not sold from', function () {
     ($this->runOut)($this->f->cake, $this->f->cakeRoom); // the cake room is where it is made, not where it is sold
@@ -127,7 +127,7 @@ it('is idempotent: the same stock-out delivered twice makes one request and anno
     expect(($this->requests)())->toHaveCount(1)
         ->and(AuditLog::query()->where('action', 'production_request.auto_create')->count())->toBe(1);
     Event::assertDispatchedTimes(ProductionRequested::class, 1);
-});
+})->group('gate:p2');
 
 it('finds the open request of an earlier run-out instead of making a second one, and makes a new one once that is closed', function () {
     Event::fake([ProductionRequested::class]);

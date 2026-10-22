@@ -14,6 +14,7 @@ use Database\Seeders\Demo\DemoBakery;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\Phase0Seeder;
 use Database\Seeders\Phase1Seeder;
+use Database\Seeders\Phase2Seeder;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
@@ -30,6 +31,7 @@ afterEach(function () {
 it('lists the phase seeders that exist, in phase order, up to the requested phase', function () {
     expect(DemoSeeder::seedersUpTo(0))->toBe([Phase0Seeder::class])
         ->and(DemoSeeder::seedersUpTo(1))->toBe([Phase0Seeder::class, Phase1Seeder::class])
+        ->and(DemoSeeder::seedersUpTo(2))->toBe([Phase0Seeder::class, Phase1Seeder::class, Phase2Seeder::class])
         ->and(DemoSeeder::seedersUpTo(5)[0])->toBe(Phase0Seeder::class)
         ->and(DemoSeeder::seedersUpTo(-1))->toBe([]);
     foreach (DemoSeeder::seedersUpTo(5) as $class) {
@@ -145,6 +147,128 @@ it('adds to a branch that already holds Phase 0 only what Phase 1 brings (the li
     expect(demoRows($branch->id, true))->toBe($catalog)
         ->and(demoRows($branch->id)['users'])->toBe($phaseZero['users'] + 1)
         ->and(demoRows($branch->id)['orders'])->toBe(7);
+})->group('feature', 'seeds');
+
+/**
+ * Row counts of the demo branch in the tables Phase 2 writes, on top of demoRows().
+ *
+ * @return array<string, int>
+ */
+function phaseTwoRows(int $branchId): array
+{
+    $rows = demoRows($branchId);
+    foreach (['suppliers', 'purchases', 'purchase_lines', 'item_costs', 'item_cost_history', 'reorder_rules', 'transfers', 'production_requests', 'production_batches', 'notifications', 'stock_alert_states', 'recipes', 'recipe_lines', 'item_prices', 'items'] as $table) {
+        $rows[$table] = DB::table($table)->where('branch_id', $branchId)->count();
+    }
+
+    return $rows;
+}
+
+it('composes Phase 2 on Phase 1: suppliers and costs, purchases, reorder rules, the gate product, recipe version 2, transfers and production, through module code', function () {
+    putenv('SEED_PHASE=2');
+    config(['queue.default' => 'database']); // what the live host runs; the seed runs the queued listeners synchronously and puts this back
+    $this->seed(DemoSeeder::class);
+
+    $branch = Branch::query()->where('name', DemoBakery::DEFAULT_BRANCH)->sole();
+    $rows = fn (string $table) => DB::table($table)->where('branch_id', $branch->id);
+    $item = fn (string $sku) => DB::table('items')->where('branch_id', $branch->id)->where('sku', $sku)->first();
+
+    // three suppliers; every ingredient has an opening cost, and the flour's average moved with the purchase
+    expect($rows('suppliers')->count())->toBe(3)
+        ->and($rows('item_costs')->count())->toBeGreaterThanOrEqual($rows('items')->where('kind', 'ingredient')->count());
+    $flour = $item('ING-FLR-WHT');
+    $history = $rows('item_cost_history')->where('item_id', $flour->id)->orderBy('id')->get();
+    expect($history)->toHaveCount(2)->and($history[1]->cost_before)->toBe($history[0]->cost_after)->and($history[1]->cost_after)->not->toBe($history[1]->cost_before);
+
+    // two confirmed purchases received into the store (a purchase_in per line) and one draft left for a hand
+    expect($rows('purchases')->orderBy('id')->pluck('status')->all())->toBe(['confirmed', 'confirmed', 'draft']);
+    $lines = DB::table('purchase_lines')->join('purchases', 'purchases.id', '=', 'purchase_lines.purchase_id')->where('purchases.branch_id', $branch->id)->where('purchases.status', 'confirmed');
+    expect((clone $lines)->whereNull('purchase_lines.movement_id')->count())->toBe(0)
+        ->and($rows('stock_movements')->where('ref_type', 'purchase')->where('reason', 'purchase_in')->count())->toBe((clone $lines)->count());
+
+    // eight reorder rules, and the only open alert is the gate product's own low stock
+    $honey = $item('P-CAK-HONEY-SLICE');
+    expect($rows('reorder_rules')->count())->toBe(8)->and($rows('reorder_rules')->where('is_active', 1)->count())->toBe(8);
+    $open = $rows('stock_alert_states')->where('is_active', 1)->get();
+    expect($open)->toHaveCount(1)->and($open[0]->item_id)->toBe($honey->id)->and($open[0]->type)->toBe('low');
+
+    // the gate product: to stock, made at the cake room, 6 a batch, a recipe over 12 slices, 150.00, one slice on hand at the display case
+    $display = $rows('locations')->where('type', 'display_case')->first();
+    $cakeRoom = $rows('stations')->where('code', 'cake_room')->first();
+    expect($honey->fulfilment)->toBe('to_stock')
+        ->and($honey->production_station_id)->toBe($cakeRoom->id)
+        ->and($honey->default_batch_qty)->toBe('6.0000')
+        ->and(DB::table('recipes')->where('product_item_id', $honey->id)->sole()->yield_qty)->toBe('12.0000')
+        ->and(DB::table('item_prices')->where('item_id', $honey->id)->sole()->price)->toBe('150.00')
+        ->and(stockRow($honey->id, $display->id)->on_hand)->toBe('1.0000')
+        ->and(DB::table('stock_movements')->where('item_id', $honey->id)->pluck('reason')->all())->toBe(['count_adjustment']);
+
+    // Bread roll: version 2 is active with a change note, version 1 is still there
+    $roll = DB::table('recipes')->where('product_item_id', $item('P-BRD-ROLL')->id)->orderBy('version')->get();
+    expect($roll->pluck('version')->map(fn ($v) => (int) $v)->all())->toBe([1, 2])
+        ->and($roll->pluck('is_active')->map(fn ($v) => (int) $v)->all())->toBe([0, 1])
+        ->and($roll[1]->change_note)->not->toBeNull();
+
+    // three transfers: one confirmed (two ledger rows), one waiting for the store, one rejected with a reason
+    $transfers = $rows('transfers')->orderBy('id')->get()->keyBy('status');
+    expect($transfers->keys()->sort()->values()->all())->toBe(['confirmed', 'rejected', 'requested'])
+        ->and($transfers['rejected']->reject_reason)->not->toBeEmpty()
+        ->and(DB::table('stock_movements')->where('ref_type', 'transfer')->where('ref_id', $transfers['confirmed']->id)->count())->toBe(2)
+        ->and(DB::table('stock_movements')->where('ref_type', 'transfer')->whereIn('ref_id', [$transfers['requested']->id, $transfers['rejected']->id])->count())->toBe(0);
+
+    // production: a scheduled high-priority request, an accepted one, a batch waiting for sign-off (nothing written yet), one confirmed today
+    $requests = $rows('production_requests')->get();
+    expect($requests->groupBy('status')->map->count()->all())->toMatchArray(['requested' => 1, 'accepted' => 1, 'pending_confirmation' => 1, 'done' => 1]);
+    $baguette = $requests->firstWhere('product_item_id', $item('P-BRD-BAGUETTE')->id);
+    expect($baguette->priority)->toBe('high')->and($baguette->reason)->toBe('schedule')->and($baguette->requested_qty)->toBe('80.0000')->and($baguette->due_at)->not->toBeNull();
+    $batches = $rows('production_batches')->get()->keyBy('status');
+    $batchRows = fn (string $status, string $reason) => DB::table('stock_movements')->where('ref_type', 'production_batch')->where('ref_id', $batches[$status]->id)->where('reason', $reason)->count();
+    expect($batches->keys()->sort()->values()->all())->toBe(['confirmed', 'finished'])
+        ->and(DB::table('stock_movements')->where('ref_type', 'production_batch')->where('ref_id', $batches['finished']->id)->count())->toBe(0)
+        ->and($batchRows('confirmed', 'production_output'))->toBe(1)
+        ->and($batchRows('confirmed', 'production_consume'))->toBeGreaterThan(3);
+
+    // the queued listeners ran during the seed: the demo has real inbox rows without a worker, and the queue setting is back
+    expect($rows('notifications')->count())->toBeGreaterThan(5)
+        ->and(config('queue.default'))->toBe('database', 'the seed restores the queue connection it found')
+        ->and($rows('audit_log')->where('action', 'purchase.confirm')->count())->toBe(2);
+})->group('feature', 'seeds');
+
+it('runs Phase 2 twice and the second run writes nothing, not even an audit row or an inbox line', function () {
+    putenv('SEED_PHASE=2');
+    $this->seed(DemoSeeder::class);
+    $branch = Branch::query()->where('name', DemoBakery::DEFAULT_BRANCH)->sole();
+    $first = phaseTwoRows($branch->id);
+    expect($first['purchases'])->toBe(3)->and($first['transfers'])->toBe(3)->and($first['reorder_rules'])->toBe(8);
+
+    $this->seed(DemoSeeder::class);
+
+    expect(phaseTwoRows($branch->id))->toBe($first);
+})->group('feature', 'seeds');
+
+it('adds to a branch that already holds Phases 0 and 1 only what Phase 2 brings (the live demo bakery)', function () {
+    putenv('SEED_PHASE=1');
+    $this->seed(DemoSeeder::class);
+    $branch = Branch::query()->where('name', DemoBakery::DEFAULT_BRANCH)->sole();
+    $before = phaseTwoRows($branch->id);
+    $catalog = demoRows($branch->id, true);
+
+    putenv('SEED_PHASE=2');
+    $this->seed(DemoSeeder::class);
+    $after = phaseTwoRows($branch->id);
+
+    // nothing of Phases 0 and 1 is rewritten: the dining room, the orders, the people, the payments
+    foreach (['dining_tables', 'payment_channels', 'devices', 'users', 'orders', 'order_lines', 'order_line_modifiers', 'order_events', 'order_counters', 'payments'] as $table) {
+        expect($after[$table])->toBe($before[$table], $table);
+    }
+    $now = demoRows($branch->id, true);
+    expect($now['stations'])->toBe($catalog['stations'])->and($now['locations'])->toBe($catalog['locations'])->and($now['categories'])->toBe($catalog['categories'])
+        // one new product with its recipe and price, and one recipe version more for the bread roll
+        ->and($now['items'])->toBe($catalog['items'] + 1)
+        ->and($now['recipes'])->toBe($catalog['recipes'] + 2)
+        ->and($now['item_prices'])->toBe($catalog['item_prices'] + 1)
+        ->and($before['purchases'])->toBe(0)
+        ->and($after['suppliers'])->toBe(3)->and($after['purchases'])->toBe(3);
 })->group('feature', 'seeds');
 
 it('seeds the role matrix and then the demo bakery with `db:seed`', function () {

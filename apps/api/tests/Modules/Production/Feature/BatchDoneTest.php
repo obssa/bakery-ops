@@ -85,7 +85,7 @@ it('finishes and confirms in one write where the station needs no overseer: N co
     expect($oracle['balances'])->toBe($oracle['movements'])->toBe($oracle['view']);
     $audit = ($this->audits)($batch)->sole();
     expect($audit->actor_id)->toBe($this->f->baker->id)->and($audit->before['status'])->toBe('started')->and($audit->after['status'])->toBe('confirmed');
-});
+})->group('gate:p2');
 
 it('stamps the rows with the baker and derives their client uuids from the batch', function () {
     $batch = $this->f->startedBatch();
@@ -111,7 +111,7 @@ it('scales to four places: a yield of 7, 4 made and 1 wasted takes 714.2857 g of
     $flour = ($this->movements)()->firstWhere('item_id', $this->f->flour->id);
     expect($flour->qty)->toBe('-714.2857')
         ->and(stockRow($this->f->flour, $this->f->cakeRoom)->on_hand)->toBe('4285.7143');
-});
+})->group('gate:p2');
 
 it('consumes the version recorded at start even when a newer one was published', function () {
     $batch = $this->f->startedBatch();

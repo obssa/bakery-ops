@@ -33,30 +33,30 @@ it('gives the weighted average of the old stock and the purchase', function (str
     'rounds a repeating third down' => ['2', '1', '1', '2', '1.3333'],                          // 4/3
     'exactly at the half rounds up' => ['1', '1.0000', '3', '1.0002', '1.0002'],                // 1.00015 -> 1.0002
     'a large figure is exact' => ['1000000', '123.4567', '1000000', '234.5678', '179.0123'],     // 179.01225 -> half-up
-])->group('unit', 'module:inventory');
+])->group('unit', 'module:inventory', 'gate:p2');
 
 it('rounds once, not at each step of the formula', function () {
     // (3 x 0.3333 + 1 x 0.3334) / 4 = 1.3333 / 4 = 0.333325 -> 0.3333; rounding the product or the sum first could not
     // change this one, but an average of averages would: the stored (already rounded) cost is the input, nothing else
     expect(MovingAverage::next('3', '0.3333', '1', '0.3334')->toString())->toBeDecimal('0.3333');
-})->group('unit', 'module:inventory');
+})->group('unit', 'module:inventory', 'gate:p2');
 
 it('accepts typed values as well as strings', function () {
     $next = MovingAverage::next(Quantity::of('10'), UnitCost::of('4'), Quantity::of('10'), UnitCost::of('6'));
 
     expect($next->toString())->toBeDecimal('5.0000');
-})->group('unit', 'module:inventory');
+})->group('unit', 'module:inventory', 'gate:p2');
 
 it('refuses a purchase of nothing, a negative old quantity and a negative cost', function () {
     expect(fn () => MovingAverage::next('1', '1', '0', '1'))->toThrow(InvalidArgumentException::class)
         ->and(fn () => MovingAverage::next('1', '1', '-1', '1'))->toThrow(InvalidArgumentException::class)
         ->and(fn () => MovingAverage::next('-1', '1', '1', '1'))->toThrow(InvalidArgumentException::class)
         ->and(fn () => MovingAverage::next('1', '1', '1', '-1'))->toThrow(InvalidArgumentException::class);
-})->group('unit', 'module:inventory');
+})->group('unit', 'module:inventory', 'gate:p2');
 
 it('is a pure function: the same inputs always give the same answer', function () {
     $a = MovingAverage::next('12.5', '3.3333', '7.25', '4.1111');
     $b = MovingAverage::next('12.5', '3.3333', '7.25', '4.1111');
 
     expect($a->toString())->toBe($b->toString());
-})->group('unit', 'module:inventory');
+})->group('unit', 'module:inventory', 'gate:p2');

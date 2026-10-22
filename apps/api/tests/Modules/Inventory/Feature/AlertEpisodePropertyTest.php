@@ -121,4 +121,4 @@ it('opens and closes episodes exactly as available crosses 0, whatever the walk'
         Event::assertDispatchedTimes(StockOut::class, $outs);
         Event::assertDispatchedTimes(StockRecovered::class, $recoveries);
     }
-})->with(alertEpisodeSeeds())->group('property', 'module:inventory');
+})->with(alertEpisodeSeeds())->group('property', 'module:inventory', 'gate:p2');
