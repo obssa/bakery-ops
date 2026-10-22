@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "current_phase": 2,
+  "current_phase": 3,
   "invariants_version": 2,
   "phases": {
     "0": {
@@ -76,15 +76,15 @@
       ]
     },
     "2": {
-      "status": "gate_pending",
+      "status": "done",
       "plan": "docs/phases/phase-2-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
       "report": "docs/phases/phase-2-report.md",
       "gate_job": "gate-p2",
-      "gate_run_url": null,
-      "done_commit": null,
-      "done_at": null,
+      "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/39721616830",
+      "done_commit": "b981f3758241145afb2d483745538d6aa0944dcb",
+      "done_at": "2026-10-22T04:44:19Z",
       "adrs": [
         "0010-station-presence-resolver",
         "0011-stock-alert-dedupe-and-queued-actor"
@@ -113,7 +113,7 @@
       ]
     },
     "3": {
-      "status": "todo",
+      "status": "planning",
       "plan": "docs/phases/phase-3-plan.md",
       "plan_approved": false,
       "plan_approved_by": null,
