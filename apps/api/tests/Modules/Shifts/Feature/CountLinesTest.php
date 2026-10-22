@@ -112,7 +112,7 @@ it('refuses a figure that is not a quantity: negative, too many decimals, too ma
 
     // all or nothing: the valid line of the same request was not kept
     expect(StockCount::query()->findOrFail($this->count)->lines()->whereNotNull('counted_qty')->count())->toBe(0);
-})->with(['-1', '1.23456', '12345678901', 'abc', '1e3', '0x10', '1,5', '--1', 12.5, true, ['1']]);
+})->with(['-1', '1.23456', '12345678901', 'abc', '1e3', '0x10', '1,5', '--1', 12.5, true, [['1']]]);
 
 it('accepts the extremes of the column and a whole number sent as a JSON integer', function () {
     $this->f->lines($this->f->chef, $this->count, ['lines' => [['item_id' => $this->flour->id, 'counted_qty' => '9999999999.9999']]])->assertOk();
