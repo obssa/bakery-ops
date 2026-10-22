@@ -76,7 +76,7 @@ final class SubmitCount
         }
 
         try {
-            return $this->audit->run(function (StockCount $c) use ($person, $station): StockCount {
+            return $this->audit->run(function (StockCount $c) use ($person, $station, $shift): StockCount {
                 CountLock::refresh($c);
                 if ($c->status->isSubmitted()) {
                     throw AlreadyReached::here();
@@ -85,9 +85,8 @@ final class SubmitCount
                     throw ShiftError::countNotDraft($c->status->value);
                 }
 
-                $shift = ShiftLock::refresh(ShiftInstance::query()->findOrFail($c->shift_instance_id));
-                $ready = $c->type === CountType::Opening ? ShiftStatus::Opening : ShiftStatus::Counting;
-                if ($shift->status !== $ready) {
+                $shift = ShiftLock::refresh($shift);
+                if (! self::takesCount($shift, $c)) {
                     throw ShiftError::countShiftNotReady($shift->status->value);
                 }
                 $blocking = $this->locks->unresolvedAt($c->location_id, $c->id);
@@ -105,7 +104,9 @@ final class SubmitCount
                 }
                 $levels = $this->ledger->lock($pairs);
                 $snapshotAt = CarbonImmutable::now();
-                $movementId = $this->stock->fingerprint()['last_movement_id'];
+                // a locking read of the tail: a plain read would see the transaction's first snapshot and could miss a movement that
+                // committed on a locked pair just before the lock (the first 3.3a race window; SubmitSnapshotRaceTest)
+                $movementId = $this->ledger->tailMovementId();
 
                 $variances = $this->variances($lines, $levels, $c->location_id);
                 $this->assertReasons($lines, $variances);
@@ -142,6 +143,21 @@ final class SubmitCount
         } catch (AlreadyReached) {
             return StockCount::query()->findOrFail($count->id);
         }
+    }
+
+    /**
+     * Is the shift taking this count now? An opening count needs an `opening` shift, a closing count a `counting` one. A recount
+     * (seq above 1, made by a rejection) is also taken by an `open` shift for an opening count (the shift opened with the difference
+     * and stays open), and by a `pending_approval` one for a closing count (the next shift already holds the station, so the
+     * rejection could not send this one back to counting).
+     */
+    private static function takesCount(ShiftInstance $shift, StockCount $count): bool
+    {
+        if ($count->type === CountType::Opening) {
+            return $shift->status === ShiftStatus::Opening || ($count->seq > 1 && $shift->status === ShiftStatus::Open);
+        }
+
+        return $shift->status === ShiftStatus::Counting || ($count->seq > 1 && $shift->status === ShiftStatus::PendingApproval);
     }
 
     /**
@@ -247,10 +263,15 @@ final class SubmitCount
         }
 
         $closed = [];
+        $adjustments = [];
         foreach (StockCountLine::query()->where('count_id', $previous->id)->get() as $line) {
             $closed[$line->item_id] = $line->counted_qty ?? Quantity::zero();
+            if ($line->adjustment_movement_id !== null) {
+                $adjustments[] = $line->adjustment_movement_id;
+            }
         }
-        $moved = $this->stock->netChangeSince($count->location_id, $previous->ledger_movement_id);
+        // the closing's own adjustments (step 3.3b) are what made the ledger equal its counted figure: they are not movement since it
+        $moved = $this->stock->netChangeSince($count->location_id, $previous->ledger_movement_id, $adjustments);
 
         $drift = [];
         foreach ($lines as $line) {

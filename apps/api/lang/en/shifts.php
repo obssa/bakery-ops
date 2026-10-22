@@ -43,6 +43,8 @@ return [
         'note_required' => 'The reason you chose needs a short note. Write what happened.',
         'blocked_by_pending' => 'An earlier count at this place is still waiting for a decision. Only one count at a place can wait at a time.',
         'shift_not_ready' => 'This shift is not taking this count right now.',
+        'not_pending' => 'This count is not waiting for a decision.',
+        'approve_self' => 'You counted this yourself, so someone else must approve it. You can reject it and count again.',
     ],
     'reason' => [
         'unknown' => 'This reason does not exist or is switched off.',

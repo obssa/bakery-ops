@@ -57,6 +57,7 @@ beforeEach(function () {
     /** A closing draft with its lines entered (flour 1000 on hand, counted 900), ready to hand in. */
     $this->round = function (int $n) {
         DB::table('shift_instances')->where('station_id', $this->f->kitchen->id)->whereNotNull('open_key')->update(['status' => 'locked', 'open_key' => null, 'locked_at' => now()]);
+        DB::table('stock_counts')->whereIn('status', ['pending_approval', 'awaiting_cosign'])->update(['status' => 'approved']); // rule R-A: the last round's count is out of the way
         $flour = $this->f->ingredient();
         $this->f->stock($flour, $this->place, '1000');
         $shift = $this->f->running($this->f->kitchen, $this->f->chef, ['date' => CarbonImmutable::parse('2026-01-01')->addDays($n)->toDateString()]);

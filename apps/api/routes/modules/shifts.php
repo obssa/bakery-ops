@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Route;
  * who may cancel depends on the shift (the admin, or the person who started it while it is opening), which the action decides
  * (403 shifts.cancel.forbidden). Step 3.3a adds the counts: shifts.view reads the summary, the counts and the variance reasons (the
  * action checks the station), shifts.count closes the shift and works a count (it checks the station too), shifts.manage keeps the
- * variance reasons. {count} and {reason} bind through the BranchScoped models. Cash, notes, handover and replay come with the later steps.
+ * variance reasons. Step 3.3b adds approve and reject (shifts.approve). {count} and {reason} bind through the BranchScoped models. Cash, notes, handover and replay come with the later steps.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:shifts.view')->group(function (): void {
@@ -56,5 +56,11 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::post('/shifts/{shift}/close', [ShiftsController::class, 'close'])->whereNumber('shift')->name('shifts.close');
         Route::put('/stock-counts/{count}/lines', [CountsController::class, 'lines'])->whereNumber('count')->name('shifts.counts.lines');
         Route::post('/stock-counts/{count}/submit', [CountsController::class, 'submit'])->whereNumber('count')->name('shifts.counts.submit');
+    });
+
+    // Step 3.3b: shifts.approve (admin, manager) decides a count; that the person who counted cannot approve it is the action's rule
+    Route::middleware(['permission:shifts.approve', 'idempotency'])->group(function (): void {
+        Route::post('/stock-counts/{count}/approve', [CountsController::class, 'approve'])->whereNumber('count')->name('shifts.counts.approve');
+        Route::post('/stock-counts/{count}/reject', [CountsController::class, 'reject'])->whereNumber('count')->name('shifts.counts.reject');
     });
 });

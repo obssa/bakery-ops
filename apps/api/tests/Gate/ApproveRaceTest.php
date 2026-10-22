@@ -58,6 +58,7 @@ beforeEach(function () {
      */
     $this->round = function (int $n, string $counted = '700') {
         DB::table('shift_instances')->where('station_id', $this->f->kitchen->id)->whereNotNull('open_key')->update(['status' => 'locked', 'open_key' => null, 'locked_at' => now()]);
+        DB::table('stock_counts')->whereIn('status', ['pending_approval', 'awaiting_cosign'])->update(['status' => 'approved']); // rule R-A: the last round's count is out of the way
         $flour = $this->f->ingredient();
         $drink = $this->f->ingredient('ml');
         $this->f->stock($flour, $this->place, '1000');

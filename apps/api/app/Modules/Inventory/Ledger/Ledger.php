@@ -263,6 +263,28 @@ final class Ledger
     }
 
     /**
+     * The id of the newest movement in the ledger, read as the latest committed state whatever snapshot the caller's transaction
+     * already holds (step 3.3b, the first 3.3a race window). A plain read under REPEATABLE READ sees the snapshot of the
+     * transaction's first plain read; a movement that committed on a pair the caller then locked is inside the locked balance but
+     * above such an id. This is a locking read of the tail row (shared mode: any number of callers at once): it returns the true
+     * newest id, and a movement still being inserted at the tail is waited for (its writer holds every balance it needs, so it never
+     * waits for us). Only the last row and the gap before it are locked, so new movements are not held back (ids only grow). Call it
+     * after Ledger::lock() on the pairs the caller measured: no movement on those pairs can commit after the lock, so every
+     * movement on them is at or below the id. Null for an empty ledger.
+     *
+     * @throws LogicException outside a transaction
+     */
+    public function tailMovementId(): ?int
+    {
+        if ($this->connection()->transactionLevel() === 0) {
+            throw new LogicException('Ledger::tailMovementId() reads under the caller\'s locks: call it inside a transaction.');
+        }
+        $id = $this->connection()->table('stock_movements')->orderByDesc('id')->limit(1)->sharedLock()->value('id');
+
+        return $id === null ? null : (int) $id;
+    }
+
+    /**
      * Lock every stock_balances row of the given items, across all their locations, for the rest of the caller's
      * transaction, in ascending (item_id, location_id) order (the first half of the system-wide lock order: balances, then
      * item_costs ascending item_id), and answer each item's total on_hand over those locations. An item that never moved

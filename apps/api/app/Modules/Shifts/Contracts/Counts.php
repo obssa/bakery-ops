@@ -6,6 +6,8 @@ namespace App\Modules\Shifts\Contracts;
 
 use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Shifts\Actions\AlreadyReached;
+use App\Modules\Shifts\Actions\ApproveCount;
+use App\Modules\Shifts\Actions\RejectCount;
 use App\Modules\Shifts\Actions\SetCountLines;
 use App\Modules\Shifts\Actions\SubmitCount;
 use App\Modules\Shifts\Counts\CountReads;
@@ -30,6 +32,12 @@ use App\Shared\Models\Station;
  *   submit: hands the count in. The expected figure comes from the balance rows read under Ledger::lock at the snapshot; the
  *     variance is counted minus expected in exact decimals; a count with a variance waits in pending_approval, one without goes to
  *     approved; the shift moves on with it. A count already handed in answers itself.
+ *   approve: step 3.3b. Writes one count_adjustment per variance line (both signs, a delta) as the counted shift in one
+ *     Ledger::appendMany, sets each line's adjustment_movement_id, leaves the count `approved` and locks the shift when its last
+ *     count resolves; refused whole (shifts.adjustment.insufficient) when an adjustment would take on_hand below zero; the person
+ *     who counted cannot approve; a count already approved answers itself.
+ *   reject: step 3.3b. The count becomes `rejected` and its prefilled recount draft (seq + 1) is returned; nothing is written to
+ *     the ledger; the shift goes back to counting. `$lineIds` marks the lines to look at again (default every line with a variance).
  * Counts and shifts are given by model or id. A final class resolved per use: the actions carry the scoped ActorContext and
  * CurrentBranch, so it keeps nothing.
  */
@@ -40,6 +48,8 @@ final class Counts
         private readonly CountReads $reads,
         private readonly SetCountLines $setLines,
         private readonly SubmitCount $submitCount,
+        private readonly ApproveCount $approveCount,
+        private readonly RejectCount $rejectCount,
         private readonly AuditedAction $audit,
         private readonly ShiftAccess $access,
     ) {}
@@ -90,6 +100,26 @@ final class Counts
     public function submit(StockCount|int $count): StockCount
     {
         return $this->submitCount->handle($this->count($count));
+    }
+
+    /**
+     * @throws ShiftError auth.forbidden, shifts.station.forbidden (403); shifts.count.not_pending, shifts.count.approve_self,
+     *                    shifts.adjustment.insufficient (409)
+     */
+    public function approve(StockCount|int $count, ?string $note = null): StockCount
+    {
+        return $this->approveCount->handle($this->count($count), $note);
+    }
+
+    /**
+     * @param  list<int>|null  $lineIds
+     * @return StockCount the recount draft
+     *
+     * @throws ShiftError auth.forbidden, shifts.station.forbidden (403); shifts.count.not_pending (409)
+     */
+    public function reject(StockCount|int $count, string $note, ?array $lineIds = null): StockCount
+    {
+        return $this->rejectCount->handle($this->count($count), $note, $lineIds)[1];
     }
 
     private function count(StockCount|int $count): StockCount

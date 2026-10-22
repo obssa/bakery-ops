@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Http\Controllers;
 
 use App\Modules\Inventory\Contracts\Stock;
+use App\Modules\Shifts\Actions\ApproveCount;
+use App\Modules\Shifts\Actions\RejectCount;
 use App\Modules\Shifts\Actions\SetCountLines;
 use App\Modules\Shifts\Actions\SubmitCount;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Counts\CountPresenter;
 use App\Modules\Shifts\Counts\CountReads;
 use App\Modules\Shifts\Enums\CountStatus;
+use App\Modules\Shifts\Http\Requests\ApproveCountRequest;
+use App\Modules\Shifts\Http\Requests\RejectCountRequest;
 use App\Modules\Shifts\Http\Requests\SetCountLinesRequest;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
@@ -31,6 +35,8 @@ use Symfony\Component\HttpFoundation\Response;
  *                                       while the count is open to change, with the ledger (the draft's expected figure is live)
  *   PUT /stock-counts/{count}/lines     200 the Count; 409 shifts.count.not_draft; 422 shifts.count.qty_invalid, item_unknown, reason.unknown
  *   POST /stock-counts/{count}/submit   200 the Count; a repeat answers it; 409 / 422 as SubmitCount says
+ *   POST /stock-counts/{count}/approve  200 the Count (step 3.3b; shifts.approve): the adjustments are written, a repeat answers it; 409 as ApproveCount says
+ *   POST /stock-counts/{count}/reject   200 the rejected Count plus `recount`, the prefilled draft revision (shifts.approve); 409 / 422 as RejectCount says
  */
 final class CountsController
 {
@@ -72,6 +78,19 @@ final class CountsController
     public function submit(Request $input, StockCount $count, SubmitCount $submit): JsonResponse
     {
         return response()->json($this->presenter->one($submit->handle($count)));
+    }
+
+    public function approve(ApproveCountRequest $input, StockCount $count, ApproveCount $approve): JsonResponse
+    {
+        return response()->json($this->presenter->one($approve->handle($count, $input->note())));
+    }
+
+    public function reject(RejectCountRequest $input, StockCount $count, RejectCount $reject): JsonResponse
+    {
+        [$rejected, $recount] = $reject->handle($count, $input->note(), $input->lineIds());
+        [$row, $recountRow] = $this->presenter->many([$rejected, $recount]);
+
+        return response()->json($row + ['recount' => $recountRow]);
     }
 
     private function assertCanRead(ShiftInstance $shift): void

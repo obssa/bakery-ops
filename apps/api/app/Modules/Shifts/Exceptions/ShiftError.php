@@ -188,6 +188,18 @@ final class ShiftError extends RuntimeException
         return new self('shifts.count.blocked_by_pending', 409, ['count_id' => $countId]);
     }
 
+    /** A decision is made on a count that waits for one (pending_approval; a reject also takes awaiting_cosign). */
+    public static function countNotPending(string $status): self
+    {
+        return new self('shifts.count.not_pending', 409, ['status' => $status]);
+    }
+
+    /** The person who counted does not approve their own count (a sole admin included: plan section 10, open question 4). */
+    public static function approveSelf(): self
+    {
+        return new self('shifts.count.approve_self', 409);
+    }
+
     /** The reason does not exist in the branch, or is switched off. */
     public static function reasonUnknown(int $reasonId): self
     {

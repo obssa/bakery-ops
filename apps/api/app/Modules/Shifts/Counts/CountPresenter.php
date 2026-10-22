@@ -12,6 +12,7 @@ use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Contracts\StockLevel;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Enums\CountStatus;
+use App\Modules\Shifts\Enums\CountType;
 use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Models\StockCountLine;
 use App\Modules\Shifts\Models\VarianceReason;
@@ -27,7 +28,7 @@ use Carbon\CarbonInterface;
  * read as committed; once it is submitted it is the stored figure of the snapshot. `blocked_by_pending` names the unresolved count
  * at the same place that would refuse this draft's submit (rule R-A). `below_reserved` lists the lines of a submitted count whose
  * counted figure is under what open orders hold now (allowed, listed: plan section 10.4 point 2). `cash` and `chain` are null
- * until steps 3.5 and 3.4. Resolved per use.
+ * until steps 3.5 and 3.4. `moved_since` on a line (step 3.3b) is what moved at the place since the count, so an approver sees it (movedSince). Resolved per use.
  */
 final class CountPresenter
 {
@@ -155,7 +156,8 @@ final class CountPresenter
             }
 
             $live = $count->status === CountStatus::Draft ? ($levels[$count->location_id] ?? []) : null;
-            $row['lines'] = array_map(fn (StockCountLine $line): array => $this->line($line, $summaries[$line->item_id] ?? null, $reasons[$line->variance_reason_id ?? 0] ?? null, $live), $lines);
+            $moved = $this->movedSince($count, $lines);
+            $row['lines'] = array_map(fn (StockCountLine $line): array => $this->line($line, $summaries[$line->item_id] ?? null, $reasons[$line->variance_reason_id ?? 0] ?? null, $live, $moved), $lines);
             $row['cash'] = null;
             $row['below_reserved'] = self::listsReserved($count) ? $this->belowReserved($lines, $levels[$count->location_id] ?? []) : [];
             $out[] = $row;
@@ -185,9 +187,10 @@ final class CountPresenter
 
     /**
      * @param  array<int, StockLevel>|null  $live  the ledger now when the count is a draft, else null (the stored figure is shown)
+     * @param  array<int, Quantity>|null  $moved  the net movement per item since the count (movedSince), null when the count has none
      * @return array<string, mixed>
      */
-    private function line(StockCountLine $line, ?ItemSummary $item, ?VarianceReason $reason, ?array $live): array
+    private function line(StockCountLine $line, ?ItemSummary $item, ?VarianceReason $reason, ?array $live, ?array $moved): array
     {
         $expected = $live === null ? $line->expected_qty : (isset($live[$line->item_id]) ? $live[$line->item_id]->onHand : Quantity::zero());
 
@@ -204,7 +207,38 @@ final class CountPresenter
             'reason_status' => $line->reason_status->value,
             'decision_note' => $line->decision_note,
             'adjustment_movement_id' => $line->adjustment_movement_id,
+            'moved_since' => $moved === null ? null : ($moved[$line->item_id] ?? Quantity::zero())->toString(),
         ];
+    }
+
+    /**
+     * What moved at the place since the count, per item (signed on_hand change, items that net to zero are left out), so an approver
+     * sees stock that arrived or left after the counter finished. A count that waits for a decision, or was approved and not yet
+     * locked: the movements after its snapshot, without its own adjustments. An opening draft: the movements since the previous
+     * closing of the place (what separates the carried figure from the ledger), without that closing's adjustments. Anything else
+     * (a closing draft, a rejected or locked count) is history or not yet measured: null.
+     *
+     * @param  list<StockCountLine>  $lines
+     * @return array<int, Quantity>|null
+     */
+    private function movedSince(StockCount $count, array $lines): ?array
+    {
+        if (in_array($count->status, [CountStatus::AwaitingCosign, CountStatus::PendingApproval, CountStatus::Approved], true)) {
+            $own = array_values(array_filter(array_map(static fn (StockCountLine $l): ?int => $l->adjustment_movement_id, $lines)));
+
+            return $this->stock->netChangeSince($count->location_id, $count->ledger_movement_id ?? 0, $own);
+        }
+        if ($count->status === CountStatus::Draft && $count->type === CountType::Opening) {
+            $previous = $this->locks->previousClosing($count->location_id);
+            if (! $previous instanceof StockCount || $previous->ledger_movement_id === null) {
+                return null;
+            }
+            $theirs = StockCountLine::query()->where('count_id', $previous->id)->whereNotNull('adjustment_movement_id')->pluck('adjustment_movement_id')->map(static fn (mixed $id): int => (int) $id)->all();
+
+            return $this->stock->netChangeSince($count->location_id, $previous->ledger_movement_id, array_values($theirs));
+        }
+
+        return null;
     }
 
     /**

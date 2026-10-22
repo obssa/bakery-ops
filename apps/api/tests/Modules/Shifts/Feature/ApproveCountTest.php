@@ -178,8 +178,8 @@ it('keeps the shift pending approval until its last count is resolved, then lock
     $drink = $this->f->ingredient('ml');
     $this->f->stock($drink, $bar, '1000');
     // the closing of a shift with two places: close again on a fresh shift
-    $other = $this->f->running($this->f->kitchen, $this->f->chef, ['date' => '2026-11-03']);
     ShiftInstance::query()->whereKey($this->shift->id)->update(['status' => 'locked', 'open_key' => null, 'locked_at' => now()]);
+    $other = $this->f->running($this->f->kitchen, $this->f->chef, ['date' => '2026-11-03']);
     $close = $this->f->close($this->f->chef, $other->id)->assertOk();
     $ids = collect($close->json('counts'))->pluck('id', 'location.id');
     expect($ids)->toHaveCount(2);
@@ -253,8 +253,8 @@ it('is a call of the Counts contract too, run as the person acting', function ()
 it('approves a count that has lines of more than one item with fractions exactly', function () {
     $oil = $this->f->ingredient('ml');
     $this->f->stock($oil, $this->place, '0.3');
-    $other = $this->f->running($this->f->kitchen, $this->f->chef, ['date' => '2026-11-03']);
     ShiftInstance::query()->whereKey($this->shift->id)->update(['status' => 'locked', 'open_key' => null, 'locked_at' => now()]);
+    $other = $this->f->running($this->f->kitchen, $this->f->chef, ['date' => '2026-11-03']);
     $count = (int) $this->f->close($this->f->chef, $other->id)->assertOk()->json('counts.0.id');
     $this->f->lines($this->f->chef, $count, ['confirm_all' => true, 'lines' => [['item_id' => $oil->id, 'counted_qty' => '0.1', 'reason_id' => $this->f->reasonId('miscount')]]])->assertOk();
     $this->f->submit($this->f->chef, $count)->assertOk();
