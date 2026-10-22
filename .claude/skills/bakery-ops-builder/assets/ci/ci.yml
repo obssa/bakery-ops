@@ -143,7 +143,7 @@ jobs:
     needs: [status, mod-inventory]
     if: fromJSON(needs.status.outputs.phase) >= 1
     uses: ./.github/workflows/module-tests.yml
-    with: { module: orders, groups: "module:orders", contracts: "contract:payments->orders" }
+    with: { module: orders, groups: "module:orders", contracts: "contract:payments->orders,contract:shifts->orders" }
 
   mod-payments:
     needs: [status, mod-orders]
