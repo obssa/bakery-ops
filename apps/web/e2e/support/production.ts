@@ -1,5 +1,6 @@
 import { Api, uuid } from "./api";
 import { run } from "./env";
+import { findOrCreateStore } from "./inventory";
 import { ensureStaff, ensureTable, findOrCreateDisplayCase, findOrCreateLocation, findOrCreateStation, loginOnce, unitLookup, type Location, type Staff, type Station } from "./fixture";
 
 // Fixture builders and waits for the Phase 2 production flows (p2-stockout-production, step 2.8a), built on api.ts,
@@ -74,6 +75,8 @@ export interface ProductionFixture {
   cakeRoom: Station;
   cakeRoomLocation: Location;
   displayCase: Location;
+  /** the store, found or created: the ingredient is stocked there only when the fixture asks for it */
+  store: Location;
   baker: Staff & { api: Api };
   overseer: Staff & { api: Api };
   waiter: Staff & { api: Api; shortCode: string };
@@ -90,7 +93,10 @@ let built = 0;
  * uses 1.8 kg, which the ledger and the card state in the base unit: 1800 g) with exactly 1 on hand in the display case, the ingredient stocked at the cake room location, the cake baker
  * assigned to the cake room and the manager assigned there as its overseer.
  */
-export async function buildProductionFixture(credentials: { phone: string; password: string }): Promise<ProductionFixture> {
+export async function buildProductionFixture(
+  credentials: { phone: string; password: string },
+  options: { cakeRoomStock?: string; storeStock?: string } = {},
+): Promise<ProductionFixture> {
   const tag = `${run}${++built}`;
   const { api: admin, login } = await loginOnce(credentials.phone, credentials.password);
   const branchId = login.user.branch_id;
@@ -111,7 +117,7 @@ export async function buildProductionFixture(credentials: { phone: string; passw
   const ingredientEn = `E2E cake flour ${tag}`;
   const ingredientAm = `የሙከራ የኬክ ዱቄት ${tag}`;
   const ingredient = await admin.post<{ id: number }>("/items", { kind: "ingredient", name_en: ingredientEn, name_am: ingredientAm, unit_id: unit("kg") });
-  const stocked = "10.0000";
+  const stocked = options.cakeRoomStock ?? "10.0000";
   await admin.post("/stock/movements", {
     item_id: ingredient.id,
     location_id: cakeRoomLocation.id,
@@ -121,6 +127,18 @@ export async function buildProductionFixture(credentials: { phone: string; passw
     client_uuid: uuid(),
     note: `e2e ${tag}`,
   });
+  const store = await findOrCreateStore(admin);
+  if (options.storeStock) {
+    await admin.post("/stock/movements", {
+      item_id: ingredient.id,
+      location_id: store.id,
+      reason: "purchase_in",
+      qty: options.storeStock,
+      unit_id: unit("kg"),
+      client_uuid: uuid(),
+      note: `e2e ${tag}`,
+    });
+  }
 
   const cakeEn = `E2E chocolate cake ${tag}`;
   const cakeAm = `የሙከራ የቸኮሌት ኬክ ${tag}`;
@@ -158,6 +176,7 @@ export async function buildProductionFixture(credentials: { phone: string; passw
     cakeRoom,
     cakeRoomLocation,
     displayCase,
+    store,
     baker: { ...bakerStaff, api: baker },
     overseer: { ...overseerStaff, api: overseer },
     waiter: { ...waiterStaff, api: waiter, shortCode },
@@ -195,4 +214,16 @@ export async function inboxOf(api: Api): Promise<InboxLine[]> {
 export async function pushOffered(api: Api): Promise<boolean> {
   const channels = await api.get<{ push: { enabled: boolean; subscribed: boolean } }>("/notifications/channels");
   return channels.push.enabled && !channels.push.subscribed;
+}
+
+export interface StockAlertView {
+  id: number;
+  type: string;
+  item: { id: number } | null;
+  location: { id: number } | null;
+}
+
+/** The active stock alerts of the branch (what the admin Stock screen flags), newest first. */
+export async function stockAlertsOf(api: Api): Promise<StockAlertView[]> {
+  return (await api.get<{ data: StockAlertView[] }>("/stock-alerts", { active: 1, limit: 200 })).data;
 }

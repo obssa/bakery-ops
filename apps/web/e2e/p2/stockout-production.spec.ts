@@ -1,8 +1,10 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
+import { uuid } from "../support/api";
 import { live, requireAdmin } from "../support/env";
-import { menuAvailable } from "../support/fixture";
+import { buildStationFixture, menuAvailable, sendOrder } from "../support/fixture";
+import { transfersOf } from "../support/inventory";
 import { openAs, openPadAndUnlock } from "../support/pad";
-import { buildProductionFixture, inboxOf, movementsOf, pushOffered, requestById, requestsOf, waitForQueue, type ProductionFixture } from "../support/production";
+import { buildProductionFixture, stockAlertsOf, inboxOf, movementsOf, pushOffered, requestById, requestsOf, waitForQueue, type ProductionFixture } from "../support/production";
 
 // Phase 2 gate project p2-stockout-production (manifest phases.2.gate.criteria; docs/phases/phase-2-plan.md section 7),
 // step 2.8a. Three browser contexts, one per screen: the waiter pad, the cake baker's production board and the
@@ -156,6 +158,80 @@ test.describe("p2 stock-out to production", () => {
       throw error;
     } finally {
       await Promise.all(contexts.map((context) => context.close()));
+    }
+  });
+});
+
+// The plan's second test (step 2.8a deferred it to the transfer work of 2.8c).
+//
+// A made-to-order sandwich sold down to the last of its ingredient raises a stock-out of the ingredient, but production is
+// not asked for anything: the auto request is only for a to-stock product (the test waits for the alert, then looks for a
+// request and finds none). Then a cake request asked for by hand over a cake-room shelf that holds 1000 g of a recipe that
+// needs 1800 g for a batch of 6: the card shows the red shortfall (800 g missing, the store has 5000 g), Done is refused with
+// the API's message inline and nothing is written, and "Request transfer" from the card creates a requested transfer from
+// the store to the cake room that carries the request.
+
+async function runNoRequestForMadeToOrder(admin: ProductionFixture["admin"], credentials: { phone: string; password: string }) {
+  const station = await buildStationFixture(credentials, "kitchen", { stock: "0.2000", perUnit: "0.2000", price: "180.00" });
+  await sendOrder(station, "1");
+  await waitForQueue(`the stock alert of ${station.ingredient.name_en}`, async () => (await stockAlertsOf(admin)).find((a) => a.item?.id === station.ingredient.id) ?? null);
+  // production gets the same event; give the queue a few drains, then look: no request for a made-to-order product
+  for (let look = 0; look < 3; look++) {
+    expect(await requestsOf(admin, station.product.id), "a made-to-order product never gets an automatic production request").toEqual([]);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
+
+async function runShortfallAndTransfer(f: ProductionFixture, baker: Page) {
+  const cake = f.cake.name_en;
+  const request = await f.admin.post<{ id: number }>("/production/requests", { client_uuid: uuid(), product_item_id: f.cake.id, note: "e2e shortfall" });
+
+  await openAs(baker, f.baker.api, `en/production/?request=${request.id}`);
+  const detail = baker.getByRole("region", { name: `Request card: ${cake}` });
+  await expect(detail).toBeVisible({ timeout: 30_000 });
+  const line = detail.getByRole("row").filter({ hasText: f.ingredient.name_en });
+  await expect(line).toContainText("1800 g");
+  await expect(line).toContainText("1000 g");
+  await expect(line).toContainText("Short");
+  await expect(line).toContainText("800 g missing");
+
+  // accept and start are allowed; Done is refused with the shortage, and nothing was written
+  await detail.getByRole("button", { name: "Accept", exact: true }).click();
+  await detail.getByRole("button", { name: "Start", exact: true }).click();
+  await detail.getByLabel("Produced").fill("6");
+  await detail.getByLabel("Waste").fill("0");
+  await detail.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(detail.getByRole("alert")).toContainText("short by 800 g", { timeout: 15_000 });
+  expect((await movementsOf(f.admin, f.ingredient.id, f.cakeRoomLocation.id)).map((m) => m.reason)).toEqual(["purchase_in"]);
+  expect((await requestById(f.admin, request.id)).status).toBe("in_progress");
+
+  // "Request transfer" from the card: the same sheet as the kitchen strip, asking the store for the 800 g
+  await line.getByRole("button", { name: `Request transfer of ${f.ingredient.name_en}` }).click();
+  const sheet = baker.getByRole("dialog", { name: `Request transfer: ${f.ingredient.name_en}` });
+  await expect(sheet.getByLabel("Quantity (g)")).toHaveValue("800");
+  await sheet.getByRole("button", { name: "Send request" }).click();
+  await expect(sheet.getByRole("status")).toContainText("Transfer requested", { timeout: 15_000 });
+  const [asked] = await transfersOf(f.admin, f.ingredient.id);
+  expect(asked).toMatchObject({ status: "requested", qty: "800.0000" });
+  expect(asked.from_location.id).toBe(f.store.id);
+  expect(asked.to_location.id).toBe(f.cakeRoomLocation.id);
+}
+
+test.describe("p2 stock-out, second case", () => {
+  test("a made-to-order stock-out makes no request, and a short batch shows the shortfall and can ask the store for the rest @live", async ({ browser }, testInfo) => {
+    test.setTimeout(live ? 600_000 : 240_000);
+    const credentials = requireAdmin(test.skip);
+    const fixture = await buildProductionFixture(credentials, { cakeRoomStock: "1.0000", storeStock: "5.0000" });
+    const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: TABLET, serviceWorkers: "block" });
+    const baker = await context.newPage();
+    try {
+      await runNoRequestForMadeToOrder(fixture.admin, credentials);
+      await runShortfallAndTransfer(fixture, baker);
+    } catch (error) {
+      await testInfo.attach("baker.png", { body: await baker.screenshot().catch(() => Buffer.alloc(0)), contentType: "image/png" });
+      throw error;
+    } finally {
+      await context.close();
     }
   });
 });

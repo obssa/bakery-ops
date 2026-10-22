@@ -1,5 +1,5 @@
 import { test, expect, type Browser, type Page, type Request } from "@playwright/test";
-import { requireAdmin } from "../support/env";
+import { requireAdmin, TICKET_VISIBLE_MS } from "../support/env";
 import { buildFlowFixture, clearStaleOrders, ledgerReasonsOf, menuAvailable, type FlowFixture } from "../support/fixture";
 import { openAs, openPadAndUnlock } from "../support/pad";
 
@@ -41,7 +41,7 @@ async function expectPollingDiscipline(requests: Request[], label: string) {
 
 async function work(page: Page, product: string) {
   const ticket = page.getByRole("article").filter({ hasText: product });
-  await expect(ticket).toBeVisible({ timeout: 5_000 });
+  await expect(ticket).toBeVisible({ timeout: TICKET_VISIBLE_MS });
   await ticket.getByRole("button", { name: `Accept ${product}` }).click();
   await expect(ticket).toContainText("Accepted");
   await ticket.getByRole("button", { name: `Ready ${product}` }).click();
@@ -76,8 +76,8 @@ async function runFlow(f: FlowFixture, pages: { pad: Page; kitchen: Page; bar: P
   await expect(pad.getByRole("status").filter({ hasText: "Order sent" })).toBeVisible({ timeout: 30_000 });
 
   // the kitchen and the bar see their ticket within 5 s; the latte is not on the kitchen rail
-  await expect(kitchen.getByRole("article").filter({ hasText: sandwich })).toBeVisible({ timeout: 5_000 });
-  await expect(bar.getByRole("article").filter({ hasText: latte })).toBeVisible({ timeout: 5_000 });
+  await expect(kitchen.getByRole("article").filter({ hasText: sandwich })).toBeVisible({ timeout: TICKET_VISIBLE_MS });
+  await expect(bar.getByRole("article").filter({ hasText: latte })).toBeVisible({ timeout: TICKET_VISIBLE_MS });
   await expect(kitchen.getByRole("article").filter({ hasText: latte })).toHaveCount(0);
   await work(kitchen, sandwich);
   await work(bar, latte);

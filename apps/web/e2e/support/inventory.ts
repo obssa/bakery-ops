@@ -1,6 +1,6 @@
 import { Api, uuid } from "./api";
 import { run } from "./env";
-import { loginOnce, unitLookup, type Location } from "./fixture";
+import { ensureStaff, findOrCreateLocation, findOrCreateStation, loginOnce, unitLookup, type Location, type Staff, type Station } from "./fixture";
 
 // Fixture builders and reads for the admin Inventory flow (p2-purchase-transfer, step 2.8b), built on api.ts, env.ts and
 // fixture.ts. Everything goes through the admin API of the isolated "E2E Test Branch": the store location is found or
@@ -39,7 +39,7 @@ function today(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-async function findOrCreateStore(admin: Api): Promise<Place> {
+export async function findOrCreateStore(admin: Api): Promise<Place> {
   const locations = (await admin.get<{ data: Place[] }>("/locations")).data;
   const found = locations.find((l) => l.type === "store");
   if (found) return found;
@@ -97,4 +97,79 @@ export async function reorderListOf(admin: Api): Promise<{ item: { id: number };
 
 export async function purchasesOf(admin: Api, supplierId: number): Promise<PurchaseView[]> {
   return (await admin.get<{ data: PurchaseView[] }>("/purchases", { supplier_id: supplierId, per_page: 100 })).data;
+}
+
+// --- the station side (p2-purchase-transfer, step 2.8c) -----------------------------------------------------------
+
+export interface TransferView {
+  id: number;
+  status: string;
+  qty: string;
+  note: string | null;
+  reject_reason: string | null;
+  item: { id: number };
+  from_location: { id: number };
+  to_location: { id: number };
+}
+
+export interface TransferFixture extends InventoryFixture {
+  kitchen: Station;
+  kitchenLocation: Location;
+  /** the chef (assigned to the kitchen) and the manager, who confirms at the store, each signed in on the API */
+  chef: Staff & { api: Api };
+  manager: Staff & { api: Api };
+  /** what the flow buys and asks for, in the item base unit (grams): 10 kg at the store from the fixture, 10 kg more on screen, 1 kg in the kitchen */
+  kitchenStart: { onHand: string; onHandText: string };
+  ask: { qty: string; text: string; note: string };
+}
+
+/**
+ * The inventory fixture plus the station side: the kitchen and its location (found or created), the fixed chef assigned to
+ * the kitchen, the fixed manager (who holds stations.all and so confirms at the store), 1 kg of the ingredient in the kitchen
+ * with a rule that puts it at Low (minimum 2 kg), so the kitchen display's stock strip lists it.
+ */
+export async function buildTransferFixture(credentials: { phone: string; password: string }): Promise<TransferFixture> {
+  const base = await buildInventoryFixture(credentials);
+  const { admin } = base;
+  const unit = await unitLookup(admin);
+  const kitchen = await findOrCreateStation(admin, "kitchen");
+  const kitchenLocation = await findOrCreateLocation(admin, kitchen);
+
+  const chefStaff = await ensureStaff(admin, credentials.password, "chef");
+  await admin.put(`/users/${chefStaff.id}/stations`, { assignments: [{ station_id: kitchen.id, can_count: true, is_overseer: false }] });
+  const managerStaff = await ensureStaff(admin, credentials.password, "manager");
+  const [chef, manager] = await Promise.all([chefStaff, managerStaff].map((s) => loginOnce(s.phone, s.password, base.branchId)));
+
+  await admin.post("/stock/movements", {
+    item_id: base.ingredient.id,
+    location_id: kitchenLocation.id,
+    reason: "purchase_in",
+    qty: "1.0000",
+    unit_id: unit("kg"),
+    client_uuid: uuid(),
+    note: "e2e kitchen start",
+  });
+  await admin.post("/reorder-rules", { item_id: base.ingredient.id, location_id: kitchenLocation.id, min_qty: "2000", reorder_qty: "5000" });
+
+  return {
+    ...base,
+    kitchen,
+    kitchenLocation,
+    chef: { ...chefStaff, api: chef.api },
+    manager: { ...managerStaff, api: manager.api },
+    kitchenStart: { onHand: "1000.0000", onHandText: "1000 g" },
+    ask: { qty: "5000", text: "5000 g", note: "for the lunch rush" },
+  };
+}
+
+/** The transfers of an item (newest first), whatever their status. */
+export async function transfersOf(admin: Api, itemId: number): Promise<TransferView[]> {
+  const page = await admin.get<{ data: (TransferView)[] }>("/transfers", { per_page: 100 });
+  return page.data.filter((t) => t.item.id === itemId);
+}
+
+/** The ledger rows of an item at a place, oldest first, with what ties a transfer pair together. */
+export async function ledgerOf(admin: Api, itemId: number, locationId: number): Promise<{ id: number; reason: string; qty: string; ref_type: string | null; ref_id: number | null }[]> {
+  const page = await admin.get<{ data: { id: number; reason: string; qty: string; ref_type: string | null; ref_id: number | null }[] }>("/ledger", { item: itemId, location: locationId, per_page: 100 });
+  return [...page.data].sort((a, b) => a.id - b.id);
 }

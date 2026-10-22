@@ -26,3 +26,10 @@ export function requireAdmin(skip: (condition: boolean, description: string) => 
       '`php artisan bakery:create-admin <phone> --branch="E2E Test Branch" --password=<password>`.',
   );
 }
+
+/**
+ * How long a kitchen or bar display may take to show a ticket the waiter just sent. The Phase 1 gate criterion is 5 s, which
+ * CI keeps; the live host is shared and a first look can miss it, so a run against the deployed site (PLAYWRIGHT_BASE_URL set)
+ * allows 10 s. Nothing else is loosened by it.
+ */
+export const TICKET_VISIBLE_MS = live ? 10_000 : 5_000;
