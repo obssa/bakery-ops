@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Exceptions\InventoryError;
+use App\Modules\Inventory\Ledger\Ledger;
+use App\Modules\Inventory\Ledger\MovementIntent;
+use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Shared\Models\Branch;
@@ -119,8 +122,8 @@ it('freezes the station while counting: with the enforcement rule on a movement 
 
     try {
         withActor($this->f->admin->id);
-        app(App\Modules\Inventory\Ledger\Ledger::class)->append(App\Modules\Inventory\Ledger\MovementIntent::of(
-            $this->flour->id, $this->place->id, '5', App\Modules\Inventory\Ledger\MovementReason::PurchaseIn, 'test',
+        app(Ledger::class)->append(MovementIntent::of(
+            $this->flour->id, $this->place->id, '5', MovementReason::PurchaseIn, 'test',
         ));
         $this->fail('a movement at a frozen station must be refused');
     } catch (InventoryError $e) {
