@@ -1238,6 +1238,180 @@
                 }
             }
         },
+        "/v1/shifts/{shift}/counts": {
+            "get": {
+                "operationId": "shifts.counts.index",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "shift",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shift ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "additionalProperties": {}
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/stock-counts/{count}": {
+            "get": {
+                "operationId": "shifts.counts.show",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "count",
+                        "in": "path",
+                        "required": true,
+                        "description": "The count ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/stock-counts/{count}/lines": {
+            "put": {
+                "operationId": "shifts.counts.lines",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "count",
+                        "in": "path",
+                        "required": true,
+                        "description": "The count ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetCountLinesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/stock-counts/{count}/submit": {
+            "post": {
+                "operationId": "shifts.counts.submit",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "count",
+                        "in": "path",
+                        "required": true,
+                        "description": "The count ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/devices": {
             "get": {
                 "operationId": "identity.devices.index",
@@ -5710,10 +5884,9 @@
                                                             "counts": {
                                                                 "type": "array",
                                                                 "items": {
-                                                                    "type": "string"
-                                                                },
-                                                                "minItems": 0,
-                                                                "maxItems": 0
+                                                                    "type": "object",
+                                                                    "additionalProperties": {}
+                                                                }
                                                             },
                                                             "notes_count": {
                                                                 "type": "integer",
@@ -6045,10 +6218,9 @@
                                         "counts": {
                                             "type": "array",
                                             "items": {
-                                                "type": "string"
-                                            },
-                                            "minItems": 0,
-                                            "maxItems": 0
+                                                "type": "object",
+                                                "additionalProperties": {}
+                                            }
                                         },
                                         "notes_count": {
                                             "type": "integer",
@@ -6082,6 +6254,171 @@
                                         "roster",
                                         "counts",
                                         "notes_count"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/shifts/{shift}/summary": {
+            "get": {
+                "operationId": "shifts.summary",
+                "tags": [
+                    "Shifts"
+                ],
+                "parameters": [
+                    {
+                        "name": "shift",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shift ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "movements": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "location": {
+                                                        "anyOf": [
+                                                            {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "id"
+                                                                ]
+                                                            },
+                                                            {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "name_en": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "name_am": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "type": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "id",
+                                                                    "name_en",
+                                                                    "name_am",
+                                                                    "type"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    "item": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "string"
+                                                            },
+                                                            "name_en": {
+                                                                "type": "string"
+                                                            },
+                                                            "name_am": {
+                                                                "type": "string"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "name_en",
+                                                            "name_am",
+                                                            "unit"
+                                                        ]
+                                                    },
+                                                    "reason": {
+                                                        "type": "string"
+                                                    },
+                                                    "qty": {
+                                                        "type": "string"
+                                                    },
+                                                    "rows": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "location",
+                                                    "item",
+                                                    "reason",
+                                                    "qty",
+                                                    "rows"
+                                                ]
+                                            }
+                                        },
+                                        "cash": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "cash_sales_total": {
+                                                    "type": "string"
+                                                },
+                                                "by_channel": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                }
+                                            },
+                                            "required": [
+                                                "cash_sales_total",
+                                                "by_channel"
+                                            ]
+                                        },
+                                        "open_work": {
+                                            "type": "object",
+                                            "properties": {
+                                                "queued_lines": {
+                                                    "type": "integer",
+                                                    "const": 0
+                                                },
+                                                "accepted_lines": {
+                                                    "type": "integer",
+                                                    "const": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "queued_lines",
+                                                "accepted_lines"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "movements",
+                                        "cash",
+                                        "open_work"
                                     ]
                                 }
                             }
@@ -6324,10 +6661,9 @@
                                         "counts": {
                                             "type": "array",
                                             "items": {
-                                                "type": "string"
-                                            },
-                                            "minItems": 0,
-                                            "maxItems": 0
+                                                "type": "object",
+                                                "additionalProperties": {}
+                                            }
                                         },
                                         "notes_count": {
                                             "type": "integer",
@@ -6605,10 +6941,9 @@
                                         "counts": {
                                             "type": "array",
                                             "items": {
-                                                "type": "string"
-                                            },
-                                            "minItems": 0,
-                                            "maxItems": 0
+                                                "type": "object",
+                                                "additionalProperties": {}
+                                            }
                                         },
                                         "notes_count": {
                                             "type": "integer",
@@ -6877,10 +7212,9 @@
                                         "counts": {
                                             "type": "array",
                                             "items": {
-                                                "type": "string"
-                                            },
-                                            "minItems": 0,
-                                            "maxItems": 0
+                                                "type": "object",
+                                                "additionalProperties": {}
+                                            }
                                         },
                                         "notes_count": {
                                             "type": "integer",
@@ -7146,10 +7480,9 @@
                                         "counts": {
                                             "type": "array",
                                             "items": {
-                                                "type": "string"
-                                            },
-                                            "minItems": 0,
-                                            "maxItems": 0
+                                                "type": "object",
+                                                "additionalProperties": {}
+                                            }
                                         },
                                         "notes_count": {
                                             "type": "integer",
@@ -7183,6 +7516,290 @@
                                         "roster",
                                         "counts",
                                         "notes_count"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/shifts/{shift}/close": {
+            "post": {
+                "operationId": "shifts.close",
+                "tags": [
+                    "Shifts"
+                ],
+                "parameters": [
+                    {
+                        "name": "shift",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shift ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "shift": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "client_uuid": {
+                                                    "type": "string"
+                                                },
+                                                "station": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "code": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "tracks_shifts": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "requires_overseer": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am",
+                                                        "tracks_shifts",
+                                                        "requires_overseer"
+                                                    ]
+                                                },
+                                                "template": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "start_time": {
+                                                            "type": "string"
+                                                        },
+                                                        "end_time": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name_en",
+                                                        "name_am",
+                                                        "start_time",
+                                                        "end_time"
+                                                    ]
+                                                },
+                                                "date": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "origin": {
+                                                    "type": "string"
+                                                },
+                                                "opening_mode": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "starts_at": {
+                                                    "type": "string"
+                                                },
+                                                "ends_at": {
+                                                    "type": "string"
+                                                },
+                                                "started_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "started_at": {
+                                                    "type": "string"
+                                                },
+                                                "opened_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "opened_at": {
+                                                    "type": "string"
+                                                },
+                                                "closed_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "closing_started_at": {
+                                                    "type": "string"
+                                                },
+                                                "submitted_at": {
+                                                    "type": "string"
+                                                },
+                                                "locked_at": {
+                                                    "type": "string"
+                                                },
+                                                "cancelled_at": {
+                                                    "type": "string"
+                                                },
+                                                "cancelled_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "cancel_reason": {
+                                                    "type": "string"
+                                                },
+                                                "me_on_roster": {
+                                                    "type": "string"
+                                                },
+                                                "version": {
+                                                    "type": "string"
+                                                },
+                                                "roster": {
+                                                    "type": "string"
+                                                },
+                                                "counts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "additionalProperties": {}
+                                                    }
+                                                },
+                                                "notes_count": {
+                                                    "type": "integer",
+                                                    "const": 0
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "client_uuid",
+                                                "station",
+                                                "template",
+                                                "date",
+                                                "status",
+                                                "origin",
+                                                "opening_mode",
+                                                "starts_at",
+                                                "ends_at",
+                                                "started_by",
+                                                "started_at",
+                                                "opened_by",
+                                                "opened_at",
+                                                "closed_by",
+                                                "closing_started_at",
+                                                "submitted_at",
+                                                "locked_at",
+                                                "cancelled_at",
+                                                "cancelled_by",
+                                                "cancel_reason",
+                                                "me_on_roster",
+                                                "version",
+                                                "roster",
+                                                "counts",
+                                                "notes_count"
+                                            ]
+                                        },
+                                        "counts": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "additionalProperties": {}
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "shift",
+                                        "counts"
                                     ]
                                 }
                             }
@@ -8937,6 +9554,219 @@
                     }
                 }
             }
+        },
+        "/v1/variance-reasons": {
+            "get": {
+                "operationId": "shifts.reasons.index",
+                "tags": [
+                    "VarianceReasons"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_en": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_am": {
+                                                        "type": "string"
+                                                    },
+                                                    "requires_note": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "is_active": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "sort": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "code",
+                                                    "name_en",
+                                                    "name_am",
+                                                    "requires_note",
+                                                    "is_active",
+                                                    "sort"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "shifts.reasons.store",
+                "tags": [
+                    "VarianceReasons"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreVarianceReasonRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "code": {
+                                            "type": "string"
+                                        },
+                                        "name_en": {
+                                            "type": "string"
+                                        },
+                                        "name_am": {
+                                            "type": "string"
+                                        },
+                                        "requires_note": {
+                                            "type": "boolean"
+                                        },
+                                        "is_active": {
+                                            "type": "boolean"
+                                        },
+                                        "sort": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "code",
+                                        "name_en",
+                                        "name_am",
+                                        "requires_note",
+                                        "is_active",
+                                        "sort"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/variance-reasons/{reason}": {
+            "patch": {
+                "operationId": "shifts.reasons.update",
+                "tags": [
+                    "VarianceReasons"
+                ],
+                "parameters": [
+                    {
+                        "name": "reason",
+                        "in": "path",
+                        "required": true,
+                        "description": "The reason ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateVarianceReasonRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "code": {
+                                            "type": "string"
+                                        },
+                                        "name_en": {
+                                            "type": "string"
+                                        },
+                                        "name_am": {
+                                            "type": "string"
+                                        },
+                                        "requires_note": {
+                                            "type": "boolean"
+                                        },
+                                        "is_active": {
+                                            "type": "boolean"
+                                        },
+                                        "sort": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "code",
+                                        "name_en",
+                                        "name_am",
+                                        "requires_note",
+                                        "is_active",
+                                        "sort"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -10186,6 +11016,52 @@
                 ],
                 "title": "SendBackBatchRequest"
             },
+            "SetCountLinesRequest": {
+                "type": "object",
+                "description": "PUT /stock-counts/{count}/lines: `lines` (each an `item_id` and any of `counted_qty`, `confirm`, `reason_id`, `reason_note`) and/or\n`confirm_all` (the explicit \"nothing changed\"). The shape is checked here; a counted figure is deliberately not: the action reads\nit as a decimal string or a whole JSON number and answers 422 shifts.count.qty_invalid naming the item when it is anything else,\nso a client gets the same error whatever is wrong with the figure. A key that is absent leaves that field alone; `null` clears it.",
+                "properties": {
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "item_id": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "confirm": {
+                                    "type": [
+                                        "boolean",
+                                        "null"
+                                    ]
+                                },
+                                "reason_id": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ],
+                                    "minimum": 1
+                                },
+                                "reason_note": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 255
+                                }
+                            },
+                            "required": [
+                                "item_id"
+                            ]
+                        },
+                        "maxItems": 500
+                    },
+                    "confirm_all": {
+                        "type": "boolean"
+                    }
+                },
+                "title": "SetCountLinesRequest"
+            },
             "SetOpeningCostRequest": {
                 "type": "object",
                 "description": "POST /inventory/costs/{item}/opening: the cost of the stock already on hand, per $unit_id (a decimal string with at most 4\ndecimals, never a float). SetOpeningCost converts it to a cost per base unit.",
@@ -10219,7 +11095,7 @@
             },
             "StartShiftRequest": {
                 "type": "object",
-                "description": "POST /stations/{station}/shifts/start: the client UUID of the shift the start may make (an offline replay with a lost\nIdempotency-Key reaches the same shift, ADR 0003), optionally the scheduled instance (`shift_id`) or the template (`template_id`)\nto start, `carry` (open without counting: every start is carried until step 3.3a) and `force` (outside the window; the admin's,\nchecked by the action).",
+                "description": "POST /stations/{station}/shifts/start: the client UUID of the shift the start may make (an offline replay with a lost\nIdempotency-Key reaches the same shift, ADR 0003), optionally the scheduled instance (`shift_id`) or the template (`template_id`)\nto start, `carry` (open without counting) and `force` (outside the window; the admin's,\nchecked by the action).",
                 "properties": {
                     "client_uuid": {
                         "type": "string",
@@ -11253,6 +12129,39 @@
                 ],
                 "title": "StoreUserRequest"
             },
+            "StoreVarianceReasonRequest": {
+                "type": "object",
+                "description": "POST /variance-reasons: a code (lower case letters, digits, underscore and hyphen, at most 32; chosen once), both names (at most\n80), whether the counter must write a note, and where it goes in the order. A code the branch already has is 409\nshifts.reason.code_taken, decided by the action.",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                        "maxLength": 32
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 80
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 80
+                    },
+                    "requires_note": {
+                        "type": "boolean"
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                    }
+                },
+                "required": [
+                    "code",
+                    "name_en",
+                    "name_am"
+                ],
+                "title": "StoreVarianceReasonRequest"
+            },
             "SubscribePushRequest": {
                 "type": "object",
                 "description": "POST /notifications/endpoints {driver: \"push\", subscription: {endpoint, keys: {p256dh, auth}}, user_agent?}: what the\nbrowser's PushManager.subscribe() returns (its toJSON()). Only push subscribes this way; a Telegram chat is linked with a\none-time code instead (POST /notifications/telegram/link). The endpoint must be an https URL, as the Web Push protocol\nrequires.",
@@ -11787,6 +12696,32 @@
                     }
                 },
                 "title": "UpdateUserRequest"
+            },
+            "UpdateVarianceReasonRequest": {
+                "type": "object",
+                "description": "PATCH /variance-reasons/{reason}: any of the names, the note rule, the switch and the order. The code never changes: a `code` in the\nbody is not a rule here, so validated() drops it.",
+                "properties": {
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 80
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 80
+                    },
+                    "requires_note": {
+                        "type": "boolean"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 65535
+                    }
+                },
+                "title": "UpdateVarianceReasonRequest"
             },
             "UserResource": {
                 "type": "object",
