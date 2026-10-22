@@ -342,8 +342,6 @@ it('answers the countable places and the cash drawer of a station as plain views
         ->and(array_map(fn (LocationView $v): int => $v->id, [...$kitchen, ...$till]))->not->toContain($foreign->id, $gone->id);
 })->group('contract:shifts->inventory', 'contract');
 
-const SHIFT_ENFORCEMENT_PENDING = 'ledger enforcement (F2) lands in step 3.1b: config/ledger.php does not exist yet';
-
 it('refuses, with the flag on, a movement that changes on_hand at a station that tracks shifts when no shift covers it, and writes nothing', function () {
     stockIn($this->flour, $this->kitchen, '10');
     ($this->flag)(true, new FakeOpenShifts);
@@ -370,7 +368,7 @@ it('refuses, with the flag on, a movement that changes on_hand at a station that
     // a batch needs every tracked station it touches covered: one uncovered end refuses the whole batch
     expect(fn () => ($this->ledger)()->appendMany(MovementIntent::transfer($this->flour->id, $this->store->id, $this->kitchen->id, '1', 'test')))->toThrow(InventoryError::class)
         ->and(DB::table('stock_movements')->count())->toBe($before);
-})->skip(fn (): bool => ! file_exists(config_path('ledger.php')), SHIFT_ENFORCEMENT_PENDING)->group('contract:shifts->inventory', 'contract');
+})->group('contract:shifts->inventory', 'contract');
 
 it('exempts reservations, a count\'s own adjustment, a location with no station and a station that does not track shifts', function () {
     stockIn($this->flour, $this->kitchen, '10');
@@ -393,7 +391,7 @@ it('exempts reservations, a count\'s own adjustment, a location with no station 
         ->and(app(Stock::class)->of($this->flour, $warehouse)->onHand->toString())->toBe('5.0000');
     // but a count_adjustment that is not a count's own is covered like any other movement
     expect(fn () => $ledger->append(MovementIntent::of($this->flour->id, $this->kitchen->id, '1', MovementReason::CountAdjustment, 'manual')))->toThrow(InventoryError::class);
-})->skip(fn (): bool => ! file_exists(config_path('ledger.php')), SHIFT_ENFORCEMENT_PENDING)->group('contract:shifts->inventory', 'contract');
+})->group('contract:shifts->inventory', 'contract');
 
 it('covers a movement by the actor\'s open shift at any station, or by the station\'s own open shift for an actor with none, and stamps the row', function () {
     stockIn($this->flour, $this->kitchen, '10');
@@ -420,7 +418,7 @@ it('covers a movement by the actor\'s open shift at any station, or by the stati
     $c = ($this->ledger)()->append(MovementIntent::of($this->flour->id, $this->kitchen->id, '1', MovementReason::PurchaseIn, 'test'));
     expect($c->shiftInstanceId)->toBe(601)
         ->and(DB::table('stock_movements')->where('id', $c->id)->value('shift_instance_id'))->toBe(601);
-})->skip(fn (): bool => ! file_exists(config_path('ledger.php')), SHIFT_ENFORCEMENT_PENDING)->group('contract:shifts->inventory', 'contract');
+})->group('contract:shifts->inventory', 'contract');
 
 it('never consults OpenShifts with the flag off, whatever the state', function () {
     $double = new FakeOpenShifts([$this->kitchenStation->id => 701]);
