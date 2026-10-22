@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { requireAdmin } from "../support/env";
-import { buildStationFixture, ledgerReasons } from "../support/fixture";
+import { buildStationFixture, clearStaleOrders, ledgerReasons } from "../support/fixture";
 import { openPadAndUnlock } from "../support/pad";
 
 // Phase 1 gate project p1-shortfall (manifest phases.1.gate.criteria; docs/phases/phase-1-plan.md section 7), built in
@@ -19,6 +19,7 @@ test.describe("p1 shortfall", () => {
   test("selling more than is available shows the shortfall on the exact line, and the reduced order sends @live", async ({ page }) => {
     test.setTimeout(180_000);
     const credentials = requireAdmin(test.skip);
+    await clearStaleOrders(credentials);
     const fixture = await buildStationFixture(credentials, "kitchen", { stock: "2.0000", perUnit: "1.0000" });
     const product = fixture.product.name_en;
 

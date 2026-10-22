@@ -429,16 +429,17 @@ export function orderLabel(order: { order_no: string | number; business_date: st
 }
 
 /**
- * Voids every unpaid order an earlier business day left in the E2E Test Branch (with the fixture manager's PIN, through the
- * cashier), so a number of today never meets the same number of an old day in the till queue.
+ * Voids every unpaid order the E2E Test Branch still holds, of any business day (with the fixture manager's PIN, through the
+ * cashier). The waiter and the tables are shared by every run, so an order an earlier failed attempt left open would otherwise
+ * be counted in the pad's "ready" badge and sit in the till queue. Specs run serially (one worker), so this cannot void the
+ * order of a running test.
  */
 export async function clearStaleOrders(adminCredentials: { phone: string; password: string }): Promise<number> {
   const staff = await buildTillStaff(adminCredentials);
-  const today = businessToday();
   const open = await staff.cashier.api.get<{ data: { id: number; status: string; business_date: string | null; totals: { balance: string } }[] }>("/orders", { limit: 200 });
-  const stale = open.data.filter((o) => o.business_date !== null && o.business_date < today && ["sent", "in_progress", "ready", "served"].includes(o.status));
+  const stale = open.data.filter((o) => ["sent", "in_progress", "ready", "served"].includes(o.status));
   for (const order of stale) {
-    await staff.cashier.api.tryPost(`/orders/${order.id}/void`, { reason: "E2E cleanup of an earlier business day", pin: staff.manager.pin });
+    await staff.cashier.api.tryPost(`/orders/${order.id}/void`, { reason: "E2E cleanup of orders an earlier run left open", pin: staff.manager.pin });
   }
   return stale.length;
 }

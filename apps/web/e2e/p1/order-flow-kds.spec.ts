@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Request, type Response } from "@playwright/test";
 import { requireAdmin } from "../support/env";
-import { buildStationFixture, ledgerReasons, sendOrder, type StationFixture } from "../support/fixture";
+import { buildStationFixture, clearStaleOrders, ledgerReasons, sendOrder, type StationFixture } from "../support/fixture";
 
 // Phase 1 gate project p1-order-flow, the kitchen half (step 1.6a; step 1.6c added the pad, the bar and the till in
 // order-flow.spec.ts, the full flow). docs/phases/phase-1-plan.md section 7, ADR 0009.
@@ -29,6 +29,7 @@ test.describe("p1 order flow: kitchen display", () => {
   test("a sent order reaches the kitchen rail, is accepted and made ready, and leaves when served @live", async ({ page }) => {
     test.setTimeout(120_000);
     const credentials = requireAdmin(test.skip);
+    await clearStaleOrders(credentials);
     const fixture = await buildStationFixture(credentials, "kitchen");
 
     const ticketRequests: Request[] = [];

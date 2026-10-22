@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { requireAdmin } from "../support/env";
-import { buildStationFixture } from "../support/fixture";
+import { buildStationFixture, clearStaleOrders } from "../support/fixture";
 import { openPad, openPadAndUnlock, typeCode } from "../support/pad";
 
 // Phase 1 gate project p1-order-flow, the pad lock screen (step 1.6b; the full flow arrives in step 1.6c). A shared pad
@@ -16,6 +16,7 @@ test.describe("p1 order flow: pad lock", () => {
   test("a wrong code is refused and the sixth attempt is locked out, in both languages @live", async ({ page }) => {
     test.setTimeout(120_000);
     const credentials = requireAdmin(test.skip);
+    await clearStaleOrders(credentials);
     const fixture = await buildStationFixture(credentials, "kitchen");
 
     await openPad(page, fixture.waiter);
@@ -41,6 +42,7 @@ test.describe("p1 order flow: pad lock", () => {
   test("the pad locks after 60 s without a touch and parks the waiter cart @live", async ({ page }) => {
     test.setTimeout(120_000);
     const credentials = requireAdmin(test.skip);
+    await clearStaleOrders(credentials);
     const fixture = await buildStationFixture(credentials, "kitchen");
     const product = fixture.product.name_en;
 

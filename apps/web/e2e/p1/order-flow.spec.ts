@@ -84,8 +84,9 @@ async function runFlow(f: FlowFixture, pages: { pad: Page; kitchen: Page; bar: P
 
   // the pad: three lines ready (the croissant was ready at send), then the waiter serves each
   await pad.getByRole("tab", { name: /My orders/ }).click();
-  await expect(pad.getByRole("tab", { name: /My orders/ })).toContainText("3 ready", { timeout: 15_000 });
+  // this run's own order shows its three lines ready (the badge also counts any other open order of the shared waiter)
   const card = pad.getByRole("article").filter({ hasText: sandwich });
+  for (const product of [sandwich, latte, croissant]) await expect(card.getByRole("button", { name: `Mark ${product} served` })).toBeVisible({ timeout: 15_000 });
   for (const product of [sandwich, latte, croissant]) await card.getByRole("button", { name: `Mark ${product} served` }).click();
   await expect(card.getByText("Served", { exact: true })).toHaveCount(3, { timeout: 15_000 });
 

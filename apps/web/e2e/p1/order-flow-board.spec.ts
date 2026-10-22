@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { requireAdmin } from "../support/env";
-import { buildStationFixture, sendOrder } from "../support/fixture";
+import { buildStationFixture, clearStaleOrders, sendOrder } from "../support/fixture";
 import { openAs } from "../support/pad";
 
 // Phase 1 gate project p1-order-flow, the admin Orders live board (step 1.6c). A waiter sends an order through the
@@ -14,6 +14,7 @@ test.describe("p1 order flow: admin orders board", () => {
   test("a sent order shows on the live board with its timeline @live", async ({ page }) => {
     test.setTimeout(120_000);
     const credentials = requireAdmin(test.skip);
+    await clearStaleOrders(credentials);
     const fixture = await buildStationFixture(credentials, "kitchen");
     const product = fixture.product.name_en;
 
