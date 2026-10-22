@@ -101,7 +101,7 @@
         "notifications": "done",
         "inventory.reorder": "done",
         "production": "done",
-        "web": "todo",
+        "web": "done",
         "docs": "todo"
       },
       "playwright_projects": [
