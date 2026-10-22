@@ -76,16 +76,19 @@
       ]
     },
     "2": {
-      "status": "in_progress",
+      "status": "gate_pending",
       "plan": "docs/phases/phase-2-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
-      "report": null,
+      "report": "docs/phases/phase-2-report.md",
       "gate_job": "gate-p2",
       "gate_run_url": null,
       "done_commit": null,
       "done_at": null,
-      "adrs": [],
+      "adrs": [
+        "0010-station-presence-resolver",
+        "0011-stock-alert-dedupe-and-queued-actor"
+      ],
       "adr_waiver": null,
       "contracts_required": [
         "production->inventory",
@@ -102,7 +105,7 @@
         "inventory.reorder": "done",
         "production": "done",
         "web": "done",
-        "docs": "todo"
+        "docs": "done"
       },
       "playwright_projects": [
         "p2-stockout-production",

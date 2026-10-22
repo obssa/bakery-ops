@@ -1020,7 +1020,7 @@ and 1.6a-c were in Phase 1.
      reorder rules and the reorder list, active alerts.
 
      **As built (step 2.8b, `phase-2/web-inventory`).** Done as planned, with these differences and decisions (the plan left them open or the code was the fact):
-     - *Red before green, as run.* One commit of tests first: `e2e/support/inventory.ts` (the fixture) and `e2e/p2/purchase-admin.spec.ts`, which `p2-purchase-transfer` matches (`/purchase/`) beside the 2.8 placeholder `purchase-transfer.spec.ts`; the placeholder and its `TODO(p2)` marker stay until 2.8c adds the station side. A second commit corrected the flow to base units (below), then the foundations (calls, types, strings, links), then the screens. Nothing was run against a local API (the PC runs no stack), so CI's `e2e-p2` is the first run of the flow.
+     - *Red before green, as run.* One commit of tests first: `e2e/support/inventory.ts` (the fixture) and `e2e/p2/purchase-admin.spec.ts`, which `p2-purchase-transfer` matches (`/purchase/`) beside the 2.8 placeholder `purchase-transfer.spec.ts`; the placeholder and its phase-2 to-do marker stay until 2.8c adds the station side. A second commit corrected the flow to base units (below), then the foundations (calls, types, strings, links), then the screens. Nothing was run against a local API (the PC runs no stack), so CI's `e2e-p2` is the first run of the flow.
      - *Where it lives.* `/admin/inventory` is a tab of the admin frame with its own sub-tabs, each a static page for both locales: Stock (balances and active alerts), Ledger, Purchases, Suppliers, Transfers, Reorder (rules and list). A sub-tab shows only to someone who may open it (`inventory.view`; `purchases.record` for Purchases and Suppliers); the API still decides every request. No API change in this step.
      - *Reads and writes.* Every list loads on open and again after any inventory write (one query-key prefix is invalidated); nothing polls. Writes are online with an `Idempotency-Key` reused on a retry, as in 2.8a. Purchases and transfers show the API's `message_en` / `message_am`; a refused transfer (not enough at the source, a person not at the station) is shown under its own row.
      - *Base units.* The ledger, stock and reorder numbers are in the item's base unit, as the API sends them: a kilogram item reads "20000 g", a reorder rule's minimum and quantity are typed in grams (the form says "In g"), and costs are rates per base unit (a purchase of 10 kg at 40 and one at 50 give 0.0400 then 0.0450 a gram; the confirm answer's "Cost changes" table shows "0.0400 / g" to "0.0450 / g"). The purchase lines keep the unit the invoice states (kg), with the units of the item's family to choose from.
@@ -1067,6 +1067,52 @@ and 1.6a-c were in Phase 1.
    section 10.2 and the "turn on push and Telegram" procedure of section 10.1), `domain-model.md` and the phase reference
    corrected where this plan departs (inbox and deliveries; `item_cost_history`; `Batches` methods; `StockRecovered`),
    the gate tests, the gate report, STATUS `claim-done`.
+
+   **As built (step 2.9, `phase-2/gate`).** Done as planned, with these differences and decisions (the plan left them open or the code
+   was the fact). The orchestrator runs `claim-done` and the tag after the merge; this PR ends at STATUS `docs` done and phase 2
+   `gate_pending`.
+   - *Test fixes first (the live run after 2.8c and 2.8d).* The p2 stock-out spec unlocks the pad again (`ensureUnlocked` in
+     `e2e/support/pad.ts`, types the short code only when the lock screen shows) before the pad assertion that follows the long queue
+     wait; the product's 60 s idle lock is unchanged. The purchase-transfer flow's second request carries a run-unique note and is
+     selected by it (earlier live runs leave transfers with the same words in the E2E branch), and the planner spec picks the assignee
+     by user id, not by name or position.
+   - *"Mark all as read" left lines unread: the web was wrong, not the API.* `POST /notifications/read-all` without `before_id` marks
+     every unread line the caller has, a feed page or not (a test with 35 unread lines, one page of 30, and a line that arrives after
+     the list is drawn pins it). The bell sent `before_id` = the newest line on screen, so a line that arrived between the last 15 s
+     poll and the click stayed unread, which is what failed the 2.8a flow in CI. The bell now sends no `before_id` and zeroes its own
+     count; the API keeps the optional `before_id` (tested) for a client that wants the old behaviour.
+   - *`Phase2Seeder`* (data in `Demo\DemoPhaseTwo`) writes only through module code: `Supplier` as the controller does, `SetOpeningCost`
+     (46 ingredient and bought-in costs), the gate product through the Phase 0 item, price, recipe and ledger paths, `SaveDraft` and
+     `ConfirmPurchase`, `RecipeBook::publish`, `RequestTransfer` / `ConfirmTransfer` / `RejectTransfer`, `CreateRequest`,
+     `AcceptRequest`, `StartBatch` and the `Batches` contract, `ReorderRules`. It runs inside one transaction with `queue.default` set
+     to `sync` and restored afterwards (the listeners run when the transaction commits). Decisions: (1) eight rules, the eighth being
+     the gate product at the display case (minimum 3, one slice on hand), so the demo's first poll shows exactly one low-stock line
+     and no other alert; (2) the honey cake's recipe uses only what the cake room already holds, so it has no honey; (3) the bread
+     roll's version 2 swaps the margarine for butter and lowers the sugar; (4) the "bread rolls" rows are two requests, one manual
+     (accepted) and one scheduled for 20:00 today (finished, waiting for the overseer), because a second open manual request for one
+     product is refused; (5) the confirmed-today batch is 12 chocolate-cake slices (cake room, signed off by the manager), not bread
+     rolls, because the bakery's only unsigned batch is the one meant to be left for a demo; (6) keys are fixed strings per branch
+     (no date), unlike Phase 1's daily orders, so a later day adds nothing; (7) the seeder asks for no password (it creates no
+     account) and refuses only a missing demo branch.
+   - *Seeds and gates.* `DemoSeederTest` gains the Phase 2 composition, a second run that writes nothing (every Phase 2 table plus the
+     ledger, audit log and inbox), and a run on a branch that already holds Phases 0 and 1; `e2e-p0` / `e2e-p1` keep `SEED_PHASE=0` /
+     `1` and `e2e-p2` seeds `2` (already so in `ci.yml`). `SeedDemoCommandTest` is unchanged and green.
+   - *Gate tests.* Most criteria already had tests from 2.1 to 2.7; they are re-tagged `gate:p2` rather than copied (moving average:
+     `MovingAverageTest`, `MovingAveragePropertyTest`, the first case of `ConfirmPurchaseTest`; version publish:
+     `RecipeVersionGateTest`; dedupe: `StockAlertDedupeTest`, `AlertEpisodePropertyTest`; the atomic batch: `BatchConfirmTest`,
+     `BatchDoneTest`, the rollback case of `BatchesContractTest`; AutoRequest scope: `AutoRequestTest`; `ProductionLedgerPropertyTest`).
+     Added: `Phase2StateMachinesTest`, `StockOutToProductionGateTest` (on the seeded product, through HTTP), `PurchaseTransferGateTest`
+     and `Phase2ActorGateTest`. As in Phase 1 no CI job runs `--group=gate:p2` on its own: the files carry a `module:` tag and run in
+     `mod-production` / `mod-inventory`; the `gate-p2` job runs `gate_check.py --mode done --phase 2 --ci`, which trusts them.
+   - *Docs.* ADR 0010 and 0011 carry "As built" sections (and 0011 now says the automatic cause is the action name
+     `production_request.auto_create`, not a `context.cause` key); ADR 0009 has the Phase 2 polling note, ADR 0004 already had its
+     cost-rate note. The manifest's ADR names now match the files, its `Batches` provides line names both methods, and the domain
+     model lists the inbox, deliveries, endpoints and `item_cost_history` as built. The runbook gained "Queued work (Phase 2)" and a
+     Phase 2 paragraph in "Demo bakery"; the push and Telegram procedure of 2.5b was checked and is unchanged.
+   - *Follow-ups, not fixed here.* The planner lists bakers from `GET /users` and `GET /stations` (`people.manage`), so a manager with
+     `production.plan` but not `people.manage` cannot assign: a read-only station-staff endpoint would fix it. Admin screens show base
+     units. The ledger has no `reason` filter. CI's per-process unique-job locks differ from the live host's database lock.
+   - *STATUS.* `docs` is done and phase 2 is `gate_pending`; no `claim-done`, no tag.
 
 ## 7. Test list
 
@@ -1459,5 +1505,4 @@ notification types.
 - **Secrets.** VAPID and Telegram keys never enter the repo (`NoSecretsInEnvExampleTest`), never a log line (`Snapshot`
   redaction extended to `address`, `token`, `private_key`), never an API response.
 - **Phase scope creep.** The step list is the scope. Advance-order deposits (UI), SMS, shift-linked presence, offline
-  production and analytics on costs are `TODO(p3)` .. `TODO(p5)` markers at most, and `gate_check --mode done` forbids
-  `TODO(p2)`.
+  production and analytics on costs are to-do markers of phases 3 to 5 at most, and `gate_check --mode done` forbids the phase-2 marker.
