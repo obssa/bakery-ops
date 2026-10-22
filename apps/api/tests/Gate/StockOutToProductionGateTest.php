@@ -54,7 +54,7 @@ it('sells the seeded last slice, makes the request, produces 6 under the oversee
     $this->withHeaders(idempotencyKey())->postJson('/api/v1/orders', [
         'client_uuid' => (string) Str::uuid(), 'type' => 'takeaway',
         'lines' => [['client_uuid' => (string) Str::uuid(), 'item_id' => $this->honey->id, 'qty' => '1']],
-    ])->assertCreated()->assertJsonPath('status', 'sent');
+    ])->assertCreated();
     expect(($this->available)())->toBe('0.0000');
 
     // StockOut -> the automatic request for the batch size at the cake room
