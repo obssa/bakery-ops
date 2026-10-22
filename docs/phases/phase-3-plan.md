@@ -757,6 +757,13 @@ live ledger in a state where a shift can be opened only through the API.
        uses). The new rules, group `module:shifts`: Shifts uses Inventory, Identity, Payments, Orders, Catalog and Audit through
        their Contracts (and the three Ledger vocabulary classes of Inventory) only, reaches no Production, Notifications or
        Analytics, and nothing but Analytics (and not Shared) imports Shifts. `ShiftInstance` is allow-listed in `SoftDeletesTest`.
+     - **Earlier tests that stamped made-up shift ids now create the shift.** With the foreign keys in place a row cannot carry
+       "shift 77" unless shift 77 exists, and 3.1a and 3.1b had written such stamps (`InventoryContractTest`, `PaymentsContractTest`,
+       `TotalsTest`, `LedgerTest`, `LedgerEnforcementTest`). `shiftRow($id, $branchId)` in `tests/Support/helpers.php` inserts one
+       scheduled ad-hoc row with that id (its date is unique per id, so any number can share a station) and is called where the
+       id is used; no assertion about behaviour changed. `InventorySchemaTest` and `OrdersSchemaTest`, which asserted "no foreign
+       key until Phase 3", now assert the key. Later steps that want a shift in a given state use `ShiftInstance::factory()->open()`
+       and its siblings (3.2c's `Tests\Support\Shifts::ensureOpen` builds on them).
      - **Tests beyond the list:** `ShiftModelsTest` (every status from the factories satisfies the CHECKs, the on-duty
        reading, soft deletes). The unique-key tests start from `Schema::hasTable`, so a missing table cannot pass as a refusal.
        Local runs: `tests/Unit/Shifts`, `tests/Modules/Shifts`, `StateMachineExhaustiveTest`, groups `arch` and `invariants`; CI ran the rest.
