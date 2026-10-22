@@ -189,7 +189,7 @@ final class CountPresenter
      */
     private function line(StockCountLine $line, ?ItemSummary $item, ?VarianceReason $reason, ?array $live): array
     {
-        $expected = $live === null ? $line->expected_qty : ($live[$line->item_id] ?? null)?->onHand ?? Quantity::zero();
+        $expected = $live === null ? $line->expected_qty : (isset($live[$line->item_id]) ? $live[$line->item_id]->onHand : Quantity::zero());
 
         return [
             'id' => $line->id,

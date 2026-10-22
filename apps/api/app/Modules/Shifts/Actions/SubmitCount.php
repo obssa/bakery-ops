@@ -99,7 +99,11 @@ final class SubmitCount
                 $this->assertComplete($c, $lines);
 
                 // under the balance locks: the figures the count is measured against
-                $levels = $this->ledger->lock($lines->map(static fn (StockCountLine $l): array => [$l->item_id, $c->location_id])->values()->all());
+                $pairs = [];
+                foreach ($lines as $line) {
+                    $pairs[] = [$line->item_id, $c->location_id];
+                }
+                $levels = $this->ledger->lock($pairs);
                 $snapshotAt = CarbonImmutable::now();
                 $movementId = $this->stock->fingerprint()['last_movement_id'];
 
@@ -182,7 +186,7 @@ final class SubmitCount
         $out = [];
         foreach ($lines as $line) {
             $level = $levels[Ledger::key($line->item_id, $locationId)] ?? null;
-            $expected = $level?->onHand ?? Quantity::zero();
+            $expected = $level instanceof StockLevel ? $level->onHand : Quantity::zero();
             $out[$line->item_id] = ['expected' => $expected, 'variance' => VarianceMath::variance($line->counted_qty ?? Quantity::zero(), $expected)];
         }
 

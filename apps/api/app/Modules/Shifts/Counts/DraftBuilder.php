@@ -142,12 +142,12 @@ final class DraftBuilder
             ->first();
         if ($previous instanceof StockCount) {
             $lines = StockCountLine::query()->where('count_id', $previous->id)->get();
-            $summaries = $this->items->summaries($lines->pluck('item_id')->all());
+            $summaries = $this->items->summaries(array_values(array_map('intval', $lines->pluck('item_id')->all())));
             foreach ($lines as $line) {
                 $counted = $line->counted_qty;
                 $expected = $line->expected_qty;
                 $hadStock = ($counted !== null && $counted->isPositive()) || ($expected !== null && $expected->isPositive());
-                $active = ($summaries[$line->item_id] ?? null)?->isActive ?? false;
+                $active = isset($summaries[$line->item_id]) && $summaries[$line->item_id]->isActive;
                 if ($active ? $hadStock : ($counted !== null && $counted->isPositive())) {
                     $ids[$line->item_id] = true;
                 }

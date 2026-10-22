@@ -10,7 +10,6 @@ use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Models\StockCountLine;
 use App\Shared\Models\Branch;
 use App\Shared\Values\Quantity;
-use ArrayObject;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
@@ -52,17 +51,18 @@ final class StockCountLineFactory extends Factory
 
     public function configure(): static
     {
-        $held = new ArrayObject;
+        /** @var array<int, string> $held the status each parent had before it was held at draft */
+        $held = [];
 
         return $this
-            ->afterMaking(function (StockCountLine $line) use ($held): void {
+            ->afterMaking(function (StockCountLine $line) use (&$held): void {
                 $status = DB::table('stock_counts')->where('id', $line->count_id)->value('status');
                 if (is_string($status) && $status !== 'draft') {
                     DB::table('stock_counts')->where('id', $line->count_id)->update(['status' => 'draft']);
                     $held[$line->count_id] = $status;
                 }
             })
-            ->afterCreating(function (StockCountLine $line) use ($held): void {
+            ->afterCreating(function (StockCountLine $line) use (&$held): void {
                 if (isset($held[$line->count_id])) {
                     DB::table('stock_counts')->where('id', $line->count_id)->update(['status' => $held[$line->count_id]]);
                     unset($held[$line->count_id]);

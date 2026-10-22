@@ -62,7 +62,7 @@ final class SetCountLines
             throw ShiftError::countNotDraft($count->status->value);
         }
 
-        $onCount = StockCountLine::query()->where('count_id', $count->id)->pluck('item_id')->all();
+        $onCount = array_values(array_map('intval', StockCountLine::query()->where('count_id', $count->id)->pluck('item_id')->all()));
         $parsed = $this->parse($lines, $onCount);
 
         return $this->audit->run(function (StockCount $c) use ($parsed, $confirmAll): StockCount {
@@ -138,7 +138,7 @@ final class SetCountLines
             return $line->carried_qty;
         }
 
-        return ($live[$line->item_id] ?? null)?->onHand ?? Quantity::zero();
+        return isset($live[$line->item_id]) ? $live[$line->item_id]->onHand : Quantity::zero();
     }
 
     /**
