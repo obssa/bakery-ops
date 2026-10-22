@@ -30,7 +30,7 @@
     "module:<name>": "All tests owned by a module",
     "contract:<consumer>-><provider>": "Consumer-side tests against a provider; written before the consumer, green with zero consumer code",
     "gate:p<N>": "The phase exit gate",
-    "seeds": "The demo bakery (DemoSeeder / PhaseNSeeder): idempotent, branch-isolated, ledger-consistent; runs in mod-inventory"
+    "seeds": "The demo bakery (DemoSeeder / PhaseNSeeder): idempotent, branch-isolated, ledger-consistent; runs in mod-shifts (it opens the stations' shifts through Shifts since step 3.2c)"
   },
   "modules": {
     "shared": {
@@ -1381,6 +1381,11 @@
         "mod-inventory",
         "mod-payments"
       ],
+      "enforced-gates": [
+        "mod-payments",
+        "mod-production",
+        "mod-notifications"
+      ],
       "mod-analytics": [
         "mod-shifts",
         "mod-production",
@@ -1460,6 +1465,7 @@
       "gate-p3": [
         "gate-p2",
         "mod-shifts",
+        "enforced-gates",
         "e2e-p3"
       ],
       "gate-p4": [

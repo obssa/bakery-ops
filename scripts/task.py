@@ -31,7 +31,7 @@ API = os.path.join(ROOT, "apps", "api")
 WEB = os.path.join(ROOT, "apps", "web")
 COMPOSE = ["docker", "compose", "-f", "compose.yml", "-f", "compose.dev.yml"]
 MODULE_ORDER = ["identity", "catalog", "inventory", "orders", "payments", "production", "notifications", "shifts", "analytics"]
-MODULE_EXTRA = {"inventory": ",property,concurrency,seeds"}  # same groups as ci.yml mod-inventory
+MODULE_EXTRA = {"inventory": ",property,concurrency", "shifts": ",seeds"}  # same groups as ci.yml mod-inventory and mod-shifts
 
 
 def sh(cmd: list[str], cwd: str = ROOT, check: bool = True, env: dict | None = None, capture: bool = False) -> subprocess.CompletedProcess:

@@ -166,9 +166,7 @@ jobs:
   mod-inventory:
     needs: mod-catalog
     uses: ./.github/workflows/module-tests.yml
-    # `seeds`: the demo bakery (Phase0Seeder ..) must stay valid as later phases change; Inventory is the top of the
-    # Phase 0 chain the seeders write through, so it runs here, after every module it depends on is green.
-    with: { module: inventory, groups: "module:inventory,property,concurrency,seeds", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory" }
+    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory" }
 
   mod-orders:
     needs: [status, mod-inventory]
@@ -198,7 +196,9 @@ jobs:
     needs: [status, mod-orders, mod-inventory, mod-payments]
     if: fromJSON(needs.status.outputs.phase) >= 3
     uses: ./.github/workflows/module-tests.yml
-    with: { module: shifts, groups: "module:shifts" }
+    # `seeds`: the demo bakery (Phase0Seeder ..) must stay valid as later phases change. Since step 3.2c the seeders open the
+    # stations' shifts through Shifts (Demo\DemoShifts), so they run here, after every module they write through is green.
+    with: { module: shifts, groups: "module:shifts,seeds" }
 
   # The enforcement rehearsal (phase-3-plan.md 10.1): the Phase 0-2 exit-gate tests again with
   # ledger.require_shift_for_station_locations ON. Their fixtures open the shifts they write at (Tests\Support\Shifts), so
