@@ -446,9 +446,9 @@ every action on it is `422 shifts.station.not_tracked`.
 | **Shifts (3.2b)** | | | | | |
 | `GET /shifts` | `shifts.view` (stations the caller works at, or all with `stations.all`) | read; `?running=1` is polled (ETag over count, `max(updated_at)`, `sum(version)`) | `?station_id=`, `?status=`, `?running=1` (opening, open, counting), `?from=` `?to=` (local dates), `?mine=1`, `?page=`, `?per_page=` | `200` paginated `{data: [ShiftSummary], meta}` newest first | `403`, `422` |
 | `GET /shifts/{shift}` | `shifts.view` at the station | read | | `200` Shift | `404`, `403 shifts.station.forbidden` |
-| `POST /shifts` | `shifts.manage` | key + `client_uuid` | `{client_uuid, station_id, template_id, date "YYYY-MM-DD" (local), user_ids [..]}` (schedules; the window is the template's on that date) | `201` Shift (`scheduled`, roster rows `source = scheduled`); a used `client_uuid` answers `200` | `422 validation.failed`, `shifts.template.not_for_station`, `shifts.roster.user_invalid` (inactive, other branch, not assigned to the station) |
+| `POST /shifts` | `shifts.manage` | key + `client_uuid` | `{client_uuid, station_id, template_id, date "YYYY-MM-DD" (local), user_ids [..]}` (schedules; the window is the template's on that date) | `201` Shift (`scheduled`, roster rows `source = scheduled`); a used `client_uuid` answers `200` | `422 validation.failed`, `shifts.template.not_for_station`, `shifts.roster.user_invalid` (inactive, other branch, not assigned to the station, or without `shifts.count` there), `shifts.station.not_tracked`, `409 shifts.shift.already_scheduled` `{shift_id}` (the same template, date and station is still waiting or running; added in 3.2b) |
 | `PUT /shifts/{shift}/roster` | `shifts.manage` | key | `{user_ids [..]}` (replaces the roster of a `scheduled` shift; removed rows are soft-deleted) | `200` Shift | `409 shifts.shift.not_scheduled`, `422 shifts.roster.user_invalid` |
-| `POST /shifts/{shift}/cancel` | `shifts.manage`, or the person who started it while `opening` | key | `{reason?}` | `200` Shift (`cancelled`, `open_key` freed) | `409 shifts.shift.not_cancellable` `{status}` (only `scheduled` and `opening`) |
+| `POST /shifts/{shift}/cancel` | `shifts.manage`, or the person who started it while `opening` | key | `{reason?}` | `200` Shift (`cancelled`, `open_key` freed) | `403 shifts.cancel.forbidden`, `409 shifts.shift.not_cancellable` `{status}` (only `scheduled` and `opening`) |
 | `GET /stations/{station}/shifts/current` | `shifts.view` at the station | read (polled, conditional) | | `200 {data: Shift or null, server_time}`: the running shift (opening, open, counting), else `null` | `403 shifts.station.forbidden`, `422 shifts.station.not_tracked` |
 | `POST /stations/{station}/shifts/start` | `shifts.count` at the station | key + `client_uuid` | `{client_uuid, shift_id? (a scheduled one), template_id?, carry? (open without counting, below), force? (outside the window; `shifts.manage` only)}` | `201 {shift, counts}`: the shift is `opening` with draft opening counts (prefilled) or, with `carry` or at a station with nothing to count, `open`; `200` for a repeat or for the same person resuming their own `opening` shift | `409 shifts.shift.already_open` `{shift_id, status}`, `409 shifts.shift.not_scheduled`, `422 shifts.shift.outside_window` `{starts_at, ends_at}`, `403 shifts.start.force_forbidden`, `403 shifts.station.forbidden`, `422 shifts.station.not_tracked` |
 | `POST /stations/{station}/shifts/open-ad-hoc` | `shifts.count` at the station (for oneself) or `shifts.manage` (`user_id`) | key + `client_uuid` | `{client_uuid, user_id?}` (the call-in: opens `origin = call_in`, `opening_mode = carried`, no template, the person joins) | `201 {shift}`; `200` if one is already running (the person joins it) | `403`, `422 shifts.station.not_tracked` |
@@ -769,6 +769,75 @@ live ledger in a state where a shift can be opened only through the API.
        Local runs: `tests/Unit/Shifts`, `tests/Modules/Shifts`, `StateMachineExhaustiveTest`, groups `arch` and `invariants`; CI ran the rest.
      - ADR 0013 is `proposed`; STATUS keeps `adrs` empty until the gate report accepts it. The provider is registered and does
        nothing: no binding, no route, no listener. Every default of Phases 0 to 2 is unchanged.
+   - **As built (step 3.2b, `phase-3/shifts-api`).** Commits: tests first (the endpoint files, `ShiftsBindingsTest`, `PresenceResolverSwapTest`,
+     `CallInTest`, `ShiftAttributionTest`, `ShiftsContractTest`, `ShiftsLangTest`, `StartRaceTest`, `PeopleWorkStationIdsTest`, the registry rows and
+     the matrix placeholders; red: the classes, routes and lang did not exist), then the code, then the docs. The three Phase 2 tests that
+     assert the default binding bind the Phase 2 class explicitly before asserting, as planned; four more tests did the same and are named
+     here: `Contract/Shifts/IdentityContractTest` (its `AssignedUsersResolver` line), `Modules/Shared/OpenShiftsDefaultTest` ("binds OpenShifts
+     to NoOpenShifts" now builds `NoOpenShifts` itself) and `Modules/Identity/Feature/ResolveActorShiftStampTest` (binds `NoOpenShifts` for its
+     "no shift" case). New defaults are asserted in `ShiftsBindingsTest`; the presence assertions of `production->identity` and
+     `notifications->identity` run against the real `OnShiftResolver` in `PresenceResolverSwapTest` (tagged with both contract groups and
+     `contract:shifts->identity`, so `mod-identity` runs it). Where the build settled what the plan left open:
+     - **Rollout guard (orchestrator decision).** `config/shifts.php` has `open_ad_hoc_on_accept` (`SHIFTS_OPEN_AD_HOC_ON_ACCEPT`, default false
+       in the code, `.env.example`, `.env.ci` and the live host) and `start_grace_minutes` (`SHIFTS_START_GRACE_MINUTES`, 60). With the flag off
+       `ShiftsAttacher` puts the person on the shift that already runs at the station and answers its id, and otherwise answers null, exactly
+       as `NullShiftAttacher` did; with it on a baker accepting at a closed station opens a `call_in` shift and the accept row, the batch and
+       its movements carry it. `CallInTest` runs both settings. Written in the runbook ("Shifts and the call-in", next to the ledger flag) and
+       in ADR 0013 rule 7; step 3.7e switches it on together with `ledger.require_shift_for_station_locations`.
+     - **`ShiftsAttacher` resolves its collaborators when it runs.** Identity's `People` is built with the `ShiftAttacher` (cycle 3), and
+       everything the attacher does is built on `People`, so injecting `People` made `People -> ShiftAttacher -> People` without end (a memory
+       exhaustion at boot). It takes the container and resolves per call, the way `Recipients` resolves the presence resolver. Its signature
+       is `attach(object $user, Station $station)`: the interface names Identity's `User`, which the Shifts arch rule forbids importing, and a
+       parameter may be wider than the interface's. `OnShiftResolver` likewise leaves the element type to the interface (it filters
+       `Stations::assignedUsers`, so it needs no `User` by name).
+     - **On duty, exactly.** `OnShiftResolver` answers the active people assigned to the station who have joined the running shift and not left;
+       with no running shift (or a station that tracks none) everyone assigned; a running shift with nobody on it answers nobody and
+       `Recipients::onDuty` falls back to the assigned people, so an alert never reaches nobody (ADR 0013 rule 4). A person on the roster who
+       is not assigned (the admin) is not on duty. `OpenShiftsReader` reads the unique running key `(station_id, open_key = 1)`; the shared
+       lock variants are `sharedLock()` (`LOCK IN SHARE MODE`, `FOR SHARE` on PostgreSQL) on the shift row.
+     - **Who may be on a roster.** "Not assigned to the station" (section 4) is read as `Access::can(person, 'shifts.count', station)`: an active
+       person of the branch who is assigned there or works everywhere, and holds `shifts.count`. A waiter assigned to the till is therefore not
+       rosterable (they could never join) and the admin and the manager are. The `can_count` flag of the assignment is not consulted in this
+       step; section 4 defines "at the station" as `Access::can`.
+     - **`People::workStationIds(userId)`** is a new additive capability of Identity (empty for anyone who cannot act): `GET /shifts` lists the
+       stations a person works at, and Shifts may name no `User`. Tested by `PeopleWorkStationIdsTest`.
+     - **Contract shape.** `Contracts\Shifts` takes stations, shifts and templates by model or id; `start`, `openAdHoc` and `schedule` answer a
+       `ShiftOutcome {shift, created}` (the endpoints turn `created` into 201 or 200), `join`, `leave`, `cancel` and `roster` answer the
+       shift. `roster` replaces the roster of a scheduled shift. The audit actions are `shift.schedule`, `shift.roster`, `shift.cancel`,
+       `shift.start`, `shift.open_ad_hoc`, `shift.join`, `shift.leave`, `shift_template.create|update|delete`.
+     - **Starting.** In this step every start opens at once, carried (`carry` is accepted and changes nothing until 3.3a). A repeat of the
+       `client_uuid`, or of the `client_uuid` of the shift that already runs, answers 200; the starter of an `opening` shift resumes it; anyone
+       else gets 409 `shifts.shift.already_open {shift_id, status}`. A scheduled instance started by id outside `starts_at - grace .. ends_at`
+       is 422 `shifts.shift.outside_window {starts_at, ends_at}` unless `force` (admin only, 403 `shifts.start.force_forbidden`); `template_id`
+       works the same way against the template's window of the local date. An automatic start takes the scheduled instance of the station
+       whose window (with the grace) holds now, the one that started latest; else `ShiftWindow::matching` over the station's active templates
+       (newest start first); else an ad-hoc instance dated by the local date. A scheduled instance started by `start` keeps its own
+       `client_uuid` (the request's is not stored on it), so an offline replay of that start with a lost key meets 409 `already_open`, not 200.
+       A race is decided by the unique key: the loser's insert fails and it answers 409 (or finds the winner's row by `client_uuid`);
+       `StartRaceTest` runs two starts, one start twice and two starts of one scheduled instance, 30 rounds each, `Innodb_deadlocks` unchanged.
+     - **Roster rows.** A person who starts or opens gets a `started` or `call_in` row; a person who joins gets `joined`; a scheduled person who
+       joins or starts keeps `scheduled` and gains `joined_at`; a person who left and joins again keeps their row (`left_at` cleared,
+       `joined_at` kept); a removed scheduled person who comes back gets the same row restored. Join, leave and roster changes move the
+       shift's `version` and `updated_at`, the merge key of the polled feeds. Joining or leaving what already holds writes nothing, not even
+       an audit row. Leaving a shift one never joined is a 200 no-op.
+     - **Two errors the plan did not list.** `POST /shifts` for a template, date and station that still has a waiting or running instance is
+       409 `shifts.shift.already_scheduled {shift_id}` (a cancelled or locked one does not count; the next takes the next `sequence`), and
+       `cancel` by someone who may not is 403 `shifts.cancel.forbidden`. The cancel route asks for `shifts.view` only, like Production's
+       cancel, and the action decides: the admin, or the starter of an `opening` shift (also for the repeat of their own cancel). An unknown,
+       inactive, deleted, other-branch or unpaired template is `shifts.template.not_for_station`; an unknown station in the body of
+       `POST /shifts` is 422 `validation.failed` on `station_id`.
+     - **Reads.** `GET /shifts` pages `{data, meta {current_page, per_page, total, last_page}}` (25 by default, at most 100) newest first
+       (`date`, then id) over the stations the caller works at; `?running=1` is conditional (ETag over the filters, the person, the count,
+       `max(updated_at)` and `sum(version)`). `GET /stations/{station}/shifts/current` is conditional on the shift's id, version and
+       `updated_at`. `counts` is `[]`, `notes_count` 0, and `cancelled_at`, `cancelled_by` and `cancel_reason` are added to the Shift. The
+       endpoints that read a station check the person's station first (403 `shifts.station.forbidden`), then `tracks_shifts` (422).
+     - **Tests beyond the list.** `ShiftsContractTest` (`Contracts\Shifts`), `ShiftsLangTest` (en/am parity for the 14 `shifts.*` keys),
+       `ShiftsFixture` (`Tests\Support`), the `{shift}` and `{template}` placeholders of the route matrix (an `opening` shift the caller
+       started), and 10 write-endpoint rows; `ShiftOpened` (Shared, no listener) is asserted in the start and call-in tests. `docs/openapi.json`
+       was re-exported against `bakery_test` (the tables must exist: Scramble reads the columns); the ERD is unchanged (no table).
+       Local runs: `tests/Modules/Shifts` (139), identity, shared, arch, invariants and the three identity contract files (154), the
+       route matrix for `module:shifts` (112), `StartRaceTest` (3), `RequestAcceptTest` and `RecipientsTest` (19); CI ran the rest,
+       including `mod-identity`, `mod-production` and `mod-notifications`, whose contracts ran against both bindings.
 3. **3.3 shifts.counts** (groups `module:shifts`, `unit`, `feature`, `property`, `concurrency`; STATUS `shifts.counts`), three PRs:
    - **3.3a `phase-3/counts-core`**: migrations 8-10 (with the lines' freeze triggers and `DefaultVarianceReasons`, the backfill for
      existing branches), `CountStatus` and its exhaustive table (`draft -> awaiting_cosign | pending_approval | approved`,

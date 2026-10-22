@@ -247,6 +247,18 @@ that tracks shifts when no shift is open there (`409 inventory.shift.required`).
 `.env.ci`, and stays unset (so off) on the live host until step 3.7e of Phase 3. Do not set it before then: no screen starts a
 shift yet. Nothing to do now; the switch-on and the kill switch are written in the Phase 3 plan, section 10.1.
 
+## Shifts and the call-in (Phase 3, off)
+
+`SHIFTS_OPEN_AD_HOC_ON_ACCEPT` (read by `config/shifts.php`) decides what happens when a baker accepts a production request at a station
+that has no running shift. Off (the default in the code, `.env.example` and `.env.ci`, and unset on the live host): nothing is opened, the
+accept, the batch and its stock movements carry no shift, exactly as before Phase 3; if a shift happens to be running at that station the
+baker is put on it. On: the accept opens an ad-hoc "call-in" shift for the baker (`origin = call_in`, opened carried), and the accept row, the
+batch and its movements carry it. It stays off on the live host until step 3.7e of Phase 3, because until then no screen shows staff a shift or
+closes one, and a shift made by a call-in would stay open for ever. Step 3.7e switches it on together with
+`LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` (above). Nothing to do now. To switch it off again, set `SHIFTS_OPEN_AD_HOC_ON_ACCEPT=false` in
+`~/bakery-ops.orcamind.dev/.env` and run `php artisan config:cache`; a shift already opened stays and is cancelled or closed from the admin screens.
+`SHIFTS_START_GRACE_MINUTES` (default 60) is how long before its window starts a scheduled shift may be started.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.

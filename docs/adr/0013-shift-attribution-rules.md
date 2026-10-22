@@ -42,6 +42,12 @@ Migrations 3 to 7 of the Phase 3 plan (step 3.2a) make the tables; this ADR is w
    refused. Lock order: domain row, `shift_instances`, `stock_balances` ascending, `item_costs` ascending.
 7. **Call-ins.** `ShiftAttacher::attach` for a person with no open shift at a station they can work at opens an ad-hoc shift
    (`origin = call_in`, opened carried) and puts them on the roster. The accept row, the batch and its movements then carry it.
+   **Rollout guard (step 3.2b).** The opening of that ad-hoc shift is behind the flag `shifts.open_ad_hoc_on_accept`
+   (`SHIFTS_OPEN_AD_HOC_ON_ACCEPT`, default false in the code, `.env.example`, `.env.ci` and on the live host): until step 3.7e
+   gives staff a way to see and close shifts, a call-in must not create a shift nobody can close. With the flag off the attacher
+   attaches the person to the shift that already runs at the station (and puts them on its roster) and otherwise answers null,
+   exactly as the Phase 2 `NullShiftAttacher` did. Step 3.7e switches the flag on together with
+   `ledger.require_shift_for_station_locations` (runbook, "Shifts and the call-in").
 8. **The date of a shift** is the local start date of its window in the branch's timezone (`Africa/Addis_Ababa`), not the UTC
    date and not the date it ends: a Night 22:00 to 06:00 running at Saturday 00:01 is Friday's. An ad-hoc shift is dated by the
    local date it opened. `App\Modules\Shifts\Support\ShiftWindow` and `LocalClock` are the only code that decides it (plan
