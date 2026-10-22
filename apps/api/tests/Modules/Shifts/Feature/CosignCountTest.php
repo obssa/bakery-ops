@@ -67,7 +67,7 @@ it('moves a count with a variance to pending approval when the station overseer 
         ->and($row->version)->toBe($version + 1, 'the co-signature moves the version once')
         ->and(($this->adjustments)())->toBe(0, 'a co-signature writes no stock');
     $audit = AuditLog::query()->where('action', 'count.cosign')->sole();
-    expect($audit->user_id)->toBe($this->overseer->id)
+    expect($audit->actor_id)->toBe($this->overseer->id)
         ->and($audit->context['note'] ?? null)->toBe('Saw the sacks');
 });
 

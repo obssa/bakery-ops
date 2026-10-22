@@ -1287,6 +1287,69 @@
                 }
             }
         },
+        "/v1/stock-counts": {
+            "get": {
+                "operationId": "shifts.counts.queue",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "awaiting_cosign",
+                                "pending_approval"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "station_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "mine",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 200
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/stock-counts/{count}": {
             "get": {
                 "operationId": "shifts.counts.show",
@@ -1434,6 +1497,56 @@
                         "application/json": {
                             "schema": {
                                 "$ref": "#/components/schemas/ApproveCountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/stock-counts/{count}/cosign": {
+            "post": {
+                "operationId": "shifts.counts.cosign",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "count",
+                        "in": "path",
+                        "required": true,
+                        "description": "The count ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CosignCountRequest"
                             }
                         }
                     }
@@ -10020,6 +10133,20 @@
                     "deleted_at"
                 ],
                 "title": "CategoryResource"
+            },
+            "CosignCountRequest": {
+                "type": "object",
+                "description": "POST /stock-counts/{count}/cosign: an optional note, kept in the audit row of the co-signature.",
+                "properties": {
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "title": "CosignCountRequest"
             },
             "DeviceResource": {
                 "type": "object",
