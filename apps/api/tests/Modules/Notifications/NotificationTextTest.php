@@ -29,6 +29,8 @@ function samplePayloads(): array
         'production_assigned' => NotificationEvents::productionAssigned(1, 6, 5)->payload(),
         'batch_pending_confirmation' => NotificationEvents::batchDone(1, 'pending_confirmation', 6, null, 5, 6)->payload(),
         'batch_done' => NotificationEvents::batchDone(1, 'confirmed', 6, 7, 5, 6)->payload(),
+        'count_submitted' => NotificationEvents::countSubmitted(1, 5)->payload(),
+        'variance_decided' => NotificationEvents::varianceDecided(1, 5, 6, 'rejected')->payload(),
     ];
 }
 
@@ -153,12 +155,12 @@ it('refuses a type it does not know and a payload that lacks what the text needs
     $payload = NotificationEvents::lineReady(1, 5)->payload();
     unset($payload['item_name_am']);
 
-    expect(fn () => $text->render('count_submitted', []))->toThrow(UnknownNotificationType::class)
+    expect(fn () => $text->render('shift_opened', []))->toThrow(UnknownNotificationType::class)
         ->and(fn () => $text->render('line_ready', $payload))->toThrow(MissingPayloadKey::class, 'item_name_am');
 })->group('module:notifications', 'unit');
 
 it('knows every type of the registry with a severity, channels and keys, and only the types the inbox table accepts', function () {
-    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected'];
+    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken'];
 
     foreach (NotificationTypes::all() as $type) {
         expect($accepted)->toContain($type)

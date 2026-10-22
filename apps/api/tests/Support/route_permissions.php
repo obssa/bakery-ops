@@ -202,5 +202,10 @@ return [
     'POST /api/v1/stock-counts/{count}/submit' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
     // Decisions (step 3.3b): shifts.approve (admin, manager) approves and rejects; that the person who counted cannot approve is the action's rule (409).
     'POST /api/v1/stock-counts/{count}/approve' => ['permission' => 'shifts.approve', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
-    'POST /api/v1/stock-counts/{count}/reject' => ['permission' => 'shifts.approve', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
+    // Step 3.3c: a co-signature is the overseer's or a shifts.cosign holder's, and the overseer's reject (while the count waits for it) is
+    // too, so both routes ask only for shifts.view and the action decides (403 shifts.count.cosign_forbidden, auth.forbidden). The
+    // reject route used to ask for shifts.approve (3.3b). GET /stock-counts is the approval queue, read at the stations one works at.
+    'POST /api/v1/stock-counts/{count}/reject' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/stock-counts/{count}/cosign' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/stock-counts' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
 ];

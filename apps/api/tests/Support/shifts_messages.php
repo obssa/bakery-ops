@@ -16,6 +16,7 @@ if (! function_exists('countsMessageKeys')) {
             'shifts.count.not_draft', 'shifts.count.item_unknown', 'shifts.count.qty_invalid', 'shifts.count.incomplete',
             'shifts.count.reason_required', 'shifts.count.note_required', 'shifts.count.blocked_by_pending', 'shifts.count.shift_not_ready',
             'shifts.count.not_pending', 'shifts.count.approve_self',
+            'shifts.count.cosign_forbidden', 'shifts.count.cosign_self', 'shifts.count.not_awaiting_cosign', 'shifts.count.item_unavailable',
             'shifts.reason.unknown', 'shifts.reason.code_taken',
             'shifts.adjustment.insufficient',
         ];

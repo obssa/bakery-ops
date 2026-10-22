@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Shared\Events\BatchDone;
+use App\Shared\Events\CountSubmitted;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
 use App\Shared\Events\ProductionAssigned;
@@ -14,6 +15,7 @@ use App\Shared\Events\StockOut;
 use App\Shared\Events\StockRecovered;
 use App\Shared\Events\TransferDecided;
 use App\Shared\Events\TransferRequested;
+use App\Shared\Events\VarianceDecided;
 
 /**
  * The events Notifications listens to, built the way their producers build them (the payload shapes are the contract:
@@ -152,6 +154,44 @@ final class NotificationEvents
         return new BatchDone(
             $branchId, $batchId, $a['requestId'], $status, 17, 'Black forest cake', 'ብላክ ፎረስት ኬክ', $a['produced'], $a['waste'], $a['unit'],
             $a['stationId'], 'Cake room', 'የኬክ ክፍል', $finishedBy, $confirmedBy, $requestedBy, $assignedTo, $a['sendBackCount'],
+        );
+    }
+
+    /**
+     * A closing count at the kitchen with one line 500 g short (variance_lines 1), handed in by $countedBy.
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public static function countSubmitted(int $branchId, int $countedBy, string $statusAfter = 'pending_approval', int $countId = 61, array $over = []): CountSubmitted
+    {
+        $a = $over + [
+            'shiftId' => 7, 'stationId' => 1, 'stationCode' => 'kitchen', 'stationEn' => 'Kitchen', 'stationAm' => 'ወጥ ቤት', 'locationId' => 3,
+            'locationEn' => 'Kitchen shelf', 'locationAm' => 'የወጥ ቤት መደርደሪያ', 'type' => 'closing', 'seq' => 1, 'lines' => 4, 'varianceLines' => 1,
+            'items' => [['item_name_en' => 'Flour', 'item_name_am' => 'ዱቄት', 'expected_qty' => '10000.0000', 'counted_qty' => '9500.0000', 'variance_qty' => '-500.0000', 'unit' => 'g']],
+            'cash' => null, 'cosignedBy' => null,
+        ];
+
+        return new CountSubmitted(
+            $branchId, $countId, $a['shiftId'], $a['stationId'], $a['stationCode'], $a['stationEn'], $a['stationAm'], $a['locationId'], $a['locationEn'], $a['locationAm'],
+            $a['type'], $a['seq'], $statusAfter, $a['lines'], $a['varianceLines'], $a['items'], $a['cash'], $countedBy, $a['cosignedBy'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $over
+     */
+    public static function varianceDecided(int $branchId, int $countedBy, int $decidedBy, string $decision = 'approved', int $countId = 61, array $over = []): VarianceDecided
+    {
+        $a = $over + [
+            'shiftId' => 7, 'stationId' => 1, 'stationCode' => 'kitchen', 'stationEn' => 'Kitchen', 'stationAm' => 'ወጥ ቤት', 'locationId' => 3,
+            'locationEn' => 'Kitchen shelf', 'locationAm' => 'የወጥ ቤት መደርደሪያ', 'type' => 'closing',
+            'note' => $decision === 'rejected' ? 'Count the top shelf again' : null,
+            'adjusted' => $decision === 'rejected' ? 0 : 2, 'recount' => $decision === 'rejected' ? 62 : null,
+        ];
+
+        return new VarianceDecided(
+            $branchId, $countId, $a['shiftId'], $a['stationId'], $a['stationCode'], $a['stationEn'], $a['stationAm'], $a['locationId'], $a['locationEn'], $a['locationAm'],
+            $a['type'], $decision, $decidedBy, $a['note'], $countedBy, $a['adjusted'], $a['recount'],
         );
     }
 }

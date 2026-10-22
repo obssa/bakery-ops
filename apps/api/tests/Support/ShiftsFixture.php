@@ -199,6 +199,42 @@ final class ShiftsFixture
         return $this->send('POST', "/api/v1/stock-counts/{$countId}/reject", $as, $body, $headers);
     }
 
+    /**
+     * POST /stock-counts/{count}/cosign as $as.
+     *
+     * @param  array<string, mixed>  $body
+     * @param  array<string, string>  $headers
+     */
+    public function cosign(User $as, int $countId, array $body = [], array $headers = []): TestResponse
+    {
+        return $this->send('POST', "/api/v1/stock-counts/{$countId}/cosign", $as, $body, $headers);
+    }
+
+    /**
+     * GET /stock-counts (the approval queue) as $as.
+     *
+     * @param  array<string, mixed>  $query
+     * @param  array<string, string>  $headers
+     */
+    public function queue(User $as, array $query = [], array $headers = []): TestResponse
+    {
+        loginAs($as);
+
+        return $this->test->withHeaders($headers)->getJson('/api/v1/stock-counts'.($query === [] ? '' : '?'.http_build_query($query)));
+    }
+
+    /** The person works at the station, may count there and is flagged as its overseer. */
+    public function overseer(User $user, Station $station): void
+    {
+        $row = UserStationAssignment::query()->withTrashed()->where('user_id', $user->id)->where('station_id', $station->id)->first();
+        if ($row === null) {
+            UserStationAssignment::factory()->overseer()->create(['branch_id' => $this->branch->id, 'user_id' => $user->id, 'station_id' => $station->id, 'can_count' => true]);
+
+            return;
+        }
+        $row->forceFill(['is_overseer' => true, 'can_count' => true, 'deleted_at' => null])->save();
+    }
+
     /** The id of the branch's variance reason with this code (the five defaults come with the branch). */
     public function reasonId(string $code): int
     {
