@@ -80,7 +80,7 @@ export function loginOnce(phone: string, password: string, branchId?: number): R
   return pending;
 }
 
-export async function findOrCreateStation(admin: Api, code: StationKind | "cake_room"): Promise<Station> {
+export async function findOrCreateStation(admin: Api, code: StationKind | "cake_room" | "bakery"): Promise<Station> {
   const stations = (await admin.get<{ data: Station[] }>("/stations")).data;
   const found = stations.find((s) => s.code === code);
   if (found) return found;
@@ -89,7 +89,9 @@ export async function findOrCreateStation(admin: Api, code: StationKind | "cake_
       ? { name_en: "Kitchen", name_am: "ኩሽና" }
       : code === "bar"
         ? { name_en: "Bar", name_am: "ባር" }
-        : { name_en: "Cake room", name_am: "የኬክ ክፍል" };
+        : code === "bakery"
+          ? { name_en: "Bakery", name_am: "ዳቦ ቤት" }
+          : { name_en: "Cake room", name_am: "የኬክ ክፍል" };
   return admin.post<Station>("/stations", { code, ...names });
 }
 

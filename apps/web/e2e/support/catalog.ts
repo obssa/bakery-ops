@@ -5,17 +5,18 @@ import { findOrCreateStore } from "./inventory";
 
 // Fixture builders and reads for the admin Catalog and planner flows (step 2.8d, project p2-stockout-production), built on
 // api.ts, env.ts, fixture.ts and inventory.ts. Everything goes through the admin API of the isolated "E2E Test Branch": the
-// cake room is found or created, the ingredient, its purchase and the product are run-unique, and the fixed cake baker
-// is the person the planner assigns to.
+// bakery station is found or created, the ingredient, its purchase and the product are run-unique, and the fixed bread baker
+// is the person the planner assigns to. The bakery station and the bread baker are used on purpose: the stock-out flow of 2.8a
+// owns the cake room and its cake baker (and that baker's inbox), and a flow that changes them or notifies them breaks it.
 
 export interface CatalogFixture {
   admin: Api;
   branchId: number;
-  cakeRoom: Station;
+  station: Station;
   baker: Staff;
   ingredient: { id: number; name_en: string; name_am: string };
   /**
-   * A made-in-batches product of the cake room, price 50.00, with recipe version 1: 0.9 kg of the ingredient per 3 pieces.
+   * A made-in-batches product of the bakery station, price 50.00, with recipe version 1: 0.9 kg of the ingredient per 3 pieces.
    * The ingredient was bought at 40 a kilogram (0.0400 a gram), so version 1 costs 36 per 3, 12.0000 a piece (margin 38.0000, 76.00 %).
    */
   cake: { id: number; name_en: string; name_am: string; price: string; batch: string };
@@ -37,10 +38,10 @@ export async function buildCatalogFixture(credentials: { phone: string; password
   const { api: admin, login } = await loginOnce(credentials.phone, credentials.password);
   const unit = await unitLookup(admin);
 
-  const cakeRoom = await findOrCreateStation(admin, "cake_room");
-  await findOrCreateLocation(admin, cakeRoom);
-  const bakerStaff = await ensureStaff(admin, credentials.password, "cake_baker");
-  await admin.put(`/users/${bakerStaff.id}/stations`, { assignments: [{ station_id: cakeRoom.id, can_count: true, is_overseer: false }] });
+  const station = await findOrCreateStation(admin, "bakery");
+  await findOrCreateLocation(admin, station);
+  const bakerStaff = await ensureStaff(admin, credentials.password, "bread_baker");
+  await admin.put(`/users/${bakerStaff.id}/stations`, { assignments: [{ station_id: station.id, can_count: true, is_overseer: false }] });
 
   // the ingredient has a cost: 10 kg bought at 40 a kilogram and confirmed
   const store = await findOrCreateStore(admin);
@@ -67,7 +68,7 @@ export async function buildCatalogFixture(credentials: { phone: string; password
     name_en: cakeEn,
     name_am: cakeAm,
     unit_id: unit("pcs"),
-    production_station_id: cakeRoom.id,
+    production_station_id: station.id,
     default_batch_qty: "6.0000",
   });
   await admin.put(`/items/${cake.id}/recipe`, {
@@ -80,7 +81,7 @@ export async function buildCatalogFixture(credentials: { phone: string; password
   return {
     admin,
     branchId: login.user.branch_id,
-    cakeRoom,
+    station,
     baker: bakerStaff,
     ingredient: { id: ingredient.id, name_en: ingredientEn, name_am: ingredientAm },
     cake: { id: cake.id, name_en: cakeEn, name_am: cakeAm, price, batch: "6.0000" },

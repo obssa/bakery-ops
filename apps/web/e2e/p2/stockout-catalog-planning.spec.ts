@@ -7,7 +7,7 @@ import { requestsOf, type RequestView } from "../support/production";
 // Phase 2 gate project p2-stockout-production (the file name lands in it), step 2.8d: the admin Catalog and planning flows.
 // Three @live tests, each building its fixture through the admin API of the isolated "E2E Test Branch"
 // (e2e/support/catalog.ts): publishing recipe version 2 and reading the cost and margin change, switching the overseer
-// requirement of the cake room in People, and scheduling and assigning a request in the planner and finding it on /production.
+// requirement of the bakery station in People, and scheduling and assigning a request in the planner and finding it on /production.
 
 test.describe("admin catalog and planning", () => {
   test("@live publish recipe version 2 and see the cost and margin change", async ({ page }) => {
@@ -60,20 +60,20 @@ test.describe("admin catalog and planning", () => {
 
   test("@live switch requires_overseer in People and see it stick", async ({ page }) => {
     const f = await buildCatalogFixture(requireAdmin(test.skip));
-    await f.admin.patch(`/stations/${f.cakeRoom.id}`, { requires_overseer: false });
+    await f.admin.patch(`/stations/${f.station.id}`, { requires_overseer: false });
     try {
       await openAs(page, f.admin, "en/admin/people/");
       const stations = page.getByRole("region", { name: "Stations" });
-      const toggle = stations.getByRole("checkbox", { name: `Require an overseer at ${f.cakeRoom.name_en}` });
+      const toggle = stations.getByRole("checkbox", { name: `Require an overseer at ${f.station.name_en}` });
       await expect(toggle).not.toBeChecked({ timeout: 30_000 });
       await toggle.check();
       await expect(stations.getByRole("status")).toContainText("saved", { timeout: 15_000 });
-      expect((await stationOf(f.admin, f.cakeRoom.id)).requires_overseer).toBe(true);
+      expect((await stationOf(f.admin, f.station.id)).requires_overseer).toBe(true);
 
       await page.reload();
-      await expect(page.getByRole("region", { name: "Stations" }).getByRole("checkbox", { name: `Require an overseer at ${f.cakeRoom.name_en}` })).toBeChecked({ timeout: 30_000 });
+      await expect(page.getByRole("region", { name: "Stations" }).getByRole("checkbox", { name: `Require an overseer at ${f.station.name_en}` })).toBeChecked({ timeout: 30_000 });
     } finally {
-      await f.admin.patch(`/stations/${f.cakeRoom.id}`, { requires_overseer: false });
+      await f.admin.patch(`/stations/${f.station.id}`, { requires_overseer: false });
     }
   });
 
