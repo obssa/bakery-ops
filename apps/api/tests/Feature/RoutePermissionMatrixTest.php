@@ -19,9 +19,12 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
+use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\ShiftTemplate;
+use App\Modules\Shifts\Models\StockCount;
+use App\Modules\Shifts\Models\VarianceReason;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -126,6 +129,21 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
         $params['{shift}'] = (string) ShiftInstance::factory()->opening()->create([
             'branch_id' => $branch->id, 'station_id' => $station->id, 'created_by_user_id' => $actorId, 'started_by_user_id' => $actorId,
         ])->id;
+    }
+    if (str_contains($uri, '{reason}')) {
+        // a reason of the caller's branch (every branch has the five defaults)
+        $params['{reason}'] = (string) VarianceReason::query()->withoutGlobalScopes()->where('branch_id', $branch->id)->orderBy('id')->value('id');
+    }
+    if (str_contains($uri, '{count}')) {
+        // a draft opening count of an opening shift the caller started, at a kitchen where the caller is assigned (a station the
+        // caller does not work at is refused by the action, not by the matrix: shifts.station.forbidden)
+        $station = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $branch->id]);
+        UserStationAssignment::factory()->create(['branch_id' => $branch->id, 'user_id' => $actorId, 'station_id' => $station->id]);
+        $place = Location::factory()->ofType(LocationType::Kitchen)->create(['branch_id' => $branch->id, 'station_id' => $station->id]);
+        $shift = ShiftInstance::factory()->opening()->create([
+            'branch_id' => $branch->id, 'station_id' => $station->id, 'created_by_user_id' => $actorId, 'started_by_user_id' => $actorId,
+        ]);
+        $params['{count}'] = (string) StockCount::factory()->forShift($shift, $place->id)->opening()->create(['created_by_user_id' => $actorId])->id;
     }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)

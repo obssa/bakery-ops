@@ -34,6 +34,8 @@ $noSoftDeletes = [
     'App\Modules\Production\Models\ProductionRequest',  // never deleted: requested, accepted, in progress, pending confirmation, then done or cancelled by status; a done one is the reason behind its batch's movements
     'App\Modules\Production\Models\ProductionBatch',  // never deleted: started, finished, then confirmed by status; a confirmed one names the production_output movement it wrote
     'App\Modules\Shifts\Models\ShiftInstance',  // never deleted: scheduled, opening, open, counting, pending approval, then locked or cancelled by status; the stamps, counts and cash of other rows point at it
+    'App\Modules\Shifts\Models\StockCount',  // never deleted: draft, awaiting co-sign, pending approval, approved, then locked or rejected by status (a database trigger refuses every delete from step 3.4); a recount or an unlock is a new row that supersedes it
+    'App\Modules\Shifts\Models\StockCountLine',  // never deleted (a database trigger refuses every delete): the lines are the variance, frozen when the count is submitted
 ];
 
 it('every mutable tenant model soft-deletes', function () use ($noSoftDeletes) {

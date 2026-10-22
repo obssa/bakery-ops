@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Shared\Http\ApiError;
 use Illuminate\Support\Arr;
 
+require_once __DIR__.'/../../Support/shifts_messages.php';
+
 pest()->group('module:shifts', 'invariants');
 
 /*
@@ -34,7 +36,9 @@ it('has an English and an Amharic text for every shifts message, with the same k
             ->and($am[$key])->not->toBe($en[$key], "am {$key} is not a copy of the English")
             ->and($am[$key])->toMatch('/\p{Ethiopic}/u');
     }
-    expect(array_keys($en))->toEqualCanonicalizing(array_map(fn (string $k): string => substr($k, strlen('shifts.')), SHIFTS_MESSAGE_KEYS), 'no key without a test, no test without a key');
+    // the keys of step 3.3a (CountsLangTest) are tested there: between the two lists no key lacks a test and no test lacks a key
+    $tested = array_map(fn (string $k): string => substr($k, strlen('shifts.')), array_merge(SHIFTS_MESSAGE_KEYS, countsMessageKeys()));
+    expect(array_keys($en))->toEqualCanonicalizing($tested, 'no key without a test, no test without a key');
 });
 
 it('answers every shifts error key with both languages through ApiError', function () {

@@ -1200,4 +1200,76 @@ return [
         },
         'payload' => fn (): array => [],
     ],
+    // Counts (step 3.3a): variance reasons, close, the lines of a count and its submit
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/variance-reasons',
+        'module' => 'shifts',
+        'table' => 'variance_reasons',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $shiftsFloor($t);
+
+            return [];
+        },
+        'payload' => fn (): array => ['code' => 'spilled', 'name_en' => 'Spilled', 'name_am' => 'ፈሰሰ'],
+    ],
+    [
+        'method' => 'PATCH',
+        'uri' => '/api/v1/variance-reasons/{reason}',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{reason}' => (string) $f->reasonId('miscount')];
+        },
+        'payload' => fn (): array => ['name_en' => 'Counting mistake'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/shifts/{shift}/close',
+        'module' => 'shifts',
+        'table' => 'stock_counts',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+            $f->place($f->kitchen);
+
+            return ['{shift}' => (string) $f->running($f->kitchen, $f->chef)->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/stock-counts/{count}/lines',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+            $item = $f->ingredient();
+            $f->stock($item, $f->place($f->kitchen), '100');
+            $shift = $f->running($f->kitchen, $f->chef);
+            loginAs($f->admin);
+
+            return ['{count}' => (string) $f->close($f->chef, $shift->id)->json('counts.0.id')];
+        },
+        'payload' => fn (): array => ['confirm_all' => true],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/stock-counts/{count}/submit',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+            $item = $f->ingredient();
+            $f->stock($item, $f->place($f->kitchen), '100');
+            $shift = $f->running($f->kitchen, $f->chef);
+            $count = (int) $f->close($f->chef, $shift->id)->json('counts.0.id');
+            $f->lines($f->chef, $count, ['confirm_all' => true])->assertOk();
+            loginAs($f->admin);
+
+            return ['{count}' => (string) $count];
+        },
+        'payload' => fn (): array => [],
+    ],
 ];

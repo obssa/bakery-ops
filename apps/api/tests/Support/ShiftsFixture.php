@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Models\UserStationAssignment;
+use App\Modules\Inventory\Enums\LocationType;
+use App\Modules\Inventory\Ledger\MovementReason;
+use App\Modules\Inventory\Models\Location;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\ShiftRoster;
 use App\Modules\Shifts\Models\ShiftTemplate;
@@ -15,6 +19,7 @@ use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -85,6 +90,38 @@ final class ShiftsFixture
         UserStationAssignment::factory()->create(['branch_id' => $this->branch->id, 'user_id' => $user->id, 'station_id' => $station->id, 'can_count' => true]);
     }
 
+    /** A place where the station keeps stock (its own kind of location: kitchen, cake room, display case for the till). */
+    public function place(Station $station, ?LocationType $type = null): Location
+    {
+        $type ??= match ($station->code) {
+            StationCode::Till => LocationType::DisplayCase,
+            StationCode::Kitchen => LocationType::Kitchen,
+            StationCode::Bar => LocationType::Bar,
+            StationCode::CakeRoom => LocationType::CakeRoom,
+            StationCode::Bakery => LocationType::Bakery,
+            default => LocationType::Store,
+        };
+
+        return Location::factory()->ofType($type)->create(['branch_id' => $this->branch->id, 'station_id' => $station->id]);
+    }
+
+    /**
+     * An ingredient of the branch counted in $unit (base units g, ml, pcs).
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public function ingredient(string $unit = 'g', array $over = []): Item
+    {
+        return Item::factory()->ingredient($unit)->create($over + ['branch_id' => $this->branch->id, 'created_by_user_id' => $this->admin->id]);
+    }
+
+    /** Put $qty of the item at the place through the Ledger, as the admin. */
+    public function stock(Item $item, Location $place, string $qty, MovementReason $reason = MovementReason::PurchaseIn): void
+    {
+        withActor($this->admin->id);
+        stockIn($item, $place, $qty, $reason);
+    }
+
     /**
      * A write as $as: a fresh Idempotency-Key unless the headers carry one.
      *
@@ -107,6 +144,54 @@ final class ShiftsFixture
     public function start(User $as, Station $at, array $body = [], array $headers = []): TestResponse
     {
         return $this->send('POST', "/api/v1/stations/{$at->id}/shifts/start", $as, $body + ['client_uuid' => (string) Str::uuid()], $headers);
+    }
+
+    /**
+     * POST /shifts/{shift}/close as $as.
+     *
+     * @param  array<string, string>  $headers
+     */
+    public function close(User $as, int $shiftId, array $headers = []): TestResponse
+    {
+        return $this->send('POST', "/api/v1/shifts/{$shiftId}/close", $as, [], $headers);
+    }
+
+    /**
+     * PUT /stock-counts/{count}/lines as $as.
+     *
+     * @param  array<string, mixed>  $body
+     * @param  array<string, string>  $headers
+     */
+    public function lines(User $as, int $countId, array $body, array $headers = []): TestResponse
+    {
+        return $this->send('PUT', "/api/v1/stock-counts/{$countId}/lines", $as, $body, $headers);
+    }
+
+    /**
+     * POST /stock-counts/{count}/submit as $as.
+     *
+     * @param  array<string, string>  $headers
+     */
+    public function submit(User $as, int $countId, array $headers = []): TestResponse
+    {
+        return $this->send('POST', "/api/v1/stock-counts/{$countId}/submit", $as, [], $headers);
+    }
+
+    /** The id of the branch's variance reason with this code (the five defaults come with the branch). */
+    public function reasonId(string $code): int
+    {
+        return (int) DB::table('variance_reasons')->where('branch_id', $this->branch->id)->where('code', $code)->value('id');
+    }
+
+    /**
+     * A running shift at the station that has been closed through the API by the person: counting, with its draft closing counts.
+     * Returns the response of the close (`shift`, `counts`).
+     */
+    public function closing(Station $station, User $by): TestResponse
+    {
+        $shift = $this->running($station, $by);
+
+        return $this->close($by, $shift->id);
     }
 
     /**

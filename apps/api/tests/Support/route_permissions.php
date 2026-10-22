@@ -11,7 +11,7 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {endpoint}, {request}, {table}, {order} (an open cart of the caller's own) and {line}
+ * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {endpoint}, {request}, {table}, {order} (an open cart of the caller's own), {reason}, {count} and {line}
  * (a queued line of a sent order of the caller's own, at a station the caller is assigned to) with a row of the right
  * table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
@@ -188,4 +188,16 @@ return [
     'POST /api/v1/stations/{station}/shifts/open-ad-hoc' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
     'POST /api/v1/shifts/{shift}/join' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
     'POST /api/v1/shifts/{shift}/leave' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    // Counts (step 3.3a): shifts.view reads at the stations one works at, shifts.count closes the shift and works the count (the action
+    // checks the station, or shifts.manage for a close), shifts.manage (the admin) keeps the variance reasons. The matrix's {count} is a
+    // draft opening count of an opening shift the caller started, at a kitchen where the caller is assigned; {reason} a reason of the branch.
+    'GET /api/v1/shifts/{shift}/summary' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/shifts/{shift}/counts' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/stock-counts/{count}' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/variance-reasons' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/variance-reasons' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
+    'PATCH /api/v1/variance-reasons/{reason}' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
+    'POST /api/v1/shifts/{shift}/close' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    'PUT /api/v1/stock-counts/{count}/lines' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/stock-counts/{count}/submit' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
 ];
