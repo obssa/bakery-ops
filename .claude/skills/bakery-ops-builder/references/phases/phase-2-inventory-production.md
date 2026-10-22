@@ -19,7 +19,7 @@ work and notifications, which is where "works locally, fails in compose" traps l
 | 2.4 | catalog.recipe-versions + inventory.recipe-cost | publish new version (swap `is_active` in one transaction, old kept readable by `version`); `RecipeCost::rollUp`; margin vs `Prices::at` | Costs | `module:catalog`, `module:inventory` |
 | 2.5 | notifications | `notifications`, `Notifier`, drivers (in_app, push VAPID, telegram; `array` in CI), dedupe store, locale rendering | Identity | `module:notifications` |
 | 2.6 | inventory.reorder | `reorder_rules`; `EvaluateThresholds` job on `StockChanged`; `StockLow` / `StockOut` with `stock_alert_states` for re-fire after recovery | Notifications (events) | `feature` |
-| 2.7 | production | `production_requests`, `production_batches`, state machines, `stations.requires_overseer`, `Batches::confirm` atomic (N consume + 1 output), `AutoRequest` on `StockOut` for `kind=product` with a non-empty recipe, `AssignedUsersResolver`, `NullShiftAttacher`; `advance` order schema fields (due_at, deposit) land here, UI later | Inventory, Catalog, Identity, Notifications | `module:production`, `unit` |
+| 2.7 | production | `production_requests`, `production_batches`, state machines, `stations.requires_overseer`, `Batches::finish` / `Batches::confirm` atomic (N consume + 1 output), `AutoRequest` on `StockOut` for `kind=product` with a non-empty recipe, `AssignedUsersResolver`, `NullShiftAttacher`; `advance` order schema fields (due_at, deposit) land here, UI later | Inventory, Catalog, Identity, Notifications | `module:production`, `unit` |
 | 2.8 | web | `/production` kanban; KDS stock strip + transfer request; till display-case panel + Request production; admin Inventory (stock by location, ledger, purchases, transfers, reorder) + recipe versions with cost + production planner | | Playwright `p2-stockout-production`, `p2-purchase-transfer` |
 | 2.9 | docs | `Phase2Seeder`; ADR 0010 station presence resolver interface; ADR 0011 alert dedupe; OpenAPI; ERD; report | | |
 
@@ -37,7 +37,7 @@ work and notifications, which is where "works locally, fails in compose" traps l
 Purchase confirm → `purchase_in` + moving average `(old_qty·old_cost + new_qty·new_cost)/(old_qty+new_qty)`
 to 4 dp; transfer request/confirm moves balances between locations; version publish keeps the old
 version; cost roll-up and margin; reorder evaluation runs on the queue (`Queue::fake` asserts dispatch,
-a `sync` twin asserts the effect); dedupe; production state machine exhaustive; `Batches::confirm` writes
+a `sync` twin asserts the effect); dedupe; production state machine exhaustive; `Batches::finish` (no overseer) and `Batches::confirm` (an overseer) write
 N consume + 1 output atomically; overseer gating per station; `AutoRequest` only for produced items.
 
 ## Exit gate (`gate:p2`, CI job `gate-p2`)

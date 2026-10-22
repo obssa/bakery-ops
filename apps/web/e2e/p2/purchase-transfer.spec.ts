@@ -95,12 +95,13 @@ async function runManagerConfirms(f: TransferFixture, manager: Page, transferId:
 
 async function runSecondRejected(f: TransferFixture, chef: Page, manager: Page) {
   const item = f.ingredient.name_en;
-  await requestFromStrip(f, chef, "2000", "one more");
-  const second = (await transfersOf(f.admin, f.ingredient.id)).find((t) => t.status === "requested");
+  const note = `one more ${f.ingredient.name_en}`; // run-unique: earlier runs leave their transfers in the E2E branch
+  await requestFromStrip(f, chef, "2000", note);
+  const second = (await transfersOf(f.admin, f.ingredient.id)).find((t) => t.status === "requested" && t.note === note);
   if (!second) throw new Error("the second request is not on the list");
 
   await openAs(manager, f.manager.api, `en/admin/inventory/transfers/?transfer=${second.id}`);
-  const row = manager.getByRole("row").filter({ hasText: "one more" });
+  const row = manager.getByRole("row").filter({ hasText: note });
   await expect(row).toContainText("Requested", { timeout: 30_000 });
   await row.getByRole("button", { name: `Reject transfer ${item}` }).click();
   const dialog = manager.getByRole("dialog", { name: "Reject this transfer" });

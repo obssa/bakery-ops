@@ -145,7 +145,7 @@ export async function buildTransferFixture(credentials: { phone: string; passwor
     chef: { ...chefStaff, api: chef.api },
     manager: { ...managerStaff, api: manager.api },
     kitchenStart: { onHand: "1000.0000", onHandText: "1000 g" },
-    ask: { qty: "5000", text: "5000 g", note: "for the lunch rush" },
+    ask: { qty: "5000", text: "5000 g", note: `for the lunch rush ${base.ingredient.name_en}` },
   };
 }
 

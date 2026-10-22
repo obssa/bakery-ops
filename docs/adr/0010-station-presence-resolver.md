@@ -1,6 +1,6 @@
 # ADR 0010: "Who is on duty at a station" is an interface, answered by assignment until Shifts exists
 
-- Status: accepted (Phase 2, step 2.1)
+- Status: accepted (Phase 2 gate, 2026-10-22)
 - Date: 2026-10-21
 - Phase: 2
 
@@ -33,3 +33,26 @@ Phase 3 must be able to change the answer without touching Production or Notific
 - Until then "on duty" overstates presence (an assigned baker who has gone home is still addressed). The in-app inbox
   keeps the notification either way, so nothing is lost; the shop sees what it costs before Shifts sharpens it.
 - A third kind of presence (a roster that includes a call-in) needs no new interface.
+
+## As built
+
+Built in step 2.1 (the interfaces, the bindings and both contract files, before any Production or Notifications code) and used by
+2.5 and 2.7. What the code does, which is the fact where it differs from the plan text:
+
+- `StationPresenceResolver::onDuty(station)` and `ShiftAttacher::attach(user, station)` are interfaces in Identity
+  (`Modules\Identity\Contracts`); the Phase 2 bindings are `Resolvers\AssignedUsersResolver` (assigned and active) and
+  `Resolvers\NullShiftAttacher` (answers null), bound in `IdentityServiceProvider`. Consumers do not see the interfaces: Identity
+  offers `Contracts\Recipients` (who to tell: `forStation`, `byPermission`, `overseers`, `byIds`) and `Contracts\People` (what a
+  module may ask about a person: `can`, `isOverseer`, `attachShift`), both final classes built per use, so Production and
+  Notifications import only Identity contracts.
+- Production calls `People::attachShift` when a baker accepts a request, before the write, and records what it answered as
+  `shift_instance_id` in the audit context of `production_request.accept` (null today). Nothing else in Production knows about shifts.
+- Notifications asks `Recipients::forStation`, which uses `onDuty` and falls back to `assignedUsers` when nobody is on duty, so a
+  stock-out reaches the station's people even before Shifts exists. Inactive users are never addressed.
+- Both contract files (`tests/Contract/Production/IdentityContractTest.php`, `tests/Contract/Notifications/IdentityContractTest.php`)
+  run against the Phase 2 binding and against a roster double that stands in for Shifts (a user who is assigned but not on the
+  roster is not on duty), so the swap is already proven.
+- What Phase 3 must keep true: rebind the two interfaces, change nothing in Production or Notifications; `onDuty` stays a subset of
+  `assignedUsers` unless a call-in is added on purpose; `attach` returns the shift instance id the caller's next writes should carry, or null.
+- Not as the plan said: there is no per-user "withhold" of a permission (spatie permissions are additive), so `byPermission` honours
+  grants, role removal and inactive users, and nothing else (plan section 6, step 2.1 note).

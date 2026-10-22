@@ -15,7 +15,7 @@ shared with the owner's other site on the same account (ADR 0006).
 | PHP (web) | CloudLinux `alt-php83` for this domain only (MultiPHP) |
 | PHP (CLI, cron, deploy) | `/opt/alt/php83/usr/bin/php` (GitHub variable `DEPLOY_PHP_BIN`) |
 | Database | MySQL database and user `<account>_bakeryops`, all privileges; password only in the server `.env` |
-| Drivers | database cache, sessions and queue (cron-drained); `BROADCAST_CONNECTION=null` (polling, ADR 0009: nothing is broadcast or queued) until a WebSocket host exists; a server `.env` that still says `log` behaves the same (the code treats `log` as no transport), switch it to `null` at the next edit |
+| Drivers | database cache, sessions and queue (cron-drained); `BROADCAST_CONNECTION=null` (polling, ADR 0009: nothing is broadcast; the queue carries Phase 2's stock alerts, automatic production requests and notifications, see "Queued work") until a WebSocket host exists; a server `.env` that still says `log` behaves the same (the code treats `log` as no transport), switch it to `null` at the next edit |
 | Web app | `DEPLOY_WEB_MODE=static` once step 0.7 (the export-safe web shell) is on `main`: the static export is served by LiteSpeed from `public/app/` at https://bakery-ops.orcamind.dev/app/ (`/` redirects there), same origin as `/api/v1`, so the server `.env` needs no `CORS_ALLOWED_ORIGINS` |
 | Live-e2e account | admin of the isolated branch "E2E Test Branch" (see "E2E account" below); its phone and password only in the GitHub secrets `E2E_ADMIN_PHONE` / `E2E_ADMIN_PASSWORD` |
 | Deploy key | ed25519 key used by this repository's GitHub Actions and by the owner's PC for provisioning; authorised with the `restrict` option (commands and rsync only, no terminal, no forwarding) |
@@ -46,6 +46,27 @@ Status: **provisioned 2026-10-19** (steps 1-10 done from the owner's PC over SSH
 * * * * * sleep $((RANDOM \% 60)) && cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan schedule:run >> /dev/null 2>&1
 * * * * * cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan queue:work --stop-when-empty --max-time=50 >> /dev/null 2>&1
 ```
+
+## Queued work (Phase 2)
+
+From Phase 2 the database queue carries real work: after a stock change a job evaluates the balance (`EvaluateBalance`), a stock-out
+queues the automatic production request, and every inbox line and every push or Telegram delivery is a job. All of it runs on the
+cron `queue:work --stop-when-empty --max-time=50` entry above (see "Cron entries"); nothing else needs to be started.
+
+- **Expect up to about a minute** between a sale that sells the last of a product and the request appearing on the baker's board
+  (and the bell lines), never more than one cron tick plus the seconds the chain takes: every job queues the next one on the same
+  queue, so one worker run normally finishes the whole chain. The pad greys the product out at once, because availability is read
+  from the balance, not from the queue. The board and the bell poll (5 s and 15 s), so add a few seconds after the chain.
+- **Nothing is lost if the worker is late or a job fails.** Jobs are idempotent (derived client UUIDs, one open episode per key, one
+  inbox line per key), so a retry or an overlapping run writes nothing twice. A failed job lands in `failed_jobs`; the hourly
+  `inventory:sweep-alerts` (in the scheduler) re-evaluates the open episodes and every active rule, so a lost evaluation heals within
+  the hour. Look at `php artisan queue:failed` after a cron outage.
+- **A release restarts the worker** (`queue:restart` is in the release script), so the next cron run loads the new code.
+- **The Playwright `@live` flows wait for this.** `p2-stockout-production` polls the API for the request for up to 150 s (30 s in
+  CI) and says which link was missing (no alert row, no request, no inbox line); a failure there on the live host with a green CI
+  run points at the cron entry or the queue, not at the code.
+- **Seeding the demo runs the listeners itself.** `bakery:seed-demo` sets the queue to `sync` for the length of the Phase 2 seed
+  and puts the setting back, so the demo bakery has its inbox lines without waiting for cron.
 
 ## How a release works
 
@@ -131,6 +152,27 @@ catalog and stock table before and after):
   the audit log and the timelines hold what a real shift would; they draw a few units of demo stock. A second run on the
   same day writes nothing; a run on a later day adds that day's seven orders (and only those), so run it once when you
   want to show the demo, not on a schedule.
+**Phase 2 (inventory and production).** After the release that ships Phase 2, run the same command once more on the branch that
+holds Phases 0 and 1 (`php artisan bakery:seed-demo --force`, or `--phase=2`). It adds only what Phase 2 brings and rewrites nothing of
+Phases 0 and 1 (a test seeds Phase 1, then Phase 2, and compares the dining room, the orders, the people, the stations, locations and
+categories before and after). All of it goes through the code the screens call, so the audit log, the ledger and the inbox hold what
+people doing it would have left; the queued listeners run synchronously for the length of the seed, so no worker is involved:
+- three suppliers (made-up names and numbers), and an opening cost for every ingredient and bought-in product, so recipe costs are
+  complete and the Catalog shows margins;
+- two confirmed purchases received into the store (flour at a price above its opening cost, so the moving average visibly moves; dairy)
+  and one draft purchase (packaging) to confirm by hand;
+- eight reorder rules (flour, sugar, butter, milk, eggs and cream at the store, cream at the cake room, and the gate product);
+- the gate product "Honey cake (slice)" with a recipe and a price of 150.00, **one slice on hand at the display case** (it is below its
+  reorder minimum, so the first poll shows one low-stock line) and "Bread roll" version 2 beside version 1;
+- three transfers out of the store: one confirmed (butter to the bakery), one requested by the chef and left for the store to act on
+  (eggs to the kitchen), one rejected with a reason (cream to the cake room);
+- production: an 80-baguette request due 06:00 tomorrow (priority high), a bread-roll request accepted by the bread baker, a batch of
+  bread rolls waiting for the overseer's sign-off (nothing is written until someone confirms it), and one chocolate-cake batch
+  confirmed today with its ledger rows.
+A second run writes nothing, not even an audit row or an inbox line (everything it creates has a fixed key); what you have since
+changed or cancelled stays. The gate product is the one to show the main flow with: sell the slice at the pad and watch the request
+reach the cake baker's board (on the live host after the cron tick, see "Queued work"). It draws only on stock the earlier phases left,
+and nothing in it holds a secret: the same `BAKERY_DEMO_PASSWORD` as before is all the command needs.
 Nothing secret is printed or stored: the password is never shown, and the sample orders carry made-up tables and
 products only. Never run it with `--branch` pointing at the "E2E Test Branch" or at shop data (a branch that is not a
 demo branch is refused anyway). `--branch="<name>"` loads a second, separate demo

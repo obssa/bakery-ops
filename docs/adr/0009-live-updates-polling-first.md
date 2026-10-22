@@ -140,3 +140,12 @@ banned outside `src/lib/live/`, so screens subscribe through `LiveFeed` instead 
 - Long polling: same problem, and no gain over 2 s polls with 304s. Rejected.
 - A hosted Pusher-compatible service now: a monthly cost and an account Ramin has not asked for; the code is ready for
   it. Deferred to his decision.
+
+## Note, 2026-10-22: Phase 2 stays on polling
+
+Phase 2 adds no socket either. The production board polls `GET /production/requests?view=board` every 5 s while the tab is
+visible and every 30 s while it is hidden (an ETag and a 304 while nothing changes), the notification bell polls
+`GET /notifications?since=` every 15 s and every 60 s hidden, the kitchen stock strip and the till's display-case panel poll their
+own ETag-backed reads, and the admin Inventory screens load on open and after their own writes. `e2e-p2` starts no Reverb. The
+chain that makes the board change (a sale, `StockOut`, the automatic request) is queued work, so on the live host it waits for
+the cron-drained worker (runbook, "Queued work"); the screens show it on their next poll after that.

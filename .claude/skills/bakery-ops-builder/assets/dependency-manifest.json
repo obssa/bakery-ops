@@ -421,7 +421,8 @@
         "production_request + batch state machines",
         "Requests::create(product, qty, due, reason)",
         "AutoRequest listener on StockOut (kind=product with non-empty recipe)",
-        "Batches::confirm(batch, produced, waste)"
+        "Batches::finish(batch, produced, waste) (also confirms where the station needs no overseer)",
+        "Batches::confirm(batch, confirmer) (the overseer sign-off)"
       ],
       "events": [
         "ProductionRequested",
@@ -1030,7 +1031,7 @@
         {
           "id": "2.7",
           "module": "production",
-          "builds": "requests, batches, state machine, stations.requires_overseer, Batches::confirm atomic, AutoRequest on StockOut; output location = the display_case (or station) location the pad reads so 'available immediately' holds; Identity's AssignedUsersResolver / NullShiftAttacher stay the Phase 2 bindings",
+          "builds": "requests, batches, state machine, stations.requires_overseer, Batches::finish / Batches::confirm atomic (finish also confirms where no overseer is needed), AutoRequest on StockOut; output location = the display_case (or station) location the pad reads so 'available immediately' holds; Identity's AssignedUsersResolver / NullShiftAttacher stay the Phase 2 bindings",
           "pest_groups": [
             "module:production",
             "unit"
@@ -1065,8 +1066,8 @@
         ]
       },
       "adrs": [
-        "0010-station-presence-resolver-interface",
-        "0011-stock-alert-dedupe"
+        "0010-station-presence-resolver",
+        "0011-stock-alert-dedupe-and-queued-actor"
       ]
     },
     "3": {

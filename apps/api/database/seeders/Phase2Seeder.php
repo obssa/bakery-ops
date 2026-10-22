@@ -97,8 +97,6 @@ final class Phase2Seeder extends Seeder
 
     private ?Units $units = null;
 
-    private ?Branch $branch = null;
-
     /**
      * @throws DemoSeedRefused before anything is written: no demo branch yet
      */
@@ -113,7 +111,6 @@ final class Phase2Seeder extends Seeder
         $previousQueue = config('queue.default');
         $this->people = [];
         $this->suppliers = [];
-        $this->branch = $branch;
         $this->units = app(Units::class);
 
         // the listeners queued by the actions below (alerts, auto requests, inbox lines) run when the transaction commits, here
@@ -251,7 +248,7 @@ final class Phase2Seeder extends Seeder
     }
 
     /**
-     * @param  list<array{0: string, 1: string, 2: string}>  $specLines  [SKU, quantity, unit]
+     * @param  list<array<int|string, string>>  $specLines  [SKU, quantity, unit], and a 'waste' percentage where there is one
      * @return list<array{ingredient_item_id: int, qty: string, unit_id: int, is_optional: bool, waste_pct: string}>|null null when an ingredient is gone
      */
     private function recipeLines(array $specLines): ?array
@@ -267,7 +264,7 @@ final class Phase2Seeder extends Seeder
                 'qty' => $line[1],
                 'unit_id' => $this->units()->resolve($line[2])->id,
                 'is_optional' => false,
-                'waste_pct' => $line['waste'] ?? '0',
+                'waste_pct' => (string) ($line['waste'] ?? '0'),
             ];
         }
 
@@ -329,7 +326,7 @@ final class Phase2Seeder extends Seeder
         if (! $active instanceof Recipe || $lines === null) {
             return;
         }
-        $steps = DemoBakery::PRODUCTS[DemoPhaseTwo::ROLL_SKU]['recipe']['steps'] ?? [];
+        $steps = DemoBakery::PRODUCTS[DemoPhaseTwo::ROLL_SKU]['recipe']['steps'];
         $spec = [
             'yield_qty' => DemoBakery::PRODUCTS[DemoPhaseTwo::ROLL_SKU]['recipe']['yield'][0],
             'yield_unit_id' => $active->yield_unit_id,

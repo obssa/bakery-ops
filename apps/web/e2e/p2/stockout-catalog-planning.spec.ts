@@ -100,7 +100,7 @@ test.describe("admin catalog and planning", () => {
     await expect(row).toContainText("Requested");
 
     // assign to the baker of the producing station
-    await row.getByLabel(`Baker for ${f.cake.name_en}`).selectOption({ label: f.baker.name });
+    await row.getByLabel(`Baker for ${f.cake.name_en}`).selectOption({ value: String(f.baker.id) }); // by id: the live branch has other bakers at this station (and maybe the same name)
     await row.getByRole("button", { name: `Assign ${f.cake.name_en}` }).click();
     await expect(row).toContainText(f.baker.name, { timeout: 15_000 });
 

@@ -55,12 +55,13 @@ Availability of a product at a location: `to_order` = `floor(min over lines of a
 | `stock_movements` | branch_id, item_id, from_location_id?, to_location_id?, qty (signed, base unit), reason, ref_type, ref_id, reservation_ref?, shift_instance_id?, user_id, acting_user_id?, station_id?, device_id?, client_uuid?, created_at | **append-only, sole writer `Ledger`**. Reasons: `purchase_in`, `transfer`, `production_consume`, `production_output`, `sale`, `waste`, `count_adjustment`, `return`, `reservation`, `reservation_release` |
 | `stock_balances` | branch_id, item_id, location_id, on_hand, reserved, updated_at | upserted in the same transaction as every movement; **the row that `SELECT … FOR UPDATE` locks**; `available = on_hand − reserved` |
 | `item_stock_view` | item_id, location_id, on_hand, reserved, available | reconciliation query (SUM over movements) exposed as a report and asserted by the gate property test; a plain VIEW on MySQL, may become a materialized view on PostgreSQL (ADR 0006) |
-| `suppliers` | branch_id, name, phone, tin | |
-| `purchases`, `purchase_lines` | supplier_id, invoice_no, date, total; item_id, qty, unit_cost | confirm → `purchase_in` into the store location; feeds moving-average cost |
-| `item_costs` | item_id, moving_avg_cost, as_of | `(old_qty·old_cost + new_qty·new_cost) / (old_qty + new_qty)` to 4 dp |
-| `transfers` | from_location_id, to_location_id, item_id, qty, status (requested, confirmed, rejected), requested_by, confirmed_by | confirm → `transfer` movement |
-| `reorder_rules` | item_id, location_id?, min_qty, reorder_qty, notify_roles JSONB | crossing `min_qty` emits `StockLow` |
-| `stock_alert_states` | item_id, location_id, type, active_since, cleared_at | re-fire only after stock rose above and dipped below again |
+| `suppliers` | branch_id, name, phone, tin, notes, is_active | a proper noun, shown as typed (no `_en` / `_am`); switched off, never deleted |
+| `purchases`, `purchase_lines` | client_uuid, supplier_id, invoice_no, purchase_date, location_id, status (draft, confirmed, cancelled), total; item_id, qty (typed, with its unit) and qty_base, unit_cost, unit_cost_base | confirm → one `purchase_in` per line into the receiving location (the store by default) in one `appendMany`, then the moving average; a confirmed purchase is immutable |
+| `item_costs` | item_id, moving_avg_cost (per base unit, `DECIMAL(14,4)`), qty_basis, currency, as_of | `(old_qty·old_cost + new_qty·new_cost) / (old_qty + new_qty)` rounded once, half-up, to 4 dp; stock with no cost row is unvalued and does not dilute |
+| `item_cost_history` | item_id, source (opening, purchase), purchase_line_id?, qty_before, cost_before?, qty_in, unit_cost_in, cost_after, user_id | **append-only**, one row per cost change; `cost_after` of one row is `cost_before` of the next |
+| `transfers` | client_uuid, from_location_id, to_location_id, item_id, qty (base unit), status (requested, confirmed, rejected), reject_reason, production_request_id?, requested_by_user_id, decided_by_user_id, out_movement_id, in_movement_id | a request moves nothing; confirm → two `transfer` movements in one `appendMany` (409 when the source's `available` is short); reject writes none |
+| `reorder_rules` | item_id, location_id? (`location_key` 0 = whole branch), min_qty, reorder_qty (base unit), notify_roles JSONB (registry roles and the literal `station`), is_active | one live rule per item and place; `available <= min_qty` opens a `low` episode and emits `StockLow` |
+| `stock_alert_states` | item_id, location_id, location_key, type (`low`, `out`), is_active (1 or NULL), active_since, cleared_at, available_at_start, threshold_qty, caused_by_user_id | one open episode per key (unique over a NULL `is_active` when closed); `StockOut` / `StockLow` fire when it opens, `StockRecovered` when it closes; `low` and `out` are independent |
 
 Reason → effect map lives in one class (`MovementReason`):
 
@@ -95,8 +96,8 @@ Reason → effect map lives in one class (`MovementReason`):
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `production_requests` | branch_id, product_item_id, requested_qty, due_at, priority, station_id, requested_by, assigned_to?, status, reason (`schedule`, `stock_out`, `manual`), linked_order_id? | stock-out auto-creates one with `default_batch_qty` |
-| `production_batches` | request_id, produced_qty, waste_qty, started_at, finished_at, produced_by, confirmed_by?, status, client_uuid | confirm writes N `production_consume` + 1 `production_output` atomically |
+| `production_requests` | branch_id, client_uuid, product_item_id, requested_qty, due_at, priority, station_id, requested_by_user_id, assigned_to_user_id?, status (requested, accepted, in_progress, pending_confirmation, done, cancelled), reason (`schedule`, `stock_out`, `manual`), source_alert_id?, open_stock_out_key | stock-out auto-creates one with `default_batch_qty`; one open stock-out request per product (the key), one open manual request per product |
+| `production_batches` | client_uuid, request_id (one batch per request), station_id, status (started, finished, confirmed), recipe_id, recipe_version, planned_qty, produced_qty, waste_qty, consume_location_id, output_location_id, started_by_user_id, finished_by_user_id, confirmed_by_user_id, send_back_count, output_movement_id | where the station needs no overseer, `Batches::finish` also confirms in the same write; otherwise `Batches::confirm` (a second person) writes N `production_consume` + 1 `production_output` atomically, at the recipe version recorded at start |
 
 ## Shifts (Phase 3)
 
@@ -115,8 +116,10 @@ Reason → effect map lives in one class (`MovementReason`):
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `notifications` | user_id, type, payload JSONB, deep_link, channel (`in_app`, `push`, `telegram`, `sms`), sent_at, read_at | |
-| `notification_dedupe` | key (item, location, type), active_since, cleared_at | one alert per episode |
+| `notifications` | branch_id, user_id, type, severity, title_en/title_am, body_en/body_am, payload JSONB, deep_link, dedupe_key, read_at, created_at | **the in-app inbox**: one row per person per event, not per channel; unique `(user_id, dedupe_key)`; no actor stamp (the cause is `payload.caused_by_user_id`) |
+| `notification_dedupe` | branch_id, dedupe_key, type, is_active, active_since, cleared_at | the gate: one alert per episode, correct under redelivery and for producers Notifications does not know |
+| `notification_endpoints` | user_id, driver (`push`, `telegram`), address (+ hash), verified_at, last_success_at, revoked_at | where a person can be reached outside the app; soft-deleted |
+| `notification_deliveries` | notification_id, driver, endpoint_id, status (pending, sent, failed, gone), attempts, last_error, sent_at | one row per extra channel; the inbox line exists whatever happens here |
 
 ## Analytics (Phase 4)
 

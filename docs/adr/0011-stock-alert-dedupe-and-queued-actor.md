@@ -1,6 +1,6 @@
 # ADR 0011: Stock alerts fire once per episode, and queued work acts as the person who caused it
 
-- Status: accepted (Phase 2, step 2.1); the Notifications half was added when it was built (step 2.5a, decision 5); the `low` level in step 2.6a (decision 6)
+- Status: accepted (Phase 2 gate, 2026-10-22; first accepted in step 2.1); the Notifications half was added when it was built (step 2.5a, decision 5); the `low` level in step 2.6a (decision 6)
 - Date: 2026-10-21
 - Phase: 2
 
@@ -78,3 +78,37 @@ no request and so no actor; and a queued listener cannot be made unique, while a
 - The uniqueness lock uses the cache lock table, so it works on the database cache without Redis; a job that never
   starts releases it after ten minutes.
 - If Ramin later wants the evaluation to run in the same request (`afterResponse`), only the listener changes.
+
+## As built
+
+Built across 2.1 (the evaluation and the actor), 2.5 (Notifications' own gate), 2.6 (the `low` level, the sweep) and 2.7 (the
+automatic request). The decisions above hold; what the code adds or says differently:
+
+- **Two levels, two independent episodes.** `out` (available at or below 0) and `low` (a live, active reorder rule says available is
+  at or below its minimum) are separate rows in `stock_alert_states`; one movement from fine to zero opens both, recovery closes both
+  (`StockRecovered` carries the type). A rule changed in mid-episode moves the episode on the next evaluation, which always reads the
+  live rule; a branch-wide rule is `location_key` 0 and reads the sum of `available` over the branch's stock places.
+- **The sweep.** `inventory:sweep-alerts` (hourly) re-evaluates the open episodes and every active rule, so a job lost to a failed
+  queue self-heals; it is the same evaluation, so it cannot double-announce.
+- **Notifications' gate is a second, separate table** (`notification_dedupe`, key `{type}:{item}:{location}`, `is_active` 1 or NULL,
+  unique with the branch), so a redelivered or foreign `StockOut` creates no second line; the inbox row has its own unique
+  `(user_id, dedupe_key)` that includes the episode id. The "unique key over NULL" technique (a nullable `is_active`, 1 while open) is used
+  by `stock_alert_states`, `notification_dedupe`, and the production request's open stock-out key, on MariaDB and PostgreSQL alike with
+  no partial index; where a soft-delete column is involved a generated column carries it.
+- **The actor of queued work** is restored by `Support\RestoresActor` (Inventory, from the ledger row of the movement) or
+  `Support\EventScope` (Notifications) and `Support\EventActor` (Production), both from the event's `causedByUserId`, through `ActorContext::runAs`, which also
+  resets the scoped instances after each job so a long-lived worker leaks nothing (CI's `worker` container proves it). No system user
+  exists. The rows written by queued work therefore name the person who caused them: the episode (`caused_by_user_id`), the automatic
+  request (`requested_by_user_id`, `created_by_user_id`) and its audit row `production_request.auto_create`, and every inbox line
+  (`payload.caused_by_user_id`). "That the cause was automatic" is carried by the action name (`production_request.auto_create`)
+  and by the line's type, not by a `context.cause` key as the first draft said. `Phase2ActorGateTest` pins this.
+- **Evaluation.** `EvaluateBalance` is `ShouldBeUniqueUntilProcessing` (branch, item, location) on the default queue after commit and
+  reads the current balance, so a burst of movements costs one job; the lock is the database cache's `cache_locks` table, so no Redis
+  is needed on the live host. All six Notifications listeners and `CreateAutoRequest` are `ShouldQueue` and
+  `ShouldHandleEventsAfterCommit` (an arch test enforces it).
+- **Where it is proven.** `AlertEvaluatorTest` (decision table), `AlertEpisodePropertyTest` and `LowAlertEpisodePropertyTest` (random
+  availability walks: episodes alternate, never two open, `StockOut` count equals the falls), `StockAlertDedupeTest` (end to end on the
+  sync queue), the race tests in `tests/Gate/` (two evaluations at the moment of reaching 0, two auto requests for one episode), the
+  `Queue::fake` / `sync` pairs, and `StockOutToProductionGateTest` on the seeded demo product.
+- **Live timing.** As the consequences say: the chain waits for the cron tick on the live host; the first `@live` run of it took about a
+  minute end to end, and the e2e helper `waitForQueue` allows 150 s there and 30 s in CI.
