@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $name_am
  * @property Bilingual|null $name
  * @property bool $requires_overseer
+ * @property bool $tracks_shifts
  * @property int $sort
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -40,11 +41,12 @@ final class Station extends Model
     protected $table = 'stations';
 
     /** @var list<string> */
-    protected $fillable = ['branch_id', 'code', 'name', 'name_en', 'name_am', 'requires_overseer', 'sort'];
+    protected $fillable = ['branch_id', 'code', 'name', 'name_en', 'name_am', 'requires_overseer', 'tracks_shifts', 'sort'];
 
     /** @var array<string, mixed> */
     protected $attributes = [
         'requires_overseer' => false,
+        'tracks_shifts' => true,
         'sort' => 0,
     ];
 
@@ -57,6 +59,7 @@ final class Station extends Model
             'code' => StationCode::class,
             'name' => Bilingual::class,
             'requires_overseer' => 'boolean',
+            'tracks_shifts' => 'boolean',
             'sort' => 'integer',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',

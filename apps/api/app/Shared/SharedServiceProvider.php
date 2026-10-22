@@ -19,6 +19,8 @@ use App\Shared\Live\Broadcasts\OrderPaidBroadcast;
 use App\Shared\Live\Broadcasts\OrderSentBroadcast;
 use App\Shared\Live\Broadcasts\OrderVoidedBroadcast;
 use App\Shared\Live\Broadcasts\StockChangedBroadcast;
+use App\Shared\Shifts\NoOpenShifts;
+use App\Shared\Shifts\OpenShifts;
 use App\Shared\Tenancy\CurrentBranch;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -40,6 +42,8 @@ final class SharedServiceProvider extends ServiceProvider
     {
         $this->app->scoped(CurrentBranch::class, static fn (): CurrentBranch => new CurrentBranch);
         $this->app->scoped(ActorContext::class, static fn (): ActorContext => new ActorContext);
+        // which shift runs at a station: Shifts rebinds it (step 3.2b); until then nothing runs (dependency-graph.md, cycle 1)
+        $this->app->scoped(OpenShifts::class, static fn (): OpenShifts => new NoOpenShifts);
     }
 
     public function boot(): void
