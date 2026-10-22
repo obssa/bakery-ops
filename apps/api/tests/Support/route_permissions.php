@@ -169,4 +169,23 @@ return [
     // hold it too (403 auth.forbidden, checked by the action after this matrix)
     'GET /api/v1/payment-channels' => ['permission' => 'payments.take', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
     'POST /api/v1/orders/{order}/payments' => ['permission' => 'payments.take', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+
+    // Shifts (step 3.2b): shifts.view reads at the stations one works at (stations.all everywhere); shifts.manage (the admin) configures
+    // and acts for others; shifts.count starts, joins and leaves, and the action checks the station (403 shifts.station.forbidden).
+    // Cancel is the admin's, or the starter's own while the shift is opening, so the route asks only for shifts.view and the action
+    // decides (403 shifts.cancel.forbidden); the matrix's {shift} is an opening shift the caller started.
+    'GET /api/v1/shift-templates' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/shift-templates' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
+    'PATCH /api/v1/shift-templates/{template}' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
+    'DELETE /api/v1/shift-templates/{template}' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
+    'GET /api/v1/shifts' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/shifts/{shift}' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/shifts' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
+    'PUT /api/v1/shifts/{shift}/roster' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
+    'POST /api/v1/shifts/{shift}/cancel' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/stations/{station}/shifts/current' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/stations/{station}/shifts/start' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/stations/{station}/shifts/open-ad-hoc' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/shifts/{shift}/join' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/shifts/{shift}/leave' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
 ];

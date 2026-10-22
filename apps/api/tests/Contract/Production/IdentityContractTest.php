@@ -119,6 +119,9 @@ it('answers onDuty from the interface: the assigned users under the Phase 2 bind
             ->and($resolver->onDuty($this->bakery)->pluck('id')->all())->not->toContain($first->id, $second->id);
     };
 
+    // the Phase 2 binding, named explicitly: from step 3.2b the container's default is the Shifts resolver, which this same
+    // presence assertion passes against in tests/Contract/Shifts and tests/Modules/Shifts
+    app()->bind(StationPresenceResolver::class, AssignedUsersResolver::class);
     expect(app(StationPresenceResolver::class))->toBeInstanceOf(AssignedUsersResolver::class);
     $holdsFor([$first->id, $second->id]);
 

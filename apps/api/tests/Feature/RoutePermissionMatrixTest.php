@@ -20,6 +20,8 @@ use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
 use App\Modules\Production\Models\ProductionRequest;
+use App\Modules\Shifts\Models\ShiftInstance;
+use App\Modules\Shifts\Models\ShiftTemplate;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -112,6 +114,18 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
             'branch_id' => $branch->id, 'station_id' => $station->id, 'created_by_user_id' => $actorId, 'requested_by_user_id' => $actorId, 'assigned_to_user_id' => $actorId,
         ]);
         $params['{batch}'] = (string) ProductionBatch::factory()->finished()->create(['branch_id' => $branch->id, 'request_id' => $request->id, 'created_by_user_id' => $actorId, 'started_by_user_id' => $actorId])->id;
+    }
+    if (str_contains($uri, '{template}')) {
+        $params['{template}'] = (string) ShiftTemplate::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;
+    }
+    if (str_contains($uri, '{shift}')) {
+        // an opening shift the caller started, at a kitchen where the caller is assigned (cancel is the starter's own while
+        // opening; join and leave are refused or not by the action, never by the matrix)
+        $station = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $branch->id]);
+        UserStationAssignment::factory()->create(['branch_id' => $branch->id, 'user_id' => $actorId, 'station_id' => $station->id]);
+        $params['{shift}'] = (string) ShiftInstance::factory()->opening()->create([
+            'branch_id' => $branch->id, 'station_id' => $station->id, 'created_by_user_id' => $actorId, 'started_by_user_id' => $actorId,
+        ])->id;
     }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)

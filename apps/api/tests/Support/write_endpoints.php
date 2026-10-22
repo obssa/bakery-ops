@@ -44,6 +44,7 @@ use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Production\Models\ProductionRequest;
+use App\Modules\Shifts\Models\ShiftTemplate;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -53,6 +54,7 @@ use Illuminate\Support\Str;
 use Tests\Support\NotificationDrivers;
 use Tests\Support\OrdersMenu;
 use Tests\Support\ProductionFixture;
+use Tests\Support\ShiftsFixture;
 use Tests\TestCase;
 
 $admin = static function (): User {
@@ -111,6 +113,15 @@ $productionFloor = static function () use ($admin): ProductionFixture {
     $admin();
     $f = ProductionFixture::build(currentBranch());
     $f->stockCakeRoom();
+    loginAs($f->admin);
+
+    return $f;
+};
+
+// the stations and people of a shift floor (Tests\Support\ShiftsFixture) in the admin's branch, the fixture's admin logged in
+$shiftsFloor = static function (TestCase $t) use ($admin): ShiftsFixture {
+    $admin();
+    $f = ShiftsFixture::build(currentBranch(), $t);
     loginAs($f->admin);
 
     return $f;
@@ -1055,5 +1066,138 @@ return [
             return ['{batch}' => (string) $f->finishedBatch($f->baker)->id];
         },
         'payload' => fn (): array => ['note' => 'Count the tray again'],
+    ],
+    // Shifts (step 3.2b): templates, scheduling, roster, cancel, start, call-in, join and leave
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/shift-templates',
+        'module' => 'shifts',
+        'table' => 'shift_templates',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $shiftsFloor($t);
+
+            return [];
+        },
+        'payload' => fn (): array => [
+            'name_en' => 'Day', 'name_am' => 'ቀን', 'start_time' => '06:00', 'end_time' => '14:00', 'days_of_week' => [1, 2, 3, 4, 5, 6, 7],
+            'station_ids' => [Station::query()->where('code', StationCode::Till->value)->latest('id')->firstOrFail()->id],
+        ],
+    ],
+    [
+        'method' => 'PATCH',
+        'uri' => '/api/v1/shift-templates/{template}',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{template}' => (string) $f->template([$f->till])->id];
+        },
+        'payload' => fn (): array => ['name_en' => 'Early day', 'sort' => 2],
+    ],
+    [
+        'method' => 'DELETE',
+        'uri' => '/api/v1/shift-templates/{template}',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{template}' => (string) $f->template([$f->till])->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/shifts',
+        'module' => 'shifts',
+        'table' => 'shift_instances',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+            $f->template([$f->till]);
+
+            return [];
+        },
+        'payload' => fn (): array => [
+            'client_uuid' => (string) Str::uuid(),
+            'station_id' => Station::query()->where('code', StationCode::Till->value)->latest('id')->firstOrFail()->id,
+            'template_id' => ShiftTemplate::query()->latest('id')->firstOrFail()->id,
+            'date' => '2026-11-02',
+            'user_ids' => [],
+        ],
+    ],
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/shifts/{shift}/roster',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{shift}' => (string) $f->scheduled($f->till, $f->template([$f->till]), '2026-11-02')->id];
+        },
+        'payload' => fn (): array => ['user_ids' => [UserStationAssignment::query()->where('station_id', Station::query()->where('code', StationCode::Till->value)->latest('id')->firstOrFail()->id)->orderBy('id')->firstOrFail()->user_id]],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/shifts/{shift}/cancel',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{shift}' => (string) $f->scheduled($f->till, $f->template([$f->till]), '2026-11-02')->id];
+        },
+        'payload' => fn (): array => ['reason' => 'Holiday'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/stations/{station}/shifts/start',
+        'module' => 'shifts',
+        'table' => 'shift_instances',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{station}' => (string) $f->till->id];
+        },
+        'payload' => fn (): array => ['client_uuid' => (string) Str::uuid()],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/stations/{station}/shifts/open-ad-hoc',
+        'module' => 'shifts',
+        'table' => 'shift_instances',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{station}' => (string) $f->kitchen->id];
+        },
+        'payload' => fn (): array => ['client_uuid' => (string) Str::uuid()],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/shifts/{shift}/join',
+        'module' => 'shifts',
+        'table' => 'shift_roster',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{shift}' => (string) $f->running($f->till, $f->cashier)->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/shifts/{shift}/leave',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+            $shift = $f->running($f->till, $f->cashier);
+            $f->onRoster($shift, $f->admin);
+
+            return ['{shift}' => (string) $shift->id];
+        },
+        'payload' => fn (): array => [],
     ],
 ];

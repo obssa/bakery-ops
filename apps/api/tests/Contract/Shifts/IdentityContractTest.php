@@ -136,7 +136,9 @@ it('passes the presence assertions of the production and notifications contracts
     // notifications->identity: onDuty(station) is the resolver's answer, and the assigned people when nobody is on duty
     $recipientIds = fn (): array => app(Recipients::class)->onDuty($this->cakeRoom)->pluck('id')->all();
 
-    expect(app(StationPresenceResolver::class))->toBeInstanceOf(AssignedUsersResolver::class, 'the Phase 2 default, until Shifts rebinds it');
+    // the Phase 2 binding, named explicitly: from step 3.2b the container's default is the Shifts resolver
+    app()->bind(StationPresenceResolver::class, AssignedUsersResolver::class);
+    expect(app(StationPresenceResolver::class))->toBeInstanceOf(AssignedUsersResolver::class);
     $holdsFor([$first->id, $second->id]);
 
     app()->instance(StationPresenceResolver::class, shiftsRosterResolver([$second->id]));

@@ -51,7 +51,9 @@ function bindOpenShifts(OpenShifts $double): void
     app()->scoped(OpenShifts::class, fn () => $double);
 }
 
-it('stamps the station the header names and, under the default binding, no shift', function () {
+it('stamps the station the header names and, when no shift runs anywhere, no shift', function () {
+    // bound explicitly: from step 3.2b the container's default is the Shifts reader (which also answers null while nothing runs)
+    bindOpenShifts(new NoOpenShifts);
     expect(app(OpenShifts::class))->toBeInstanceOf(NoOpenShifts::class);
 
     $audit = stampedWrite($this, ['X-Station-Id' => (string) $this->kitchen->id]);

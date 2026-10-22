@@ -8,14 +8,14 @@ use App\Shared\Shifts\OpenShifts;
 /*
  * Phase 3, step 3.1a (F3, plan section 2): Shared's OpenShifts is the interface through which Inventory (the ledger check,
  * step 3.1b) and Identity (ResolveActor's stamp) ask "which shift is running at this station" without importing Shifts
- * (dependency-graph.md, cycle 1). Shifts rebinds it at step 3.2b; until then the default answers that nothing runs.
+ * (dependency-graph.md, cycle 1). Shifts rebinds it at step 3.2b (tests/Modules/Shifts/ShiftsBindingsTest.php pins the new
+ * default); NoOpenShifts stays as the answer of an environment without Shifts, and these tests bind it explicitly.
  */
 
-it('binds OpenShifts to NoOpenShifts, which answers that no shift runs anywhere', function () {
-    $open = app(OpenShifts::class);
+it('answers through NoOpenShifts that no shift runs anywhere', function () {
+    $open = new NoOpenShifts;
 
-    expect($open)->toBeInstanceOf(NoOpenShifts::class)
-        ->and($open->stampFor(1))->toBeNull()
+    expect($open->stampFor(1))->toBeNull()
         ->and($open->openAt(1))->toBeNull()
         ->and($open->openAt(1, true))->toBeNull()
         ->and($open->isOpen(1))->toBeFalse()

@@ -146,6 +146,8 @@ it('binds StationPresenceResolver to AssignedUsersResolver, whose onDuty() is as
     $chef = makeUser($this->branch, 'chef');
     assignTo($chef, $this->kitchen);
 
+    // bound explicitly: from step 3.2b the container's default is the Shifts resolver (tests/Modules/Shifts/ShiftsBindingsTest.php)
+    app()->bind(StationPresenceResolver::class, AssignedUsersResolver::class);
     $resolver = app(StationPresenceResolver::class);
     expect($resolver)->toBeInstanceOf(AssignedUsersResolver::class)
         ->and($resolver->onDuty($this->kitchen)->pluck('id')->all())->toBe([$chef->id])
@@ -155,6 +157,8 @@ it('binds StationPresenceResolver to AssignedUsersResolver, whose onDuty() is as
 it('binds ShiftAttacher to NullShiftAttacher, which attaches no shift until Phase 3 rebinds', function () {
     $chef = makeUser($this->branch, 'chef');
 
+    // bound explicitly: from step 3.2b the container's default is the Shifts attacher
+    app()->bind(ShiftAttacher::class, NullShiftAttacher::class);
     $attacher = app(ShiftAttacher::class);
     expect($attacher)->toBeInstanceOf(NullShiftAttacher::class)
         ->and($attacher->attach($chef, $this->kitchen))->toBeNull();
