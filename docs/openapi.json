@@ -1412,6 +1412,107 @@
                 }
             }
         },
+        "/v1/stock-counts/{count}/approve": {
+            "post": {
+                "operationId": "shifts.counts.approve",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "count",
+                        "in": "path",
+                        "required": true,
+                        "description": "The count ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApproveCountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/stock-counts/{count}/reject": {
+            "post": {
+                "operationId": "shifts.counts.reject",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "count",
+                        "in": "path",
+                        "required": true,
+                        "description": "The count ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RejectCountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/devices": {
             "get": {
                 "operationId": "identity.devices.index",
@@ -9771,6 +9872,20 @@
     },
     "components": {
         "schemas": {
+            "ApproveCountRequest": {
+                "type": "object",
+                "description": "POST /stock-counts/{count}/approve: an optional note, kept as the count's decision note.",
+                "properties": {
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "title": "ApproveCountRequest"
+            },
             "AssignProductionRequest": {
                 "type": "object",
                 "description": "POST /production/requests/{request}/assign: the person who makes it, by id. Whether they are an active person of this branch\nwho holds production.fulfil at the request's station is the action's question (AssignRequest).",
@@ -10671,6 +10786,31 @@
                     "amount"
                 ],
                 "title": "RecordPaymentRequest"
+            },
+            "RejectCountRequest": {
+                "type": "object",
+                "description": "POST /stock-counts/{count}/reject: the note is required (what to look at again); `line_ids` marks the lines to look at again\n(default every line with a variance; the action refuses a line that is not on the count).",
+                "properties": {
+                    "note": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "line_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "maxItems": 500
+                    }
+                },
+                "required": [
+                    "note"
+                ],
+                "title": "RejectCountRequest"
             },
             "RejectLineRequest": {
                 "type": "object",
