@@ -258,9 +258,9 @@ jobs:
     # BROADCAST_CONNECTION=null, NEXT_PUBLIC_LIVE_TRANSPORT=poll
     with: { phase: 1, projects: "p1-order-flow p1-shortfall", profiles: "full" }
 
-  # e2e-p3..p5 keep the stack they had before step 1.2 (worker and Reverb, `ws` now being its own compose profile)
+  # e2e-p4..p5 keep the stack they had before step 1.2 (worker and Reverb, `ws` now being its own compose profile)
   # until their phase plans settle the transport; ADR 0009 has the screens poll unless a WebSocket host exists.
-  # e2e-p2 is settled (phase-2-plan.md section 2): polling, with the worker the queued stock-out chain needs.
+  # e2e-p2 and e2e-p3 are settled (phase-2-plan.md section 2, phase-3-plan.md section 2, F7): polling, with the worker the queued chains need.
   e2e-p2:
     needs: [status, mod-production, mod-notifications, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 2
@@ -271,7 +271,7 @@ jobs:
     needs: [status, mod-shifts, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 3
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 3, projects: "p3-handover p3-opening-prefill", profiles: "full,ws" }
+    with: { phase: 3, projects: "p3-handover p3-opening-prefill", profiles: "full" }
 
   e2e-p4:
     needs: [status, mod-analytics, web-build, docker-build]
