@@ -172,6 +172,70 @@
                                             "required": [
                                                 "id"
                                             ]
+                                        },
+                                        "work_stations": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "station_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_en": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_am": {
+                                                        "type": "string"
+                                                    },
+                                                    "tracks_shifts": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "requires_overseer": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "current_shift": {
+                                                        "type": [
+                                                            "object",
+                                                            "null"
+                                                        ],
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "date": {
+                                                                "type": "string"
+                                                            },
+                                                            "opened_at": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "status",
+                                                            "date",
+                                                            "opened_at"
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "station_id",
+                                                    "code",
+                                                    "name_en",
+                                                    "name_am",
+                                                    "tracks_shifts",
+                                                    "requires_overseer",
+                                                    "current_shift"
+                                                ]
+                                            }
                                         }
                                     },
                                     "required": [
@@ -179,7 +243,8 @@
                                         "permissions",
                                         "locale",
                                         "acting",
-                                        "device"
+                                        "device",
+                                        "work_stations"
                                     ]
                                 }
                             }
@@ -7995,6 +8060,9 @@
                     "requires_overseer": {
                         "type": "boolean"
                     },
+                    "tracks_shifts": {
+                        "type": "boolean"
+                    },
                     "sort": {
                         "type": "integer"
                     }
@@ -8006,6 +8074,7 @@
                     "name_en",
                     "name_am",
                     "requires_overseer",
+                    "tracks_shifts",
                     "sort"
                 ],
                 "title": "StationResource"
@@ -8658,6 +8727,9 @@
                     "requires_overseer": {
                         "type": "boolean"
                     },
+                    "tracks_shifts": {
+                        "type": "boolean"
+                    },
                     "sort": {
                         "type": "integer",
                         "minimum": 0,
@@ -8877,7 +8949,10 @@
                                 "production.view",
                                 "production.plan",
                                 "notifications.view",
-                                "costs.view"
+                                "costs.view",
+                                "shifts.view",
+                                "shifts.manage",
+                                "shifts.replay"
                             ]
                         }
                     },
@@ -9235,7 +9310,7 @@
             },
             "UpdateStationRequest": {
                 "type": "object",
-                "description": "PATCH /stations/{station}: any subset of the names (both languages, rule 9), requires_overseer and sort. The code is fixed\nonce a station exists (routing, permissions and the seeders name stations by it), so sending one is refused rather than\nignored.",
+                "description": "PATCH /stations/{station}: any subset of the names (both languages, rule 9), requires_overseer, tracks_shifts and sort. The code is fixed\nonce a station exists (routing, permissions and the seeders name stations by it), so sending one is refused rather than\nignored.",
                 "properties": {
                     "code": {
                         "type": "string"
@@ -9249,6 +9324,9 @@
                         "maxLength": 120
                     },
                     "requires_overseer": {
+                        "type": "boolean"
+                    },
+                    "tracks_shifts": {
                         "type": "boolean"
                     },
                     "sort": {
@@ -9371,7 +9449,10 @@
                                 "production.view",
                                 "production.plan",
                                 "notifications.view",
-                                "costs.view"
+                                "costs.view",
+                                "shifts.view",
+                                "shifts.manage",
+                                "shifts.replay"
                             ]
                         }
                     },
