@@ -11,6 +11,7 @@ use App\Modules\Inventory\Exceptions\InventoryError;
 use App\Modules\Inventory\Models\Location;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Events\StockChanged;
+use App\Shared\Shifts\OpenShifts;
 use App\Shared\Tenancy\BranchScope;
 use App\Shared\Tenancy\CurrentBranch;
 use App\Shared\Values\Quantity;
@@ -87,6 +88,9 @@ final class Ledger
 
         /** @var array{0: list<StockMovement>, 1: array<string, StockBalance>, 2: array<string, list<int>>} $written */
         $written = $this->connection()->transaction(function () use ($intents, $pairs, $branches, $userId): array {
+            // with the flag on: every on_hand change at a station that tracks shifts must be covered (and the shifts relied on are
+            // locked) before any balance lock is taken; nothing is consulted with the flag off
+            $stamps = $this->shiftCover($intents);
             $balances = $this->lockRows($pairs, $branches);
 
             // the batch's effect on every balance it touches, checked as a whole before anything is written
@@ -111,7 +115,7 @@ final class Ledger
             $now = CarbonImmutable::now();
             $movements = [];
             $byPair = [];
-            foreach ($intents as $intent) {
+            foreach ($intents as $index => $intent) {
                 $row = new StockMovement;
                 $row->forceFill([
                     'branch_id' => $branches[self::key($intent->itemId, $intent->locationId)],
@@ -123,7 +127,7 @@ final class Ledger
                     'ref_type' => $intent->refType,
                     'ref_id' => $intent->refId,
                     'reservation_ref' => $intent->reservationRef,
-                    'shift_instance_id' => $this->actor->shiftInstanceId(),
+                    'shift_instance_id' => $stamps[$index] ?? $this->actor->shiftInstanceId(),
                     'user_id' => $userId,
                     'acting_user_id' => $this->actor->actingUserId(),
                     'station_id' => $this->actor->stationId(),
@@ -158,6 +162,79 @@ final class Ledger
         }
 
         return array_map(static fn (StockMovement $m): Movement => $m->toMovement(), $movements);
+    }
+
+    /**
+     * The shift check of ledger.require_shift_for_station_locations (phase-3 plan section 10.1), run inside the batch's
+     * transaction before any balance lock. An intent needs cover when it changes on_hand (every reason but the two that move
+     * reserved only), at a location whose station tracks shifts, and is not a count's own adjustment. It is covered when the
+     * actor carries a shift that is open (the row keeps the actor's stamp), else when the station has a shift in status open
+     * (the row is stamped with it). Every shift relied on is then re-read with a shared lock in ascending id order, so a close
+     * (which takes the row FOR UPDATE) either finishes first or finds the movement written. Nothing runs with the flag off.
+     *
+     * @param  list<MovementIntent>  $intents
+     * @return array<int, int> intent index => the shift to stamp when it is not the actor's own
+     *
+     * @throws InventoryError inventory.shift.required (409) naming the station and location of the first uncovered intent
+     */
+    private function shiftCover(array $intents): array
+    {
+        if (! (bool) config('ledger.require_shift_for_station_locations')) {
+            return [];
+        }
+
+        $needing = [];
+        foreach ($intents as $index => $intent) {
+            $countsOwn = $intent->reason === MovementReason::CountAdjustment && $intent->refType === 'stock_count_line';
+            if (! $countsOwn && ! $intent->effect()->onHand->isZero()) {
+                $needing[$index] = $intent->locationId;
+            }
+        }
+        if ($needing === []) {
+            return [];
+        }
+
+        $locations = Location::query()->whereKey(array_values(array_unique($needing)))->with('station')->get()->keyBy('id');
+        $tracked = [];
+        foreach ($needing as $index => $locationId) {
+            $station = $locations[$locationId]->station ?? null;
+            if ($station !== null && $station->tracks_shifts) {
+                $tracked[$index] = [$station->id, $locationId];
+            }
+        }
+        if ($tracked === []) {
+            return [];
+        }
+
+        $shifts = app(OpenShifts::class);
+        $actorShift = $this->actor->shiftInstanceId();
+        $actorCovers = $actorShift !== null && $shifts->isOpen($actorShift);
+
+        $stamps = [];
+        $relied = [];
+        $found = [];
+        foreach ($tracked as $index => [$stationId, $locationId]) {
+            if ($actorCovers) {
+                $relied[$actorShift] ??= [$stationId, $locationId];
+
+                continue;
+            }
+            if (! array_key_exists($stationId, $found)) {
+                $found[$stationId] = $shifts->openAt($stationId);
+            }
+            $shiftId = $found[$stationId] ?? throw InventoryError::shiftRequired($stationId, $locationId);
+            $stamps[$index] = $shiftId;
+            $relied[$shiftId] ??= [$stationId, $locationId];
+        }
+
+        ksort($relied);
+        foreach ($relied as $shiftId => [$stationId, $locationId]) {
+            if (! $shifts->isOpen($shiftId, true)) {
+                throw InventoryError::shiftRequired($stationId, $locationId);
+            }
+        }
+
+        return $stamps;
     }
 
     /**

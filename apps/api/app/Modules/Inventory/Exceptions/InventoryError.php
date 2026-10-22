@@ -42,6 +42,12 @@ final class InventoryError extends RuntimeException
         ]);
     }
 
+    /** A movement changes on_hand at a station that tracks shifts while neither the actor's shift nor the station's is open. */
+    public static function shiftRequired(int $stationId, int $locationId): self
+    {
+        return new self('inventory.shift.required', 409, ['station_id' => $stationId, 'location_id' => $locationId]);
+    }
+
     public static function reservationNotFound(string $ref): self
     {
         return new self('inventory.reservation.not_found', 404, ['reservation_ref' => $ref]);
