@@ -1,0 +1,19 @@
+<?php
+
+/*
+ * The switches and settings of Shifts (phase-3 plan sections 4 and 6; ADR 0013). Plain values only: no closures, so `config:cache`
+ * keeps working on the shared host (DeployableCachesTest).
+ *
+ * start_grace_minutes: how long before its window starts a scheduled shift may be started (POST /stations/{station}/shifts/start).
+ *
+ * open_ad_hoc_on_accept: when true, a baker accepting a production request at a station that has no running shift opens an ad-hoc
+ * (call-in) shift through Identity's ShiftAttacher, and the accept row, the batch and its movements carry it (ADR 0013 rule 7).
+ * It ships OFF everywhere (here, .env.example, .env.ci and the live host): until step 3.7e gives staff a way to see and close
+ * shifts, the live host must not make shifts nobody can close. With it off the attacher attaches the person to a shift that is
+ * already running and otherwise answers null, exactly as the Phase 2 NullShiftAttacher did. Step 3.7e switches it on together with
+ * `ledger.require_shift_for_station_locations` (docs/runbook/server.md, "Shifts and the call-in").
+ */
+return [
+    'start_grace_minutes' => (int) env('SHIFTS_START_GRACE_MINUTES', 60),
+    'open_ad_hoc_on_accept' => (bool) env('SHIFTS_OPEN_AD_HOC_ON_ACCEPT', false),
+];

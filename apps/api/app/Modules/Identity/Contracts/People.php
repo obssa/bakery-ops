@@ -17,6 +17,7 @@ use App\Shared\Models\Station;
  *     null (Phase 3 rebinds the attacher; until then it is always null), and puts that id into ActorContext so that the rest
  *     of the request is stamped with it (an answer of null leaves the context alone); null, without calling the attacher, for a person who
  *     cannot act;
+ *   workStationIds: the ids of the stations the person may work at, for Shifts' lists (step 3.2b); empty for anyone who cannot act;
  *   isOverseer: the active person of this branch who is flagged as the overseer at that station (Stations::isOverseer; step 2.7c,
  *     for the rule of who may confirm a production batch); false for anyone else;
  *   names: the display names of the ids, for a card or a list that names a requester or a baker who has since left, so
@@ -44,6 +45,23 @@ final class People
         $user = $this->active($userId);
 
         return $user !== null && $this->stations->isOverseer($user, $station);
+    }
+
+    /**
+     * The ids of the stations the person may work at (Stations::workStationsOf: their live assignments, or every station of the
+     * branch for a person who holds stations.all); empty for anyone who cannot act (inactive, deleted, another branch, unknown).
+     * Shifts lists the shifts of these stations.
+     *
+     * @return list<int>
+     */
+    public function workStationIds(int $userId): array
+    {
+        $user = $this->active($userId);
+        if ($user === null) {
+            return [];
+        }
+
+        return array_values($this->stations->workStationsOf($user)->map(static fn (Station $station): int => $station->id)->all());
     }
 
     public function attachShift(int $userId, Station $station): ?int

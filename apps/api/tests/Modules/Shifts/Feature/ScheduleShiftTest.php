@@ -144,7 +144,7 @@ it('refuses a second shift of one template on one date at one station while the 
 
     ($this->schedule)()->assertStatus(409)->assertJsonPath('message_key', 'shifts.shift.already_scheduled')->assertJsonPath('shift_id', $first->json('id'));
     ($this->schedule)(['date' => '2026-11-03'])->assertCreated();
-    ($this->schedule)(['station_id' => $this->f->kitchen->id])->assertCreated();
+    ($this->schedule)(['station_id' => $this->f->kitchen->id, 'user_ids' => []])->assertCreated();
 
     ShiftInstance::query()->whereKey($first->json('id'))->update(['status' => 'cancelled', 'cancelled_at' => now(), 'cancel_reason' => 'x']);
     ($this->schedule)()->assertCreated()->assertJsonPath('status', 'scheduled');
