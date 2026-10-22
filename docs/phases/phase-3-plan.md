@@ -900,6 +900,39 @@ live ledger in a state where a shift can be opened only through the API.
    - **3.3c `phase-3/counts-cosign-notify`**: `cosign`, the admin queue endpoint, `CountSubmitted` / `VarianceDecided` events and
      their Notifications listeners, texts and registry rows, migration 11 (types), both-language `NotificationText`. Groups add
      `module:notifications`. Ends with `gate_check --mode module --module notifications` and `shifts.counts: done`.
+   - **As built (step 3.3a, `phase-3/counts-core`).** Commits: tests first (red; 24 files), then four test corrections (below), then the migrations,
+     models and factories, the counts core, the endpoints, and the e2e helper, ERD, STATUS and this note. Where the build settled what the plan left open:
+     - **Expected figure (the 3.1a carry-over).** `SubmitCount` reads each line's expected figure from the balance rows locked by `Ledger::lock` (count
+       row, then shift row, then balances ascending), so `stock_movements.created_at` stays DATETIME and no migration touches the append-only table.
+       The property test proves `expected_qty == Stock::balanceAt(snapshot_at)` with the clock moving at least two seconds between operations. Two narrow
+       windows are left, both to be pinned by 3.3b's `SubmitSnapshotRaceTest`: `ledger_movement_id` is read with a plain read (`Stock::fingerprint`), which under
+       REPEATABLE READ can miss a movement committed at a locked pair between the transaction's first plain read and the lock; and an item whose first
+       stock arrives in that same instant is not yet "on the count" and is judged by the next count.
+     - **Test corrections (separate commits, each says why).** `DefaultVarianceReasonsTest` (`withoutGlobalScopes()` also lifts the soft-delete scope);
+       `CountLinesTest` (Pest unpacks a bare `['1']` dataset row into the argument `'1'`); `OpeningPrefillTest` (two shifts of one station on one date);
+       `CountsPropertyTest` (a fraction of `on_hand` needs a rounding mode). The freeze trigger refuses lines under a count that is not a draft, as the plan
+       says, but several tests build history as a submitted count with lines: `StockCountLineFactory` holds the parent at `draft` for the insert and puts the
+       status back (not possible for `locked`; make its lines first).
+     - **`ReasonStatus` is a state machine** (`none -> pending -> accepted | rejected`), because `StateMachineExhaustiveTest` requires every `*Status` enum to be one.
+     - **Triggers.** The MariaDB update trigger names every column (`id`, `branch_id`, `created_at` too; the plan's sketch listed ten) so `LinesFreezeTriggerTest`
+       can check the text; PostgreSQL has one `stock_count_lines_guard()` function attached `BEFORE INSERT OR UPDATE OR DELETE`.
+     - **Statuses.** A submit at a station that `requires_overseer` always goes to `awaiting_cosign` (3.3c co-signs); otherwise a variance gives `pending_approval`
+       and none gives `approved`, with `decision` left null (nobody decided). A shift moves with its counts: the last opening count in opens it (`counted`, the
+       submitter as opener, `ShiftOpened`; a difference does not hold it back), the last closing count in moves `counting -> pending_approval` and frees the station.
+       `close` at a station with no stock place locks the shift at once. New key `shifts.count.shift_not_ready` (409, naming the status) for a count whose shift is
+       not taking that kind of count.
+     - **Carried figure.** `Locks::previousClosing` is the newest `approved` closing of the place; `carried_qty` is copied into the draft when it is made and not
+       refreshed if an earlier closing is approved later. At submit an opening count is proved against the previous closing's counted figure plus
+       `Stock::netChangeSince(previous.ledger_movement_id)`; a difference is audited as `count.opening_drift` and the count still goes against the ledger.
+       `moved_since` on lines is left to 3.3b.
+     - **Rule R-A** is checked after the shift lock with a plain read; no database lock is added: two counts can only meet at one place across shifts, and the
+       shift machine already orders those (the next shift cannot start before the last closing count is in).
+     - **Negative stock stays refused.** `VarianceMath::assertApplicable` implements the `409 shifts.adjustment.insufficient` rule for 3.3b's approval; nothing is
+       written in this step. A count under the reserved quantity is allowed and listed as `below_reserved` in the answer.
+     - **Additive contract changes.** `Locations::views(ids)` (Inventory, names a count's places), `Contracts\Shifts::close`, `Contracts\Counts`, `Contracts\Locks`.
+       `start` has `carry` for the old behaviour; `DemoShifts`, the test helpers and the e2e helper keep starting carried, and the e2e helper also finishes the
+       opening counts of a shift left `opening` (`finishOpeningCounts`: `confirm_all`, submit).
+     - **Limits noted.** An item soft-deleted while it still has stock cannot be locked by the Ledger, so a count listing it is refused; the draft keeps an inactive item only while it has stock or was counted above zero.
 4. **3.4 shifts.locks** (groups `invariants`, `unit`, `module:shifts`, `property`, `concurrency`; STATUS `shifts.locks`),
    `phase-3/locks`: ADR 0012 (proposed); migration 12; `Hash\CanonicalJson` (own encoder, section 10.3), `Hash\PayloadBuilder`,
    `Contracts\HashChain` (`lock(count)`, `verify(location)`, `export(location)`), `Contracts\Locks` (`previousClosing(location)`

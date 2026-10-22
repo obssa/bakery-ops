@@ -133,7 +133,7 @@
       "modules": {
         "contracts": "done",
         "shifts.instances": "done",
-        "shifts.counts": "todo",
+        "shifts.counts": "in_progress",
         "shifts.locks": "todo",
         "shifts.cash": "todo",
         "shifts.handover": "todo",
