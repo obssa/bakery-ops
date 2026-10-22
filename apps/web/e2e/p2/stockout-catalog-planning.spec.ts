@@ -102,7 +102,8 @@ test.describe("admin catalog and planning", () => {
     // assign to the baker of the producing station
     await row.getByLabel(`Baker for ${f.cake.name_en}`).selectOption({ value: String(f.baker.id) }); // by id: the live branch has other bakers at this station (and maybe the same name)
     await row.getByRole("button", { name: `Assign ${f.cake.name_en}` }).click();
-    await expect(row).toContainText(f.baker.name, { timeout: 15_000 });
+    // the row's select shows the chosen baker at once, so it proves nothing: wait on the API for the saved assignment
+    await expect.poll(() => requestsOf(f.admin, f.cake.id).then((r) => r[0]?.assigned_to?.id), { timeout: 30_000 }).toBe(f.baker.id);
 
     const requests = await requestsOf(f.admin, f.cake.id);
     expect(requests).toHaveLength(1);
