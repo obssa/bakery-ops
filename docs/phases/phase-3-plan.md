@@ -838,6 +838,42 @@ live ledger in a state where a shift can be opened only through the API.
        Local runs: `tests/Modules/Shifts` (139), identity, shared, arch, invariants and the three identity contract files (154), the
        route matrix for `module:shifts` (112), `StartRaceTest` (3), `RequestAcceptTest` and `RecipientsTest` (19); CI ran the rest,
        including `mod-identity`, `mod-production` and `mod-notifications`, whose contracts ran against both bindings.
+   - **As built (step 3.2c, `phase-3/enforcement-rehearsal`).** Commits in the planned order: (1) the flag on in `compose.ci.yml` (`app`
+     and `worker`) and the new `enforced-gates` job, nothing else, pushed red on purpose: `e2e-p0`, `e2e-p1`, `e2e-p2` and `e2e-p3`
+     (their seeding and fixtures hit `inventory.shift.required`) and `enforced-gates` (276 failed, 538 passed of 814) went red and
+     `gate-p1` to `gate-p5` were skipped behind them; (2) `Tests\Support\Shifts` and `DemoShifts`; (3) the web `support/shifts.ts`
+     and the live budget; (4) the `seeds` move, manifest and skill copies. Locally `gate:p0`, `gate:p1`, `gate:p2` with the flag on
+     pass (814 tests). What the build settled:
+     - **`Tests\Support\Shifts`** has `ensureOpen(Station|int)`, `ensureOpenAt(Location|int)` and `ensureOpenAll(...)`; all are no-ops
+       with the flag off, skip stations that track no shift, and open nothing where a shift already holds the station (it is the factory's
+       `open()` row, not a `Shifts::start`, so the fixtures stay independent of the Shifts actions). `stockIn()` opens the shift of its
+       location's station first, which covers `OrdersMenu` (also called explicitly), `OrderFloor`, and every test that stocks a station;
+       `ProductionFixture`, `TransferFixture` and `PurchaseFixture` open theirs at the end of the constructor.
+     - **`DemoShifts::ensureOpen($branch)`** takes no station list: it walks the branch's tracked stations and, where `Shifts::current` is
+       null, calls `Shifts::start(..., carry: true)` as the authenticated demo admin with a client UUID derived from branch and station
+       code, so a second run, even after a close, answers the same row and writes nothing. It is called once at the top of each seeder's
+       transaction (after the admin is the actor; in `Phase0Seeder` after the locations). The seeders do not set `ActorContext::inShift`:
+       rule 4b (the station has an open shift, whoever acts) covers them, and the rows are stamped with that shift. `DemoSeederTest` gains
+       the composition with the rule on (Phases 0 to 2: one open carried shift per tracked station, none at the store, stamped movements,
+       a second run writes nothing).
+     - **Plan error fixed in code: the demo store tracked shifts.** `Phase0Seeder` created stations without `tracks_shifts`, so a fresh demo
+       branch got the column default (true) at the store; it now sets `tracks_shifts = (code !== store)` as `POST /stations` does (the
+       migration had only corrected existing rows).
+     - **Web.** `support/shifts.ts`: `ensureOpenShift(admin, station)` asks `GET /stations/{id}/shifts/current` and starts a carried shift
+       when none runs (409 `already_open` and 422 `not_tracked` are accepted), `ensureOpenShifts`, and `ensureOpenShiftAt(admin, location)`
+       for locations that may have no station. `fixture.ts` gains `ensureTill` (find or create the till station, assign the fixed cashier
+       with `can_count`, open its shift) called by `buildTillStaff` and `buildFlowFixture`; the E2E branch's display case stays unlinked.
+       The shifts the fixtures open are never closed (closing arrives in 3.3), so a live run finds the previous one running and writes no
+       new shift; none of the helpers retries a start with a lost key, so the replay note of 3.2b does not bite.
+     - **Live budget.** `MULTI_CONTEXT_TEST_MS` in `e2e/support/env.ts` (120 s live, 60 s otherwise) is the timeout of the three-context
+       purchase-and-transfer flow.
+     - **`GET /transfers` already pages** (`paginate`, default 25, `per_page` up to 100, newest first, test with `per_page=1` in
+       `TransferRequestTest`), so no product change was made; the admin screen asks for the newest 100 of one status. A "load more" on
+       that screen is a later screen decision, not needed for correctness.
+     - **CI.** `module-tests.yml` takes an optional `env` input (KEY=VALUE lines appended to `GITHUB_ENV`). `enforced-gates` needs
+       `mod-payments`, `mod-production`, `mod-notifications` and is a need of `gate-p3`; the `seeds` group runs in `mod-shifts`
+       (`scripts/task.py` follows). `SHIFTS_OPEN_AD_HOC_ON_ACCEPT` stays off in CI. The skill's `assets/ci/ci.yml` copy was already behind the
+       real one (MySQL, no static-export step); only the 3.2c changes were applied to it.
 3. **3.3 shifts.counts** (groups `module:shifts`, `unit`, `feature`, `property`, `concurrency`; STATUS `shifts.counts`), three PRs:
    - **3.3a `phase-3/counts-core`**: migrations 8-10 (with the lines' freeze triggers and `DefaultVarianceReasons`, the backfill for
      existing branches), `CountStatus` and its exhaustive table (`draft -> awaiting_cosign | pending_approval | approved`,
