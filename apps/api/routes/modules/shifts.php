@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Modules\Shifts\Http\Controllers\CountsController;
 use App\Modules\Shifts\Http\Controllers\ShiftsController;
 use App\Modules\Shifts\Http\Controllers\StationShiftsController;
 use App\Modules\Shifts\Http\Controllers\TemplatesController;
+use App\Modules\Shifts\Http\Controllers\VarianceReasonsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,7 +18,9 @@ use Illuminate\Support\Facades\Route;
  * Step 3.2b: shifts.view reads (the action checks the station: 403 shifts.station.forbidden), shifts.manage (the admin) configures
  * and schedules, shifts.count starts, joins and leaves (the action checks the station too). Cancel asks only for shifts.view because
  * who may cancel depends on the shift (the admin, or the person who started it while it is opening), which the action decides
- * (403 shifts.cancel.forbidden). Close, summary, counts, cash, notes, handover and replay come with the later steps.
+ * (403 shifts.cancel.forbidden). Step 3.3a adds the counts: shifts.view reads the summary, the counts and the variance reasons (the
+ * action checks the station), shifts.count closes the shift and works a count (it checks the station too), shifts.manage keeps the
+ * variance reasons. {count} and {reason} bind through the BranchScoped models. Cash, notes, handover and replay come with the later steps.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:shifts.view')->group(function (): void {
@@ -24,6 +28,10 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/shifts', [ShiftsController::class, 'index'])->name('shifts.index');
         Route::get('/shifts/{shift}', [ShiftsController::class, 'show'])->whereNumber('shift')->name('shifts.show');
         Route::get('/stations/{station}/shifts/current', [StationShiftsController::class, 'current'])->whereNumber('station')->name('shifts.current');
+        Route::get('/shifts/{shift}/summary', [ShiftsController::class, 'summary'])->whereNumber('shift')->name('shifts.summary');
+        Route::get('/shifts/{shift}/counts', [CountsController::class, 'forShift'])->whereNumber('shift')->name('shifts.counts.index');
+        Route::get('/stock-counts/{count}', [CountsController::class, 'show'])->whereNumber('count')->name('shifts.counts.show');
+        Route::get('/variance-reasons', [VarianceReasonsController::class, 'index'])->name('shifts.reasons.index');
     });
 
     Route::middleware(['permission:shifts.manage', 'idempotency'])->group(function (): void {
@@ -32,6 +40,8 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::delete('/shift-templates/{template}', [TemplatesController::class, 'destroy'])->whereNumber('template')->name('shifts.templates.destroy');
         Route::post('/shifts', [ShiftsController::class, 'store'])->name('shifts.store');
         Route::put('/shifts/{shift}/roster', [ShiftsController::class, 'replaceRoster'])->whereNumber('shift')->name('shifts.roster');
+        Route::post('/variance-reasons', [VarianceReasonsController::class, 'store'])->name('shifts.reasons.store');
+        Route::patch('/variance-reasons/{reason}', [VarianceReasonsController::class, 'update'])->whereNumber('reason')->name('shifts.reasons.update');
     });
 
     Route::middleware(['permission:shifts.view', 'idempotency'])->group(function (): void {
@@ -43,5 +53,8 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::post('/stations/{station}/shifts/open-ad-hoc', [StationShiftsController::class, 'openAdHoc'])->whereNumber('station')->name('shifts.open_ad_hoc');
         Route::post('/shifts/{shift}/join', [ShiftsController::class, 'join'])->whereNumber('shift')->name('shifts.join');
         Route::post('/shifts/{shift}/leave', [ShiftsController::class, 'leave'])->whereNumber('shift')->name('shifts.leave');
+        Route::post('/shifts/{shift}/close', [ShiftsController::class, 'close'])->whereNumber('shift')->name('shifts.close');
+        Route::put('/stock-counts/{count}/lines', [CountsController::class, 'lines'])->whereNumber('count')->name('shifts.counts.lines');
+        Route::post('/stock-counts/{count}/submit', [CountsController::class, 'submit'])->whereNumber('count')->name('shifts.counts.submit');
     });
 });

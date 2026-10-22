@@ -1,0 +1,82 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Modules\Shifts\Http\Controllers;
+
+use App\Modules\Inventory\Contracts\Stock;
+use App\Modules\Shifts\Actions\SetCountLines;
+use App\Modules\Shifts\Actions\SubmitCount;
+use App\Modules\Shifts\Contracts\Locks;
+use App\Modules\Shifts\Counts\CountPresenter;
+use App\Modules\Shifts\Counts\CountReads;
+use App\Modules\Shifts\Enums\CountStatus;
+use App\Modules\Shifts\Http\Requests\SetCountLinesRequest;
+use App\Modules\Shifts\Models\ShiftInstance;
+use App\Modules\Shifts\Models\StockCount;
+use App\Modules\Shifts\Support\ShiftAccess;
+use App\Shared\Live\ConditionalPoll;
+use App\Shared\Models\Station;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+/**
+ * The counts of a shift (phase-3 plan section 4, "Counts", step 3.3a). Every write is an AuditedAction in the action classes behind
+ * an Idempotency-Key; another branch's shift or count is 404 through the BranchScoped route binding (rule 8). shifts.view reads and
+ * shifts.count writes, both at the shift's station (403 shifts.station.forbidden; the admin and manager work at every station).
+ *
+ *   GET /shifts/{shift}/counts          200 {data: [Count]} every revision of the shift's counts, oldest first, with their lines
+ *   GET /stock-counts/{count}           200 the Count with its lines side by side; polled (ETag, 304): the tag moves with the count and,
+ *                                       while the count is open to change, with the ledger (the draft's expected figure is live)
+ *   PUT /stock-counts/{count}/lines     200 the Count; 409 shifts.count.not_draft; 422 shifts.count.qty_invalid, item_unknown, reason.unknown
+ *   POST /stock-counts/{count}/submit   200 the Count; a repeat answers it; 409 / 422 as SubmitCount says
+ */
+final class CountsController
+{
+    public function __construct(
+        private readonly CountPresenter $presenter,
+        private readonly ShiftAccess $access,
+    ) {}
+
+    public function forShift(Request $input, ShiftInstance $shift, CountReads $reads): JsonResponse
+    {
+        $this->assertCanRead($shift);
+
+        return response()->json(['data' => $this->presenter->many($reads->all($shift))]);
+    }
+
+    public function show(Request $input, StockCount $count, Stock $stock, Locks $locks): Response
+    {
+        $shift = ShiftInstance::query()->findOrFail($count->shift_instance_id);
+        $this->assertCanRead($shift);
+
+        $moving = $count->status === CountStatus::Draft || $count->status->isUnresolved() || $count->status === CountStatus::Approved;
+        $etag = ConditionalPoll::etag('shifts.count', [
+            $count->id,
+            $count->version,
+            $count->status->value,
+            $count->updated_at?->getTimestamp(),
+            $moving ? $stock->fingerprint()['last_movement_id'] : null,
+            $count->status === CountStatus::Draft ? $locks->unresolvedAt($count->location_id, $count->id)?->id : null,
+        ]);
+
+        return ConditionalPoll::respond($input, $etag, fn (): array => $this->presenter->one($count));
+    }
+
+    public function lines(SetCountLinesRequest $input, StockCount $count, SetCountLines $set): JsonResponse
+    {
+        return response()->json($this->presenter->one($set->handle($count, $input->lines(), $input->confirmAll())));
+    }
+
+    public function submit(Request $input, StockCount $count, SubmitCount $submit): JsonResponse
+    {
+        return response()->json($this->presenter->one($submit->handle($count)));
+    }
+
+    private function assertCanRead(ShiftInstance $shift): void
+    {
+        $person = $this->access->person('shifts.view');
+        $this->access->assertAt($person, 'shifts.view', Station::query()->withTrashed()->findOrFail($shift->station_id));
+    }
+}

@@ -7,6 +7,9 @@ namespace App\Modules\Shifts\Http\Controllers;
 use App\Modules\Shifts\Actions\OpenAdHocShift;
 use App\Modules\Shifts\Actions\ShiftRows;
 use App\Modules\Shifts\Actions\StartShift;
+use App\Modules\Shifts\Counts\CountPresenter;
+use App\Modules\Shifts\Counts\CountReads;
+use App\Modules\Shifts\Enums\CountType;
 use App\Modules\Shifts\Http\Requests\OpenAdHocShiftRequest;
 use App\Modules\Shifts\Http\Requests\StartShiftRequest;
 use App\Modules\Shifts\Support\ShiftAccess;
@@ -24,7 +27,8 @@ use Symfony\Component\HttpFoundation\Response;
  * on it is 422 shifts.station.not_tracked. {station} binds through the BranchScoped model, so another branch's station is 404.
  *
  *   GET  /stations/{station}/shifts/current         200 {data: Shift or null, server_time}: the running shift (opening, open, counting); polled (ETag, 304)
- *   POST /stations/{station}/shifts/start           201 {shift, counts}; 200 for a repeat or for the starter resuming their opening shift
+ *   POST /stations/{station}/shifts/start           201 {shift, counts}: `opening` with its draft opening counts, or `open` with none (carried);
+ *                                                   200 for a repeat or for the starter resuming their opening shift
  *   POST /stations/{station}/shifts/open-ad-hoc     201 {shift}; 200 when a shift already runs (the person joins it)
  */
 final class StationShiftsController
@@ -52,11 +56,12 @@ final class StationShiftsController
         ]);
     }
 
-    public function start(StartShiftRequest $input, Station $station, StartShift $start): JsonResponse
+    public function start(StartShiftRequest $input, Station $station, StartShift $start, CountReads $reads, CountPresenter $counts): JsonResponse
     {
         $outcome = $start->handle($station, $input->options());
+        $opening = $counts->many($reads->latest($outcome->shift, CountType::Opening));
 
-        return response()->json(['shift' => $this->presenter->one($outcome->shift), 'counts' => []], $outcome->created ? 201 : 200);
+        return response()->json(['shift' => $this->presenter->one($outcome->shift), 'counts' => $opening], $outcome->created ? 201 : 200);
     }
 
     public function openAdHoc(OpenAdHocShiftRequest $input, Station $station, OpenAdHocShift $open): JsonResponse
