@@ -34,7 +34,7 @@ beforeEach(function () {
 });
 
 it('reads a transfer at both of its places in a shift summary and in a net change', function () {
-    app(ActorContext::class)->inShift(8);
+    app(ActorContext::class)->inShift(shiftRow(8, $this->branch->id));
     stockIn($this->flour, $this->store, '10');
     $first = stockIn($this->flour, $this->store, '1');
     app(Ledger::class)->appendMany(MovementIntent::transfer($this->flour->id, $this->store->id, $this->kitchen->id, '4', 'test'));
@@ -56,7 +56,7 @@ it('leaves out an item whose net change is zero and never mixes in another branc
     actInBranch($other);
     $theirs = stockLocation($other, LocationType::Kitchen);
     $item = Item::factory()->ingredient('kg')->create(['branch_id' => $other->id]);
-    app(ActorContext::class)->inShift(8);
+    app(ActorContext::class)->inShift(shiftRow(8, $this->branch->id));
     stockIn($item, $theirs, '9');
     actInBranch($this->branch);
 
