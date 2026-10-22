@@ -49,6 +49,11 @@ return [
         'cosign_self' => 'You counted this yourself, so someone else must co-sign it. You can reject it and count again.',
         'not_awaiting_cosign' => 'This count is not waiting for a co-signature.',
         'item_unavailable' => 'An item on this count was removed from the catalog. Reject the count and count again without it.',
+        'not_locked' => 'Only a locked count can be unlocked.',
+        'already_superseded' => 'This count already has a newer revision.',
+    ],
+    'lock' => [
+        'chain_busy' => 'Another count at this place was locked at the same moment. Please try again.',
     ],
     'reason' => [
         'unknown' => 'This reason does not exist or is switched off.',

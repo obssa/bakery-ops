@@ -147,7 +147,7 @@ it('lets the recount be completed, submitted and approved: the delta is against 
     expect(ShiftInstance::query()->findOrFail($this->shift->id)->status->value)->toBe('pending_approval');
 
     $this->f->approve($this->f->admin, $recount)->assertOk()
-        ->assertJsonPath('status', 'approved');
+        ->assertJsonPath('status', 'locked');
 
     $flour = DB::table('stock_movements')->where('reason', 'count_adjustment')->where('item_id', $this->flour->id)->sole();
     expect($flour->qty)->toBe('-550.0000', 'expected 10250, counted 9700')
@@ -222,7 +222,7 @@ it('rejects an opening count: the shift stays as it is and the recount can be su
     expect(ShiftInstance::query()->findOrFail($shiftId)->status->value)->toBe('open');
     $recount = (int) $rejected->json('recount.id');
     $this->f->lines($this->f->chef, $recount, ['confirm_all' => true, 'lines' => [['item_id' => $this->flour->id, 'counted_qty' => '10000']]])->assertOk();
-    $this->f->submit($this->f->chef, $recount)->assertOk()->assertJsonPath('status', 'approved');
+    $this->f->submit($this->f->chef, $recount)->assertOk()->assertJsonPath('status', 'locked');
     expect(ShiftInstance::query()->findOrFail($shiftId)->status->value)->toBe('open');
 });
 

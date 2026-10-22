@@ -1,0 +1,145 @@
+{
+    "format": "bakery-chain-vectors",
+    "version": 1,
+    "vectors": [
+        {
+            "name": "stock_count",
+            "payload": {
+                "branch_id": 1,
+                "location_id": 5,
+                "shift_instance_id": 17,
+                "shift_date": "2026-11-02",
+                "station_id": 3,
+                "type": "closing",
+                "seq": 1,
+                "supersedes_count_id": null,
+                "snapshot_at": "2026-11-02T12:00:00.123456Z",
+                "ledger_movement_id": 811,
+                "counted_by_user_id": 9,
+                "cosigned_by_user_id": null,
+                "decision": "approved",
+                "decided_by_user_id": 2,
+                "decided_at": "2026-11-02T12:30:00.000000Z",
+                "decision_note": "Checked the store room",
+                "submitted_at": "2026-11-02T12:00:00.000000Z",
+                "lines": [
+                    {
+                        "item_id": 31,
+                        "expected_qty": "10000.0000",
+                        "carried_qty": null,
+                        "counted_qty": "9500.0000",
+                        "variance_qty": "-500.0000",
+                        "reason_code": "spoilage",
+                        "reason_note": null,
+                        "adjustment_movement_id": 812,
+                        "adjustment_qty": "-500.0000"
+                    },
+                    {
+                        "item_id": 32,
+                        "expected_qty": "300.0000",
+                        "carried_qty": null,
+                        "counted_qty": "300.0000",
+                        "variance_qty": "0.0000",
+                        "reason_code": null,
+                        "reason_note": null,
+                        "adjustment_movement_id": null,
+                        "adjustment_qty": null
+                    }
+                ],
+                "cash": null,
+                "chain_seq": 4,
+                "locked_at": "2026-11-02T12:30:00.482913Z",
+                "locked_by_user_id": 2,
+                "payload_version": 1
+            },
+            "canonical": "{\"branch_id\":1,\"cash\":null,\"chain_seq\":4,\"cosigned_by_user_id\":null,\"counted_by_user_id\":9,\"decided_at\":\"2026-11-02T12:30:00.000000Z\",\"decided_by_user_id\":2,\"decision\":\"approved\",\"decision_note\":\"Checked the store room\",\"ledger_movement_id\":811,\"lines\":[{\"adjustment_movement_id\":812,\"adjustment_qty\":\"-500.0000\",\"carried_qty\":null,\"counted_qty\":\"9500.0000\",\"expected_qty\":\"10000.0000\",\"item_id\":31,\"reason_code\":\"spoilage\",\"reason_note\":null,\"variance_qty\":\"-500.0000\"},{\"adjustment_movement_id\":null,\"adjustment_qty\":null,\"carried_qty\":null,\"counted_qty\":\"300.0000\",\"expected_qty\":\"300.0000\",\"item_id\":32,\"reason_code\":null,\"reason_note\":null,\"variance_qty\":\"0.0000\"}],\"location_id\":5,\"locked_at\":\"2026-11-02T12:30:00.482913Z\",\"locked_by_user_id\":2,\"payload_version\":1,\"seq\":1,\"shift_date\":\"2026-11-02\",\"shift_instance_id\":17,\"snapshot_at\":\"2026-11-02T12:00:00.123456Z\",\"station_id\":3,\"submitted_at\":\"2026-11-02T12:00:00.000000Z\",\"supersedes_count_id\":null,\"type\":\"closing\"}",
+            "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+            "payload_hash": "17a046e27a30f77fb93598faff5fe272e4a6170608630e8a9397799cd878e336"
+        },
+        {
+            "name": "till_count_with_cash",
+            "payload": {
+                "branch_id": 1,
+                "location_id": 9,
+                "shift_instance_id": 21,
+                "shift_date": "2026-11-03",
+                "station_id": 1,
+                "type": "opening",
+                "seq": 2,
+                "supersedes_count_id": 40,
+                "snapshot_at": "2026-11-03T03:00:00.000001Z",
+                "ledger_movement_id": 902,
+                "counted_by_user_id": 6,
+                "cosigned_by_user_id": 8,
+                "decision": null,
+                "decided_by_user_id": null,
+                "decided_at": null,
+                "decision_note": null,
+                "submitted_at": "2026-11-03T03:00:00.000000Z",
+                "lines": [],
+                "cash": {
+                    "denominations": {
+                        "200": 6,
+                        "100": 5,
+                        "10": 4,
+                        "5": 2
+                    },
+                    "counted_total": "1750.50",
+                    "expected_total": "1750.50",
+                    "variance_total": "0.00",
+                    "carried_float_total": "500.00",
+                    "cash_sales_total": "1250.50",
+                    "float_left_total": "500.00",
+                    "channels": [
+                        {
+                            "code": "cash",
+                            "receipts": 12,
+                            "sum": "1250.50"
+                        }
+                    ],
+                    "reason_code": null,
+                    "reason_note": null,
+                    "currency": "ETB"
+                },
+                "chain_seq": 1,
+                "locked_at": "2026-11-03T03:05:09.000000Z",
+                "locked_by_user_id": 8,
+                "payload_version": 1
+            },
+            "canonical": "{\"branch_id\":1,\"cash\":{\"carried_float_total\":\"500.00\",\"cash_sales_total\":\"1250.50\",\"channels\":[{\"code\":\"cash\",\"receipts\":12,\"sum\":\"1250.50\"}],\"counted_total\":\"1750.50\",\"currency\":\"ETB\",\"denominations\":{\"10\":4,\"100\":5,\"200\":6,\"5\":2},\"expected_total\":\"1750.50\",\"float_left_total\":\"500.00\",\"reason_code\":null,\"reason_note\":null,\"variance_total\":\"0.00\"},\"chain_seq\":1,\"cosigned_by_user_id\":8,\"counted_by_user_id\":6,\"decided_at\":null,\"decided_by_user_id\":null,\"decision\":null,\"decision_note\":null,\"ledger_movement_id\":902,\"lines\":[],\"location_id\":9,\"locked_at\":\"2026-11-03T03:05:09.000000Z\",\"locked_by_user_id\":8,\"payload_version\":1,\"seq\":2,\"shift_date\":\"2026-11-03\",\"shift_instance_id\":21,\"snapshot_at\":\"2026-11-03T03:00:00.000001Z\",\"station_id\":1,\"submitted_at\":\"2026-11-03T03:00:00.000000Z\",\"supersedes_count_id\":40,\"type\":\"opening\"}",
+            "previous_hash": "17a046e27a30f77fb93598faff5fe272e4a6170608630e8a9397799cd878e336",
+            "payload_hash": "5861ca157fb8bef1fbd46cf3f9ac44918d2ca9a458f71f9b25cdc810f5016588"
+        },
+        {
+            "name": "unicode_note",
+            "payload": {
+                "branch_id": 1,
+                "location_id": 6,
+                "shift_instance_id": 17,
+                "shift_date": "2026-11-02",
+                "station_id": 3,
+                "type": "closing",
+                "seq": 3,
+                "supersedes_count_id": null,
+                "snapshot_at": "2026-11-02T12:00:00.123456Z",
+                "ledger_movement_id": 811,
+                "counted_by_user_id": 9,
+                "cosigned_by_user_id": null,
+                "decision": "approved",
+                "decided_by_user_id": 2,
+                "decided_at": "2026-11-02T12:30:00.000000Z",
+                "decision_note": "ስኳር አልቋል \"quoted\" back\\slash /slash\u0001tab\t\u2028 😀",
+                "submitted_at": "2026-11-02T12:00:00.000000Z",
+                "lines": [],
+                "cash": null,
+                "chain_seq": 2,
+                "locked_at": "2026-11-02T12:30:00.482913Z",
+                "locked_by_user_id": 2,
+                "payload_version": 1
+            },
+            "canonical": "{\"branch_id\":1,\"cash\":null,\"chain_seq\":2,\"cosigned_by_user_id\":null,\"counted_by_user_id\":9,\"decided_at\":\"2026-11-02T12:30:00.000000Z\",\"decided_by_user_id\":2,\"decision\":\"approved\",\"decision_note\":\"ስኳር አልቋል \\\"quoted\\\" back\\\\slash /slash\\u0001tab\\u0009\u2028 😀\",\"ledger_movement_id\":811,\"lines\":[],\"location_id\":6,\"locked_at\":\"2026-11-02T12:30:00.482913Z\",\"locked_by_user_id\":2,\"payload_version\":1,\"seq\":3,\"shift_date\":\"2026-11-02\",\"shift_instance_id\":17,\"snapshot_at\":\"2026-11-02T12:00:00.123456Z\",\"station_id\":3,\"submitted_at\":\"2026-11-02T12:00:00.000000Z\",\"supersedes_count_id\":null,\"type\":\"closing\"}",
+            "previous_hash": "5861ca157fb8bef1fbd46cf3f9ac44918d2ca9a458f71f9b25cdc810f5016588",
+            "payload_hash": "67200f9e967425efcd56439f9d5b22643a64f9237efdfee22b9a36c67fa7b34e"
+        }
+    ]
+}

@@ -27,8 +27,8 @@ use Carbon\CarbonInterface;
  * While a count is a draft its `expected_qty` is the live ledger figure (the figure the screens show beside the counter's own),
  * read as committed; once it is submitted it is the stored figure of the snapshot. `blocked_by_pending` names the unresolved count
  * at the same place that would refuse this draft's submit (rule R-A). `below_reserved` lists the lines of a submitted count whose
- * counted figure is under what open orders hold now (allowed, listed: plan section 10.4 point 2). `cash` and `chain` are null
- * until steps 3.5 and 3.4. `moved_since` on a line (step 3.3b) is what moved at the place since the count, so an approver sees it (movedSince). Resolved per use.
+ * counted figure is under what open orders hold now (allowed, listed: plan section 10.4 point 2). `chain` is the lock (sequence, previous and own hash, the instant) of a
+ * locked count and null before; `cash` is null until step 3.5. `moved_since` on a line (step 3.3b) is what moved at the place since the count, so an approver sees it (movedSince). Resolved per use.
  */
 final class CountPresenter
 {
@@ -144,7 +144,12 @@ final class CountPresenter
                 'decision_note' => $count->decision_note,
                 'supersede_cause' => $count->supersede_cause?->value,
                 'superseded_by_id' => $count->superseded_by_id,
-                'chain' => null,
+                'chain' => $count->status === CountStatus::Locked ? [
+                    'chain_seq' => $count->chain_seq,
+                    'previous_hash' => $count->previous_hash,
+                    'payload_hash' => $count->payload_hash,
+                    'locked_at' => $count->locked_at?->format('Y-m-d\TH:i:s.uP'),
+                ] : null,
                 'blocked_by_pending' => $this->blockedBy($count),
                 'version' => $count->version,
             ];

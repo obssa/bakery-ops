@@ -50,7 +50,7 @@ it('locks an approved count as the first link: genesis previous hash, sequence 1
         ->and($row->locked_at)->not->toBeNull()
         ->and($row->locked_by_user_id)->toBe($this->f->admin->id)
         ->and(json_decode($row->canonical_payload, true)['chain_seq'])->toBe(1)
-        ->and($row->version)->toBe($count->version + 1);
+        ->and($row->version)->toBe(2, 'the lock moves the version once');
 });
 
 it('chains the next link to the hash of the one before it, one place at a time', function () {

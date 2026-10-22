@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
+use App\Modules\Shifts\Contracts\HashChain;
 use App\Modules\Shifts\Counts\CountLock;
 use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Exceptions\ShiftError;
@@ -37,6 +38,7 @@ final class CosignCount
         private readonly AuditedAction $audit,
         private readonly ShiftAccess $access,
         private readonly CountAnnouncer $announcer,
+        private readonly HashChain $chain,
     ) {}
 
     /**
@@ -84,6 +86,7 @@ final class CosignCount
                 ])->save();
 
                 if ($c->status === CountStatus::Approved) {
+                    $this->chain->lock($c, $person);
                     ShiftResolution::lockWhenResolved($shift, $now);
                 }
                 $this->announcer->submitted($c, $person);

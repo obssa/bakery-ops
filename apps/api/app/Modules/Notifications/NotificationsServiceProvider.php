@@ -11,6 +11,7 @@ use App\Modules\Notifications\Drivers\DriverRegistry;
 use App\Modules\Notifications\Drivers\SentLog;
 use App\Modules\Notifications\Listeners\ClearStockDedupe;
 use App\Modules\Notifications\Listeners\NotifyBatchDone;
+use App\Modules\Notifications\Listeners\NotifyChainBroken;
 use App\Modules\Notifications\Listeners\NotifyCountSubmitted;
 use App\Modules\Notifications\Listeners\NotifyLineReady;
 use App\Modules\Notifications\Listeners\NotifyLineRejected;
@@ -22,6 +23,7 @@ use App\Modules\Notifications\Listeners\NotifyTransferDecided;
 use App\Modules\Notifications\Listeners\NotifyTransferRequested;
 use App\Modules\Notifications\Listeners\NotifyVarianceDecided;
 use App\Shared\Events\BatchDone;
+use App\Shared\Events\ChainBroken;
 use App\Shared\Events\CountSubmitted;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
@@ -67,6 +69,7 @@ final class NotificationsServiceProvider extends ServiceProvider
         Event::listen(BatchDone::class, [NotifyBatchDone::class, 'handle']);
         Event::listen(CountSubmitted::class, [NotifyCountSubmitted::class, 'handle']);
         Event::listen(VarianceDecided::class, [NotifyVarianceDecided::class, 'handle']);
+        Event::listen(ChainBroken::class, [NotifyChainBroken::class, 'handle']);
 
         $this->loadRoutesFrom(base_path('routes/modules/notifications.php'));
 

@@ -75,11 +75,11 @@ it('moves a count without a variance to approved when the overseer co-signs it',
     ($this->submitSame)();
 
     $this->f->cosign($this->overseer, $this->count)->assertOk()
-        ->assertJsonPath('status', 'approved')
+        ->assertJsonPath('status', 'locked')
         ->assertJsonPath('cosigned_by.id', $this->overseer->id)
         ->assertJsonPath('decision', null);
 
-    expect(($this->row)()->status)->toBe(CountStatus::Approved)
+    expect(($this->row)()->status)->toBe(CountStatus::Locked)
         ->and(($this->adjustments)())->toBe(0);
 });
 
@@ -228,7 +228,7 @@ it('lets the admin approve a co-signed count and write the adjustments', functio
     $this->f->approve($this->f->admin, $this->count)->assertStatus(409)->assertJsonPath('message_key', 'shifts.count.not_pending');
 
     $this->f->cosign($this->overseer, $this->count)->assertOk();
-    $this->f->approve($this->f->admin, $this->count)->assertOk()->assertJsonPath('status', 'approved');
+    $this->f->approve($this->f->admin, $this->count)->assertOk()->assertJsonPath('status', 'locked');
 
     expect(($this->adjustments)())->toBe(1);
 });

@@ -91,11 +91,11 @@ it('announces a count that went straight to approved, and a repeat of the submit
     Event::fake([CountSubmitted::class]);
     $this->f->lines($this->f->chef, $this->count, ['confirm_all' => true])->assertOk();
 
-    $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'approved');
+    $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'locked');
     $this->f->submit($this->f->chef, $this->count)->assertOk();
 
     Event::assertDispatchedTimes(CountSubmitted::class, 1);
-    Event::assertDispatched(CountSubmitted::class, fn (CountSubmitted $e): bool => $e->payload()['status_after'] === 'approved' && $e->payload()['variance_lines'] === 0);
+    Event::assertDispatched(CountSubmitted::class, fn (CountSubmitted $e): bool => $e->payload()['status_after'] === 'locked' && $e->payload()['variance_lines'] === 0);
 });
 
 it('announces a refused submit never', function () {

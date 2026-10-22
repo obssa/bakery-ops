@@ -133,6 +133,15 @@ return [
             'gate' => null,
             'deep_link' => '/admin/shifts?count={count_id}',
         ],
+        // Phase 3 (step 3.4): the nightly check of the hash chain found a break. The key makes one line per distinct break however often the
+        // check finds it again; every channel the admin has switched on.
+        'chain_broken' => [
+            'severity' => 'critical',
+            'channels' => ['in_app', 'push', 'telegram'],
+            'inbox_key' => 'chain_broken:{location_id}:{first_bad_chain_seq}:{kind}',
+            'gate' => null,
+            'deep_link' => '/admin/shifts?location={location_id}',
+        ],
         'variance_decided' => [
             'severity' => 'info',
             'channels' => ['in_app', 'push'],

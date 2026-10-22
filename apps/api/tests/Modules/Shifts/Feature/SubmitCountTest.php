@@ -90,7 +90,7 @@ it('sends a count without a difference straight to approved, writes nothing, and
     $this->f->lines($this->f->chef, $count, ['confirm_all' => true])->assertOk();
 
     $this->f->submit($this->f->chef, $count)->assertOk()
-        ->assertJsonPath('status', 'approved')
+        ->assertJsonPath('status', 'locked')
         ->assertJsonPath('lines.0.variance_qty', '0.0000')
         ->assertJsonPath('lines.0.reason_status', 'none');
 
@@ -143,7 +143,7 @@ it('refuses a count that misses an item the place now holds, until the counter a
         ->assertJsonPath('item_ids', [$late->id]);
 
     $this->f->lines($this->f->chef, $count, ['lines' => [['item_id' => $late->id, 'counted_qty' => '12']]])->assertOk();
-    $this->f->submit($this->f->chef, $count)->assertOk()->assertJsonPath('status', 'approved');
+    $this->f->submit($this->f->chef, $count)->assertOk()->assertJsonPath('status', 'locked');
 });
 
 it('requires a reason for every line that differs, and only for those', function () {
@@ -289,7 +289,7 @@ it('opens the shift when its opening count is submitted, counted, with the submi
     Event::assertNotDispatched(ShiftOpened::class);
     $this->f->lines($this->f->chef, $count, ['confirm_all' => true])->assertOk();
 
-    $this->f->submit($this->f->chef, $count)->assertOk()->assertJsonPath('status', 'approved');
+    $this->f->submit($this->f->chef, $count)->assertOk()->assertJsonPath('status', 'locked');
 
     $shift = ShiftInstance::query()->findOrFail($shiftId);
     expect($shift->status->value)->toBe('open')

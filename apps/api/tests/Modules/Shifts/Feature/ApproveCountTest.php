@@ -74,7 +74,7 @@ it('writes one count_adjustment per variance line, both signs, stamped with the 
             ->and($row->ref_type)->toBe('stock_count_line');
     }
 
-    $response->assertJsonPath('status', 'approved')
+    $response->assertJsonPath('status', 'locked')
         ->assertJsonPath('decision', 'approved')
         ->assertJsonPath('decided_by.id', $this->f->admin->id)
         ->assertJsonPath('decision_note', 'Checked the store room');
@@ -85,11 +85,11 @@ it('writes one count_adjustment per variance line, both signs, stamped with the 
         ->and($lines[$this->salt->id]['adjustment_movement_id'])->toBeNull()
         ->and($lines[$this->salt->id]['reason_status'])->toBe('none');
     $count = StockCount::query()->findOrFail($this->count);
-    expect($count->status)->toBe(CountStatus::Approved)
+    expect($count->status)->toBe(CountStatus::Locked)
         ->and($count->decision)->toBe(CountDecision::Approved)
         ->and($count->decided_by_user_id)->toBe($this->f->admin->id)
         ->and($count->decided_at?->toIso8601String())->toBe('2026-11-02T12:30:00+00:00')
-        ->and($count->chain_seq)->toBeNull('the lock is step 3.4');
+        ->and($count->chain_seq)->toBe(1, 'approved and locked in one step (step 3.4)');
 });
 
 it('leaves the ledger equal to the counted figure when nothing else moved', function () {
@@ -197,7 +197,7 @@ it('keeps the shift pending approval until its last count is resolved, then lock
     expect($shift->status->value)->toBe('locked')
         ->and($shift->open_key)->toBeNull()
         ->and($shift->locked_at)->not->toBeNull()
-        ->and(StockCount::query()->whereIn('id', $ids->values()->all())->pluck('status')->map->value->unique()->all())->toBe(['approved']);
+        ->and(StockCount::query()->whereIn('id', $ids->values()->all())->pluck('status')->map->value->unique()->all())->toBe(['locked']);
 });
 
 it('keeps the shift pending approval while an opening count of the same shift still waits', function () {
@@ -223,11 +223,11 @@ it('refuses a count that is not waiting for a decision, naming its status', func
 
 it('refuses a count that went straight to approved, because nobody has anything to decide', function () {
     $this->f->lines($this->f->chef, $this->count, ['confirm_all' => true])->assertOk();
-    $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'approved');
+    $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'locked');
 
     $this->f->approve($this->f->admin, $this->count)->assertStatus(409)
         ->assertJsonPath('message_key', 'shifts.count.not_pending')
-        ->assertJsonPath('status', 'approved');
+        ->assertJsonPath('status', 'locked');
 });
 
 it('refuses a rejected count', function () {
@@ -245,7 +245,7 @@ it('is a call of the Counts contract too, run as the person acting', function ()
 
     $approved = app(Counts::class)->approve($this->count, 'by contract');
 
-    expect($approved->status)->toBe(CountStatus::Approved)
+    expect($approved->status)->toBe(CountStatus::Locked)
         ->and($approved->decision_note)->toBe('by contract')
         ->and(($this->onHand)($this->flour))->toBe('9500.0000');
 });

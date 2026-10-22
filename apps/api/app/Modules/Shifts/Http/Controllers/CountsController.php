@@ -11,6 +11,7 @@ use App\Modules\Shifts\Actions\CosignCount;
 use App\Modules\Shifts\Actions\RejectCount;
 use App\Modules\Shifts\Actions\SetCountLines;
 use App\Modules\Shifts\Actions\SubmitCount;
+use App\Modules\Shifts\Actions\UnlockCount;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Counts\CountPresenter;
 use App\Modules\Shifts\Counts\CountQueue;
@@ -21,6 +22,7 @@ use App\Modules\Shifts\Http\Requests\CosignCountRequest;
 use App\Modules\Shifts\Http\Requests\ListCountsRequest;
 use App\Modules\Shifts\Http\Requests\RejectCountRequest;
 use App\Modules\Shifts\Http\Requests\SetCountLinesRequest;
+use App\Modules\Shifts\Http\Requests\UnlockCountRequest;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Support\ShiftAccess;
@@ -45,6 +47,8 @@ use Symfony\Component\HttpFoundation\Response;
  *   POST /stock-counts/{count}/reject   200 the rejected Count plus `recount`, the prefilled draft revision (the action decides: a co-signer while the count
  *                                       waits for a co-signature, shifts.approve while it waits for a decision); 409 / 422 as RejectCount says
  *   POST /stock-counts/{count}/cosign   200 the Count (step 3.3c; the overseer of the station or a shifts.cosign holder, never the counter); 403 / 409 as CosignCount says
+ *   POST /stock-counts/{count}/unlock   200 {unlocked, revision} (step 3.4; shifts.unlock, the admin): the locked Count stays locked and gets superseded_by_id, the
+ *                                       revision is a new draft (supersede_cause unlock); 409 shifts.count.not_locked / already_superseded
  *   GET  /stock-counts                  200 {data: [CountSummary + station, shift, variance_lines], counts: {awaiting_cosign, pending_approval}, server_time}: the approval
  *                                       queue of the stations the caller works at; ?status=, ?station_id=, ?mine=1, ?limit=; polled (ETag, 304)
  */
@@ -127,6 +131,14 @@ final class CountsController
         [$row, $recountRow] = $this->presenter->many([$rejected, $recount]);
 
         return response()->json($row + ['recount' => $recountRow]);
+    }
+
+    public function unlock(UnlockCountRequest $input, StockCount $count, UnlockCount $unlock): JsonResponse
+    {
+        [$unlocked, $revision] = $unlock->handle($count, $input->reason());
+        [$old, $new] = $this->presenter->many([$unlocked, $revision]);
+
+        return response()->json(['unlocked' => $old, 'revision' => $new]);
     }
 
     private function assertCanRead(ShiftInstance $shift): void

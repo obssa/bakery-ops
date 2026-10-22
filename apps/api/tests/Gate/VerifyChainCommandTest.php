@@ -62,7 +62,7 @@ it('prints and logs the head hash of every place and exits 0 when every chain is
 it('checks the chains of every branch', function () {
     Event::fake([ChainBroken::class]);
     $this->chain->chain($this->place, 1);
-    $other = Branch::factory()->create();
+    $other = actInBranch(Branch::factory()->create());
     $f2 = ShiftsFixture::build($other, $this);
     $place2 = $f2->place($f2->kitchen);
     $second = (new ChainFixture($f2))->chain($place2, 2);

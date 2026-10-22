@@ -91,7 +91,7 @@ it('writes the adjustments once when the same count is approved twice at the sam
 
         foreach ($results as $i => $r) {
             $value = $r['value'] ?? [];
-            if (($r['ok'] ?? false) !== true || ($value['status'] ?? null) !== 200 || ($value['count_status'] ?? null) !== 'approved') {
+            if (($r['ok'] ?? false) !== true || ($value['status'] ?? null) !== 200 || ($value['count_status'] ?? null) !== 'locked') {
                 $failures[] = "round {$round}, approver {$i}: ".json_encode($r);
             }
         }
@@ -131,7 +131,7 @@ it('approves two counts of different places of one shift at the same moment, loc
         if (($this->onHand)($flour, $this->place) !== '700.0000' || ($this->onHand)($drink, $this->bar) !== '450.0000') {
             $failures[] = "round {$round}: wrong stock after the approvals";
         }
-        if (StockCount::query()->where('shift_instance_id', $shift->id)->where('status', CountStatus::Approved->value)->count() !== 2) {
+        if (StockCount::query()->where('shift_instance_id', $shift->id)->where('status', CountStatus::Locked->value)->count() !== 2) {
             $failures[] = "round {$round}: both counts should be approved";
         }
     }
@@ -175,7 +175,7 @@ it('keeps the ledger right when a sale races an approval: either order, never ne
             continue;
         }
         if ($approve['status'] === 200) {
-            if ($adjusted !== 1 || $status !== CountStatus::Approved) {
+            if ($adjusted !== 1 || $status !== CountStatus::Locked) {
                 $failures[] = "round {$round}: an approved count must have its adjustment";
             }
             $expected = $sold ? (string) (700 - (int) $sale).'.0000' : '700.0000';

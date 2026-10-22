@@ -102,6 +102,11 @@ jobs:
         run: mkdir -p tmp && php artisan route:list --json > tmp/routes.json
       - name: All repo invariants
         run: python3 scripts/check_invariants.py --all --routes apps/api/tmp/routes.json
+      # ADR 0012: a second implementation of the canonical JSON grammar, with no PHP in it, recomputes the pinned vectors
+      # (apps/api/tests/Fixtures/chain/vectors.json) byte for byte and hash for hash, so a change in PHP, in brick/math or in the
+      # encoder that moves one byte of what the chain hashes fails a job that has nothing to do with PHP.
+      - name: Hash chain cross-check (independent Python implementation)
+        run: python3 scripts/verify_chain.py
 
   openapi-check:
     needs: api-arch

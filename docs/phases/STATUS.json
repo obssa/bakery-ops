@@ -134,7 +134,7 @@
         "contracts": "done",
         "shifts.instances": "done",
         "shifts.counts": "done",
-        "shifts.locks": "todo",
+        "shifts.locks": "done",
         "shifts.cash": "todo",
         "shifts.handover": "todo",
         "web": "todo",

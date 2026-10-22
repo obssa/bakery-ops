@@ -184,6 +184,6 @@ it('leaves an item whose first stock came after the count to the next count, wit
         ->and($lines[$flour->id]['carried_qty'])->toBe('900.0000')
         ->and(DB::table('stock_count_lines')->where('count_id', $count)->where('item_id', $late->id)->exists())->toBeFalse();
     $this->f->lines($this->f->chef, $start->json('counts.0.id'), ['confirm_all' => true])->assertOk();
-    $this->f->submit($this->f->chef, $start->json('counts.0.id'))->assertOk()->assertJsonPath('status', 'approved');
+    $this->f->submit($this->f->chef, $start->json('counts.0.id'))->assertOk()->assertJsonPath('status', 'locked');
     expect(DB::table('audit_log')->where('action', 'count.opening_drift')->count())->toBe(0);
 })->group('module:shifts', 'feature');

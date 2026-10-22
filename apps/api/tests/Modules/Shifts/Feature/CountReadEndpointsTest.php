@@ -76,7 +76,7 @@ it('shows the live ledger figure on a draft and the snapshot figure after the su
     $this->f->stock($this->flour, $this->place, '70'); // after the snapshot: the count does not move
 
     ($this->get)("/api/v1/stock-counts/{$this->count}", $this->f->chef)->assertOk()
-        ->assertJsonPath('status', 'approved')
+        ->assertJsonPath('status', 'locked')
         ->assertJsonPath('lines.0.expected_qty', '10500.0000')
         ->assertJsonPath('lines.0.counted_qty', '10500.0000')
         ->assertJsonPath('lines.0.variance_qty', '0.0000');

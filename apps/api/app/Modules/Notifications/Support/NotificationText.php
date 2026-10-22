@@ -60,6 +60,7 @@ final class NotificationText
             ],
             'variance_decided' => ['text.variance_decided.'.($this->str($type, $payload, 'decision') === 'rejected' ? 'rejected' : 'approved'), 'body'],
             'transfer_decided' => ['text.transfer_decided.'.($this->str($type, $payload, 'status') === 'rejected' ? 'rejected' : 'confirmed'), 'body'],
+            'chain_broken' => ['text.chain_broken', 'body'],
             default => ["text.{$type}", 'body'],
         };
     }
@@ -130,6 +131,11 @@ final class NotificationText
                 'type' => $this->template('count_type.'.$this->str($type, $p, 'type'), $locale),
                 'adjusted' => (string) $this->int($type, $p, 'adjusted_lines'),
                 'note' => $this->optional($type, $p, 'note') ?? '-',
+            ],
+            'chain_broken' => [
+                'place' => $this->str($type, $p, $in('location_name')),
+                'seq' => (string) $this->int($type, $p, 'first_bad_chain_seq'),
+                'kind' => $this->template('chain_kind.'.$this->str($type, $p, 'kind'), $locale),
             ],
             default => throw UnknownNotificationType::named($type),
         };

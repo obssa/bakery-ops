@@ -86,6 +86,18 @@ return [
                 'body' => 'Your :type count at :place was rejected: :note Please count again.',
             ],
         ],
+        // Phase 3, step 3.4: the nightly check of the hash chain found a record that does not match what was locked
+        'chain_broken' => [
+            'title' => 'Counts record broken: :place',
+            'body' => 'The locked counts of :place no longer match their seal at entry :seq (:kind). A locked count was changed or removed outside the app. Open the record and check who had access.',
+        ],
+    ],
+
+    'chain_kind' => [
+        'gap' => 'an entry is missing',
+        'previous_mismatch' => 'it no longer follows the entry before it',
+        'hash_mismatch' => 'its seal does not match its content',
+        'payload_mismatch' => 'its content differs from the records it was made from',
     ],
 
     'count_type' => [

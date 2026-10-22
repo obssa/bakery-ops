@@ -79,7 +79,7 @@ it('is null on a rejected count and shows the recount draft no movement either',
 
 it('shows an opening draft the net movements since the previous closing', function () {
     $this->f->lines($this->f->chef, $this->count, ['confirm_all' => true])->assertOk();
-    $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'approved');
+    $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'locked');
     $this->f->stock($this->flour, $this->place, '400'); // arrives between the shifts
     $this->f->stock($this->sugar, $this->place, '-30', MovementReason::Waste);
     $start = $this->f->start($this->f->chef, $this->f->kitchen)->assertCreated();

@@ -163,7 +163,7 @@ it('keeps counted minus expected exact and at most one unresolved count per plac
                 expect($line->expected_qty->toString())->toBe($atSnapshot->onHand->toString(), $fail("count {$count->id} line {$line->id} expected against the balance at snapshot_at"));
                 $differs = $differs || ! $variance->isZero();
             }
-            if ($count->status === CountStatus::Approved) {
+            if (in_array($count->status, [CountStatus::Approved, CountStatus::Locked], true) && $count->decision === null) {
                 expect($differs)->toBeFalse($fail("approved count {$count->id} has a variance"));
             }
             if ($count->status === CountStatus::PendingApproval) {

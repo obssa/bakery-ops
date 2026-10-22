@@ -10,6 +10,7 @@ use App\Modules\Inventory\Contracts\StockLevel;
 use App\Modules\Inventory\Ledger\Ledger;
 use App\Modules\Inventory\Ledger\MovementIntent;
 use App\Modules\Inventory\Ledger\MovementReason;
+use App\Modules\Shifts\Contracts\HashChain;
 use App\Modules\Shifts\Counts\CountLock;
 use App\Modules\Shifts\Counts\VarianceMath;
 use App\Modules\Shifts\Enums\CountDecision;
@@ -60,6 +61,7 @@ final class ApproveCount
         private readonly ActorContext $actor,
         private readonly CountAnnouncer $announcer,
         private readonly Items $items,
+        private readonly HashChain $chain,
     ) {}
 
     /**
@@ -115,6 +117,7 @@ final class ApproveCount
                     'version' => $c->version + 1,
                 ])->save();
 
+                $this->chain->lock($c, $person);
                 ShiftResolution::lockWhenResolved($shift, $now);
                 $this->announcer->decided($c, count($written));
 

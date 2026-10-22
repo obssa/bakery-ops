@@ -246,6 +246,24 @@ final class ShiftError extends RuntimeException
         return new self('shifts.adjustment.insufficient', 409, ['item_id' => $itemId, 'location_id' => $locationId, 'on_hand' => $onHand, 'adjustment' => $adjustment]);
     }
 
+    /** An unlock is asked of a count that is not locked. */
+    public static function countNotLocked(string $status): self
+    {
+        return new self('shifts.count.not_locked', 409, ['status' => $status]);
+    }
+
+    /** The locked count already has a revision (it was unlocked, or recounted): only one revision follows a count. */
+    public static function alreadySuperseded(int $supersededById): self
+    {
+        return new self('shifts.count.already_superseded', 409, ['superseded_by_id' => $supersededById]);
+    }
+
+    /** The chain's next sequence number was taken by another lock three times in a row; the caller may try again. */
+    public static function chainBusy(): self
+    {
+        return new self('shifts.lock.chain_busy', 409);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

@@ -9,6 +9,7 @@ use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Contracts\StockLevel;
 use App\Modules\Inventory\Ledger\Ledger;
+use App\Modules\Shifts\Contracts\HashChain;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Counts\CountLock;
 use App\Modules\Shifts\Counts\VarianceMath;
@@ -17,6 +18,7 @@ use App\Modules\Shifts\Enums\CountType;
 use App\Modules\Shifts\Enums\ReasonStatus;
 use App\Modules\Shifts\Enums\ShiftOpeningMode;
 use App\Modules\Shifts\Enums\ShiftStatus;
+use App\Modules\Shifts\Enums\SupersedeCause;
 use App\Modules\Shifts\Exceptions\ShiftError;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
@@ -59,6 +61,7 @@ final class SubmitCount
         private readonly ShiftAnnouncer $announcer,
         private readonly CountAnnouncer $counts,
         private readonly Items $items,
+        private readonly HashChain $chain,
     ) {}
 
     /**
@@ -144,7 +147,15 @@ final class SubmitCount
                     'version' => $c->version + 1,
                 ])->save();
 
+                if ($to === CountStatus::Approved) {
+                    // nothing to decide: approved and locked are one step (step 3.4); the link is made in this transaction
+                    $this->chain->lock($c, $person);
+                }
+
                 $this->moveShift($shift, $c, $person);
+                if ($c->status === CountStatus::Locked) {
+                    ShiftResolution::lockWhenResolved($shift, CarbonImmutable::now()->startOfSecond());
+                }
                 $this->counts->submitted($c);
 
                 return $c;
@@ -162,6 +173,9 @@ final class SubmitCount
      */
     private static function takesCount(ShiftInstance $shift, StockCount $count): bool
     {
+        if ($count->supersede_cause === SupersedeCause::Unlock && $shift->status === ShiftStatus::Locked) {
+            return true; // an unlock revision is counted after the shift locked, and changes nothing about the shift
+        }
         if ($count->type === CountType::Opening) {
             return $shift->status === ShiftStatus::Opening || ($count->seq > 1 && $shift->status === ShiftStatus::Open);
         }

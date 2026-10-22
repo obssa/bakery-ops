@@ -56,7 +56,7 @@ it('locks every approved count, oldest decision first within a place, one chain 
 
 it('says who locked each: the decider, else the person who counted', function () {
     $decided = $this->chain->approved($this->place, ($this->line)(), ($this->at)('1 10'));
-    $straight = $this->chain->approved($this->bar, [], ($this->at)('1 11') + ['decision' => null, 'decided_at' => null, 'decided_by_user_id' => null]);
+    $straight = $this->chain->approved($this->bar, [], array_merge(($this->at)('1 11'), ['decision' => null, 'decided_at' => null, 'decided_by_user_id' => null]));
 
     app(Locks::class)->lockApproved();
 
@@ -91,7 +91,7 @@ it('leaves every count that is not approved alone, and continues an existing cha
 
 it('works across branches and leaves each branch\'s chain on its own', function () {
     $mine = $this->chain->approved($this->place, ($this->line)(), ($this->at)('1 10'));
-    $other = Branch::factory()->create();
+    $other = actInBranch(Branch::factory()->create());
     $f2 = ShiftsFixture::build($other, $this);
     $place2 = $f2->place($f2->kitchen);
     $theirs = (new ChainFixture($f2))->approved($place2, [], ($this->at)('1 10'));

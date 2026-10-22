@@ -177,7 +177,7 @@ it('refuses to change a count that is no longer a draft, naming the status', fun
 
     $this->f->lines($this->f->chef, $this->count, ['lines' => [['item_id' => $this->flour->id, 'counted_qty' => '1']]])->assertStatus(409)
         ->assertJsonPath('message_key', 'shifts.count.not_draft')
-        ->assertJsonPath('status', 'approved');
+        ->assertJsonPath('status', 'locked');
 });
 
 it('bumps the count\'s version and writes one audit row per change', function () {

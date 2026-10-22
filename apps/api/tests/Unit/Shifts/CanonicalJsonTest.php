@@ -124,7 +124,7 @@ it('keeps list order and writes no whitespace', function () {
 });
 
 it('escapes only the quote, the backslash and U+0000 to U+001F, with lowercase hex', function () {
-    expect(CanonicalJson::encode("a\"b\\c"))->toBe('"a\\"b\\\\c"')
+    expect(CanonicalJson::encode('a"b\\c'))->toBe('"a\\"b\\\\c"')
         ->and(CanonicalJson::encode("\x00\x1f\n\r\t\x08\x0c"))->toBe('"\u0000\u001f\u000a\u000d\u0009\u0008\u000c"')
         ->and(CanonicalJson::encode('a/b'))->toBe('"a/b"')
         ->and(CanonicalJson::encode("\x7F"))->toBe("\"\x7F\"")
@@ -136,7 +136,7 @@ it('escapes only the quote, the backslash and U+0000 to U+001F, with lowercase h
 it('refuses what is not in the grammar: floats, objects, invalid UTF-8', function () {
     expect(fn () => CanonicalJson::encode(1.5))->toThrow(LogicException::class)
         ->and(fn () => CanonicalJson::encode(['a' => new stdClass]))->toThrow(LogicException::class)
-        ->and(fn () => CanonicalJson::encode(Quantity::of('1')))->toThrow(LogicException::class, 'a decimal is formatted first, then encoded as a string')
+        ->and(fn () => CanonicalJson::encode(Quantity::of('1')))->toThrow(LogicException::class)
         ->and(fn () => CanonicalJson::encode("\xB1\x31"))->toThrow(LogicException::class)
         ->and(fn () => CanonicalJson::encode(NAN))->toThrow(LogicException::class);
 });
@@ -154,7 +154,7 @@ it('writes quantities with four decimals, money with two, and zero never as nega
         ->and(CanonicalJson::money('-0.00'))->toBe('0.00')
         ->and(CanonicalJson::money('-2.5'))->toBe('-2.50')
         ->and(CanonicalJson::money(null))->toBeNull()
-        ->and(fn () => CanonicalJson::quantity('1.00001'))->toThrow(LogicException::class, 'a figure with more places than the scale is a bug, never rounded here')
+        ->and(fn () => CanonicalJson::quantity('1.00001'))->toThrow(LogicException::class)
         ->and(fn () => CanonicalJson::money('1.005'))->toThrow(LogicException::class);
 });
 

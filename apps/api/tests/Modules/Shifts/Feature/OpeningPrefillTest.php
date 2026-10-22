@@ -112,7 +112,7 @@ it('expects the carried figure plus what moved since the closing, and finds no d
     $this->f->lines($this->f->chef, $count, ['lines' => [['item_id' => $this->flour->id, 'counted_qty' => '620', 'confirm' => true]]])->assertOk();
 
     $this->f->submit($this->f->chef, $count)->assertOk()
-        ->assertJsonPath('status', 'approved')
+        ->assertJsonPath('status', 'locked')
         ->assertJsonPath('lines.0.carried_qty', '500.0000')
         ->assertJsonPath('lines.0.expected_qty', '620.0000')
         ->assertJsonPath('lines.0.variance_qty', '0.0000');

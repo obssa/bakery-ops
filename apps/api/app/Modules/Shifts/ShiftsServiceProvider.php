@@ -6,6 +6,8 @@ namespace App\Modules\Shifts;
 
 use App\Modules\Identity\Contracts\ShiftAttacher;
 use App\Modules\Identity\Contracts\StationPresenceResolver;
+use App\Modules\Shifts\Console\LockApprovedCommand;
+use App\Modules\Shifts\Console\VerifyChainCommand;
 use App\Modules\Shifts\Listeners\EnsureDefaultVarianceReasons;
 use App\Modules\Shifts\Support\OnShiftResolver;
 use App\Modules\Shifts\Support\OpenShiftsReader;
@@ -43,5 +45,10 @@ final class ShiftsServiceProvider extends ServiceProvider
         // a new branch gets the five default variance reasons, in the transaction that creates it
         Event::listen(BranchCreated::class, [EnsureDefaultVarianceReasons::class, 'handle']);
         $this->loadRoutesFrom(base_path('routes/modules/shifts.php'));
+
+        if ($this->app->runningInConsole()) {
+            // step 3.4: the nightly verification of the hash chains (scheduled in routes/console.php) and the retry of the backfill lock
+            $this->commands([VerifyChainCommand::class, LockApprovedCommand::class]);
+        }
     }
 }

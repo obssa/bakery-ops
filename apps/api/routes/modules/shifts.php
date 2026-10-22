@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Shifts\Http\Controllers\ChainController;
 use App\Modules\Shifts\Http\Controllers\CountsController;
 use App\Modules\Shifts\Http\Controllers\ShiftsController;
 use App\Modules\Shifts\Http\Controllers\StationShiftsController;
@@ -70,5 +71,15 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     Route::middleware(['permission:shifts.view', 'idempotency'])->group(function (): void {
         Route::post('/stock-counts/{count}/cosign', [CountsController::class, 'cosign'])->whereNumber('count')->name('shifts.counts.cosign');
         Route::post('/stock-counts/{count}/reject', [CountsController::class, 'reject'])->whereNumber('count')->name('shifts.counts.reject');
+    });
+
+    // Step 3.4: the unlock is the admin's, and the chain of a place is read and verified by the people who may replay (admin, manager)
+    Route::middleware(['permission:shifts.unlock', 'idempotency'])->group(function (): void {
+        Route::post('/stock-counts/{count}/unlock', [CountsController::class, 'unlock'])->whereNumber('count')->name('shifts.counts.unlock');
+    });
+
+    Route::middleware('permission:shifts.replay')->group(function (): void {
+        Route::get('/locations/{location}/chain', [ChainController::class, 'index'])->whereNumber('location')->name('shifts.chain.index');
+        Route::get('/locations/{location}/chain/verify', [ChainController::class, 'verify'])->whereNumber('location')->name('shifts.chain.verify');
     });
 });

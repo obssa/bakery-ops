@@ -12,7 +12,7 @@ use Carbon\CarbonImmutable;
 
 /**
  * A shift that waits for approval is `locked` once the newest revision of every count it has, opening and closing, is approved (or
- * already locked): its last count has resolved. Called inside the transaction of the action that resolved a count (ApproveCount, and
+ * already locked): its last count has resolved. Announces ShiftLocked (after commit) with the chain links of its counts. Called inside the transaction of the action that resolved a count (ApproveCount, and
  * CosignCount when the co-signature itself approves a count without a variance), with the shift row already locked.
  */
 final class ShiftResolution
@@ -40,5 +40,7 @@ final class ShiftResolution
             'locked_at' => $now,
             'version' => $shift->version + 1,
         ])->save();
+
+        app(ShiftAnnouncer::class)->locked($shift);
     }
 }
