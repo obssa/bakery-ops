@@ -166,7 +166,7 @@ test.describe("p2 stock-out to production", () => {
 //
 // A made-to-order sandwich sold down to the last of its ingredient raises a stock-out of the ingredient, but production is
 // not asked for anything: the auto request is only for a to-stock product (the test waits for the alert, then looks for a
-// request and finds none). Then a cake request asked for by hand over a cake-room shelf that holds 1000 g of a recipe that
+// request and finds none). Then a cake request asked for by hand over a cake room that needs no overseer (so Done writes the stock at once) and a shelf that holds 1000 g of a recipe that
 // needs 1800 g for a batch of 6: the card shows the red shortfall (800 g missing, the store has 5000 g), Done is refused with
 // the API's message inline and nothing is written, and "Request transfer" from the card creates a requested transfer from
 // the store to the cake room that carries the request.
@@ -221,7 +221,7 @@ test.describe("p2 stock-out, second case", () => {
   test("a made-to-order stock-out makes no request, and a short batch shows the shortfall and can ask the store for the rest @live", async ({ browser }, testInfo) => {
     test.setTimeout(live ? 600_000 : 240_000);
     const credentials = requireAdmin(test.skip);
-    const fixture = await buildProductionFixture(credentials, { cakeRoomStock: "1.0000", storeStock: "5.0000" });
+    const fixture = await buildProductionFixture(credentials, { cakeRoomStock: "1.0000", storeStock: "5.0000", requiresOverseer: false });
     const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: TABLET, serviceWorkers: "block" });
     const baker = await context.newPage();
     try {

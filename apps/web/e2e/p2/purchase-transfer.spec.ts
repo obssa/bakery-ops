@@ -1,6 +1,6 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
 import { requireAdmin } from "../support/env";
-import { balanceAt, buildTransferFixture, ledgerOf, movingAverage, transfersOf, type TransferFixture } from "../support/inventory";
+import { balanceAt, buildTransferFixture, ledgerOf, movingAverage, stockKitchen, transfersOf, type TransferFixture } from "../support/inventory";
 import { uuid } from "../support/api";
 import { openAs } from "../support/pad";
 
@@ -129,6 +129,7 @@ test.describe("p2 purchase and transfer", () => {
     const { contexts, pages } = await openContexts(browser, testInfo.project.use.baseURL);
     try {
       await runPurchase(fixture);
+      await stockKitchen(fixture);
       const transferId = await runChefAsks(fixture, pages.chef);
       await runManagerConfirms(fixture, pages.manager, transferId);
       await runSecondRejected(fixture, pages.chef, pages.manager);

@@ -95,7 +95,7 @@ let built = 0;
  */
 export async function buildProductionFixture(
   credentials: { phone: string; password: string },
-  options: { cakeRoomStock?: string; storeStock?: string } = {},
+  options: { cakeRoomStock?: string; storeStock?: string; requiresOverseer?: boolean } = {},
 ): Promise<ProductionFixture> {
   const tag = `${run}${++built}`;
   const { api: admin, login } = await loginOnce(credentials.phone, credentials.password);
@@ -104,7 +104,7 @@ export async function buildProductionFixture(
 
   const cakeRoom = await findOrCreateStation(admin, "cake_room");
   const cakeRoomLocation = await findOrCreateLocation(admin, cakeRoom);
-  await admin.patch(`/stations/${cakeRoom.id}`, { requires_overseer: true });
+  await admin.patch(`/stations/${cakeRoom.id}`, { requires_overseer: options.requiresOverseer ?? true });
   const displayCase = await findOrCreateDisplayCase(admin);
 
   const bakerStaff = await ensureStaff(admin, credentials.password, "cake_baker");

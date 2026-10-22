@@ -125,13 +125,11 @@ export interface TransferFixture extends InventoryFixture {
 
 /**
  * The inventory fixture plus the station side: the kitchen and its location (found or created), the fixed chef assigned to
- * the kitchen, the fixed manager (who holds stations.all and so confirms at the store), 1 kg of the ingredient in the kitchen
- * with a rule that puts it at Low (minimum 2 kg), so the kitchen display's stock strip lists it.
+ * the kitchen, the fixed manager (who holds stations.all and so confirms at the store), each signed in on the API.
  */
 export async function buildTransferFixture(credentials: { phone: string; password: string }): Promise<TransferFixture> {
   const base = await buildInventoryFixture(credentials);
   const { admin } = base;
-  const unit = await unitLookup(admin);
   const kitchen = await findOrCreateStation(admin, "kitchen");
   const kitchenLocation = await findOrCreateLocation(admin, kitchen);
 
@@ -139,17 +137,6 @@ export async function buildTransferFixture(credentials: { phone: string; passwor
   await admin.put(`/users/${chefStaff.id}/stations`, { assignments: [{ station_id: kitchen.id, can_count: true, is_overseer: false }] });
   const managerStaff = await ensureStaff(admin, credentials.password, "manager");
   const [chef, manager] = await Promise.all([chefStaff, managerStaff].map((s) => loginOnce(s.phone, s.password, base.branchId)));
-
-  await admin.post("/stock/movements", {
-    item_id: base.ingredient.id,
-    location_id: kitchenLocation.id,
-    reason: "purchase_in",
-    qty: "1.0000",
-    unit_id: unit("kg"),
-    client_uuid: uuid(),
-    note: "e2e kitchen start",
-  });
-  await admin.post("/reorder-rules", { item_id: base.ingredient.id, location_id: kitchenLocation.id, min_qty: "2000", reorder_qty: "5000" });
 
   return {
     ...base,
@@ -166,6 +153,24 @@ export async function buildTransferFixture(credentials: { phone: string; passwor
 export async function transfersOf(admin: Api, itemId: number): Promise<TransferView[]> {
   const page = await admin.get<{ data: (TransferView)[] }>("/transfers", { per_page: 100 });
   return page.data.filter((t) => t.item.id === itemId);
+}
+
+/**
+ * Puts 1 kg of the ingredient in the kitchen and a kitchen rule with a minimum of 2 kg, so the stock strip lists it as Low.
+ * Done after the purchases, which would otherwise count this stock in the moving average.
+ */
+export async function stockKitchen(f: TransferFixture): Promise<void> {
+  const unit = await unitLookup(f.admin);
+  await f.admin.post("/stock/movements", {
+    item_id: f.ingredient.id,
+    location_id: f.kitchenLocation.id,
+    reason: "purchase_in",
+    qty: "1.0000",
+    unit_id: unit("kg"),
+    client_uuid: uuid(),
+    note: "e2e kitchen start",
+  });
+  await f.admin.post("/reorder-rules", { item_id: f.ingredient.id, location_id: f.kitchenLocation.id, min_qty: "2000", reorder_qty: "5000" });
 }
 
 /** The ledger rows of an item at a place, oldest first, with what ties a transfer pair together. */
