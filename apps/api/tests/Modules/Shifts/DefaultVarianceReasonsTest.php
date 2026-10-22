@@ -32,9 +32,10 @@ function varianceReasonMigration(): Migration
 /** @return list<string> */
 function reasonCodesOf(int $branchId, bool $withTrashed = false): array
 {
+    // withoutGlobalScopes() lifts the soft-delete scope together with the branch scope, so a removed reason is filtered out by hand
     $query = VarianceReason::query()->withoutGlobalScopes()->where('branch_id', $branchId)->orderBy('sort')->orderBy('id');
-    if ($withTrashed) {
-        $query->withTrashed();
+    if (! $withTrashed) {
+        $query->whereNull('deleted_at');
     }
 
     return $query->pluck('code')->all();
