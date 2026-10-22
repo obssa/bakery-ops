@@ -1,5 +1,6 @@
 import { Api, uuid } from "./api";
 import { run } from "./env";
+import { ensureOpenShift, ensureOpenShiftAt } from "./shifts";
 
 // Fixture builders for the Phase 1 flows (p1-order-flow, p1-shortfall), written once in step 1.6a and reused by 1.6b
 // and 1.6c. Everything goes through the admin API of the isolated "E2E Test Branch" and is run-unique where it is
@@ -80,7 +81,7 @@ export function loginOnce(phone: string, password: string, branchId?: number): R
   return pending;
 }
 
-export async function findOrCreateStation(admin: Api, code: StationKind | "cake_room" | "bakery"): Promise<Station> {
+export async function findOrCreateStation(admin: Api, code: StationKind | "cake_room" | "bakery" | "till"): Promise<Station> {
   const stations = (await admin.get<{ data: Station[] }>("/stations")).data;
   const found = stations.find((s) => s.code === code);
   if (found) return found;
@@ -91,7 +92,9 @@ export async function findOrCreateStation(admin: Api, code: StationKind | "cake_
         ? { name_en: "Bar", name_am: "ባር" }
         : code === "bakery"
           ? { name_en: "Bakery", name_am: "ዳቦ ቤት" }
-          : { name_en: "Cake room", name_am: "የኬክ ክፍል" };
+          : code === "till"
+            ? { name_en: "Till", name_am: "ገንዘብ ተቀባይ" }
+            : { name_en: "Cake room", name_am: "የኬክ ክፍል" };
   return admin.post<Station>("/stations", { code, ...names });
 }
 
@@ -184,6 +187,8 @@ async function makeStationSide(
 
   const station = await findOrCreateStation(admin, kind);
   const location = await findOrCreateLocation(admin, station);
+  // the ingredient is stocked at this location below: with the shift rule on, the station needs a running shift first
+  await ensureOpenShift(admin, station);
 
   const workerRole = kind === "kitchen" ? "chef" : "barista";
   const worker = await ensureStaff(admin, adminPassword, workerRole);
@@ -285,10 +290,23 @@ export async function buildTillStaff(adminCredentials: { phone: string; password
   const { api: admin, login } = await loginOnce(adminCredentials.phone, adminCredentials.password);
   const branchId = login.user.branch_id;
   const cashierStaff = await ensureStaff(admin, adminCredentials.password, "cashier");
+  await ensureTill(admin, cashierStaff);
   const { api } = await loginOnce(cashierStaff.phone, cashierStaff.password, branchId);
   const managerStaff = await ensureStaff(admin, adminCredentials.password, "manager");
   const { short_code: pin } = await admin.post<{ short_code: string }>(`/users/${managerStaff.id}/short-code/reset`);
   return { admin, branchId, cashier: { ...cashierStaff, api }, manager: { ...managerStaff, pin } };
+}
+
+/**
+ * The till station (found or created) with the fixed cashier assigned to it with can_count, and its shift running: the cashier
+ * who takes a payment works a shift of the till (the payment rule of step 3.5 asks for it; the ledger asks for the station's
+ * shift whenever the display case is tied to the till). The assignment replaces the cashier's list, which is only ever the till.
+ */
+export async function ensureTill(admin: Api, cashier: { id: number }): Promise<Station> {
+  const till = await findOrCreateStation(admin, "till");
+  await admin.put(`/users/${cashier.id}/stations`, { assignments: [{ station_id: till.id, can_count: true, is_overseer: false }] });
+  await ensureOpenShift(admin, till);
+  return till;
 }
 
 export async function findOrCreateDisplayCase(admin: Api): Promise<Location> {
@@ -340,6 +358,7 @@ export async function buildFlowFixture(adminCredentials: { phone: string; passwo
     unit_id: unit("pcs"),
   });
   await admin.post(`/items/${croissant.id}/prices`, { price: croissantPrice });
+  await ensureOpenShiftAt(admin, displayCase);
   await admin.post("/stock/movements", {
     item_id: croissant.id,
     location_id: displayCase.id,
@@ -353,6 +372,7 @@ export async function buildFlowFixture(adminCredentials: { phone: string; passwo
   const waiterStaff = await ensureStaff(admin, adminCredentials.password, "waiter");
   const { short_code: shortCode } = await admin.post<{ short_code: string }>(`/users/${waiterStaff.id}/short-code/reset`);
   const cashierStaff = await ensureStaff(admin, adminCredentials.password, "cashier");
+  await ensureTill(admin, cashierStaff);
   const [waiterSession, chefSession, baristaSession, cashierSession] = await Promise.all(
     [waiterStaff, kitchen.worker, bar.worker, cashierStaff].map((s) => loginOnce(s.phone, s.password, branchId)),
   );

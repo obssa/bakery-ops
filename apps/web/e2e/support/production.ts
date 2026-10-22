@@ -1,6 +1,7 @@
 import { Api, uuid } from "./api";
 import { run } from "./env";
 import { findOrCreateStore } from "./inventory";
+import { ensureOpenShift, ensureOpenShiftAt } from "./shifts";
 import { ensureStaff, ensureTable, findOrCreateDisplayCase, findOrCreateLocation, findOrCreateStation, loginOnce, unitLookup, type Location, type Staff, type Station } from "./fixture";
 
 // Fixture builders and waits for the Phase 2 production flows (p2-stockout-production, step 2.8a), built on api.ts,
@@ -106,6 +107,9 @@ export async function buildProductionFixture(
   const cakeRoomLocation = await findOrCreateLocation(admin, cakeRoom);
   await admin.patch(`/stations/${cakeRoom.id}`, { requires_overseer: options.requiresOverseer ?? true });
   const displayCase = await findOrCreateDisplayCase(admin);
+  // stock is written at the cake room and the display case below, and the batch consumes and outputs there
+  await ensureOpenShift(admin, cakeRoom);
+  await ensureOpenShiftAt(admin, displayCase);
 
   const bakerStaff = await ensureStaff(admin, credentials.password, "cake_baker");
   await admin.put(`/users/${bakerStaff.id}/stations`, { assignments: [{ station_id: cakeRoom.id, can_count: true, is_overseer: false }] });
@@ -128,6 +132,7 @@ export async function buildProductionFixture(
     note: `e2e ${tag}`,
   });
   const store = await findOrCreateStore(admin);
+  await ensureOpenShiftAt(admin, store);
   if (options.storeStock) {
     await admin.post("/stock/movements", {
       item_id: ingredient.id,

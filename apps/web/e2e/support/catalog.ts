@@ -2,6 +2,7 @@ import { Api, uuid } from "./api";
 import { run } from "./env";
 import { ensureStaff, findOrCreateLocation, findOrCreateStation, loginOnce, unitLookup, type Staff, type Station } from "./fixture";
 import { findOrCreateStore } from "./inventory";
+import { ensureOpenShift, ensureOpenShiftAt } from "./shifts";
 
 // Fixture builders and reads for the admin Catalog and planner flows (step 2.8d, project p2-stockout-production), built on
 // api.ts, env.ts, fixture.ts and inventory.ts. Everything goes through the admin API of the isolated "E2E Test Branch": the
@@ -40,11 +41,13 @@ export async function buildCatalogFixture(credentials: { phone: string; password
 
   const station = await findOrCreateStation(admin, "bakery");
   await findOrCreateLocation(admin, station);
+  await ensureOpenShift(admin, station);
   const bakerStaff = await ensureStaff(admin, credentials.password, "bread_baker");
   await admin.put(`/users/${bakerStaff.id}/stations`, { assignments: [{ station_id: station.id, can_count: true, is_overseer: false }] });
 
   // the ingredient has a cost: 10 kg bought at 40 a kilogram and confirmed
   const store = await findOrCreateStore(admin);
+  await ensureOpenShiftAt(admin, store);
   const supplier = await admin.post<{ id: number }>("/suppliers", { name: `E2E catalog supplier ${tag}`, notes: "created by the e2e flow" });
   const ingredientEn = `E2E catalog flour ${tag}`;
   const ingredientAm = `የሙከራ ካታሎግ ዱቄት ${tag}`;

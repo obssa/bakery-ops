@@ -1,5 +1,6 @@
 import { Api, uuid } from "./api";
 import { run } from "./env";
+import { ensureOpenShift, ensureOpenShiftAt } from "./shifts";
 import { ensureStaff, findOrCreateLocation, findOrCreateStation, loginOnce, unitLookup, type Location, type Staff, type Station } from "./fixture";
 
 // Fixture builders and reads for the admin Inventory flow (p2-purchase-transfer, step 2.8b), built on api.ts, env.ts and
@@ -51,6 +52,7 @@ export async function buildInventoryFixture(credentials: { phone: string; passwo
   const { api: admin, login } = await loginOnce(credentials.phone, credentials.password);
   const unit = await unitLookup(admin);
   const store = await findOrCreateStore(admin);
+  await ensureOpenShiftAt(admin, store);
 
   const supplier = await admin.post<{ id: number; name: string }>("/suppliers", { name: `E2E supplier ${tag}`, notes: "created by the e2e flow" });
   const ingredientEn = `E2E sugar ${tag}`;
@@ -132,6 +134,8 @@ export async function buildTransferFixture(credentials: { phone: string; passwor
   const { admin } = base;
   const kitchen = await findOrCreateStation(admin, "kitchen");
   const kitchenLocation = await findOrCreateLocation(admin, kitchen);
+  // the transfer lands in the kitchen and stockKitchen() puts stock there: the kitchen needs its shift
+  await ensureOpenShift(admin, kitchen);
 
   const chefStaff = await ensureStaff(admin, credentials.password, "chef");
   await admin.put(`/users/${chefStaff.id}/stations`, { assignments: [{ station_id: kitchen.id, can_count: true, is_overseer: false }] });
@@ -161,6 +165,7 @@ export async function transfersOf(admin: Api, itemId: number): Promise<TransferV
  */
 export async function stockKitchen(f: TransferFixture): Promise<void> {
   const unit = await unitLookup(f.admin);
+  await ensureOpenShift(f.admin, f.kitchen);
   await f.admin.post("/stock/movements", {
     item_id: f.ingredient.id,
     location_id: f.kitchenLocation.id,

@@ -1,5 +1,5 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
-import { requireAdmin } from "../support/env";
+import { MULTI_CONTEXT_TEST_MS, requireAdmin } from "../support/env";
 import { balanceAt, buildTransferFixture, ledgerOf, movingAverage, stockKitchen, transfersOf, type TransferFixture } from "../support/inventory";
 import { uuid } from "../support/api";
 import { openAs } from "../support/pad";
@@ -125,6 +125,7 @@ async function openContexts(browser: Browser, baseURL: string | undefined) {
 
 test.describe("p2 purchase and transfer", () => {
   test("a purchase raises the store, and a transfer asked for in the kitchen strip moves stock once the store confirms it @live", async ({ browser }, testInfo) => {
+    test.setTimeout(MULTI_CONTEXT_TEST_MS);
     const credentials = requireAdmin(test.skip);
     const fixture = await buildTransferFixture(credentials);
     const { contexts, pages } = await openContexts(browser, testInfo.project.use.baseURL);

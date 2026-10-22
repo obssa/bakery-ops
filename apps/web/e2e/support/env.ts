@@ -33,3 +33,11 @@ export function requireAdmin(skip: (condition: boolean, description: string) => 
  * allows 10 s. Nothing else is loosened by it.
  */
 export const TICKET_VISIBLE_MS = live ? 10_000 : 5_000;
+
+/**
+ * The test budget of a flow that drives several browser contexts (a role per context) and builds its fixture through the API
+ * first. CI keeps Playwright's 60 s default; the shared live host is slower (the E2E branch's lists grow every run), and the
+ * purchase-and-transfer flow with three contexts exceeded 60 s there, so a run against the deployed site (PLAYWRIGHT_BASE_URL
+ * set) gets twice that. Nothing else is loosened by it.
+ */
+export const MULTI_CONTEXT_TEST_MS = live ? 120_000 : 60_000;
