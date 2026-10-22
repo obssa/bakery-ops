@@ -61,9 +61,10 @@ it('leaves audit_log without a foreign key on its shift id', function () {
 });
 
 it('keeps every shift_instance_id nullable and indexed', function () {
+    // shift_roster and stock_counts name the shift they belong to: it is their parent key, not an actor stamp (step 3.3a)
     $nullable = DB::select(
         "select table_name as table_name from information_schema.columns
-          where table_schema = ? and column_name = 'shift_instance_id' and is_nullable = 'NO' and table_name <> 'shift_roster'",
+          where table_schema = ? and column_name = 'shift_instance_id' and is_nullable = 'NO' and table_name not in ('shift_roster', 'stock_counts')",
         [dbSchema()],
     );
     expect(array_map(fn ($r) => $r->table_name, $nullable))->toBe([]);
