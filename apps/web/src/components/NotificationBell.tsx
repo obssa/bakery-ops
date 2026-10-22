@@ -8,7 +8,7 @@ import { uuid } from "@/lib/api/idempotency";
 import type { AppNotification, Locale } from "@/lib/api/types";
 import { resolveDeepLink } from "@/lib/deeplink";
 import { useErrorText } from "@/lib/errors";
-import { createInboxFeed, inboxOf, markedRead } from "@/lib/live/notifications";
+import { createInboxFeed, inboxOf, markedAllRead, markedRead } from "@/lib/live/notifications";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { enablePush, type PushOutcome } from "@/lib/push";
 import { useSession } from "@/lib/session";
@@ -125,11 +125,10 @@ export function NotificationBell() {
   async function markAll() {
     setFailure(null);
     const now = new Date().toISOString();
-    const ids = lines.filter((line) => line.read_at === null).map((line) => line.id);
     try {
-      // up to the newest line on screen: a line that arrived while the panel was open stays unread until it is seen
-      await readAllNotifications(lines.length > 0 ? lines[0].id : null, uuid());
-      feed?.amend((state) => markedRead(state, ids, now));
+      // every unread line the person has now, drawn or not: a line that arrived since the last poll is cleared too
+      await readAllNotifications(uuid());
+      feed?.amend((state) => markedAllRead(state, now));
       feed?.refresh();
     } catch (error) {
       setFailure(error);

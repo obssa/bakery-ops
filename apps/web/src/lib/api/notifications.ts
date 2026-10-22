@@ -11,8 +11,12 @@ export function readNotification(id: number, idempotencyKey: string): Promise<Ap
   return authed<AppNotification>(`/notifications/${id}/read`, { method: "POST", body: {}, idempotencyKey });
 }
 
-export function readAllNotifications(beforeId: number | null, idempotencyKey: string): Promise<{ updated: number }> {
-  return authed<{ updated: number }>("/notifications/read-all", { method: "POST", body: beforeId === null ? {} : { before_id: beforeId }, idempotencyKey });
+/**
+ * POST /notifications/read-all with no before_id: every unread line the person has at that moment, the ones this screen has not
+ * drawn yet included. (Sending the newest id on screen as before_id left a line that arrived since the last poll unread.)
+ */
+export function readAllNotifications(idempotencyKey: string): Promise<{ updated: number }> {
+  return authed<{ updated: number }>("/notifications/read-all", { method: "POST", body: {}, idempotencyKey });
 }
 
 /** GET /notifications/channels: the "Enable notifications" control is offered only when push is on and not yet subscribed. */

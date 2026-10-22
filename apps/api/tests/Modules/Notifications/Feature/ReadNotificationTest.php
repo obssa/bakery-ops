@@ -134,6 +134,22 @@ it('reads only up to before_id, so lines that arrived since the list was drawn s
     $this->withHeaders(idempotencyKey())->postJson('/api/v1/notifications/read-all', ['before_id' => 'x'])->assertStatus(422)->assertJsonPath('message_key', 'validation.failed');
 })->group('module:notifications', 'feature');
 
+it('clears every unread line of mine without before_id, more than one feed page of them and the ones that arrived after the list was drawn', function () {
+    foreach (range(1, 35) as $i) {
+        ($this->line)();
+    }
+    $drawn = $this->getJson('/api/v1/notifications')->assertOk();
+    expect($drawn->json('unread_count'))->toBe(35)->and(count($drawn->json('data')))->toBe(30, 'one page holds fewer lines than are unread');
+    $late = ($this->line)(); // arrives between drawing the list and pressing "Mark all as read"
+
+    $response = $this->withHeaders(idempotencyKey())->postJson('/api/v1/notifications/read-all', [])->assertOk();
+
+    expect($response->json('updated'))->toBe(36)
+        ->and($late->fresh()->read_at)->not->toBeNull()
+        ->and($this->getJson('/api/v1/notifications')->json('unread_count'))->toBe(0)
+        ->and(Notification::query()->where('user_id', $this->me->id)->whereNull('read_at')->count())->toBe(0);
+})->group('module:notifications', 'feature');
+
 it('answers updated 0 and writes no audit row when nothing is unread', function () {
     ($this->line)(['read_at' => CarbonImmutable::now()]);
 

@@ -49,6 +49,13 @@ export function markedRead(state: InboxState, ids: readonly number[], at: string
   return { lines, unread: Math.max(0, state.unread - lowered) };
 }
 
+/** The state after "Mark all as read": every line this screen holds is read and the count is 0 (the API cleared the rest too). */
+export function markedAllRead(state: InboxState, at: string): InboxState {
+  const lines: Record<number, AppNotification> = {};
+  for (const [id, line] of Object.entries(state.lines)) lines[Number(id)] = line.read_at ? line : { ...line, read_at: at };
+  return { lines, unread: 0 };
+}
+
 export const inboxSpec: FeedSpec<NotificationsPage, InboxState> = {
   initial: { lines: {}, unread: 0 },
   cursorOf: (page) => page.cursor || null,
