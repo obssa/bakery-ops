@@ -12,6 +12,8 @@ use App\Modules\Shifts\Counts\CountReads;
 use App\Modules\Shifts\Enums\CountType;
 use App\Modules\Shifts\Http\Requests\OpenAdHocShiftRequest;
 use App\Modules\Shifts\Http\Requests\StartShiftRequest;
+use App\Modules\Shifts\Models\HandoverNote;
+use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Modules\Shifts\Support\ShiftPresenter;
 use App\Shared\Actor\ActorContext;
@@ -46,8 +48,14 @@ final class StationShiftsController
         $this->access->assertTracked($station);
 
         $shift = $rows->running($station->id);
+        // the body carries `notes_count` and the count summaries, which the shift's own version does not move (a handover note, a recount
+        // after a rejection): count them, so the bar never lags and a row committed late under a lower id still changes the tag
+        $notes = $shift === null ? 0 : HandoverNote::query()->where('shift_instance_id', $shift->id)->count();
+        $stamp = $shift === null ? null : StockCount::query()->where('shift_instance_id', $shift->id)->toBase()
+            ->selectRaw('count(*) as total, coalesce(sum(version), 0) as versions, max(id) as newest')->first();
         $etag = ConditionalPoll::etag('shifts.current', [
             $station->id, $this->actor->effectiveUserId(), $shift?->id, $shift?->version, $shift?->updated_at?->getTimestamp(), $shift?->status->value,
+            $notes, (int) ($stamp->total ?? 0), (int) ($stamp->versions ?? 0), (int) ($stamp->newest ?? 0),
         ]);
 
         return ConditionalPoll::respond($input, $etag, fn (): array => [

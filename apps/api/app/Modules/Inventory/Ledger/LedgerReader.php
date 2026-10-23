@@ -336,4 +336,20 @@ final class LedgerReader
 
         return is_numeric($id) ? (int) $id : null;
     }
+
+    /**
+     * The newest movement of the branch by id: its id and the instant it was written (UTC), null for an empty ledger. The settling
+     * window of Stock::fingerprint() reads the instant, because ids become visible in commit order, not in id order.
+     *
+     * @return array{id: int, at: CarbonImmutable}|null
+     */
+    public function lastMovement(): ?array
+    {
+        $row = StockMovement::query()->toBase()->orderByDesc('id')->limit(1)->first(['id', 'created_at']);
+        if ($row === null || ! is_numeric($row->id) || ! is_string($row->created_at)) {
+            return null;
+        }
+
+        return ['id' => (int) $row->id, 'at' => CarbonImmutable::parse($row->created_at, 'UTC')];
+    }
 }

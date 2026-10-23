@@ -7,7 +7,9 @@ namespace App\Modules\Inventory\Contracts;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Inventory\Ledger\LedgerReader;
 use App\Modules\Inventory\Models\Location;
+use App\Shared\Live\OverlapCursor;
 use App\Shared\Values\Quantity;
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -121,22 +123,32 @@ final class Stock
     }
 
     /**
-     * What the stock side of the pad's menu is computed from (GET /menu's ETag, with Catalog's Items::menuFingerprint):
-     * the highest ledger movement id of the branch (every receipt, sale, waste and reservation is a movement) and the
-     * state of its locations. Two cheap queries.
+     * What the stock side of the pad's menu is computed from (GET /menu's ETag, with Catalog's Items::menuFingerprint; the stock
+     * strips, the display case and the approval queue read it too): the highest ledger movement id of the branch (every receipt,
+     * sale, waste and reservation is a movement), the state of its locations, and a settling bucket.
      *
-     * @return array{last_movement_id: int|null, locations_n: int, locations_at: string|null}
+     * Ids become visible in commit order, not in id order (ADR 0009 decision 4): a transaction that took a lower id can commit after
+     * a higher one was served, and max(id) alone would not move, so a pad would show stale stock until the next movement. While the
+     * newest movement is younger than the overlap window `settling` is the current second, which moves the tag on every poll of the
+     * window; once it is older the bucket is null again and the tag is stable, and different from every tag the window handed out, so
+     * a client that looked inside the window looks once more after it. Two cheap queries.
+     *
+     * @return array{last_movement_id: int|null, locations_n: int, locations_at: string|null, settling: int|null}
      */
     public function fingerprint(): array
     {
         $row = Location::query()->withTrashed()->toBase()->selectRaw('count(*) as n, max(updated_at) as touched')->first();
 
         $latest = $row?->touched;
+        $last = $this->reader->lastMovement();
+        $now = CarbonImmutable::now();
+        $young = $last !== null && $last['at']->greaterThan($now->subSeconds(OverlapCursor::fromConfig()->windowSeconds()));
 
         return [
-            'last_movement_id' => $this->reader->lastMovementId(),
+            'last_movement_id' => $last['id'] ?? null,
             'locations_n' => (int) ($row?->n),
             'locations_at' => is_string($latest) ? $latest : null,
+            'settling' => $young ? $now->getTimestamp() : null,
         ];
     }
 }

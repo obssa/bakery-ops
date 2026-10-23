@@ -78,9 +78,10 @@ final class CountsController
 
         // the polled feed: a few cheap numbers say whether anything changed, the ledger included (moved_since reads it) (ADR 0009)
         $stamp = (clone $scope)->toBase()->selectRaw('count(*) as total, max(updated_at) as moved, coalesce(sum(version), 0) as versions')->first();
+        $ledger = $stock->fingerprint();
         $etag = ConditionalPoll::etag('shifts.queue', [
             $person, implode(',', $stationIds), $input->stationId(), $input->status()?->value, $input->mine(), $input->limit(),
-            (int) ($stamp->total ?? 0), (string) ($stamp->moved ?? ''), (int) ($stamp->versions ?? 0), $stock->fingerprint()['last_movement_id'],
+            (int) ($stamp->total ?? 0), (string) ($stamp->moved ?? ''), (int) ($stamp->versions ?? 0), $ledger['last_movement_id'], $ledger['settling'],
         ]);
 
         return ConditionalPoll::respond($input, $etag, fn (): array => [
@@ -96,12 +97,14 @@ final class CountsController
         $this->assertCanRead($shift);
 
         $moving = $count->status === CountStatus::Draft || $count->status->isUnresolved() || $count->status === CountStatus::Approved;
+        $ledger = $moving ? $stock->fingerprint() : null;
         $etag = ConditionalPoll::etag('shifts.count', [
             $count->id,
             $count->version,
             $count->status->value,
             $count->updated_at?->getTimestamp(),
-            $moving ? $stock->fingerprint()['last_movement_id'] : null,
+            $ledger['last_movement_id'] ?? null,
+            $ledger['settling'] ?? null,
             $count->status === CountStatus::Draft ? $locks->unresolvedAt($count->location_id, $count->id)?->id : null,
         ]);
 
