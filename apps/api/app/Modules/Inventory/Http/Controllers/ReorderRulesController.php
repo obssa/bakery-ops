@@ -29,7 +29,8 @@ final class ReorderRulesController
 {
     public function index(ListReorderRulesRequest $request): AnonymousResourceCollection
     {
-        $query = ReorderRule::query()->with(['item.unit.baseUnit', 'location'])->orderBy('id');
+        // a rule whose item was deleted from the catalog is left out (the item relation is soft-deleted, and the resource needs the item)
+        $query = ReorderRule::query()->whereHas('item')->with(['item.unit.baseUnit', 'location'])->orderBy('id');
         if ($request->itemId() !== null) {
             $query->where('item_id', $request->itemId());
         }
