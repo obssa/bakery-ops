@@ -26,19 +26,37 @@ export interface LoginResult {
   permissions: string[];
 }
 
+// POST /login is throttled (10 a minute per address) and the live run logs in from one runner, so an account logs in once per worker
+// whoever asks (a cache per origin, phone and branch) and again only when the API answers 401 on one of its requests (a revoked token).
+const sessions = new Map<string, Promise<{ token: string; login: LoginResult }>>();
+
 export class Api {
   constructor(
-    readonly token: string | null = null,
+    public token: string | null = null,
     readonly origin: string = apiOrigin,
+    private readonly account: { phone: string; password: string; branchId?: number } | null = null,
   ) {}
 
-  static async login(phone: string, password: string, branchId?: number): Promise<{ api: Api; login: LoginResult }> {
-    const anonymous = new Api();
-    const login = await anonymous.send<LoginResult>("POST", "/login", { phone, password, ...(branchId ? { branch_id: branchId } : {}) });
-    return { api: new Api(login.token), login };
+  static async login(phone: string, password: string, branchId?: number, origin: string = apiOrigin): Promise<{ api: Api; login: LoginResult }> {
+    const session = await Api.session(phone, password, branchId, origin);
+    return { api: new Api(session.token, origin, { phone, password, branchId }), login: session.login };
   }
 
-  private async send<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+  private static session(phone: string, password: string, branchId: number | undefined, origin: string) {
+    const key = `${origin}|${phone}|${branchId ?? ""}`;
+    let pending = sessions.get(key);
+    if (!pending) {
+      pending = new Api(null, origin)
+        .send<LoginResult>("POST", "/login", { phone, password, ...(branchId ? { branch_id: branchId } : {}) })
+        .then((login) => ({ token: login.token, login }));
+      sessions.set(key, pending);
+      // a failed login is not kept: the next caller tries again
+      pending.catch(() => sessions.delete(key));
+    }
+    return pending;
+  }
+
+  private async send<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}, retried = false): Promise<T> {
     const response = await fetch(`${this.origin}/api/v1${path}`, {
       method,
       headers: {
@@ -52,6 +70,14 @@ export class Api {
     });
     const text = await response.text();
     const json: unknown = text ? JSON.parse(text) : null;
+    if (response.status === 401 && this.account && !retried) {
+      // the token was revoked: forget the cached login, log in once more (shared with the other holders of this account) and retry
+      const { phone, password, branchId } = this.account;
+      const key = `${this.origin}|${phone}|${branchId ?? ""}`;
+      if (this.token === null || (await sessions.get(key))?.token === this.token) sessions.delete(key);
+      this.token = (await Api.session(phone, password, branchId, this.origin)).token;
+      return this.send<T>(method, path, body, headers, true);
+    }
     if (!response.ok) throw new ApiFailure(response.status, path, json);
     return json as T;
   }
