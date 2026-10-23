@@ -176,6 +176,22 @@ it('shows the till widget the cash in the drawer so far, live', function () {
     $this->f->cashRead($this->f->cashier2, $this->shift)->assertOk()->assertJsonPath('cash_sales_total', '110.50')->assertJsonPath('expected_total', '610.50');
 });
 
+it('polls the till widget conditionally: an ETag, a 304 while nothing is taken, a new tag when money comes in', function () {
+    $this->f->cashPut($this->f->cashier, $this->count, ['denominations' => ['100' => 5]])->assertOk();
+    $this->f->submit($this->f->cashier, $this->count)->assertOk();
+    loginAs($this->f->cashier);
+    $uri = "/api/v1/shifts/{$this->shift}/cash";
+
+    $first = $this->getJson($uri)->assertOk();
+    $etag = $first->headers->get('ETag');
+    expect($etag)->toBeString()->and($first->headers->get('Cache-Control'))->toContain('no-cache')->toContain('private');
+    $this->getJson($uri, ['If-None-Match' => $etag])->assertStatus(304);
+
+    $this->f->taken($this->shift, '12.00');
+    $after = $this->getJson($uri, ['If-None-Match' => $etag])->assertOk()->assertJsonPath('cash_sales_total', '12.00');
+    expect($after->headers->get('ETag'))->not->toBe($etag);
+});
+
 it('reads the opening figure as the float carried before the opening count is in', function () {
     $this->f->cashRead($this->f->cashier, $this->shift)->assertOk()
         ->assertJsonPath('opening_total', '0.00')

@@ -861,11 +861,42 @@ export interface CountChain {
   locked_at: string;
 }
 
+/** One channel of the reconciliation: what Payments took in the shift against what the cashier declared (null where nothing was declared). */
+export interface CashChannelRow {
+  code: string;
+  name_en: string;
+  name_am: string;
+  expected_receipts: number;
+  expected_sum: string;
+  declared_receipts: number | null;
+  declared_sum: string | null;
+  difference_sum: string | null;
+}
+
+/** The cash drawer's declaration on a drawer count (phase-3 plan section 4, "Cash (3.5)"). Money is decimal strings, tallies whole numbers. */
 export interface CashBlock {
-  counted_total: string | null;
-  expected_total: string | null;
-  variance_total: string | null;
+  /** every configured denomination, zero where none: {"200": 3, "0.50": 1} */
+  denominations: Record<string, number>;
+  counted_total: string;
+  expected_total: string;
+  variance_total: string;
+  carried_float_total: string | null;
+  cash_sales_total: string | null;
   float_left_total: string | null;
+  channels: CashChannelRow[];
+  confirmed: boolean;
+  reason: { id: number; code: string; name_en: string; name_am: string } | null;
+  note: string | null;
+  currency: string;
+}
+
+/** GET /shifts/{shift}/cash: the till widget's figures, live from Payments. */
+export interface CashSummary {
+  opening_total: string;
+  carried_float_total: string | null;
+  cash_sales_total: string;
+  expected_total: string;
+  by_channel: { code: string; name_en: string; name_am: string; receipts: number; sum: string }[];
   currency: string;
 }
 
@@ -901,7 +932,7 @@ export interface CountSummary {
 
 export interface Count extends Omit<CountSummary, "lines_count"> {
   lines: CountLine[];
-  /** the cash drawer's declaration (3.7d builds its screen); null for a stock count */
+  /** the cash drawer's declaration; null for a stock count */
   cash: CashBlock | null;
 }
 
