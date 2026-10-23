@@ -164,6 +164,7 @@ it('lets the admin and the manager confirm, and an overseer of the station co-si
 })->group('contract:production->identity', 'contract');
 
 it('attaches no shift under the Phase 2 binding: ShiftAttacher::attach answers null and writes nothing', function () {
+    config(['shifts.open_ad_hoc_on_accept' => false]); // with the call-in on (the default since step 3.7e) Shifts' attacher opens a shift
     $this->stations->replace($this->people['cake_baker'], [['station_id' => $this->cakeRoom->id, 'can_count' => true, 'is_overseer' => false]]);
     $tables = ['audit_log', 'users', 'user_station_assignments', 'acting_sessions', 'devices', 'stock_movements'];
     $counts = fn (): array => array_map(fn (string $table): int => DB::table($table)->count(), $tables);
