@@ -945,3 +945,99 @@ export interface HandoverPanelData {
   previous_closing: PreviousClosing[];
   pending_counts: CountSummary[];
 }
+
+// --- the admin shifts screens (step 3.7c; phase-3 plan section 4, "Templates and reasons", "Shifts", "Chain" and "Replay") ----------
+
+/** GET /shift-templates: a window of the local day on some weekdays (ISO, 1 = Monday) at some stations. */
+export interface ShiftTemplate {
+  id: number;
+  name_en: string;
+  name_am: string;
+  start_time: string;
+  end_time: string;
+  days_of_week: number[];
+  station_ids: number[];
+  is_active: boolean;
+  sort: number;
+  version: number;
+}
+
+/** GET /shifts: a shift as the list shows it (no roster, counts or note count). */
+export type ShiftSummary = Omit<Shift, "roster" | "counts" | "notes_count"> & {
+  submitted_at?: string | null;
+  locked_at?: string | null;
+  cancelled_at?: string | null;
+  cancel_reason?: string | null;
+};
+
+export interface ShiftPage {
+  data: ShiftSummary[];
+  meta: { current_page: number; last_page: number; per_page: number; total: number };
+}
+
+/** GET /locations (inventory.view) */
+export interface StockPlace {
+  id: number;
+  name_en: string;
+  name_am: string;
+  type: string;
+  station_id: number | null;
+}
+
+export interface ChainLink {
+  count_id: number;
+  chain_seq: number;
+  type: "opening" | "closing";
+  shift_id: number;
+  shift_date: string;
+  locked_at: string;
+  previous_hash: string | null;
+  payload_hash: string;
+  superseded_by_id: number | null;
+}
+
+export interface ChainPage {
+  data: ChainLink[];
+  head: { chain_seq: number; payload_hash: string } | null;
+}
+
+export type ChainFailureKind = "gap" | "previous_mismatch" | "hash_mismatch" | "payload_mismatch";
+
+export interface ChainVerify {
+  ok: boolean;
+  checked: number;
+  head_hash: string | null;
+  failures: { chain_seq: number; count_id: number; kind: ChainFailureKind }[];
+}
+
+/** GET /replay: the station at a moment (phase-3 plan section 4; no cash block). */
+export interface Replay {
+  at: string;
+  station: { id: number; code: StationCode; name_en: string; name_am: string };
+  shift: ShiftSummary | null;
+  on_duty: { user: { id: number; name: string }; joined_at: string | null; left_at: string | null }[];
+  locations: {
+    location: CountPlace;
+    balances: { item: { id: number; name_en: string; name_am: string; unit: string }; on_hand: string; reserved: string }[];
+    last_locked: { count_id: number; chain_seq: number; payload_hash: string; locked_at: string } | null;
+  }[];
+  open_orders: {
+    order_id: number;
+    order_no: string;
+    table_code: string | null;
+    type: string;
+    sent_at: string | null;
+    owner: { id: number; name: string };
+    lines: { item_id: number; qty: string; status: string }[];
+  }[];
+  counts: {
+    count_id: number;
+    shift_id: number;
+    location_id: number;
+    type: "opening" | "closing";
+    status_at: string;
+    submitted_at: string | null;
+    decided_at: string | null;
+    locked_at: string | null;
+  }[];
+}
