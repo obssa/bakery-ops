@@ -10,11 +10,11 @@ use App\Shared\Models\Station;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Opens the shift a fixture needs when the enforcement rehearsal is on (phase-3 plan section 10.1, step 3.2c).
+ * Opens the shift a fixture needs when a shift rule is on (phase-3 plan section 10.1, step 3.2c; since 3.7e the rules are on by default).
  *
- * With `ledger.require_shift_for_station_locations` off (the default, so every module job) every call is a no-op and the
- * tests behave exactly as they did before Shifts existed. With it on (the enforced-gates job sets
- * LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS=true) a station that tracks shifts gets an open shift row (ShiftInstance's
+ * With both `ledger.require_shift_for_station_locations` and `payments.require_shift_for_cash` off (the rules-off-gates job, the
+ * kill switch) every call is a no-op and the tests behave exactly as they did before Shifts existed. With either on (the default;
+ * the cash rule also needs the till's shift) a station that tracks shifts gets an open shift row (ShiftInstance's
  * factory, `open()`) unless a shift already holds the station, so the Ledger finds the station covered (rule 4b) and stamps
  * the rows with it. Needs the same context as the fixtures: a resolved branch and, for the factory's creator, an actor.
  */

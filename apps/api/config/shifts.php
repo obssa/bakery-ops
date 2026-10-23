@@ -8,10 +8,10 @@
  *
  * open_ad_hoc_on_accept: when true, a baker accepting a production request at a station that has no running shift opens an ad-hoc
  * (call-in) shift through Identity's ShiftAttacher, and the accept row, the batch and its movements carry it (ADR 0013 rule 7).
- * It ships OFF everywhere (here, .env.example, .env.ci and the live host): until step 3.7e gives staff a way to see and close
- * shifts, the live host must not make shifts nobody can close. With it off the attacher attaches the person to a shift that is
- * already running and otherwise answers null, exactly as the Phase 2 NullShiftAttacher did. Step 3.7e switches it on together with
- * `ledger.require_shift_for_station_locations` (docs/runbook/server.md, "Shifts and the call-in").
+ * It ships ON since step 3.7e, when staff got screens to see and close shifts. With it off (the kill switch,
+ * SHIFTS_OPEN_AD_HOC_ON_ACCEPT=false in the server .env and `php artisan config:cache`) the attacher attaches the person to a shift that
+ * is already running and otherwise answers null, exactly as the Phase 2 NullShiftAttacher did.
+ * (docs/runbook/server.md, "Shift rules and the kill switch").
  *
  * handover_note_days: how long a handover note addressed to a named colleague keeps showing on the Start shift panel of the station it was
  * written at (step 3.6); the previous shift's notes show whatever their age.
@@ -24,7 +24,7 @@
  */
 return [
     'start_grace_minutes' => (int) env('SHIFTS_START_GRACE_MINUTES', 60),
-    'open_ad_hoc_on_accept' => (bool) env('SHIFTS_OPEN_AD_HOC_ON_ACCEPT', false),
+    'open_ad_hoc_on_accept' => (bool) env('SHIFTS_OPEN_AD_HOC_ON_ACCEPT', true),
     'handover_note_days' => 7,
     'denominations' => ['200', '100', '50', '10', '5', '1', '0.50', '0.25', '0.10', '0.05'],
 ];

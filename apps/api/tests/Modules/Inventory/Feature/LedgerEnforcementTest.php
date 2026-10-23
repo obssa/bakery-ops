@@ -301,8 +301,8 @@ it('refuses when the shift found closes between the look and the lock', function
         ->and(DB::table('stock_movements')->count())->toBe($before);
 })->group('module:inventory', 'unit');
 
-it('ships the flag off in the config file and has the refusal in both languages', function () {
-    expect(config('ledger.require_shift_for_station_locations'))->toBeFalse()
+it('ships the flag on in the config file (step 3.7e) and has the refusal in both languages', function () {
+    expect(config('ledger.require_shift_for_station_locations'))->toBeTrue()
         ->and(trans('inventory.shift.required', [], 'en'))->not->toBe('inventory.shift.required')
         ->and(trans('inventory.shift.required', [], 'am'))->not->toBe('inventory.shift.required')
         ->and(trans('inventory.shift.required', [], 'am'))->not->toBe(trans('inventory.shift.required', [], 'en'));

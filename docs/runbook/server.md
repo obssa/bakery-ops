@@ -240,35 +240,43 @@ Run the commands from the site folder: `cd ~/bakery-ops.orcamind.dev` and use `/
   `/opt/alt/php83/usr/bin/php -m | grep -E 'openssl|curl|mbstring'`). If either fails the inbox still works; the deliveries show the error.
 - CI never sends anything: its `.env.ci` switches on only the `array` driver, which records what it was asked to send.
 
-## Shift enforcement in the ledger (Phase 3, off)
+## Shift rules and the kill switch (Phase 3, on since step 3.7e)
 
-`LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` (read by `config/ledger.php`) makes the stock ledger refuse a movement at a station
-that tracks shifts when no shift is open there (`409 inventory.shift.required`). It ships `false` in the code, `.env.example` and
-`.env.ci`, and stays unset (so off) on the live host until step 3.7e of Phase 3. Do not set it before then: no screen starts a
-shift yet. Nothing to do now; the switch-on and the kill switch are written in the Phase 3 plan, section 10.1.
+Three rules are on by default in the code (`config/ledger.php`, `config/shifts.php`, `config/payments.php`), in `.env.example` and `.env.ci`. The live
+`.env` sets none of them, so the code defaults apply; each has its own variable, so one rule can be switched off alone.
 
-## Shifts and the call-in (Phase 3, off)
+| Variable (server `.env`) | On (default) | Off (kill switch) |
+|---|---|---|
+| `LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` | The stock ledger refuses a movement that changes on-hand stock at a location of a station that tracks shifts unless a shift is open there (`409 inventory.shift.required`). Locations of no station (the E2E branch's display case, the store) and a count's own correction are exempt. | Stock moves at any station with no shift, as before Phase 3; rows carry the shift only when one runs. |
+| `SHIFTS_OPEN_AD_HOC_ON_ACCEPT` | A baker who accepts a production request at a station with no running shift opens a call-in shift (`origin = call_in`, carried); the accept, the batch and its movements carry it. | Nothing is opened; the accept carries a shift only if one already runs (the baker joins it). |
+| `PAYMENTS_REQUIRE_SHIFT_FOR_CASH` | A cash payment at the till needs the cashier to carry an open shift (`409 payments.shift.required`); the web till's Pay button waits for a running shift. | Cash is taken with or without a shift, as before; the till's cash count still works on whatever payments carry the shift. |
 
-`SHIFTS_OPEN_AD_HOC_ON_ACCEPT` (read by `config/shifts.php`) decides what happens when a baker accepts a production request at a station
-that has no running shift. Off (the default in the code, `.env.example` and `.env.ci`, and unset on the live host): nothing is opened, the
-accept, the batch and its stock movements carry no shift, exactly as before Phase 3; if a shift happens to be running at that station the
-baker is put on it. On: the accept opens an ad-hoc "call-in" shift for the baker (`origin = call_in`, opened carried), and the accept row, the
-batch and its movements carry it. It stays off on the live host until step 3.7e of Phase 3, because until then no screen shows staff a shift or
-closes one, and a shift made by a call-in would stay open for ever. Step 3.7e switches it on together with
-`LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` (above). Nothing to do now. To switch it off again, set `SHIFTS_OPEN_AD_HOC_ON_ACCEPT=false` in
-`~/bakery-ops.orcamind.dev/.env` and run `php artisan config:cache`; a shift already opened stays and is cancelled or closed from the admin screens.
+**Kill switch** (nothing is deployed and no data is lost; shifts already opened stay and are closed or cancelled from the screens). On the server,
+as the account user, in the release's `.env` (`~/bakery-ops.orcamind.dev/.env`; copy it to `.env.bak` first):
+
+```
+cd ~/bakery-ops.orcamind.dev
+cp .env .env.bak
+printf '
+LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS=false
+SHIFTS_OPEN_AD_HOC_ON_ACCEPT=false
+PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false
+' >> .env
+/opt/alt/php83/usr/bin/php artisan config:cache
+```
+
+(or edit the three lines in place if they are already there; the last value wins only when there is one line per variable, so remove duplicates).
+The change takes effect with `config:cache`; verify with `php artisan tinker --execute="var_dump(config('ledger.require_shift_for_station_locations'), config('shifts.open_ad_hoc_on_accept'), config('payments.require_shift_for_cash'));"`
+(three `false`). To switch a rule back on, delete its line (or set `true`) and run `config:cache` again; a deploy runs `optimize` and so keeps whatever the `.env` says.
+
+The web build carries one matching switch, `NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH=true` (set in `deploy.yml` for the static export): the till's Pay button
+blocks when no shift runs. With the cash rule off on the server the button still blocks until the next release is built with it `false`; the API would accept the payment
+anyway, so this is a convenience, not a safety. `CI` proves both sides: every job runs with the rules on, and the `rules-off-gates` job runs the Phase 0-2 gate tests with all three `false`.
 `SHIFTS_START_GRACE_MINUTES` (default 60) is how long before its window starts a scheduled shift may be started.
 
-## Shift rule for cash (Phase 3, off)
-
-`PAYMENTS_REQUIRE_SHIFT_FOR_CASH` (read by `config/payments.php`) makes the till refuse a cash payment (`409 payments.shift.required`) unless
-the cashier carries an open shift: a payment taken after the till's count began would fall outside the declared cash, and one with no shift
-would be in no drawer's total. It ships `false` in the code, `.env.example` and `.env.ci`, and stays unset (so off) on the live host until
-step 3.7e of Phase 3, which switches it on together with `LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` and `SHIFTS_OPEN_AD_HOC_ON_ACCEPT`
-(above): until the till has a screen with a Start button, turning it on would stop the shop taking cash. It has its own variable so either rule
-can be switched off alone. To switch it off again, set `PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false` in `~/bakery-ops.orcamind.dev/.env` and run
-`php artisan config:cache`; nothing is deployed and nothing is lost. The till's cash count itself (opening float, closing declaration, channel
-reconciliation) works with the flag off: it counts whatever payments carry the shift. Nothing to do now.
+**What staff see after the flip.** A station that tracks shifts must have a shift started from the shift bar (Start shift) before orders are taken, stock moves or
+a baker confirms a batch there; the till needs its shift for cash. The demo bakery (branch 2) has no open shifts until someone starts them, or until `bakery:seed-demo`
+is run again (it opens carried shifts at every tracked demo station); that decision is the owner's, not part of the flip.
 
 ## Manual operations
 

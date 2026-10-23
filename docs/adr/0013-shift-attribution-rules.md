@@ -47,7 +47,7 @@ Migrations 3 to 7 of the Phase 3 plan (step 3.2a) make the tables; this ADR is w
    gives staff a way to see and close shifts, a call-in must not create a shift nobody can close. With the flag off the attacher
    attaches the person to the shift that already runs at the station (and puts them on its roster) and otherwise answers null,
    exactly as the Phase 2 `NullShiftAttacher` did. Step 3.7e switches the flag on together with
-   `ledger.require_shift_for_station_locations` (runbook, "Shifts and the call-in").
+   `ledger.require_shift_for_station_locations` (runbook, "Shift rules and the kill switch").
 8. **The date of a shift** is the local start date of its window in the branch's timezone (`Africa/Addis_Ababa`), not the UTC
    date and not the date it ends: a Night 22:00 to 06:00 running at Saturday 00:01 is Friday's. An ad-hoc shift is dated by the
    local date it opened. `App\Modules\Shifts\Support\ShiftWindow` and `LocalClock` are the only code that decides it (plan

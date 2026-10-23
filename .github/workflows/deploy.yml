@@ -71,6 +71,9 @@ jobs:
         working-directory: apps/web
         env:
           NEXT_OUTPUT: export
+          # Step 3.7e: the till's Pay button waits for a running shift, as the API now requires one for cash (PAYMENTS_REQUIRE_SHIFT_FOR_CASH).
+          # A build-time switch, not a secret. If the kill switch is thrown on the server, rebuild with this set to false (runbook).
+          NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH: "true"
         run: |
           corepack enable && corepack prepare pnpm@9.15.9 --activate
           pnpm install --frozen-lockfile

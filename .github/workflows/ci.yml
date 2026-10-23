@@ -205,20 +205,21 @@ jobs:
     # stations' shifts through Shifts (Demo\DemoShifts), so they run here, after every module they write through is green.
     with: { module: shifts, groups: "module:shifts,seeds" }
 
-  # The enforcement rehearsal (phase-3-plan.md 10.1): the Phase 0-2 exit-gate tests again with
-  # ledger.require_shift_for_station_locations ON. Their fixtures open the shifts they write at (Tests\Support\Shifts), so
-  # the same tests pass with the flag off (the module jobs above) and on (here). Dropped in 3.7e, when the default flips.
-  enforced-gates:
+  # The kill switch rehearsal (phase-3-plan.md 10.1): since step 3.7e the three shift rules are ON by default, so every module job and
+  # every e2e job runs with them on. This job runs the Phase 0-2 exit-gate tests with all three OFF, the state the live host is in when
+  # the switch is thrown (the server .env sets the three variables to false and `php artisan config:cache` is run), so the kill switch
+  # is proven to leave a working system. The fixtures open the shifts they write at (Tests\Support\Shifts), which is a no-op when off.
+  rules-off-gates:
     needs: [status, mod-payments, mod-production, mod-notifications]
     if: fromJSON(needs.status.outputs.phase) >= 3
     uses: ./.github/workflows/module-tests.yml
     with:
-      module: enforced-gates
+      module: rules-off-gates
       groups: "gate:p0,gate:p1,gate:p2"
       env: |
-        LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS=true
-        SHIFTS_OPEN_AD_HOC_ON_ACCEPT=true
-        PAYMENTS_REQUIRE_SHIFT_FOR_CASH=true
+        LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS=false
+        SHIFTS_OPEN_AD_HOC_ON_ACCEPT=false
+        PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false
 
   mod-analytics:
     needs: [status, mod-shifts, mod-production, mod-notifications]
@@ -280,7 +281,7 @@ jobs:
           rm -rf out
       - run: pnpm build
         working-directory: apps/web
-        env: { NEXT_PUBLIC_API_URL: http://localhost:8000, NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH: "true" }
+        env: { NEXT_PUBLIC_API_URL: http://localhost:8000, NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH: "true" } # the same build variable as the live release (deploy.yml)
       - uses: actions/upload-artifact@v4
         with:
           name: web-build
@@ -401,7 +402,7 @@ jobs:
       - run: python3 scripts/gate_check.py --mode done --phase 2 --ci
 
   gate-p3:
-    needs: [status, gate-p2, mod-shifts, enforced-gates, e2e-p3]
+    needs: [status, gate-p2, mod-shifts, rules-off-gates, e2e-p3]
     if: fromJSON(needs.status.outputs.phase) >= 3
     runs-on: ubuntu-24.04
     steps:

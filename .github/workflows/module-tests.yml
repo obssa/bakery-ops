@@ -19,7 +19,7 @@ on:
         type: string
         default: ""
       env:
-        description: Extra environment for the Pest steps, one KEY=VALUE per line (the enforced-gates job turns a rollout flag on)
+        description: Extra environment for the Pest steps, one KEY=VALUE per line (the rules-off-gates job turns the three shift rules off)
         required: false
         type: string
         default: ""

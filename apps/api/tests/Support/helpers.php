@@ -161,7 +161,7 @@ if (! function_exists('stockIn')) {
     /**
      * Write one movement of $qty (base units, signed as the reason wants) through the Ledger, the only writer of the
      * stock tables (ADR 0002). Needs an authenticated ActorContext (withActor) like every ledger write. With the shift rule
-     * on (the enforced-gates job) it first opens the shift of the location's station, so a fixture's stock does not need to
+     * on (the flags are on by default) it first opens the shift of the location's station, so a fixture's stock does not need to
      * know about shifts; with the rule off nothing is added (Tests\Support\Shifts).
      */
     function stockIn(Item|int $item, Location|int $location, string $qty, MovementReason $reason = MovementReason::PurchaseIn): Movement

@@ -16,7 +16,7 @@ pest()->group('module:shifts', 'feature');
 /*
  * The call-in (ADR 0013 rule 7; phase-3 plan section 6 item 2): a baker accepting a request at a station with no running shift
  * opens an ad-hoc one through ShiftsAttacher, and the accept row, the batch and its movements carry it. It is behind the flag
- * shifts.open_ad_hoc_on_accept (SHIFTS_OPEN_AD_HOC_ON_ACCEPT, false everywhere until step 3.7e gives staff a way to see and close
+ * shifts.open_ad_hoc_on_accept (SHIFTS_OPEN_AD_HOC_ON_ACCEPT, true by default since step 3.7e, which gave staff a way to see and close
  * shifts): with the flag off the attacher behaves like NullShiftAttacher unless a shift is already running.
  */
 
@@ -80,8 +80,8 @@ it('opens nothing when the flag is off, and the accept, the batch and its moveme
         ->and(($this->movementShifts)())->toBe([null]);
 });
 
-it('ships with the flag off', function () {
-    expect(config('shifts.open_ad_hoc_on_accept'))->toBeFalse()
+it('ships with the flag on (step 3.7e)', function () {
+    expect(config('shifts.open_ad_hoc_on_accept'))->toBeTrue()
         ->and(config('shifts.start_grace_minutes'))->toBe(60);
 });
 
