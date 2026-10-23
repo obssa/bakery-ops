@@ -14,6 +14,7 @@ const SECTIONS = [
   { href: "/admin/orders", key: "orders" },
   { href: "/admin/inventory", key: "inventory" },
   { href: "/admin/planner", key: "planner" },
+  { href: "/admin/shifts", key: "shifts" },
 ] as const;
 
 export function AdminFrame({ children }: { children: ReactNode }) {

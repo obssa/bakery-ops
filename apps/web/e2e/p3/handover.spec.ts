@@ -10,7 +10,7 @@ import { currentShift, ensureOpenShift, settleStation } from "../support/shifts"
 // variance is explained, handed in and approved side by side, the adjustment lands in the ledger, the count locks and shows its hash,
 // and the next shift's opening count is prefilled with the locked values and shows the handover panel.
 //
-// Test 2 (the till's cash declaration) is step 3.7d's and joins this file then.
+// Test 2 (the till's cash declaration) is step 3.7d's: it stays a fixme below, with its marker, until that step builds the screens.
 //
 // Built through the admin API in the isolated "E2E Test Branch", so it carries @live. The kitchen station already carries a shift that
 // other fixtures opened, so the flow settles it first and opens a carried shift again at the end, as every other fixture expects.
@@ -135,11 +135,11 @@ test.describe("p3 handover", () => {
       await openAs(boss, admin, "en/admin/shifts/");
       const queue = boss.getByRole("region", { name: "Counts waiting for a decision" });
       await expect(queue).toBeVisible({ timeout: 30_000 });
-      const entry = queue.getByRole("listitem").filter({ hasText: `Count #${countId}` });
+      const entry = queue.getByRole("listitem").filter({ hasText: new RegExp(`Count #${countId}(?!\\d)`) });
       await expect(entry).toContainText(ingredient.name_en, { timeout: 30_000 });
-      await entry.getByRole("link", { name: `Review count #${countId}` }).click();
+      await entry.getByRole("link", { name: `Review count #${countId}`, exact: true }).click();
 
-      await expect(boss.getByRole("heading", { name: `Count #${countId}`, level: 1 })).toBeVisible({ timeout: 30_000 });
+      await expect(boss.getByRole("heading", { name: `Count #${countId}`, level: 1, exact: true })).toBeVisible({ timeout: 30_000 });
       const side = boss.getByRole("row").filter({ hasText: ingredient.name_en });
       await expect(side).toContainText(shown(expected));
       await expect(side).toContainText(shown(counted));
@@ -166,7 +166,7 @@ test.describe("p3 handover", () => {
 
       // --- the next shift: its opening count is prefilled with the locked values, and the handover panel carries the note ------------
       expect(await currentShift(admin, station)).toBeNull();
-      await chef.reload();
+      await chef.goto("en/kds/kitchen/");
       await expect(bar).toContainText("No shift is running", { timeout: 30_000 });
       await bar.getByRole("button", { name: "Start shift", exact: true }).click();
       await expect(bar).toContainText("Opening count in progress", { timeout: 15_000 });
@@ -199,5 +199,11 @@ test.describe("p3 handover", () => {
     expect(carried).toBeTruthy();
     expect(scaled(carried!.counted_qty!)).toBe(scaled(countedFigure));
     await ensureOpenShift(admin, station);
+  });
+
+  // TODO(p3): step 3.7d replaces this placeholder with the second flow of p3-handover (plan section 7): the till's cash declaration by
+  // denomination with a variance and the channel reconciliation, built through the admin API in the E2E Test Branch, so it carries @live.
+  test.fixme("the till's cash declaration by denomination with a variance and the channel reconciliation @live (built in step 3.7d)", async () => {
+    // step 3.7d
   });
 });

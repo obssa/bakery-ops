@@ -13,6 +13,8 @@ import { can, useSession } from "@/lib/session";
 import { useShiftNotice } from "@/lib/station";
 import { Alert, Badge, Button, Field, Modal, Select } from "../ui";
 import { focusRing } from "../styles";
+import { HandoverPanel } from "./HandoverPanel";
+import { NoteForm } from "./Notes";
 import type { ShiftStation } from "./useShiftStation";
 
 // The shift bar (step 3.7a, phase-3 plan section 6 item 7): the strip at the top of every station screen (kitchen and bar displays,
@@ -38,6 +40,7 @@ type ActionName = "start" | "start_carried" | "join" | "leave" | "close" | "canc
 
 export function ShiftBar({ model }: { model: ShiftStation }) {
   const t = useTranslations("shifts");
+  const tc = useTranslations("counts");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
   const me = useSession((s) => s.me);
@@ -47,6 +50,8 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   const [busy, setBusy] = useState<ActionName | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [showHandover, setShowHandover] = useState(false);
+  const [noting, setNoting] = useState(false);
 
   // one key per logical action, reused by a retry of the same request and dropped when it succeeded (ADR 0003)
   const keys = useRef<Map<string, string>>(new Map());
@@ -216,6 +221,16 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
                   {t("close")}
                 </Button>
               ) : null}
+              {actions.mode === "idle" || actions.mode === "opening" ? (
+                <Button type="button" variant="secondary" aria-expanded={showHandover} onClick={() => setShowHandover((open) => !open)}>
+                  {showHandover ? tc("handover_hide") : tc("handover_show")}
+                </Button>
+              ) : null}
+              {shift && actions.mode !== "idle" && powers.canCount ? (
+                <Button type="button" variant="secondary" onClick={() => setNoting(true)}>
+                  {tc("note_open")}
+                </Button>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -232,6 +247,27 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
         <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
           {t("stale")}
         </p>
+      ) : null}
+
+      {showHandover && (actions.mode === "idle" || actions.mode === "opening") ? <HandoverPanel stationId={station.station_id} /> : null}
+
+      {noting && shift ? (
+        <Modal label={tc("note_title")} onClose={() => setNoting(false)}>
+          <h2 className="text-lg font-semibold text-neutral-900">{tc("note_title")}</h2>
+          <NoteForm
+            shiftId={shift.id}
+            roster={shift.roster}
+            onSaved={() => {
+              setNoting(false);
+              feed?.refresh();
+            }}
+          />
+          <div className="flex justify-end">
+            <Button type="button" variant="secondary" onClick={() => setNoting(false)}>
+              {tc("cancel")}
+            </Button>
+          </div>
+        </Modal>
       ) : null}
 
       {confirmClose ? (

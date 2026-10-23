@@ -31,11 +31,36 @@ interface CountView {
  * left to the caller, because a fixture that cannot open its shift must not carry on.
  */
 export async function finishOpeningCounts(admin: Api, shiftId: number): Promise<void> {
+  await finishDrafts(admin, shiftId);
+}
+
+/**
+ * Confirms and submits every draft count of the shift, "as it stands". Two things a half-finished earlier run leaves behind are put
+ * right and the submit tried again: a draft made before some item was stocked (422 shifts.count.incomplete names the items with stock
+ * that are not on it: they are added at the ledger figure) and a line a screen edited and left unexplained (422
+ * shifts.count.reason_required or note_required: it goes back to the ledger figure, so nothing needs explaining).
+ */
+async function finishDrafts(admin: Api, shiftId: number): Promise<void> {
   const counts = (await admin.get<{ data: CountView[] }>(`/shifts/${shiftId}/counts`)).data;
   for (const count of counts) {
     if (count.status !== "draft") continue;
     await admin.put(`/stock-counts/${count.id}/lines`, { confirm_all: true });
-    await admin.post(`/stock-counts/${count.id}/submit`);
+    for (let attempt = 0; ; attempt++) {
+      const result = await admin.tryPost(`/stock-counts/${count.id}/submit`);
+      if (result.ok) break;
+      const ids = (result.failure.body as { item_ids?: number[] } | null)?.item_ids ?? [];
+      const key = result.failure.key;
+      if (attempt >= 2 || ids.length === 0) throw result.failure;
+      if (key === "shifts.count.incomplete") {
+        await admin.put(`/stock-counts/${count.id}/lines`, { lines: ids.map((item_id) => ({ item_id, confirm: true })), confirm_all: true });
+      } else if (key === "shifts.count.reason_required" || key === "shifts.count.note_required") {
+        const draft = await admin.get<{ lines: { item: { id: number }; expected_qty: string }[] }>(`/stock-counts/${count.id}`);
+        const back = draft.lines.filter((line) => ids.includes(line.item.id)).map((line) => ({ item_id: line.item.id, counted_qty: line.expected_qty, confirm: true }));
+        await admin.put(`/stock-counts/${count.id}/lines`, { lines: back });
+      } else {
+        throw result.failure;
+      }
+    }
   }
 }
 
@@ -89,12 +114,7 @@ export async function currentShift(admin: Api, station: StationRef): Promise<Run
  * reason (the stock moved since) cannot be finished this way and fails the caller, as in finishOpeningCounts.
  */
 export async function finishClosingCounts(admin: Api, shiftId: number): Promise<void> {
-  const counts = (await admin.get<{ data: CountView[] }>(`/shifts/${shiftId}/counts`)).data;
-  for (const count of counts) {
-    if (count.status !== "draft") continue;
-    await admin.put(`/stock-counts/${count.id}/lines`, { confirm_all: true });
-    await admin.post(`/stock-counts/${count.id}/submit`);
-  }
+  await finishDrafts(admin, shiftId);
 }
 
 /**
@@ -103,6 +123,7 @@ export async function finishClosingCounts(admin: Api, shiftId: number): Promise<
  * already carry the shifts the other fixtures opened) and ensureOpenShift again at the end.
  */
 export async function settleStation(admin: Api, station: StationRef): Promise<void> {
+  await resolvePendingCounts(admin, station);
   const shift = await currentShift(admin, station);
   if (!shift) return;
   if (shift.status === "opening") {
@@ -111,4 +132,17 @@ export async function settleStation(admin: Api, station: StationRef): Promise<vo
   }
   if (shift.status === "open") await admin.post(`/shifts/${shift.id}/close`, {});
   await finishClosingCounts(admin, shift.id);
+}
+
+/**
+ * Approves what an earlier run left waiting at the station (the approval queue, oldest first; a count that waits for a co-signature is
+ * co-signed first): one count waiting at a place blocks the next count there (409 shifts.count.blocked_by_pending). The admin never
+ * counted these, so the two-person rules hold.
+ */
+export async function resolvePendingCounts(admin: Api, station: StationRef): Promise<void> {
+  const queue = (await admin.get<{ data: { id: number; status: string }[] }>("/stock-counts", { station_id: station.id })).data;
+  for (const row of queue) {
+    if (row.status === "awaiting_cosign") await admin.post(`/stock-counts/${row.id}/cosign`, {});
+    await admin.post(`/stock-counts/${row.id}/approve`, {});
+  }
 }

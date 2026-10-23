@@ -13,6 +13,7 @@ import {
   stageOf,
   varianceOf,
 } from "../../src/lib/counts";
+import { QUEUE_POLL, queueSpec } from "../../src/lib/live/counts";
 
 // Step 3.7b, the parts of the count screen and the approval screens that are plain logic (no browser, no API): the variance of a
 // line, which lines are touched, which need a reason or a note, what the review summary says before the count is submitted, which
@@ -173,5 +174,12 @@ test.describe("p3 count screen: logic", () => {
     expect(shortHash(hash)).toBe(`${hash.slice(0, 8)}…${hash.slice(-8)}`);
     expect(shortHash("abc")).toBe("abc");
     expect(shortHash(null)).toBe("");
+  });
+
+  test("the approval queue feed replaces its state with each answer and is polled like the shift feed", () => {
+    expect(QUEUE_POLL).toEqual({ intervalMs: 5000, hiddenMs: 30_000, maxBackoffMs: 30_000 });
+    const page = { data: [], counts: { awaiting_cosign: 1, pending_approval: 2 }, server_time: "2026-10-23T08:00:00Z" };
+    expect(queueSpec.merge(queueSpec.initial, page)).toEqual({ rows: [], totals: { awaiting_cosign: 1, pending_approval: 2 }, serverTime: "2026-10-23T08:00:00Z" });
+    expect(queueSpec.cursorOf(page)).toBeNull();
   });
 });

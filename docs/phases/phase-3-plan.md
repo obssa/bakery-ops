@@ -1230,6 +1230,58 @@ live ledger in a state where a shift can be opened only through the API.
      counted in base units, the touched/untouched mark, "nothing changed", the reason picker, the note, add an item, the review
      summary before confirming), the admin approval queue and side-by-side approval, the chain hash shown on a locked count, and
      `p3-handover` (first test) green.
+     - **As built (step 3.7b, `phase-3/web-counts`).** Web plus one small API fix (Orders and Inventory stay `stable`).
+       **Count screen** `/shifts/count?shift=<id>` (`components/shifts/CountScreen.tsx`, `CountPanel`, `CountLines`, `ReviewDialog`, `ChainCard`;
+       pure rules in `lib/counts.ts`, tested without a browser in `e2e/p3/handover-count-logic.spec.ts`): one component for opening and closing. It polls
+       the shift and its counts every 6 s, shows the counts of the phase the shift is in (`phaseOf`), one place at a time (a button per place with
+       its stage), and sets `X-Station-Id` to the shift's station. A draft count is a table: item, expected (live ledger), carried (opening only),
+       counted (a field saved when left: `counted_qty` with `confirm`), difference (counted minus expected, string arithmetic), reason and note (shown
+       only for a touched line that differs; the note placeholder says whether the reason requires it), and the touched mark ("Counted" / "Not
+       counted" with an "As expected" button). "Nothing changed" is `confirm_all`. "Add an item" lists active, stockable items not on the count
+       (`GET /items`). "Review and submit" opens a dialog with the totals, each differing line with its reason, and what blocks the submit (untouched
+       lines, differences with no reason, reasons that need a note); Submit stays disabled until none remain. After the submit the panel says what
+       happens next: waiting for co-signature, "Waiting for a manager to approve", or "Approved and locked" with the chain card (link, full
+       fingerprint, previous fingerprint). A rejected count's recount (`seq + 1`) opens with a banner naming who sent it back and their note. An unlocked
+       count's revision says it was reopened. A drawer count (`cash` set) shows "the cash count comes in the next update" and no lines: the declaration
+       is 3.7d's. Handover notes sit below (list, and a form with an optional addressee from the roster).
+       **Handover panel** (`HandoverPanel.tsx`, `GET /stations/{station}/handover`, refreshed every 15 s): the previous shift, its notes and notes to me,
+       one row per place (a `provisional` closing reads "Waiting for approval", a locked one shows its link and short fingerprint, the drawer its float),
+       and the number of unresolved counts. It is a "Show handover" disclosure in the shift bar's no-shift and opening states and the first panel of an
+       opening count. The bar also gains "Add a note" (a dialog over `POST /shifts/{id}/notes`; the `client_uuid` is the Idempotency-Key).
+       **Approval screens.** The queue (`ApprovalQueue.tsx`, feed `lib/live/counts.ts` over `GET /stock-counts`, ETag, 5 s / 30 s) is mounted at
+       `/admin/shifts` (a new "Shifts" tab and overview card; 3.7c builds the rest of `/admin/shifts` around it). Each row: count number, status, station,
+       place, shift date, who handed in, the differing lines, and "Review". The side-by-side page `/admin/shifts/review?count=<id>` shows expected,
+       counted, difference, moved since, reason and note per line (differing lines first), the chain card of a locked count, and the actions the person may
+       try (`approvalActions`: approve and reject by `shifts.approve` and never for the counter; co-sign by `shifts.cosign` or an overseer at a station that
+       asks for one; unlock by `shifts.unlock`): Approve and Co-sign with an optional note, Send back (a required note and the lines to look at again,
+       default the differing ones), Unlock (a required reason). The API still decides and answers in both languages.
+       **p3-handover test 1** is real (`e2e/p3/handover.spec.ts`, `@live`): the chef closes the kitchen shift from the bar and counts; one ingredient is 500 g
+       short; the review refuses until a reason is chosen; a note is written and the count handed in. The admin finds it in the queue, sees the line
+       side by side, approves; the page shows the locked count's fingerprint; the API shows one `count_adjustment` equal to the variance on that line and
+       `chain/verify` ok with the head equal to the count's hash. The chef starts the next shift: the handover panel shows the note and the fingerprint, the
+       opening line carries the locked figure, "Nothing changed", submit, the shift is open. Test 2 stays a `test.fixme` with its TODO(p3) marker for 3.7d.
+       The support helpers got sturdier (`finishDrafts`: a draft made before an item was stocked gets that item added, a line left unexplained goes back to
+       the ledger figure; `resolvePendingCounts` approves what an earlier run left waiting; `settleStation` calls it first), because one count waiting at a
+       place blocks the next count there and a failed live run would otherwise poison the E2E branch.
+       **The ETag fix (the gap 3.7a left open).** `Stock::fingerprint()` used the highest movement id, so a transaction that took a lower id but committed
+       after a higher one was served left the tag unchanged. It now adds `settling`: while the newest movement is younger than the overlap window
+       (`bakery.live.overlap_seconds`, 5 s) it is the current second, so the tag moves on every poll of the window; after it the tag is stable again and
+       different from every tag the window handed out, so a pad that looked inside the window looks once more. Feeds that read it: the menu, the stock strip,
+       the display case, the stock views, and now the approval queue and the count read (their `moved_since` reads the ledger; both used only the id).
+       Checked and left alone: the tickets and orders-list feeds (`OverlapCursor::fingerprint` already counts the rows after the cursor), the notes feed
+       (same), and the queue's own part (count, `max(updated_at)`, `sum(version)` change when a row arrives whatever its id). The `current` shift tag gains the
+       handover-note count and the shift's count rows (total, `sum(version)`, newest id): a note changes `notes_count` without moving the shift's version,
+       and a recount after a rejection changes `counts` the same way. Tests: `MenuReadsContractTest`, `MenuEndpointTest`, `CountQueueTest`,
+       `ShiftReadEndpointsTest`.
+       **Decisions the plan left open.** (1) The queue lives at `/admin/shifts` and the detail at `/admin/shifts/review?count=<id>` (a static export reads
+       the id on the client). (2) The count screen needs only `shifts.view`; the buttons that write appear for everyone and the API answers 403 for those
+       without `shifts.count`. (3) A count is saved line by line as it is edited, not on a "Save" button: the draft is the server's. (4) "Add an item" lists
+       any active, non-made-to-order item (the API refuses the rest). (5) Unlock stays on the review page; the revision is counted on the count screen.
+       **For 3.7c to 3.7e.** 3.7c mounts its sections around `ApprovalQueue` on `/admin/shifts` (the page is a server component with a `PageHeader` and the queue)
+       and can link `/admin/shifts/review?count=<id>` from the locked history. 3.7d fills the drawer case in `CountPanel` (the `drawer` branch) and the
+       cash block in `ApprovalReview`; both show "the cash count comes in the next update" until then. Quantities are base units as the API sends them
+       (the kitchen's ingredients count in `g`). `ensureOpenShift` still opens carried shifts; with a drawer, 3.7e must declare it.
+       CI evidence: see the PR.
    - **3.7c `phase-3/web-admin-shifts`**: `/admin/shifts` (templates, roster calendar with schedule and "Start now" for an admin,
      running shifts, approvals, locked history with the hash and a "Verify" button, notes, replay at a point in time, variance
      reasons), the setup check (stock places with no station, stations without templates), and `p3-opening-prefill` green.

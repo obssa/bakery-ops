@@ -1,7 +1,15 @@
 "use client";
 
 import { focusRing } from "./styles";
-import { useEffect, useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import {
+  useEffect,
+  useId,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 
 // The few building blocks every Phase 0 screen uses. Tablet-first (workflows-and-screens.md): every control is at
 // least 48 px tall, focus is always visible, text stays legible at arm's length. Plain and quiet on purpose.
@@ -65,6 +73,10 @@ export function Field({ label, hint, error, optionalLabel, children }: FieldProp
 
 export function TextInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`${control} ${className}`} {...props} />;
+}
+
+export function Textarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea className={`${control} min-h-24 py-2 ${className}`} {...props} />;
 }
 
 export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {

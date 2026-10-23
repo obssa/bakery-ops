@@ -13,6 +13,7 @@ const CARDS = [
   { href: "/admin/orders", title: "orders", body: "orders_desc" },
   { href: "/admin/inventory", title: "inventory", body: "inventory_desc" },
   { href: "/admin/planner", title: "planner", body: "planner_desc" },
+  { href: "/admin/shifts", title: "shifts", body: "shifts_desc" },
 ] as const;
 
 export default async function AdminHome(props: LocaleProps) {
