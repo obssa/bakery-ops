@@ -482,9 +482,9 @@ every action on it is `422 shifts.station.not_tracked`.
 | `GET /locations/{location}/chain/verify` | `shifts.replay` | read | | `200 {ok, checked, head_hash, failures: [{chain_seq, count_id, kind}]}`, `kind` in `gap`, `previous_mismatch`, `hash_mismatch`, `payload_mismatch` | `403`, `404` |
 | **Handover and replay (3.6)** | | | | | |
 | `GET /shifts/{shift}/notes` | `shifts.view` at the station | read | `?after_id=` | `200 {data: [Note], last_id}` oldest first | `404` |
-| `POST /shifts/{shift}/notes` | `shifts.count` at the station | key + `client_uuid` | `{client_uuid, body, to_user_id?}` | `201` Note; a used `client_uuid` answers `200` | `422 validation.failed`, `409 shifts.shift.not_running` (a locked or cancelled shift takes no notes) |
-| `GET /stations/{station}/handover` | `shifts.view` at the station | read | | `200 {previous: ShiftSummary or null, notes: [Note] (the previous shift's, and any addressed to the caller), previous_closing: [{location, count_id, chain_seq, payload_hash, locked_at, provisional: bool}], pending_counts: [CountSummary]}`: the "Start shift" screen's first panel | `403`, `422 shifts.station.not_tracked` |
-| `GET /replay` | `shifts.replay` | read | `?station_id=` (required), `?at=` (required, ISO-8601 with an offset or `Z`; a bare time is the branch's local time), `?nonzero=0` (default only non-zero balances) | `200 {at, station, shift: ShiftSummary or null, on_duty: [{user, joined_at, left_at}], locations: [{location, balances: [{item, on_hand, reserved}], last_locked: {count_id, chain_seq, payload_hash, locked_at} or null}], open_orders: [{order_id, order_no, table_code, type, sent_at, owner, lines: [{item_id, qty, status}]}], counts: [{count_id, type, status_at, submitted_at, decided_at, locked_at}]}` | `422 shifts.replay.future`, `422 validation.failed`, `403` |
+| `POST /shifts/{shift}/notes` | `shifts.count` at the station | key + `client_uuid` | `{client_uuid, body, to_user_id?}` | `201` Note; a used `client_uuid` answers `200` | `422 validation.failed`, `409 shifts.shift.not_running` (a scheduled, locked or cancelled shift takes no notes; as built in 3.6 one waiting for approval still does) |
+| `GET /stations/{station}/handover` | `shifts.view` at the station | read | | `200 {previous: ShiftSummary or null, notes: [Note] (the previous shift's, and any addressed to the caller), previous_closing: [{location, count_id, chain_seq, payload_hash, locked_at, provisional: bool, float_left_total}], pending_counts: [CountSummary]}`: the "Start shift" screen's first panel (as built in 3.6: `float_left_total` is the money the drawer keeps for the next shift, null on every other place; a provisional row has no hash) | `403`, `422 shifts.station.not_tracked` |
+| `GET /replay` | `shifts.replay` | read | `?station_id=` (required), `?at=` (required, ISO-8601 with an offset or `Z`; a bare time is the branch's local time), `?nonzero=0` (default only non-zero balances) | `200 {at, station, shift: ShiftSummary or null, on_duty: [{user, joined_at, left_at}], locations: [{location, balances: [{item, on_hand, reserved}], last_locked: {count_id, chain_seq, payload_hash, locked_at} or null}], open_orders: [{order_id, order_no, table_code, type, sent_at, owner, lines: [{item_id, qty, status}]}], counts: [{count_id, shift_id, location_id, type, status_at, submitted_at, decided_at, locked_at}]}` (as built in 3.6: no cash block, a timestamp after `at` is null, `on_duty[].left_at` is always null) | `422 shifts.replay.future`, `422 validation.failed`, `403` |
 
 Resources.
 
@@ -1130,6 +1130,48 @@ live ledger in a state where a shift can be opened only through the API.
    migration 14; notes and handover endpoints; `Contracts\Replay::at(station, time)`; `GET /replay`; `ReplayPropertyTest`;
    then `gate_check --mode module --module shifts` and `phase_status.py module-stable shifts`. Playwright projects stay
    placeholders. `shifts.handover: done`.
+
+   - **As built (step 3.6, `phase-3/handover`).** Migration 14 is `2026_10_26_100200_create_handover_notes_table`; `HandoverNote` is append-only by
+     trigger (`handover_notes_forbid_update_delete_update` / `_delete` on MariaDB, `forbid_update_delete()` on PostgreSQL), has no factory (the tests
+     write through the API or raw rows) and is on the `SoftDeletesTest` list. `check_invariants.py` and `AppendOnlyTest` know the table; ERD and OpenAPI
+     are re-exported. Where the build settled what the plan left open:
+     - **Notes.** `WriteHandoverNote` (`handover_note.create`, one AuditedAction under the shift row's lock): `shifts.count` at the station, `client_uuid`
+       and `body` (1 to 1000 characters, trimmed) required. A used `client_uuid` answers `200` with the note already written, even when the body
+       differs, and writes nothing (no audit row). The shift takes notes while it is `opening`, `open`, `counting` or `pending_approval` (the outgoing
+       baker may write after handing the closing in); `scheduled`, `locked` and `cancelled` are `409 shifts.shift.not_running` naming the status.
+       `to_user_id` must be an active person of the branch who holds `shifts.view` at the station, else `422 validation.failed` on `to_user_id`.
+       `from` is the person acting (short-code actor, else the account); `created_by_user_id` is always the account. `GET /shifts/{shift}/notes` is
+       a polled feed through `OverlapCursor` (ETag, 304, `last_id` held back by the overlap window, `?after_id=`), `shifts.view` at the station.
+       `notes_count` in the full Shift resource is a grouped count.
+     - **Handover panel.** `Handover\HandoverPanel`. `previous` is the newest shift of the station in `pending_approval` or `locked` (by `started_at`,
+       then id); the shift that runs now is never it. `notes` are the previous shift's (any age) plus the ones addressed to the caller that were written
+       on a shift of this station within `config('shifts.handover_note_days')` (7) days, oldest first, at most 200; there is no read receipt. One
+       `previous_closing` row per stock place and for the drawer: an unresolved closing is the row and is `provisional` (no hash, no `locked_at`),
+       otherwise `Locks::previousClosing`. `float_left_total` is `CashDeclarations::carriedFloat` for a locked drawer closing and the declared figure
+       for a provisional one (a decision: the screen can show what is proposed, flagged). `pending_counts` are the unresolved counts of those places.
+       A drawer-only station (the till) works with no stock place. Not conditional (not polled).
+     - **Replay.** `Contracts\Replay::at(station, time, nonzero)` returns a readonly `ReplayState` (`ReplayDuty`, `ReplayPlace`, `ReplayLink`,
+       `ReplayCount`); `Handover\ReplayPresenter` makes the JSON. It depends on contracts only (`Stock`, `Orders`, `Locations`), so it closes no cycle.
+       The shift that held the station is the one with `started_at <= t` and no end by `t`, the end being `submitted_at`, else `cancelled_at`, else
+       `locked_at` (the station is free once the closing counts are handed in): that is a summary of the row **as it is now**; shifts keep no status
+       history, so a shift sent back to counting and later is read as held for the whole time. A roster row keeps one `joined_at`, so someone who left
+       and came back shows from the first join; `on_duty` therefore holds only people not gone by `t` and `left_at` is always null. Balances are
+       `Stock::locationAt` (non-zero only unless `nonzero=0`); the cash drawer is not a place and **the replay carries no cash** (cash is not in the
+       ledger; a shift's money is `Totals::cash` through the summary and cash endpoints), but a drawer count is in `counts`. `counts` are the counts
+       of the shift that held the station, of the shift before it, and any not yet locked, started by `t`, each with `status_at` worked out from its
+       timestamps (locked, else the decision, else submitted as `awaiting_cosign` at a station that requires an overseer and has no co-signature yet
+       or `pending_approval`, else `draft`); a rejected count of an older shift is left out. `at` accepts `Z`, an offset, or a bare time read as
+       the branch's local time; a moment after now is `422 shifts.replay.future`; an unknown or foreign `station_id` is `422 validation.failed`.
+       The replay is not limited to stations that track shifts (the store replays with `shift: null`).
+     - **Tests.** `ReplayPropertyTest` runs random histories only: the `Phase3Seeder` it also names does not exist yet (the seeds step adds the
+       seeded-history half), and it is tagged `property`, `module:shifts` like `CountsPropertyTest`, not `gate:p3` (the gate re-tags come with the
+       gate steps). The oracles are written in the test from `stock_movements`, `order_events`, `shift_roster` and the count timestamps.
+       `HandoverNotesTest`, `HandoverPanelTest`, `ReplayEndpointTest` are the feature files with 403 per role; `HandoverNotesSchemaTest`,
+       `HandoverLangTest` the schema and the message key. Matrix and write registries list the four routes.
+     - **For the web steps (3.7).** Notes: `POST /shifts/{id}/notes {client_uuid, body, to_user_id?}`, poll `GET .../notes?after_id=<last_id>` and
+       merge by id. The waiter has no `shifts.view`, so no handover panel and no notes for the pad. The panel's `previous_closing[].location.type ==
+       'cash_drawer'` row carries `float_left_total`; show `provisional` rows as "waiting for approval". The first opening count of a drawer is a
+       chain link too, so a till's chain has one link per count (closing `chain_seq` 2 after one opening). Replay is admin and manager only.
 7. **3.7 web** (STATUS `web`; Playwright `p3-handover`, `p3-opening-prefill`), five PRs. Each flow is committed red first with its
    fixture helpers (`e2e/support/shifts.ts`), then the screens; the placeholders and their TODO markers go as their flow lands.
    Strings are added to `messages/en.json` and `messages/am.json` together (the `i18n-check` key sets must match); money and

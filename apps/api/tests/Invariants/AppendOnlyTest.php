@@ -6,6 +6,7 @@ use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Models\Location;
 use App\Shared\Models\Branch;
+use App\Shared\Models\Station;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -77,7 +78,7 @@ function seedAppendOnlyRow(string $table): int
             $branch = Branch::factory()->create();
             $user = User::factory()->create(['branch_id' => $branch->id]);
             $shiftId = DB::table('shift_instances')->insertGetId([
-                'branch_id' => $branch->id, 'client_uuid' => (string) Str::uuid(), 'station_id' => App\Shared\Models\Station::factory()->create(['branch_id' => $branch->id])->id,
+                'branch_id' => $branch->id, 'client_uuid' => (string) Str::uuid(), 'station_id' => Station::factory()->create(['branch_id' => $branch->id])->id,
                 'slot_key' => 0, 'sequence' => 1, 'date' => '2026-11-02', 'origin' => 'started', 'status' => 'scheduled', 'created_by_user_id' => $user->id,
                 'version' => 1, 'created_at' => now(), 'updated_at' => now(),
             ]);
