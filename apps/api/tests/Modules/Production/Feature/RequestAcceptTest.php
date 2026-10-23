@@ -30,8 +30,9 @@ beforeEach(function () {
 });
 
 it('moves a requested request to accepted for the baker, audited, with the shift answer in the audit context', function () {
-    config(['shifts.open_ad_hoc_on_accept' => false]); // on by default since step 3.7e (CallInTest): with it off the attacher answers no shift
     $request = $this->f->request();
+    // the floor opens the cake room's shift when a rule is on (the default since step 3.7e), and the baker joins it; with the rules off there is none
+    $running = DB::table('shift_instances')->where('station_id', $request->station_id)->whereNotNull('open_key')->value('id');
 
     $response = ($this->accept)($request)->assertOk();
 
@@ -44,7 +45,7 @@ it('moves a requested request to accepted for the baker, audited, with the shift
         ->and($row->accepted_at)->not->toBeNull();
     $audit = ($this->audits)($request)->sole();
     expect($audit->actor_id)->toBe($this->f->baker->id)
-        ->and($audit->context)->toBe(['shift_instance_id' => null])
+        ->and($audit->context)->toBe(['shift_instance_id' => $running === null ? null : (int) $running])
         ->and($audit->before['status'])->toBe('requested')
         ->and($audit->after['status'])->toBe('accepted');
 });
