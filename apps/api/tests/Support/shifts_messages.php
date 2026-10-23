@@ -24,6 +24,14 @@ if (! function_exists('countsMessageKeys')) {
     }
 }
 
+if (! function_exists('handoverMessageKeys')) {
+    /** @return list<string> the keys step 3.6 adds to lang/{en,am}/shifts.php (the replay) */
+    function handoverMessageKeys(): array
+    {
+        return ['shifts.replay.future'];
+    }
+}
+
 if (! function_exists('cashMessageKeys')) {
     /** @return list<string> the keys step 3.5 adds to lang/{en,am}/shifts.php (the cash declaration) */
     function cashMessageKeys(): array

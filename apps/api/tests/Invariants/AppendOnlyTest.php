@@ -73,6 +73,20 @@ function seedAppendOnlyRow(string $table): int
                 'unit_cost_in' => '5.0000', 'cost_after' => '5.0000', 'user_id' => $user->id, 'acting_user_id' => null, 'created_at' => now(),
             ]);
         })(),
+        'handover_notes' => (function (): int {
+            $branch = Branch::factory()->create();
+            $user = User::factory()->create(['branch_id' => $branch->id]);
+            $shiftId = DB::table('shift_instances')->insertGetId([
+                'branch_id' => $branch->id, 'client_uuid' => (string) Str::uuid(), 'station_id' => App\Shared\Models\Station::factory()->create(['branch_id' => $branch->id])->id,
+                'slot_key' => 0, 'sequence' => 1, 'date' => '2026-11-02', 'origin' => 'started', 'status' => 'scheduled', 'created_by_user_id' => $user->id,
+                'version' => 1, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+
+            return DB::table('handover_notes')->insertGetId([
+                'branch_id' => $branch->id, 'client_uuid' => (string) Str::uuid(), 'shift_instance_id' => $shiftId, 'from_user_id' => $user->id,
+                'body' => 'Probe', 'created_by_user_id' => $user->id, 'created_at' => now(),
+            ]);
+        })(),
         default => throw new LogicException("seedAppendOnlyRow(): add a seed row for append-only table {$table}"),
     };
 }
@@ -84,6 +98,7 @@ function appendOnlyTamper(string $table): array
         'stock_movements' => ['qty' => '2.0000'],
         'order_events' => ['event' => 'order.voided'],
         'item_cost_history' => ['cost_after' => '9.0000'],
+        'handover_notes' => ['body' => 'tampered'],
         default => ['action' => 'tampered'],
     };
 }

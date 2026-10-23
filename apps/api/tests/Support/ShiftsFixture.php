@@ -226,6 +226,50 @@ final class ShiftsFixture
         return $this->test->withHeaders($headers)->getJson('/api/v1/stock-counts'.($query === [] ? '' : '?'.http_build_query($query)));
     }
 
+    /**
+     * POST /shifts/{shift}/notes as $as: a handover note, under a fresh client_uuid unless the body names one.
+     *
+     * @param  array<string, mixed>  $body
+     * @param  array<string, string>  $headers
+     */
+    public function note(User $as, int $shiftId, array $body = [], array $headers = []): TestResponse
+    {
+        return $this->send('POST', "/api/v1/shifts/{$shiftId}/notes", $as, $body + ['client_uuid' => (string) Str::uuid(), 'body' => 'Mixer is noisy again'], $headers);
+    }
+
+    /**
+     * GET /shifts/{shift}/notes as $as.
+     *
+     * @param  array<string, mixed>  $query
+     * @param  array<string, string>  $headers
+     */
+    public function notes(User $as, int $shiftId, array $query = [], array $headers = []): TestResponse
+    {
+        loginAs($as);
+
+        return $this->test->withHeaders($headers)->getJson("/api/v1/shifts/{$shiftId}/notes".($query === [] ? '' : '?'.http_build_query($query)));
+    }
+
+    /** GET /stations/{station}/handover as $as: the Start shift screen's first panel. */
+    public function handover(User $as, int $stationId): TestResponse
+    {
+        loginAs($as);
+
+        return $this->test->getJson("/api/v1/stations/{$stationId}/handover");
+    }
+
+    /**
+     * GET /replay as $as.
+     *
+     * @param  array<string, mixed>  $query
+     */
+    public function replay(User $as, array $query): TestResponse
+    {
+        loginAs($as);
+
+        return $this->test->getJson('/api/v1/replay?'.http_build_query($query));
+    }
+
     /** The person works at the station, may count there and is flagged as its overseer. */
     public function overseer(User $user, Station $station): void
     {

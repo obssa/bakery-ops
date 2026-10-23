@@ -36,8 +36,8 @@ it('has an English and an Amharic text for every shifts message, with the same k
             ->and($am[$key])->not->toBe($en[$key], "am {$key} is not a copy of the English")
             ->and($am[$key])->toMatch('/\p{Ethiopic}/u');
     }
-    // the keys of step 3.3a (CountsLangTest) and of step 3.5 (CashLangTest) are tested there: between the two lists no key lacks a test and no test lacks a key
-    $tested = array_map(fn (string $k): string => substr($k, strlen('shifts.')), array_merge(SHIFTS_MESSAGE_KEYS, countsMessageKeys(), cashMessageKeys()));
+    // the keys of step 3.3a (CountsLangTest) and of steps 3.5 and 3.6 (CashLangTest, HandoverLangTest) are tested there: between the two lists no key lacks a test and no test lacks a key
+    $tested = array_map(fn (string $k): string => substr($k, strlen('shifts.')), array_merge(SHIFTS_MESSAGE_KEYS, countsMessageKeys(), cashMessageKeys(), handoverMessageKeys()));
     expect(array_keys($en))->toEqualCanonicalizing($tested, 'no key without a test, no test without a key');
 });
 

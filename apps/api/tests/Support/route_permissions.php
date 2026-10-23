@@ -215,4 +215,9 @@ return [
     'GET /api/v1/locations/{location}/chain' => ['permission' => 'shifts.replay', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
     'GET /api/v1/locations/{location}/chain/verify' => ['permission' => 'shifts.replay', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
     'GET /api/v1/stock-counts' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    // Step 3.6: notes are written by those who count (the action checks the station) and read by those who see the shift; the handover panel is read at the station; the replay is the managers'
+    'GET /api/v1/shifts/{shift}/notes' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'POST /api/v1/shifts/{shift}/notes' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/stations/{station}/handover' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/replay' => ['permission' => 'shifts.replay', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
 ];

@@ -1364,4 +1364,17 @@ return [
         },
         'payload' => fn (): array => ['reason' => 'Counted the wrong sack'],
     ],
+    // Step 3.6: a handover note, written by the chef at the kitchen's running shift
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/shifts/{shift}/notes',
+        'module' => 'shifts',
+        'table' => 'handover_notes',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+
+            return ['{shift}' => (string) $f->running($f->kitchen, $f->chef)->id];
+        },
+        'payload' => fn (): array => ['client_uuid' => (string) Str::uuid(), 'body' => 'The mixer needs oil'],
+    ],
 ];
