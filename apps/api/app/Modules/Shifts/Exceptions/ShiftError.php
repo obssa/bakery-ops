@@ -318,6 +318,12 @@ final class ShiftError extends RuntimeException
         return new self('shifts.cash.note_required', 422);
     }
 
+    /** The replay is asked about a moment that has not happened yet. */
+    public static function replayFuture(string $at): self
+    {
+        return new self('shifts.replay.future', 422, ['at' => $at]);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

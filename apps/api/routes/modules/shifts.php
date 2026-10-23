@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Modules\Shifts\Http\Controllers\ChainController;
 use App\Modules\Shifts\Http\Controllers\CountsController;
+use App\Modules\Shifts\Http\Controllers\HandoverController;
+use App\Modules\Shifts\Http\Controllers\NotesController;
 use App\Modules\Shifts\Http\Controllers\ShiftsController;
 use App\Modules\Shifts\Http\Controllers\StationShiftsController;
 use App\Modules\Shifts\Http\Controllers\TemplatesController;
@@ -21,7 +23,7 @@ use Illuminate\Support\Facades\Route;
  * who may cancel depends on the shift (the admin, or the person who started it while it is opening), which the action decides
  * (403 shifts.cancel.forbidden). Step 3.3a adds the counts: shifts.view reads the summary, the counts and the variance reasons (the
  * action checks the station), shifts.count closes the shift and works a count (it checks the station too), shifts.manage keeps the
- * variance reasons. Step 3.3b adds approve and reject (shifts.approve); step 3.3c adds cosign and the queue, and the reject moves to shifts.view with the action deciding. {count} and {reason} bind through the BranchScoped models. Step 3.5 adds the cash: shifts.count declares the drawer's cash (the action checks the till), shifts.view reads the shift's cash. Notes, handover and replay come with the later steps.
+ * variance reasons. Step 3.3b adds approve and reject (shifts.approve); step 3.3c adds cosign and the queue, and the reject moves to shifts.view with the action deciding. {count} and {reason} bind through the BranchScoped models. Step 3.5 adds the cash: shifts.count declares the drawer's cash (the action checks the till), shifts.view reads the shift's cash. Step 3.6 adds the notes (shifts.view reads, shifts.count writes; the action checks the station), the handover panel (shifts.view at the station) and the replay (shifts.replay).
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:shifts.view')->group(function (): void {
@@ -35,6 +37,8 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/stock-counts', [CountsController::class, 'index'])->name('shifts.counts.queue');
         Route::get('/stock-counts/{count}', [CountsController::class, 'show'])->whereNumber('count')->name('shifts.counts.show');
         Route::get('/variance-reasons', [VarianceReasonsController::class, 'index'])->name('shifts.reasons.index');
+        Route::get('/shifts/{shift}/notes', [NotesController::class, 'index'])->whereNumber('shift')->name('shifts.notes.index');
+        Route::get('/stations/{station}/handover', [HandoverController::class, 'show'])->whereNumber('station')->name('shifts.handover');
     });
 
     Route::middleware(['permission:shifts.manage', 'idempotency'])->group(function (): void {
@@ -59,6 +63,7 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::post('/shifts/{shift}/close', [ShiftsController::class, 'close'])->whereNumber('shift')->name('shifts.close');
         Route::put('/stock-counts/{count}/lines', [CountsController::class, 'lines'])->whereNumber('count')->name('shifts.counts.lines');
         Route::put('/stock-counts/{count}/cash', [CountsController::class, 'cash'])->whereNumber('count')->name('shifts.counts.cash');
+        Route::post('/shifts/{shift}/notes', [NotesController::class, 'store'])->whereNumber('shift')->name('shifts.notes.store');
         Route::post('/stock-counts/{count}/submit', [CountsController::class, 'submit'])->whereNumber('count')->name('shifts.counts.submit');
     });
 
@@ -83,5 +88,6 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     Route::middleware('permission:shifts.replay')->group(function (): void {
         Route::get('/locations/{location}/chain', [ChainController::class, 'index'])->whereNumber('location')->name('shifts.chain.index');
         Route::get('/locations/{location}/chain/verify', [ChainController::class, 'verify'])->whereNumber('location')->name('shifts.chain.verify');
+        Route::get('/replay', [HandoverController::class, 'replay'])->name('shifts.replay');
     });
 });

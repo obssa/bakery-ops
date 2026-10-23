@@ -2391,6 +2391,698 @@
                 }
             }
         },
+        "/v1/stations/{station}/handover": {
+            "get": {
+                "operationId": "shifts.handover",
+                "tags": [
+                    "Handover"
+                ],
+                "parameters": [
+                    {
+                        "name": "station",
+                        "in": "path",
+                        "required": true,
+                        "description": "The station ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "previous": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "client_uuid": {
+                                                    "type": "string"
+                                                },
+                                                "station": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "code": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "tracks_shifts": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "requires_overseer": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am",
+                                                        "tracks_shifts",
+                                                        "requires_overseer"
+                                                    ]
+                                                },
+                                                "template": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "start_time": {
+                                                            "type": "string"
+                                                        },
+                                                        "end_time": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name_en",
+                                                        "name_am",
+                                                        "start_time",
+                                                        "end_time"
+                                                    ]
+                                                },
+                                                "date": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "origin": {
+                                                    "type": "string"
+                                                },
+                                                "opening_mode": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "starts_at": {
+                                                    "type": "string"
+                                                },
+                                                "ends_at": {
+                                                    "type": "string"
+                                                },
+                                                "started_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "started_at": {
+                                                    "type": "string"
+                                                },
+                                                "opened_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "opened_at": {
+                                                    "type": "string"
+                                                },
+                                                "closed_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "closing_started_at": {
+                                                    "type": "string"
+                                                },
+                                                "submitted_at": {
+                                                    "type": "string"
+                                                },
+                                                "locked_at": {
+                                                    "type": "string"
+                                                },
+                                                "cancelled_at": {
+                                                    "type": "string"
+                                                },
+                                                "cancelled_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "cancel_reason": {
+                                                    "type": "string"
+                                                },
+                                                "me_on_roster": {
+                                                    "type": "string"
+                                                },
+                                                "version": {
+                                                    "type": "string"
+                                                },
+                                                "roster": {
+                                                    "type": "string"
+                                                },
+                                                "counts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "additionalProperties": {}
+                                                    }
+                                                },
+                                                "notes_count": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "client_uuid",
+                                                "station",
+                                                "template",
+                                                "date",
+                                                "status",
+                                                "origin",
+                                                "opening_mode",
+                                                "starts_at",
+                                                "ends_at",
+                                                "started_by",
+                                                "started_at",
+                                                "opened_by",
+                                                "opened_at",
+                                                "closed_by",
+                                                "closing_started_at",
+                                                "submitted_at",
+                                                "locked_at",
+                                                "cancelled_at",
+                                                "cancelled_by",
+                                                "cancel_reason",
+                                                "me_on_roster",
+                                                "version",
+                                                "roster",
+                                                "counts",
+                                                "notes_count"
+                                            ]
+                                        },
+                                        "notes": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "previous_closing": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "location": {
+                                                        "type": "string"
+                                                    },
+                                                    "count_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "chain_seq": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "payload_hash": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "locked_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "provisional": {
+                                                        "type": "string"
+                                                    },
+                                                    "float_left_total": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "location",
+                                                    "count_id",
+                                                    "chain_seq",
+                                                    "payload_hash",
+                                                    "locked_at",
+                                                    "provisional",
+                                                    "float_left_total"
+                                                ]
+                                            }
+                                        },
+                                        "pending_counts": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "additionalProperties": {}
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "previous",
+                                        "notes",
+                                        "previous_closing",
+                                        "pending_counts"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/replay": {
+            "get": {
+                "operationId": "shifts.replay",
+                "tags": [
+                    "Handover"
+                ],
+                "parameters": [
+                    {
+                        "name": "station_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "at",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}(:\\d{2}(\\.\\d{1,6})?)?(Z|[+-]\\d{2}:?\\d{2})?$"
+                        }
+                    },
+                    {
+                        "name": "nonzero",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "at": {
+                                            "type": "string"
+                                        },
+                                        "station": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "code": {
+                                                    "type": "string"
+                                                },
+                                                "name_en": {
+                                                    "type": "string"
+                                                },
+                                                "name_am": {
+                                                    "type": "string"
+                                                },
+                                                "tracks_shifts": {
+                                                    "type": "boolean"
+                                                },
+                                                "requires_overseer": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "code",
+                                                "name_en",
+                                                "name_am",
+                                                "tracks_shifts",
+                                                "requires_overseer"
+                                            ]
+                                        },
+                                        "shift": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "client_uuid": {
+                                                    "type": "string"
+                                                },
+                                                "station": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "code": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "tracks_shifts": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "requires_overseer": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am",
+                                                        "tracks_shifts",
+                                                        "requires_overseer"
+                                                    ]
+                                                },
+                                                "template": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "start_time": {
+                                                            "type": "string"
+                                                        },
+                                                        "end_time": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name_en",
+                                                        "name_am",
+                                                        "start_time",
+                                                        "end_time"
+                                                    ]
+                                                },
+                                                "date": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "origin": {
+                                                    "type": "string"
+                                                },
+                                                "opening_mode": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "starts_at": {
+                                                    "type": "string"
+                                                },
+                                                "ends_at": {
+                                                    "type": "string"
+                                                },
+                                                "started_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "started_at": {
+                                                    "type": "string"
+                                                },
+                                                "opened_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "opened_at": {
+                                                    "type": "string"
+                                                },
+                                                "closed_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "closing_started_at": {
+                                                    "type": "string"
+                                                },
+                                                "submitted_at": {
+                                                    "type": "string"
+                                                },
+                                                "locked_at": {
+                                                    "type": "string"
+                                                },
+                                                "cancelled_at": {
+                                                    "type": "string"
+                                                },
+                                                "cancelled_by": {
+                                                    "type": [
+                                                        "object",
+                                                        "null"
+                                                    ],
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "cancel_reason": {
+                                                    "type": "string"
+                                                },
+                                                "me_on_roster": {
+                                                    "type": "string"
+                                                },
+                                                "version": {
+                                                    "type": "string"
+                                                },
+                                                "roster": {
+                                                    "type": "string"
+                                                },
+                                                "counts": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "additionalProperties": {}
+                                                    }
+                                                },
+                                                "notes_count": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "client_uuid",
+                                                "station",
+                                                "template",
+                                                "date",
+                                                "status",
+                                                "origin",
+                                                "opening_mode",
+                                                "starts_at",
+                                                "ends_at",
+                                                "started_by",
+                                                "started_at",
+                                                "opened_by",
+                                                "opened_at",
+                                                "closed_by",
+                                                "closing_started_at",
+                                                "submitted_at",
+                                                "locked_at",
+                                                "cancelled_at",
+                                                "cancelled_by",
+                                                "cancel_reason",
+                                                "me_on_roster",
+                                                "version",
+                                                "roster",
+                                                "counts",
+                                                "notes_count"
+                                            ]
+                                        },
+                                        "on_duty": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "locations": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "open_orders": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "counts": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "at",
+                                        "station",
+                                        "shift",
+                                        "on_duty",
+                                        "locations",
+                                        "open_orders",
+                                        "counts"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/health": {
             "get": {
                 "operationId": "health",
@@ -3243,6 +3935,102 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/shifts/{shift}/notes": {
+            "get": {
+                "operationId": "shifts.notes.index",
+                "tags": [
+                    "Notes"
+                ],
+                "parameters": [
+                    {
+                        "name": "shift",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shift ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "after_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "shifts.notes.store",
+                "tags": [
+                    "Notes"
+                ],
+                "parameters": [
+                    {
+                        "name": "shift",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shift ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreHandoverNoteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
                     }
                 }
             }
@@ -6434,8 +7222,7 @@
                                                                 }
                                                             },
                                                             "notes_count": {
-                                                                "type": "integer",
-                                                                "const": 0
+                                                                "type": "integer"
                                                             }
                                                         },
                                                         "required": [
@@ -6768,8 +7555,7 @@
                                             }
                                         },
                                         "notes_count": {
-                                            "type": "integer",
-                                            "const": 0
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
@@ -7282,8 +8068,7 @@
                                             }
                                         },
                                         "notes_count": {
-                                            "type": "integer",
-                                            "const": 0
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
@@ -7562,8 +8347,7 @@
                                             }
                                         },
                                         "notes_count": {
-                                            "type": "integer",
-                                            "const": 0
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
@@ -7833,8 +8617,7 @@
                                             }
                                         },
                                         "notes_count": {
-                                            "type": "integer",
-                                            "const": 0
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
@@ -8101,8 +8884,7 @@
                                             }
                                         },
                                         "notes_count": {
-                                            "type": "integer",
-                                            "const": 0
+                                            "type": "integer"
                                         }
                                     },
                                     "required": [
@@ -8372,8 +9154,7 @@
                                                     }
                                                 },
                                                 "notes_count": {
-                                                    "type": "integer",
-                                                    "const": 0
+                                                    "type": "integer"
                                                 }
                                             },
                                             "required": [
@@ -12016,6 +12797,32 @@
                     "name_am"
                 ],
                 "title": "StoreDiningTableRequest"
+            },
+            "StoreHandoverNoteRequest": {
+                "type": "object",
+                "description": "POST /shifts/{shift}/notes: the client UUID of the note (an offline replay writes nothing twice), its text (1 to 1000 characters in any\nlanguage, trimmed by the framework) and optionally the colleague it is for (whether they may read the station is the action's question).",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "body": {
+                        "type": "string",
+                        "maxLength": 1000
+                    },
+                    "to_user_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "client_uuid",
+                    "body"
+                ],
+                "title": "StoreHandoverNoteRequest"
             },
             "StoreItemPriceRequest": {
                 "type": "object",

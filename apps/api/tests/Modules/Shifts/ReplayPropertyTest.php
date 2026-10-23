@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
@@ -35,7 +36,7 @@ pest()->group('module:shifts', 'property');
  *   - the people on duty: the roster rows joined at or before t and not left by t, of the shift that held the station at t;
  *   - each count's status_at, by its timestamps.
  * The `Phase3Seeder` history the plan also names does not exist until the seeds step; the generator here is the random history. 10 seeds, 25
- * instants each, at most 40 operations; the seed is in the dataset name and in every failure message; SHIFTS_SEED=<n> replays one.
+ * instants each, at most 60 operations; the seed is in the dataset name and in every failure message; SHIFTS_SEED=<n> replays one.
  */
 
 /** @return array<string, array{0: int}> */
@@ -141,7 +142,7 @@ it('replays any instant of a history exactly as an oracle reads it from the tabl
     $branch = actInBranch(Branch::factory()->create());
     $f = ShiftsFixture::build($branch, $this);
     $f->assign($f->cashier2, $f->kitchen);
-    $places = [$f->place($f->kitchen), $f->place($f->kitchen, App\Modules\Inventory\Enums\LocationType::Bar)];
+    $places = [$f->place($f->kitchen), $f->place($f->kitchen, LocationType::Bar)];
     $items = [$f->ingredient(), $f->ingredient(), $f->ingredient('ml')];
     $start = CarbonImmutable::parse('2026-11-02 08:00:00', 'UTC');
     $clock = $start;
@@ -167,11 +168,11 @@ it('replays any instant of a history exactly as an oracle reads it from the tabl
         ]);
     };
 
-    $operations = $rng->getInt(15, 40);
+    $operations = $rng->getInt(30, 60);
     for ($i = 1; $i <= $operations; $i++) {
         $this->travelTo($clock = $clock->addSeconds($rng->getInt(30, 900)));
         withActor($f->admin->id);
-        $choice = $rng->getInt(1, 9);
+        $choice = $rng->getInt(1, 12);
         $note = "op {$i} at {$clock->format('H:i:s')}: ";
         $running = $shifts()->current($f->kitchen);
 
@@ -188,7 +189,7 @@ it('replays any instant of a history exactly as an oracle reads it from the tabl
                 $f->stock($item, $place, '-'.$qty, MovementReason::Waste);
                 $note .= "waste {$qty}";
             }
-        } elseif ($choice === 3) {
+        } elseif ($choice <= 4) {
             if ($running === null) {
                 $carry = $rng->getInt(1, 10) <= 3;
                 $outcome = $shifts()->start($f->kitchen, (string) Str::uuid(), carry: $carry);
@@ -197,12 +198,12 @@ it('replays any instant of a history exactly as an oracle reads it from the tabl
                 $shifts()->close($running);
                 $note .= 'close';
             }
-        } elseif ($choice === 4 || $choice === 5) {
+        } elseif ($choice <= 8) {
             $drafts = StockCount::query()->where('status', CountStatus::Draft->value)
                 ->whereIn('shift_instance_id', ShiftInstance::query()->where('open_key', 1)->pluck('id'))->orderBy('id')->get();
             if (! $drafts->isEmpty()) {
                 $count = $drafts[$rng->getInt(0, $drafts->count() - 1)];
-                if ($choice === 4) {
+                if ($choice <= 6) {
                     $lines = [];
                     foreach ($count->lines()->get() as $line) {
                         if ($rng->getInt(1, 10) <= 4) {
@@ -223,7 +224,7 @@ it('replays any instant of a history exactly as an oracle reads it from the tabl
                     }
                 }
             }
-        } elseif ($choice === 6) {
+        } elseif ($choice === 9) {
             $pending = StockCount::query()->where('status', CountStatus::PendingApproval->value)->orderBy('id')->first();
             if ($pending !== null) {
                 withActor($f->manager->id);
@@ -234,7 +235,7 @@ it('replays any instant of a history exactly as an oracle reads it from the tabl
                     $note .= "approve refused: {$e->messageKey}";
                 }
             }
-        } elseif ($choice === 7) {
+        } elseif ($choice === 10) {
             if ($running !== null) {
                 withActor($f->cashier2->id);
                 try {
@@ -282,8 +283,12 @@ it('replays any instant of a history exactly as an oracle reads it from the tabl
     $replay = fn (): Replay => app(Replay::class);
     $placeIds = array_map(fn ($p): int => $p->id, $places);
 
+    $withShift = 0;
+    $withOrders = 0;
     foreach ($instants as $t) {
         $state = $replay()->at($f->kitchen, $t);
+        $withShift += $state->shift !== null ? 1 : 0;
+        $withOrders += $state->openOrders !== [] ? 1 : 0;
         $at = $t->format('Y-m-d H:i:s');
 
         $seen = [];
@@ -337,7 +342,7 @@ it('replays any instant of a history exactly as an oracle reads it from the tabl
             expect(CarbonImmutable::parse($row->started_at, 'UTC')->lessThanOrEqualTo($t))->toBeTrue($fail("count {$c->countId} listed before it started at {$at}"));
         }
     }
-
+    expect($withShift + $withOrders)->toBeGreaterThan(0, $fail('the sampled instants never met a shift or an open order'));
     foreach ($snapshots as $count) {
         $state = $replay()->at($f->kitchen, CarbonImmutable::parse($count->snapshot_at, 'UTC'));
         $levels = [];

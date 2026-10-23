@@ -177,7 +177,7 @@ it('reads at the stations one works at: another station is 403, a locked shift c
     $this->f->notes($this->f->cashier, $this->shift->id)->assertForbidden()->assertJsonPath('message_key', 'shifts.station.forbidden');
     $locked = $this->f->running($this->f->cakeRoom, $this->f->baker, [], 'locked');
     $this->f->notes($this->f->baker, $locked->id)->assertOk();
-    $this->f->notes($this->f->waiter, $this->f->running($this->f->till, $this->f->cashier, ['date' => '2026-11-01'], 'locked')->id)->assertOk();
+    $this->f->notes($this->f->waiter, $this->shift->id)->assertForbidden()->assertJsonPath('message_key', 'auth.forbidden');
 });
 
 it('answers 304 to a matching If-None-Match and changes the tag with a new note', function () {

@@ -62,6 +62,9 @@ return [
     'adjustment' => [
         'insufficient' => 'The correction would leave less than nothing in stock, because stock left after the count. Reject the count and count again.',
     ],
+    'replay' => [
+        'future' => 'This moment has not happened yet. Choose a time that has passed.',
+    ],
     'cash' => [
         'no_drawer' => 'This count is not the cash drawer, so there is no cash to declare.',
         'denomination_unknown' => 'This note or coin is not one the till counts.',

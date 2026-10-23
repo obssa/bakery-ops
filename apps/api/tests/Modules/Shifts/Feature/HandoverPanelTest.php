@@ -143,7 +143,7 @@ it('shows the float a locked drawer closing leaves, and a drawer-only station ne
         ->assertJsonPath('previous_closing.0.count_id', $closing['count'])
         ->assertJsonPath('previous_closing.0.provisional', false)
         ->assertJsonPath('previous_closing.0.float_left_total', '50.00')
-        ->assertJsonPath('previous_closing.0.chain_seq', 1);
+        ->assertJsonPath('previous_closing.0.chain_seq', 2);
 });
 
 it('marks a drawer closing that waits for approval as provisional, with the float it proposes but no hash', function () {
@@ -169,7 +169,8 @@ it('marks a drawer closing that waits for approval as provisional, with the floa
 it('is for those who read the station: the floor there, the managers anywhere', function () {
     $this->f->handover($this->f->cashier, $this->f->kitchen->id)->assertForbidden()->assertJsonPath('message_key', 'shifts.station.forbidden');
     $this->f->handover($this->f->chef, $this->f->till->id)->assertForbidden()->assertJsonPath('message_key', 'shifts.station.forbidden');
-    $this->f->handover($this->f->waiter, $this->f->till->id)->assertOk();
+    $this->f->handover($this->f->waiter, $this->f->till->id)->assertForbidden()->assertJsonPath('message_key', 'auth.forbidden');
+    $this->f->handover($this->f->cashier, $this->f->till->id)->assertOk();
     $this->f->handover($this->f->chef, $this->f->kitchen->id)->assertOk();
     $this->f->handover($this->f->manager, $this->f->kitchen->id)->assertOk();
     $this->f->handover($this->f->admin, $this->f->cakeRoom->id)->assertOk();

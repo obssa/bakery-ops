@@ -61,7 +61,7 @@ beforeEach(function () {
     $this->closing->refresh();
 
     ($this->go)('10:30');
-    $this->b = $this->f->running($this->f->kitchen, $this->f->manager, ['started_at' => ($this->t)('10:30'), 'date' => '2026-11-02'], 'opening');
+    $this->b = $this->f->running($this->f->kitchen, $this->f->manager, ['started_at' => ($this->t)('10:30'), 'date' => '2026-11-02', 'sequence' => 2], 'opening');
     ($this->go)('12:00');
 
     $this->at = fn (string $hm, array $extra = []) => $this->f->replay($this->f->admin, ['station_id' => $this->f->kitchen->id, 'at' => ($this->t)($hm)->toIso8601ZuluString()] + $extra);
@@ -69,7 +69,6 @@ beforeEach(function () {
 });
 
 it('is empty before anything happened: no shift, nobody on duty, no balances, no counts', function () {
-    ($this->go)('05:00');
     $response = ($this->at)('05:59')->assertOk();
 
     $response->assertJsonPath('station.id', $this->f->kitchen->id)
