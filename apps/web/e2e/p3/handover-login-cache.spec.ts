@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Api } from "../support/api";
@@ -12,18 +13,27 @@ interface Fake {
   origin: string;
   logins: string[];
   revoked: Set<string>;
+  throttle: { left: number; retryAfter: string | null };
 }
 
 async function fakeApi(): Promise<Fake> {
   const logins: string[] = [];
   const revoked = new Set<string>();
   let serial = 0;
+  const throttle = { left: 0, retryAfter: null as string | null };
   const server = createServer((request, response) => {
     let body = "";
     request.on("data", (chunk) => (body += chunk));
     request.on("end", () => {
       response.setHeader("Content-Type", "application/json");
       if (request.url === "/api/v1/login") {
+        if (throttle.left > 0) {
+          throttle.left -= 1;
+          response.statusCode = 429;
+          if (throttle.retryAfter) response.setHeader("Retry-After", throttle.retryAfter);
+          response.end(JSON.stringify({ message: "Too Many Attempts." }));
+          return;
+        }
         const { phone } = JSON.parse(body) as { phone: string };
         logins.push(phone);
         response.end(JSON.stringify({ token: `${phone}-${++serial}`, user: { id: 1, branch_id: 1, name: "x", phone, stations: [] }, permissions: [] }));
@@ -39,7 +49,7 @@ async function fakeApi(): Promise<Fake> {
     });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  return { server, origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, logins, revoked };
+  return { server, origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, logins, revoked, throttle };
 }
 
 test.describe("p3 e2e support: login cache", () => {
@@ -73,6 +83,34 @@ test.describe("p3 e2e support: login cache", () => {
       const again = await Api.login("+251900000003", "pw", undefined, fake.origin);
       expect(again.api.token).toBe(answer.token);
       expect(fake.logins).toHaveLength(2);
+    } finally {
+      fake.server.close();
+    }
+  });
+
+  test("a 429 on the login waits for Retry-After and tries once more", async () => {
+    const fake = await fakeApi();
+    fake.throttle.left = 1;
+    fake.throttle.retryAfter = "1";
+    try {
+      const started = Date.now();
+      const { api } = await Api.login("+251900000004", "pw", undefined, fake.origin);
+      expect(api.token).toBeTruthy();
+      expect(Date.now() - started).toBeGreaterThanOrEqual(1000);
+      expect(fake.logins).toEqual(["+251900000004"]);
+    } finally {
+      fake.server.close();
+    }
+  });
+
+  test("the login is also written to the run's shared file, for a worker that restarts", async () => {
+    const fake = await fakeApi();
+    try {
+      const { api } = await Api.login("+251900000005", "pw", 1, fake.origin);
+      const file = process.env.E2E_TOKEN_FILE;
+      expect(file).toBeTruthy();
+      const stored = JSON.parse(readFileSync(file!, "utf8")) as Record<string, { token: string }>;
+      expect(stored[`${fake.origin}|+251900000005|1`]?.token).toBe(api.token);
     } finally {
       fake.server.close();
     }
