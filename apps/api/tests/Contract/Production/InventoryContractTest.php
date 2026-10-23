@@ -49,6 +49,7 @@ use Illuminate\Support\Str;
  */
 
 beforeEach(function () {
+    config(['ledger.require_shift_for_station_locations' => false]); // on by default since step 3.7e: the contract cases write stock with no shift running; the rule has its own tests (LedgerEnforcementTest, the enforced and rules-off gates)
     seedRoles();
     $this->branch = actInBranch(Branch::factory()->create());
     $b = $this->branch->id;

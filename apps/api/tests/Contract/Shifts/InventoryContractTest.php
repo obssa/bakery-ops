@@ -40,6 +40,7 @@ use Tests\Support\FakeOpenShifts;
  */
 
 beforeEach(function () {
+    config(['ledger.require_shift_for_station_locations' => false]); // on by default since step 3.7e: the cases stamp made-up shift ids; the ones about the rule turn it on themselves (below)
     seedRoles();
     $this->branch = actInBranch(Branch::factory()->create());
     $b = $this->branch->id;
