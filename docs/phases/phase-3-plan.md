@@ -1286,6 +1286,57 @@ live ledger in a state where a shift can be opened only through the API.
    - **3.7c `phase-3/web-admin-shifts`**: `/admin/shifts` (templates, roster calendar with schedule and "Start now" for an admin,
      running shifts, approvals, locked history with the hash and a "Verify" button, notes, replay at a point in time, variance
      reasons), the setup check (stock places with no station, stations without templates), and `p3-opening-prefill` green.
+     - **As built (step 3.7c, `phase-3/web-admin-shifts`).** Web only (no API change, no new route, flags untouched). `/admin/shifts` is now a section with its own tabs
+       (`AdminShiftsNav`, like Inventory): **Overview** (`/admin/shifts`), **Templates**, **Roster**, **History**, **Handover notes**, **Replay**, **Variance reasons**
+       (`/admin/shifts/<name>`; static pages, the screens read their own state on the client). A person sees the tabs their permissions give (`adminSections`): everyone with
+       `shifts.view` reads all of them except Replay (`shifts.replay`: admin and manager); every write button and form is for `shifts.manage` (the admin) and is hidden
+       from the others, and the API still decides each call. The pure rules are in `lib/shiftsAdmin.ts` and are tested without a browser in
+       `e2e/p3/handover-admin-logic.spec.ts` (local dates and ISO weekdays, the templates that run on a date, the template and reason forms, the setup check, the roster
+       cells, who may be offered for a station, the point-in-time input, the chain summary, the sections); the calls are in `lib/api/adminShifts.ts`.
+       **Overview**: the *setup check* (`GET /me` work stations, `GET /locations`, `GET /shift-templates`: every stock place with no station, every station that tracks
+       shifts and has no active template, each with the link that fixes it: "Add a template" opens Templates with the station ticked, "Open inventory" for a place), *shifts
+       running now* (a new `LiveFeed` over `GET /shifts?running=1`, ETag, 5 s visible and 30 s hidden like the queue, `lib/live/running.ts`; a row says station, template and
+       date, status, who started it, links to the count and "Cancel start" for an `opening` shift to its starter or `shifts.manage`), and 3.7b's `ApprovalQueue` unchanged below.
+       **Templates**: list with window, days, stations and status; the admin makes, edits and retires (`DELETE` is a soft delete: a retired template leaves the calendar and
+       shifts already made keep their window); the form checks what the API would refuse before it asks (both names, different start and end times, a day, a station) and says
+       when a window runs through midnight. **Roster**: a Monday-to-Sunday week (a date field "Show the week of", previous, this and next week), one table per tracked station,
+       a row per active template, a cell per date the template runs on, placed by station, template and local date (`GET /shifts?from&to`). A cell shows each shift's status and,
+       for a scheduled one, the people on it (`GET /shifts/{id}`; the list leaves the roster out); the admin schedules people into an empty cell (the people offered are the
+       active ones assigned to the station with `can_count`, from `GET /users`), changes the people of a scheduled shift (`PUT .../roster`), cancels it, or presses **Start now**.
+       Start now opens a confirmation ("Start without counting" is a tick box) and calls `POST /stations/{id}/shifts/start {shift_id, force: true, carry}` with the key as the
+       `client_uuid`: the admin's way into a window that is over; the shift keeps the date it was scheduled for. **History**: for admin and manager the locked counts of a place
+       (`GET /locations/{id}/chain`: link, count, shift date, locked time, short fingerprint with the full one in the tooltip, a "Review" link to 3.7b's side-by-side page) and
+       a **Verify** button that walks the chain (`GET .../chain/verify`) and says "intact, N links checked" or lists each failure by link and kind in plain words; below it every
+       shift, newest first, with a station and status filter and paging. **Handover notes**: shifts newest first with a "Show notes" toggle per shift (`GET /shifts/{id}/notes`:
+       who wrote it, when, for whom). **Replay**: a station and a date-time typed on the branch clock (Africa/Addis_Ababa, sent with its `+03:00` offset), then the shift that was
+       running, who was on, the balances per place with the last locked link, the orders still open and the counts with the status each had then (`GET /replay`; `422
+       shifts.replay.future` is shown in the page language). **Variance reasons**: list (retired ones included) with add, edit (names, "needs a note") and retire or bring back;
+       the code is typed once and never changes. The **shift bar** now names the shift by template and local start date ("E2E Night · 2026-10-22", "Ad hoc shift · date"), which
+       is what makes a Night shift worked after midnight readable.
+       **`p3-opening-prefill` is green** (`e2e/p3/opening-prefill.spec.ts`, fixture in `e2e/support/nightshift.ts`, `@live`): the bakery gets a run-unique ingredient of 5 kg and
+       is settled (closed and its closing count submitted as it stands, so a locked closing exists); the admin schedules the "E2E Night" template (22:00 to 06:00, every day,
+       found or made) for **yesterday's local date** with the bread baker, then presses Start now on the roster in the browser; the baker's bar names the Night shift of
+       yesterday's date, the opening count shows 5000 prefilled from the locked closing, is submitted, and the baker writes a note, closes, counts "nothing changed" and the
+       count locks and shows its hash; "Start shift" then opens the next shift with the Night closing values and the note in the handover panel. The API checks: the Night
+       shift's `date` is yesterday while its `opened_at` is today and its `starts_at` is yesterday 22:00 local; `GET /shifts?station_id&from&to` lists both; each opening line's
+       `carried_qty` is the previous closing's `counted_qty`; the closing's `previous_hash` is the `payload_hash` of the link before it; verify is ok.
+       **Midnight and `@live`.** The test does not control the clock and does not need to: yesterday and today come from the Addis Ababa date at run time (`addisDate`), and the
+       dates are asserted from the shifts themselves. It is therefore `@live` and runs after every deploy. The one place the clock leaks in is the *next* shift: started from
+       "Start shift" between 22:00 and 06:00 local it matches the Night window and is dated by the day that window started (yesterday after midnight), at any other time it is the
+       ad-hoc shift dated today; the test reads the rule from the shift (`origin`, `template`, `starts_at`, `opened_at`) and accepts exactly those two outcomes. The instant-level
+       boundaries (23:59, 00:01, 05:59, 06:00) stay in Pest (`CrossMidnightGateTest`). A second flow, `e2e/p3/handover-admin.spec.ts` (`@live`, project `p3-handover`), makes,
+       edits and retires a run-unique template in the browser, then checks the overview, the chain verification and the replay for the bakery.
+       **Decisions the plan left open.** (1) The tabs are separate static pages under `/admin/shifts/` (the queue stays on the overview, so 3.7b's test is unchanged), not one page
+       with client-side tabs. (2) Stations for the pickers come from `GET /me` (`work_stations`: every station for `stations.all`), so a manager needs no `people.manage`; only the
+       roster's people list (`GET /users`) is admin-only, which matches scheduling being `shifts.manage`. (3) "Stock places with no station" lists every such place, the display
+       case included (the E2E branch's has none by design); the fix link goes to Inventory because there is no location editor in the web yet. (4) The roster cell offers
+       "Schedule" whenever no shift of that template and date is waiting or running; the API's `409 shifts.shift.already_scheduled` stays the rule. (5) The history's chain view is
+       per place and skips display cases (they have no count). (6) Retiring a variance reason is `is_active: false`, never a delete.
+       **For 3.7d and 3.7e.** The admin screens never touch cash: the drawer's declaration is still 3.7d's (the review page and the count screen keep the "next update" lines).
+       The roster's "Start now" and the ad-hoc starts from the bar both leave an `opening` shift when "Start without counting" is off, so with a cash drawer 3.7e's fixtures must
+       still declare it. The running-shifts feed uses the API's own ETag (count, `max(updated_at)`, `sum(version)`), no ledger part is involved. Local note: the Docker stack on this PC answers in 2 to 9 seconds per request, so the browser flows only finish there with
+       longer waits (a copy of the specs with larger timeouts passed up to the last submit); CI and the live host are the evidence.
+       CI evidence: see the PR.
    - **3.7d `phase-3/web-cash`**: the till's shift widget (opening float by denomination, cash so far by channel from
      `GET /shifts/{shift}/cash`), the cash declaration and channel reconciliation inside the closing count, the second test of
      `p3-handover`.
