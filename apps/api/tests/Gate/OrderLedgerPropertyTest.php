@@ -28,6 +28,7 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Orders\Support\LineInput;
 use App\Modules\Payments\Actions\RecordPayment;
+use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Branch;
 use App\Shared\Values\Money;
 use App\Shared\Values\Quantity;
@@ -39,6 +40,7 @@ use Illuminate\Support\Str;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 use Tests\Support\OrdersMenu;
+use Tests\Support\Shifts;
 
 /*
  * Phase 1 gate, property criterion (phase-1 plan section 7): random sequences of at most 50 operations (send, accept,
@@ -231,6 +233,8 @@ it('keeps the ledger honest through random order sequences: oracle, reserved, av
                     break;
                 case 'pay':
                     $order = Order::query()->findOrFail($id);
+                    // payments.require_shift_for_cash: the cashier takes the cash in the till's running shift
+                    app(ActorContext::class)->inShift(Shifts::ensureOpen($m->tillStation));
                     $pay->handle($order->id, (string) Str::uuid(), 'cash', $order->total->amount(), $order->total->amount(), null, $cashier);
                     break;
             }
