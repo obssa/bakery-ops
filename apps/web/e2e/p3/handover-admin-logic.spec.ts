@@ -71,7 +71,7 @@ test.describe("admin shifts logic", () => {
 
   test("a local date-time becomes an instant with the +03:00 offset, and nothing else is accepted", () => {
     expect(addisToIso("2026-10-22T14:30")).toBe("2026-10-22T14:30:00+03:00");
-    expect(Date.parse(addisToIso("2026-10-22T01:30"))).toBe(Date.parse("2026-10-21T22:30:00Z"));
+    expect(Date.parse(addisToIso("2026-10-22T01:30")!)).toBe(Date.parse("2026-10-21T22:30:00Z"));
     expect(addisToIso("")).toBeNull();
     expect(addisToIso("2026-10-22")).toBeNull();
     expect(addisToIso("not a date")).toBeNull();

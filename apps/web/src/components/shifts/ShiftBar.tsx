@@ -80,6 +80,8 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   const crew = onDuty(shift);
   const stationName = locale === "am" ? station.name_am : station.name_en;
   const showNotice = notice !== null && (notice.stationId === null || notice.stationId === station.station_id) && actions.mode !== "open";
+  // the shift is named by its template and its local start date: the Night shift started at 22:00 yesterday is still yesterday's (step 3.7c)
+  const shiftLabel = shift ? t("shift_label", { name: shift.template ? (locale === "am" ? shift.template.name_am : shift.template.name_en) : t("ad_hoc"), date: shift.date }) : "";
   const noticeText = notice ? (locale === "am" ? notice.message_am || notice.message_en : notice.message_en || notice.message_am) : "";
 
   async function run(name: ActionName, keyName: string, call: (key: string) => Promise<Shift | null>) {
@@ -150,6 +152,7 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {loaded ? <Badge tone={BADGE[actions.mode].tone}>{t(BADGE[actions.mode].key)}</Badge> : null}
             <p className="text-lg font-semibold text-neutral-900">{loaded ? headline : t("checking")}</p>
+            {loaded && shift ? <p className="text-base font-medium text-neutral-800">{shiftLabel}</p> : null}
             {loaded && detail ? <p className="text-base text-neutral-600">{detail}</p> : null}
             {loaded && shift && shift.notes_count > 0 ? <p className="text-base text-neutral-600">{t("notes", { count: shift.notes_count })}</p> : null}
           </div>
