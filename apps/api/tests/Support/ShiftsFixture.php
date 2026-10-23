@@ -82,8 +82,19 @@ final class ShiftsFixture
         }
     }
 
+    /**
+     * The floor of the Shifts tests. They test the shift mechanics themselves (start, join, close, counts) and write stock before a
+     * shift runs, so the fixture pins the three rollout rules OFF (step 3.7e made them on by default); a test that is about a rule turns
+     * it on after building, as before the flip.
+     */
     public static function build(Branch $branch, TestCase $test): self
     {
+        config([
+            'ledger.require_shift_for_station_locations' => false,
+            'shifts.open_ad_hoc_on_accept' => false,
+            'payments.require_shift_for_cash' => false,
+        ]);
+
         return new self($branch, $test);
     }
 

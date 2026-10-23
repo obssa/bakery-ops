@@ -54,6 +54,7 @@ use Illuminate\Support\Str;
 use Tests\Support\NotificationDrivers;
 use Tests\Support\OrdersMenu;
 use Tests\Support\ProductionFixture;
+use Tests\Support\Shifts;
 use Tests\Support\ShiftsFixture;
 use Tests\TestCase;
 
@@ -631,7 +632,12 @@ return [
         'module' => 'payments',
         'table' => 'payments',
         'setup' => function (TestCase $t) use ($admin, $orderableCake): array {
-            $cake = $orderableCake($admin());
+            $me = $admin();
+            $cake = $orderableCake($me);
+            // payments.require_shift_for_cash (on by default since step 3.7e): the admin takes the cash at a till whose shift runs
+            $till = Station::factory()->forCode(StationCode::Till)->create(['branch_id' => $me->branch_id]);
+            Shifts::ensureOpen($till);
+            $t->withHeader('X-Station-Id', (string) $till->id);
             $order = $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson('/api/v1/orders', [
                 'client_uuid' => (string) Str::uuid(),
                 'type' => 'takeaway',
@@ -998,6 +1004,9 @@ return [
         'setup' => function (TestCase $t) use ($admin): array {
             $me = $admin();
             $request = ProductionRequest::factory()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'requested_by_user_id' => $me->id]);
+            // this registry entry counts one audit row per write; with the call-in on (the default since step 3.7e) the accept also opens or joins a
+            // shift, which writes its own audit row (CallInTest and the Shifts endpoint tests cover that), so the call-in is off for this entry
+            config(['shifts.open_ad_hoc_on_accept' => false]);
 
             return ['{request}' => (string) $request->id];
         },
