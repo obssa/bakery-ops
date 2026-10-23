@@ -146,8 +146,8 @@ final class ShiftsController
         return response()->json(['shift' => $this->presenter->one($closed), 'counts' => $counts->many($reads->latest($closed, CountType::Closing))]);
     }
 
-    /** GET /shifts/{shift}/cash (step 3.5): the till widget's cash in the drawer so far, live from Payments' Totals; 422 shifts.cash.no_drawer for a station with no drawer. */
-    public function cash(Request $input, ShiftInstance $shift, CashDeclarations $cash, Locations $locations): JsonResponse
+    /** GET /shifts/{shift}/cash (step 3.5): the till widget's cash in the drawer so far, live from Payments' Totals; polled (ETag, 304, step 3.7d); 422 shifts.cash.no_drawer for a station with no drawer. */
+    public function cash(Request $input, ShiftInstance $shift, CashDeclarations $cash, Locations $locations): Response
     {
         $person = $this->access->person('shifts.view');
         $this->access->assertAt($person, 'shifts.view', Station::query()->withTrashed()->findOrFail($shift->station_id));
@@ -156,7 +156,10 @@ final class ShiftsController
             throw ShiftError::noDrawer();
         }
 
-        return response()->json($cash->summary($shift, $drawer));
+        // polled by the till widget (step 3.7d): the figures are two small reads, and the tag is made from them, so it moves whenever a figure does
+        $figures = $cash->summary($shift, $drawer);
+
+        return ConditionalPoll::respond($input, ConditionalPoll::etag('shifts.cash', [$shift->id, md5(json_encode($figures, JSON_THROW_ON_ERROR))]), fn (): array => $figures);
     }
 
     public function summary(Request $input, ShiftInstance $shift, ShiftSummaryReader $summary): JsonResponse

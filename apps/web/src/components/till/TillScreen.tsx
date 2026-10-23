@@ -10,6 +10,7 @@ import { useSession } from "@/lib/session";
 import { OrderingSurface } from "../pad/OrderingSurface";
 import { usePadOutcomes, useReleaseStaleSends } from "../pad/outcomes";
 import { PageHeader } from "../ui";
+import { CashWidget } from "../shifts/CashWidget";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
 import { CASH_NEEDS_SHIFT_BUILD, payBlockReason } from "@/lib/shifts";
@@ -72,6 +73,7 @@ export function TillScreen() {
     <div className="space-y-4">
       <PageHeader title={t("title")} />
       <ShiftBar model={shiftStation} />
+      <CashWidget shift={shiftStation.shift} />
 
       <div role="tablist" aria-label={t("views")} className="flex gap-2">
         {(["queue", "order"] as const).map((value) => (

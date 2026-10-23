@@ -139,7 +139,7 @@ export function Badge({ tone = "neutral", children, className = "" }: { tone?: k
  * A dialog over the screen (the till's pay sheet and void form): named for screen readers, closed by Escape or a tap on
  * the backdrop. The page behind stays as it was; the dialog holds what must be decided before going on.
  */
-export function Modal({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ label, onClose, size = "md", children }: { label: string; onClose: () => void; size?: "md" | "lg"; children: ReactNode }) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
@@ -154,7 +154,7 @@ export function Modal({ label, onClose, children }: { label: string; onClose: ()
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="max-h-full w-full max-w-lg space-y-4 overflow-y-auto rounded-lg bg-white p-5 shadow-xl"
+        className={`max-h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-lg"} space-y-4 overflow-y-auto rounded-lg bg-white p-5 shadow-xl`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}

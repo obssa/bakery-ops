@@ -11,6 +11,9 @@ import { isQuantityText } from "@/lib/decimal";
 import { stageOf } from "@/lib/counts";
 import { useErrorText } from "@/lib/errors";
 import { Alert, Badge, Button, Field, Panel, Select, TextInput } from "../ui";
+import { CashDeclaration } from "./CashDeclaration";
+import { CashReviewDialog } from "./CashReviewDialog";
+import { CashSummaryView } from "./CashSummaryView";
 import { ChainCard } from "./ChainCard";
 import { CountLines } from "./CountLines";
 import { ReviewDialog } from "./ReviewDialog";
@@ -18,7 +21,7 @@ import { useKeys } from "./useKeys";
 
 // One place's count on the count screen (step 3.7b): its lines, "Nothing changed", an item found that was not on the list, the review
 // and the submit, and what has happened to the count since: waiting for a co-signature or for the approval, locked with its hash, or
-// sent back (the recount shows what the approver said). A cash drawer's count has no lines here: its declaration is the till's, step 3.7d.
+// sent back (the recount shows what the approver said). A cash drawer's count has no lines: it is the till's cash declaration (step 3.7d), by denomination.
 
 export const STAGE_TONE = {
   counting: "blue",
@@ -67,7 +70,6 @@ export function CountPanel({
   const [addInvalid, setAddInvalid] = useState(false);
 
   const editable = count.status === "draft";
-  const drawer = count.cash !== null;
   const stage = stageOf(count);
   const previous = all.find((other) => other.superseded_by_id === count.id) ?? null;
 
@@ -173,8 +175,14 @@ export function CountPanel({
         {stage === "sent_back" ? <p className="rounded-md bg-red-50 px-4 py-3 text-base text-red-900">{t("stage_sent_back")}</p> : null}
         {count.blocked_by_pending ? <Alert>{t("blocked_by_pending")}</Alert> : null}
 
-        {drawer ? (
-          <p className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-700">{t("cash_soon")}</p>
+        {count.cash ? (
+          editable ? (
+            <>
+              <CashDeclaration count={count} cash={count.cash} reasons={reasons} onChange={onChange} onBusy={(busy) => setSaving(busy ? 1 : 0)} />
+            </>
+          ) : (
+            <CashSummaryView count={count} cash={count.cash} />
+          )
         ) : (
           <>
             {editable ? (
@@ -221,7 +229,7 @@ export function CountPanel({
           </>
         )}
 
-        {editable && !drawer ? (
+        {editable ? (
           <div className="flex justify-end">
             <Button type="button" disabled={saving > 0} onClick={() => setReview(true)}>
               {t("review_button")}
@@ -230,7 +238,10 @@ export function CountPanel({
         ) : null}
       </div>
 
-      {review ? (
+      {review && count.cash ? (
+        <CashReviewDialog count={count} cash={count.cash} reasons={reasons} busy={submitting} failure={submitFailure} onSubmit={() => void submit()} onClose={() => setReview(false)} />
+      ) : null}
+      {review && !count.cash ? (
         <ReviewDialog count={count} reasons={reasons} busy={submitting} failure={submitFailure} onSubmit={() => void submit()} onClose={() => setReview(false)} />
       ) : null}
     </Panel>

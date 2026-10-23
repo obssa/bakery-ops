@@ -158,7 +158,7 @@ test.describe("p3 cash screens: logic", () => {
     };
     const next = cashSpec.merge(cashSpec.initial, answer);
     expect(next.summary).toEqual(answer);
-    expect(cashSpec.cursorOf(next)).toBeNull();
+    expect(cashSpec.cursorOf(answer)).toBeNull();
     expect(CASH_POLL.intervalMs).toBe(5000);
   });
 });

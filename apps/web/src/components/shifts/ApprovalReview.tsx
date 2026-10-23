@@ -16,6 +16,7 @@ import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
 import { Alert, Badge, Button, Field, Modal, PageHeader, Panel, Status, Textarea } from "../ui";
 import { focusRing } from "../styles";
+import { CashSummaryView } from "./CashSummaryView";
 import { ChainCard } from "./ChainCard";
 import { itemName, reasonName } from "./CountLines";
 import { STAGE_TONE } from "./CountPanel";
@@ -172,8 +173,13 @@ function Loaded({ countId }: { countId: number }) {
       </div>
 
       {count.blocked_by_pending ? <Alert>{t("blocked_by_pending")}</Alert> : null}
-      {count.cash ? <p className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-700">{t("cash_soon")}</p> : null}
+      {count.cash ? (
+        <Panel title={t("cash_side_title")}>
+          <CashSummaryView count={count} cash={count.cash} />
+        </Panel>
+      ) : null}
 
+      {count.cash && lines.length === 0 ? null : (
       <Panel title={t("side_title")}>
         {lines.length === 0 ? (
           <p className="text-base text-neutral-600">{t("no_lines")}</p>
@@ -237,6 +243,7 @@ function Loaded({ countId }: { countId: number }) {
           <p className="mt-3 text-sm text-amber-900">{t("moved_hint")}</p>
         ) : null}
       </Panel>
+      )}
 
       {count.status === "locked" && count.chain ? <ChainCard chain={count.chain} /> : null}
 

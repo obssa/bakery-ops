@@ -13,6 +13,7 @@ import { can, useSession } from "@/lib/session";
 import { useShiftNotice } from "@/lib/station";
 import { Alert, Badge, Button, Field, Modal, Select } from "../ui";
 import { focusRing } from "../styles";
+import { DrawerDialog } from "./DrawerDialog";
 import { HandoverPanel } from "./HandoverPanel";
 import { NoteForm } from "./Notes";
 import type { ShiftStation } from "./useShiftStation";
@@ -22,7 +23,7 @@ import type { ShiftStation } from "./useShiftStation";
 // or close it. It reads the live shift (GET /stations/{station}/shifts/current, 5 s) and acts through the shift endpoints.
 //
 //   no shift   "Start shift" (count the stock first: the shift is `opening`) and "Start without counting" (open at once)
-//   opening    the count is in progress: a link to the count screen (a placeholder until step 3.7b) and "Cancel start"
+//   opening    the count is in progress: a link to the count screen, "Cancel start" and, at a till, "Declare the drawer" (step 3.7d)
 //   open       who is on, "Join shift" / "Leave shift", "Close shift" (after a confirmation: the station is frozen from then on)
 //   counting   the closing count is in progress: the link to the count screen
 //
@@ -52,6 +53,7 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   const [confirmClose, setConfirmClose] = useState(false);
   const [showHandover, setShowHandover] = useState(false);
   const [noting, setNoting] = useState(false);
+  const [declaring, setDeclaring] = useState(false);
 
   // one key per logical action, reused by a retry of the same request and dropped when it succeeded (ADR 0003)
   const keys = useRef<Map<string, string>>(new Map());
@@ -203,6 +205,11 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
                   {busy === "start_carried" ? t("working") : t("start_carried")}
                 </Button>
               ) : null}
+              {actions.mode === "opening" && station.code === "till" && powers.canCount ? (
+                <Button type="button" variant="secondary" onClick={() => setDeclaring(true)}>
+                  {t("declare_drawer")}
+                </Button>
+              ) : null}
               {actions.continueCount ? count : null}
               {actions.cancel ? (
                 <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void act("cancel", cancelShift)}>
@@ -253,6 +260,8 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
       ) : null}
 
       {showHandover && (actions.mode === "idle" || actions.mode === "opening") ? <HandoverPanel stationId={station.station_id} /> : null}
+
+      {declaring && shift ? <DrawerDialog shiftId={shift.id} onClose={() => setDeclaring(false)} /> : null}
 
       {noting && shift ? (
         <Modal label={tc("note_title")} onClose={() => setNoting(false)}>
