@@ -61,16 +61,15 @@ final class ReplayPresenter
             ], $state->onDuty),
             'locations' => array_map(static fn (ReplayPlace $p): array => [
                 'location' => $p->location->toArray(),
-                'balances' => array_map(static fn ($level): array => [
-                    'item' => [
-                        'id' => $level->itemId,
-                        'name_en' => ($summaries[$level->itemId] ?? null)?->nameEn ?? '',
-                        'name_am' => ($summaries[$level->itemId] ?? null)?->nameAm ?? '',
-                        'unit' => ($summaries[$level->itemId] ?? null)?->unit ?? '',
-                    ],
-                    'on_hand' => $level->onHand->toString(),
-                    'reserved' => $level->reserved->toString(),
-                ], $p->levels),
+                'balances' => array_map(static function ($level) use ($summaries): array {
+                    $item = $summaries[$level->itemId] ?? null;
+
+                    return [
+                        'item' => ['id' => $level->itemId, 'name_en' => $item->nameEn ?? '', 'name_am' => $item->nameAm ?? '', 'unit' => $item->unit ?? ''],
+                        'on_hand' => $level->onHand->toString(),
+                        'reserved' => $level->reserved->toString(),
+                    ];
+                }, $p->levels),
                 'last_locked' => $p->lastLocked === null ? null : [
                     'count_id' => $p->lastLocked->countId,
                     'chain_seq' => $p->lastLocked->chainSeq,

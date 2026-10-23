@@ -165,7 +165,9 @@ final class Replay
             return 'locked';
         }
         if (self::byThen($count->decided_at, $t) !== null) {
-            return $count->decision?->value ?? 'approved';
+            $decision = $count->decision;
+
+            return $decision === null ? 'approved' : $decision->value;
         }
         if (self::byThen($count->submitted_at, $t) !== null) {
             return $station->requires_overseer && self::byThen($count->cosigned_at, $t) === null ? 'awaiting_cosign' : 'pending_approval';
