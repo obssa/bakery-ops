@@ -1122,7 +1122,10 @@ live ledger in a state where a shift can be opened only through the API.
        cash to replay (cash is not in the ledger); the payments of a shift are `Totals::cash(shift)` / `byChannel(shift)`. Nothing in 3.5 writes to
        `shift_instances`; `GET /shifts/{shift}/summary` still answers its own `cash` block (`cash_sales_total` and channels) and `GET /shifts/{shift}/cash`
        is the widget's. The only new statuses a screen meets are the existing ones: a drawer count waits in `pending_approval` like any count.
-     - **CI.** (filled in when CI is green)
+     - **CI** (run on `b73e84a`, PR 52). `mod-payments` (the module gate evidence, Payments stays `stable`): `module:payments` 52 passed (549
+       assertions), `contract:shifts->payments` 10 passed (66); `mod-shifts` 980 passed (11971); `enforced-gates` (the ledger flag on), `gate-p0`
+       to `gate-p3`, `e2e-p0` to `e2e-p3`, `api-arch`, `invariants`, `openapi-check`, `erd-check`, `i18n-check` green. Local: `tests/Modules/Shifts`,
+       `Payments`, `Invariants`, `Arch` 685 tests with the one stamp-column test fixed afterwards, the Gate tests of the chain 54 passed.
 6. **3.6 shifts.handover** (groups `feature`, `module:shifts`, `property`; STATUS `shifts.handover`), `phase-3/handover`:
    migration 14; notes and handover endpoints; `Contracts\Replay::at(station, time)`; `GET /replay`; `ReplayPropertyTest`;
    then `gate_check --mode module --module shifts` and `phase_status.py module-stable shifts`. Playwright projects stay
