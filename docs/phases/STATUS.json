@@ -136,9 +136,10 @@
         "shifts.counts": "done",
         "shifts.locks": "done",
         "shifts.cash": "done",
-        "shifts.handover": "todo",
+        "shifts.handover": "done",
         "web": "todo",
-        "docs": "todo"
+        "docs": "todo",
+        "shifts": "done"
       },
       "playwright_projects": [
         "p3-handover",
@@ -249,8 +250,8 @@
     },
     "shifts": {
       "phase": 3,
-      "status": "todo",
-      "stable_since": null
+      "status": "stable",
+      "stable_since": "2026-10-23T05:30:01Z"
     },
     "analytics": {
       "phase": 4,

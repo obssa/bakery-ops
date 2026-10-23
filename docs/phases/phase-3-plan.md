@@ -1168,6 +1168,9 @@ live ledger in a state where a shift can be opened only through the API.
        gate steps). The oracles are written in the test from `stock_movements`, `order_events`, `shift_roster` and the count timestamps.
        `HandoverNotesTest`, `HandoverPanelTest`, `ReplayEndpointTest` are the feature files with 403 per role; `HandoverNotesSchemaTest`,
        `HandoverLangTest` the schema and the message key. Matrix and write registries list the four routes.
+     - **CI** (run 39901423445, PR 53, on `c5fb4dc`). `mod-shifts` (the module gate evidence): 1083 passed (14773 assertions); `enforced-gates`, `gate-p0` to
+       `gate-p3`, `e2e-p0` to `e2e-p3`, `api-arch`, `api-lint`, `invariants`, `openapi-check`, `erd-check`, `i18n-check`, web checks green. STATUS
+       `shifts.handover: done`, module `shifts: stable`. Local: the new feature, schema, lang and property files, Arch, Invariants and the route matrix.
      - **For the web steps (3.7).** Notes: `POST /shifts/{id}/notes {client_uuid, body, to_user_id?}`, poll `GET .../notes?after_id=<last_id>` and
        merge by id. The waiter has no `shifts.view`, so no handover panel and no notes for the pad. The panel's `previous_closing[].location.type ==
        'cash_drawer'` row carries `float_left_total`; show `provisional` rows as "waiting for approval". The first opening count of a drawer is a
