@@ -23,6 +23,56 @@ interface ShiftView {
 interface CountView {
   id: number;
   status: string;
+  type?: string;
+  cash?: { expected_total: string; denominations: Record<string, number> } | null;
+}
+
+// --- the till's drawer (step 3.7d) -------------------------------------------------------------------------------------------
+// A count at a cash drawer is declared by denomination (PUT /stock-counts/{count}/cash), not confirmed line by line. The helpers below
+// find or make the till's drawer and declare a draft drawer count "as it stands": exactly the figure that is expected, made of the
+// configured notes and coins, with nothing left in the drawer at a closing (so no variance needs a reason).
+
+function cents(value: string): bigint {
+  const [whole, fraction = ""] = value.split(".");
+  return BigInt(whole) * BigInt(100) + BigInt(fraction.padEnd(2, "0").slice(0, 2));
+}
+
+function money(units: bigint): string {
+  const negative = units < BigInt(0);
+  const digits = (negative ? -units : units).toString().padStart(3, "0");
+  return `${negative ? "-" : ""}${digits.slice(0, -2)}.${digits.slice(-2)}`;
+}
+
+/** The fewest notes and coins (greedy over the configured values) that make `total`; every key of `keys` is listed, zero where none. */
+export function tallyFor(total: string, keys: string[]): Record<string, number> {
+  let rest = cents(total);
+  const tally: Record<string, number> = {};
+  for (const key of [...keys].sort((a, b) => Number(cents(b) - cents(a)))) {
+    const value = cents(key);
+    const n = value > BigInt(0) ? rest / value : BigInt(0);
+    tally[key] = Number(n);
+    rest -= n * value;
+  }
+  return tally;
+}
+
+/** The tally's total as a 2 dp decimal string. */
+export function tallyTotalOf(tally: Record<string, number>): string {
+  return money(Object.entries(tally).reduce((sum, [key, n]) => sum + cents(key) * BigInt(n), BigInt(0)));
+}
+
+/** The cash drawer of the station: found, or made (type cash_drawer, tied to the station). */
+export async function ensureDrawer(admin: Api, station: StationRef): Promise<{ id: number }> {
+  const locations = (await admin.get<{ data: { id: number; type: string; station_id: number | null }[] }>("/locations")).data;
+  const found = locations.find((l) => l.type === "cash_drawer" && l.station_id === station.id);
+  if (found) return found;
+  return admin.post<{ id: number }>("/locations", { name_en: "Cash drawer", name_am: "የገንዘብ መሳቢያ", type: "cash_drawer", station_id: station.id });
+}
+
+async function declareDrawerAsExpected(admin: Api, count: CountView): Promise<void> {
+  const cash = count.cash!;
+  const denominations = tallyFor(cash.expected_total, Object.keys(cash.denominations));
+  await admin.put(`/stock-counts/${count.id}/cash`, { denominations, ...(count.type === "closing" ? { float_left_total: "0.00" } : {}) });
 }
 
 /**
@@ -44,6 +94,11 @@ async function finishDrafts(admin: Api, shiftId: number): Promise<void> {
   const counts = (await admin.get<{ data: CountView[] }>(`/shifts/${shiftId}/counts`)).data;
   for (const count of counts) {
     if (count.status !== "draft") continue;
+    if (count.cash) {
+      await declareDrawerAsExpected(admin, count);
+      await admin.post(`/stock-counts/${count.id}/submit`);
+      continue;
+    }
     await admin.put(`/stock-counts/${count.id}/lines`, { confirm_all: true });
     for (let attempt = 0; ; attempt++) {
       const result = await admin.tryPost(`/stock-counts/${count.id}/submit`);
