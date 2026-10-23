@@ -1728,6 +1728,17 @@
                             "application/json": {
                                 "schema": {
                                     "type": "object",
+                                    "properties": {
+                                        "dropped_item_ids": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "dropped_item_ids"
+                                    ],
                                     "additionalProperties": {}
                                 }
                             }

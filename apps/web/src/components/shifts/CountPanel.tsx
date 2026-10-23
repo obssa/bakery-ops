@@ -65,6 +65,7 @@ export function CountPanel({
   const [review, setReview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitFailure, setSubmitFailure] = useState<string | null>(null);
+  const [dropped, setDropped] = useState(0);
   const [addItem, setAddItem] = useState("");
   const [addQty, setAddQty] = useState("");
   const [addInvalid, setAddInvalid] = useState(false);
@@ -109,6 +110,7 @@ export function CountPanel({
       const next = await submitCount(count.id, keys.keyFor(name));
       keys.done(name);
       onChange(next);
+      setDropped(next.dropped_item_ids?.length ?? 0);
       setReview(false);
       void client.invalidateQueries({ queryKey: ["shift", shiftId] });
       void client.invalidateQueries({ queryKey: ["handover"] });
@@ -164,6 +166,11 @@ export function CountPanel({
           </p>
         ) : null}
 
+        {dropped > 0 ? (
+          <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+            {t("dropped_notice", { count: dropped })}
+          </p>
+        ) : null}
         {stage === "waiting_cosign" ? <p className="rounded-md bg-amber-50 px-4 py-3 text-base text-amber-900">{t("stage_waiting_cosign")}</p> : null}
         {stage === "waiting_approval" ? <p className="rounded-md bg-amber-50 px-4 py-3 text-base text-amber-900">{t("stage_waiting_approval")}</p> : null}
         {stage === "locked" ? (

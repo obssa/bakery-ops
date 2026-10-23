@@ -123,7 +123,9 @@ final class CountsController
 
     public function submit(Request $input, StockCount $count, SubmitCount $submit): JsonResponse
     {
-        return response()->json($this->presenter->one($submit->handle($count)));
+        $submitted = $submit->handle($count);
+
+        return response()->json([...$this->presenter->one($submitted), 'dropped_item_ids' => $submit->dropped()]);
     }
 
     public function approve(ApproveCountRequest $input, StockCount $count, ApproveCount $approve): JsonResponse

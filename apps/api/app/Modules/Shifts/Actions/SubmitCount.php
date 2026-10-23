@@ -39,7 +39,7 @@ use Carbon\CarbonImmutable;
  * ledger_movement_id the newest movement of the branch; variance_qty is counted minus expected in exact decimals. Nothing here
  * writes a movement: a count with a variance waits in pending_approval (approval is step 3.3b), one without goes to approved, and
  * at a station that requires an overseer every count first waits in awaiting_cosign (CosignCount, step 3.3c). CountSubmitted is
- * announced after commit (3.3c); a line for an item deleted since the draft is 409 shifts.count.item_unavailable. A cash-drawer count (step 3.5)
+ * announced after commit (3.3c); a line of the draft for an item deleted since is dropped (step 3.7d; audit count.lines_dropped, ids in dropped_item_ids of the answer). A cash-drawer count (step 3.5)
  * has no lines: its declaration must have been entered (422 shifts.cash.declaration_missing, shifts.cash.float_required at a closing), a
  * cash variance or a channel difference needs a reason (422 shifts.cash.reason_required, shifts.cash.note_required) and sends the count to
  * a decision like a line with a variance; the figures (expected, variance, the cash sales read from Payments) are fixed under the locks.
@@ -56,6 +56,9 @@ use Carbon\CarbonImmutable;
  */
 final class SubmitCount
 {
+    /** @var list<int> the items whose lines the last handle() dropped from the draft because the items were deleted from the catalog */
+    private array $dropped = [];
+
     public function __construct(
         private readonly AuditedAction $audit,
         private readonly ShiftAccess $access,
@@ -70,12 +73,23 @@ final class SubmitCount
     ) {}
 
     /**
+     * The item ids whose lines the last submit dropped (deleted from the catalog while the draft listed them).
+     *
+     * @return list<int>
+     */
+    public function dropped(): array
+    {
+        return $this->dropped;
+    }
+
+    /**
      * @throws ShiftError auth.forbidden, shifts.station.forbidden (403); shifts.count.not_draft, shifts.count.shift_not_ready,
      *                    shifts.count.blocked_by_pending (409); shifts.count.incomplete, shifts.count.reason_required,
      *                    shifts.count.note_required (422)
      */
     public function handle(StockCount $count): StockCount
     {
+        $this->dropped = [];
         $person = $this->access->person('shifts.count');
         $shift = ShiftInstance::query()->findOrFail($count->shift_instance_id);
         $station = Station::query()->withTrashed()->findOrFail($shift->station_id);
@@ -109,7 +123,20 @@ final class SubmitCount
                 $lines = StockCountLine::query()->where('count_id', $c->id)->orderBy('item_id')->get();
                 $deleted = $this->items->deleted(array_values($lines->pluck('item_id')->map(static fn (mixed $id): int => (int) $id)->all()));
                 if ($deleted !== []) {
-                    throw ShiftError::itemUnavailable($deleted);
+                    // a draft cannot be rejected, so a line for an item deleted from the catalog is dropped here (step 3.7d), as an item
+                    // deleted from the catalog that is not on the count is out of scope in assertComplete; no movement is written
+                    $gone = array_flip($deleted);
+                    $this->dropped = array_values(array_map(static fn (mixed $id): int => (int) $id, $deleted));
+                    sort($this->dropped);
+                    $dropped = $lines->filter(static fn (StockCountLine $line): bool => isset($gone[$line->item_id]));
+                    $this->audit->recordEvent('count.lines_dropped', $c->getMorphClass(), $c->id, [
+                        'item_ids' => $this->dropped,
+                        'lines' => $dropped->map(static fn (StockCountLine $line): array => [
+                            'item_id' => $line->item_id, 'counted_qty' => $line->counted_qty?->toString(), 'confirmed' => $line->confirmed_at !== null,
+                        ])->values()->all(),
+                    ]);
+                    StockCountLine::query()->whereIn('id', $dropped->pluck('id')->all())->delete();
+                    $lines = $lines->reject(static fn (StockCountLine $line): bool => isset($gone[$line->item_id]))->values();
                 }
                 $this->assertComplete($c, $lines);
 

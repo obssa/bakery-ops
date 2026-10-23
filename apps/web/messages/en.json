@@ -1179,7 +1179,8 @@
     "cash_block_float": "Say how much stays in the drawer for the next shift (0.00 for none).",
     "cash_block_reason": "The count differs ({variance}) or a channel differs ({channels}): choose a reason.",
     "cash_block_note": "The reason you chose asks for a note.",
-    "cash_side_title": "Cash, side by side"
+    "cash_side_title": "Cash, side by side",
+    "dropped_notice": "{count, plural, one {# item was removed from the catalog while you were counting, so its line was left out of the count.} other {# items were removed from the catalog while you were counting, so their lines were left out of the count.}}"
   },
   "adminShifts": {
     "sections": "Shifts sections",

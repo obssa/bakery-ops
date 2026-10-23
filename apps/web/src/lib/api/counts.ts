@@ -34,8 +34,11 @@ export function putCash(countId: number, body: { denominations: Record<string, n
   return authed<Count>(`/stock-counts/${countId}/cash`, { method: "PUT", body, idempotencyKey: key });
 }
 
-export function submitCount(countId: number, key: string): Promise<Count> {
-  return authed<Count>(`/stock-counts/${countId}/submit`, { method: "POST", body: {}, idempotencyKey: key });
+/** The submit's answer: the count, and the items whose lines it dropped because they were deleted from the catalog while the draft listed them. */
+export type SubmittedCount = Count & { dropped_item_ids?: number[] };
+
+export function submitCount(countId: number, key: string): Promise<SubmittedCount> {
+  return authed<SubmittedCount>(`/stock-counts/${countId}/submit`, { method: "POST", body: {}, idempotencyKey: key });
 }
 
 export function cosignCount(countId: number, note: string, key: string): Promise<Count> {
