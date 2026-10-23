@@ -54,7 +54,8 @@ it('says no for anyone who cannot act: inactive, deleted, another branch, unknow
     }
 });
 
-it('attaches a shift through the bound ShiftAttacher: null by default, the answer of a rebinding, nothing for a person who cannot act', function () {
+it('attaches a shift through the bound ShiftAttacher: null with the call-in off, the answer of a rebinding, nothing for a person who cannot act', function () {
+    config(['shifts.open_ad_hoc_on_accept' => false]); // on by default since step 3.7e, when Shifts' own attacher would open a call-in shift
     expect($this->people->attachShift($this->baker->id, $this->cakeRoom))->toBeNull();
 
     $calls = new ArrayObject;
