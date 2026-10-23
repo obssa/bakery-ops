@@ -74,6 +74,18 @@ it('shows the station location\'s ingredients, out first, then low, then by avai
     expect(array_keys($response->json()))->toBe(['location_id', 'data']);
 });
 
+it('leaves a deleted or switched-off ingredient off the strip, so leftovers cannot crowd out the live ones', function () {
+    $live = ($this->ingredient)('Live', 'ሕያው', '900', '300');
+    $deleted = ($this->ingredient)('Deleted', 'የተሰረዘ', '0', '500');
+    $off = ($this->ingredient)('Off', 'የጠፋ', '0', '500');
+    $deleted->delete();
+    $off->forceFill(['is_active' => false])->save();
+
+    $ids = array_column(array_column(($this->strip)(null, '?limit=10')->assertOk()->json('data'), 'item'), 'id');
+
+    expect($ids)->toBe([$live->id]);
+});
+
 it('counts an item at exactly its minimum as low', function () {
     ($this->ingredient)('Flour', 'ዱቄት', '500', '500');
 

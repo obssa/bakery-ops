@@ -62,7 +62,7 @@ final class StockStrip
 
         $levels = $this->stock->at($location);
         $items = $levels === [] ? collect() : Item::query()
-            ->whereKey(array_keys($levels))->where('kind', ItemKind::Ingredient->value)->with('unit.baseUnit')->get()->keyBy('id');
+            ->whereKey(array_keys($levels))->where('kind', ItemKind::Ingredient->value)->where('is_active', true)->with('unit.baseUnit')->get()->keyBy('id');
         $rules = $items->isEmpty() ? collect() : ReorderRule::query()
             ->where('location_key', $location->id)->where('is_active', true)->whereIn('item_id', $items->keys()->all())->get()->keyBy('item_id');
 

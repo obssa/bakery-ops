@@ -69,6 +69,10 @@ export class Api {
     return this.send<T>("PUT", path, body);
   }
 
+  delete<T>(path: string): Promise<T> {
+    return this.send<T>("DELETE", path);
+  }
+
   patch<T>(path: string, body: unknown): Promise<T> {
     return this.send<T>("PATCH", path, body);
   }

@@ -1,6 +1,7 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
 import { MULTI_CONTEXT_TEST_MS, requireAdmin } from "../support/env";
 import { balanceAt, buildTransferFixture, ledgerOf, movingAverage, stockKitchen, transfersOf, type TransferFixture } from "../support/inventory";
+import { retireStaleIngredients } from "../support/fixture";
 import { uuid } from "../support/api";
 import { openAs } from "../support/pad";
 
@@ -96,7 +97,14 @@ async function runManagerConfirms(f: TransferFixture, manager: Page, transferId:
 async function runSecondRejected(f: TransferFixture, chef: Page, manager: Page) {
   const item = f.ingredient.name_en;
   const note = `one more ${f.ingredient.name_en}`; // run-unique: earlier runs leave their transfers in the E2E branch
-  await requestFromStrip(f, chef, "2000", note);
+  const onStrip = chef.getByRole("region", { name: "Stock strip" }).getByRole("listitem").filter({ hasText: item });
+  if (await onStrip.count()) {
+    await requestFromStrip(f, chef, "2000", note);
+  } else {
+    // the strip is cut to a few rows and other items may rank ahead of this one: the flow does not depend on its rank, the first
+    // request already went through the strip
+    await f.chef.api.post("/transfers", { client_uuid: uuid(), item_id: f.ingredient.id, to_location_id: f.kitchenLocation.id, qty: "2000", note });
+  }
   const second = (await transfersOf(f.admin, f.ingredient.id)).find((t) => t.status === "requested" && t.note === note);
   if (!second) throw new Error("the second request is not on the list");
 
@@ -128,6 +136,7 @@ test.describe("p2 purchase and transfer", () => {
     test.setTimeout(MULTI_CONTEXT_TEST_MS);
     const credentials = requireAdmin(test.skip);
     const fixture = await buildTransferFixture(credentials);
+    await retireStaleIngredients(fixture.admin);
     const { contexts, pages } = await openContexts(browser, testInfo.project.use.baseURL);
     try {
       await runPurchase(fixture);

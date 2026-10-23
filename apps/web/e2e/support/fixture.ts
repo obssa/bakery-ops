@@ -465,3 +465,23 @@ export async function clearStaleOrders(adminCredentials: { phone: string; passwo
   }
   return stale.length;
 }
+
+/**
+ * Retires the ingredients that earlier runs left in the E2E Test Branch ("E2E ..." names whose run tag is not this process's), so the
+ * kitchen's stock strip (out first, then low, cut to a handful of rows) is not crowded by them: before this, a run's fresh ingredient
+ * fell past the cut once a few older runs had left theirs and the strip flow failed on every deploy. An item is deleted (soft) when
+ * nothing uses it; one a recipe still uses is switched off, which the strip also leaves out. Only items of the E2E branch are listed
+ * (the admin's own branch), and only "E2E " ingredients are touched; this run's items are kept.
+ */
+export async function retireStaleIngredients(admin: Api): Promise<number> {
+  const items = (await admin.get<{ data: { id: number; name_en: string; is_active: boolean }[] }>("/items", { kind: "ingredient" })).data;
+  const stale = items.filter((item) => item.name_en.startsWith("E2E ") && !item.name_en.includes(run) && item.is_active);
+  for (const item of stale) {
+    try {
+      await admin.delete(`/items/${item.id}`);
+    } catch {
+      await admin.patch(`/items/${item.id}`, { is_active: false });
+    }
+  }
+  return stale.length;
+}
