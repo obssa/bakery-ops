@@ -7,6 +7,7 @@ groups="$1"; allow_empty="${2:-}"
 cd "$(dirname "$0")/../../apps/api"
 args=""; IFS="," ; for g in $groups; do args="$args --group=$g"; done; unset IFS
 out=$(vendor/bin/pest $args --colors=never 2>&1); code=$?
+echo "$out" | grep -E "^s+FAILED" | sort | uniq | head -150
 echo "$out" | tail -40
 if echo "$out" | grep -Eq "No tests (found|executed)"; then
   if [ "$allow_empty" = "--allow-empty" ]; then echo "(no tests for groups '$groups' yet: allowed)"; exit 0; fi

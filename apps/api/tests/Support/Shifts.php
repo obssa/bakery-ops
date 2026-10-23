@@ -22,7 +22,7 @@ final class Shifts
 {
     public static function enforced(): bool
     {
-        return (bool) config('ledger.require_shift_for_station_locations');
+        return (bool) config('ledger.require_shift_for_station_locations') || (bool) config('payments.require_shift_for_cash');
     }
 
     /**

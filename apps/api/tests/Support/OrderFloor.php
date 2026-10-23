@@ -71,6 +71,7 @@ final class OrderFloor
         $floor->breadBaker = makeUser($floor->branch, 'bread_baker');
         $floor->assign($floor->chef, $floor->menu->kitchenStation);
         $floor->assign($floor->barista, $floor->menu->barStation);
+        $floor->assign($floor->cashier, $floor->menu->tillStation);
         Shifts::ensureOpenAll($floor->menu->kitchenStation, $floor->menu->barStation, $floor->menu->tillStation);
 
         return $floor;

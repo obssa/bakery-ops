@@ -23,6 +23,7 @@ use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Orders\Support\LineInput;
 use App\Modules\Payments\Actions\RecordPayment;
 use App\Modules\Payments\Contracts\Channels;
+use App\Modules\Shifts\Contracts\Shifts;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -303,7 +304,10 @@ final class Phase1Seeder extends Seeder
         $total = $order->total->amount();
         $tendered = BigDecimal::of($total)->dividedBy('100', 0, RoundingMode::Up)->multipliedBy('100')->toScale(2)->__toString();
         $cashier = $this->user($this->cashierPhone());
-        $this->actAs($cashier, null, $this->stationOf('till')->id, null);
+        $till = $this->stationOf('till');
+        $this->actAs($cashier, null, $till->id, null);
+        // payments.require_shift_for_cash (step 3.7e): the cashier takes the cash in the till's running shift (DemoShifts opened it)
+        app(ActorContext::class)->inShift(app(Shifts::class)->current($till)?->id);
         app(RecordPayment::class)->handle($order->id, $paymentUuid, 'cash', $total, $tendered, null, $cashier);
     }
 
