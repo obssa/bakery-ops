@@ -8,6 +8,7 @@ use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Inventory\Contracts\Locations;
 use App\Modules\Inventory\Contracts\LocationView;
 use App\Modules\Inventory\Contracts\Stock;
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Enums\CountType;
@@ -21,7 +22,7 @@ use Ramsey\Uuid\Uuid;
 
 /**
  * Makes the draft counts of a shift boundary (phase-3 plan section 4, "How a count works"; section 10.8, "Count scope"): one
- * draft per stock place of the shift's station (never the cash drawer), of the given type. A repeat finds the rows already made
+ * draft per stock place of the shift's station (never the cash drawer: buildCash makes that one), of the given type. A repeat finds the rows already made
  * (the client UUID is derived, UUIDv5 of count:{shift}:{location}:{type}:{seq}, so a retried start or close reaches the same
  * rows), and a place that already has a later revision answers that one. The lines of a draft are
  *   - the items with a non-zero on_hand at the place (read as committed: the expected figure is taken again, under the locks, at
@@ -40,6 +41,7 @@ final class DraftBuilder
         private readonly Items $items,
         private readonly Locks $locks,
         private readonly ActorContext $actor,
+        private readonly CashDeclarations $cash,
     ) {}
 
     /**
@@ -63,6 +65,29 @@ final class DraftBuilder
         }
 
         return [$counts, $created];
+    }
+
+    /**
+     * The draft count of the station's cash drawer, with its empty declaration (step 3.5): null for a station with no cash drawer. A
+     * repeat answers the row already made (any revision). `build()` stays the stock places only, so the stock contract is unchanged;
+     * start and close ask for both.
+     */
+    public function buildCash(ShiftInstance $shift, CountType $type): ?StockCount
+    {
+        $drawer = $this->locations->cashDrawerOf($shift->station_id);
+        if (! $drawer instanceof LocationView) {
+            return null;
+        }
+        $existing = StockCount::query()
+            ->where('shift_instance_id', $shift->id)->where('location_id', $drawer->id)->where('type', $type->value)
+            ->orderByDesc('seq')->first();
+        if ($existing instanceof StockCount) {
+            return $existing;
+        }
+        $count = $this->make($shift, $type, $drawer);
+        $this->cash->draft($count, $shift);
+
+        return $count;
     }
 
     /** The derived client UUID of a count. */

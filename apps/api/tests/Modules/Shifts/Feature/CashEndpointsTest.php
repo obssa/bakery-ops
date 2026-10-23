@@ -9,6 +9,7 @@ use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Shared\Models\Branch;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\ShiftsFixture;
 
@@ -71,22 +72,34 @@ it('keeps what a later request leaves out, and clears what it sets to null', fun
 });
 
 it('refuses what cannot be a count of money, naming it, and writes nothing', function (array $body, int $status, string $key, array $extra) {
-    $before = CashDeclaration::query()->where('count_id', $this->count)->sole()->toArray();
+    $before = (array) DB::table('cash_declarations')->where('count_id', $this->count)->first();
 
     $response = $this->f->cashPut($this->f->cashier, $this->count, $body)->assertStatus($status)->assertJsonPath('message_key', $key);
     foreach ($extra as $field => $value) {
         $response->assertJsonPath($field, $value);
     }
-    expect(CashDeclaration::query()->where('count_id', $this->count)->sole()->toArray())->toBe($before);
+    expect((array) DB::table('cash_declarations')->where('count_id', $this->count)->first())->toBe($before);
 })->with([
     'no denominations' => [[], 422, 'validation.failed', []],
     'denominations that are not an object' => [['denominations' => 'many'], 422, 'validation.failed', []],
     'an unknown denomination' => [['denominations' => ['20' => 1]], 422, 'shifts.cash.denomination_unknown', ['denomination' => '20']],
     'a negative count' => [['denominations' => ['100' => -1]], 422, 'shifts.cash.count_invalid', ['denomination' => '100']],
     'half a note' => [['denominations' => ['100' => 1.5]], 422, 'shifts.cash.count_invalid', ['denomination' => '100']],
-    'a float left larger than the drawer' => [['denominations' => ['100' => 1], 'float_left_total' => '100.01'], 422, 'shifts.cash.float_too_large', []],
     'a reason that does not exist' => [['denominations' => ['100' => 1], 'reason_id' => 999999], 422, 'shifts.reason.unknown', []],
 ]);
+
+it('refuses a float left larger than the drawer, now or after a recount of the notes', function () {
+    $c = $this->f->cashier;
+    $this->f->cashPut($c, $this->count, ['denominations' => ['100' => 5]])->assertOk();
+    $this->f->submit($c, $this->count)->assertOk();
+    $closing = $this->f->closeTill($this->shift, $c)['count'];
+
+    $this->f->cashPut($c, $closing, ['denominations' => ['100' => 1], 'float_left_total' => '100.01'])->assertUnprocessable()
+        ->assertJsonPath('message_key', 'shifts.cash.float_too_large');
+    $this->f->cashPut($c, $closing, ['denominations' => ['100' => 1], 'float_left_total' => '100.00'])->assertOk();
+    $this->f->cashPut($c, $closing, ['denominations' => ['50' => 1]])->assertUnprocessable()->assertJsonPath('message_key', 'shifts.cash.float_too_large');
+    expect(CashDeclaration::query()->where('count_id', $closing)->sole()->counted_total->amount())->toBe('100.00');
+});
 
 it('takes the closing fields only at a closing: a float left or channel figures on an opening count are refused', function () {
     $this->f->cashPut($this->f->cashier, $this->count, ['denominations' => ['100' => 1], 'float_left_total' => '50.00'])->assertUnprocessable()
@@ -160,7 +173,7 @@ it('shows the till widget the cash in the drawer so far, live', function () {
         ->assertJsonStructure(['by_channel' => [['code', 'name_en', 'name_am', 'receipts', 'sum']]]);
 
     $this->f->taken($this->shift, '10.50');
-    $this->f->cashRead($this->f->waiter, $this->shift)->assertOk()->assertJsonPath('cash_sales_total', '110.50')->assertJsonPath('expected_total', '610.50');
+    $this->f->cashRead($this->f->cashier2, $this->shift)->assertOk()->assertJsonPath('cash_sales_total', '110.50')->assertJsonPath('expected_total', '610.50');
 });
 
 it('reads the opening figure as the float carried before the opening count is in', function () {

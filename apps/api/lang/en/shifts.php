@@ -62,4 +62,15 @@ return [
     'adjustment' => [
         'insufficient' => 'The correction would leave less than nothing in stock, because stock left after the count. Reject the count and count again.',
     ],
+    'cash' => [
+        'no_drawer' => 'This count is not the cash drawer, so there is no cash to declare.',
+        'denomination_unknown' => 'This note or coin is not one the till counts.',
+        'count_invalid' => 'The cash figures must be whole numbers of notes and coins, and amounts with at most two decimals.',
+        'float_too_large' => 'The money left in the drawer cannot be more than the money counted.',
+        'channel_unknown' => 'This payment method does not exist or is switched off.',
+        'declaration_missing' => 'Count the notes and coins in the drawer before handing in the count.',
+        'float_required' => 'Say how much money stays in the drawer for the next shift before handing in the count.',
+        'reason_required' => 'The cash does not match what was expected. Choose a reason.',
+        'note_required' => 'This reason needs a short note about the cash.',
+    ],
 ];

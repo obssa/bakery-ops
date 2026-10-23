@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Shifts\Hash;
 
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Models\StockCountLine;
@@ -21,11 +22,13 @@ use LogicException;
  *
  * `adjustment_qty` is the quantity of the movement the approval wrote for the line, which is by construction the line's variance
  * (a delta, never "set to the counted figure", ApproveCount); it is read from the line, so Shifts needs no view of the ledger's
- * movement rows. `cash` is null until step 3.5 gives a till count its declaration. Resolved per use.
+ * movement rows. `cash` is null for a stock count and, for a till count, the block of its declaration (CashDeclarations::payload): the keys scripts/verify_chain.py knows, rebuilt from the frozen declaration row. Resolved per use.
  */
 final class PayloadBuilder
 {
     public const int VERSION = 1;
+
+    public function __construct(private readonly CashDeclarations $cash) {}
 
     /**
      * @return array<string, mixed>
@@ -58,7 +61,7 @@ final class PayloadBuilder
             'decision_note' => $count->decision_note,
             'submitted_at' => CanonicalJson::timestamp($count->submitted_at),
             'lines' => array_map(fn (StockCountLine $line): array => $this->line($line, $codes), $lines),
-            'cash' => $this->cash($count), // becomes the declaration's block (an array, canonical keys sorted by the encoder) in step 3.5
+            'cash' => $this->cash->payload($count), // a cash-drawer count's declaration (step 3.5); null for a stock count
             'chain_seq' => $chainSeq,
             'locked_at' => CanonicalJson::timestamp($lockedAt),
             'locked_by_user_id' => $lockedByUserId,
@@ -106,13 +109,5 @@ final class PayloadBuilder
             'adjustment_movement_id' => $line->adjustment_movement_id,
             'adjustment_qty' => $line->adjustment_movement_id === null ? null : CanonicalJson::quantity($line->variance_qty),
         ];
-    }
-
-    /**
-     * The till count's cash declaration (step 3.5 fills this); null for every count until then.
-     */
-    private function cash(StockCount $count): null
-    {
-        return null;
     }
 }

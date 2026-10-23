@@ -9,6 +9,7 @@ use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Shifts\Actions\ApproveCount;
 use App\Modules\Shifts\Actions\CosignCount;
 use App\Modules\Shifts\Actions\RejectCount;
+use App\Modules\Shifts\Actions\SetCashDeclaration;
 use App\Modules\Shifts\Actions\SetCountLines;
 use App\Modules\Shifts\Actions\SubmitCount;
 use App\Modules\Shifts\Actions\UnlockCount;
@@ -21,6 +22,7 @@ use App\Modules\Shifts\Http\Requests\ApproveCountRequest;
 use App\Modules\Shifts\Http\Requests\CosignCountRequest;
 use App\Modules\Shifts\Http\Requests\ListCountsRequest;
 use App\Modules\Shifts\Http\Requests\RejectCountRequest;
+use App\Modules\Shifts\Http\Requests\SetCashDeclarationRequest;
 use App\Modules\Shifts\Http\Requests\SetCountLinesRequest;
 use App\Modules\Shifts\Http\Requests\UnlockCountRequest;
 use App\Modules\Shifts\Models\ShiftInstance;
@@ -42,6 +44,7 @@ use Symfony\Component\HttpFoundation\Response;
  *   GET /stock-counts/{count}           200 the Count with its lines side by side; polled (ETag, 304): the tag moves with the count and,
  *                                       while the count is open to change, with the ledger (the draft's expected figure is live)
  *   PUT /stock-counts/{count}/lines     200 the Count; 409 shifts.count.not_draft; 422 shifts.count.qty_invalid, item_unknown, reason.unknown
+ *   PUT  /stock-counts/{count}/cash     200 the Count with its `cash` block (step 3.5; the till's cash declaration, draft only); 409 / 422 as SetCashDeclaration says
  *   POST /stock-counts/{count}/submit   200 the Count; a repeat answers it; 409 / 422 as SubmitCount says
  *   POST /stock-counts/{count}/approve  200 the Count (step 3.3b; shifts.approve): the adjustments are written, a repeat answers it; 409 as ApproveCount says
  *   POST /stock-counts/{count}/reject   200 the rejected Count plus `recount`, the prefilled draft revision (the action decides: a co-signer while the count
@@ -108,6 +111,11 @@ final class CountsController
     public function lines(SetCountLinesRequest $input, StockCount $count, SetCountLines $set): JsonResponse
     {
         return response()->json($this->presenter->one($set->handle($count, $input->lines(), $input->confirmAll())));
+    }
+
+    public function cash(SetCashDeclarationRequest $input, StockCount $count, SetCashDeclaration $set): JsonResponse
+    {
+        return response()->json($this->presenter->one($set->handle($count, $input->declaration())));
     }
 
     public function submit(Request $input, StockCount $count, SubmitCount $submit): JsonResponse

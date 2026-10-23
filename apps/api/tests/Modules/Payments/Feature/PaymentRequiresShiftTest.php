@@ -50,7 +50,7 @@ it('ships off: the config default and the env files of the repository say false'
     expect(config('payments.require_shift_for_cash'))->toBeFalse();
     foreach (['.env.example', '.env.ci'] as $file) {
         $text = (string) file_get_contents(base_path($file));
-        expect($text)->toContain('PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false', "{$file} names the switch and leaves it off");
+        expect(str_contains($text, 'PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false'))->toBeTrue("{$file} names the switch and leaves it off");
     }
 });
 

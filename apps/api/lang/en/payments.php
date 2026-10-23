@@ -23,6 +23,9 @@ return [
         'not_payable' => 'This order cannot be paid: it must have been sent and not be cancelled, voided or closed.',
         'settled' => 'This order is already paid. It closes when its last item is served.',
     ],
+    'shift' => [
+        'required' => 'Start your shift before taking cash. A payment needs a shift that is open.',
+    ],
     'client_uuid' => [
         'reused' => 'This payment id was already used for another order.',
     ],

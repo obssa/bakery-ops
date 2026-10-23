@@ -10,6 +10,7 @@ use App\Modules\Identity\Contracts\People;
 use App\Modules\Inventory\Contracts\Locations;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Contracts\StockLevel;
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Enums\CountType;
@@ -28,7 +29,7 @@ use Carbon\CarbonInterface;
  * read as committed; once it is submitted it is the stored figure of the snapshot. `blocked_by_pending` names the unresolved count
  * at the same place that would refuse this draft's submit (rule R-A). `below_reserved` lists the lines of a submitted count whose
  * counted figure is under what open orders hold now (allowed, listed: plan section 10.4 point 2). `chain` is the lock (sequence, previous and own hash, the instant) of a
- * locked count and null before; `cash` is null until step 3.5. `moved_since` on a line (step 3.3b) is what moved at the place since the count, so an approver sees it (movedSince). Resolved per use.
+ * locked count and null before; `cash` is the cash declaration of a cash-drawer count (CashDeclarations::present, step 3.5) and null for a stock count. `moved_since` on a line (step 3.3b) is what moved at the place since the count, so an approver sees it (movedSince). Resolved per use.
  */
 final class CountPresenter
 {
@@ -38,6 +39,7 @@ final class CountPresenter
         private readonly Locations $locations,
         private readonly Stock $stock,
         private readonly Locks $locks,
+        private readonly CashDeclarations $cash,
     ) {}
 
     /**
@@ -163,7 +165,7 @@ final class CountPresenter
             $live = $count->status === CountStatus::Draft ? ($levels[$count->location_id] ?? []) : null;
             $moved = $this->movedSince($count, $lines);
             $row['lines'] = array_map(fn (StockCountLine $line): array => $this->line($line, $summaries[$line->item_id] ?? null, $reasons[$line->variance_reason_id ?? 0] ?? null, $live, $moved), $lines);
-            $row['cash'] = null;
+            $row['cash'] = $this->cash->present($count);
             $row['below_reserved'] = self::listsReserved($count) ? $this->belowReserved($lines, $levels[$count->location_id] ?? []) : [];
             $out[] = $row;
         }

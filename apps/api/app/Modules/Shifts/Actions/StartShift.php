@@ -222,6 +222,7 @@ final class StartShift
             $this->rosters->join($s, $person, RosterSource::Started);
             if ($counting) {
                 $this->drafts->build($s, CountType::Opening);
+                $this->drafts->buildCash($s, CountType::Opening);
             } else {
                 $this->announcer->opened($s);
             }
@@ -245,6 +246,7 @@ final class StartShift
             $this->rosters->join($shift, $person, RosterSource::Started);
             if ($counting) {
                 $this->drafts->build($shift, CountType::Opening);
+                $this->drafts->buildCash($shift, CountType::Opening);
             } else {
                 $this->announcer->opened($shift);
             }
@@ -256,6 +258,6 @@ final class StartShift
     /** Does the start count first? A station with a place to count does, unless the person starts without counting. */
     private function countsIn(int $stationId, bool $carry): bool
     {
-        return ! $carry && $this->locations->stockLocationsOf($stationId) !== [];
+        return ! $carry && ($this->locations->stockLocationsOf($stationId) !== [] || $this->locations->cashDrawerOf($stationId) !== null);
     }
 }

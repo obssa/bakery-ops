@@ -1653,6 +1653,57 @@
                 }
             }
         },
+        "/v1/stock-counts/{count}/cash": {
+            "put": {
+                "operationId": "shifts.counts.cash",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "count",
+                        "in": "path",
+                        "required": true,
+                        "description": "The count ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetCashDeclarationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/stock-counts/{count}/submit": {
             "post": {
                 "operationId": "shifts.counts.submit",
@@ -6927,6 +6978,77 @@
                 }
             }
         },
+        "/v1/shifts/{shift}/cash": {
+            "get": {
+                "operationId": "shifts.cash",
+                "summary": "GET /shifts/{shift}/cash (step 3.5): the till widget's cash in the drawer so far, live from Payments' Totals; 422 shifts.cash.no_drawer for a station with no drawer",
+                "tags": [
+                    "Shifts"
+                ],
+                "parameters": [
+                    {
+                        "name": "shift",
+                        "in": "path",
+                        "required": true,
+                        "description": "The shift ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "opening_total": {
+                                            "type": "string"
+                                        },
+                                        "carried_float_total": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "cash_sales_total": {
+                                            "type": "string"
+                                        },
+                                        "expected_total": {
+                                            "type": "string"
+                                        },
+                                        "by_channel": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "currency": {
+                                            "type": "string",
+                                            "const": "ETB"
+                                        }
+                                    },
+                                    "required": [
+                                        "opening_total",
+                                        "carried_float_total",
+                                        "cash_sales_total",
+                                        "expected_total",
+                                        "by_channel",
+                                        "currency"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/shifts/{shift}/roster": {
             "put": {
                 "operationId": "shifts.roster",
@@ -11562,6 +11684,52 @@
                     "note"
                 ],
                 "title": "SendBackBatchRequest"
+            },
+            "SetCashDeclarationRequest": {
+                "type": "object",
+                "description": "PUT /stock-counts/{count}/cash: `denominations` (an object, {\"200\": 3, ..}; always the whole count, an empty object is a drawer with\nnothing in it) and any of `float_left_total`, `channels`, `reason_id`, `reason_note`. The shape is checked here; the denominations, the\nsums and the channels are checked by the action, which answers 422 shifts.cash.* naming what is wrong, so a client gets the same error\nwhatever the mistake. A key that is absent leaves that part alone, `null` clears it. Any total sent is ignored: the server works it out.",
+                "properties": {
+                    "denominations": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "float_left_total": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "channels": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 50
+                    },
+                    "reason_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1
+                    },
+                    "reason_note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "denominations"
+                ],
+                "title": "SetCashDeclarationRequest"
             },
             "SetCountLinesRequest": {
                 "type": "object",

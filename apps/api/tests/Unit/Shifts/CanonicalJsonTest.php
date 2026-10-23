@@ -44,7 +44,7 @@ function chainVectors(): array
         'cash' => [
             'denominations' => [200 => 6, 100 => 5, 10 => 4, 5 => 2], 'counted_total' => '1750.50', 'expected_total' => '1750.50', 'variance_total' => '0.00',
             'carried_float_total' => '500.00', 'cash_sales_total' => '1250.50', 'float_left_total' => '500.00',
-            'channels' => [['code' => 'cash', 'receipts' => 12, 'sum' => '1250.50']], 'reason_code' => null, 'reason_note' => null, 'currency' => 'ETB',
+            'channels' => [['code' => 'cash', 'expected_receipts' => 12, 'expected_sum' => '1250.50', 'declared_receipts' => 12, 'declared_sum' => '1250.50', 'difference_sum' => '0.00']], 'reason_code' => null, 'reason_note' => null, 'currency' => 'ETB',
         ],
         'chain_seq' => 1, 'locked_at' => '2026-11-03T03:05:09.000000Z', 'locked_by_user_id' => 8, 'payload_version' => 1,
     ];
@@ -62,7 +62,7 @@ function chainVectors(): array
         .'{"adjustment_movement_id":null,"adjustment_qty":null,"carried_qty":null,"counted_qty":"300.0000","expected_qty":"300.0000","item_id":32,"reason_code":null,"reason_note":null,"variance_qty":"0.0000"}],'
         .'"location_id":5,"locked_at":"2026-11-02T12:30:00.482913Z","locked_by_user_id":2,"payload_version":1,"seq":1,"shift_date":"2026-11-02","shift_instance_id":17,'
         .'"snapshot_at":"2026-11-02T12:00:00.123456Z","station_id":3,"submitted_at":"2026-11-02T12:00:00.000000Z","supersedes_count_id":null,"type":"closing"}';
-    $tillCanonical = $head.'{"carried_float_total":"500.00","cash_sales_total":"1250.50","channels":[{"code":"cash","receipts":12,"sum":"1250.50"}],"counted_total":"1750.50",'
+    $tillCanonical = $head.'{"carried_float_total":"500.00","cash_sales_total":"1250.50","channels":[{"code":"cash","declared_receipts":12,"declared_sum":"1250.50","difference_sum":"0.00","expected_receipts":12,"expected_sum":"1250.50"}],"counted_total":"1750.50",'
         .'"currency":"ETB","denominations":{"10":4,"100":5,"200":6,"5":2},"expected_total":"1750.50","float_left_total":"500.00","reason_code":null,"reason_note":null,"variance_total":"0.00"},'
         .'"chain_seq":1,"cosigned_by_user_id":8,"counted_by_user_id":6,"decided_at":null,"decided_by_user_id":null,"decision":null,"decision_note":null,"ledger_movement_id":902,"lines":[],'
         .'"location_id":9,"locked_at":"2026-11-03T03:05:09.000000Z","locked_by_user_id":8,"payload_version":1,"seq":2,"shift_date":"2026-11-03","shift_instance_id":21,'

@@ -20,7 +20,7 @@ use Carbon\CarbonImmutable;
  * enforcement check takes the same row in share mode: a movement that began first finishes first and is inside the counted figure,
  * one that starts after finds the shift no longer `open` and is refused 409 inventory.shift.required, section 10.1). One draft closing
  * count is made per stock place of the station, with its expected figure shown live from the ledger (DraftBuilder). A station with no
- * place to count has nothing to count: the shift goes straight on to `locked`. Any other status than `open` is 409
+ * place to count and no cash drawer has nothing to count: the shift goes straight on to `locked`. Any other status than `open` is 409
  * shifts.shift.not_open naming it (a shift still `opening` is cancelled or opened, not closed). A repeat on a `counting` shift
  * answers it and writes nothing, not even an audit row. One AuditedAction (shift.close).
  */
@@ -68,7 +68,8 @@ final class CloseShift
                 ])->save();
 
                 [$counts] = $this->drafts->build($s, CountType::Closing);
-                if ($counts === []) {
+                $drawer = $this->drafts->buildCash($s, CountType::Closing);
+                if ($counts === [] && $drawer === null) {
                     $locked = $s->status->transitionTo(ShiftStatus::Locked);
                     $s->forceFill([
                         'status' => $locked,

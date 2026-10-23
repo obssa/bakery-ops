@@ -6,6 +6,7 @@ namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Catalog\Contracts\Items;
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Counts\CountLock;
 use App\Modules\Shifts\Counts\DraftBuilder;
 use App\Modules\Shifts\Enums\CountDecision;
@@ -55,6 +56,7 @@ final class RejectCount
         private readonly ActorContext $actor,
         private readonly CountAnnouncer $announcer,
         private readonly Items $items,
+        private readonly CashDeclarations $cash,
     ) {}
 
     /**
@@ -213,6 +215,9 @@ final class RejectCount
             'device_id' => $stamp['device_id'],
             'version' => 1,
         ])->save();
+
+        // a drawer count's recount starts from the same declaration, for the cashier to look at again (step 3.5)
+        $this->cash->copy($rejected, $recount);
 
         $gone = array_flip($this->items->deleted(array_map(static fn (StockCountLine $l): int => $l->item_id, $lines)));
         $rows = [];

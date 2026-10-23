@@ -46,6 +46,7 @@ CASH_KEYS = {
     "denominations", "counted_total", "expected_total", "variance_total", "carried_float_total", "cash_sales_total", "float_left_total",
     "channels", "reason_code", "reason_note", "currency",
 }
+CHANNEL_KEYS = {"code", "expected_receipts", "expected_sum", "declared_receipts", "declared_sum", "difference_sum"}
 QTY = re.compile(r"^-?\d+\.\d{4}$")
 MONEY = re.compile(r"^-?\d+\.\d{2}$")
 INSTANT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$")
@@ -105,14 +106,14 @@ def load_no_floats(text: str) -> object:
 
 
 def decimal_problems(path: str, value: object, problems: list[str]) -> None:
-    """Every *_qty is a four-place decimal string, every *_total two places; zero is never negative."""
+    """Every *_qty is a four-place decimal string, every *_total and *_sum two places; zero is never negative."""
     if isinstance(value, dict):
         for key, item in value.items():
             where = "%s.%s" % (path, key)
             if item is not None and key.endswith("_qty"):
                 if not isinstance(item, str) or not QTY.match(item) or item.startswith("-0.0000"):
                     problems.append("%s: %r is not a four-place decimal" % (where, item))
-            elif item is not None and key.endswith("_total"):
+            elif item is not None and (key.endswith("_total") or key.endswith("_sum")):
                 if not isinstance(item, str) or not MONEY.match(item) or item.startswith("-0.00"):
                     problems.append("%s: %r is not a two-place decimal" % (where, item))
             elif key.endswith("_at") and item is not None:
@@ -143,6 +144,9 @@ def payload_problems(payload: dict) -> list[str]:
     if cash is not None:
         if set(cash) != CASH_KEYS:
             problems.append("cash keys differ")
+        for row in cash["channels"]:
+            if set(row) != CHANNEL_KEYS:
+                problems.append("cash channel keys differ for %r" % row.get("code"))
         codes = [row["code"] for row in cash["channels"]]
         if codes != sorted(codes, key=lambda c: c.encode("utf-8")):
             problems.append("cash channels are not ordered by code: %s" % codes)

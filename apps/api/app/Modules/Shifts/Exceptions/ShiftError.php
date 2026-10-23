@@ -264,6 +264,60 @@ final class ShiftError extends RuntimeException
         return new self('shifts.lock.chain_busy', 409);
     }
 
+    /** The count is not at a cash drawer, so it takes no cash declaration. */
+    public static function noDrawer(): self
+    {
+        return new self('shifts.cash.no_drawer', 422);
+    }
+
+    /** A denomination that is not on config('shifts.denominations'). */
+    public static function denominationUnknown(string $denomination): self
+    {
+        return new self('shifts.cash.denomination_unknown', 422, ['denomination' => $denomination]);
+    }
+
+    /** A figure of the declaration that is not a count of money: a count that is not a whole number, a sum with more than two decimals, a channel twice. */
+    public static function cashCountInvalid(string $what, string $kind = 'denomination'): self
+    {
+        return new self('shifts.cash.count_invalid', 422, [$kind => $what]);
+    }
+
+    /** The float left in the drawer is more than the drawer holds. */
+    public static function floatTooLarge(string $floatLeft, string $counted): self
+    {
+        return new self('shifts.cash.float_too_large', 422, ['float_left_total' => $floatLeft, 'counted_total' => $counted]);
+    }
+
+    /** A channel of the reconciliation that does not exist in the branch or is switched off. */
+    public static function channelUnknown(string $code): self
+    {
+        return new self('shifts.cash.channel_unknown', 422, ['code' => $code]);
+    }
+
+    /** The drawer count was never declared (no notes and coins entered). */
+    public static function declarationMissing(): self
+    {
+        return new self('shifts.cash.declaration_missing', 422);
+    }
+
+    /** A closing declaration that does not say what stays in the drawer for the next shift. */
+    public static function floatRequired(): self
+    {
+        return new self('shifts.cash.float_required', 422);
+    }
+
+    /** A cash variance or a channel difference with no reason. */
+    public static function cashReasonRequired(): self
+    {
+        return new self('shifts.cash.reason_required', 422);
+    }
+
+    /** The reason of the cash declaration asks for a note and there is none. */
+    public static function cashNoteRequired(): self
+    {
+        return new self('shifts.cash.note_required', 422);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

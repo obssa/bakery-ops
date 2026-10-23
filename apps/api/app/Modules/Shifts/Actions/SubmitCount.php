@@ -9,6 +9,7 @@ use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Contracts\StockLevel;
 use App\Modules\Inventory\Ledger\Ledger;
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Contracts\HashChain;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Counts\CountLock;
@@ -38,7 +39,10 @@ use Carbon\CarbonImmutable;
  * ledger_movement_id the newest movement of the branch; variance_qty is counted minus expected in exact decimals. Nothing here
  * writes a movement: a count with a variance waits in pending_approval (approval is step 3.3b), one without goes to approved, and
  * at a station that requires an overseer every count first waits in awaiting_cosign (CosignCount, step 3.3c). CountSubmitted is
- * announced after commit (3.3c); a line for an item deleted since the draft is 409 shifts.count.item_unavailable.
+ * announced after commit (3.3c); a line for an item deleted since the draft is 409 shifts.count.item_unavailable. A cash-drawer count (step 3.5)
+ * has no lines: its declaration must have been entered (422 shifts.cash.declaration_missing, shifts.cash.float_required at a closing), a
+ * cash variance or a channel difference needs a reason (422 shifts.cash.reason_required, shifts.cash.note_required) and sends the count to
+ * a decision like a line with a variance; the figures (expected, variance, the cash sales read from Payments) are fixed under the locks.
  *
  * Refused, and nothing changed: 409 shifts.count.not_draft (a rejected count), 409 shifts.count.shift_not_ready (the shift is not
  * taking this kind of count: an opening count needs an `opening` shift, a closing count a `counting` one), 409
@@ -62,6 +66,7 @@ final class SubmitCount
         private readonly CountAnnouncer $counts,
         private readonly Items $items,
         private readonly HashChain $chain,
+        private readonly CashDeclarations $cash,
     ) {}
 
     /**
@@ -125,7 +130,10 @@ final class SubmitCount
                     $this->logDrift($c, $lines, $variances);
                 }
 
-                $differs = false;
+                // a drawer count: the declaration is checked and its figures fixed here, while the count is still a draft (step 3.5)
+                $cashFigures = $this->cash->settle($c);
+
+                $differs = $cashFigures !== null && $cashFigures->differs;
                 foreach ($lines as $line) {
                     $expected = $variances[$line->item_id]['expected'];
                     $variance = $variances[$line->item_id]['variance'];

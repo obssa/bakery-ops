@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Contracts\HashChain;
 use App\Modules\Shifts\Counts\CountLock;
 use App\Modules\Shifts\Enums\CountStatus;
@@ -39,6 +40,7 @@ final class CosignCount
         private readonly ShiftAccess $access,
         private readonly CountAnnouncer $announcer,
         private readonly HashChain $chain,
+        private readonly CashDeclarations $cash,
     ) {}
 
     /**
@@ -73,7 +75,7 @@ final class CosignCount
                 }
                 ShiftLock::refresh($shift);
 
-                $differs = false;
+                $differs = $this->cash->differs($c);
                 foreach (StockCountLine::query()->where('count_id', $c->id)->get() as $line) {
                     $differs = $differs || ($line->variance_qty instanceof Quantity && ! $line->variance_qty->isZero());
                 }

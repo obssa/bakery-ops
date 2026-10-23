@@ -6,6 +6,7 @@ namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Inventory\Contracts\Locations;
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Models\StockCountLine;
@@ -28,6 +29,7 @@ final class CountAnnouncer
     public function __construct(
         private readonly Items $items,
         private readonly Locations $locations,
+        private readonly CashDeclarations $cash,
     ) {}
 
     /** The count was handed in (or co-signed): it now waits at `$count->status`. */
@@ -79,7 +81,7 @@ final class CountAnnouncer
             count($lines),
             count($varying),
             $items,
-            null,
+            $this->cash->varianceTotal($count),
             (int) $count->counted_by_user_id,
             $cosignedBy,
         ));

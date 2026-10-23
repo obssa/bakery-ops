@@ -114,6 +114,6 @@ it('names every column of the table in the update trigger text (a column added l
         if (in_array($column, ['updated_at'], true)) {
             continue;
         }
-        expect($text)->toContain("`{$column}`", "the update trigger names {$column}");
+        expect(preg_match('/NEW\.`?'.preg_quote($column, '/').'`?\s*<=>/', $text))->toBe(1, "the update trigger names {$column}");
     }
 });

@@ -12,8 +12,15 @@
  * shifts, the live host must not make shifts nobody can close. With it off the attacher attaches the person to a shift that is
  * already running and otherwise answers null, exactly as the Phase 2 NullShiftAttacher did. Step 3.7e switches it on together with
  * `ledger.require_shift_for_station_locations` (docs/runbook/server.md, "Shifts and the call-in").
+ *
+ * denominations: the notes and coins a cashier counts in the drawer (step 3.5; phase-3 plan section 10.5), largest first, written as
+ * strings exactly as they appear in the payload of a locked count: the ETB notes 200, 100, 50, 10, 5, 1 and coins 0.50, 0.25, 0.10, 0.05.
+ * A cash declaration carries a whole number of each (zero where none), and the server works out the total in Money. No cash rounding
+ * rule is applied (the "nearest 0.05" setting of the architecture is not built). Changing the list changes what new declarations ask
+ * for; a locked count keeps the denominations it was counted with.
  */
 return [
     'start_grace_minutes' => (int) env('SHIFTS_START_GRACE_MINUTES', 60),
     'open_ad_hoc_on_accept' => (bool) env('SHIFTS_OPEN_AD_HOC_ON_ACCEPT', false),
+    'denominations' => ['200', '100', '50', '10', '5', '1', '0.50', '0.25', '0.10', '0.05'],
 ];

@@ -259,6 +259,17 @@ closes one, and a shift made by a call-in would stay open for ever. Step 3.7e sw
 `~/bakery-ops.orcamind.dev/.env` and run `php artisan config:cache`; a shift already opened stays and is cancelled or closed from the admin screens.
 `SHIFTS_START_GRACE_MINUTES` (default 60) is how long before its window starts a scheduled shift may be started.
 
+## Shift rule for cash (Phase 3, off)
+
+`PAYMENTS_REQUIRE_SHIFT_FOR_CASH` (read by `config/payments.php`) makes the till refuse a cash payment (`409 payments.shift.required`) unless
+the cashier carries an open shift: a payment taken after the till's count began would fall outside the declared cash, and one with no shift
+would be in no drawer's total. It ships `false` in the code, `.env.example` and `.env.ci`, and stays unset (so off) on the live host until
+step 3.7e of Phase 3, which switches it on together with `LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` and `SHIFTS_OPEN_AD_HOC_ON_ACCEPT`
+(above): until the till has a screen with a Start button, turning it on would stop the shop taking cash. It has its own variable so either rule
+can be switched off alone. To switch it off again, set `PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false` in `~/bakery-ops.orcamind.dev/.env` and run
+`php artisan config:cache`; nothing is deployed and nothing is lost. The till's cash count itself (opening float, closing declaration, channel
+reconciliation) works with the flag off: it counts whatever payments carry the shift. Nothing to do now.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.

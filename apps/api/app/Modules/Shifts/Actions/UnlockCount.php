@@ -6,6 +6,7 @@ namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Catalog\Contracts\Items;
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Counts\CountLock;
 use App\Modules\Shifts\Counts\DraftBuilder;
@@ -45,6 +46,7 @@ final class UnlockCount
         private readonly ActorContext $actor,
         private readonly Locks $locks,
         private readonly Items $items,
+        private readonly CashDeclarations $cash,
     ) {}
 
     /**
@@ -110,6 +112,9 @@ final class UnlockCount
             'device_id' => $stamp['device_id'],
             'version' => 1,
         ])->save();
+
+        // a drawer count's revision starts from the same declaration, to be looked at again (step 3.5)
+        $this->cash->copy($locked, $revision);
 
         $lines = StockCountLine::query()->where('count_id', $locked->id)->orderBy('item_id')->get();
         $gone = array_flip($this->items->deleted(array_values($lines->pluck('item_id')->map(static fn (mixed $id): int => (int) $id)->all())));

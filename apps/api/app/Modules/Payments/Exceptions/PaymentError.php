@@ -82,6 +82,15 @@ final class PaymentError extends RuntimeException
         return new self('payments.client_uuid.reused', 409, ['field' => 'client_uuid']);
     }
 
+    /**
+     * payments.require_shift_for_cash is on and the actor carries no open shift (none at all, or one that is counting or locked):
+     * the cash would be in no drawer's total.
+     */
+    public static function shiftRequired(): self
+    {
+        return new self('payments.shift.required', 409);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

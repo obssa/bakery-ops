@@ -15,6 +15,7 @@ use App\Modules\Payments\Models\PaymentChannel;
 use App\Modules\Payments\Support\CashTender;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Events\PaymentRecorded;
+use App\Shared\Shifts\OpenShifts;
 use App\Shared\Tenancy\CurrentBranch;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
@@ -33,6 +34,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
  *      it (422 payments.tendered.too_low), change = tendered - amount; the payment row is written, then PaymentRecorded
  *      is dispatched INSIDE the transaction, where Orders' ApplyPayment adds it to the order, settles it and, once it is
  *      served, pays, sells and closes it. A failure anywhere rolls the payment back with it.
+ * Step 3.5 adds a fourth rule behind payments.require_shift_for_cash (off by default): cash needs an open shift (409 payments.shift.required).
  * The reference number is stored but never logged (the audit snapshot redacts it). Money is Money (brick/math) and
  * decimal strings, never float.
  */
@@ -46,6 +48,7 @@ final class RecordPayment
         private readonly Orders $orders,
         private readonly CurrentBranch $branch,
         private readonly ActorContext $actor,
+        private readonly OpenShifts $shifts,
     ) {}
 
     /**
@@ -70,6 +73,7 @@ final class RecordPayment
                 if ($replayed instanceof Payment) {
                     throw new AlreadyRecorded($replayed);
                 }
+                $this->assertShiftForCash($channel);
                 if (! $view->isPayable()) {
                     throw PaymentError::notPayable($view->status);
                 }
@@ -129,6 +133,25 @@ final class RecordPayment
         }
 
         return new RecordedPayment($payment, true, $this->orders->forPayment($orderId));
+    }
+
+    /**
+     * With payments.require_shift_for_cash on, cash needs the actor to carry an OPEN shift (step 3.5): the shared lock on its row
+     * keeps a close (which takes the row FOR UPDATE) from freezing the drawer between this check and the payment row, so a payment
+     * either is inside the declared cash or is refused. A payment that was already taken is answered before this (a replay).
+     * With the flag off nothing is asked of Shifts.
+     *
+     * @throws PaymentError payments.shift.required (409)
+     */
+    private function assertShiftForCash(PaymentChannel $channel): void
+    {
+        if ($channel->code !== self::CASH || ! config('payments.require_shift_for_cash')) {
+            return;
+        }
+        $shift = $this->actor->shiftInstanceId();
+        if ($shift === null || ! $this->shifts->isOpen($shift, true)) {
+            throw PaymentError::shiftRequired();
+        }
     }
 
     /**

@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Http\Controllers;
 
 use App\Modules\Identity\Contracts\People;
+use App\Modules\Inventory\Contracts\Locations;
+use App\Modules\Inventory\Contracts\LocationView;
 use App\Modules\Shifts\Actions\CancelShift;
 use App\Modules\Shifts\Actions\CloseShift;
 use App\Modules\Shifts\Actions\JoinShift;
 use App\Modules\Shifts\Actions\LeaveShift;
 use App\Modules\Shifts\Actions\ReplaceRoster;
 use App\Modules\Shifts\Actions\ScheduleShift;
+use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Counts\CountPresenter;
 use App\Modules\Shifts\Counts\CountReads;
 use App\Modules\Shifts\Enums\CountType;
+use App\Modules\Shifts\Exceptions\ShiftError;
 use App\Modules\Shifts\Http\Requests\CancelShiftRequest;
 use App\Modules\Shifts\Http\Requests\ListShiftsRequest;
 use App\Modules\Shifts\Http\Requests\ReplaceRosterRequest;
@@ -42,6 +46,7 @@ use Symfony\Component\HttpFoundation\Response;
  *   POST /shifts/{shift}/cancel       200 the cancelled Shift (the admin, or the starter of an opening shift); a repeat answers itself
  *   POST /shifts/{shift}/join         200 the Shift with the caller on duty; 409 shifts.shift.not_running
  *   POST /shifts/{shift}/leave        200 the Shift with the caller off duty; 409 shifts.shift.not_running
+ *   GET  /shifts/{shift}/cash         200 {opening_total, carried_float_total, cash_sales_total, expected_total, by_channel, currency}: the till's cash so far (step 3.5)
  *   POST /shifts/{shift}/close        200 {shift, counts}: open -> counting, one draft closing count per stock place; a repeat answers it
  *   GET  /shifts/{shift}/summary      200 {movements, cash, open_work}: what the shift did and what is still open
  */
@@ -139,6 +144,19 @@ final class ShiftsController
         $closed = $close->handle($shift);
 
         return response()->json(['shift' => $this->presenter->one($closed), 'counts' => $counts->many($reads->latest($closed, CountType::Closing))]);
+    }
+
+    /** GET /shifts/{shift}/cash (step 3.5): the till widget's cash in the drawer so far, live from Payments' Totals; 422 shifts.cash.no_drawer for a station with no drawer. */
+    public function cash(Request $input, ShiftInstance $shift, CashDeclarations $cash, Locations $locations): JsonResponse
+    {
+        $person = $this->access->person('shifts.view');
+        $this->access->assertAt($person, 'shifts.view', Station::query()->withTrashed()->findOrFail($shift->station_id));
+        $drawer = $locations->cashDrawerOf($shift->station_id);
+        if (! $drawer instanceof LocationView) {
+            throw ShiftError::noDrawer();
+        }
+
+        return response()->json($cash->summary($shift, $drawer));
     }
 
     public function summary(Request $input, ShiftInstance $shift, ShiftSummaryReader $summary): JsonResponse

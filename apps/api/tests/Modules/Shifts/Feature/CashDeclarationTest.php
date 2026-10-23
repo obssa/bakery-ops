@@ -227,7 +227,7 @@ it('writes the cash block into the locked payload, and the chain verifies it', f
         ->and($closing['cash']['float_left_total'])->toBe('500.00')
         ->and($closing['cash']['carried_float_total'])->toBeNull()
         ->and($closing['cash']['currency'])->toBe('ETB')
-        ->and($closing['cash']['denominations'])->toBe(['200' => 3, '100' => 1, '50' => 0, '10' => 2, '5' => 1, '1' => 0, '0.50' => 1, '0.25' => 0, '0.10' => 0, '0.05' => 0])
+        ->and($closing['cash']['denominations'])->toEqual(['200' => 3, '100' => 1, '50' => 0, '10' => 2, '5' => 1, '1' => 0, '0.50' => 1, '0.25' => 0, '0.10' => 0, '0.05' => 0])
         ->and($closing['cash']['channels'])->toBe([['code' => 'cash', 'declared_receipts' => null, 'declared_sum' => null, 'difference_sum' => null, 'expected_receipts' => 3, 'expected_sum' => '225.50']])
         ->and($opening['cash']['counted_total'])->toBe('500.00')
         ->and($opening['cash']['channels'])->toBe([])
@@ -297,8 +297,8 @@ it('makes the drawer part of the shift beside the stock places: both must be han
 });
 
 it('does not give a station without a cash drawer a cash count', function () {
-    $this->f->place($this->f->kitchen);
-    $start = $this->f->start($this->f->chef, $this->f->kitchen)->assertCreated();
+    $this->f->place($this->f->cakeRoom);
+    $start = $this->f->start($this->f->baker, $this->f->cakeRoom)->assertCreated();
 
     expect(collect($start->json('counts'))->pluck('cash')->filter()->all())->toBe([])
         ->and(CashDeclaration::query()->count())->toBe(0);

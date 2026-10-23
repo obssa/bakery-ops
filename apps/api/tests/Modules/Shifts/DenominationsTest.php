@@ -48,7 +48,7 @@ it('works out the total in exact decimals: the worked table of section 10.5', fu
 it('answers every configured denomination, zero where nothing was counted, in the configured order', function () {
     $normal = (new Denominations)->normalise(['10' => 4, '200' => 1]);
 
-    expect(array_keys($normal))->toBe(['200', '100', '50', '10', '5', '1', '0.50', '0.25', '0.10', '0.05'])
+    expect(array_map('strval', array_keys($normal)))->toBe(['200', '100', '50', '10', '5', '1', '0.50', '0.25', '0.10', '0.05'])
         ->and($normal['200'])->toBe(1)
         ->and($normal['10'])->toBe(4)
         ->and($normal['0.05'])->toBe(0)
@@ -74,7 +74,7 @@ it('refuses a count that is not a non-negative whole number', function (mixed $c
 
     expect($messageKey)->toBe('shifts.cash.count_invalid')
         ->and($extra['denomination'] ?? null)->toBe('100');
-})->with([-1, 1.5, '1.5', 'three', null, true, [1], 1000001]);
+})->with([-1, 1.5, '1.5', 'three', null, true, [[1]], 1000001]);
 
 it('accepts a whole number sent as a string or an integer', function () {
     $normal = (new Denominations)->normalise(['100' => '3', '50' => 2, '10' => 0]);
