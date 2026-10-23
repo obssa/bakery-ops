@@ -135,7 +135,7 @@
         "shifts.instances": "done",
         "shifts.counts": "done",
         "shifts.locks": "done",
-        "shifts.cash": "todo",
+        "shifts.cash": "done",
         "shifts.handover": "todo",
         "web": "todo",
         "docs": "todo"

@@ -394,6 +394,14 @@ migrates it (`erd-check`).
     `currency` CHAR(3), timestamps. CHECKs: `counted_total >= 0`; `float_left_total IS NULL OR (float_left_total >= 0 AND
     float_left_total <= counted_total)`. Frozen by the same trigger pattern as the lines (parent `draft` only; `locked` fully).
     Amounts are `*_total`, so the money rule (12,2) applies; `*_total` and a JSON column are the only shapes.
+    **As built (3.5), where the code differs from the text above:** one more column, `confirmed_at` DATETIME NULL (null until the cashier
+    has declared; a submit refuses an undeclared drawer, as it refuses an unconfirmed line); `counted_total` defaults to `0.00` (a draft is a
+    declaration of nothing yet); `channel_counts` holds the declared figures `[{code, receipts, sum}]` while the count is a draft and, from the
+    submit, the whole reconciliation `[{code, expected_receipts, expected_sum, declared_receipts, declared_sum, difference_sum}]`; the
+    triggers are `cash_declarations_freeze_insert` (parent not a draft), `cash_declarations_freeze_update` (parent not a draft and any column
+    but `updated_at` changed, read from `information_schema` so it names every column, as migration 12 does; parent `locked`: always) and
+    `cash_declarations_forbid_delete`; PostgreSQL has the one `cash_declarations_guard()` function. There is no decision column to leave
+    writable (a count's decision lives on `stock_counts`), so unlike a line nothing may change after the submit.
 14. `..._create_handover_notes_table` (Shifts, 3.6): `id`, `branch_id`, `client_uuid` UUID, `shift_instance_id` FK, `from_user_id`
     FK (the person who wrote it: acting-as, else the account), `to_user_id` FK NULL (a named colleague; null means "the next
     shift"), `body` VARCHAR(1000) NOT NULL (CHECK `CHAR_LENGTH(body) > 0` on MariaDB, `char_length` on PostgreSQL; free text in
@@ -467,7 +475,7 @@ every action on it is `422 shifts.station.not_tracked`.
 | `POST /stock-counts/{count}/reject` | route `shifts.view` (3.3c; it was `shifts.approve` in 3.3b); the action decides: a count in `awaiting_cosign` is rejected by whoever may co-sign it (the overseer flagged there, `shifts.cosign`), one in `pending_approval` by `shifts.approve` (`403 auth.forbidden` otherwise) | key | `{note, line_ids?}` (the note is required; `line_ids` marks the lines to look at again, default every line with a variance) | `200` Count (`rejected`) + the new draft revision `{recount: Count}` prefilled with the counted values (both attempts are kept, the first is `superseded_by_id` -> the second); the shift goes back to `counting` or stays `opening`. Emits `VarianceDecided` | `403`, `422 validation.failed`, `409 shifts.count.not_pending` |
 | `POST /stock-counts/{count}/unlock` | `shifts.unlock` (admin) | key | `{reason}` (required) | `200 {unlocked: Count (still locked, `superseded_by_id` set), revision: Count (draft, `supersede_cause = unlock`, expected = the unlocked count's counted value)}` | `403`, `422 validation.failed`, `409 shifts.count.not_locked`, `409 shifts.count.already_superseded` |
 | **Cash (3.5)** | | | | | |
-| `PUT /stock-counts/{count}/cash` | `shifts.count` at the till | key | `{denominations: {"200": 3, "100": 5, ...}, float_left_total? (closing), channels: [{code, receipts, sum}]? (closing), reason_id?, reason_note?}` on the count of the cash-drawer place (draft only) | `200` Count with `cash` (below); `counted_total` is computed from the denominations | `409 shifts.count.not_draft`, `422 shifts.cash.no_drawer` (not a cash-drawer count), `422 shifts.cash.denomination_unknown` `{denomination}`, `422 shifts.cash.count_invalid`, `422 shifts.cash.float_too_large` |
+| `PUT /stock-counts/{count}/cash` | `shifts.count` at the till | key | `{denominations: {"200": 3, "100": 5, ...}, float_left_total? (closing), channels: [{code, receipts, sum}]? (closing), reason_id?, reason_note?}` on the count of the cash-drawer place (draft only) | `200` Count with `cash` (below); `counted_total` is computed from the denominations | `409 shifts.count.not_draft`, `422 shifts.cash.no_drawer` (not a cash-drawer count), `422 shifts.cash.denomination_unknown` `{denomination}`, `422 shifts.cash.count_invalid` `{denomination}` or `{field}` (a count that is not a whole number, a sum with more than two decimals or not a number, a channel twice, a float left or channel figures on an opening count), `422 shifts.cash.float_too_large`, `422 shifts.cash.channel_unknown` `{code}` (not a channel of the branch, or switched off), `422 shifts.reason.unknown`, `422 validation.failed` (no `denominations`). A key that is absent leaves that part alone and `null` clears it; any `counted_total` sent is ignored. The submit adds `422 shifts.cash.declaration_missing`, `422 shifts.cash.float_required` (a closing that does not say what stays in the drawer), `422 shifts.cash.reason_required` and `422 shifts.cash.note_required` (a cash variance or any channel difference with no reason, or with a reason that asks for a note and has none) |
 | `GET /shifts/{shift}/cash` | `shifts.view` at the till | read | | `200 {opening_total, carried_float_total, cash_sales_total, expected_total, by_channel: [{code, name_en, name_am, receipts, sum}], currency}`: the till widget's "cash in the drawer so far", live from `Totals` | `404`, `403` |
 | **Chain (3.4)** | | | | | |
 | `GET /locations/{location}/chain` | `shifts.replay` | read | `?limit=` (default 50, at most 200), `?before_seq=` | `200 {data: [{count_id, chain_seq, type, shift_id, shift_date, locked_at, previous_hash, payload_hash, superseded_by_id}], head: {chain_seq, payload_hash} or null}` newest first | `403`, `404` |
@@ -481,7 +489,7 @@ every action on it is `422 shifts.station.not_tracked`.
 Resources.
 
 - **Shift** (`ShiftSummary` is the same without `roster`, `counts` and `notes_count`): `{id, client_uuid, station {id, code, name_en, name_am, tracks_shifts, requires_overseer}, template {id, name_en, name_am, start_time, end_time} or null, date (local start date), status, origin, opening_mode, starts_at, ends_at, started_by {id, name}, started_at, opened_by, opened_at, closed_by, closing_started_at, submitted_at, locked_at, roster: [{user {id, name}, source, joined_at, left_at}], counts: [CountSummary], notes_count, me_on_roster: bool, version}`. Times are UTC ISO-8601; the screens show `Africa/Addis_Ababa`.
-- **Count**: `{id, shift_id, location {id, name_en, name_am, type}, type, seq, status, counted_by {id, name} or null, started_at, snapshot_at, submitted_at, cosigned_by, decided_by, decision, decision_note, supersede_cause, superseded_by_id, lines: [Line], cash: Cash or null, chain: {chain_seq, previous_hash, payload_hash, locked_at} or null, blocked_by_pending: {count_id} or null, version}`. **Line**: `{id, item {id, name_en, name_am, unit}, expected_qty, carried_qty, counted_qty, variance_qty, confirmed, reason {id, code, name_en, name_am} or null, note, reason_status, decision_note, adjustment_movement_id, moved_since}` (decimal strings; null where not yet known). **Cash**: `{denominations: {"200": 3}, counted_total, expected_total, variance_total, carried_float_total, cash_sales_total, float_left_total, channels: [{code, name_en, name_am, expected_receipts, expected_sum, declared_receipts, declared_sum, difference_sum}], reason, note, currency}`.
+- **Count**: `{id, shift_id, location {id, name_en, name_am, type}, type, seq, status, counted_by {id, name} or null, started_at, snapshot_at, submitted_at, cosigned_by, decided_by, decision, decision_note, supersede_cause, superseded_by_id, lines: [Line], cash: Cash or null, chain: {chain_seq, previous_hash, payload_hash, locked_at} or null, blocked_by_pending: {count_id} or null, version}`. **Line**: `{id, item {id, name_en, name_am, unit}, expected_qty, carried_qty, counted_qty, variance_qty, confirmed, reason {id, code, name_en, name_am} or null, note, reason_status, decision_note, adjustment_movement_id, moved_since}` (decimal strings; null where not yet known). **Cash**: `{denominations: {"200": 3}, counted_total, expected_total, variance_total, carried_float_total, cash_sales_total, float_left_total, channels: [{code, name_en, name_am, expected_receipts, expected_sum, declared_receipts, declared_sum, difference_sum}], confirmed, reason {id, code, name_en, name_am} or null, note, currency}`; every configured denomination is listed (zero where none); for a draft the figures that depend on payments are live (`expected_total`, `variance_total`, `cash_sales_total`, the expected side of `channels`), from the submit they are the stored ones; a channel row has the declared figures and the difference null where nothing was declared for it; `channels` is `[]` for an opening count.
 - **Note**: `{id, client_uuid, shift_id, from {id, name}, to {id, name} or null, body, created_at}`.
 
 **How a start works (said exactly).** (1) The `client_uuid` of a repeat answers the shift already made. (2) A running shift
@@ -1077,6 +1085,44 @@ live ledger in a state where a shift can be opened only through the API.
    (the `RecordPayment` guard, flag-gated, tested both ways), the cash-drawer count joining start/close/submit/approve/lock.
    Tests: `CashDeclarationTest` (the worked tables of section 10.5), `DenominationsTest`, `CashEndpointsTest`,
    `ChannelReconciliationTest`, `PaymentRequiresShiftTest`, `CashPropertyTest`. Ends with `gate_check --mode module --module payments`.
+   - **As built (step 3.5, `phase-3/cash`).** STATUS `shifts.cash: done`; Payments stays `stable`.
+     - **Order.** Red first (`5e71e38`: the tests of the list above plus `CashMathTest`, `CashDeclarationsSchemaTest`, `CashTamperTest`,
+       `CashLangTest`, the two new cases of `PaymentsContractTest`; case 8 was green on arrival because `Totals` already existed, as the
+       plan expected, case 9 and the rest red), then the code. `ShiftsFixture` gains `drawer`, `cashPut`, `cashRead`, `taken`, `openTill`, `closeTill`.
+     - **Payments.** `config/payments.php` (`require_shift_for_cash`, env `PAYMENTS_REQUIRE_SHIFT_FOR_CASH`, **false** in the code,
+       `.env.example`, `.env.ci` and the live host; its own variable, not the ledger's: section 10.1 corrected). `RecordPayment` asks Shared's
+       `OpenShifts::isOpen(actor shift, lock)` inside its transaction, after the replay check and only for the `cash` channel, and refuses
+       `409 payments.shift.required` (bilingual, `lang/{en,am}/payments.php`) when the actor carries no shift or one that is not `open`
+       (counting, locked, cancelled): the shared lock keeps `close` (FOR UPDATE) from freezing the drawer between the check and the row.
+       With the flag off Shifts is never asked (`PaymentsContractTest`). A payment already taken answers itself even after the till began
+       counting. The `enforced-gates` rehearsal still turns only the ledger flag on (section 10.5, last bullet). Runbook: "Shift rule for cash".
+     - **Shifts.** Migration `2026_10_26_100100_create_cash_declarations_table` (section 3, item 13, with the as-built differences written there);
+       `Models\CashDeclaration`; `Cash\Denominations` (config `shifts.denominations`), `Cash\CashMath` (opening/closing expected, variance, all
+       `Money`), `Cash\CashFigures`, `Cash\CashDeclarations` (live figures for a draft, `settle` at submit, `present` for the API, `payload` for the
+       hash, `summary` for the widget, `copy` for a recount or revision), `Actions\SetCashDeclaration` (`PUT /stock-counts/{count}/cash`, audit
+       `count.cash`, count version moves), `GET /shifts/{shift}/cash`. `DraftBuilder::buildCash` makes the drawer's draft and its empty declaration
+       in start and close; `SubmitCount` settles the declaration before the status change (the trigger lets a draft parent be written) and a cash
+       variance or channel difference sends the count to a decision like a line does; `CosignCount` counts it too; `RejectCount` and `UnlockCount`
+       copy the declaration into the recount or revision, unconfirmed; `CountPresenter` fills `cash`; `CountAnnouncer` fills
+       `cash_variance_total` of `CountSubmitted`; `PayloadBuilder::cash` is `CashDeclarations::payload`.
+     - **A constructor cycle found and cut.** `Locks -> HashChain -> PayloadBuilder -> CashDeclarations -> Locks` overflowed the container
+       (the migration of step 3.4 resolves `Locks`); `CashDeclarations` resolves `Locks` where it needs `previousClosing`, not in its constructor.
+     - **The chain.** Payload version 1 is unchanged; the `cash` block and its channel row keys are written in section 10.3. A locked drawer count's
+       declaration is rebuilt from its row on every verification, so a changed figure, reason, note or a deleted row is `payload_mismatch` at that
+       link (`tests/Gate/CashTamperTest.php`, with the freeze trigger dropped as the other tamper cases do). The pinned till vector and
+       `scripts/verify_chain.py` moved together (`UPDATE_CHAIN_FIXTURES=1` must be passed into the container with `docker compose exec -e`).
+     - **Tests.** `tests/Unit/Shifts/DenominationsTest.php` is `tests/Modules/Shifts/DenominationsTest.php` (it reads the configuration, so it needs
+       the application, which `Unit` does not boot). The route matrix and the write-endpoint matrix list the two new routes. `CashPropertyTest`:
+       12 seeds, 4 shifts each, an independent `BigDecimal` sum of the denominations and of the payments.
+     - **Left open by the plan, decided here:** section 10.5, "Decisions of 3.5" (declaration required, closing basis, live versus fixed
+       figures, channel differences, denomination spelling, copies, the separate flag).
+     - **For step 3.6 (handover and replay).** A till count has `lines: []` and a `cash` block: the handover panel's `previous_closing` row for the
+       drawer has a `float_left_total` to show (`CashDeclarations::carriedFloat(location)`), and `provisional` is true for a drawer closing that
+       is submitted but not locked, whose float is not carried yet (`Locks::previousClosing` ignores it until it is approved). `Replay::at` has no
+       cash to replay (cash is not in the ledger); the payments of a shift are `Totals::cash(shift)` / `byChannel(shift)`. Nothing in 3.5 writes to
+       `shift_instances`; `GET /shifts/{shift}/summary` still answers its own `cash` block (`cash_sales_total` and channels) and `GET /shifts/{shift}/cash`
+       is the widget's. The only new statuses a screen meets are the existing ones: a drawer count waits in `pending_approval` like any count.
+     - **CI.** (filled in when CI is green)
 6. **3.6 shifts.handover** (groups `feature`, `module:shifts`, `property`; STATUS `shifts.handover`), `phase-3/handover`:
    migration 14; notes and handover endpoints; `Contracts\Replay::at(station, time)`; `GET /replay`; `ReplayPropertyTest`;
    then `gate_check --mode module --module shifts` and `phase_status.py module-stable shifts`. Playwright projects stay
@@ -1390,8 +1436,9 @@ settled come first, each with a recommended default.
 ### 10.1 Turning on `ledger.require_shift_for_station_locations`
 
 **The rule (E1), exactly.** The config key lives in `config/ledger.php` as `require_shift_for_station_locations`, read from the
-environment variable `LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS`; `config/payments.php` has `require_shift_for_cash` reading the **same**
-variable, so there is one switch. With it on, `Ledger::appendMany` refuses the whole batch with `409 inventory.shift.required
+environment variable `LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS`; `config/payments.php` has `require_shift_for_cash` reading its **own**
+variable, `PAYMENTS_REQUIRE_SHIFT_FOR_CASH` (corrected in 3.5: the first draft shared the ledger's variable, but the two rules fail in different
+ways, so each gets its own kill switch; 3.7e flips all three together). With it on, `Ledger::appendMany` refuses the whole batch with `409 inventory.shift.required
 {station_id, location_id}` and writes nothing when it contains an intent that
 
 1. changes `on_hand` (every reason except `reservation` and `reservation_release`; a `production_consume` or `sale` that settles
@@ -1530,6 +1577,14 @@ string keys to values; anything else (a float, an object) is a `LogicException`.
   `float_left_total`, `channels`, `reason_code`, `reason_note`, `currency`), `chain_seq`, `locked_at`, `locked_by_user_id`,
   `payload_version`. Illustrative shape (abbreviated, not a pinned vector):
   `{"branch_id":1,"cash":null,"chain_seq":4,"counted_by_user_id":9,...,"lines":[{"adjustment_movement_id":812,"adjustment_qty":"-500.0000","carried_qty":null,"counted_qty":"9500.0000","expected_qty":"10000.0000","item_id":31,"reason_code":"spoilage","reason_note":null,"variance_qty":"-500.0000"}],...}`.
+- **The `cash` block, as built in 3.5.** `denominations` is the object of every denomination the count was declared with (whole counts, zero
+  included, keys sorted as strings by the encoder), the money figures are two-place decimal strings or null (`carried_float_total` only at an
+  opening, `cash_sales_total` and `float_left_total` only at a closing), `channels` is `[]` at an opening and, at a closing, one row per channel
+  ordered by `code` with the keys `code`, `expected_receipts`, `expected_sum`, `declared_receipts`, `declared_sum`, `difference_sum` (the declared
+  figures and the difference null where nothing was declared), `reason_code` / `reason_note` are the declaration's. `lines` is `[]` for a drawer
+  count. The version stays 1: no link had a non-null `cash` before 3.5, so no old link changes its bytes, and a stock count still has
+  `cash: null`. `scripts/verify_chain.py` checks the channel row keys and that every `*_sum` is a two-place decimal; the pinned till vector in
+  `vectors.json` has the new row shape.
 - **The hash**: `payload_hash = lowercase_hex(sha256(previous_hash . canonical_payload))`, where `.` is byte concatenation of the 64
   ASCII characters of the previous hash and the payload bytes; the first link of a place has `previous_hash = "0" x 64`.
   `canonical_payload` is stored with the row, so verification (a) recomputes the hash from the stored bytes, (b) checks
@@ -1604,6 +1659,34 @@ Worked table (the one `CashDeclarationTest` and `CashDeclarationGateTest` pin):
 Denominations are `config('shifts.denominations')`: the ETB notes `200, 100, 50, 10, 5, 1` and coins `0.50, 0.25, 0.10, 0.05`; counts are
 non-negative integers; the server computes `counted_total`; an unknown denomination is `422 shifts.cash.denomination_unknown`.
 No cash rounding rule is applied (the "nearest 0.05" setting of the architecture is not built).
+
+**Decisions of 3.5 that the text above left open.**
+
+- **A till count without a declaration refuses to be handed in** (`422 shifts.cash.declaration_missing`), and a closing without
+  `float_left_total` refuses too (`422 shifts.cash.float_required`): an empty drawer is declared by sending `{}` and a float of `0.00`; nothing
+  is guessed. The declaration is made with the draft of the cash-drawer count (`DraftBuilder::buildCash`, called by start and close next to
+  `build`, so `Counts::draftsFor` and the stock contract still answer stock places only); a station with a cash drawer and no stock place now
+  starts in `opening`, not `open`.
+- **The opening figure a closing is measured against** is what the shift's opening count at the drawer counted (the newest revision that was
+  handed in and not rejected); with no opening count (a shift started with `carry`) it is the float the last locked closing left; with neither,
+  nothing. This is the counted figure, not the carried one: a drawer that was 20.00 short at the start (explained and approved) is measured
+  from what it held.
+- **Figures are live while a draft and fixed at the submit.** `cash_sales_total` is read from `Totals::cash` inside the submit transaction
+  after the shift row is locked; with `payments.require_shift_for_cash` on, a cash payment takes a shared lock on its shift row and needs the
+  shift `open`, so nothing can be taken once `close` has run. With the flag off (today) a payment stamped with the shift can still land between
+  the draft screen and the submit; the submit's read is the one that counts, and a payment after the submit is outside the declared cash.
+- **Channel differences.** A row exists for every channel that took money in the shift or was declared, ordered by code. `difference_sum` =
+  declared - expected exists only where something was declared; an undeclared channel (the cash row included) is listed with nulls and cannot
+  make the count differ. A non-zero difference needs the declaration's reason (and note, if the reason asks) exactly as a cash variance does,
+  and sends the count to a decision. A declared channel must be a channel of the branch and enabled (`422 shifts.cash.channel_unknown`).
+- **Denominations** are every configured value with a whole count (zero where none); a key is read in any spelling that equals a configured
+  value (`"0.5"` is `"0.50"`); a count is an integer or a digit string up to 1,000,000; a locked count keeps the denominations it was counted
+  with when the configuration changes.
+- **A recount (reject) and an unlock revision copy the declaration** (denominations, float left, declared channels, reason and note) and leave
+  it unconfirmed; the figures of the submit are not copied.
+- **The rule for cash** reads `PAYMENTS_REQUIRE_SHIFT_FOR_CASH` (own variable, default false everywhere). It is not switched on in the
+  `enforced-gates` rehearsal of 3.2c: the fixtures that take cash would each need a till shift, which the 3.7 fixtures bring; 3.5 proves the
+  rule both ways in `PaymentRequiresShiftTest` and `PaymentsContractTest` case 9.
 
 ### 10.6 New permissions and how they reach the live database
 
