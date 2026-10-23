@@ -1336,6 +1336,7 @@ live ledger in a state where a shift can be opened only through the API.
        The roster's "Start now" and the ad-hoc starts from the bar both leave an `opening` shift when "Start without counting" is off, so with a cash drawer 3.7e's fixtures must
        still declare it. The running-shifts feed uses the API's own ETag (count, `max(updated_at)`, `sum(version)`), no ledger part is involved. Local note: the Docker stack on this PC answers in 2 to 9 seconds per request, so the browser flows only finish there with
        longer waits (a copy of the specs with larger timeouts passed up to the last submit); CI and the live host are the evidence.
+       **purchase-transfer on live (from the 3.7b deploy, run 39939310713).** The trace showed both attempts spending the whole 120 s before the first browser action: `retireStaleIngredients` deleted the earlier runs' E2E ingredients one request at a time (about 400 of them at 0.6 s) inside the test's own budget. It now asks the server only for active ingredients (`is_active=1`), retires four at a time (each request keeps its own Idempotency-Key, a refused delete still falls back to the PATCH), and runs in a `test.beforeAll` with its own 300 s budget. The next live deploy proves it.
        CI evidence: see the PR.
    - **3.7d `phase-3/web-cash`**: the till's shift widget (opening float by denomination, cash so far by channel from
      `GET /shifts/{shift}/cash`), the cash declaration and channel reconciliation inside the closing count, the second test of
