@@ -146,7 +146,11 @@ final class ShiftsController
         return response()->json(['shift' => $this->presenter->one($closed), 'counts' => $counts->many($reads->latest($closed, CountType::Closing))]);
     }
 
-    /** GET /shifts/{shift}/cash (step 3.5): the till widget's cash in the drawer so far, live from Payments' Totals; polled (ETag, 304, step 3.7d); 422 shifts.cash.no_drawer for a station with no drawer. */
+    /**
+     * GET /shifts/{shift}/cash (step 3.5): the till widget's cash in the drawer so far, live from Payments' Totals; polled (ETag, 304, step 3.7d); 422 shifts.cash.no_drawer for a station with no drawer.
+     *
+     * @response array{opening_total: string, carried_float_total: string|null, cash_sales_total: string, expected_total: string, by_channel: list<array{code: string, name_en: string, name_am: string, receipts: int, sum: string}>, currency: string}
+     */
     public function cash(Request $input, ShiftInstance $shift, CashDeclarations $cash, Locations $locations): Response
     {
         $person = $this->access->person('shifts.view');

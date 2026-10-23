@@ -7767,7 +7767,7 @@
         "/v1/shifts/{shift}/cash": {
             "get": {
                 "operationId": "shifts.cash",
-                "summary": "GET /shifts/{shift}/cash (step 3.5): the till widget's cash in the drawer so far, live from Payments' Totals; 422 shifts.cash.no_drawer for a station with no drawer",
+                "summary": "GET /shifts/{shift}/cash (step 3.5): the till widget's cash in the drawer so far, live from Payments' Totals; polled (ETag, 304, step 3.7d); 422 shifts.cash.no_drawer for a station with no drawer",
                 "tags": [
                     "Shifts"
                 ],
@@ -7807,11 +7807,36 @@
                                         },
                                         "by_channel": {
                                             "type": "array",
-                                            "items": {}
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_en": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_am": {
+                                                        "type": "string"
+                                                    },
+                                                    "receipts": {
+                                                        "type": "integer"
+                                                    },
+                                                    "sum": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "code",
+                                                    "name_en",
+                                                    "name_am",
+                                                    "receipts",
+                                                    "sum"
+                                                ]
+                                            }
                                         },
                                         "currency": {
-                                            "type": "string",
-                                            "const": "ETB"
+                                            "type": "string"
                                         }
                                     },
                                     "required": [
