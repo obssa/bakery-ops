@@ -32,6 +32,9 @@ use Tests\Support\OrderFloor;
  */
 
 beforeEach(function () {
+    // both rules are on by default since step 3.7e; these cases double the shift reads themselves, so they start with the rules off and the
+    // ones about a rule turn it on (payments.require_shift_for_cash below)
+    config(['payments.require_shift_for_cash' => false, 'ledger.require_shift_for_station_locations' => false]);
     seedRoles();
     $this->branch = actInBranch(Branch::factory()->create());
     $this->admin = makeUser($this->branch, 'admin');
