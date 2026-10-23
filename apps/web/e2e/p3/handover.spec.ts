@@ -246,9 +246,10 @@ test.describe("p3 handover", () => {
       const opening = (await admin.get<{ data: CountView[] }>(`/shifts/${shiftId}/counts`)).data.find((c) => c.location.id === drawer.id && c.type === "opening")!;
       expect(opening.cash).toBeTruthy();
       const keys = Object.keys(opening.cash!.denominations);
-      // what the last closing left is declared as it stands (500.00 the first time ever), written by denomination
+      // what the last closing left is declared as it stands, written by denomination (settling the till left 0.00 the first time: an
+      // empty drawer, declared with "Confirm this count")
       const expectedOpening = opening.cash!.expected_total;
-      const openingTally = tallyFor(expectedOpening === "0.00" ? "500.00" : expectedOpening, keys);
+      const openingTally = tallyFor(expectedOpening, keys);
       openingTotal = tallyTotalOf(openingTally);
       const used = Object.keys(openingTally).filter((k) => openingTally[k] > 0);
 
@@ -259,15 +260,18 @@ test.describe("p3 handover", () => {
         await field.fill(String(openingTally[key]));
         await field.press("Tab");
       }
+      if (used.length === 0) await declare.getByRole("button", { name: "Confirm this count", exact: true }).click();
       await expect(declare.getByText("Declared", { exact: true })).toBeVisible({ timeout: 20_000 });
       await declare.getByRole("button", { name: "Done", exact: true }).click();
 
       await bar.getByRole("link", { name: "Open the count" }).click();
       await expect(page.getByRole("heading", { name: "Shift count", level: 1 })).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByLabel(`Count of ${used[0]}`, { exact: true })).toHaveValue(String(openingTally[used[0]]), { timeout: 20_000 });
+      if (used.length > 0) await expect(page.getByLabel(`Count of ${used[0]}`, { exact: true })).toHaveValue(String(openingTally[used[0]]), { timeout: 20_000 });
+      else await expect(page.getByText("Declared", { exact: true })).toBeVisible({ timeout: 20_000 });
       await page.getByRole("button", { name: "Review and submit", exact: true }).click();
       const openReview = page.getByRole("dialog", { name: "Review the cash count" });
       await expect(openReview).toContainText(openingTotal);
+      await expect(openReview.getByRole("button", { name: "Submit count", exact: true })).toBeEnabled({ timeout: 15_000 });
       await openReview.getByRole("button", { name: "Submit count", exact: true }).click();
       await expect(page.getByText("Approved and locked")).toBeVisible({ timeout: 30_000 });
 
@@ -387,7 +391,9 @@ test.describe("p3 handover", () => {
       await again.getByRole("button", { name: "Done", exact: true }).click();
       await bar.getByRole("link", { name: "Open the count" }).click();
       await page.getByRole("button", { name: "Review and submit", exact: true }).click();
-      await page.getByRole("dialog", { name: "Review the cash count" }).getByRole("button", { name: "Submit count", exact: true }).click();
+      const lastSubmit = page.getByRole("dialog", { name: "Review the cash count" }).getByRole("button", { name: "Submit count", exact: true });
+      await expect(lastSubmit).toBeEnabled({ timeout: 15_000 });
+      await lastSubmit.click();
       await expect(page.getByText("Approved and locked")).toBeVisible({ timeout: 30_000 });
     } finally {
       await cashierContext.close();
