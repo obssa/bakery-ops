@@ -83,6 +83,7 @@ it('shows the live ledger figure on a draft and the snapshot figure after the su
 });
 
 it('is a conditional read: 304 with the tag, a new tag when the count or the ledger moves', function () {
+    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $first = ($this->get)("/api/v1/stock-counts/{$this->count}", $this->f->chef)->assertOk();
     $tag = $first->headers->get('ETag');
     expect($tag)->not->toBeNull()->and($first->headers->get('Cache-Control'))->toContain('no-cache')->toContain('private');

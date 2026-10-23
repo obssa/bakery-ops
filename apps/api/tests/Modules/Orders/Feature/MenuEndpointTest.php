@@ -210,6 +210,7 @@ it('is for the order takers: orders.create', function () {
 })->group('module:orders', 'feature');
 
 it('answers 304 with no body when If-None-Match is current, and does not build the menu to do it', function () {
+    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $first = ($this->menu)();
     $etag = $first->headers->get('ETag');
 
@@ -285,7 +286,7 @@ it('changes the ETag when stock changes, when a price changes, when the catalog 
 it('changes the ETag for every catalog edit, even two inside the same second (a client must never get a 304 over a missed edit)', function () {
     $m = $this->floor->menu;
     $etag = fn () => ($this->menu)()->headers->get('ETag');
-    $this->travelTo(CarbonImmutable::now()->startOfSecond()->addSeconds(5)); // frozen: every write below shares one stamp
+    $this->travelTo(CarbonImmutable::now()->startOfSecond()->addSeconds(10)); // past the settling window; frozen: every write below shares one stamp
 
     $first = $etag();
     $m->cake->forceFill(['name_en' => 'Black forest'])->save();

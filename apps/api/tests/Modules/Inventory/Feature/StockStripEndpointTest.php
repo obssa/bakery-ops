@@ -157,6 +157,7 @@ it('treats another branch\'s station as not found', function () {
 it('stamps an ETag and Cache-Control, answers 304 with no body when nothing changed, and a new ETag after a movement', function () {
     $flour = ($this->ingredient)('Flour', 'ዱቄት', '100', '50');
 
+    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $first = ($this->strip)()->assertOk()->assertHeader('Cache-Control', 'no-cache, private');
     $etag = $first->headers->get('ETag');
     expect($etag)->toBeString()->not->toBe('');
@@ -208,6 +209,7 @@ it('does the work in a fixed number of queries as the items grow, and almost non
         ($this->ingredient)('A'.$i, 'አ'.$i, (string) ($i * 100), $i % 2 === 0 ? '500' : null);
     }
     $many = $count();
+    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $etag = ($this->strip)(null, '?limit=50')->headers->get('ETag');
     $notModified = $count(['If-None-Match' => (string) $etag]);
 
