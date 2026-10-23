@@ -31,7 +31,7 @@ use Carbon\CarbonImmutable;
  *
  * Quantities are decimal strings (or JSON integers) in the item's base unit: not negative, at most four decimals, at most ten
  * integer digits (422 shifts.count.qty_invalid naming the item). An item that is not an item of the branch or cannot be stocked
- * (switched off, deleted, made to order) is 422 shifts.count.item_unknown; a reason that does not exist or is switched off is
+ * (deleted, made to order, or switched off with no stock at the counted place: a switched-off item that still has stock there is countable, step 3.7e) is 422 shifts.count.item_unknown; a reason that does not exist or is switched off is
  * 422 shifts.reason.unknown. Everything is checked before anything is written. Draft only (409 shifts.count.not_draft naming the
  * status). One AuditedAction (count.lines) that moves the count's version; the count row is locked first, so two writers queue.
  * The person acting needs shifts.count at the shift's station.
@@ -63,7 +63,7 @@ final class SetCountLines
         }
 
         $onCount = array_values(array_map('intval', StockCountLine::query()->where('count_id', $count->id)->pluck('item_id')->all()));
-        $parsed = $this->parse($lines, $onCount);
+        $parsed = $this->parse($lines, $onCount, $count->location_id);
 
         return $this->audit->run(function (StockCount $c) use ($parsed, $confirmAll): StockCount {
             CountLock::refresh($c);
@@ -141,16 +141,24 @@ final class SetCountLines
         return isset($live[$line->item_id]) ? $live[$line->item_id]->onHand : Quantity::zero();
     }
 
+    private function hasStock(int $itemId, int $locationId): bool
+    {
+        $level = $this->stock->at($locationId)[$itemId] ?? null;
+
+        return $level instanceof StockLevel && ! $level->onHand->isZero();
+    }
+
     /**
      * Check every input and turn it into plain values; nothing is written.
      *
      * @param  list<array<string, mixed>>  $lines
      * @param  list<int>  $onCount  the items already on the count
+     * @param  int  $locationId  the counted place: a switched-off item that still has stock there is countable
      * @return list<array{item_id: int, has_qty: bool, qty: string|null, confirm: bool|null, has_reason: bool, reason_id: int|null, has_note: bool, note: string|null}>
      *
      * @throws ShiftError
      */
-    private function parse(array $lines, array $onCount): array
+    private function parse(array $lines, array $onCount, int $locationId): array
     {
         $added = [];
         foreach ($lines as $line) {
@@ -174,7 +182,12 @@ final class SetCountLines
             $itemId = (int) $line['item_id'];
             if (isset($added[$itemId])) {
                 $summary = $summaries[$itemId] ?? null;
-                if ($summary === null || ! $summary->isActive || ($summary->isProduct() && $summary->fulfilment === 'to_order')) {
+                if ($summary === null || ($summary->isProduct() && $summary->fulfilment === 'to_order')) {
+                    throw ShiftError::itemUnknown($itemId);
+                }
+                // count what is on the shelf: an item switched off while it still has stock here is countable (and the submit asks for
+                // it); one with no stock here, or deleted from the catalog, is not
+                if (! $summary->isActive && ($this->items->deleted([$itemId]) !== [] || ! $this->hasStock($itemId, $locationId))) {
                     throw ShiftError::itemUnknown($itemId);
                 }
             }
