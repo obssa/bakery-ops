@@ -10,6 +10,10 @@ import { useSession } from "@/lib/session";
 import { OrderingSurface } from "../pad/OrderingSurface";
 import { usePadOutcomes, useReleaseStaleSends } from "../pad/outcomes";
 import { PageHeader } from "../ui";
+import { ShiftBar } from "../shifts/ShiftBar";
+import { useShiftStation } from "../shifts/useShiftStation";
+import { CASH_NEEDS_SHIFT_BUILD, payBlockReason } from "@/lib/shifts";
+import { useShiftNotice } from "@/lib/station";
 import { focusRing } from "../styles";
 import { DisplayCasePanel } from "./DisplayCasePanel";
 import { PaySheet } from "./PaySheet";
@@ -21,6 +25,7 @@ import { VoidDialog } from "./VoidDialog";
 // created_via = till). The queue is a LiveFeed over GET /orders (?unpaid=1 first, then the cursor, ETag-gated).
 
 type View = "queue" | "order";
+const TILL_KINDS = ["till"] as const;
 const NOTICE_MS = 8000;
 
 export function TillScreen() {
@@ -31,6 +36,13 @@ export function TillScreen() {
   const [view, setView] = useState<View>("queue");
   const [paying, setPaying] = useState<Order | null>(null);
   const [voiding, setVoiding] = useState<Order | null>(null);
+
+  // the shift at the till: Pay waits for it once the API has said a cash payment needs one (payments.require_shift_for_cash, step 3.5;
+  // switched on in step 3.7e). With the rule off nothing blocks, the bar only shows the state.
+  const shiftStation = useShiftStation({ kinds: TILL_KINDS });
+  const cashNeedsShift = useShiftNotice((s) => s.cashNeedsShift) || CASH_NEEDS_SHIFT_BUILD;
+  const block = payBlockReason({ shift: shiftStation.shift, tracked: shiftStation.station?.tracks_shifts === true, loaded: shiftStation.loaded, enforced: cashNeedsShift });
+  const payBlocked = block === null ? null : t(block === "no_shift" ? "pay_blocked_no_shift" : "pay_blocked_not_open");
 
   const queueFeed = useMemo(() => createQueueFeed(branchId), [branchId]);
   const menuFeed = useMemo(() => createMenuFeed(branchId), [branchId]);
@@ -59,6 +71,7 @@ export function TillScreen() {
   return (
     <div className="space-y-4">
       <PageHeader title={t("title")} />
+      <ShiftBar model={shiftStation} />
 
       <div role="tablist" aria-label={t("views")} className="flex gap-2">
         {(["queue", "order"] as const).map((value) => (
@@ -82,7 +95,7 @@ export function TillScreen() {
 
       {view === "queue" ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <TillQueue orders={orders} loaded={!!queue?.loaded} stale={queue?.error ? t("stale") : null} onPay={setPaying} onVoid={setVoiding} />
+          <TillQueue orders={orders} loaded={!!queue?.loaded} stale={queue?.error ? t("stale") : null} payBlocked={payBlocked} onPay={setPaying} onVoid={setVoiding} />
           <DisplayCasePanel />
         </div>
       ) : (

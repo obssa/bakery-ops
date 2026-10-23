@@ -137,7 +137,7 @@
         "shifts.locks": "done",
         "shifts.cash": "done",
         "shifts.handover": "done",
-        "web": "todo",
+        "web": "in_progress",
         "docs": "todo",
         "shifts": "done"
       },
@@ -167,7 +167,7 @@
         "shared.files": "todo",
         "payments": "todo",
         "analytics": "todo",
-        "web": "todo",
+        "web": "in_progress",
         "docs": "todo"
       },
       "playwright_projects": [

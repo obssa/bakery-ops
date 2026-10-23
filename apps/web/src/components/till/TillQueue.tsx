@@ -20,7 +20,19 @@ const AGE_STYLE: Record<TicketAge, string> = {
   red: "border-red-500 bg-red-50",
 };
 
-function QueueCard({ order, now, onPay, onVoid }: { order: Order; now: number; onPay: (order: Order) => void; onVoid: (order: Order) => void }) {
+function QueueCard({
+  order,
+  now,
+  payBlocked,
+  onPay,
+  onVoid,
+}: {
+  order: Order;
+  now: number;
+  payBlocked: string | null;
+  onPay: (order: Order) => void;
+  onVoid: (order: Order) => void;
+}) {
   const t = useTranslations("till");
   const k = useTranslations("kds");
   const locale = useLocale() as Locale;
@@ -61,12 +73,24 @@ function QueueCard({ order, now, onPay, onVoid }: { order: Order; now: number; o
             <Button type="button" variant="secondary" aria-label={t("void_aria", { no })} onClick={() => onVoid(order)}>
               {t("void")}
             </Button>
-            <Button type="button" className="min-h-14 px-6 text-lg" aria-label={t("take_payment_aria", { no })} onClick={() => onPay(order)}>
+            <Button
+              type="button"
+              className="min-h-14 px-6 text-lg"
+              aria-label={t("take_payment_aria", { no })}
+              aria-describedby={payBlocked ? `pay-blocked-${order.id}` : undefined}
+              disabled={payBlocked !== null}
+              onClick={() => onPay(order)}
+            >
               {t("take_payment")}
             </Button>
           </div>
         )}
       </footer>
+      {payBlocked && !settled ? (
+        <p id={`pay-blocked-${order.id}`} className="text-base font-medium text-amber-900">
+          {payBlocked}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -75,12 +99,15 @@ export function TillQueue({
   orders,
   loaded,
   stale,
+  payBlocked,
   onPay,
   onVoid,
 }: {
   orders: Order[];
   loaded: boolean;
   stale: string | null;
+  /** why Pay is disabled (no shift is running at the till), or null */
+  payBlocked: string | null;
   onPay: (order: Order) => void;
   onVoid: (order: Order) => void;
 }) {
@@ -103,7 +130,7 @@ export function TillQueue({
         <ul aria-label={t("queue_list")} className="grid gap-4 lg:grid-cols-2">
           {orders.map((order) => (
             <li key={order.id}>
-              <QueueCard order={order} now={now} onPay={onPay} onVoid={onVoid} />
+              <QueueCard order={order} now={now} payBlocked={payBlocked} onPay={onPay} onVoid={onVoid} />
             </li>
           ))}
         </ul>

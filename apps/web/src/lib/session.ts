@@ -82,11 +82,17 @@ export const useSession = create<SessionState>()((set, get) => ({
     storeToken(login.token);
     set({
       token: login.token,
-      me: { user: login.user, permissions: login.permissions, locale: login.locale, acting: null, device: null },
+      me: { user: login.user, permissions: login.permissions, locale: login.locale, acting: null, device: null, work_stations: [] },
       status: "signed-in",
       expired: false,
       unreachable: false,
     });
+    // the sign-in answer has no work_stations: read /me once more so the station screens know where this person works
+    void request<Me>("/me", { token: login.token })
+      .then((me) => {
+        if (get().token === login.token) set({ me });
+      })
+      .catch(() => {});
   },
 
   signOut: async () => {

@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { focusRing } from "@/components/styles";
+import { StationsPanel } from "@/components/shifts/StationsPanel";
 import { PageHeader } from "@/components/ui";
 import { Link } from "@/i18n/navigation";
 import { enterLocale, titledBy, type LocaleProps } from "@/lib/page";
@@ -33,6 +34,7 @@ export default async function AdminHome(props: LocaleProps) {
           </li>
         ))}
       </ul>
+      <StationsPanel />
     </>
   );
 }

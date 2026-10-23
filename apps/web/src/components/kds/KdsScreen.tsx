@@ -11,6 +11,8 @@ import { createTicketsFeed, lineIdsOf, railOf } from "@/lib/live/tickets";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { onOutboxApplied } from "@/lib/outbox/store";
 import { Alert, Field, PageHeader, Select } from "../ui";
+import { ShiftBar } from "../shifts/ShiftBar";
+import { useShiftStation } from "../shifts/useShiftStation";
 import { focusRing } from "../styles";
 import { StockStrip } from "./StockStrip";
 import { TicketCard } from "./TicketCard";
@@ -33,7 +35,9 @@ function useStations(kind: StationCode): { stations: StationChoice[]; loading: b
     queryFn: async () => (await authed<Collection<Station>>("/stations")).data,
     enabled: lists,
   });
-  const assigned = (me?.user.stations ?? []).filter((s) => s.code === kind).map((s) => ({ id: s.station_id, name_en: s.name_en, name_am: s.name_am }));
+  // the stations this person may work at: their assignments, or every station for stations.all (GET /me work_stations)
+  const worksAt = (me?.work_stations ?? []).filter((s) => s.code === kind).map((s) => ({ id: s.station_id, name_en: s.name_en, name_am: s.name_am }));
+  const assigned = [...(me?.user.stations ?? []).filter((s) => s.code === kind).map((s) => ({ id: s.station_id, name_en: s.name_en, name_am: s.name_am })), ...worksAt];
   const merged = new Map<number, StationChoice>(assigned.map((s) => [s.id, s]));
   if (lists) for (const s of all.data ?? []) if (s.code === kind) merged.set(s.id, { id: s.id, name_en: s.name_en, name_am: s.name_am });
   return { stations: [...merged.values()].sort((a, b) => a.id - b.id), loading: lists && all.isLoading };
@@ -46,6 +50,7 @@ export function KdsScreen({ kind }: { kind: "kitchen" | "bar" }) {
   const { stations, loading } = useStations(kind);
   const [chosen, setChosen] = useState<number | null>(null);
   const stationId = stations.find((s) => s.id === chosen)?.id ?? stations[0]?.id ?? null;
+  const shiftStation = useShiftStation({ stationId });
 
   const feed = useMemo(() => (stationId === null ? null : createTicketsFeed(stationId)), [stationId]);
   const snapshot = useLiveFeed(feed);
@@ -89,6 +94,7 @@ export function KdsScreen({ kind }: { kind: "kitchen" | "bar" }) {
     // the first tap on the screen unlocks audio, as browsers require
     <div className="space-y-4" onPointerDown={unlockAudio} onKeyDown={unlockAudio}>
       <PageHeader title={title} />
+      <ShiftBar model={shiftStation} />
 
       <div className="flex flex-wrap items-end gap-4">
         {stations.length > 1 ? (

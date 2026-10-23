@@ -1,3 +1,4 @@
+import { stationHeaders, useShiftNotice } from "../station";
 import type { ApiErrorBody, Locale } from "./types";
 
 // The one way the shell talks to /api/v1 (ADR 0007): bearer token, JSON, and an Idempotency-Key on every write
@@ -49,6 +50,43 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** Extra request headers: the pad sends X-Acting-Session and X-Device-Id (lib/acting.ts). */
   headers?: Record<string, string>;
+  /** Give up after this long (default WRITE_TIMEOUT_MS for writes, READ_TIMEOUT_MS for reads): a network failure. */
+  timeoutMs?: number;
+}
+
+/** How long a call may wait for an answer before it counts as a network failure (a hung connection must not freeze a feed). */
+export const READ_TIMEOUT_MS = 20_000;
+export const WRITE_TIMEOUT_MS = 30_000;
+
+/**
+ * A signal that fires when the caller aborts or when `ms` have passed, and a way to tell the two apart. Without a limit a fetch that
+ * never answers (a dropped connection behind the proxy) leaves a feed waiting for ever: a look is awaited before the next is
+ * scheduled, so the screen would stop updating and say nothing (step 3.7a, the pad menu that did not refresh).
+ */
+function withTimeout(caller: AbortSignal | undefined, ms: number): { signal: AbortSignal; timedOut: () => boolean; done: () => void } {
+  const controller = new AbortController();
+  let fired = false;
+  const timer = setTimeout(() => {
+    fired = true;
+    controller.abort();
+  }, ms);
+  const onAbort = () => controller.abort();
+  if (caller?.aborted) controller.abort();
+  else caller?.addEventListener("abort", onAbort, { once: true });
+  return {
+    signal: controller.signal,
+    timedOut: () => fired,
+    done: () => {
+      clearTimeout(timer);
+      caller?.removeEventListener("abort", onAbort);
+    },
+  };
+}
+
+/** Records the refusals that mean "start a shift first" so the shift bar can say so (step 3.7a), and returns the error. */
+function failed(error: ApiError): ApiError {
+  if (error.status === 409) useShiftNotice.getState().report(error);
+  return error;
 }
 
 export function apiUrl(path: string, query?: RequestOptions["query"]): string {
@@ -63,7 +101,7 @@ export function apiUrl(path: string, query?: RequestOptions["query"]): string {
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
-  const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
+  const headers: Record<string, string> = { Accept: "application/json", ...stationHeaders(), ...options.headers };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (WRITE_METHODS.has(method)) {
@@ -71,21 +109,25 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers["Idempotency-Key"] = options.idempotencyKey;
   }
 
+  const limit = withTimeout(options.signal, options.timeoutMs ?? (WRITE_METHODS.has(method) ? WRITE_TIMEOUT_MS : READ_TIMEOUT_MS));
   let response: Response;
+  let text: string;
   try {
     response = await fetch(apiUrl(path, options.query), {
       method,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
+      signal: limit.signal,
       cache: "no-store",
     });
+    text = await response.text();
   } catch (cause) {
-    if (cause instanceof DOMException && cause.name === "AbortError") throw cause;
+    if (cause instanceof DOMException && cause.name === "AbortError" && !limit.timedOut()) throw cause;
     throw new ApiError(0, { message_key: "network" });
+  } finally {
+    limit.done();
   }
 
-  const text = await response.text();
   let json: unknown = undefined;
   if (text) {
     try {
@@ -96,7 +138,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
   if (!response.ok) {
     const body = json && typeof json === "object" ? (json as Partial<ApiErrorBody>) : {};
-    throw new ApiError(response.status, body);
+    throw failed(new ApiError(response.status, body));
   }
   return json as T;
 }
@@ -116,23 +158,28 @@ export async function conditionalGet<T>(
     etag?: string | null;
     signal?: AbortSignal;
     headers?: Record<string, string>;
+    timeoutMs?: number;
   } = {},
 ): Promise<ConditionalResult<T>> {
-  const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
+  const headers: Record<string, string> = { Accept: "application/json", ...stationHeaders(), ...options.headers };
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (options.etag) headers["If-None-Match"] = options.etag;
 
+  const limit = withTimeout(options.signal, options.timeoutMs ?? READ_TIMEOUT_MS);
   let response: Response;
+  let text = "";
   try {
-    response = await fetch(apiUrl(path, options.query), { method: "GET", headers, signal: options.signal, cache: "no-store" });
+    response = await fetch(apiUrl(path, options.query), { method: "GET", headers, signal: limit.signal, cache: "no-store" });
+    if (response.status !== 304) text = await response.text();
   } catch (cause) {
-    if (cause instanceof DOMException && cause.name === "AbortError") throw cause;
+    if (cause instanceof DOMException && cause.name === "AbortError" && !limit.timedOut()) throw cause;
     throw new ApiError(0, { message_key: "network" });
+  } finally {
+    limit.done();
   }
   const etag = response.headers.get("ETag");
   if (response.status === 304) return { notModified: true, etag: etag ?? options.etag ?? null };
 
-  const text = await response.text();
   let json: unknown = undefined;
   if (text) {
     try {
@@ -142,7 +189,7 @@ export async function conditionalGet<T>(
     }
   }
   if (!response.ok) {
-    throw new ApiError(response.status, json && typeof json === "object" ? (json as Partial<ApiErrorBody>) : {});
+    throw failed(new ApiError(response.status, json && typeof json === "object" ? (json as Partial<ApiErrorBody>) : {}));
   }
   return { notModified: false, etag, data: json as T };
 }

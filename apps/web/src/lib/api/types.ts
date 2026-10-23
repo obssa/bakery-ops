@@ -50,6 +50,66 @@ export interface Me {
     user: { id: number; name: string; photo_url: string | null; locale: Locale };
   };
   device: null | { id: number };
+  /** The stations this person may work at (every station for stations.all), each with the shift running there (step 3.1a). */
+  work_stations: WorkStation[];
+}
+
+export type ShiftStatus = "scheduled" | "opening" | "open" | "counting" | "pending_approval" | "locked" | "cancelled";
+
+/** GET /me work_stations: a station the person works at and, when it tracks shifts, the one running there. */
+export interface WorkStation {
+  station_id: number;
+  code: StationCode;
+  name_en: string;
+  name_am: string;
+  tracks_shifts: boolean;
+  requires_overseer: boolean;
+  current_shift: null | { id: number; status: ShiftStatus; date: string; opened_at: string | null };
+}
+
+export interface RosterRow {
+  user: { id: number; name: string } | null;
+  source: "scheduled" | "started" | "joined" | "call_in";
+  joined_at: string | null;
+  left_at: string | null;
+}
+
+/** A count of a shift as the shift lists it (the count screen of step 3.7b reads the whole count). */
+export interface ShiftCountSummary {
+  id: number;
+  type: "opening" | "closing";
+  status: string;
+  location: { id: number; name_en: string; name_am: string; type: string };
+}
+
+/** GET /stations/{station}/shifts/current and the shift endpoints (phase-3 plan section 4, "Resources"). */
+export interface Shift {
+  id: number;
+  client_uuid: string;
+  station: { id: number; code: StationCode; name_en: string; name_am: string; tracks_shifts: boolean; requires_overseer: boolean };
+  template: { id: number; name_en: string; name_am: string; start_time: string; end_time: string } | null;
+  date: string;
+  status: ShiftStatus;
+  origin: string;
+  opening_mode: "counted" | "carried" | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  started_by: { id: number; name: string } | null;
+  started_at: string | null;
+  opened_by: { id: number; name: string } | null;
+  opened_at: string | null;
+  closed_by: { id: number; name: string } | null;
+  closing_started_at: string | null;
+  me_on_roster: boolean;
+  version: number;
+  roster: RosterRow[];
+  counts: ShiftCountSummary[];
+  notes_count: number;
+}
+
+export interface ShiftCurrentPage {
+  data: Shift | null;
+  server_time: string;
 }
 
 export interface Unit {

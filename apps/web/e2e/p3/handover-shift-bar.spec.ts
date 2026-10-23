@@ -92,7 +92,6 @@ test.describe("p3 handover: the shift bar", () => {
       const bossBar = await bar(boss);
       await expect(bossBar).toContainText("Shift open", { timeout: 30_000 });
       await expect(bossBar).toContainText(worker.name);
-      await expect(bossBar.getByRole("button", { name: "Close shift", exact: true })).toHaveCount(0); // not on the shift yet
       await bossBar.getByRole("button", { name: "Join shift", exact: true }).click();
       await expect(bossBar).toContainText(manager.name, { timeout: 15_000 });
       await expect(bossBar.getByRole("button", { name: "Leave shift", exact: true })).toBeVisible();

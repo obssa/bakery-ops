@@ -10,6 +10,8 @@ import { boardColumns, COLUMNS, createProductionFeed, ownStationId } from "@/lib
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { authed, useSession } from "@/lib/session";
 import { Alert, Field, PageHeader, Select } from "../ui";
+import { ShiftBar } from "../shifts/ShiftBar";
+import { useShiftStation } from "../shifts/useShiftStation";
 import { RequestCard } from "./RequestCard";
 import { RequestDetail } from "./RequestDetail";
 
@@ -18,6 +20,8 @@ import { RequestDetail } from "./RequestDetail";
 // ETag / 304. Accepted cards sit in Requested with their baker shown. A baker who works at one production station sees
 // that station first; everyone can widen the board to all stations. ?request=<id> (a notification link) opens that card.
 
+const PRODUCTION_KINDS = ["cake_room", "bakery"] as const;
+
 export function ProductionBoard() {
   const t = useTranslations("production");
   const locale = useLocale() as Locale;
@@ -25,6 +29,7 @@ export function ProductionBoard() {
   const me = useSession((s) => s.me);
   const params = useSearchParams();
 
+  const shiftStation = useShiftStation({ kinds: PRODUCTION_KINDS });
   const feed = useMemo(() => createProductionFeed(), []);
   const snapshot = useLiveFeed(feed);
 
@@ -61,6 +66,7 @@ export function ProductionBoard() {
   return (
     <div className="space-y-4">
       <PageHeader title={t("title")} intro={t("intro")} />
+      <ShiftBar model={shiftStation} />
 
       {choices.length > 1 ? (
         <div className="w-64">
