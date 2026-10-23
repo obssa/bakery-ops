@@ -1,7 +1,7 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
 import { MULTI_CONTEXT_TEST_MS, requireAdmin } from "../support/env";
 import { balanceAt, buildTransferFixture, ledgerOf, movingAverage, stockKitchen, transfersOf, type TransferFixture } from "../support/inventory";
-import { retireStaleIngredients } from "../support/fixture";
+import { loginOnce, retireStaleIngredients } from "../support/fixture";
 import { uuid } from "../support/api";
 import { openAs } from "../support/pad";
 
@@ -132,11 +132,19 @@ async function openContexts(browser: Browser, baseURL: string | undefined) {
 }
 
 test.describe("p2 purchase and transfer", () => {
+  // Retiring the earlier runs' E2E ingredients can take minutes on the live host (hundreds of items); it has its own budget instead of
+  // eating the test's.
+  test.beforeAll(async () => {
+    test.setTimeout(300_000);
+    const credentials = requireAdmin(test.skip);
+    const { api } = await loginOnce(credentials.phone, credentials.password);
+    await retireStaleIngredients(api);
+  });
+
   test("a purchase raises the store, and a transfer asked for in the kitchen strip moves stock once the store confirms it @live", async ({ browser }, testInfo) => {
     test.setTimeout(MULTI_CONTEXT_TEST_MS);
     const credentials = requireAdmin(test.skip);
     const fixture = await buildTransferFixture(credentials);
-    await retireStaleIngredients(fixture.admin);
     const { contexts, pages } = await openContexts(browser, testInfo.project.use.baseURL);
     try {
       await runPurchase(fixture);

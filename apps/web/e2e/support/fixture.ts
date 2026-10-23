@@ -473,15 +473,22 @@ export async function clearStaleOrders(adminCredentials: { phone: string; passwo
  * nothing uses it; one a recipe still uses is switched off, which the strip also leaves out. Only items of the E2E branch are listed
  * (the admin's own branch), and only "E2E " ingredients are touched; this run's items are kept.
  */
-export async function retireStaleIngredients(admin: Api): Promise<number> {
-  const items = (await admin.get<{ data: { id: number; name_en: string; is_active: boolean }[] }>("/items", { kind: "ingredient" })).data;
+export async function retireStaleIngredients(admin: Api, concurrency = 4): Promise<number> {
+  const items = (await admin.get<{ data: { id: number; name_en: string; is_active: boolean }[] }>("/items", { kind: "ingredient", is_active: 1 })).data;
   const stale = items.filter((item) => item.name_en.startsWith("E2E ") && !item.name_en.includes(run) && item.is_active);
-  for (const item of stale) {
-    try {
-      await admin.delete(`/items/${item.id}`);
-    } catch {
-      await admin.patch(`/items/${item.id}`, { is_active: false });
+  let next = 0;
+  // a few requests at a time (each carries its own Idempotency-Key): the live host answers in about 0.6 s, and hundreds of items used to
+  // take longer than the whole test budget when they were retired one by one
+  const worker = async () => {
+    while (next < stale.length) {
+      const item = stale[next++];
+      try {
+        await admin.delete(`/items/${item.id}`);
+      } catch {
+        await admin.patch(`/items/${item.id}`, { is_active: false });
+      }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, stale.length) }, worker));
   return stale.length;
 }
