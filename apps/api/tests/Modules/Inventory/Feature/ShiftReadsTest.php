@@ -24,6 +24,7 @@ pest()->group('module:inventory', 'feature');
  */
 
 beforeEach(function () {
+    config(['ledger.require_shift_for_station_locations' => false]); // these tests are about the reads; the stamps use made-up shift ids
     seedRoles();
     $this->branch = actInBranch(Branch::factory()->create());
     withActor(makeUser($this->branch, 'admin')->id);
