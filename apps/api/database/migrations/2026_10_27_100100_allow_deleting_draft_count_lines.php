@@ -32,7 +32,37 @@ return new class extends Migration
         }
 
         if (DB::getDriverName() === 'pgsql') {
-            DB::unprepared(self::pgGuard(draftMayDelete: true));
+            DB::unprepared(<<<'SQL'
+                CREATE OR REPLACE FUNCTION stock_count_lines_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+                DECLARE
+                    parent_status text;
+                BEGIN
+                    IF TG_OP = 'DELETE' THEN
+                        SELECT status INTO parent_status FROM stock_counts WHERE id = OLD.count_id;
+                        IF parent_status IS NULL OR parent_status <> 'draft' THEN
+                            RAISE EXCEPTION 'count lines are immutable after submit: they are only deleted from a draft (rule 5)' USING ERRCODE = '45000';
+                        END IF;
+                        RETURN OLD;
+                    END IF;
+                    IF TG_OP = 'INSERT' THEN
+                        SELECT status INTO parent_status FROM stock_counts WHERE id = NEW.count_id;
+                        IF parent_status IS NOT NULL AND parent_status <> 'draft' THEN
+                            RAISE EXCEPTION 'count lines are immutable after submit (rule 5)' USING ERRCODE = '45000';
+                        END IF;
+                        RETURN NEW;
+                    END IF;
+                    SELECT status INTO parent_status FROM stock_counts WHERE id = OLD.count_id;
+                    IF parent_status = 'locked' THEN
+                        RAISE EXCEPTION 'a locked count is immutable (rule 5)' USING ERRCODE = '45000';
+                    ELSIF parent_status <> 'draft'
+                        AND (to_jsonb(NEW) - 'reason_status' - 'decision_note' - 'adjustment_movement_id' - 'updated_at')
+                            IS DISTINCT FROM (to_jsonb(OLD) - 'reason_status' - 'decision_note' - 'adjustment_movement_id' - 'updated_at') THEN
+                        RAISE EXCEPTION 'count lines are immutable after submit (rule 5)' USING ERRCODE = '45000';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$
+                SQL);
         }
     }
 
@@ -49,53 +79,33 @@ return new class extends Migration
         }
 
         if (DB::getDriverName() === 'pgsql') {
-            DB::unprepared(self::pgGuard(draftMayDelete: false));
-        }
-    }
-
-    /** The guard function of the create migration, with the DELETE branch either as it was or allowing a draft's line. */
-    private static function pgGuard(bool $draftMayDelete): string
-    {
-        $delete = $draftMayDelete
-            ? <<<'PLPGSQL'
-                    IF TG_OP = 'DELETE' THEN
-                        SELECT status INTO parent_status FROM stock_counts WHERE id = OLD.count_id;
-                        IF parent_status IS NULL OR parent_status <> 'draft' THEN
-                            RAISE EXCEPTION 'count lines are immutable after submit: they are only deleted from a draft (rule 5)' USING ERRCODE = '45000';
-                        END IF;
-                        RETURN OLD;
-                    END IF;
-                PLPGSQL
-            : <<<'PLPGSQL'
+            DB::unprepared(<<<'SQL'
+                CREATE OR REPLACE FUNCTION stock_count_lines_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+                DECLARE
+                    parent_status text;
+                BEGIN
                     IF TG_OP = 'DELETE' THEN
                         RAISE EXCEPTION 'count lines are immutable: they are never deleted (rule 5)' USING ERRCODE = '45000';
                     END IF;
-                PLPGSQL;
-
-        return <<<SQL
-            CREATE OR REPLACE FUNCTION stock_count_lines_guard() RETURNS trigger LANGUAGE plpgsql AS \$\$
-            DECLARE
-                parent_status text;
-            BEGIN
-            {$delete}
-                IF TG_OP = 'INSERT' THEN
-                    SELECT status INTO parent_status FROM stock_counts WHERE id = NEW.count_id;
-                    IF parent_status IS NOT NULL AND parent_status <> 'draft' THEN
+                    IF TG_OP = 'INSERT' THEN
+                        SELECT status INTO parent_status FROM stock_counts WHERE id = NEW.count_id;
+                        IF parent_status IS NOT NULL AND parent_status <> 'draft' THEN
+                            RAISE EXCEPTION 'count lines are immutable after submit (rule 5)' USING ERRCODE = '45000';
+                        END IF;
+                        RETURN NEW;
+                    END IF;
+                    SELECT status INTO parent_status FROM stock_counts WHERE id = OLD.count_id;
+                    IF parent_status = 'locked' THEN
+                        RAISE EXCEPTION 'a locked count is immutable (rule 5)' USING ERRCODE = '45000';
+                    ELSIF parent_status <> 'draft'
+                        AND (to_jsonb(NEW) - 'reason_status' - 'decision_note' - 'adjustment_movement_id' - 'updated_at')
+                            IS DISTINCT FROM (to_jsonb(OLD) - 'reason_status' - 'decision_note' - 'adjustment_movement_id' - 'updated_at') THEN
                         RAISE EXCEPTION 'count lines are immutable after submit (rule 5)' USING ERRCODE = '45000';
                     END IF;
                     RETURN NEW;
-                END IF;
-                SELECT status INTO parent_status FROM stock_counts WHERE id = OLD.count_id;
-                IF parent_status = 'locked' THEN
-                    RAISE EXCEPTION 'a locked count is immutable (rule 5)' USING ERRCODE = '45000';
-                ELSIF parent_status <> 'draft'
-                    AND (to_jsonb(NEW) - 'reason_status' - 'decision_note' - 'adjustment_movement_id' - 'updated_at')
-                        IS DISTINCT FROM (to_jsonb(OLD) - 'reason_status' - 'decision_note' - 'adjustment_movement_id' - 'updated_at') THEN
-                    RAISE EXCEPTION 'count lines are immutable after submit (rule 5)' USING ERRCODE = '45000';
-                END IF;
-                RETURN NEW;
-            END;
-            \$\$
-            SQL;
+                END;
+                $$
+                SQL);
+        }
     }
 };

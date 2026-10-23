@@ -126,7 +126,7 @@ final class SubmitCount
                     // a draft cannot be rejected, so a line for an item deleted from the catalog is dropped here (step 3.7d), as an item
                     // deleted from the catalog that is not on the count is out of scope in assertComplete; no movement is written
                     $gone = array_flip($deleted);
-                    $this->dropped = array_values(array_map(static fn (mixed $id): int => (int) $id, $deleted));
+                    $this->dropped = array_map(static fn (mixed $id): int => (int) $id, $deleted);
                     sort($this->dropped);
                     $dropped = $lines->filter(static fn (StockCountLine $line): bool => isset($gone[$line->item_id]));
                     $this->audit->recordEvent('count.lines_dropped', $c->getMorphClass(), $c->id, [
