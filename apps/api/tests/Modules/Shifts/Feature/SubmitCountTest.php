@@ -85,7 +85,7 @@ it('takes the snapshot under the ledger lock: expected equals the balance at sna
         ->and($line->variance_qty?->toString())->toBe('0.0000');
 });
 
-it('sends a count without a difference straight to approved, writes nothing, and moves the shift to pending approval', function () {
+it('sends a count without a difference straight to locked, writes nothing, and locks the shift with its last count', function () {
     $count = ($this->closeAndGetCount)();
     $this->f->lines($this->f->chef, $count, ['confirm_all' => true])->assertOk();
 
@@ -95,9 +95,10 @@ it('sends a count without a difference straight to approved, writes nothing, and
         ->assertJsonPath('lines.0.reason_status', 'none');
 
     $shift = ShiftInstance::query()->findOrFail($this->shift->id);
-    expect($shift->status->value)->toBe('pending_approval')
+    expect($shift->status->value)->toBe('locked')
         ->and($shift->open_key)->toBeNull()
         ->and($shift->submitted_at?->toIso8601String())->toBe('2026-11-02T12:00:00+00:00')
+        ->and($shift->locked_at)->not->toBeNull()
         ->and(DB::table('stock_movements')->where('reason', 'count_adjustment')->count())->toBe(0);
 });
 
@@ -325,7 +326,7 @@ it('opens the shift only when the opening count of every place is in', function 
     expect(ShiftInstance::query()->findOrFail($shiftId)->status->value)->toBe('open');
 });
 
-it('moves the shift to pending approval only when the closing count of every place is in', function () {
+it('moves the shift on only when the closing count of every place is in (here nothing differs, so it locks)', function () {
     $bar = $this->f->place($this->f->kitchen, LocationType::Bar);
     $close = $this->f->close($this->f->chef, ($this->ensureShift)()->id)->assertOk();
     $ids = collect($close->json('counts'))->pluck('id', 'location.id');
@@ -337,5 +338,5 @@ it('moves the shift to pending approval only when the closing count of every pla
     expect(ShiftInstance::query()->findOrFail($this->shift->id)->status->value)->toBe('counting');
 
     $this->f->submit($this->f->chef, $ids[$bar->id])->assertOk();
-    expect(ShiftInstance::query()->findOrFail($this->shift->id)->status->value)->toBe('pending_approval');
+    expect(ShiftInstance::query()->findOrFail($this->shift->id)->status->value)->toBe('locked');
 });

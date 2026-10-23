@@ -8,6 +8,7 @@ use App\Modules\Shifts\Models\StockCount;
 use App\Shared\Models\Branch;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\Support\ShiftsFixture;
 
 pest()->group('module:shifts', 'invariants');
@@ -57,6 +58,7 @@ it('refuses a change to any column of a locked count, one column at a time, exce
         $new = match (true) {
             in_array($info['type'], ['int', 'bigint', 'smallint', 'tinyint', 'mediumint'], true) => ((int) $old) + 1,
             in_array($info['type'], ['datetime', 'timestamp'], true) => '2001-01-01 00:00:00',
+            $column === 'client_uuid' => (string) Str::uuid(),
             // the same length, one character different (a longer value would be refused as too long before the trigger sees it)
             default => $old === null ? 'x' : (((string) $old)[0] === 'z' ? 'y' : 'z').substr((string) $old, 1),
         };

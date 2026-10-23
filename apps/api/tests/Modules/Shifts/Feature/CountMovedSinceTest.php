@@ -56,7 +56,7 @@ it('shows zero right after the hand-in and the net change after it, per item', f
         ->and(($this->movedOf)($response, $this->sugar))->toBe('-50.0000');
 });
 
-it('does not count the approval\'s own adjustments as movement since the count', function () {
+it('is gone once the approval has locked the count: a locked count is history and its own adjustments are not movement since it', function () {
     $this->f->lines($this->f->chef, $this->count, ['confirm_all' => true, 'lines' => [['item_id' => $this->flour->id, 'counted_qty' => '9500', 'reason_id' => $this->f->reasonId('spoilage')]]])->assertOk();
     $this->f->submit($this->f->chef, $this->count)->assertOk();
     $this->f->stock($this->flour, $this->place, '700');
@@ -64,7 +64,8 @@ it('does not count the approval\'s own adjustments as movement since the count',
 
     $response = ($this->read)($this->count);
 
-    expect(($this->movedOf)($response, $this->flour))->toBe('700.0000');
+    expect($response->json('status'))->toBe('locked')
+        ->and(($this->movedOf)($response, $this->flour))->toBeNull();
 });
 
 it('is null on a rejected count and shows the recount draft no movement either', function () {

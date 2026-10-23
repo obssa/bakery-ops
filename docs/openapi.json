@@ -956,6 +956,222 @@
                 }
             }
         },
+        "/v1/locations/{location}/chain": {
+            "get": {
+                "operationId": "shifts.chain.index",
+                "tags": [
+                    "Chain"
+                ],
+                "parameters": [
+                    {
+                        "name": "location",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 200
+                        }
+                    },
+                    {
+                        "name": "before_seq",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "count_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "chain_seq": {
+                                                        "type": "integer"
+                                                    },
+                                                    "type": {
+                                                        "type": "string"
+                                                    },
+                                                    "shift_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "shift_date": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "locked_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "previous_hash": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "payload_hash": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "superseded_by_id": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "count_id",
+                                                    "chain_seq",
+                                                    "type",
+                                                    "shift_id",
+                                                    "shift_date",
+                                                    "locked_at",
+                                                    "previous_hash",
+                                                    "payload_hash",
+                                                    "superseded_by_id"
+                                                ]
+                                            }
+                                        },
+                                        "head": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "chain_seq": {
+                                                    "type": "integer"
+                                                },
+                                                "payload_hash": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "chain_seq",
+                                                "payload_hash"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "head"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/locations/{location}/chain/verify": {
+            "get": {
+                "operationId": "shifts.chain.verify",
+                "tags": [
+                    "Chain"
+                ],
+                "parameters": [
+                    {
+                        "name": "location",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "ok": {
+                                            "type": "boolean"
+                                        },
+                                        "checked": {
+                                            "type": "integer",
+                                            "const": 0
+                                        },
+                                        "head_hash": {
+                                            "type": "string"
+                                        },
+                                        "failures": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "chain_seq": {
+                                                        "type": "integer",
+                                                        "const": 1
+                                                    },
+                                                    "count_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "kind": {
+                                                        "type": "string",
+                                                        "const": "payload_mismatch"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "chain_seq",
+                                                    "count_id",
+                                                    "kind"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "ok",
+                                        "checked",
+                                        "head_hash",
+                                        "failures"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/inventory/costs/{item}/opening": {
             "post": {
                 "operationId": "inventory.costs.opening",
@@ -1622,6 +1838,70 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/stock-counts/{count}/unlock": {
+            "post": {
+                "operationId": "shifts.counts.unlock",
+                "tags": [
+                    "Counts"
+                ],
+                "parameters": [
+                    {
+                        "name": "count",
+                        "in": "path",
+                        "required": true,
+                        "description": "The count ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UnlockCountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "unlocked": {
+                                            "type": "object",
+                                            "additionalProperties": {}
+                                        },
+                                        "revision": {
+                                            "type": "object",
+                                            "additionalProperties": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "unlocked",
+                                        "revision"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -12575,6 +12855,20 @@
                     "is_base"
                 ],
                 "title": "UnitResource"
+            },
+            "UnlockCountRequest": {
+                "type": "object",
+                "description": "POST /stock-counts/{count}/unlock: the reason is required (it is kept on the revision and in the audit row).",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "UnlockCountRequest"
             },
             "UpdateCategoryRequest": {
                 "type": "object",

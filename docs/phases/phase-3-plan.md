@@ -1007,6 +1007,69 @@ live ledger in a state where a shift can be opened only through the API.
    swap two: each is found and named), `LockedRowsTest`, `StockCountsTriggerCoversEveryColumnTest`, `UnlockTest` (new revision,
    delta maths, the chain gets a new link, the old one stays and verifies), `LockChainRaceTest` (concurrency, forks: two counts of
    one place locking at once get sequence n and n+1, no deadlock, `Innodb_deadlocks` unchanged, 30 rounds), `VerifyChainCommandTest`.
+   - **As built (step 3.4, `phase-3/locks`).** ADR 0012 (proposed); migration `2026_10_25_100100_add_stock_counts_locked_rows_triggers`.
+     - **Where the lock is.** `Contracts\HashChain::lock(count, user)` is called inside the transaction of `SubmitCount` (a count that needs nothing decided
+       goes `draft -> approved -> locked` in one step), `ApproveCount` and `CosignCount` (a co-signature that finds no difference), after the count row and
+       the shift row are locked; `ShiftResolution::lockWhenResolved` then locks the shift when its last count is `locked` (also for a shift whose counts were
+       all locked at submit, which used to wait for this step) and announces `ShiftLocked` (after commit; `Shared\Events\ShiftLocked`, links = the newest
+       revision of each place and type with its `chain_seq` and hash). `CountSubmitted.status_after` therefore never says `approved`: it says `locked`
+       for a count that needs nothing decided; the approve and cosign endpoints answer `locked` with `chain {chain_seq, previous_hash, payload_hash,
+       locked_at}` (the presenter's `chain`, null before the lock). `locked_by_user_id` is whoever made the lock happen (the submitter, the approver or
+       the co-signer).
+     - **How the sequence is claimed** (plan section 10.3 said the unique key decides; this is the loop). The head is read without a lock; the link is one
+       query-builder `UPDATE` (status, `chain_seq`, hashes, `canonical_payload`, `locked_at` with microseconds, `locked_by_user_id`, `version`) inside a
+       savepoint; on a duplicate key (`UniqueConstraintViolationException`) it reads the row that now has that number with `sharedLock()` (a row that exists,
+       so no gap lock: the first link of a place never takes a `FOR UPDATE` on a missing row), takes its hash as the previous hash and tries the next number.
+       `HashChain::MAX_ATTEMPTS = 8` (the plan's "three retries" was a guess; eight costs nothing and three counts of a new place racing needs three);
+       exhausted, it is `409 shifts.lock.chain_busy` and the transaction rolls back. `LockChainRaceTest` (forks, 30 rounds of two counts of one place, 30
+       rounds of two counts of a new place, 10 rounds of three) saw sequences n and n+1 and `Innodb_deadlocks` unchanged. The first version saved through
+       Eloquent and lost `locked_at` from the UPDATE after a lost claim (a dirty-state surprise); the query builder removes the question.
+     - **Payload.** `Hash\PayloadBuilder` is exactly the version 1 list of section 10.3. `adjustment_qty` is read from the line's `variance_qty` when
+       `adjustment_movement_id` is set (the approval writes the delta, by construction), so Shifts needs no view of movement rows; `supersedes_count_id` is
+       the count whose `superseded_by_id` is this one; `cash` is null until 3.5 (the method that fills it is `PayloadBuilder::cash`). An empty list encodes
+       as `[]`, and no empty map is in the schema. `CanonicalJson` also exposes `quantity()`, `money()`, `timestamp()` and `date()`, which refuse a figure that
+       would need rounding (`LogicException`). Three vectors are pinned in `CanonicalJsonTest` and in `tests/Fixtures/chain/vectors.json`
+       (`UPDATE_CHAIN_FIXTURES=1` rewrites it).
+     - **Verify.** `HashChain::verify(location)` reports at most one failure per link, in the order `gap` (the named `chain_seq` is the missing number and
+       `count_id` the link found in its place), `previous_mismatch`, `hash_mismatch`, `payload_mismatch`; after a failure it carries on with the stored hash of
+       the link, so one tampered link names itself and the link after it, nothing more. A chain shortened at its newest end still verifies (only a head
+       hash kept elsewhere can tell: ADR 0012, Consequences). `export(location)` is `{format: bakery-chain-export, version, branch_id, location_id,
+       genesis_hash, head_hash, links: [{chain_seq, count_id, previous_hash, payload_hash, payload_version, canonical_payload}]}` for
+       `scripts/verify_chain.py --export`.
+     - **Triggers.** `stock_counts_locked_forbid_update` lists every column from `information_schema` when the migration runs (MariaDB), and lets
+       `superseded_by_id` / `superseded_at` move only from a NULL `superseded_by_id` (and `superseded_at` only with a non-null `superseded_by_id`);
+       `stock_counts_forbid_delete` refuses every DELETE. PostgreSQL: `stock_counts_guard()` over `to_jsonb(NEW) - the two columns`. `down()` drops them.
+       `LockedRowsTest` tries every column of a locked row one by one (to a new value and to NULL).
+     - **Unlock.** `Actions\UnlockCount` (`POST /stock-counts/{count}/unlock`, `shifts.unlock`): `409 shifts.count.not_locked {status}`,
+       `409 shifts.count.already_superseded {superseded_by_id}`, `422` for a missing or over-long reason; response `{unlocked, revision}`. The revision's
+       lines copy `counted_qty`, `carried_qty`, the reason and the note and are left **unconfirmed** (the counter looks at each again, `confirm_all` is the
+       explicit "nothing changed"); a line for an item deleted since is not copied. `expected_qty` is not copied from anywhere: it is the ledger under the
+       balance locks at submit, which equals the old counted figure plus anything that moved since, so approving writes only the difference. A locked
+       shift takes an unlock revision (`SubmitCount::takesCount`); the shift stays `locked`. `Locks::supersede` is the one query-builder UPDATE the trigger
+       allows. `Locks::previousClosing` is `approved` or `locked`, not superseded, newest `submitted_at` first.
+     - **Backfill** (`Locks::lockApproved()`, last statement of the migration, also `php artisan shifts:lock-approved`). For every branch (the current
+       branch is set and put back), every count with status `approved` is locked in its own transaction, within a place by `coalesce(decided_at,
+       submitted_at)` then id, so the chain keeps the order things happened in; `locked_by_user_id` is the decider, else the counter, else the creator;
+       the count row is locked `FOR UPDATE` before its shift row, and a shift left `pending_approval` whose counts are now all locked is locked too
+       (`ShiftLocked` is dispatched). A count that cannot be locked is logged (`Log::warning`) and stays `approved` (still carried by `previousClosing`)
+       for the command to retry; nothing aborts the migration. A second run finds nothing. No `audit_log` row is written (no actor in a migration).
+       `LockApprovedBackfillTest` runs the migration's `up()` twice on a populated database.
+     - **Nightly check.** `shifts:verify-chain [--branch=]` (routes/console.php: `dailyAt('03:00')`, `Africa/Addis_Ababa`, `withoutOverlapping(60)`) prints
+       and logs (`Log::info`, context `branch_id, location_id, checked, head_hash, ok`) every head hash, dispatches one `ChainBroken` per failure and
+       exits 1 (2 for an unknown branch). `Shared\Events\ChainBroken` carries `location_id`, both names, `first_bad_chain_seq` (the failing link of that
+       failure), `kind`, `count_id` and `caused_by_user_id` (the link's `locked_by_user_id`). `Notifications\NotifyChainBroken` tells `byRoles(['admin'])`
+       plus `byPermission('shifts.replay')`, critical, `in_app, push, telegram`, inbox key `chain_broken:{location_id}:{first_bad_chain_seq}:{kind}`, deep
+       link `/admin/shifts?location={location_id}`; the texts say the kind in words (`chain_kind.*`).
+     - **Chain endpoints.** `GET /locations/{location}/chain` (`limit` default 50, at most 200, `before_seq`) and `/chain/verify`, `shifts.replay`; a place of
+       another branch is 404 through `Locations::has`.
+     - **Python cross-check.** `scripts/verify_chain.py` (standard library only, its own encoder) recomputes the vectors and, with `--export`, any chain
+       export; CI runs it in the `invariants` job.
+     - **Tests moved and changed.** `HashChainTest`, `VerifyChainCommandTest` and `LockApprovedBackfillTest` live in `tests/Gate/` (not `Modules/`):
+       they drop and recreate the protecting triggers (DDL commits) and so use `CommitsForConcurrency`, which cannot be combined with the `RefreshDatabase`
+       the `Modules` directory gets (the run re-migrated per test). They still carry `module:shifts`. Every earlier test that expected a count to be
+       `approved` after the API approved it, or a shift to wait in `pending_approval` after no-variance counts, now expects `locked`.
+     - **Left open by the plan, decided here.** The unlock revision is not pre-confirmed. The backfill locks by `coalesce(decided_at, submitted_at)`. The
+       lock is by the person who caused it. `ChainBroken` is one event per failure, not per chain. `adjustment_qty` is the variance.
 5. **3.5 shifts.cash** (groups `feature`, `module:shifts`; STATUS `shifts.cash`), `phase-3/cash`: the two cash cases of
    `shifts->payments` appended red first; migration 13; `Denominations` (the configured list, the arithmetic in `Money`),
    `CashDeclarations` (the cash-drawer count's lines of money: opening float, closing expected/variance, float left, channel

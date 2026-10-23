@@ -196,8 +196,8 @@ it('has the next opening count carry the locked closing, and previousClosing pre
 
 it('rolls the lock back with the approval when the approval is refused', function () {
     ($this->short)();
-    $this->f->submit($this->f->chef, $this->count)->assertOk();
-    $this->f->approve($this->f->chef, $this->count)->assertStatus(409)->assertJsonPath('message_key', 'shifts.count.approve_self');
+    $this->f->submit($this->f->admin, $this->count)->assertOk();
+    $this->f->approve($this->f->admin, $this->count)->assertStatus(409)->assertJsonPath('message_key', 'shifts.count.approve_self');
 
     expect(($this->row)()->chain_seq)->toBeNull()
         ->and(($this->row)()->status)->toBe(CountStatus::PendingApproval);
