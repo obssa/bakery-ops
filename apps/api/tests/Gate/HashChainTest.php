@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Shifts\Contracts\HashChain;
 use App\Modules\Shifts\Enums\CountStatus;
+use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Shared\Models\Branch;
+use App\Shared\StateMachine\IllegalTransition;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\ChainFixture;
 use Tests\Support\CommitsForConcurrency;
@@ -32,7 +36,7 @@ beforeEach(function () {
     $this->f = ShiftsFixture::build($this->branch, $this);
     $this->chain = new ChainFixture($this->f);
     $this->place = $this->f->place($this->f->kitchen);
-    $this->bar = $this->f->place($this->f->kitchen, App\Modules\Inventory\Enums\LocationType::Bar);
+    $this->bar = $this->f->place($this->f->kitchen, LocationType::Bar);
     $this->verify = fn (?int $location = null): array => app(HashChain::class)->verify($location ?? $this->place->id)->toArray();
 });
 
@@ -81,8 +85,8 @@ it('keeps a chain per branch as well: the same place id cannot exist in two, but
 });
 
 it('refuses to lock a count that is not approved, and leaves a locked one as it is', function () {
-    $draft = StockCount::factory()->forShift(App\Modules\Shifts\Models\ShiftInstance::factory()->locked()->create(['branch_id' => $this->branch->id, 'station_id' => $this->f->kitchen->id, 'created_by_user_id' => $this->f->chef->id]), $this->place->id)->create(['created_by_user_id' => $this->f->chef->id]);
-    expect(fn () => DB::transaction(fn () => app(HashChain::class)->lock($draft, $this->f->admin->id)))->toThrow(App\Shared\StateMachine\IllegalTransition::class);
+    $draft = StockCount::factory()->forShift(ShiftInstance::factory()->locked()->create(['branch_id' => $this->branch->id, 'station_id' => $this->f->kitchen->id, 'created_by_user_id' => $this->f->chef->id]), $this->place->id)->create(['created_by_user_id' => $this->f->chef->id]);
+    expect(fn () => DB::transaction(fn () => app(HashChain::class)->lock($draft, $this->f->admin->id)))->toThrow(IllegalTransition::class);
 
     $locked = $this->chain->link($this->place);
     $again = DB::transaction(fn () => app(HashChain::class)->lock($locked, $this->f->manager->id));
@@ -190,5 +194,5 @@ it('puts the triggers back after a tamper, exactly as they were', function () {
     $this->chain->chain($this->place, 1);
     ChainFixture::withoutTriggers(COUNT_TRIGGERS, fn () => null);
 
-    expect(fn () => DB::table('stock_counts')->where('chain_seq', 1)->update(['decision_note' => 'x']))->toThrow(Illuminate\Database\QueryException::class);
+    expect(fn () => DB::table('stock_counts')->where('chain_seq', 1)->update(['decision_note' => 'x']))->toThrow(QueryException::class);
 });

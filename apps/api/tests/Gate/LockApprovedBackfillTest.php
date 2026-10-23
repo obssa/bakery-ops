@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Shifts\Contracts\HashChain;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Enums\CountStatus;
+use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Shared\Models\Branch;
 use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\ChainFixture;
 use Tests\Support\CommitsForConcurrency;
@@ -31,7 +34,7 @@ beforeEach(function () {
     $this->f = ShiftsFixture::build($this->branch, $this);
     $this->chain = new ChainFixture($this->f);
     $this->place = $this->f->place($this->f->kitchen);
-    $this->bar = $this->f->place($this->f->kitchen, App\Modules\Inventory\Enums\LocationType::Bar);
+    $this->bar = $this->f->place($this->f->kitchen, LocationType::Bar);
     $this->flour = $this->f->ingredient();
     $this->line = fn (): array => [['item' => $this->flour, 'counted' => '9500', 'expected' => '10000', 'reason' => 'spoilage']];
     $at = fn (string $time): array => ['decided_at' => CarbonImmutable::parse("2026-11-0{$time}:00:00", 'UTC'), 'submitted_at' => CarbonImmutable::parse("2026-11-0{$time}:00:00", 'UTC')->subHour()];
@@ -76,7 +79,7 @@ it('is idempotent: a second run finds nothing and changes nothing', function () 
 
 it('leaves every count that is not approved alone, and continues an existing chain', function () {
     $existing = $this->chain->link($this->place, ($this->line)());
-    $draft = StockCount::factory()->forShift(App\Modules\Shifts\Models\ShiftInstance::factory()->locked()->create(['branch_id' => $this->branch->id, 'station_id' => $this->f->kitchen->id, 'created_by_user_id' => $this->f->chef->id, 'date' => '2026-12-01']), $this->place->id)->closing()->create(['created_by_user_id' => $this->f->chef->id]);
+    $draft = StockCount::factory()->forShift(ShiftInstance::factory()->locked()->create(['branch_id' => $this->branch->id, 'station_id' => $this->f->kitchen->id, 'created_by_user_id' => $this->f->chef->id, 'date' => '2026-12-01']), $this->place->id)->closing()->create(['created_by_user_id' => $this->f->chef->id]);
     $pending = $this->chain->approved($this->place, ($this->line)(), ['status' => CountStatus::PendingApproval, 'decision' => null, 'decided_at' => null, 'decided_by_user_id' => null]);
     $approved = $this->chain->approved($this->place, ($this->line)(), ($this->at)('5 10'));
 
@@ -117,7 +120,7 @@ it('is what the end of migration 12 does, and the migration can run again on a p
     expect(StockCount::query()->findOrFail($a->id)->chain_seq)->toBe(1)
         ->and(StockCount::query()->findOrFail($b->id)->chain_seq)->toBe(2)
         ->and(app(HashChain::class)->verify($this->place->id)->toArray())->toMatchArray(['ok' => true, 'checked' => 2]);
-    expect(fn () => DB::table('stock_counts')->where('id', $a->id)->update(['decision_note' => 'x']))->toThrow(Illuminate\Database\QueryException::class);
+    expect(fn () => DB::table('stock_counts')->where('id', $a->id)->update(['decision_note' => 'x']))->toThrow(QueryException::class);
     expect(DB::table('information_schema.triggers')->where('trigger_schema', dbSchema())->where('trigger_name', 'stock_counts_locked_forbid_update')->count())->toBe(1);
 });
 

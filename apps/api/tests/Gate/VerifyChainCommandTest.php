@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Shifts\Models\StockCount;
 use App\Shared\Events\ChainBroken;
 use App\Shared\Models\Branch;
@@ -30,7 +31,7 @@ beforeEach(function () {
     $this->f = ShiftsFixture::build($this->branch, $this);
     $this->chain = new ChainFixture($this->f);
     $this->place = $this->f->place($this->f->kitchen);
-    $this->bar = $this->f->place($this->f->kitchen, App\Modules\Inventory\Enums\LocationType::Bar);
+    $this->bar = $this->f->place($this->f->kitchen, LocationType::Bar);
 });
 
 it('is scheduled daily at 03:00 Addis Ababa time without overlapping itself', function () {
