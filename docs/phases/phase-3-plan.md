@@ -1185,6 +1185,47 @@ live ledger in a state where a shift can be opened only through the API.
      on `/kds/kitchen`, `/kds/bar`, `/production` and `/till`, a `LiveFeed` over `GET /stations/{station}/shifts/current` (5 s
      visible, 30 s hidden, ETag), the till's Pay button disabled with the reason when no shift is running, and the stations-list
      for managers from `work_stations`.
+     - **As built (step 3.7a, `phase-3/web-shift-bar`).** Web only (no API change). `lib/api/client.ts` sends `X-Station-Id` from `lib/station.ts`
+       (`useActiveStation`, set by each screen through `useShiftStation`; the kitchen and bar displays pass the station they picked, production
+       and the till pass their station kinds), `Me.work_stations` is typed and `signIn` reads `/me` once more because the login answer has none.
+       `components/shifts/ShiftBar.tsx` renders four states over `lib/live/shifts.ts` (`createShiftFeed`, `SHIFT_POLL` 5 s / 30 s / 30 s, no
+       cursor, the answer replaces the state): **no shift** (badge "No shift", "Start shift" = count first, "Start without counting" =
+       `carry`), **opening** (count in progress, who started it, "Open the count", "Cancel start" for the starter or `shifts.manage`), **open**
+       (since when, the people on duty as chips, the notes count, "Join shift" or "Leave shift", "Close shift" behind a confirmation) and
+       **counting** (closing count in progress, "Open the count"). A station that tracks no shifts, or a person without `shifts.view` there,
+       gets no bar. The pure rules are in `lib/shifts.ts` (`barActions`, `onDuty`, `payBlockReason`, `shiftRequiredNotice`, `stationsFor`,
+       `addisClock`) and tested without a browser in `e2e/p3/handover-shift-bar-logic.spec.ts`. Any 409 `inventory.shift.required` or
+       `payments.shift.required` that the client sees (a write or a poll) is kept in `useShiftNotice` and shown in the bar in the page's
+       language, using the API's own `message_en` / `message_am`, above the same Start buttons; a running shift clears it. Start,
+       join, leave, close and cancel each keep one Idempotency-Key (the start's `client_uuid` is the same value) until they succeed or the
+       API answers definitely. `/shifts/count?shift=<id>` is a placeholder page that 3.7b replaces; the admin overview (`/admin`) gains a
+       "Stations and shifts" panel from `/me` work_stations (`stations.all` only, refreshed every 15 s). The kitchen and bar displays now
+       also list the stations of `work_stations`, so a manager (stations.all, no assignment) can open them.
+       **Decisions the plan left open.** (1) *The till's Pay button.* The plan says it is disabled with the reason when no shift is running;
+       with `payments.require_shift_for_cash` off that would stop cash on the live site. The web cannot read the flag, so Pay is blocked
+       only after the API has answered `payments.shift.required` once in the session, or when the build sets
+       `NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH=true`; otherwise the bar shows "No shift is running" and Pay stays enabled. 3.7e sets the build
+       variable together with the flag. (2) *Close needs no roster membership:* any holder of `shifts.count` at the station may close, as the
+       endpoint allows. (3) *The `opening` dead end:* "Start shift" counts first, but the count screen is 3.7b, so for now an `opening` shift is
+       left through "Cancel start" and a fresh "Start without counting". (4) `notes_count` in the bar can lag: the `current` ETag moves with the
+       shift version, which a handover note does not change; the count refreshes at the next roster or status change (3.7b adds the notes
+       panel and may add the notes count to the ETag).
+       **The pad menu flake (carry from 3.4, `stockout-production.spec.ts:100`).** The run's Playwright report was not among its artifacts
+       (only the release), so the trace could not be read. What the code shows: the menu ETag is the highest ledger movement id plus the
+       locations' state, so a production output moves it; the pad's menu feed starts with the screen and is not touched by the idle lock or the
+       unlock (it is a separate feed from the waiter's orders); the 304 path keeps the state, and the poll cadence (5 s visible, 20 s hidden,
+       back-off to 20 s) leaves room in 30 s. The one way a feed stops for good is a request that never answers: a look is awaited before the
+       next one is scheduled and `fetch` had no time limit, so a connection dropped behind the proxy froze the menu until a reload. Requests
+       now give up (`READ_TIMEOUT_MS` 20 s for reads and polls, `WRITE_TIMEOUT_MS` 30 s for writes, reported as the usual network failure so
+       the feed backs off and looks again), with a test that a hung `conditionalGet` fails inside its limit. This is the likely cause, not a
+       proven one. A second, theoretical gap is left for a later step: the menu ETag uses `max(id)` of the ledger, so a transaction that
+       takes a lower id but commits after a higher one would not move it.
+       **For 3.7b to 3.7e.** The flow in `e2e/p3/handover-shift-bar.spec.ts` settles the kitchen station first (`settleStation`: cancel an
+       `opening` shift, close and submit an `open` or `counting` one) and ends with `ensureOpenShift`; 3.7b should reuse `finishClosingCounts`
+       until its own screens finish counts. `useShiftStation` and `ShiftBar` take a station and are ready for the count and handover links
+       (the handover panel belongs in the bar's "opening" state). 3.7d adds the declaration to the till's opening state next to "Open the
+       count". 3.7e: set `NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH` with the cash flag.
+       CI evidence: see the PR.
    - **3.7b `phase-3/web-counts`**: the count screen (one component for opening and closing: lines with expected, carried and
      counted in base units, the touched/untouched mark, "nothing changed", the reason picker, the note, add an item, the review
      summary before confirming), the admin approval queue and side-by-side approval, the chain hash shown on a locked count, and
