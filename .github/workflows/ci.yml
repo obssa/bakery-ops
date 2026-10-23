@@ -217,6 +217,8 @@ jobs:
       groups: "gate:p0,gate:p1,gate:p2"
       env: |
         LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS=true
+        SHIFTS_OPEN_AD_HOC_ON_ACCEPT=true
+        PAYMENTS_REQUIRE_SHIFT_FOR_CASH=true
 
   mod-analytics:
     needs: [status, mod-shifts, mod-production, mod-notifications]
@@ -278,7 +280,7 @@ jobs:
           rm -rf out
       - run: pnpm build
         working-directory: apps/web
-        env: { NEXT_PUBLIC_API_URL: http://localhost:8000 }
+        env: { NEXT_PUBLIC_API_URL: http://localhost:8000, NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH: "true" }
       - uses: actions/upload-artifact@v4
         with:
           name: web-build
