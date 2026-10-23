@@ -23,3 +23,15 @@ if (! function_exists('countsMessageKeys')) {
         ];
     }
 }
+
+if (! function_exists('cashMessageKeys')) {
+    /** @return list<string> the keys step 3.5 adds to lang/{en,am}/shifts.php (the cash declaration) */
+    function cashMessageKeys(): array
+    {
+        return [
+            'shifts.cash.no_drawer', 'shifts.cash.denomination_unknown', 'shifts.cash.count_invalid', 'shifts.cash.float_too_large',
+            'shifts.cash.channel_unknown', 'shifts.cash.declaration_missing', 'shifts.cash.float_required',
+            'shifts.cash.reason_required', 'shifts.cash.note_required',
+        ];
+    }
+}

@@ -10,6 +10,8 @@ use App\Modules\Identity\Models\UserStationAssignment;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Payments\Models\Payment;
+use App\Modules\Payments\Models\PaymentChannel;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\ShiftRoster;
 use App\Modules\Shifts\Models\ShiftTemplate;
@@ -18,6 +20,7 @@ use App\Modules\Shifts\Support\ShiftWindow;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
+use Brick\Math\BigDecimal;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -239,6 +242,82 @@ final class ShiftsFixture
     public function reasonId(string $code): int
     {
         return (int) DB::table('variance_reasons')->where('branch_id', $this->branch->id)->where('code', $code)->value('id');
+    }
+
+    /** The cash drawer of the station (a location of its own kind; no stock is ever counted in it). */
+    public function drawer(Station $station): Location
+    {
+        return $this->place($station, LocationType::CashDrawer);
+    }
+
+    /**
+     * PUT /stock-counts/{count}/cash as $as.
+     *
+     * @param  array<string, mixed>  $body
+     * @param  array<string, string>  $headers
+     */
+    public function cashPut(User $as, int $countId, array $body, array $headers = []): TestResponse
+    {
+        return $this->send('PUT', "/api/v1/stock-counts/{$countId}/cash", $as, $body, $headers);
+    }
+
+    /** GET /shifts/{shift}/cash as $as. */
+    public function cashRead(User $as, int $shiftId): TestResponse
+    {
+        loginAs($as);
+
+        return $this->test->getJson("/api/v1/shifts/{$shiftId}/cash");
+    }
+
+    /**
+     * A payment row as Payments wrote it, taken in the shift (a row only: it moves nothing on its order).
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public function taken(ShiftInstance|int $shift, string $amount, ?string $tendered = null, string $channel = 'cash', array $over = []): Payment
+    {
+        $change = $tendered === null ? '0.00' : (string) BigDecimal::of($tendered)->minus($amount)->toScale(2);
+
+        return Payment::factory()->create($over + [
+            'branch_id' => $this->branch->id,
+            'channel_id' => PaymentChannel::query()->where('code', $channel)->value('id'),
+            'amount' => $amount,
+            'tendered_amount' => $channel === 'cash' ? ($tendered ?? $amount) : null,
+            'change_amount' => $channel === 'cash' ? $change : null,
+            'reference_no' => $channel === 'cash' ? null : 'REF-'.uniqid(),
+            'received_by_user_id' => $this->cashier->id,
+            'shift_instance_id' => $shift instanceof ShiftInstance ? $shift->id : $shift,
+        ]);
+    }
+
+    /**
+     * The till opens a shift through the API: starts it, declares the opening float by denomination and hands the count in.
+     *
+     * @param  array<string, int>  $denominations
+     * @return array{shift: int, count: int, start: TestResponse, submit: TestResponse}
+     */
+    public function openTill(Station $till, User $by, array $denominations, array $cash = []): array
+    {
+        $start = $this->start($by, $till)->assertCreated();
+        $shiftId = (int) $start->json('shift.id');
+        $drawer = collect($start->json('counts'))->firstWhere('location.type', 'cash_drawer');
+        $countId = (int) $drawer['id'];
+        $this->cashPut($by, $countId, ['denominations' => $denominations] + $cash)->assertOk();
+
+        return ['shift' => $shiftId, 'count' => $countId, 'start' => $start, 'submit' => $this->submit($by, $countId)];
+    }
+
+    /**
+     * The till closes: Close shift, then the drawer count of the closing counts.
+     *
+     * @return array{count: int, close: TestResponse}
+     */
+    public function closeTill(int $shiftId, User $by): array
+    {
+        $close = $this->close($by, $shiftId)->assertOk();
+        $drawer = collect($close->json('counts'))->firstWhere('location.type', 'cash_drawer');
+
+        return ['count' => (int) $drawer['id'], 'close' => $close];
     }
 
     /**

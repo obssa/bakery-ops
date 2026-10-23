@@ -3,14 +3,19 @@
 declare(strict_types=1);
 
 use App\Modules\Orders\Contracts\Orders;
+use App\Modules\Orders\Models\Order;
 use App\Modules\Payments\Contracts\ChannelTotal;
 use App\Modules\Payments\Contracts\Payments;
 use App\Modules\Payments\Contracts\Totals;
+use App\Modules\Payments\Exceptions\PaymentError;
 use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Models\PaymentChannel;
 use App\Shared\Models\Branch;
+use App\Shared\Shifts\OpenShifts;
+use App\Shared\Values\Money;
 use Brick\Math\BigDecimal;
 use Illuminate\Support\Str;
+use Tests\Support\FakeOpenShifts;
 use Tests\Support\OrderFloor;
 
 /*
@@ -23,7 +28,7 @@ use Tests\Support\OrderFloor;
  * drawer when the payment is taken, so a payment taken in shift B for an order created in shift A counts for B (the
  * manifest said "whose order carries that shift"; corrected in this step, ADR 0013). It runs in Payments' CI job
  * (mod-payments) for the life of the project. Cases 8 and 9 of the plan (the cash-declaration arithmetic and the
- * payments.require_shift_for_cash guard) are added at step 3.5, red first.
+ * payments.require_shift_for_cash guard) were added at step 3.5, red first.
  */
 
 beforeEach(function () {
@@ -177,4 +182,86 @@ it('stamps a payment recorded through Payments::record with the shift the actor 
         ->and(Payment::query()->findOrFail($b->payment->id)->shift_instance_id)->toBeNull()
         ->and(app(Totals::class)->cash(71)->amount())->toBe($withShift['totals']['total'])
         ->and(app(Totals::class)->cash(72)->amount())->toBe('0.00');
+})->group('contract:shifts->payments', 'contract');
+
+it('gives the cash-declaration arithmetic on a worked table: opening float plus the cash taken is the expected figure, change given back is not counted', function () {
+    // section 10.5, case 1: an opening float of 500.00, three payments with tender and change
+    ($this->take)('cash', '60.00', 81, ['tendered_amount' => '100.00', 'change_amount' => '40.00']);
+    ($this->take)('cash', '120.00', 81, ['tendered_amount' => '120.00', 'change_amount' => '0.00']);
+    ($this->take)('cash', '45.50', 81, ['tendered_amount' => '50.00', 'change_amount' => '4.50']);
+    // case 3: a payment taken in another shift and a voided one are in no figure of shift 81
+    ($this->take)('cash', '30.00', 82);
+    ($this->take)('cash', '80.00', 81, ['status' => 'voided']);
+
+    $totals = app(Totals::class);
+    $opening = Money::of('500.00');
+    $sales = $totals->cash(81);
+    $expected = $opening->plus($sales);
+
+    expect($sales->amount())->toBe('225.50', 'tender 270.00 less change 44.50 is not what the till sold')
+        ->and($expected->amount())->toBe('725.50')
+        ->and(Money::of('725.50')->minus($expected)->amount())->toBe('0.00', 'counted 725.50: no variance')
+        ->and(Money::of('700.00')->minus($expected)->amount())->toBe('-25.50', 'counted 700.00: short by 25.50')
+        ->and(array_sum(array_map(fn (ChannelTotal $c): int => $c->receipts, $totals->byChannel(81))))->toBe(3);
+})->group('contract:shifts->payments', 'contract');
+
+it('refuses a cash payment with 409 payments.shift.required when the flag is on and the actor carries no open shift, and rolls the payment back whole', function () {
+    config(['payments.require_shift_for_cash' => true]);
+    $double = new FakeOpenShifts([], [91]);
+    app()->instance(OpenShifts::class, $double);
+    $f = OrderFloor::open($this);
+    $m = $f->menu;
+    $serve = function () use ($f, $m): array {
+        $order = $f->send([$m->line($m->croissant)]);
+        foreach ((array) $order['lines'] as $line) {
+            $f->act('served', $line['id'], $f->waiter)->assertOk();
+        }
+
+        return $order;
+    };
+    $order = $serve();
+    $before = Payment::query()->count();
+    $try = function (?int $shift) use ($f, $order): ?PaymentError {
+        withActor($f->cashier->id, null, null, null, $shift === null ? null : shiftRow($shift, $f->branch->id));
+        try {
+            app(Payments::class)->record($order['id'], (string) Str::uuid(), 'cash', $order['totals']['total'], null, null, $f->cashier);
+        } catch (PaymentError $e) {
+            return $e;
+        }
+
+        return null;
+    };
+
+    $none = $try(null);
+    $notOpen = $try(92);
+
+    expect($none)->toBeInstanceOf(PaymentError::class)
+        ->and($none?->messageKey)->toBe('payments.shift.required')
+        ->and($none?->status)->toBe(409)
+        ->and($notOpen?->messageKey)->toBe('payments.shift.required', 'a shift that is not open (counting, locked) does not take cash')
+        ->and(Payment::query()->count())->toBe($before, 'the refusal rolls the whole payment back')
+        ->and(Order::query()->findOrFail($order['id'])->status->value)->not->toBe('closed');
+
+    expect($try(91))->toBeNull('an open shift takes it');
+    expect(Payment::query()->count())->toBe($before + 1)
+        ->and(Payment::query()->latest('id')->firstOrFail()->shift_instance_id)->toBe(91);
+})->group('contract:shifts->payments', 'contract');
+
+it('never asks Shifts anything when the flag is off, whatever the actor carries', function () {
+    config(['payments.require_shift_for_cash' => false]);
+    $double = new FakeOpenShifts;
+    app()->instance(OpenShifts::class, $double);
+    $f = OrderFloor::open($this);
+    $m = $f->menu;
+    $order = $f->send([$m->line($m->croissant)]);
+    foreach ((array) $order['lines'] as $line) {
+        $f->act('served', $line['id'], $f->waiter)->assertOk();
+    }
+    $double->asked = [];
+
+    withActor($f->cashier->id);
+    app(Payments::class)->record($order['id'], (string) Str::uuid(), 'cash', $order['totals']['total'], null, null, $f->cashier);
+
+    expect(array_filter($double->asked, fn (string $q): bool => str_starts_with($q, 'isOpen')))->toBe([])
+        ->and(Payment::query()->count())->toBe(1);
 })->group('contract:shifts->payments', 'contract');

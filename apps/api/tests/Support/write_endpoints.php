@@ -1255,6 +1255,20 @@ return [
         'payload' => fn (): array => ['confirm_all' => true],
     ],
     [
+        'method' => 'PUT',
+        'uri' => '/api/v1/stock-counts/{count}/cash',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $f = $shiftsFloor($t);
+            $f->drawer($f->till);
+            loginAs($f->admin);
+
+            return ['{count}' => (string) collect($f->start($f->cashier, $f->till)->json('counts'))->firstWhere('location.type', 'cash_drawer')['id']];
+        },
+        'payload' => fn (): array => ['denominations' => ['100' => 2]],
+    ],
+    [
         'method' => 'POST',
         'uri' => '/api/v1/stock-counts/{count}/submit',
         'module' => 'shifts',

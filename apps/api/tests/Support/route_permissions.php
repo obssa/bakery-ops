@@ -199,6 +199,9 @@ return [
     'PATCH /api/v1/variance-reasons/{reason}' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
     'POST /api/v1/shifts/{shift}/close' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
     'PUT /api/v1/stock-counts/{count}/lines' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    // Cash (step 3.5): the till's cash declaration is entered by those who count at the till (the action checks the station), read by those who see its shifts
+    'PUT /api/v1/stock-counts/{count}/cash' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
+    'GET /api/v1/shifts/{shift}/cash' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
     'POST /api/v1/stock-counts/{count}/submit' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
     // Decisions (step 3.3b): shifts.approve (admin, manager) approves and rejects; that the person who counted cannot approve is the action's rule (409).
     'POST /api/v1/stock-counts/{count}/approve' => ['permission' => 'shifts.approve', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],

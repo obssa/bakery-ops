@@ -17,12 +17,12 @@ it('has an English and an Amharic text for every Payments message, with the same
     foreach ([
         'channel.unknown', 'channel.disabled', 'channel.photo_required', 'channel.reference_required',
         'amount.mismatch', 'tendered.too_low',
-        'order.not_payable', 'order.settled', 'client_uuid.reused',
+        'order.not_payable', 'order.settled', 'client_uuid.reused', 'shift.required',
     ] as $key) {
         expect($en[$key] ?? null)->toBeString()->not->toBeEmpty("en {$key}")
             ->and($am[$key] ?? null)->toBeString()->not->toBeEmpty("am {$key}")
             ->and($am[$key])->not->toBe($en[$key], "am {$key} is not a copy of the English")
             ->and($am[$key])->toMatch('/\p{Ethiopic}/u');
     }
-    expect(array_keys($en))->toHaveCount(9);
+    expect(array_keys($en))->toHaveCount(10);
 })->group('module:payments');
