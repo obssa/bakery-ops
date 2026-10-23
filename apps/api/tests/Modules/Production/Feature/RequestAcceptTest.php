@@ -30,6 +30,7 @@ beforeEach(function () {
 });
 
 it('moves a requested request to accepted for the baker, audited, with the shift answer in the audit context', function () {
+    config(['shifts.open_ad_hoc_on_accept' => false]); // on by default since step 3.7e (CallInTest): with it off the attacher answers no shift
     $request = $this->f->request();
 
     $response = ($this->accept)($request)->assertOk();
