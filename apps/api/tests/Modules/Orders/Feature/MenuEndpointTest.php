@@ -230,6 +230,25 @@ it('answers 304 with no body when If-None-Match is current, and does not build t
     expect($etag)->toBe(($this->menu)()->headers->get('ETag')); // idle: the same tag
 })->group('module:orders', 'feature');
 
+it('moves the ETag on every poll while a movement is younger than the overlap window, and answers 304 again after it', function () {
+    $m = $this->floor->menu;
+    stockIn($m->water, $m->display, '2');
+    $start = CarbonImmutable::now();
+    $etag = fn () => ($this->menu)()->headers->get('ETag');
+
+    $this->travelTo($start->addSeconds(1));
+    $inside = $etag();
+    $this->travelTo($start->addSeconds(2));
+    expect($etag())->not->toBe($inside); // a late commit below the highest id could be in this window: never a 304 over it
+
+    $this->travelTo($start->addSeconds(9));
+    $settled = $etag();
+    expect($settled)->not->toBe($inside);
+    $this->travelTo($start->addSeconds(12));
+    expect(($this->menu)('', ['If-None-Match' => $settled])->status())->toBe(304);
+    expect(($this->menu)('', ['If-None-Match' => $inside])->status())->toBe(200);
+})->group('module:orders', 'feature');
+
 it('changes the ETag when stock changes, when a price changes, when the catalog changes, and per query string', function () {
     $f = $this->floor;
     $m = $f->menu;

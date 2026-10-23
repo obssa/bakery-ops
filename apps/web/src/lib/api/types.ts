@@ -816,3 +816,132 @@ export interface NewScheduledRequest {
   priority: RequestPriority;
   note?: string;
 }
+
+// --- counts, handover and the approval queue (step 3.7b; phase-3 plan section 4, "Counts" and "Handover and replay") ------------
+// Quantities are decimal strings in the item's base unit and are shown as the API sends them; null where not yet known.
+
+export type CountStatus = "draft" | "awaiting_cosign" | "pending_approval" | "approved" | "locked" | "rejected";
+
+export interface CountReason {
+  id: number;
+  code: string;
+  name_en: string;
+  name_am: string;
+}
+
+/** GET /variance-reasons */
+export interface VarianceReason extends CountReason {
+  requires_note: boolean;
+  is_active: boolean;
+  sort: number;
+}
+
+export interface CountLine {
+  id: number;
+  item: { id: number; name_en: string; name_am: string; unit: string };
+  expected_qty: string | null;
+  carried_qty: string | null;
+  counted_qty: string | null;
+  variance_qty: string | null;
+  /** the counter has touched the line (typed a figure or pressed "as expected") */
+  confirmed: boolean;
+  reason: CountReason | null;
+  note: string | null;
+  reason_status: "none" | "pending" | "accepted" | "rejected";
+  decision_note: string | null;
+  adjustment_movement_id: number | null;
+  /** the net change at the place since the count (or since the previous closing for an opening draft); null where not measured */
+  moved_since: string | null;
+}
+
+export interface CountChain {
+  chain_seq: number;
+  previous_hash: string | null;
+  payload_hash: string;
+  locked_at: string;
+}
+
+export interface CashBlock {
+  counted_total: string | null;
+  expected_total: string | null;
+  variance_total: string | null;
+  float_left_total: string | null;
+  currency: string;
+}
+
+export interface CountPlace {
+  id: number;
+  name_en: string;
+  name_am: string;
+  type: string;
+}
+
+export interface CountSummary {
+  id: number;
+  shift_id: number;
+  location: CountPlace | null;
+  type: "opening" | "closing";
+  seq: number;
+  status: CountStatus;
+  counted_by: { id: number; name: string } | null;
+  started_at: string | null;
+  snapshot_at: string | null;
+  submitted_at: string | null;
+  cosigned_by: { id: number; name: string } | null;
+  decided_by: { id: number; name: string } | null;
+  decision: "approved" | "rejected" | null;
+  decision_note: string | null;
+  supersede_cause: "recount" | "unlock" | null;
+  superseded_by_id: number | null;
+  chain: CountChain | null;
+  blocked_by_pending: { count_id: number } | null;
+  version: number;
+  lines_count: number;
+}
+
+export interface Count extends Omit<CountSummary, "lines_count"> {
+  lines: CountLine[];
+  /** the cash drawer's declaration (3.7d builds its screen); null for a stock count */
+  cash: CashBlock | null;
+}
+
+/** GET /stock-counts: a summary with what an approver needs without opening the count. */
+export interface QueueRow extends CountSummary {
+  station: { id: number; code: string; name_en: string; name_am: string; requires_overseer: boolean };
+  shift: { id: number; date: string; status: ShiftStatus };
+  variance_lines: CountLine[];
+}
+
+export interface QueuePage {
+  data: QueueRow[];
+  counts: { awaiting_cosign: number; pending_approval: number };
+  server_time: string;
+}
+
+export interface HandoverNote {
+  id: number;
+  client_uuid: string;
+  shift_id: number;
+  from: { id: number; name: string } | null;
+  to: { id: number; name: string } | null;
+  body: string;
+  created_at: string;
+}
+
+export interface PreviousClosing {
+  location: CountPlace;
+  count_id: number;
+  chain_seq: number | null;
+  payload_hash: string | null;
+  locked_at: string | null;
+  provisional: boolean;
+  float_left_total: string | null;
+}
+
+/** GET /stations/{station}/handover */
+export interface HandoverPanelData {
+  previous: Omit<Shift, "roster" | "counts" | "notes_count"> | null;
+  notes: HandoverNote[];
+  previous_closing: PreviousClosing[];
+  pending_counts: CountSummary[];
+}

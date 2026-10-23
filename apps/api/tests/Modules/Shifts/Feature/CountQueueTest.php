@@ -150,6 +150,22 @@ it('answers 304 to a matching If-None-Match and a new tag after a count moves', 
         ->and($after->json('data'))->toBe([]);
 });
 
+it('moves the tag on every poll while the newest ledger movement is inside the overlap window (moved_since reads the ledger)', function () {
+    ($this->handIn)($this->f->kitchen, $this->f->chef, $this->flour, '9500');
+    stockIn($this->flour, $this->kitchenPlace, '10');
+    $start = CarbonImmutable::now();
+
+    $this->travelTo($start->addSeconds(1));
+    $inside = $this->f->queue($this->f->admin)->assertOk()->headers->get('ETag');
+    $this->travelTo($start->addSeconds(2));
+    $this->f->queue($this->f->admin, [], ['If-None-Match' => $inside])->assertOk();
+
+    $this->travelTo($start->addSeconds(9));
+    $settled = $this->f->queue($this->f->admin)->headers->get('ETag');
+    $this->travelTo($start->addSeconds(12));
+    $this->f->queue($this->f->admin, [], ['If-None-Match' => $settled])->assertStatus(304);
+});
+
 it('moves the tag when a count arrives with an id below the highest one', function () {
     ($this->handIn)($this->f->kitchen, $this->f->chef, $this->flour, '9500');
     $tag = $this->f->queue($this->f->admin)->headers->get('ETag');

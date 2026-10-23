@@ -143,6 +143,18 @@ it('polls the current shift conditionally', function () {
     ($this->get)($uri, $this->f->cashier, ['If-None-Match' => $etag])->assertOk();
 });
 
+it('moves the current-shift tag when a handover note is written, so the notes count on the bar does not lag', function () {
+    $shift = $this->f->running($this->f->till, $this->f->cashier);
+    $uri = "/api/v1/stations/{$this->f->till->id}/shifts/current";
+
+    $etag = ($this->get)($uri, $this->f->cashier)->assertOk()->headers->get('ETag');
+    ($this->get)($uri, $this->f->cashier, ['If-None-Match' => $etag])->assertStatus(304);
+
+    $this->f->note($this->f->cashier, $shift->id)->assertCreated();
+    $after = ($this->get)($uri, $this->f->cashier, ['If-None-Match' => $etag])->assertOk();
+    expect($after->json('data.notes_count'))->toBe(1)->and($after->headers->get('ETag'))->not->toBe($etag);
+});
+
 it('refuses the current shift of a station the caller does not work at and of one that tracks no shifts', function () {
     ($this->get)("/api/v1/stations/{$this->f->kitchen->id}/shifts/current", $this->f->cashier)->assertStatus(403)->assertJsonPath('message_key', 'shifts.station.forbidden');
     ($this->get)("/api/v1/stations/{$this->f->store->id}/shifts/current")->assertStatus(422)->assertJsonPath('message_key', 'shifts.station.not_tracked');

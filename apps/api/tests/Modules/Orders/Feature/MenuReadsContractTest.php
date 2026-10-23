@@ -98,6 +98,27 @@ it('Availability::bulk still agrees with ofProduct for a mixed list at each loca
     }
 })->group('module:orders', 'feature');
 
+it('Stock::fingerprint keeps moving while the newest movement is inside the overlap window, then settles on a tag no poll of the window had', function () {
+    // ids become visible in commit order, not id order (ADR 0009): a transaction holding a lower id can commit after a higher one was
+    // served, and max(id) alone would not move. So a young newest movement adds a time bucket; once it is older than the window the
+    // tag is stable again, and different from every tag the window handed out, so a pad that polled inside it looks again.
+    $m = $this->floor->menu;
+    stockIn($m->water, $m->display, '1');
+    $start = CarbonImmutable::now();
+    $stock = fn () => app(Stock::class)->fingerprint();
+
+    $this->travelTo($start->addSeconds(1));
+    $first = $stock();
+    $this->travelTo($start->addSeconds(2));
+    $second = $stock();
+    expect($second)->not->toBe($first);
+
+    $this->travelTo($start->addSeconds(9));
+    $settled = $stock();
+    $this->travelTo($start->addSeconds(12));
+    expect($stock())->toBe($settled)->and($settled)->not->toBe($first)->and($settled)->not->toBe($second);
+})->group('module:orders', 'feature');
+
 it('Items::menuFingerprint and Stock::fingerprint move when what the menu shows moves, and only then', function () {
     $f = $this->floor;
     $m = $f->menu;
