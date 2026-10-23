@@ -253,3 +253,16 @@ it('opens a low episode when a rule is created over a balance already below its 
     $this->withHeaders(idempotencyKey())->deleteJson("/api/v1/reorder-rules/{$created}")->assertOk();
     Event::assertDispatchedTimes(StockRecovered::class, 3);
 });
+
+it('leaves out the rules of deleted items instead of failing, and keeps those of switched-off items (step 3.7e)', function () {
+    $gone = Item::factory()->ingredient('g')->create(['branch_id' => $this->branch->id, 'name_en' => 'Gone sugar', 'name_am' => 'ስኳር']);
+    $off = Item::factory()->ingredient('g')->create(['branch_id' => $this->branch->id, 'name_en' => 'Off salt', 'name_am' => 'ጨው', 'is_active' => false]);
+    ($this->makeRule)(['item_id' => $this->flour->id]);
+    ($this->makeRule)(['item_id' => $gone->id]);
+    ($this->makeRule)(['item_id' => $off->id]);
+    $gone->delete();
+
+    $names = collect($this->getJson('/api/v1/reorder-rules')->assertOk()->json('data'))->pluck('item.name_en')->all();
+
+    expect($names)->toBe(['Flour', 'Off salt']);
+});
