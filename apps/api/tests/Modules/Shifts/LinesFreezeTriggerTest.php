@@ -19,7 +19,7 @@ pest()->group('module:shifts', 'invariants');
 /*
  * Migration 10 (phase-3 plan section 3): stock_count_lines is immutable after submit, by trigger. An INSERT is refused when the
  * parent count is not a draft; an UPDATE of any column other than reason_status, decision_note, adjustment_movement_id and
- * updated_at is refused when the parent is not a draft, and even those once it is locked; every DELETE is refused. The
+ * updated_at is refused when the parent is not a draft, and even those once it is locked; a DELETE is refused unless the parent is a draft (step 3.7d). The
  * trigger text names every column of the table (this test fails when a column is added and the trigger is not updated).
  */
 
@@ -157,12 +157,19 @@ it('lets the decision columns change on a submitted count that is not locked, an
     }
 });
 
-it('refuses every delete, of a draft count\'s line too', function (string $status) {
+it('refuses a delete once the count is not a draft', function (string $status) {
     $f = frozenFixture($status);
 
     expect(fn () => DB::table('stock_count_lines')->where('id', $f['line'])->delete())->toThrow(QueryException::class, 'immutable');
     expect(DB::table('stock_count_lines')->where('id', $f['line'])->exists())->toBeTrue();
-})->with(['draft', 'pending_approval', 'locked']);
+})->with(['pending_approval', 'locked']);
+
+it('lets a line of a draft count go (step 3.7d: the submit drops the lines of deleted items)', function () {
+    $f = frozenFixture('draft');
+
+    expect(DB::table('stock_count_lines')->where('id', $f['line'])->delete())->toBe(1);
+    expect(DB::table('stock_count_lines')->where('id', $f['line'])->exists())->toBeFalse();
+});
 
 it('names every column of the table in the MariaDB update trigger, so a new column cannot be forgotten', function () {
     if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {

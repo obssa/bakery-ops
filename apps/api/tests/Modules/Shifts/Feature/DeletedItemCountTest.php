@@ -13,8 +13,9 @@ pest()->group('module:shifts', 'feature');
 
 /*
  * Carry from step 3.3b: an item that is soft-deleted while a count still lists it cannot be locked by the Ledger, which used to surface
- * as an unmapped server error. Approving, and submitting, now answer a clean bilingual 409 shifts.count.item_unavailable naming the
- * items; nothing is written, and the count can still be rejected and counted again.
+ * as an unmapped server error. Approving answers a clean bilingual 409 shifts.count.item_unavailable naming the items; nothing is
+ * written, and the count can still be rejected and counted again. Submitting (step 3.7d) drops the lines of a draft whose items were deleted
+ * (a draft cannot be rejected, so the station could never close) and reports their ids in dropped_item_ids.
  */
 
 beforeEach(function () {
@@ -59,13 +60,32 @@ it('lets the approver reject that count and count again', function () {
     $this->f->reject($this->f->admin, $this->count, ['note' => 'Count again'])->assertOk()->assertJsonPath('recount.status', 'draft');
 });
 
-it('refuses to submit a count that lists a deleted item with the same answer', function () {
+it('drops the lines of a draft whose items were deleted, reports their ids and submits the rest', function () {
     ($this->fill)();
     $this->sugar->delete();
 
-    $this->f->submit($this->f->chef, $this->count)->assertStatus(409)
-        ->assertJsonPath('message_key', 'shifts.count.item_unavailable')
-        ->assertJsonPath('item_ids', [$this->sugar->id]);
+    $response = $this->f->submit($this->f->chef, $this->count)->assertOk()
+        ->assertJsonPath('status', 'pending_approval')
+        ->assertJsonPath('dropped_item_ids', [$this->sugar->id]);
 
-    expect(StockCount::query()->findOrFail($this->count)->status)->toBe(CountStatus::Draft);
+    $items = collect($response->json('lines'))->pluck('item.id')->all();
+    expect($items)->toContain($this->flour->id)->not->toContain($this->sugar->id)
+        ->and(DB::table('stock_count_lines')->where('count_id', $this->count)->where('item_id', $this->sugar->id)->exists())->toBeFalse()
+        ->and(DB::table('stock_count_lines')->where('count_id', $this->count)->where('item_id', $this->flour->id)->value('variance_qty'))->toBe('-500.0000')
+        ->and(($this->adjustments)())->toBe(0, 'submit writes no movement');
+    $audit = DB::table('audit_log')->where('action', 'count.lines_dropped')->where('subject_id', $this->count)->first();
+    expect($audit)->not->toBeNull()->and((string) $audit->after)->toContain((string) $this->sugar->id);
+});
+
+it('reports no dropped ids when nothing was deleted, and lets the station close with every line deleted', function () {
+    ($this->fill)();
+    $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('dropped_item_ids', []);
+});
+
+it('submits a draft whose lines are all for deleted items once the place holds no other stock', function () {
+    $this->flour->delete();
+    $this->sugar->delete();
+
+    $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('dropped_item_ids', [$this->flour->id, $this->sugar->id]);
+    expect(DB::table('stock_count_lines')->where('count_id', $this->count)->count())->toBe(0);
 });
