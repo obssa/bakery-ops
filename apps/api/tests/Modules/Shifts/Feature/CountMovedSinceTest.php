@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Inventory\Ledger\MovementReason;
+use App\Shared\Live\OverlapCursor;
 use App\Shared\Models\Branch;
 use Carbon\CarbonImmutable;
 use Tests\Support\ShiftsFixture;
@@ -96,7 +97,7 @@ it('shows an opening draft the net movements since the previous closing', functi
 it('moves the ETag with the ledger while the count is undecided', function () {
     $this->f->lines($this->f->chef, $this->count, ['confirm_all' => true, 'lines' => [['item_id' => $this->flour->id, 'counted_qty' => '9500', 'reason_id' => $this->f->reasonId('spoilage')]]])->assertOk();
     $this->f->submit($this->f->chef, $this->count)->assertOk();
-    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
+    $this->travel(OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $first = $this->f->send('GET', "/api/v1/stock-counts/{$this->count}", $this->f->admin)->assertOk();
     $etag = $first->headers->get('ETag');
     $this->f->send('GET', "/api/v1/stock-counts/{$this->count}", $this->f->admin, [], ['If-None-Match' => $etag])->assertStatus(304);

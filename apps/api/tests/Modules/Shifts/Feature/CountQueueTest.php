@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Shifts\Models\StockCount;
+use App\Shared\Live\OverlapCursor;
 use App\Shared\Models\Branch;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -137,7 +138,7 @@ it('does not show another branch\'s counts', function () {
 
 it('answers 304 to a matching If-None-Match and a new tag after a count moves', function () {
     $count = ($this->handIn)($this->f->kitchen, $this->f->chef, $this->flour, '9500');
-    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
+    $this->travel(OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $first = $this->f->queue($this->f->admin)->assertOk();
     $tag = $first->headers->get('ETag');
     expect($tag)->not->toBeNull();

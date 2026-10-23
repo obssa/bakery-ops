@@ -13,6 +13,7 @@ use App\Modules\Catalog\Services\PriceHistory;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\Location;
+use App\Shared\Live\OverlapCursor;
 use App\Shared\Models\Branch;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
@@ -210,7 +211,7 @@ it('is for the order takers: orders.create', function () {
 })->group('module:orders', 'feature');
 
 it('answers 304 with no body when If-None-Match is current, and does not build the menu to do it', function () {
-    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
+    $this->travel(OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $first = ($this->menu)();
     $etag = $first->headers->get('ETag');
 

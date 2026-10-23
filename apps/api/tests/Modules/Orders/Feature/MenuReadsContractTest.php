@@ -12,6 +12,7 @@ use App\Modules\Catalog\Services\PriceHistory;
 use App\Modules\Inventory\Contracts\Availability;
 use App\Modules\Inventory\Contracts\Locations;
 use App\Modules\Inventory\Contracts\Stock;
+use App\Shared\Live\OverlapCursor;
 use App\Shared\Models\Branch;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
@@ -122,7 +123,7 @@ it('Stock::fingerprint keeps moving while the newest movement is inside the over
 it('Items::menuFingerprint and Stock::fingerprint move when what the menu shows moves, and only then', function () {
     $f = $this->floor;
     $m = $f->menu;
-    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
+    $this->travel(OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $now = CarbonImmutable::now();
     $catalog = fn () => app(Items::class)->menuFingerprint($now);
     $stock = fn () => app(Stock::class)->fingerprint();

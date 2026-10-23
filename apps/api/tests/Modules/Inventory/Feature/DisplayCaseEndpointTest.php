@@ -11,6 +11,7 @@ use App\Modules\Inventory\Contracts\ReserveLine;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Shared\Enums\StationCode;
+use App\Shared\Live\OverlapCursor;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use Illuminate\Database\Events\QueryExecuted;
@@ -137,7 +138,7 @@ it('is for the floor: the cashier reads it, the waiter is refused with 403', fun
 it('stamps an ETag, answers 304 when nothing changed, and a new ETag after a movement or a catalog change', function () {
     $cake = ($this->product)('Cake', 'ኬክ', Fulfilment::ToStock, '9');
 
-    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
+    $this->travel(OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $first = ($this->panel)()->assertOk()->assertHeader('Cache-Control', 'no-cache, private');
     $etag = (string) $first->headers->get('ETag');
     $again = ($this->panel)(['If-None-Match' => $etag]);
@@ -176,7 +177,7 @@ it('does the work in a fixed number of queries as the products grow, and fewer f
     $few = $count();
     $make(12, 3);
     $many = $count();
-    $this->travel(\App\Shared\Live\OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
+    $this->travel(OverlapCursor::fromConfig()->windowSeconds() + 1)->seconds(); // past the settling window of the ledger tag
     $etag = (string) ($this->panel)()->headers->get('ETag');
 
     expect($many)->toBe($few)->and($count(['If-None-Match' => $etag]))->toBeLessThan($many);
