@@ -67,3 +67,48 @@ export async function ensureOpenShifts(admin: Api, ...stations: StationRef[]): P
 export async function ensureOpenShiftAt(admin: Api, location: { station_id: number | null }): Promise<void> {
   if (location.station_id !== null) await ensureOpenShift(admin, { id: location.station_id });
 }
+
+// --- closing a shift through the API (step 3.7a) ------------------------------------------------------------------------------
+// The shift screens (3.7b onwards) finish counts in the browser; until then a flow that closes a shift from the bar has to finish
+// the closing counts here, or the station is left `counting` and every later fixture that wants an open shift finds none.
+
+interface RunningShift {
+  id: number;
+  status: string;
+  started_by: { id: number } | null;
+  roster: { user: { id: number; name: string } | null; left_at: string | null }[];
+}
+
+/** The running shift of the station (opening, open or counting), or null. */
+export async function currentShift(admin: Api, station: StationRef): Promise<RunningShift | null> {
+  return (await admin.get<{ data: RunningShift | null }>(`/stations/${station.id}/shifts/current`)).data;
+}
+
+/**
+ * Submits the closing counts of a `counting` shift as they stand ("nothing changed": confirm_all, then submit). A count that needs a
+ * reason (the stock moved since) cannot be finished this way and fails the caller, as in finishOpeningCounts.
+ */
+export async function finishClosingCounts(admin: Api, shiftId: number): Promise<void> {
+  const counts = (await admin.get<{ data: CountView[] }>(`/shifts/${shiftId}/counts`)).data;
+  for (const count of counts) {
+    if (count.status !== "draft") continue;
+    await admin.put(`/stock-counts/${count.id}/lines`, { confirm_all: true });
+    await admin.post(`/stock-counts/${count.id}/submit`);
+  }
+}
+
+/**
+ * Leaves the station with no running shift: an `opening` one is cancelled, an `open` one is closed and its counts submitted, a
+ * `counting` one has its counts submitted. A flow that starts a shift from the screen calls this first (the E2E branch's stations
+ * already carry the shifts the other fixtures opened) and ensureOpenShift again at the end.
+ */
+export async function settleStation(admin: Api, station: StationRef): Promise<void> {
+  const shift = await currentShift(admin, station);
+  if (!shift) return;
+  if (shift.status === "opening") {
+    await admin.post(`/shifts/${shift.id}/cancel`, {});
+    return;
+  }
+  if (shift.status === "open") await admin.post(`/shifts/${shift.id}/close`, {});
+  await finishClosingCounts(admin, shift.id);
+}
