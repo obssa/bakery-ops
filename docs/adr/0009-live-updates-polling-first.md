@@ -149,3 +149,13 @@ visible and every 30 s while it is hidden (an ETag and a 304 while nothing chang
 own ETag-backed reads, and the admin Inventory screens load on open and after their own writes. `e2e-p2` starts no Reverb. The
 chain that makes the board change (a sale, `StockOut`, the automatic request) is queued work, so on the live host it waits for
 the cron-drained worker (runbook, "Queued work"); the screens show it on their next poll after that.
+
+## Note, 2026-10-24: Phase 3 stays on polling
+
+Phase 3 adds no channel. The shift bar polls `GET /stations/{station}/shifts/current` every 5 s while the tab is visible and every 30 s hidden (an ETag
+and a 304 while nothing changes), the admin approval queue every 10 s, the handover notes through `GET /shifts/{shift}/notes?after_id=` (the
+`OverlapCursor` rule), the till's cash widget through an ETag made from the figures it would answer, and the replay is a read on demand. Settled by
+step 3.7b: while the newest movement is younger than the overlap window (5 s) the stock feeds' ETag carries a `settling` marker, so a reader whose
+cursor sits below a late commit is never answered 304 for a change it has not seen; tests that expect a 304 after writing stock travel past the window
+first. The chain that makes a screen change (`CountSubmitted`, `VarianceDecided`, `ChainBroken`) is queued work, so on the live host it waits for the
+cron-drained worker (runbook, "Queued work").

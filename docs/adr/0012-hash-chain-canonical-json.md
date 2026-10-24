@@ -1,6 +1,6 @@
 # ADR 0012: The hash chain of locked counts, and its canonical JSON
 
-- Status: proposed (Phase 3, step 3.4; becomes accepted in the Phase 3 gate report)
+- Status: accepted (Phase 3 gate, 2026-10-24; proposed in step 3.4)
 - Date: 2026-10-25
 - Phase: 3
 
@@ -75,3 +75,39 @@ race").
 - Counts left `approved` by the deploys between steps 3.3b and 3.4 are locked by the end of migration 12 (`Locks::lockApproved`,
   oldest decision first within a place); `shifts:lock-approved` repeats it for any count the migration could not lock.
 - Changing the grammar (a new field, a new scale) is a new `payload_version` with a new builder, the old one kept for ever.
+
+## As built (step 3.8, 2026-10-24)
+
+Accepted at the Phase 3 gate. What the code does, which is the fact where it differs from the text above:
+
+- **Where the lock happens.** `HashChain::lock(count, user)` runs inside the transaction of `SubmitCount` (a count that needs nothing
+  decided goes `draft -> approved -> locked` in one step), of `ApproveCount` and of `CosignCount` (a co-signature that finds no
+  difference), after the count row and the shift row are locked. `locked_by_user_id` is whoever made the lock happen. A shift locks
+  (`ShiftResolution::lockWhenResolved`, then `ShiftLocked`) when the newest revision of every count it has is locked.
+- **The claim loop.** The head is read without a lock; the link is one query-builder UPDATE inside a savepoint; on a duplicate key the
+  request reads the row that now has the number with a shared locking read (a row that exists, so no gap lock) and tries the next number.
+  `HashChain::MAX_ATTEMPTS` is 8 (the plan's three was a guess); exhausted, it is `409 shifts.lock.chain_busy` and the transaction rolls back.
+  `LockChainRaceTest` (forks, 30 rounds of two counts of one place, 30 of a new place, 10 of three) saw sequences n and n+1 and an unchanged
+  `Innodb_deadlocks`. The first version saved through Eloquent and lost `locked_at` after a lost claim; the query builder removed the question.
+- **The payload** is exactly version 1 of plan section 10.3: `adjustment_qty` is the line's `variance_qty` when an adjustment was written, the
+  `cash` block (step 3.5) is rebuilt from the declaration row on every verification, so a changed figure, reason or note, or a deleted row, is
+  `payload_mismatch` at that link (`tests/Gate/CashTamperTest.php`). Three vectors are pinned (a stock count, a till count with cash, a Unicode
+  note) in `tests/Fixtures/chain/vectors.json` and in `scripts/verify_chain.py`.
+- **Verify** reports at most one failure per link, in the order `gap`, `previous_mismatch`, `hash_mismatch`, `payload_mismatch`, and carries on with
+  the stored hash, so a tampered link names itself and the link after it. A chain cut at its newest end still verifies: only a head hash kept
+  elsewhere can tell. `export(location)` feeds `scripts/verify_chain.py --export`.
+- **Triggers.** `stock_counts_locked_forbid_update` lists every column from `information_schema` when the migration runs (MariaDB), and lets
+  `superseded_by_id` / `superseded_at` move only from NULL; `stock_counts_forbid_delete` refuses every DELETE; PostgreSQL has `stock_counts_guard()`.
+  `LockedRowsTest` tries every column one by one. `stock_count_lines` are frozen once their count leaves `draft`; since step 3.7d the lines trigger
+  allows DELETE of a draft's lines (a submit drops the lines of items deleted from the catalog since the draft was made), never of a submitted
+  count's. `handover_notes` are append-only by trigger.
+- **Unlock** (`POST /stock-counts/{count}/unlock`, `shifts.unlock`): the revision's lines are left unconfirmed, its expected figure is the ledger under
+  the balance locks at submit, so approving it writes only the correcting difference.
+- **Backfill.** Counts left `approved` by the deploys between steps 3.3b and 3.4 were locked by `Locks::lockApproved()` at the end of migration 12,
+  oldest decision first within a place (`shifts:lock-approved` repeats it).
+- **Nightly check.** `shifts:verify-chain [--branch=]` at 03:00 Africa/Addis_Ababa prints and logs every head hash and dispatches one `ChainBroken` per
+  failure (admins and `shifts.replay` holders, critical, once per distinct break). Runbook: "Shift rules and the kill switch" and "When the chain
+  reports a break".
+- **Seeded history.** `Phase3Seeder` locks two days of history on a fresh demo branch through this code; `Phase3SeederTest` verifies every place's chain.
+- Not as the text says: the limits stay as written (someone with the database and the application can recompute a chain); the head hashes shown on
+  the admin screen are printed and logged, but their inclusion in a weekly summary sent outside the database is Phase 4.

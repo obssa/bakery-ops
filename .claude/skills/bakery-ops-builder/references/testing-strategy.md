@@ -65,14 +65,15 @@ depended on by the next step.
 - **Playwright**: always run against the *built* app (`next start`), one `newContext()` per role,
   `serviceWorkers: 'block'` except `p5-offline`, wait on API state (poll an endpoint) never on timers.
 - **Seeds**: `DemoSeeder --phase=N` composes `Phase0Seeder … PhaseNSeeder`. Earlier phases' gate
-  projects always run in CI, so a later seed change that breaks an earlier gate is caught.
+  projects always run in CI, so a later seed change that breaks an earlier gate is caught. `Phase3SeederTest` seeds a fresh branch (about a minute in Docker, the clock anchored three days back), checks the chains, the expected figures against `balanceAt(snapshot)`, the cash against `Totals::cash`, the planned differences and a second run that writes nothing, and the already-seeded path (Phases 0 to 2, a day later, no row dated before the newest movement).
+- **Shift rules**: the three rollout rules (`ledger.require_shift_for_station_locations`, `payments.require_shift_for_cash`, `shifts.open_ad_hoc_on_accept`) ship on. `ShiftsFixture::build` pins them off so a test can stock a station before a shift runs; a test about a rule turns it on after building. The `rules-off-gates` job runs the Phase 0-2 gates with all three off (the kill-switch state); everything else runs on. Tests that expect a 304 or an unchanged tag after writing stock first travel past the 5 s settling window (`OverlapCursor`).
 - **Money and quantities in assertions**: compare decimal strings (`'12.5000'`), never floats.
 
 ## Naming
 
 - Pest files mirror the module: `tests/Modules/Inventory/Feature/ReserveStockTest.php`,
   `tests/Modules/Orders/Unit/OrderStatusMachineTest.php`.
-- Gate tests: `tests/Gate/Phase1GateTest.php` with `->group('gate:p1')`.
+- Gate tests: `tests/Gate/Phase1GateTest.php` with `->group('gate:p1')`. A gate test may also live in its module and carry the tag (Phase 3 tags `HashChainTest`, `ShiftAttributionTest`, `PresenceResolverSwapTest`, `ReplayPropertyTest`, `LedgerEnforcementTest`, the state-machine, window and cash unit tests with `gate:p3`; `EnforcementDefaultGateTest` and `ReplaySeededHistoryTest` are in `tests/Gate/`). Tests that drop triggers (DDL commits) use `CommitsForConcurrency` and so live in `tests/Gate/`, not `Modules/`.
 - Playwright: `apps/web/e2e/p1/order-flow.spec.ts` under project `p1-order-flow`.
 - Every test name says the behaviour, not the method: `it('releases the reservation when a line is rejected')`.
 

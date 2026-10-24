@@ -99,18 +99,19 @@ Reason → effect map lives in one class (`MovementReason`):
 | `production_requests` | branch_id, client_uuid, product_item_id, requested_qty, due_at, priority, station_id, requested_by_user_id, assigned_to_user_id?, status (requested, accepted, in_progress, pending_confirmation, done, cancelled), reason (`schedule`, `stock_out`, `manual`), source_alert_id?, open_stock_out_key | stock-out auto-creates one with `default_batch_qty`; one open stock-out request per product (the key), one open manual request per product |
 | `production_batches` | client_uuid, request_id (one batch per request), station_id, status (started, finished, confirmed), recipe_id, recipe_version, planned_qty, produced_qty, waste_qty, consume_location_id, output_location_id, started_by_user_id, finished_by_user_id, confirmed_by_user_id, send_back_count, output_movement_id | where the station needs no overseer, `Batches::finish` also confirms in the same write; otherwise `Batches::confirm` (a second person) writes N `production_consume` + 1 `production_output` atomically, at the recipe version recorded at start |
 
-## Shifts (Phase 3)
+## Shifts (Phase 3, as built)
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `shift_templates` | branch_id, name, start_time, end_time, days_of_week, station_ids | Day 06–14, Evening 14–22, Night 22–06, or custom; may overlap |
-| `shift_instances` | template_id?, station_id, date (local start date), opened_by, opened_at, closed_by, closed_at, status, is_ad_hoc | one per station per shift; opens when the opening count is confirmed |
-| `shift_roster` | shift_instance_id or template+date, user_id | scheduled vs just-started both recorded |
-| `stock_counts` | shift_instance_id, type (`opening`, `closing`), location_id, status, counted_by, overseer_user_id?, approved_by?, approved_at, locked_at, payload_hash, previous_hash, superseded_by_id?, version | a closing count becomes the next opening's expected values; locked rows immutable except `superseded_by_id` |
-| `stock_count_lines` | count_id, item_id, expected_qty, counted_qty, variance_qty, variance_reason_id?, note, reason_status (`none`, `pending`, `accepted`, `rejected`) | expected = ledger balance at count time; non-zero variance needs reason + approval |
-| `variance_reasons` | code, name_en, name_am | spoilage, breakage, miscount, theft suspected, other |
-| `cash_declarations` | shift_instance_id, opening_float, denominations JSONB, counted_total, expected_total, channel_reconciliation JSONB | cashier closing |
-| `handover_notes` | shift_instance_id, text, from_user, to_user | "oven 2 thermostat drifting" |
+| `shift_templates` | branch_id, name_en, name_am, start_time, end_time, days_mask (ISO weekdays 1-7 as bits), is_active, sort, actor stamp, version | a named window of the day; Day 06-14, Night 22-06 in the demo, any other by the admin; may overlap or cross midnight; soft-deleted; editing never changes an instance already made |
+| `shift_template_stations` | template_id, station_id | which stations a template applies to; unique pair; a pair that goes is soft-deleted |
+| `shift_instances` | client_uuid, station_id, template_id?, slot_key (template id or 0), sequence, date (**local start date**), starts_at?, ends_at?, origin (`scheduled`, `started`, `call_in`), status, open_key, opening_mode (`counted`, `carried`), started/opened/closed/cancelled by + at, closing_started_at, submitted_at, locked_at, version | one per station per window; `open_key` is 1 while `opening`, `open` or `counting` so the unique `(station_id, open_key)` allows one running shift per station; unique `(station_id, date, slot_key, sequence)`; never deleted |
+| `shift_roster` | shift_instance_id, user_id, source (`scheduled`, `started`, `joined`, `call_in`), joined_at, left_at | unique per shift and person; "on duty" = joined and not left on the running shift |
+| `stock_counts` | client_uuid, shift_instance_id, location_id, type (`opening`, `closing`), seq, status, counted_by, snapshot_at (µs), ledger_movement_id, submitted_at, cosigned_by/at, decision, decided_by/at/note, supersede_cause (`recount`, `unlock`), unlock_reason, superseded_by_id/at, chain_seq, previous_hash, payload_hash, payload_version, canonical_payload, locked_at (µs), locked_by | one count per stock place (and per cash drawer) per boundary; a recount or unlock revision is a new row (`seq` + 1); unique `(branch_id, location_id, chain_seq)` is the chain; a locked row accepts no UPDATE except `superseded_by_id`/`superseded_at` from NULL, and no DELETE ever (triggers) |
+| `stock_count_lines` | count_id, item_id, expected_qty, carried_qty, counted_qty, variance_qty, confirmed_at, variance_reason_id?, variance_note, reason_status (`none`, `pending`, `accepted`, `rejected`), decision_note, adjustment_movement_id? | expected = the locked ledger balance at submit (not `balanceAt`); carried = the previous locked closing's counted figure; frozen by trigger once the count leaves `draft` (draft lines can be deleted: a submit drops a line of a deleted item) |
+| `variance_reasons` | code, name_en, name_am, requires_note, is_active, sort | five per branch (spoilage, breakage, miscount, theft suspected, other which asks for a note) from `DefaultVarianceReasons`; soft-deleted |
+| `cash_declarations` | count_id (unique, the cash-drawer count), denominations JSON, counted_total, expected_total, variance_total, carried_float_total, cash_sales_total, float_left_total, channel_counts JSON, reason, note, confirmed_at | the cash of the till's drawer; expected = opening basis + `Totals::cash(shift)`; the change given back is not in it; frozen with its count |
+| `handover_notes` | client_uuid, shift_instance_id, from_user_id, to_user_id?, body | append-only (trigger); written while the shift runs or waits for approval |
 
 ## Notifications (Phase 2)
 
@@ -135,7 +136,7 @@ on demand. Dashboards read only these.
 | order_line | queued → accepted → ready → served; rejected (reason) from queued or accepted; display-case lines queued → ready at send; voided with their order |
 | production_request | requested → accepted → in_progress → pending_confirmation (if station requires overseer) → done; cancelled |
 | production_batch | started → finished → confirmed |
-| shift_instance | scheduled → open (opening count confirmed) → counting → pending_approval (if variances) → locked; cannot lock with unresolved variances |
-| stock_count | draft → submitted → (pending_approval → approved \| rejected) → locked; locked → superseded (admin unlock creates a new version) |
+| shift_instance | scheduled → opening \| open \| cancelled; opening → open \| cancelled; open → counting; counting → pending_approval \| locked; pending_approval → counting (a recount) \| locked; locked and cancelled terminal. `opening` while the opening counts are made (a carried start, a call-in and a station with nothing to count open at once); a shift locks when the newest revision of every count it has is locked, and cannot lock with an unresolved count |
+| stock_count | draft → awaiting_cosign (a station that requires an overseer) \| pending_approval (a difference) \| approved; awaiting_cosign → pending_approval \| approved \| rejected; pending_approval → approved \| rejected; approved → locked in the same transaction (a hash-chain link); rejected and locked terminal; an admin unlock does not move the status: it gives the locked count a revision (`seq` + 1, `superseded_by_id`). Line `reason_status`: none → pending → accepted \| rejected |
 | payment | recorded → verified \| disputed; recorded/verified → voided (PIN) |
 | transfer | requested → confirmed \| rejected |

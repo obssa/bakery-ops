@@ -22,7 +22,7 @@ L5  Orders         → Inventory, Catalog, Identity, Shared, Audit          (Pay
     Production     → Inventory, Catalog, Identity, Shared, Audit          (Notifications: events; Shifts: interfaces)
     Notifications  → Identity, Shared                                      (inbound: events only)
 L6  Payments       → Orders, Identity, Shared(Files), Audit
-    Shifts         → Inventory, Identity, Payments(read), Orders(read: openAt), Catalog, Shared, Audit
+    Shifts         → Inventory, Identity, Payments(read), Orders(read: openAt), Catalog, Shared, Audit   (nothing imports Shifts: it binds Shared's OpenShifts and Identity's two Phase 2 interfaces)
 L7  Analytics      → read-only Facts ports of Orders, Payments, Production, Inventory, Shifts, Catalog
 ```
 
@@ -57,10 +57,11 @@ These are the contract surfaces. Expose each as a final service class (or interf
 | Production | Inventory | `Stock::of`, `Ledger::appendMany` (consume + output atomically), `Transfers::request`, listens to `StockOut` |
 | Production | Identity | `assignedUsers`, `isOverseer`, `can('production.fulfil', station)`, `StationPresenceResolver::onDuty`, `ShiftAttacher::attach` |
 | Notifications | Identity | recipients by role / station, `StationPresenceResolver`, user locale |
-| Shifts | Inventory | `Stock::balanceAt(location, now)`, `Ledger::append(count_adjustment)`, movements by `shift_instance_id` |
-| Shifts | Identity | `canCount`, `isOverseer`, roster users, `can('shifts.approve')` |
-| Shifts | Payments | `Totals::cash(shift)` (keyed on the payment's own shift), `Totals::byChannel(shift)` |
+| Shifts | Inventory | `Stock::at(location)` and `locationAt(location, t)` (the live and the replayed balances), `Stock::balanceAt`, `Stock::shiftSummary`, `Stock::netChangeSince`, `Ledger::lock` and `appendMany` (the approval writes one `count_adjustment` per variance line as the counted shift), `Locations::stockLocationsOf`, `cashDrawerOf`, `views`; Inventory in turn asks Shared's `OpenShifts` (bound by Shifts) before an `on_hand` change at a station that tracks shifts |
+| Shifts | Identity | `People::can(user, permission, station)`, `isOverseer`, `workStationIds`; Shifts rebinds `StationPresenceResolver` (`OnShiftResolver`) and `ShiftAttacher` (`ShiftsAttacher`, which resolves `People` per call: injecting it is a constructor cycle) |
+| Shifts | Payments | `Totals::cash(shift)` (keyed on the payment's own shift), `Totals::byChannel(shift)`, `Channels::find`; Payments asks `OpenShifts` before a cash payment (`payments.require_shift_for_cash`) |
 | Shifts | Orders | `Orders::openAt(station, time)` for the replay |
+| Shifts | Catalog | `Items::summaries`, `Items::deleted` (a count refuses or drops a line for a deleted item) |
 | Analytics | all | provider-owned `Facts` query classes only; listens to `ShiftLocked` |
 
 ## Frontend surfaces and what they consume
@@ -78,9 +79,10 @@ These are the contract surfaces. Expose each as a final service class (or interf
 
 | # | Soft cycle | Break | Closed |
 |---|---|---|---|
-| 1 | Inventory movements carry `shift_instance_id`; Shifts (P3) needs Inventory balances | Inventory never imports Shifts. `shift_instance_id` is a nullable FK read from `ActorContext`. P3 adds middleware that fills it from `Shifts::current(station)` and flips `ledger.require_shift_for_station_locations=true`. Pre-P3 rows legitimately keep null; nothing is backfilled. | P3 |
+| 1 | Inventory movements carry `shift_instance_id`; Shifts (P3) needs Inventory balances | Inventory never imports Shifts. `shift_instance_id` is a nullable FK read from `ActorContext`. P3 binds Shared's `OpenShifts` (`OpenShiftsReader`, scoped), which `ResolveActor` reads to fill the stamp and the Ledger reads for the enforcement rule; `ledger.require_shift_for_station_locations`, `payments.require_shift_for_cash` and `shifts.open_ad_hoc_on_accept` are on by default since 3.7e (the kill switch is three env lines, runbook). Pre-P3 rows legitimately keep null; nothing is backfilled. | P3 |
 | 2 | Orders ↔ Payments | Payments depends on Orders (reads totals). Orders reacts to `PaymentRecorded` through a listener and never imports Payments classes. | P1 |
-| 3 | Production (P2) needs "on-shift users" and "open an ad-hoc shift" | Interfaces `StationPresenceResolver` and `ShiftAttacher` live in Identity, and so do the Phase 2 default bindings `AssignedUsersResolver` and `NullShiftAttacher` (they must exist before any Production code, or the `production->identity` contract cannot be green). P3 rebinds to the Shifts implementations. The Production contract test runs against both bindings. | P3 |
+| 3 | Production (P2) needs "on-shift users" and "open an ad-hoc shift" | Interfaces `StationPresenceResolver` and `ShiftAttacher` live in Identity, and so do the Phase 2 default bindings `AssignedUsersResolver` and `NullShiftAttacher` (they must exist before any Production code, or the `production->identity` contract cannot be green). P3 rebinds to the Shifts implementations (`OnShiftResolver`, `ShiftsAttacher`). The Production and Notifications contract tests run against both bindings. | P3 |
+| 10 | Shifts: `Locks` -> `HashChain` -> `PayloadBuilder` -> `CashDeclarations` -> `Locks` (a constructor cycle that overflowed the container at boot) | `CashDeclarations` resolves `Locks` where it needs `previousClosing`, not in its constructor; `ShiftsAttacher` resolves `People` per call for the same reason. | P3 |
 | 4 | Audit is used by everyone and needs shift/station/device | Audit is a leaf reading only `ActorContext`; subjects by morph string; arch test forbids Audit using any other module. | P0 |
 | 5 | Catalog recipe cost roll-up needs Inventory moving-average cost | `RecipeCost` lives in Inventory. The admin Catalog screen calls `GET /inventory/recipe-costs/{product}`. | P2 |
 | 6 | Product availability needs recipe explosion and is needed by Orders and Production | `Availability` lives in Inventory (which may import Catalog). Orders and Production both call it; neither re-implements the math. | P0/P1 |
@@ -103,4 +105,4 @@ These are the contract surfaces. Expose each as a final service class (or interf
   but only cash can pass validation until photo upload exists in P4.
 - P1: `LineReady` reaches the waiter through the live-update transport directly (polled orders feed on the live host,
   `user.{id}` once a WebSocket transport is on); P2 adds the persisted notification.
-- P1–P2: `orders.shift_instance_id` and movement `shift_instance_id` stay null until P3.
+- P1–P2: `orders.shift_instance_id` and movement `shift_instance_id` stay null for rows written before Phase 3 (nothing is backfilled), and for exempt movements (reservations) and untracked places afterwards.

@@ -124,3 +124,9 @@ sequence per line, void releases, one transaction per send), `MovementReason` (o
   needs product stock that does not exist. Rejected.
 - Orders locking the balance rows itself before calling `reserve` per line: needs the recipe explosion in Orders
   (dependency-graph.md cycle 6 forbids re-implementing it). Rejected.
+
+## Note, 2026-10-24: shifts in the path
+
+Reserve at send, consume at ready, sale at pay is unchanged. Since step 3.7e a consume or a sale at a station that tracks shifts needs that station's shift
+open (a reservation does not: it has no `on_hand` effect), and a cash payment needs the till's open shift; the stamp of the reservation, the consume and the
+sale is the shift of the station where each happened. With the three rules off (the kill switch) the old behaviour is exactly back.

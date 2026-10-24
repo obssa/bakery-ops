@@ -56,3 +56,13 @@ Built in step 2.1 (the interfaces, the bindings and both contract files, before 
   `assignedUsers` unless a call-in is added on purpose; `attach` returns the shift instance id the caller's next writes should carry, or null.
 - Not as the plan said: there is no per-user "withhold" of a permission (spatie permissions are additive), so `byPermission` honours
   grants, role removal and inactive users, and nothing else (plan section 6, step 2.1 note).
+
+## Note, 2026-10-24: rebound to Shifts in Phase 3
+
+The two interfaces were rebound in step 3.2b: `Shifts\Support\OnShiftResolver` answers `onDuty` (the active people assigned to the station who have joined the
+running shift and not left; everyone assigned when no shift runs; nobody when a shift runs and nobody has joined, where `Recipients::onDuty` falls back to the
+assigned people so an alert never reaches nobody) and `Shifts\Support\ShiftsAttacher` answers `attach` (the shift id the person's next writes should carry,
+a call-in shift opened when `shifts.open_ad_hoc_on_accept` is on and none runs, null for a person who cannot count there). What was kept true: the Phase 2
+bindings still exist and are asserted when bound explicitly; `production->identity` and `notifications->identity` run against both (`PresenceResolverSwapTest`
+runs their presence assertions against the real resolver); Production and Notifications changed not at all; `onDuty` is a subset of the assigned people. The
+resolver collaborators are resolved per call because Identity's `People` is built with the attacher.

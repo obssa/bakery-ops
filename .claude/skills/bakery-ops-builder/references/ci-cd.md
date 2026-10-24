@@ -38,12 +38,13 @@ status ─┬─ api-lint → api-arch ─┬→ mod-identity → mod-catalog �
         ├─ web-lint → web-build  ─ i18n-check                                                                    │
         ├─ docker-build (api image → artifact)                                                                   │
         ├─ e2e-p0 ◄ [mod-catalog, web-build, docker-build]      e2e-p1 ◄ [mod-payments, web-build, docker-build]
+        │  rules-off-gates ◄ [mod-payments, mod-production, mod-notifications]   (gate:p0..p2 with the three shift rules off)
         │  e2e-p2 ◄ [mod-production, mod-notifications, …]     e2e-p3 ◄ [mod-shifts, …]
         │  e2e-p4 + perf-dashboards ◄ [mod-analytics, …]        e2e-p5 ◄ [e2e-p4]
         └─ gate-p0 ◄ [api-arch, mod-inventory, mod-catalog, e2e-p0, openapi-check, erd-check, invariants]
            gate-p1 ◄ [gate-p0, mod-orders, mod-payments, e2e-p1]
            gate-p2 ◄ [gate-p1, mod-production, mod-notifications, e2e-p2]
-           gate-p3 ◄ [gate-p2, mod-shifts, e2e-p3]
+           gate-p3 ◄ [gate-p2, mod-shifts, rules-off-gates, e2e-p3]
            gate-p4 ◄ [gate-p3, mod-analytics, e2e-p4, perf-dashboards]
            gate-p5 ◄ [gate-p4, e2e-p5, i18n-check (strict), backup-drill]
 ```

@@ -38,19 +38,13 @@ flows and the phase plan's endpoint list: every bullet below is a behaviour the 
 - Scheduled production: admin/manager creates requests for the night from the planner.
 
 ### Shift opening and handover — Phase 3
-- Incoming user opens Start shift; screen shows the previous shift's locked closing count as expected.
-- They count; matches turn green; mismatches demand a reason (spoilage, breakage, miscount, theft
-  suspected, other + note).
-- Confirm opening submits; with variances the shift opens but the count sits in `pending_approval`;
-  admin and manager get the diff. Variance lines cannot be edited after submission.
-- Admin accepts (a `count_adjustment` movement is written) or rejects (recount; both attempts kept).
-- Close shift lists every item at the location with ledger balance; same variance rule; day's
-  production, sales and waste totals shown for review.
-- Cashier closing adds a cash declaration by denomination versus expected cash and a per-channel
-  reconciliation of receipts versus payments.
-- Approved closing counts lock (immutable, hash-chained). Only admin can unlock, which creates a new
-  version and keeps the old visible. The next opening is pre-filled from the locked value.
-- Handover notes travel with the shift.
+- The shift bar on the station screen (kitchen, bar, production, till) shows who is on and offers Start shift, Join, Close and "Start without counting" (a carried start). With the rules on, orders, stock moves, batch confirmations and cash payments are refused at a station with no running shift (the bar says so and offers Start).
+- Start shift opens the opening count, prefilled with the previous locked closing (the carried figure; the ledger figure where nothing was carried). "Nothing changed" confirms every line; a changed figure demands a reason (spoilage, breakage, miscount, theft suspected, other + note). Items found that are not on the list can be added; a switched-off item that still has stock is counted.
+- The shift opens when its opening counts are handed in; a difference does not hold it back. At a station that requires an overseer (cake room, bakery) every count first waits for a co-signature (the overseer flagged there, or admin/manager), then for a decision if a line differs. The person who counted never approves their own count, a sole admin included.
+- Admin or manager accepts (one `count_adjustment` per variance line, both signs, stamped with the counted shift) or rejects (a prefilled recount; both attempts kept). A count with no difference locks at once.
+- Close shift freezes the station and lists every item at each place with the ledger balance; same variance rule. The till's drawer is a count of its own: the cashier declares notes and coins by denomination (opening against the float the last closing left; closing against opening plus cash sales), the float that stays, the receipts counted per channel, and a reason for any difference. A drawer is declared whenever a counted till shift opens.
+- Locked counts are immutable and hash-chained per place (the head hash is shown). Only the admin can unlock, which creates a revision and keeps the old link visible. The next opening is pre-filled from the locked value.
+- Handover notes travel with the shift; the Start shift screen shows the previous shift's notes, its closing figures and what still waits for approval. The admin replays a station at any past moment (balances, open orders, who was on).
 
 ### Payment at the till — cash Phase 1, full Phase 4
 - Cashier opens the order (table, number, waiter) and taps Pay; channels come from enabled

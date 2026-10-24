@@ -1,6 +1,6 @@
 # ADR 0013: Shift attribution rules
 
-- Status: proposed (Phase 3, step 3.2a; becomes accepted in the Phase 3 gate report)
+- Status: accepted (Phase 3 gate, 2026-10-24; proposed in step 3.2a)
 - Date: 2026-10-22
 - Phase: 3
 
@@ -34,8 +34,8 @@ Migrations 3 to 7 of the Phase 3 plan (step 3.2a) make the tables; this ADR is w
 5. **When the ledger refuses.** With `ledger.require_shift_for_station_locations` on, `Ledger::appendMany` refuses the whole
    batch with `409 inventory.shift.required {station_id, location_id}` when an intent changes `on_hand` at a location of a
    station that tracks shifts and is not covered, either by the actor's own open shift or by the station's open shift
-   (rule E1, section 10.1, exemptions included: `reservation`, `reservation_release`, a count's own adjustment). The flag stays
-   off everywhere until step 3.7e.
+   (rule E1, section 10.1, exemptions included: `reservation`, `reservation_release`, a count's own adjustment). The flag ships on
+   since step 3.7e.
 6. **The freeze.** A station whose shift is not `open` refuses on-hand movements from anyone not covered by a shift of their
    own, so a closing count compares against a ledger that is not moving. `close` takes the shift row `FOR UPDATE`; the ledger
    check takes it shared: a movement that began before the close finishes inside the counted figure, one that begins after is
@@ -43,7 +43,7 @@ Migrations 3 to 7 of the Phase 3 plan (step 3.2a) make the tables; this ADR is w
 7. **Call-ins.** `ShiftAttacher::attach` for a person with no open shift at a station they can work at opens an ad-hoc shift
    (`origin = call_in`, opened carried) and puts them on the roster. The accept row, the batch and its movements then carry it.
    **Rollout guard (step 3.2b).** The opening of that ad-hoc shift is behind the flag `shifts.open_ad_hoc_on_accept`
-   (`SHIFTS_OPEN_AD_HOC_ON_ACCEPT`, default false in the code, `.env.example`, `.env.ci` and on the live host): until step 3.7e
+   (`SHIFTS_OPEN_AD_HOC_ON_ACCEPT`, default false until step 3.7e, true since): until step 3.7e
    gives staff a way to see and close shifts, a call-in must not create a shift nobody can close. With the flag off the attacher
    attaches the person to the shift that already runs at the station (and puts them on its roster) and otherwise answers null,
    exactly as the Phase 2 `NullShiftAttacher` did. Step 3.7e switches the flag on together with
@@ -93,3 +93,24 @@ unique per `(shift_instance_id, user_id)`; every `shift_instance_id` column outs
 - **A partial unique index or a generated column for "one running shift".** Rejected: needs engine-specific DDL where a plain
   nullable key does the same on MariaDB and PostgreSQL.
 - **Backfill old rows with a synthetic shift.** Rejected: it invents attribution; null honestly means "before shifts existed".
+
+## As built (step 3.8, 2026-10-24)
+
+Accepted at the Phase 3 gate. Rules 1 to 10 hold as written, with these facts from the build:
+
+- **Rule 5 and rule 7 are on.** `ledger.require_shift_for_station_locations`, `payments.require_shift_for_cash` and `shifts.open_ad_hoc_on_accept` each
+  have an env variable and default to `true` since step 3.7e (the flip). The kill switch is the three variables set to `false` in the server `.env` and
+  `php artisan config:cache`; the `rules-off-gates` CI job runs the Phase 0-2 gates in that state.
+- **Rule 3, the fallback.** A movement the actor's shift does not cover is stamped with the open shift of the station that owns its location only when the
+  rule enforces it; reservations and reservation releases (no `on_hand` effect), untracked places (the store) and a count's own adjustment (`ref_type =
+  stock_count_line`, stamped by `runAs` with the counted shift) are exempt, so some rows legitimately keep a null shift.
+- **Rule 4.** On duty = the active people assigned to the station who have joined the running shift and not left. A rostered person who is not assigned
+  (the admin) is not on duty. With a running shift nobody has joined, callers fall back to everyone assigned.
+- **Rule 6, the freeze.** `close` takes the shift row `FOR UPDATE`; `Ledger::shiftCover` takes it shared, in ascending id order, inside the ledger
+  transaction (`LedgerEnforcementTest`: 16 reasons by 6 places by 7 states of cover, flag off and on; the close-in-between case).
+- **Rule 7 (call-ins).** A baker accepting at a closed station opens a `call_in` shift (carried) and joins its roster; `ShiftsAttacher` resolves Identity's
+  `People` per call (a constructor cycle otherwise).
+- **Rule 8.** `ShiftWindow` and `LocalClock` are the only code that decides the date; the Night 22:00-06:00 cases are `ShiftWindowTest` (23:59, 00:01, 05:59, 06:00).
+- **Rule 9** is code, pinned by `CountsPropertyTest`. **Rule 10** is `Totals::cash`, keyed on the payment's own shift (contract case 2, amended).
+- **Seeds.** The demo seeders open their shifts through `DemoShifts::ensureOpen`; `Phase3Seeder` writes the history through the same actions the screens
+  call, and runs every seeded movement and cash payment inside the right open shift.
