@@ -15,7 +15,7 @@ use Tests\Support\ChainFixture;
 use Tests\Support\CommitsForConcurrency;
 use Tests\Support\ShiftsFixture;
 
-pest()->group('module:shifts', 'feature');
+pest()->group('module:shifts', 'feature', 'gate:p3');
 
 uses(CommitsForConcurrency::class);
 

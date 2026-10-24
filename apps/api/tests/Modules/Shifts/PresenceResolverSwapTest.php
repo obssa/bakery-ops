@@ -15,7 +15,7 @@ use Illuminate\Support\Collection;
 use Tests\Support\NotificationEvents;
 use Tests\Support\ShiftsFixture;
 
-pest()->group('module:shifts', 'feature', 'contract:production->identity', 'contract:notifications->identity', 'contract:shifts->identity');
+pest()->group('module:shifts', 'feature', 'gate:p3', 'contract:production->identity', 'contract:notifications->identity', 'contract:shifts->identity');
 
 /*
  * Step 3.2b: Identity's StationPresenceResolver is now Shifts' OnShiftResolver. The presence assertions of the

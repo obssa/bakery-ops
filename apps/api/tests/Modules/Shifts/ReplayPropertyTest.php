@@ -24,7 +24,7 @@ use Random\Engine\Mt19937;
 use Random\Randomizer;
 use Tests\Support\ShiftsFixture;
 
-pest()->group('module:shifts', 'property');
+pest()->group('module:shifts', 'property', 'gate:p3');
 
 /*
  * ReplayPropertyTest (phase-3 plan section 7, step 3.6): a seeded history at one station (stock in and waste at two places, shifts that start

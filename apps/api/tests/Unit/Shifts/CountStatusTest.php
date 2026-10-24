@@ -22,7 +22,7 @@ it('moves a count along the plan list and nowhere else', function () {
         ->and(CountStatus::Approved->nextStates())->toBe([CountStatus::Locked])
         ->and(CountStatus::Locked->isTerminal())->toBeTrue()
         ->and(CountStatus::Rejected->isTerminal())->toBeTrue();
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');
 
 it('does not let a draft be rejected or locked, an approved count be rejected, or a locked or rejected one move', function () {
     expect(fn () => CountStatus::Draft->transitionTo(CountStatus::Rejected))->toThrow(IllegalTransition::class)
@@ -32,7 +32,7 @@ it('does not let a draft be rejected or locked, an approved count be rejected, o
         ->and(fn () => CountStatus::PendingApproval->transitionTo(CountStatus::Draft))->toThrow(IllegalTransition::class)
         ->and(fn () => CountStatus::Locked->transitionTo(CountStatus::Approved))->toThrow(IllegalTransition::class)
         ->and(fn () => CountStatus::Rejected->transitionTo(CountStatus::Draft))->toThrow(IllegalTransition::class);
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');
 
 it('stores the values the CHECK constraints repeat', function () {
     expect(array_map(fn (CountStatus $s): string => $s->value, CountStatus::cases()))
@@ -41,7 +41,7 @@ it('stores the values the CHECK constraints repeat', function () {
         ->and(array_map(fn (ReasonStatus $s): string => $s->value, ReasonStatus::cases()))->toBe(['none', 'pending', 'accepted', 'rejected'])
         ->and(array_map(fn (CountDecision $s): string => $s->value, CountDecision::cases()))->toBe(['approved', 'rejected'])
         ->and(array_map(fn (SupersedeCause $s): string => $s->value, SupersedeCause::cases()))->toBe(['recount', 'unlock']);
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');
 
 it('says which statuses are unresolved (rule R-A: one per place) and which are submitted', function () {
     $unresolved = array_values(array_filter(CountStatus::cases(), fn (CountStatus $s): bool => $s->isUnresolved()));
@@ -51,4 +51,4 @@ it('says which statuses are unresolved (rule R-A: one per place) and which are s
         ->and($submitted)->toBe([CountStatus::AwaitingCosign, CountStatus::PendingApproval, CountStatus::Approved, CountStatus::Locked])
         ->and(CountStatus::Draft->isSubmitted())->toBeFalse()
         ->and(CountStatus::Rejected->isSubmitted())->toBeFalse();
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');

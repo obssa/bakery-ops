@@ -56,7 +56,7 @@ it('answers the section 10.2 table', function (string $instant, Closure $templat
     $window = ShiftWindow::containing(localAt($instant), $templates());
 
     expect($window?->date)->toBe($date);
-})->with('section 10.2 table')->group('unit', 'module:shifts');
+})->with('section 10.2 table')->group('unit', 'module:shifts', 'gate:p3');
 
 it('gives starts_at and ends_at as the window in UTC, the Night of Friday ending on Saturday morning', function () {
     $window = ShiftWindow::containing(localAt('2026-10-24 00:01'), [nightTemplate(7)]);

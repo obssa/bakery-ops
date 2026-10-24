@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 use Tests\Support\OrderFloor;
 use Tests\Support\ProductionFixture;
 
-pest()->group('module:shifts', 'feature');
+pest()->group('module:shifts', 'feature', 'gate:p3');
 
 /*
  * ADR 0013 rules 2 and 3, through the whole stack: once a shift runs at the station a person works at, every write that person

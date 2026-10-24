@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Modules\Shifts\Cash\CashMath;
 use App\Shared\Values\Money;
 
-pest()->group('unit', 'module:shifts');
+pest()->group('unit', 'module:shifts', 'gate:p3');
 
 /*
  * The arithmetic of the cash declaration in one place, all in Money (phase-3 plan section 10.5):

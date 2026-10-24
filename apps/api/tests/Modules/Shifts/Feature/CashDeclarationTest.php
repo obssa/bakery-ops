@@ -12,7 +12,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Event;
 use Tests\Support\ShiftsFixture;
 
-pest()->group('module:shifts', 'feature');
+pest()->group('module:shifts', 'feature', 'gate:p3');
 
 /*
  * The cash declaration of the till's drawer (step 3.5; phase-3 plan sections 3 (migration 13), 4 and 10.5). The drawer is a count like any

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Tests\Support\OrderFloor;
 use Tests\Support\ShiftsFixture;
 
-pest()->group('module:shifts', 'feature');
+pest()->group('module:shifts', 'feature', 'gate:p3');
 
 /*
  * GET /replay?station_id&at[&nonzero=0] and Contracts\Replay::at (phase-3 plan section 4): the state of a station at a point in time.

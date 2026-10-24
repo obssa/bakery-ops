@@ -215,7 +215,7 @@ it('refuses or writes as the rule says, for every reason at every place in every
             }
         }
     }
-})->with('enf reasons')->with('enf places')->group('module:inventory', 'unit');
+})->with('enf reasons')->with('enf places')->group('module:inventory', 'unit', 'gate:p3');
 
 it('asks OpenShifts nothing with the flag off or for a batch that needs no cover, and needs a shift only for what is enforced', function () {
     $double = new FakeOpenShifts;

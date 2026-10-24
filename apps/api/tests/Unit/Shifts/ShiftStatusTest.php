@@ -21,7 +21,7 @@ it('moves a shift along the plan list and nowhere else', function () {
         ->and(ShiftStatus::PendingApproval->nextStates())->toBe([ShiftStatus::Counting, ShiftStatus::Locked])
         ->and(ShiftStatus::Locked->isTerminal())->toBeTrue()
         ->and(ShiftStatus::Cancelled->isTerminal())->toBeTrue();
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');
 
 it('does not let an open shift be cancelled, a locked one reopen or a counting one go back to open', function () {
     expect(fn () => ShiftStatus::Open->transitionTo(ShiftStatus::Cancelled))->toThrow(IllegalTransition::class)
@@ -30,14 +30,14 @@ it('does not let an open shift be cancelled, a locked one reopen or a counting o
         ->and(fn () => ShiftStatus::Cancelled->transitionTo(ShiftStatus::Scheduled))->toThrow(IllegalTransition::class)
         ->and(fn () => ShiftStatus::Opening->transitionTo(ShiftStatus::Counting))->toThrow(IllegalTransition::class)
         ->and(fn () => ShiftStatus::PendingApproval->transitionTo(ShiftStatus::Open))->toThrow(IllegalTransition::class);
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');
 
 it('stores the values the CHECK constraint repeats', function () {
     expect(array_map(fn (ShiftStatus $s): string => $s->value, ShiftStatus::cases()))
         ->toBe(['scheduled', 'opening', 'open', 'counting', 'pending_approval', 'locked', 'cancelled'])
         ->and(array_map(fn (ShiftOrigin $s): string => $s->value, ShiftOrigin::cases()))->toBe(['scheduled', 'started', 'call_in'])
         ->and(array_map(fn (RosterSource $s): string => $s->value, RosterSource::cases()))->toBe(['scheduled', 'started', 'call_in', 'joined']);
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');
 
 it('says which statuses are running: the ones that hold the station (open_key 1)', function () {
     $running = array_values(array_filter(ShiftStatus::cases(), fn (ShiftStatus $s): bool => $s->isRunning()));
@@ -48,10 +48,10 @@ it('says which statuses are running: the ones that hold the station (open_key 1)
         ->and(ShiftStatus::PendingApproval->openKey())->toBeNull()
         ->and(ShiftStatus::Locked->openKey())->toBeNull()
         ->and(ShiftStatus::Cancelled->openKey())->toBeNull();
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');
 
 it('says which statuses have an opened_at: open, counting, pending_approval and locked', function () {
     $opened = array_values(array_filter(ShiftStatus::cases(), fn (ShiftStatus $s): bool => $s->hasOpened()));
 
     expect($opened)->toBe([ShiftStatus::Open, ShiftStatus::Counting, ShiftStatus::PendingApproval, ShiftStatus::Locked]);
-})->group('unit', 'module:shifts');
+})->group('unit', 'module:shifts', 'gate:p3');
