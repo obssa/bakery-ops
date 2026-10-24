@@ -56,9 +56,7 @@
       "tables": [
         "branches",
         "stations",
-        "idempotency_keys"
-      ],
-      "tables_phase_4": [
+        "idempotency_keys",
         "stored_files"
       ]
     },

@@ -63,3 +63,25 @@ it('caches the config with the three shift rules switched off, and on again', fu
         @unlink($cache);
     }
 })->with([['false', false], ['true', true]])->group('invariants');
+
+/*
+ * Step 4.2a: the files disk is named by FILES_DISK (ADR 0015). The config must cache with the variable unset (the live host: the local
+ * private disk) and set to files_s3 (the move to a bucket), and the cache must carry what the environment says.
+ */
+it('caches the files config with and without FILES_DISK', function (?string $value, string $expected) {
+    $cache = app()->getCachedConfigPath();
+    $env = ['APP_CONFIG_CACHE' => $cache, 'FILES_DISK' => $value ?? false];
+    try {
+        $process = new Process([PHP_BINARY, 'artisan', 'config:cache'], base_path(), $env);
+        $process->run();
+        expect($process->getExitCode())->toBe(0, $process->getErrorOutput().$process->getOutput());
+
+        $cached = require $cache;
+        expect(data_get($cached, 'files.disk'))->toBe($expected)
+            ->and(data_get($cached, 'filesystems.disks.files.root'))->toBe(storage_path('app/private/files'))
+            ->and(data_get($cached, 'filesystems.disks.files_s3.driver'))->toBe('s3')
+            ->and(data_get($cached, 'files.max_edge'))->toBe(1600);
+    } finally {
+        @unlink($cache);
+    }
+})->with([[null, 'files'], ['files_s3', 'files_s3']])->group('invariants');
