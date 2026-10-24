@@ -6,11 +6,16 @@ use App\Modules\Orders\Contracts\Orders;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
 use App\Shared\Events\OrderPaid;
+use App\Shared\Events\OrderRefunded;
 use App\Shared\Events\PaymentRecorded;
+use App\Shared\Events\PaymentVoided;
 use Brick\Math\BigDecimal;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Tests\Support\OrderFloor;
+use Tests\Support\Shifts;
 
 /*
  * Contract: payments -> orders (manifest contracts["payments->orders"]; phase-1 plan sections 2 and 5, step 1.4).
@@ -19,6 +24,11 @@ use Tests\Support\OrderFloor;
  * reacts to) and the events of App\Shared. Each case is phrased from Payments' side: "when I, Payments, record a
  * payment, I ask Orders for the totals, then I dispatch PaymentRecorded inside my transaction; I rely on Orders to add
  * the amount, to settle the order and, once it is served, to make it paid, sell its display-case lines and close it".
+ *
+ * Phase 4 (step 4.1a) appends the cases 5 to 13 at the end of the file: the refund path, the void of a payment, part payments and
+ * the extra totals. They are RED until step 4.1b builds `Orders::refund`, the `ReversePayment` listener and `Inventory\Reversals`,
+ * and carry the group `contract:payments->orders:refund`, which no CI job runs yet: `mod-orders` keeps running the four Phase 1
+ * cases under `contract:payments->orders`. Step 4.1b gives the cases the first group name too, once they are green.
  * Orders is set up through its own API (OrderFloor); the payment is simulated by dispatching the event exactly as
  * Payments will, inside a transaction. It runs in Orders' CI job (mod-orders) for the life of the project.
  */
@@ -192,3 +202,254 @@ it('keeps the order unsettled when the amount is less than the balance', functio
         ->and(($this->totals)($order['id'])->balance)->not->toBe('0.00')
         ->and($this->paidEvents)->toBe([]);
 })->group('contract:payments->orders');
+
+// ===================================================================================================================================
+// Phase 4 (step 4.1a, plan section 2). Red until step 4.1b. The signature the cases pin (manifest `modules.orders`, plan 10.9 item 8):
+//
+//   Orders::refund(int $orderId, string $reason, User $approver, array $lines, array $dispositions, string $clientUuid): void
+//
+// $lines are order-line ids (empty: the whole order, with the default dispositions of plan 10.2 R-C, still open with Ramin);
+// $dispositions map a line id to 'restock' | 'waste' | 'none'. The approver's PIN is checked by the controller, never here.
+// A refusal carries a message_key (an OrderError). Nothing here builds any refund stock logic: these cases only state what 4.1b must make true.
+// ===================================================================================================================================
+
+const REFUND_GROUP = 'contract:payments->orders:refund';
+
+beforeEach(function () {
+    // an order that is paid, served and closed: [order (API shape), croissant line, sandwich line, croissant ref, sandwich ref]
+    $this->closedOrder = function (): array {
+        $f = $this->floor;
+        $m = $f->menu;
+        $order = $f->send([$m->line($m->sandwich), $m->line($m->croissant, '2')]);
+        ($this->serveAll)($order);
+        ($this->pay)($order['id']);
+        expect(($this->status)($order['id']))->toBe('closed');
+        $croissant = $f->lineOf($order, $m->croissant);
+        $sandwich = $f->lineOf($order, $m->sandwich);
+
+        return [$order, $croissant, $sandwich, $f->refOf($croissant['client_uuid']), $f->refOf($sandwich['client_uuid'])];
+    };
+    $this->refund = function (int $orderId, array $lines = [], array $dispositions = [], string $reason = 'customer returned it', ?string $uuid = null): void {
+        app(Orders::class)->refund($orderId, $reason, $this->floor->manager, $lines, $dispositions, $uuid ?? (string) Str::uuid());
+    };
+    // the message_key of the OrderError a call throws, null when it did not throw
+    $this->refusal = function (Closure $call): ?string {
+        try {
+            $call();
+        } catch (Throwable $e) {
+            // only a refusal with a message_key is an answer; anything else is a failure of the test or of the code
+            if (! property_exists($e, 'messageKey')) {
+                throw $e;
+            }
+
+            return $e->messageKey;
+        }
+
+        return null;
+    };
+    $this->movementRows = fn (string $ref, string $reason): array => DB::table('stock_movements')
+        ->where('reservation_ref', $ref)->where('reason', $reason)->orderBy('id')->get()
+        ->map(fn (object $r): array => (array) $r)->all();
+});
+
+it('refunds a restocked display-case line with ONE reversing return movement that points at the sale and leaves the sale untouched', function () {
+    $f = $this->floor;
+    $m = $f->menu;
+    [$order, $croissant, , $croissantRef] = ($this->closedOrder)();
+    $sale = ($this->movementRows)($croissantRef, 'sale');
+    expect($sale)->toHaveCount(1);
+    $onHandAfterSale = $f->level($m->croissant, $m->display)->onHand->toString();
+
+    ($this->refund)($order['id'], [$croissant['id']], [$croissant['id'] => 'restock']);
+
+    $returns = DB::table('stock_movements')->where('reason', 'return')->where('ref_type', 'stock_movement')->where('ref_id', $sale[0]['id'])->get();
+    expect($returns)->toHaveCount(1)
+        ->and((string) $returns[0]->qty)->toBe('2.0000') // the sale was -2: the stock comes back
+        ->and((int) $returns[0]->item_id)->toBe($m->croissant->id)
+        ->and((int) ($returns[0]->to_location_id ?? $returns[0]->from_location_id))->toBe($m->display->id)
+        ->and(DB::table('stock_movement_reversals')->where('reverses_movement_id', $sale[0]['id'])->where('movement_id', $returns[0]->id)->count())->toBe(1)
+        ->and($f->level($m->croissant, $m->display)->onHand->toString())->toBe(BigDecimal::of($onHandAfterSale)->plus('2')->toScale(4)->__toString())
+        // the original is byte-identical when read again
+        ->and(($this->movementRows)($croissantRef, 'sale'))->toBe($sale);
+    $oracle = ledgerOracle($f->branch->id);
+    expect($oracle['movements'])->toBe($oracle['balances'])->and($oracle['balances'])->toBe($oracle['view']);
+})->group(REFUND_GROUP);
+
+it('writes no movement for a line refunded as waste or none, and the originals stand', function () {
+    $f = $this->floor;
+    [$order, $croissant, $sandwich, $croissantRef, $sandwichRef] = ($this->closedOrder)();
+    $before = DB::table('stock_movements')->where('branch_id', $f->branch->id)->count();
+    $consumed = ($this->movementRows)($sandwichRef, 'production_consume');
+    $sold = ($this->movementRows)($croissantRef, 'sale');
+    expect($consumed)->not->toBe([]);
+
+    ($this->refund)($order['id'], [$sandwich['id'], $croissant['id']], [$sandwich['id'] => 'waste', $croissant['id'] => 'none']);
+
+    expect(DB::table('stock_movements')->where('branch_id', $f->branch->id)->count())->toBe($before)
+        ->and(DB::table('stock_movement_reversals')->count())->toBe(0)
+        ->and(($this->movementRows)($sandwichRef, 'production_consume'))->toBe($consumed)
+        ->and(($this->movementRows)($croissantRef, 'sale'))->toBe($sold);
+})->group(REFUND_GROUP);
+
+it('reverses a movement once: a second refund of the line is refused and so is a second reversal row for the same original', function () {
+    $f = $this->floor;
+    [$order, $croissant, , $croissantRef] = ($this->closedOrder)();
+    ($this->refund)($order['id'], [$croissant['id']], [$croissant['id'] => 'restock']);
+    $movements = DB::table('stock_movements')->count();
+
+    $second = ($this->refusal)(fn () => ($this->refund)($order['id'], [$croissant['id']], [$croissant['id'] => 'restock']));
+
+    expect($second)->toBe('orders.refund.line_refunded')
+        ->and(DB::table('stock_movements')->count())->toBe($movements)
+        ->and(DB::table('stock_movement_reversals')->count())->toBe(1);
+    // the database says it too: an original can be named by one reversal row only
+    $sale = ($this->movementRows)($croissantRef, 'sale')[0];
+    $duplicate = fn () => DB::table('stock_movement_reversals')->insert([
+        'branch_id' => $f->branch->id, 'movement_id' => $sale['id'], 'reverses_movement_id' => $sale['id'], 'created_at' => now(),
+    ]);
+    expect($duplicate)->toThrow(QueryException::class);
+})->group(REFUND_GROUP);
+
+it('refunds only a closed order, with a reason; it stays closed, carries refunded_total and the timeline, and OrderRefunded follows the commit', function () {
+    $f = $this->floor;
+    $m = $f->menu;
+    // refused: sent, served-unpaid, settled-but-not-served
+    $sent = $f->send([$m->line($m->sandwich), $m->line($m->croissant)]);
+    $served = $f->send([$m->line($m->sandwich), $m->line($m->croissant)]);
+    ($this->serveAll)($served);
+    $settled = $f->send([$m->line($m->sandwich), $m->line($m->croissant)]);
+    ($this->pay)($settled['id']);
+    foreach (['sent' => $sent, 'served' => $served, 'settled but not served' => $settled] as $what => $o) {
+        expect(($this->refusal)(fn () => ($this->refund)($o['id'])))->toBe('orders.refund.not_refundable', $what);
+    }
+
+    [$order, $croissant] = ($this->closedOrder)();
+    $refunded = [];
+    Event::listen(OrderRefunded::class, function (OrderRefunded $e) use (&$refunded): void {
+        $refunded[] = $e->payload();
+    });
+    expect(($this->refusal)(fn () => ($this->refund)($order['id'], [$croissant['id']], [$croissant['id'] => 'restock'], '  ')))->toBe('orders.refund.reason_required')
+        ->and($refunded)->toBe([]);
+
+    ($this->refund)($order['id'], [$croissant['id']], [$croissant['id'] => 'restock']);
+
+    $row = Order::query()->findOrFail($order['id']);
+    $lineTotal = BigDecimal::of($croissant['line_total'] ?? $croissant['total'])->toScale(2)->__toString();
+    expect($row->status->value)->toBe('closed')
+        ->and($row->refunded_total->amount())->toBe($lineTotal)
+        ->and(BigDecimal::of($row->refunded_total->amount())->isLessThanOrEqualTo($row->paid_total->amount()))->toBeTrue()
+        ->and($row->refunded_at)->not->toBeNull()
+        ->and(($this->timeline)($order['id']))->toContain('line.refunded')->toContain('order.refunded')
+        ->and($refunded)->toHaveCount(1)
+        ->and($refunded[0]['order_id'])->toBe($order['id'])
+        ->and($refunded[0]['amount'])->toBe($lineTotal);
+
+    // the lines already refunded cannot come back again, so a whole-order refund after a line refund is refused
+    expect(($this->refusal)(fn () => ($this->refund)($order['id'])))->toBe('orders.refund.line_refunded');
+})->group(REFUND_GROUP);
+
+it('does not announce OrderRefunded, write a movement or a timeline row when the refund rolls back', function () {
+    [$order, $croissant] = ($this->closedOrder)();
+    $refunded = [];
+    Event::listen(OrderRefunded::class, function (OrderRefunded $e) use (&$refunded): void {
+        $refunded[] = $e->payload();
+    });
+    $events = count(($this->timeline)($order['id']));
+    $movements = DB::table('stock_movements')->count();
+
+    try {
+        DB::transaction(function () use ($order, $croissant): void {
+            ($this->refund)($order['id'], [$croissant['id']], [$croissant['id'] => 'restock']);
+            throw new RuntimeException('payment_refunds insert failed'); // what Payments does after Orders::refund
+        });
+    } catch (RuntimeException $e) {
+        expect($e->getMessage())->toBe('payment_refunds insert failed');
+    }
+
+    expect($refunded)->toBe([])
+        ->and(count(($this->timeline)($order['id'])))->toBe($events)
+        ->and(DB::table('stock_movements')->count())->toBe($movements)
+        ->and(Order::query()->findOrFail($order['id'])->refunded_total->amount())->toBe('0.00');
+})->group(REFUND_GROUP);
+
+it('does not bypass the shift rule: restocking a station line while its station has no open shift is refused and writes nothing', function () {
+    $f = $this->floor;
+    [$order, , $sandwich] = ($this->closedOrder)();
+    // the kitchen shift ends; the ledger refuses a station movement outside a shift (ADR 0013)
+    DB::table('shift_instances')->where('station_id', $f->menu->kitchenStation->id)->update([
+        'status' => 'cancelled', 'open_key' => null, 'cancelled_at' => now(), 'cancelled_by_user_id' => $f->admin->id, 'cancel_reason' => 'test: no shift',
+    ]);
+    $movements = DB::table('stock_movements')->count();
+
+    $refused = ($this->refusal)(fn () => ($this->refund)($order['id'], [$sandwich['id']], [$sandwich['id'] => 'restock']));
+
+    expect($refused)->toBe('inventory.shift.required')
+        ->and(DB::table('stock_movements')->count())->toBe($movements)
+        ->and(DB::table('stock_movement_reversals')->count())->toBe(0)
+        ->and(Order::query()->findOrFail($order['id'])->refunded_total->amount())->toBe('0.00');
+})->group(REFUND_GROUP)->skip(fn () => ! Shifts::enforced(), 'the shift rules are off (rules-off-gates)');
+
+it('takes a voided payment out of paid_total while the order is sent..served, and refuses it once the order is paid or closed', function () {
+    $f = $this->floor;
+    $m = $f->menu;
+    $order = $f->send([$m->line($m->sandwich), $m->line($m->croissant)]);
+    ($this->pay)($order['id'], null, null, 1); // settles, not served
+    expect(Order::query()->findOrFail($order['id'])->settled_at)->not->toBeNull();
+    $amount = ($this->totals)($order['id'])->paid;
+
+    DB::transaction(function () use ($order, $amount, $f): void {
+        withActor($f->cashier->id);
+        event(new PaymentVoided($f->branch->id, 1, $order['id'], 'cash', $amount, 'wrong amount keyed', $f->cashier->id, $f->manager->id));
+    });
+
+    $row = Order::query()->findOrFail($order['id']);
+    expect($row->paid_total->amount())->toBe('0.00')
+        ->and($row->settled_at)->toBeNull()
+        ->and($row->status->value)->toBe('sent')
+        ->and(($this->timeline)($order['id']))->toContain('payment.voided')
+        ->and(($this->totals)($order['id'])->balance)->toBe($order['totals']['total']);
+
+    // a closed order cannot be un-paid by voiding a payment: it is refunded instead
+    [$closed] = ($this->closedOrder)();
+    $closedPaid = ($this->totals)($closed['id'])->paid;
+    $thrown = ($this->refusal)(function () use ($closed, $closedPaid, $f): void {
+        DB::transaction(function () use ($closed, $closedPaid, $f): void {
+            withActor($f->cashier->id);
+            event(new PaymentVoided($f->branch->id, 2, $closed['id'], 'cash', $closedPaid, 'oops', $f->cashier->id, $f->manager->id));
+        });
+    });
+    expect($thrown)->toBe('payments.void.order_closed')
+        ->and(Order::query()->findOrFail($closed['id'])->paid_total->amount())->toBe($closedPaid);
+})->group(REFUND_GROUP);
+
+it('keeps the order unsettled after a part payment, settles it with the last one, and sells the display-case lines exactly once', function () {
+    $f = $this->floor;
+    $m = $f->menu;
+    $order = $f->send([$m->line($m->sandwich), $m->line($m->croissant, '2')]);
+    ($this->serveAll)($order);
+    $ref = $f->refOf($f->lineOf($order, $m->croissant)['client_uuid']);
+
+    ($this->pay)($order['id'], '100.00', null, 1);
+    expect(Order::query()->findOrFail($order['id'])->settled_at)->toBeNull()
+        ->and(($this->movementRows)($ref, 'sale'))->toBe([]);
+
+    ($this->pay)($order['id'], null, null, 2);
+
+    expect(($this->status)($order['id']))->toBe('closed')
+        ->and(($this->totals)($order['id'])->paid)->toBe($order['totals']['total'])
+        ->and(($this->movementRows)($ref, 'sale'))->toHaveCount(1)
+        ->and($this->paidEvents)->toHaveCount(1);
+})->group(REFUND_GROUP);
+
+it('answers refunded and net_paid as decimal strings next to total, paid and balance', function () {
+    [$order, $croissant] = ($this->closedOrder)();
+    $before = app(Orders::class)->totals($order['id']);
+    expect($before->refunded)->toBe('0.00')->and($before->netPaid)->toBe($before->paid);
+
+    ($this->refund)($order['id'], [$croissant['id']], [$croissant['id'] => 'restock']);
+
+    $after = app(Orders::class)->totals($order['id']);
+    expect($after->refunded)->toBeString()->not->toBe('0.00')
+        ->and($after->netPaid)->toBe(BigDecimal::of($after->paid)->minus($after->refunded)->toScale(2)->__toString())
+        ->and($after->paid)->toBe($before->paid); // paid is what came in; the refund is its own figure
+})->group(REFUND_GROUP);
