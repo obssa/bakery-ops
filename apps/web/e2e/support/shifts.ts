@@ -120,21 +120,36 @@ async function finishDrafts(admin: Api, shiftId: number): Promise<void> {
 }
 
 /**
- * Makes sure the station has a running shift: asks for the current one and, when there is none, starts one carried ("start without
- * counting"), or finishes the opening counts of one that is still `opening`. A station that tracks no shifts (the store) needs none and is left alone. A start that loses a race with
- * another one (409 shifts.shift.already_open) found the shift running, which is what was wanted.
+ * Makes sure the station ends with an `open` shift, whatever state the earlier runs left it in: none (a carried start), `opening` (the
+ * opening counts are finished), `counting` (a closing in progress: settleStation finishes the closing counts and resolves what waits
+ * for approval, then a carried start follows) or `open` (nothing to do). With the shift rules on, a station whose shift is anything but
+ * `open` refuses every stock movement (409 inventory.shift.required), so the status is read again at the end and a station that is
+ * still not open is an error, not a fixture that carries on. A station that tracks no shifts (the store) needs none and is left alone.
+ * A start that loses a race with another one (409 shifts.shift.already_open) found the shift running, which is what was wanted.
  */
 export async function ensureOpenShift(admin: Api, station: StationRef): Promise<void> {
   try {
-    const current = (await admin.get<{ data: ShiftView | null }>(`/stations/${station.id}/shifts/current`)).data;
-    if (current) {
-      if (current.status === "opening") await finishOpeningCounts(admin, current.id);
-      return;
+    const current = await currentShift(admin, station);
+    if (current?.status === "opening") {
+      await finishOpeningCounts(admin, current.id);
+    } else if (current && current.status !== "open") {
+      await settleStation(admin, station);
+      await resolvePendingCounts(admin, station);
     }
-    await admin.post(`/stations/${station.id}/shifts/start`, { client_uuid: uuid(), carry: true });
+    if ((await currentShift(admin, station)) === null) {
+      try {
+        await admin.post(`/stations/${station.id}/shifts/start`, { client_uuid: uuid(), carry: true });
+      } catch (error) {
+        if (!(error instanceof ApiFailure && error.key === "shifts.shift.already_open")) throw error;
+      }
+    }
   } catch (error) {
-    if (error instanceof ApiFailure && (error.key === "shifts.station.not_tracked" || error.key === "shifts.shift.already_open")) return;
+    if (error instanceof ApiFailure && error.key === "shifts.station.not_tracked") return;
     throw error;
+  }
+  const after = await currentShift(admin, station);
+  if (after?.status !== "open") {
+    throw new Error(`ensureOpenShift: station ${station.id} is ${after ? `"${after.status}"` : "without a shift"}, not open; stock movements there would be refused`);
   }
 }
 
