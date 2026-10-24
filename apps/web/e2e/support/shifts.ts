@@ -15,11 +15,6 @@ export interface StationRef {
   id: number;
 }
 
-interface ShiftView {
-  id: number;
-  status: string;
-}
-
 interface CountView {
   id: number;
   status: string;
