@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Payments\Models\Payment;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use Illuminate\Database\QueryException;
@@ -88,6 +89,16 @@ function seedAppendOnlyRow(string $table): int
                 'body' => 'Probe', 'created_by_user_id' => $user->id, 'created_at' => now(),
             ]);
         })(),
+        'payment_refunds' => (function (): int {
+            $payment = Payment::factory()->create();
+
+            return DB::table('payment_refunds')->insertGetId([
+                'branch_id' => $payment->branch_id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $payment->order_id, 'order_refund_id' => 1,
+                'payment_id' => $payment->id, 'channel_id' => $payment->channel_id, 'amount' => '10.00',
+                'refunded_by_user_id' => $payment->received_by_user_id, 'approved_by_user_id' => $payment->received_by_user_id,
+                'refunded_at' => now(), 'created_at' => now(),
+            ]);
+        })(),
         default => throw new LogicException("seedAppendOnlyRow(): add a seed row for append-only table {$table}"),
     };
 }
@@ -100,6 +111,7 @@ function appendOnlyTamper(string $table): array
         'order_events' => ['event' => 'order.voided'],
         'item_cost_history' => ['cost_after' => '9.0000'],
         'handover_notes' => ['body' => 'tampered'],
+        'payment_refunds' => ['amount' => '99.00'],
         default => ['action' => 'tampered'],
     };
 }

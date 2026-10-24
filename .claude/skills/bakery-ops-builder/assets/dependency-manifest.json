@@ -350,11 +350,11 @@
       ],
       "tables": [
         "payment_channels",
-        "payments"
+        "payments",
+        "payment_refunds"
       ],
       "tables_phase_4": [
-        "receipt_settings",
-        "payment_refunds"
+        "receipt_settings"
       ]
     },
     "notifications": {
