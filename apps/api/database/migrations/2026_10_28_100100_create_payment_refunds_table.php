@@ -40,7 +40,7 @@ return new class extends Migration
             $table->foreignId('refunded_by_user_id')->constrained('users')->restrictOnDelete();
             $table->foreignId('approved_by_user_id')->constrained('users')->restrictOnDelete();
             $table->foreignId('acting_user_id')->nullable()->constrained('users')->restrictOnDelete();
-            $table->unsignedBigInteger('shift_instance_id')->nullable();
+            $table->foreignId('shift_instance_id')->nullable()->constrained('shift_instances')->restrictOnDelete();
             $table->foreignId('station_id')->nullable()->constrained('stations')->restrictOnDelete();
             $table->foreignId('device_id')->nullable()->constrained('devices')->restrictOnDelete();
             $table->dateTime('refunded_at');
