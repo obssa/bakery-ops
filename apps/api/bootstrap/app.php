@@ -12,6 +12,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Exceptions\UnauthorizedException;
@@ -60,6 +61,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (UnauthorizedException $e, Request $request) => $api($request) ? ApiError::json('auth.forbidden', 403) : null);
         $exceptions->render(fn (ModelNotFoundException $e, Request $request) => $api($request) ? ApiError::json('http.not_found', 404) : null);
         $exceptions->render(fn (NotFoundHttpException $e, Request $request) => $api($request) ? ApiError::json('http.not_found', 404) : null);
+        $exceptions->render(fn (InvalidSignatureException $e, Request $request) => $api($request) ? ApiError::json('files.invalid_signature', 403) : null);
         $exceptions->render(fn (ThrottleRequestsException $e, Request $request) => $api($request) ? ApiError::json('http.too_many_requests', 429)->withHeaders($e->getHeaders()) : null);
 
         // A status change the machine does not allow is a conflict with the current state, told bilingually.

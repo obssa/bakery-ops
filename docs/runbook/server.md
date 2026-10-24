@@ -380,6 +380,13 @@ and a round trip that re-encodes a generated 3000x2000 JPEG with a planted GPS b
 PHP and the CLI PHP can differ on cPanel (MultiPHP INI Editor, Select PHP Version), so the admin also gets `GET /files/doctor` (step 4.2b):
 compare the two tables after a host change.
 
+`files:doctor` is built (step 4.2a). It prints a table of `check`, `status` (`ok`, `warn` or `missing`) and `detail`, ends with the round trip line
+(`exif stripped: yes, longest edge: 1600, bytes: ..., ms: ...`) and exits 1 when any row is `missing`. `warn` rows are not blockers: no `exif`
+(the pure PHP reader is used), no WebP in `gd` (WebP uploads answer `files.unsupported_type`), a `memory_limit` under 256M (a 24 MP photo may not
+decode), a missing `storage/fonts`. It writes one small probe object to the files disk and deletes it; nothing else. Run it as shown above, once
+after a deploy that touches PHP and once before the photo feature is switched on. To move to a bucket later: `FILES_DISK=files_s3` plus the `AWS_*`
+variables, then copy `storage/app/private/files` into the bucket under the same keys (`stored_files.disk` records where each object lives).
+
 ### Disk space
 
 Photos are about 180 KB each at 1600 px: 200 digital payments a day is about 1 GB a month. The account's home directory used 961 MB on

@@ -1,10 +1,10 @@
 <?php
 
 /*
- * Receipt photos and other uploads (phase-4 plan section 6, step 4.2a). PLACEHOLDER of step 4.1a: plain values only, so
- * `config:cache` keeps working on the shared host (DeployableCachesTest). Step 4.2a adds the `files` disk to filesystems.php and the code
- * that reads these. The code only ever talks to Storage::disk(config('files.disk')); FILES_DISK=files_s3 moves the bytes to an
- * S3-compatible bucket without touching it (ADR 0015).
+ * Receipt photos and other uploads (phase-4 plan section 6, step 4.2a; ADR 0015). Plain values only, so `config:cache` works on the
+ * shared host (DeployableCachesTest). The code only ever talks to Storage::disk(config('files.disk')); FILES_DISK=files_s3 moves the
+ * bytes to an S3-compatible bucket (config/filesystems.php) without touching it. max_edge and quality are what ImageProcessor writes;
+ * orphan_hours is read by files:purge-orphans (step 4.2b).
  */
 return [
     'disk' => env('FILES_DISK', 'files'),

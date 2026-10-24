@@ -47,6 +47,28 @@ return [
             'report' => false,
         ],
 
+        // Receipt photos and other uploads (phase 4, ADR 0015): private, never served by the web server. Only App\Shared\Files\Files reads
+        // or writes them; the live host uses `files`, FILES_DISK=files_s3 moves the same keys to an S3-compatible bucket.
+        'files' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/files'),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+            'report' => false,
+        ],
+        'files_s3' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_BUCKET'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

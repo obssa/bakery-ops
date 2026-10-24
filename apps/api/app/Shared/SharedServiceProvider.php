@@ -48,6 +48,7 @@ final class SharedServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadRoutesFrom(base_path('routes/modules/files.php'));
         Event::listen(StockChanged::class, static function (StockChanged $event): void {
             event(new StockChangedBroadcast($event));
         });

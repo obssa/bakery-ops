@@ -19,9 +19,9 @@ ARG PHPREDIS_SHA256=cb8f81df1a275599e4f8ddcfec7e1f65ed1953e6f5673649149fd680ebff
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
         git unzip ca-certificates \
-        libpq-dev libzip-dev libicu-dev libpng-dev libjpeg-dev libfreetype6-dev libonig-dev \
- && docker-php-ext-configure gd --with-freetype --with-jpeg \
- && docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_pgsql pgsql intl bcmath gd zip pcntl opcache \
+        libpq-dev libzip-dev libicu-dev libpng-dev libjpeg-dev libwebp-dev libfreetype6-dev libonig-dev \
+ && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+ && docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_pgsql pgsql intl bcmath gd exif zip pcntl opcache \
  && mkdir -p /usr/src/php/ext/redis \
  && curl -fsSL --retry 5 --retry-all-errors -o /tmp/phpredis.tar.gz \
         "https://github.com/phpredis/phpredis/archive/refs/tags/${PHPREDIS_VERSION}.tar.gz" \

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Shared\Files\Doctor;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 
@@ -35,7 +36,7 @@ it('leaves nothing behind in the files folder', function () {
 it('says what the rows are as data for the web check of step 4.2b', function () {
     Storage::fake(config('files.disk'));
 
-    $rows = (new App\Shared\Files\Doctor)->rows();
+    $rows = (new Doctor)->rows();
 
     expect($rows)->not->toBeEmpty();
     foreach ($rows as $row) {

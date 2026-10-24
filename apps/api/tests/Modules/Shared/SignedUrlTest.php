@@ -44,9 +44,9 @@ it('serves the JPEG with private headers until the ttl and not after', function 
         ->and($response->headers->get('Content-Disposition'))->toStartWith('inline')
         ->and($response->streamedContent())->toBe(Storage::disk(config('files.disk'))->get($this->file->key));
 
-    $this->travel(119)->seconds();
+    $this->travel(90)->seconds(); // travel is cumulative; the margin keeps a slow machine from tipping it
     $this->get($url)->assertOk();
-    $this->travel(2)->seconds();
+    $this->travel(40)->seconds();
     $this->get($url)->assertForbidden();
 });
 

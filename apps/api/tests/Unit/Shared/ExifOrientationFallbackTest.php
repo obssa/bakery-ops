@@ -36,7 +36,10 @@ it('agrees with the exif extension when it is loaded', function (int $orientatio
         return;
     }
     $jpeg = imgInject(imgJpeg(40, 30), imgExifApp1($orientation));
-    $read = @exif_read_data('data://image/jpeg;base64,'.base64_encode($jpeg));
+    $stream = fopen('php://memory', 'r+');
+    fwrite($stream, $jpeg);
+    rewind($stream);
+    $read = @exif_read_data($stream);
 
     expect(ExifOrientation::fromJpeg($jpeg))->toBe((int) ($read['Orientation'] ?? 1));
 })->with([1, 3, 6, 8])->group('unit', 'module:shared');
