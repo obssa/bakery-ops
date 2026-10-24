@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use Database\Seeders\Demo\DemoClock;
 use Database\Seeders\Demo\DemoCounts;
 use Database\Seeders\Demo\DemoCredentials;
 use Database\Seeders\Demo\DemoSeedRefused;
@@ -60,7 +61,11 @@ final class SeedDemoCommand extends Command
         }
         try {
             DemoCredentials::password(); // refuses before anything is written
-            $accounts = $this->seed($phase === null ? DemoSeeder::maxPhase() : (int) $phase);
+            $max = $phase === null ? DemoSeeder::maxPhase() : (int) $phase;
+            $accounts = [];
+            DemoClock::around($max, function () use ($max, &$accounts): void {
+                $accounts = $this->seed($max);
+            });
             $seeded = Phase0Seeder::existingBranch();
         } catch (DemoSeedRefused $e) {
             $this->error($e->getMessage());

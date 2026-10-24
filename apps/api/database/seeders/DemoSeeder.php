@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use Database\Seeders\Demo\DemoClock;
 use Illuminate\Database\Seeder;
 
 /**
@@ -20,9 +21,12 @@ final class DemoSeeder extends Seeder
 
     public function run(): void
     {
-        foreach (self::seedersUpTo(self::maxPhase()) as $class) {
-            $this->call($class);
-        }
+        $max = self::maxPhase();
+        DemoClock::around($max, function () use ($max): void {
+            foreach (self::seedersUpTo($max) as $class) {
+                $this->call($class);
+            }
+        });
     }
 
     /** SEED_PHASE when it is set, else every phase. */

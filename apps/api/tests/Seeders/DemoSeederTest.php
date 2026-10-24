@@ -15,6 +15,7 @@ use Database\Seeders\DemoSeeder;
 use Database\Seeders\Phase0Seeder;
 use Database\Seeders\Phase1Seeder;
 use Database\Seeders\Phase2Seeder;
+use Database\Seeders\Phase3Seeder;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
@@ -32,6 +33,7 @@ it('lists the phase seeders that exist, in phase order, up to the requested phas
     expect(DemoSeeder::seedersUpTo(0))->toBe([Phase0Seeder::class])
         ->and(DemoSeeder::seedersUpTo(1))->toBe([Phase0Seeder::class, Phase1Seeder::class])
         ->and(DemoSeeder::seedersUpTo(2))->toBe([Phase0Seeder::class, Phase1Seeder::class, Phase2Seeder::class])
+        ->and(DemoSeeder::seedersUpTo(3))->toBe([Phase0Seeder::class, Phase1Seeder::class, Phase2Seeder::class, Phase3Seeder::class])
         ->and(DemoSeeder::seedersUpTo(5)[0])->toBe(Phase0Seeder::class)
         ->and(DemoSeeder::seedersUpTo(-1))->toBe([]);
     foreach (DemoSeeder::seedersUpTo(5) as $class) {
@@ -298,4 +300,19 @@ it('seeds Phases 0 to 2 with the shift rule on, opening one shift at each tracke
     $this->seed(DemoSeeder::class);
 
     expect(phaseTwoRows($branch->id) + ['shift_instances' => DB::table('shift_instances')->where('branch_id', $branch->id)->count(), 'shift_roster' => DB::table('shift_roster')->count()])->toBe($first);
+})->group('feature', 'seeds');
+
+it('composes Phase 3 on Phase 2 on a fresh branch: the history is locked and chained, the open shifts are those of today, and a second run writes nothing', function () {
+    putenv('SEED_PHASE=3');
+    $this->seed(DemoSeeder::class);
+    $branch = Branch::query()->where('name', DemoBakery::DEFAULT_BRANCH)->sole();
+    $shifts = fn () => DB::table('shift_instances')->where('branch_id', $branch->id)->pluck('status')->countBy()->all();
+    $first = [$shifts(), phaseTwoRows($branch->id)];
+
+    expect($first[0])->toEqual(['locked' => 15, 'pending_approval' => 1, 'open' => 5])
+        ->and(DB::table('stock_counts')->where('branch_id', $branch->id)->whereNotNull('payload_hash')->count())->toBeGreaterThan(30);
+
+    $this->seed(DemoSeeder::class);
+
+    expect([$shifts(), phaseTwoRows($branch->id)])->toBe($first);
 })->group('feature', 'seeds');

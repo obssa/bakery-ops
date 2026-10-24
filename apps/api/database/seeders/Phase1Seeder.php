@@ -33,6 +33,7 @@ use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\DemoBakery;
+use Database\Seeders\Demo\DemoClock;
 use Database\Seeders\Demo\DemoCredentials;
 use Database\Seeders\Demo\DemoSeedRefused;
 use Database\Seeders\Demo\DemoShifts;
@@ -198,7 +199,7 @@ final class Phase1Seeder extends Seeder
 
     private function orders(Branch $branch): void
     {
-        $today = CarbonImmutable::now($branch->timezone)->toDateString();
+        $today = DemoClock::dayKey($branch->timezone);
         foreach (DemoBakery::sampleOrders() as $key => $spec) {
             $uuid = fn (string $part): string => Uuid::uuid5(Uuid::NAMESPACE_URL, "https://bakery-ops.orcamind.dev/demo-seed/{$branch->id}/{$today}/order/{$key}{$part}")->toString();
             if (Order::query()->where('client_uuid', $uuid(''))->exists()) {

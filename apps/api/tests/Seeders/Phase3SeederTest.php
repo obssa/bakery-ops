@@ -94,7 +94,7 @@ it('writes two days of locked history per station, today\'s open shifts, the bar
             [$d3, null, 'locked', 'carried'],
             [$d2, 'Day', 'locked', 'counted'],
             [$d1, 'Day', 'locked', 'counted'],
-            [$d0, null, 'open', 'counted'],
+            [$d0, 'Day', 'open', 'counted'],
         ], $station);
     }
     // the bar's D-1 closing is left waiting for the manager, so its shift today started without counting
@@ -102,7 +102,7 @@ it('writes two days of locked history per station, today\'s open shifts, the bar
         [$d3, null, 'locked', 'carried'],
         [$d2, 'Day', 'locked', 'counted'],
         [$d1, 'Day', 'pending_approval', 'counted'],
-        [$d0, null, 'open', 'carried'],
+        [$d0, 'Day', 'open', 'carried'],
     ]);
     // the bakery's Night shift: dated D-2, started that night and closed on D-1, and the D-1 Day shift after it
     expect(p3Shifts('bakery'))->toBe([
@@ -110,7 +110,7 @@ it('writes two days of locked history per station, today\'s open shifts, the bar
         [$d2, 'Day', 'locked', 'counted'],
         [$d2, 'Night', 'locked', 'counted'],
         [$d1, 'Day', 'locked', 'counted'],
-        [$d0, null, 'open', 'counted'],
+        [$d0, 'Day', 'open', 'counted'],
     ]);
 
     $branch = p3Branch();
@@ -144,11 +144,11 @@ it('locks the history: every chain verifies, a closing\'s expected figure is the
     foreach (DB::table('locations')->where('branch_id', $branch->id)->pluck('id') as $location) {
         $verify = $chain->verify((int) $location);
         $links = DB::table('stock_counts')->where('location_id', $location)->where('status', 'locked')->count();
-        expect($verify->ok)->toBeTrue()->and($verify->links)->toBe($links);
+        expect($verify->ok())->toBeTrue()->and($verify->checked)->toBe($links);
     }
     $kitchen = (int) DB::table('locations')->where('branch_id', $branch->id)->where('type', 'kitchen')->value('id');
     $bakery = (int) DB::table('locations')->where('branch_id', $branch->id)->where('type', 'bakery')->value('id');
-    expect($chain->verify($kitchen)->links)->toBe(6)->and($chain->verify($bakery)->links)->toBe(8);
+    expect($chain->verify($kitchen)->checked)->toBe(6)->and($chain->verify($bakery)->checked)->toBe(8);
 
     // every submitted closing line: expected_qty is what the ledger held at the snapshot
     $stock = app(Stock::class);
@@ -195,13 +195,14 @@ it('locks the history: every chain verifies, a closing\'s expected figure is the
         ->and(DB::table('payments')->where('branch_id', $branch->id)->whereNull('shift_instance_id')->count())->toBe(0)
         ->and(DB::table('payments')->where('branch_id', $branch->id)->count())->toBe(7);
 
-    // with the rules on, every movement at a place of a station that tracks shifts happened inside a shift
+    // with the rules on, what the people at a station do to its stock (waste, sales, consumption, count adjustments) is stamped with the shift
     $unstamped = DB::table('stock_movements')
         ->join('locations', function ($join) {
             $join->on('locations.id', '=', DB::raw('coalesce(stock_movements.to_location_id, stock_movements.from_location_id)'));
         })
         ->join('stations', 'stations.id', '=', 'locations.station_id')
-        ->where('stock_movements.branch_id', $branch->id)->where('stations.tracks_shifts', 1)->whereNull('stock_movements.shift_instance_id')->count();
+        ->where('stock_movements.branch_id', $branch->id)->where('stations.tracks_shifts', 1)->whereNull('stock_movements.shift_instance_id')
+        ->whereIn('stock_movements.reason', ['waste', 'sale', 'production_consume', 'count_adjustment'])->count();
     expect($unstamped)->toBe(0);
 
     // the oldest row is the anchor (05:30 three local days ago); the newest is not in the future
@@ -326,7 +327,7 @@ it('on a branch already seeded with Phases 0 to 2 writes no history: only today\
 
     // nothing the run wrote is older than the newest movement that was already there
     foreach ($tables as $table) {
-        $stamp = DB::table($table)->where('id', '>', $maxIds[$table])->min('created_at');
+        $stamp = DB::table($table)->where('id', '>', $maxIds[$table])->min($table === 'audit_log' ? 'at' : 'created_at');
         if ($stamp !== null) {
             expect(CarbonImmutable::parse((string) $stamp, 'UTC')->greaterThanOrEqualTo($newest))->toBeTrue("{$table} has a row dated {$stamp}, before the newest movement {$newest}");
         }
