@@ -112,7 +112,7 @@ final class Doctor
 
     private function plantedJpeg(int $w, int $h): string
     {
-        $image = imagecreatetruecolor($w, $h);
+        $image = imagecreatetruecolor(max(1, $w), max(1, $h));
         imagefilledrectangle($image, 0, 0, intdiv($w, 2), $h, (int) imagecolorallocate($image, 200, 60, 40));
         ob_start();
         imagejpeg($image, null, 85);

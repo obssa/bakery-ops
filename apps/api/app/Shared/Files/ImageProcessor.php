@@ -30,7 +30,7 @@ final class ImageProcessor
         }
 
         $info = $bytes === '' ? false : @getimagesizefromstring($bytes);
-        if ($info === false || ! isset($info[2])) {
+        if ($info === false) {
             throw FilesError::notAnImage();
         }
         $mime = (string) $info['mime'];
@@ -79,7 +79,7 @@ final class ImageProcessor
                 throw FilesError::notAnImage();
             }
         } else {
-            $expected = (unpack('V', substr($bytes, 4, 4))[1] ?? 0) + 8;
+            $expected = ExifOrientation::number('V', substr($bytes, 4, 4)) + 8;
             if (strlen($bytes) < $expected) {
                 throw FilesError::truncated();
             }
@@ -216,7 +216,7 @@ final class ImageProcessor
             if ($marker === 0xDA) {
                 break;
             }
-            $size = 2 + unpack('n', substr($bytes, $i + 2, 2))[1];
+            $size = 2 + ExifOrientation::number('n', substr($bytes, $i + 2, 2));
             if ($marker !== 0xFE && ($marker < 0xE1 || $marker > 0xEF)) {
                 $out .= substr($bytes, $i, $size);
             }
@@ -248,7 +248,7 @@ final class ImageProcessor
             if (in_array($marker, [0xE1, 0xE2, 0xED, 0xFE], true)) {
                 throw FilesError::processingFailed();
             }
-            $i += 2 + unpack('n', substr($bytes, $i + 2, 2))[1];
+            $i += 2 + ExifOrientation::number('n', substr($bytes, $i + 2, 2));
         }
 
         return new ProcessedImage($bytes, $width, $height);

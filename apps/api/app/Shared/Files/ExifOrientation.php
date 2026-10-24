@@ -36,7 +36,7 @@ final class ExifOrientation
 
                 continue;
             }
-            $size = unpack('n', substr($bytes, $i + 2, 2))[1];
+            $size = self::number('n', substr($bytes, $i + 2, 2));
             if ($size < 2 || $i + 2 + $size > $length) {
                 return 1;
             }
@@ -47,6 +47,14 @@ final class ExifOrientation
         }
 
         return 1;
+    }
+
+    /** One unsigned number out of a binary string; a string that is too short reads as 0 (every caller treats that as "cannot trust"). */
+    public static function number(string $format, string $data): int
+    {
+        $values = unpack($format, $data);
+
+        return is_array($values) ? (int) ($values[1] ?? 0) : 0;
     }
 
     private static function fromTiff(string $tiff): int
@@ -60,21 +68,21 @@ final class ExifOrientation
         }
         $short = $order === 'MM' ? 'n' : 'v';
         $long = $order === 'MM' ? 'N' : 'V';
-        if (unpack($short, substr($tiff, 2, 2))[1] !== 42) {
+        if (self::number($short, substr($tiff, 2, 2)) !== 42) {
             return 1;
         }
-        $offset = unpack($long, substr($tiff, 4, 4))[1];
+        $offset = self::number($long, substr($tiff, 4, 4));
         if ($offset < 8 || $offset + 2 > strlen($tiff)) {
             return 1;
         }
-        $entries = unpack($short, substr($tiff, $offset, 2))[1];
+        $entries = self::number($short, substr($tiff, $offset, 2));
         for ($n = 0; $n < $entries; $n++) {
             $at = $offset + 2 + 12 * $n;
             if ($at + 12 > strlen($tiff)) {
                 return 1;
             }
-            if (unpack($short, substr($tiff, $at, 2))[1] === 0x0112) {
-                $value = unpack($short, substr($tiff, $at + 8, 2))[1];
+            if (self::number($short, substr($tiff, $at, 2)) === 0x0112) {
+                $value = self::number($short, substr($tiff, $at + 8, 2));
 
                 return $value >= 1 && $value <= 8 ? $value : 1;
             }
