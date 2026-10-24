@@ -67,13 +67,10 @@ final readonly class LocalDay
     public function utcBounds(?string $timezone = null): array
     {
         $zone = $timezone ?? $this->timezone();
-        $start = CarbonImmutable::createFromFormat('!Y-m-d', $this->from, $zone);
-        $end = CarbonImmutable::createFromFormat('!Y-m-d', $this->to, $zone);
-        if ($start === false || $end === false) {
-            throw new InvalidArgumentException('LocalDay: unreadable dates');
-        }
+        $start = CarbonImmutable::parse($this->from.' 00:00:00', $zone);
+        $end = CarbonImmutable::parse($this->to.' 00:00:00', $zone);
 
-        return [$start->startOfDay()->utc(), $end->addDay()->startOfDay()->utc()];
+        return [$start->utc(), $end->addDay()->startOfDay()->utc()];
     }
 
     /** The local date ('YYYY-MM-DD') of an instant; a string is read as UTC. */
@@ -104,10 +101,7 @@ final readonly class LocalDay
     public function days(): array
     {
         $zone = $this->timezone();
-        $cursor = CarbonImmutable::createFromFormat('!Y-m-d', $this->from, $zone);
-        if ($cursor === false) {
-            throw new InvalidArgumentException('LocalDay: unreadable dates');
-        }
+        $cursor = CarbonImmutable::parse($this->from.' 00:00:00', $zone);
         $days = [];
         while ($cursor->toDateString() <= $this->to) {
             $days[] = $cursor->toDateString();
@@ -119,8 +113,7 @@ final readonly class LocalDay
 
     private static function assertDate(string $value): void
     {
-        $parsed = CarbonImmutable::createFromFormat('!Y-m-d', $value, 'UTC');
-        if ($parsed === false || $parsed->toDateString() !== $value) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1 || CarbonImmutable::parse($value.' 00:00:00', 'UTC')->toDateString() !== $value) {
             throw new InvalidArgumentException("LocalDay: '{$value}' is not a YYYY-MM-DD date");
         }
     }

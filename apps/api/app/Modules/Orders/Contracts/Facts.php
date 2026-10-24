@@ -14,6 +14,7 @@ use App\Shared\Values\Money;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 use Generator;
+use stdClass;
 
 /**
  * What Analytics may read of Orders (phase-4 plan section 2, contract analytics->facts): sales and their lines, as plain rows.
@@ -36,7 +37,7 @@ final class Facts
                 ->whereIn('orders.status', self::sold())
                 ->where('orders.settled_at', '>=', DayRows::sql($start))
                 ->where('orders.settled_at', '<', DayRows::sql($end)),
-            fn (object $row, string $day): SaleFact => new SaleFact(
+            fn (stdClass $row, string $day): SaleFact => new SaleFact(
                 (int) $row->id,
                 $day,
                 $range->hourOf((string) $row->settled_at),
@@ -68,7 +69,7 @@ final class Facts
                 ->whereNotIn('order_lines.status', [LineStatus::Rejected->value, LineStatus::Voided->value])
                 ->where('orders.settled_at', '>=', DayRows::sql($start))
                 ->where('orders.settled_at', '<', DayRows::sql($end)),
-            fn (object $row, string $day): LineFact => new LineFact(
+            fn (stdClass $row, string $day): LineFact => new LineFact(
                 (int) $row->id,
                 (int) $row->order_id,
                 $day,

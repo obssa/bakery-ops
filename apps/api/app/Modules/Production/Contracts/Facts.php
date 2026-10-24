@@ -11,6 +11,7 @@ use App\Shared\Time\LocalDay;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 use Generator;
+use stdClass;
 
 /**
  * What Analytics may read of Production (phase-4 plan section 2, contract analytics->facts): batches that were finished
@@ -31,7 +32,7 @@ final class Facts
                 ->whereIn('production_batches.status', [BatchStatus::Finished->value, BatchStatus::Confirmed->value])
                 ->where('production_batches.finished_at', '>=', DayRows::sql($start))
                 ->where('production_batches.finished_at', '<', DayRows::sql($end)),
-            fn (object $row, string $day): BatchFact => new BatchFact(
+            fn (stdClass $row, string $day): BatchFact => new BatchFact(
                 (int) $row->id,
                 $day,
                 (int) $row->station_id,

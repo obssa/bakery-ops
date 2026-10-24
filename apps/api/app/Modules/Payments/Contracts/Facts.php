@@ -13,6 +13,7 @@ use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
 use Generator;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 /**
  * What Analytics may read of Payments (phase-4 plan section 2, contract analytics->facts): payments and refunds as plain rows.
@@ -37,7 +38,7 @@ final class Facts
                 ->where('payments.status', '!=', PaymentStatus::Voided->value)
                 ->where('payments.received_at', '>=', DayRows::sql($start))
                 ->where('payments.received_at', '<', DayRows::sql($end)),
-            fn (object $row, string $day): PaymentFact => new PaymentFact(
+            fn (stdClass $row, string $day): PaymentFact => new PaymentFact(
                 (int) $row->id,
                 (int) $row->order_id,
                 $day,
@@ -69,7 +70,7 @@ final class Facts
                 ->when($branchId !== null, fn ($q) => $q->where('payment_refunds.branch_id', $branchId))
                 ->where('payment_refunds.refunded_at', '>=', DayRows::sql($start))
                 ->where('payment_refunds.refunded_at', '<', DayRows::sql($end)),
-            fn (object $row, string $day): RefundFact => new RefundFact(
+            fn (stdClass $row, string $day): RefundFact => new RefundFact(
                 (int) $row->id,
                 (int) $row->order_id,
                 (int) $row->payment_id,

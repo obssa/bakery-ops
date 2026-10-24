@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Closure;
 use Generator;
 use Illuminate\Database\Query\Builder;
+use stdClass;
 
 /**
  * The one way a Facts port reads (phase-4 plan section 2): a generator over a chunked, ordered query, one local day at a time, so
@@ -23,7 +24,7 @@ final class DayRows
      * @template T
      *
      * @param  Closure(CarbonImmutable, CarbonImmutable): Builder  $query  UTC [start, end) of one local day
-     * @param  Closure(object, string): T  $map
+     * @param  Closure(stdClass, string): T  $map
      * @return Generator<int, T>
      */
     public static function generate(LocalDay $range, string $idColumn, Closure $query, Closure $map, int $chunk = self::CHUNK): Generator

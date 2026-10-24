@@ -14,6 +14,7 @@ use App\Shared\Values\Quantity;
 use App\Shared\Values\UnitCost;
 use Carbon\CarbonImmutable;
 use Generator;
+use stdClass;
 
 /**
  * What Analytics may read of Inventory (phase-4 plan section 2, contract analytics->facts). Reads only; each method is a generator
@@ -38,7 +39,7 @@ final class Facts
             $range,
             'id',
             fn (CarbonImmutable $start, CarbonImmutable $end) => $reader->movementsBetween(DayRows::sql($start), DayRows::sql($end)),
-            fn (object $row, string $day): MovementFact => new MovementFact(
+            fn (stdClass $row, string $day): MovementFact => new MovementFact(
                 (int) $row->id,
                 $day,
                 (int) $row->item_id,
@@ -76,7 +77,7 @@ final class Facts
                 ->where('type', StockAlertState::OUT)
                 ->where('active_since', '>=', DayRows::sql($start))
                 ->where('active_since', '<', DayRows::sql($end)),
-            fn (object $row, string $day): StockOutFact => new StockOutFact(
+            fn (stdClass $row, string $day): StockOutFact => new StockOutFact(
                 (int) $row->id,
                 $day,
                 (int) $row->item_id,
