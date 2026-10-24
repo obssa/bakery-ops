@@ -336,6 +336,30 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      generator over a chunked, ordered query. M10 and M11 are in this PR. `contract:analytics->facts` green with `app/Modules/Analytics` absent. Groups added to the
      provider jobs. ModuleBoundariesTest: Analytics may use `*\Contracts\Facts*`, `Catalog\Contracts\*`, `Identity\Contracts\ActorDirectory`
      and `Shared\*` only; the arch test fails on any model import from Analytics.
+   - **As built (step 4.1c, `phase-4/facts-ports`).** Order: M10 and M11, the ERD line and the `AppendOnlyTest` seed for `payment_refunds`, the `LocalDay` tests (red);
+     `LocalDay` and `DayRows`; the five ports with their row classes and the contract setup fixes; the Analytics arch rule; the CI wiring; this note. Where the code
+     disagreed with the plan or the plan left a choice:
+     - **`LocalDay`** is `between(from, to, ?tz)` (also `of(day)`), with `timezone()`, `utcBounds(?tz)` returning `[start, end)` as UTC instants (end = the start of the day after
+       `to`), `dayOf`, `hourOf`, `days`. The zone is the one given, else the current branch's, else `config('bakery.timezone')`. `DayRows::generate` is the one reader every port
+       uses: it walks the local days of the range and runs a keyset-chunked query (`id > last ORDER BY id LIMIT 500`) inside each day, so the order is `(day, id)` and the
+       clock filter is `clock >= start AND clock < end`, which the `(branch_id, clock)` indexes serve.
+     - **M11 added two indexes, not six.** `payments (branch_id, received_at)`, `stock_movements (branch_id, created_at)` and `shift_instances (branch_id, date)` already exist and lead with the
+       same columns; `orders (branch_id, voided_at)` and the three-column variants are not needed (voided orders are excluded by status). New: `orders (branch_id, settled_at)` and
+       `production_batches (branch_id, finished_at)`. The plan's "only if EXPLAIN shows" is applied by reading the existing definitions, not by an EXPLAIN test.
+     - **M10 `payment_refunds`**: `order_refund_id` and `proof_file_id` are plain unsigned columns; **4.1b adds the foreign key to `order_refunds` in its M7 migration, 4.2a the one to `stored_files`**
+       (the way `shift_instance_id` waited for Shifts). Append-only (triggers), CHECK `amount > 0`, listed in `APPEND_ONLY_TABLES`. The manifest moved `payment_refunds` from
+       `tables_phase_4` to `tables`.
+     - **Port details.** Row classes are `SaleFact`, `LineFact`, `PaymentFact`, `RefundFact`, `BatchFact`, `MovementFact`, `ClosingBalanceFact`, `StockOutFact`, `UnitCostFact`, `ShiftFact`
+       (named `*Fact`, so the arch rule allows `Facts` and `*Fact` of each provider's Contracts). Sales and lines count `paid` and `closed` orders only, by `settled_at`; lines leave out
+       rejected and voided ones. Payments leave out voided, keep disputed. `closingBalances(day)` yields one row per (item, location) with `on_hand` and `reserved`, from the Ledger's own
+       `sumsAt`, so it is the `Stock::balanceAt` oracle by construction. `unitCosts(day)` is the history row with the highest id written before the next local midnight. `Shifts\Facts`
+       returns a shift once: found by its `date` in the range or by its life (`opened_at` to `locked_at`/`cancelled_at`, open-ended while running) overlapping it; `closed_at` is `submitted_at`
+       (there is no closed_at column). The ledger read sits in `Inventory\Ledger\FactsReader` because the arch tests keep the movement model inside the Ledger namespace.
+     - **Contract setup fixes (expectations unchanged).** The refunds case called `Orders::refund` and read `order_refunds`, both 4.1b's (on hold); it now uses a plain `order_refund_id = 1`
+       (no FK until 4.1b, which should swap in the real refund). The batches case built three requests and the factory made a second `cake_room` station per branch; it now shares one station.
+     - **CI**: `contract:analytics->facts` runs in `mod-inventory`, `mod-orders`, `mod-payments`, `mod-production`, `mod-shifts` and `mod-analytics`. Arch rule: Analytics may use the
+       Facts classes, `Catalog\Contracts\*`, `Identity\Contracts\ActorDirectory` (not built yet) and Shared; `Identity` joined Analytics' allowed modules in the dependency table for it.
+     - STATUS: module `contracts` stays `in_progress` until 4.1b lands.
 2. **4.2 shared.files** (STATUS `shared.files`), two PRs.
    - **4.2a `phase-4/files-core`**: M1; `App\Shared\Files\Files` (final, resolved per use): `put(UploadedFile|string $bytes, purpose, clientUuid): StoredFile`,
      `signedUrl(StoredFile|key, ?ttl): string`, `stream(StoredFile)`, `delete(StoredFile)`, `exists`; `ImageProcessor` (decode, apply orientation, resize to a

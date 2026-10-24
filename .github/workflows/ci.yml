@@ -171,25 +171,25 @@ jobs:
   mod-inventory:
     needs: mod-catalog
     uses: ./.github/workflows/module-tests.yml
-    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory" }
+    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory,contract:analytics->facts" }
 
   mod-orders:
     needs: [status, mod-inventory]
     if: fromJSON(needs.status.outputs.phase) >= 1
     uses: ./.github/workflows/module-tests.yml
-    with: { module: orders, groups: "module:orders", contracts: "contract:payments->orders,contract:shifts->orders" }
+    with: { module: orders, groups: "module:orders", contracts: "contract:payments->orders,contract:shifts->orders,contract:analytics->facts" }
 
   mod-payments:
     needs: [status, mod-orders]
     if: fromJSON(needs.status.outputs.phase) >= 1
     uses: ./.github/workflows/module-tests.yml
-    with: { module: payments, groups: "module:payments", contracts: "contract:shifts->payments" }
+    with: { module: payments, groups: "module:payments", contracts: "contract:shifts->payments,contract:analytics->facts" }
 
   mod-production:
     needs: [status, mod-inventory]
     if: fromJSON(needs.status.outputs.phase) >= 2
     uses: ./.github/workflows/module-tests.yml
-    with: { module: production, groups: "module:production" }
+    with: { module: production, groups: "module:production", contracts: "contract:analytics->facts" }
 
   mod-notifications:
     needs: [status, mod-inventory]
@@ -203,7 +203,7 @@ jobs:
     uses: ./.github/workflows/module-tests.yml
     # `seeds`: the demo bakery (Phase0Seeder ..) must stay valid as later phases change. Since step 3.2c the seeders open the
     # stations' shifts through Shifts (Demo\DemoShifts), so they run here, after every module they write through is green.
-    with: { module: shifts, groups: "module:shifts,seeds" }
+    with: { module: shifts, groups: "module:shifts,seeds", contracts: "contract:analytics->facts" }
 
   # The kill switch rehearsal (phase-3-plan.md 10.1): since step 3.7e the three shift rules are ON by default, so every module job and
   # every e2e job runs with them on. This job runs the Phase 0-2 exit-gate tests with all three OFF, the state the live host is in when
@@ -225,8 +225,8 @@ jobs:
     needs: [status, mod-shifts, mod-production, mod-notifications]
     if: fromJSON(needs.status.outputs.phase) >= 4
     uses: ./.github/workflows/module-tests.yml
-    # contracts: "contract:analytics->facts" is added back by step 4.1c, which turns the Facts contract green (4.1a commits it red)
-    with: { module: analytics, groups: "module:analytics" }
+    # the Facts contract is green since step 4.1c and runs here with Analytics absent (its ports live in the providers) and in every provider job
+    with: { module: analytics, groups: "module:analytics", contracts: "contract:analytics->facts" }
 
   # ------------------------------------------------------------------ web
   web-lint:
