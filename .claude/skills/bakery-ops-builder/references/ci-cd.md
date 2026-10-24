@@ -70,14 +70,14 @@ survive, only parallelism is lost.
 | `i18n-check` | `node scripts/i18n-check.mjs` (`--strict` when phase ≥ 5) |
 | `docker-build` | `docker/build-push-action` with `cache-from/to: type=gha`, `outputs: type=docker,dest=api.tar` → artifact |
 | `e2e-p<N>` | download artifacts; `docker load`; `docker compose -f compose.yml -f compose.ci.yml up -d --wait`; `artisan migrate:fresh --seed --seeder=DemoSeeder -- --phase=N`; setup-node 24 + Playwright browser cache; `npx playwright test --project=p<N>-*`, with `--pass-with-no-tests` only while phase N is `todo`/`planning`/`plan_approved` (once it is `in_progress` or later, each of its projects must list at least one test); upload `test-results` on failure |
-| `perf-dashboards` | k6 against compose with the 90-day seed, thresholds `p(95)<1000` |
+| `perf-dashboards` | k6 against the CI compose stack with the 90-day seed, thresholds `p(95)<1000` (never against the live host; the timed Pest substitute `DashboardBudgetGateTest` is part of `gate:p4`) |
 | `gate-p<N>` | `python scripts/gate_check.py --mode done --phase N --ci` |
 
 Live updates in e2e (ADR 0009): `e2e-p1` and later run the polling transport, as the live host does
 (`BROADCAST_CONNECTION=null`, `NEXT_PUBLIC_LIVE_TRANSPORT=poll`), so no `ws` service is needed. Reverb is its own
 compose profile, `ws` (not part of `full`); `e2e.yml` sets `BROADCAST_CONNECTION=reverb` and
-`NEXT_PUBLIC_LIVE_TRANSPORT=reverb` only when the job's `profiles` include `ws`. `e2e-p1`, `e2e-p2` and `e2e-p3` run `full` (worker, no
-Reverb); `e2e-p4..p5` list `full,ws`, the stack they had before step 1.2, until their phase plans settle the
+`NEXT_PUBLIC_LIVE_TRANSPORT=reverb` only when the job's `profiles` include `ws`. `e2e-p1` to `e2e-p4` run `full` (worker, no
+Reverb); `e2e-p5` lists `full,ws`, the stack it had before step 1.2, until its phase plan settles the
 transport. When a WebSocket transport is switched on, Reverb inside compose: the app container reaches `ws:8080`;
 the browser reaches `localhost:8080`. These are two env vars (`REVERB_HOST` vs `NEXT_PUBLIC_REVERB_HOST`), never one.
 

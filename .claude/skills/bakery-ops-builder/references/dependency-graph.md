@@ -62,7 +62,8 @@ These are the contract surfaces. Expose each as a final service class (or interf
 | Shifts | Payments | `Totals::cash(shift)` (keyed on the payment's own shift), `Totals::byChannel(shift)`, `Channels::find`; Payments asks `OpenShifts` before a cash payment (`payments.require_shift_for_cash`) |
 | Shifts | Orders | `Orders::openAt(station, time)` for the replay |
 | Shifts | Catalog | `Items::summaries`, `Items::deleted` (a count refuses or drops a line for a deleted item) |
-| Analytics | all | provider-owned `Facts` query classes only; listens to `ShiftLocked` |
+| Analytics | all | provider-owned `Facts` query classes only (Orders `sales`/`lines`, Payments `payments`/`refunds`, Production `batches`, Inventory `movements`/`closingBalances`/`stockOuts`/`unitCosts`, Shifts `instances`), Shared `LocalDay`; listens to `ShiftLocked`; announces `WeeklySummaryReady` (Notifications subscribes: event only) |
+| Payments | Shared | `Files::put`, `signedUrl` (contract `payments->files`) |
 
 ## Frontend surfaces and what they consume
 

@@ -225,7 +225,8 @@ jobs:
     needs: [status, mod-shifts, mod-production, mod-notifications]
     if: fromJSON(needs.status.outputs.phase) >= 4
     uses: ./.github/workflows/module-tests.yml
-    with: { module: analytics, groups: "module:analytics", contracts: "contract:analytics->facts" }
+    # contracts: "contract:analytics->facts" is added back by step 4.1c, which turns the Facts contract green (4.1a commits it red)
+    with: { module: analytics, groups: "module:analytics" }
 
   # ------------------------------------------------------------------ web
   web-lint:
@@ -323,9 +324,9 @@ jobs:
     # BROADCAST_CONNECTION=null, NEXT_PUBLIC_LIVE_TRANSPORT=poll
     with: { phase: 1, projects: "p1-order-flow p1-shortfall", profiles: "full" }
 
-  # e2e-p4..p5 keep the stack they had before step 1.2 (worker and Reverb, `ws` now being its own compose profile)
-  # until their phase plans settle the transport; ADR 0009 has the screens poll unless a WebSocket host exists.
-  # e2e-p2 and e2e-p3 are settled (phase-2-plan.md section 2, phase-3-plan.md section 2, F7): polling, with the worker the queued chains need.
+  # e2e-p5 keeps the stack it had before step 1.2 (worker and Reverb, `ws` now being its own compose profile)
+  # until its phase plan settles the transport; ADR 0009 has the screens poll unless a WebSocket host exists.
+  # e2e-p2, e2e-p3 and e2e-p4 are settled (phase-2-plan.md section 2, phase-3-plan.md section 2, F7, phase-4-plan.md 10.9 item 3): polling, with the worker the queued chains need.
   e2e-p2:
     needs: [status, mod-production, mod-notifications, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 2
@@ -339,12 +340,12 @@ jobs:
     with: { phase: 3, projects: "p3-handover p3-opening-prefill", profiles: "full" }
 
   e2e-p4:
-    # TODO(p4) receipt photos need a file store in e2e: add the `s3` compose profile once compose.yml names an
-    # S3-compatible image that can be pulled (minio/minio no longer can), or keep the local disk as the live host does.
+    # Receipt photos use the local `files` disk here, as on the live host; an S3-compatible store is proved only by the
+    # portability job `files-s3` (phase-4-plan.md 4.2b, 10.9 item 1).
     needs: [status, mod-analytics, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 4
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 4, projects: "p4-pay-photo-split p4-dashboards", profiles: "full,ws" }
+    with: { phase: 4, projects: "p4-pay-photo-split p4-dashboards", profiles: "full" }
 
   perf-dashboards:
     needs: [status, e2e-p4]

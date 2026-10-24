@@ -18,7 +18,7 @@ that mechanical rather than a matter of discipline.
 | Module | `module:<name>` | everything the module owns | the module's job |
 | Gate | `gate:p<N>` + Playwright projects `p<N>-*` | the phase's critical path end to end | `gate-p<N>` job |
 | E2E | Playwright (`apps/web/e2e/p<N>/`) | real browser, real compose stack, several roles in separate contexts | `e2e-p<N>` jobs |
-| Performance | k6 (`perf-dashboards`, Phase 4/5 load) | p95 budgets | gates 4 and 5 |
+| Performance | k6 (`perf-dashboards`, CI compose stack only), timed in-process Pest budgets (`DashboardBudgetGateTest`, `analytics:bench`) | p95 budgets | gates 4 and 5 |
 
 ## Contract tests: the rule that makes dependencies real
 

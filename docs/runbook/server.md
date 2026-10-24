@@ -356,6 +356,43 @@ On the day:
 Decisions that stay with the owner and are asked of the pilot: whether stock may go negative on a count approval (refused by default), whether a sole admin may
 confirm their own count (refused by default), and the push and Telegram keys (the notifications that tell approvers about a count work in the app without them).
 
+## Phase 4: receipt photos and analytics (host checks)
+
+Phase 4 stores receipt photos on the account's private disk and builds summary tables behind the dashboards. The live host has no MinIO,
+no S3 and no Docker; the code talks to a `files` disk (`FILES_DISK`, default the local private folder `storage/app/private/files`), so
+nothing here needs a service that is not installed. The detailed design is in `docs/phases/phase-4-plan.md` (sections 6, 10.1 and 10.9).
+
+### PHP extensions the photo feature needs (check on every host move)
+
+Checked read-only on 2026-10-24: `alt-php83` on this host has `gd` (JPEG, PNG and WebP), `exif`, `fileinfo`, `mbstring`, `zip`, `dom`,
+`xmlwriter`, `xmlreader`, `libxml` and `intl`; it has no `imagick`, and the code does not need it. `gd` is required (the feature is off
+without it); `exif` is optional (a pure PHP fallback reads the orientation). Re-check after any PHP version change or host move, with the
+CLI PHP that the cron and the deploy use:
+
+```
+/opt/alt/php83/usr/bin/php -m | grep -E 'gd|exif|fileinfo|mbstring|zip|dom|xmlwriter|xmlreader|libxml|intl'
+/opt/alt/php83/usr/bin/php ~/bakery-ops.orcamind.dev/artisan files:doctor
+```
+
+`files:doctor` (built in step 4.2a) prints one row per extension and per `gd` capability (JPEG, PNG, WebP, FreeType), the PHP limits
+(`memory_limit`, `upload_max_filesize`, `post_max_size`), free disk space, the size of the files folder, whether the folders are writable,
+and a round trip that re-encodes a generated 3000x2000 JPEG with a planted GPS block and reports whether the metadata is gone. The web
+PHP and the CLI PHP can differ on cPanel (MultiPHP INI Editor, Select PHP Version), so the admin also gets `GET /files/doctor` (step 4.2b):
+compare the two tables after a host change.
+
+### Disk space
+
+Photos are about 180 KB each at 1600 px: 200 digital payments a day is about 1 GB a month. The account's home directory used 961 MB on
+2026-10-24 and `quota -s` reports no quota on this host: read the figure in cPanel (Disk Usage) before the photos grow, and move to an
+S3-compatible disk (`FILES_DISK=files_s3`, Cloudflare R2) before the account passes 70% of its quota or the nightly backup gets slow.
+Unattached uploads are purged after 24 hours (`files:purge-orphans`).
+
+### Dashboards and the cron
+
+`analytics:rebuild`, `analytics:weekly-summary` and `files:purge-orphans` run from the existing `schedule:run` line (section "Cron entries").
+No extra cron entry is needed. k6 is never run against this host; to time the dashboards on the live demo branch use
+`php artisan analytics:bench` (step 4.4d), which makes the same timed calls in process and exits non-zero over budget.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.

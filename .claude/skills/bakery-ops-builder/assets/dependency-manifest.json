@@ -49,13 +49,15 @@
         "BranchScoped trait",
         "DomainEvent base",
         "Live updates (ADR 0009, step 1.2): Live\\Channels registry station.{id} user.{id} branch.{id}.stock branch.{id}.orders; BroadcastsDomainEvent (broadcastWhen false under null/log, nothing queued); ConditionalPoll (ETag, If-None-Match -> 304); OverlapCursor (cursor held back by the overlap window, fingerprint for the ETag, merge by id and version)",
-        "Files::put/signedUrl (Phase 4)",
-        "App\\Shared\\Events namespace for cross-module domain event classes (array payloads), so Notifications and Analytics never import producer modules"
+        "Files::put/signedUrl (Phase 4): a `files` disk, local private on the live host, S3-compatible by configuration (FILES_DISK); EXIF stripped, 1600 px longest side, signed expiring URLs, never a public bucket",
+        "App\\Shared\\Events namespace for cross-module domain event classes (array payloads), so Notifications and Analytics never import producer modules",
+        "LocalDay (Phase 4): inclusive range of local dates in Africa/Addis_Ababa with utcBounds and dayOf, used by every Facts port"
       ],
       "tables": [
         "branches",
         "stations",
-        "idempotency_keys"
+        "idempotency_keys",
+        "stored_files"
       ]
     },
     "audit": {
@@ -206,7 +208,8 @@
         "Reservations::consume(ref, actual[]); consumeMany(refs, production_consume | sale) in one lock pass",
         "Availability::ofProduct(product, location) / bulk(products[], location) (branches on items.fulfilment: to_order = floor(min(available ingredient / qty)), to_stock and bought_in = on_hand of the product at its location)",
         "Locations::forProduct(item) (its order station's location, the display case for counter products), forStation(station), displayCase()",
-        "Phase 2: Purchases::confirm, Transfers::request/confirm, Costs::movingAverage, RecipeCost::rollUp, ReorderRules::evaluate"
+        "Phase 2: Purchases::confirm, Transfers::request/confirm, Costs::movingAverage, RecipeCost::rollUp, ReorderRules::evaluate",
+        "Phase 4: Reversals::of(movementIds, ref) writes one `return` per original and a stock_movement_reversals row, in the Ledger's lock order; Facts::movements/closingBalances/stockOuts/unitCosts"
       ],
       "events": [
         "StockChanged",
@@ -224,7 +227,8 @@
         "item_costs",
         "transfers",
         "reorder_rules",
-        "stock_alert_states"
+        "stock_alert_states",
+        "stock_movement_reversals"
       ]
     },
     "orders": {
@@ -266,7 +270,8 @@
           "live-update events (broadcast companions behind BROADCAST_CONNECTION, polling cursors; ADR 0009)"
         ],
         "payments": [
-          "listens to PaymentRecorded -> markPaidIfSettled"
+          "listens to PaymentRecorded -> markPaidIfSettled",
+          "listens to PaymentVoided -> ReversePayment (Phase 4)"
         ]
       },
       "provides": [
@@ -277,7 +282,7 @@
         "Tickets::since(station, cursor)",
         "Orders::totals(order)",
         "Orders::openAt(station, time)",
-        "Phase 4: Orders::refund(order, reason, pin)"
+        "Orders::refund(order, reason, approver User, lines, dispositions, client_uuid): restock lines write ONE reversing `return` movement per original (via Inventory Reversals), waste/none write none; the approver's PIN is checked by the controller (plan 10.9 item 8)"
       ],
       "events": [
         "OrderSent",
@@ -285,7 +290,8 @@
         "LineReady",
         "LineRejected",
         "OrderPaid",
-        "OrderVoided"
+        "OrderVoided",
+        "OrderRefunded"
       ],
       "tables": [
         "dining_tables",
@@ -309,15 +315,16 @@
       ],
       "needs": {
         "orders": [
-          "Orders::totals(order) -> {total, paid, balance}",
-          "Phase 4: Orders::refund"
+          "Orders::totals(order) -> {total, paid, balance, refunded, net_paid}",
+          "Orders::forPayment(order, lock)",
+          "Phase 4: Orders::refund(order, reason, approver, lines, dispositions, client_uuid)"
         ],
         "identity": [
           "can('payments.take')",
           "verifyPinFor('payments.void')"
         ],
         "shared": [
-          "Files::put (Phase 4)",
+          "Files::put / signedUrl (Phase 4; contract payments->files)",
           "Idempotency"
         ]
       },
@@ -332,11 +339,16 @@
       ],
       "events": [
         "PaymentRecorded",
-        "PaymentVoided"
+        "PaymentVoided",
+        "PaymentVerified",
+        "PaymentDisputed",
+        "RefundPaid"
       ],
       "tables": [
         "payment_channels",
-        "payments"
+        "payments",
+        "receipt_settings",
+        "payment_refunds"
       ]
     },
     "notifications": {
@@ -365,7 +377,10 @@
         "CountSubmitted",
         "VarianceDecided",
         "LineReady",
-        "LineRejected"
+        "LineRejected",
+        "WeeklySummaryReady",
+        "PaymentDisputed",
+        "OrderRefunded"
       ],
       "provides": [
         "Notifier::send(users, type, payload, deepLink)",
@@ -422,7 +437,8 @@
         "Requests::create(product, qty, due, reason)",
         "AutoRequest listener on StockOut (kind=product with non-empty recipe)",
         "Batches::finish(batch, produced, waste) (also confirms where the station needs no overseer)",
-        "Batches::confirm(batch, confirmer) (the overseer sign-off)"
+        "Batches::confirm(batch, confirmer) (the overseer sign-off)",
+        "Phase 4: Facts::batches(range)"
       ],
       "events": [
         "ProductionRequested",
@@ -483,7 +499,8 @@
         "Locks::previousClosing(location)",
         "HashChain::verify(location)",
         "Replay::at(station, time)",
-        "implements StationPresenceResolver (on-shift) and ShiftAttacher"
+        "implements StationPresenceResolver (on-shift) and ShiftAttacher",
+        "Phase 4: Facts::instances(range)"
       ],
       "events": [
         "ShiftOpened",
@@ -513,22 +530,27 @@
         "inventory",
         "shifts",
         "catalog",
-        "shared"
+        "shared",
+        "identity"
       ],
       "read_only": true,
       "needs": {
         "orders": [
-          "Orders\\Facts::sales(range)"
+          "Orders\\Facts::sales(range)",
+          "Orders\\Facts::lines(range)"
         ],
         "payments": [
-          "Payments\\Facts::payments(range)"
+          "Payments\\Facts::payments(range)",
+          "Payments\\Facts::refunds(range)"
         ],
         "production": [
           "Production\\Facts::batches(range)"
         ],
         "inventory": [
           "Inventory\\Facts::movements(range)",
-          "Costs::movingAverage"
+          "Inventory\\Facts::closingBalances(day)",
+          "Inventory\\Facts::stockOuts(range)",
+          "Inventory\\Facts::unitCosts(day)"
         ],
         "shifts": [
           "Shifts\\Facts::instances(range)",
@@ -536,6 +558,15 @@
         ],
         "catalog": [
           "names, categories"
+        ],
+        "identity": [
+          "ActorDirectory::names(ids)"
+        ],
+        "shared": [
+          "LocalDay"
+        ],
+        "notifications": [
+          "event only: WeeklySummaryReady"
         ]
       },
       "provides": [
@@ -546,10 +577,16 @@
         "weekly summary job"
       ],
       "tables": [
+        "analytics_days",
         "daily_sales",
-        "daily_station_metrics",
+        "daily_hour_sales",
+        "daily_channel_totals",
         "daily_item_metrics",
-        "daily_channel_totals"
+        "daily_station_metrics",
+        "daily_user_metrics"
+      ],
+      "event_only": [
+        "notifications"
       ]
     }
   },
@@ -702,7 +739,15 @@
         "Orders::totals returns total, paid, balance as decimal strings",
         "PaymentRecorded with balance zero moves the order to paid and writes sale movements for display-case lines",
         "a payment recorded before the last line is served settles the order, which becomes paid and closed when that line is served",
-        "Phase 4: Orders::refund writes reversing movements referencing originals and leaves originals untouched"
+        "Phase 4 (red until 4.1b, group contract:payments->orders:refund): Orders::refund(order, reason, approver, lines, dispositions, client_uuid) on a closed order writes ONE reversing `return` per restocked line (ref_type stock_movement, ref_id the original, one stock_movement_reversals row), originals byte-identical",
+        "a line refunded as waste or none writes no movement",
+        "a movement is reversed once (409 orders.refund.line_refunded; unique reverses_movement_id)",
+        "refund needs a closed order and a reason; the order stays closed with refunded_total and timeline events; OrderRefunded after commit, never on rollback",
+        "restocking a station line without an open shift is 409 inventory.shift.required and writes nothing",
+        "PaymentVoided on a sent..served order takes the amount out of paid_total and unsettles it; on paid/closed it is refused (payments.void.order_closed)",
+        "part payments leave the order unsettled, the last settles it, display-case lines are sold once",
+        "two payments racing for the last balance: one recorded, one payments.amount.mismatch (fork test, OrdersConcurrencyTest.php)",
+        "Orders::totals also reports refunded and net_paid"
       ]
     },
     "production->inventory": {
@@ -783,9 +828,15 @@
       "phase": 4,
       "file": "apps/api/tests/Contract/Analytics/FactsContractTest.php",
       "cases": [
-        "every Facts port returns stable shapes bucketed by Africa/Addis_Ababa day",
-        "facts exclude voided payments and cancelled orders"
-      ]
+        "one describe per port (Orders sales/lines, Payments payments/refunds, Production batches, Inventory movements/closingBalances/stockOuts/unitCosts, Shifts instances): an empty range is [] (never null)",
+        "stable keys and types: money strings scale 2, quantities scale 4, ids ints, days YYYY-MM-DD",
+        "bucketed by Africa/Addis_Ababa: 23:59:59 local is day D, 00:00:00 local is D+1; both ends of the range inclusive",
+        "each port names its clock (orders settled_at, payments received_at, refunds refunded_at, batches finished_at, movements created_at, shifts opening and lock dates)",
+        "facts exclude voided payments and voided/cancelled/open orders; branch isolation; deterministic (day, id) order",
+        "closingBalances(day) equals Stock::balanceAt(end of local day); unitCosts(day) equals the item_cost_history row in force",
+        "Shifts\\Facts::instances returns a shift once for any range holding a local day of its life (a Night shift)"
+      ],
+      "note": "committed red by 4.1a; the mod-analytics job adds the group to its contracts input in step 4.1c, when the ports exist"
     },
     "shifts->orders": {
       "phase": 3,
@@ -797,6 +848,20 @@
         "oldest sent first, then by order id",
         "another branch's orders are never seen"
       ]
+    },
+    "payments->files": {
+      "phase": 4,
+      "file": "apps/api/tests/Contract/Payments/FilesContractTest.php",
+      "cases": [
+        "Files::put strips EXIF/GPS/ICC (read by an independent JPEG walker), applies orientation, longest side 1600, aspect kept",
+        "a PNG with alpha is flattened and stored as JPEG",
+        "not an image, truncated, 25 MP and over max_bytes are refused with distinct keys and nothing is stored",
+        "signedUrl verifies until its ttl and not after, fails when any parameter changes, never signs another branch's key",
+        "put twice with one client_uuid returns the same row and one object",
+        "nothing is world-readable: private disk outside public/, an unsigned GET is refused",
+        "the key and the signed URL never reach the log"
+      ],
+      "note": "provider is Shared, built in this phase (step 4.2a); written red in 4.1a, run by mod-payments from 4.2a. Not in phases.4.contracts_required: the entry gate requires a contract whose provider is from an earlier phase (Shared, phase 0) to be green at entry; see phases.4.intra_phase_contracts."
     }
   },
   "phases": {
@@ -1203,8 +1268,8 @@
       "entry": [
         "gate-p3 green on main",
         "phase-4-plan.md approved",
-        "contract:payments->orders (refund) and analytics->facts green",
-        "MinIO service in CI"
+        "contract:analytics->facts green (the payments->orders refund cases are required at the consumer's step: their provider Orders is extended in this phase)",
+        "a `files` disk: local private on the live host, S3-compatible by configuration; MinIO only in the portability job files-s3 (step 4.2b)"
       ],
       "contracts_required": [
         "payments->orders",
@@ -1214,12 +1279,12 @@
         {
           "id": "4.1",
           "module": "contracts",
-          "builds": "refund path in tests/Contract/Payments/OrdersContractTest.php, tests/Contract/Analytics/FactsContractTest.php"
+          "builds": "refund path in tests/Contract/Payments/OrdersContractTest.php, payments->files and analytics->facts contract files (red); provider work: Orders::refund, Inventory Reversals, the Facts ports"
         },
         {
           "id": "4.2",
           "module": "shared.files",
-          "builds": "S3 disk (MinIO in CI), signed URLs, EXIF strip, 1600 px max, upload endpoint",
+          "builds": "`files` disk (local private; S3-compatible by FILES_DISK; MinIO only in the files-s3 portability job), signed URLs, EXIF strip, 1600 px max, upload endpoint, files:doctor",
           "pest_groups": [
             "feature"
           ]
@@ -1235,7 +1300,7 @@
         {
           "id": "4.4",
           "module": "analytics",
-          "builds": "daily_sales, daily_station_metrics, daily_item_metrics, daily_channel_totals; Rebuild::day idempotent; triggers ShiftLocked, nightly, on demand; dashboards read summaries only; exports; weekly summary",
+          "builds": "analytics_days, daily_sales, daily_hour_sales, daily_channel_totals, daily_item_metrics, daily_station_metrics, daily_user_metrics; Rebuild::day idempotent; triggers ShiftLocked, nightly, on demand; dashboards read summaries only; exports; weekly summary",
           "pest_groups": [
             "module:analytics"
           ]
@@ -1268,12 +1333,16 @@
         "criteria": [
           "ChannelTotalsEqualPaymentsTest on the seeded day: daily_channel_totals.amount == SUM(payments.amount) WHERE status <> voided per channel; counts equal; daily_sales.revenue == SUM(orders.total) for paid/closed",
           "p4-pay-photo-split: Telebirr with photo + cash remainder; requires_photo blocks completion until a photo is attached",
-          "perf-dashboards (k6) against compose with the 90-day seed: p95 < 1000 ms on every /analytics/* endpoint; p4-dashboards asserts first data under 1000 ms",
+          "timed budget (R-G): DashboardBudgetGateTest in process on the 90-day seed (p95 < 400 ms, at most 8 queries per /analytics/* endpoint) plus analytics:bench; perf-dashboards (k6) on the CI compose stack where Docker exists; Playwright p4-dashboards asserts first data under 1000 ms. k6 never runs against the live host",
           "dashboards hit no raw tables (query log assertion); Rebuild::day run twice yields identical rows"
         ]
       },
       "adrs": [
         "0014-summary-rebuild-semantics"
+      ],
+      "intra_phase_contracts": [
+        "payments->orders",
+        "payments->files"
       ]
     },
     "5": {

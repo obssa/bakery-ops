@@ -36,7 +36,7 @@ and English throughout.
 - **DB**: MariaDB 10.11 on the live host (Laravel `mariadb` driver; CI and local stack use the same image) (the document allows it "if hosting dictates"; ADR 0006), PostgreSQL 16 on a VPS later; schema stays portable: `DECIMAL(12,2)` money, `DECIMAL(14,4)` quantities, JSON columns, triggers, `SELECT ... FOR UPDATE`, no materialized views, no partial indexes. Redis only where available (database drivers on cPanel).
 - **Web**: Next.js 15 App Router, TypeScript strict, Tailwind, shadcn/ui, TanStack Query, Zustand,
   next-intl (`en`, `am`), Workbox service worker, IndexedDB outbox, Noto Sans Ethiopic.
-- **Files**: S3-compatible (MinIO locally and in CI, Cloudflare R2 later).
+- **Files**: a `files` disk behind `FILES_DISK`: local and private on the shared host, S3-compatible (Cloudflare R2, or MinIO in the portability job) later.
 - **Infra**: Docker Compose (`app`, `web` = Caddy, `ws` = Reverb, `worker` = Horizon, `db`, `redis`, `minio`).
   GitHub Actions CI. Sentry. Nightly `pg_dump`.
 - **Where it runs**: https://bakery-ops.orcamind.dev on shared cPanel (MySQL, database drivers, cron queue, polling
