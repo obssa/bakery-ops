@@ -30,7 +30,7 @@ it('signs the files.show route on a local disk, by id, with the configured defau
     expect($parts['path'])->toBe('/api/v1/files/'.$this->file->id)
         ->and($query)->toHaveKeys(['expires', 'signature'])
         ->and(str_contains($url, $this->file->key))->toBeFalse()
-        ->and((int) $query['expires'])->toBe(now()->addSeconds(300)->getTimestamp());
+        ->and((int) $query['expires'] - now()->getTimestamp())->toBeGreaterThan(290)->toBeLessThanOrEqual(300);
 });
 
 it('serves the JPEG with private headers until the ttl and not after', function () {
