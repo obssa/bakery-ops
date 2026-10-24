@@ -22,7 +22,6 @@ use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Orders\Support\LineInput;
 use App\Modules\Payments\Actions\RecordPayment;
 use App\Shared\Actor\ActorContext;
-use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use App\Shared\Values\Quantity;
 use Brick\Math\BigDecimal;
@@ -37,7 +36,7 @@ use LogicException;
  */
 final class DemoOrders
 {
-    public function __construct(private readonly Branch $branch, private readonly DemoShiftFlow $flow) {}
+    public function __construct(private readonly DemoShiftFlow $flow) {}
 
     /**
      * @param  list<array{0: string, 1: string}>  $lines  [SKU, quantity]

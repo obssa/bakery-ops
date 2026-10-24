@@ -31,6 +31,7 @@ use Database\Seeders\Demo\DemoClock;
 use Database\Seeders\Demo\DemoOrders;
 use Database\Seeders\Demo\DemoSeedRefused;
 use Database\Seeders\Demo\DemoShiftFlow;
+use Illuminate\Console\Command;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -64,12 +65,21 @@ final class Phase3Seeder extends Seeder
     /** Station codes in the order they open and close. */
     private const array STATIONS = ['kitchen', 'bar', 'cake_room', 'bakery', 'till'];
 
+    private ?Command $console = null;
+
     private DemoShiftFlow $flow;
 
     private DemoOrders $orders;
 
     /** @var array<string, ShiftTemplate> by name */
     private array $templates = [];
+
+    public function setCommand(Command $command): static
+    {
+        $this->console = $command;
+
+        return parent::setCommand($command);
+    }
 
     /**
      * @throws DemoSeedRefused before anything is written: no demo branch yet
@@ -84,7 +94,7 @@ final class Phase3Seeder extends Seeder
         $previousActor = $actor->toArray();
         $previousQueue = config('queue.default');
         $this->flow = new DemoShiftFlow($branch);
-        $this->orders = new DemoOrders($branch, $this->flow);
+        $this->orders = new DemoOrders($this->flow);
         $this->templates = [];
         $history = DemoClock::anchored();
 
@@ -113,7 +123,9 @@ final class Phase3Seeder extends Seeder
 
     private function say(string $level, string $message): void
     {
-        $this->command?->{$level}($message);
+        if ($this->console instanceof Command) {
+            $this->console->{$level}($message);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------------- templates
@@ -170,6 +182,7 @@ final class Phase3Seeder extends Seeder
             }
         }
 
+        /** @var array<string, ShiftInstance> $shifts */
         $shifts = [];
         foreach ([$d2, $d1] as $date) {
             if ($date === $d1) {

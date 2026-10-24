@@ -185,9 +185,9 @@ final class DemoShiftFlow
     /** @return list<StockCount> the newest revision of each place's count of the type, in place order */
     private function counts(ShiftInstance $shift, ?CountType $type): array
     {
-        return StockCount::query()->where('shift_instance_id', $shift->id)
+        return array_values(StockCount::query()->where('shift_instance_id', $shift->id)
             ->when($type !== null, fn ($q) => $q->where('type', $type?->value))
-            ->orderBy('location_id')->orderBy('id')->get()->all();
+            ->orderBy('location_id')->orderBy('id')->get()->all());
     }
 
     /**
