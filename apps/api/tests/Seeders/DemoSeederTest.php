@@ -16,6 +16,7 @@ use Database\Seeders\Phase0Seeder;
 use Database\Seeders\Phase1Seeder;
 use Database\Seeders\Phase2Seeder;
 use Database\Seeders\Phase3Seeder;
+use Database\Seeders\Phase4Seeder;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
@@ -34,6 +35,7 @@ it('lists the phase seeders that exist, in phase order, up to the requested phas
         ->and(DemoSeeder::seedersUpTo(1))->toBe([Phase0Seeder::class, Phase1Seeder::class])
         ->and(DemoSeeder::seedersUpTo(2))->toBe([Phase0Seeder::class, Phase1Seeder::class, Phase2Seeder::class])
         ->and(DemoSeeder::seedersUpTo(3))->toBe([Phase0Seeder::class, Phase1Seeder::class, Phase2Seeder::class, Phase3Seeder::class])
+        ->and(DemoSeeder::seedersUpTo(4))->toBe([Phase0Seeder::class, Phase1Seeder::class, Phase2Seeder::class, Phase3Seeder::class, Phase4Seeder::class])
         ->and(DemoSeeder::seedersUpTo(5)[0])->toBe(Phase0Seeder::class)
         ->and(DemoSeeder::seedersUpTo(-1))->toBe([]);
     foreach (DemoSeeder::seedersUpTo(5) as $class) {
