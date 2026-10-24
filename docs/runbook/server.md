@@ -173,6 +173,23 @@ A second run writes nothing, not even an audit row or an inbox line (everything 
 changed or cancelled stays. The gate product is the one to show the main flow with: sell the slice at the pad and watch the request
 reach the cake baker's board (on the live host after the cron tick, see "Queued work"). It draws only on stock the earlier phases left,
 and nothing in it holds a secret: the same `BAKERY_DEMO_PASSWORD` as before is all the command needs.
+**Phase 3 (shifts).** `bakery:seed-demo` now ends with `Phase3Seeder` (`--phase=3`, or no `--phase`). What it does depends on the branch, and it says which in its output:
+
+- *A fresh demo branch* (it does not exist yet, or holds no stock movement and no shift): the clock is moved to 05:30 local three days ago before Phase 0 runs, Phases 0 to 2 are seeded
+  there, and `Phase3Seeder` plays two days forward through the code the screens call: the anchor day's carried shifts are closed and locked; D-2 and D-1 each get a Day shift per
+  station (counted from the previous locked closing), waste, a transfer from the store and three cash orders paid in the till's shift, closings, and the bakery's Night shift
+  (planned with the bread baker, started 22:05 on D-2, closed 05:55 on D-1). Planned differences, decided by the manager as the second person: 500 g of flour in the kitchen (D-2), 3 loaves
+  over at the bakery (D-1), 20.00 short in the till's drawer (D-1). The bar's closing of D-1 (250 ml of milk short) is left **pending approval** for the admin's first demo. Today every
+  station has an open shift opened from yesterday's locked closing (the bar's started without counting, because of the pending closing; the till's drawer is declared), a handover note
+  from the chef is on the kitchen, and there are the Day and Night templates, the roster and the five variance reasons. About a minute on a developer PC. The real clock is put back
+  afterwards; nothing is dated in the future.
+- *A branch that already holds movements* (the live demo bakery, loaded on Phases 0 to 2 on 2026-10-21/22): **no history is written**. The ledger is append-only and rows backdated under rows it
+  has already shown would rewrite what it showed, so the command does only the "today" part: the templates, the five reasons, the roster, today's shifts for a station with none running
+  (counted from the current ledger, the till's drawer declared) and the kitchen's note, and prints "history not written". Earlier phases' seeders run first as they always do:
+  `DemoShifts` opens a carried shift at any tracked station without one, and Phase 1 adds the new day's seven sample orders. No row is dated before the newest movement that was there.
+  For the full history load a **new** demo branch: `php artisan bakery:seed-demo --force --branch="Demo Bakery 2"`.
+- A second run writes nothing either way. Running it on the live demo branch is the owner's decision (the report lists it).
+
 Nothing secret is printed or stored: the password is never shown, and the sample orders carry made-up tables and
 products only. Never run it with `--branch` pointing at the "E2E Test Branch" or at shop data (a branch that is not a
 demo branch is refused anyway). `--branch="<name>"` loads a second, separate demo
@@ -276,7 +293,68 @@ anyway, so this is a convenience, not a safety. `CI` proves both sides: every jo
 
 **What staff see after the flip.** A station that tracks shifts must have a shift started from the shift bar (Start shift) before orders are taken, stock moves or
 a baker confirms a batch there; the till needs its shift for cash. The demo bakery (branch 2) has no open shifts until someone starts them, or until `bakery:seed-demo`
-is run again (it opens carried shifts at every tracked demo station); that decision is the owner's, not part of the flip.
+is run again (it opens carried shifts at every tracked demo station and does only today's part of Phase 3, see "Demo bakery"); that decision is the owner's, not part of the flip.
+
+## Nightly chain verification (Phase 3)
+
+Every locked count is a link in the hash chain of its place (ADR 0012). The scheduler runs `php artisan shifts:verify-chain` every day at 03:00
+Africa/Addis_Ababa (`routes/console.php`, `withoutOverlapping`; it needs only the `schedule:run` cron entry above). For every branch and every place it
+checks the numbering, the previous hash, the hash and that the stored bytes are what the live rows produce today. It prints and logs one line per place
+with the **head hash** (`storage/logs/laravel-*.log`, message `shifts:verify-chain`, context `branch_id, location_id, checked, head_hash, ok`), and for every
+break it dispatches one `ChainBroken` notification (critical: the admins and every `shifts.replay` holder, in the app, by push and by Telegram where
+those are on, deep link `/admin/shifts?location=<id>`). Exit code 0 is a clean run, 1 a break, 2 an unknown `--branch`.
+
+- Run it by hand: `cd ~/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan shifts:verify-chain` (add `--branch=<id>`).
+- One place: `GET /api/v1/locations/{id}/chain/verify` (admin screen: Shifts, the place's chain card) answers `{ok, checked, head_hash, failures}`.
+- **Keep the head hashes.** A chain cut at its newest end still verifies; only a head hash kept elsewhere tells. The nightly log lines are that record
+  on the server; copy a week of them to the owner's records each Monday during the pilot (Phase 4 puts them in the weekly summary).
+
+### When the chain reports a break
+
+A break means a stored count, its lines or its cash declaration no longer match the hash that sealed them, or a link is missing. Do not "repair" it and do not
+recompute a hash.
+
+1. Read the notification or the command output: it names the place, the link (`chain_seq`), the count and the kind. `gap`: a link is missing from the
+   numbering. `previous_mismatch`: the link does not point at the hash before it. `hash_mismatch`: the stored hash is not the hash of the stored bytes.
+   `payload_mismatch`: the stored bytes are no longer what the live rows produce (a line, note, reason, figure or the cash declaration was changed after the lock).
+   One tampered link names itself and the link after it, nothing more.
+2. Look at the count on the admin Shifts screen (the locked count shows its hash and its decisions) and at the audit log around the count's `locked_at`.
+   Ask who had database access. An application bug is as likely as a person: check the deploys since the last clean night (`gh run list`, the release log).
+3. Compare the head hash with the last clean night's line in the log (and the copy in the owner's records). If the break is at the newest links only, the head
+   differs; if it is in the middle, links after it are still intact.
+4. **Fixing a wrong figure is an unlock, not an edit.** The admin unlocks the count with a reason (`POST /stock-counts/{count}/unlock`): the old link stays and
+   keeps verifying, the revision is counted again, approved by a second person, and becomes the next link. A tampered link itself is not unlocked: restore the
+   rows from the last backup taken before the break, verify again, and record what happened.
+5. Until it is explained, treat the place's counts since the break as unconfirmed; stock itself is the ledger, which is append-only and has its own triggers, so
+   shifts and sales carry on. Record the break, the cause and the fix in the pilot log (`docs/phases/phase-3-pilot-feedback-template.md`).
+
+## Pilot day-one checklist (Phase 3)
+
+Before the first shift, on https://bakery-ops.orcamind.dev/app/ as the admin:
+
+- [ ] Every person has an account with the right role and a short code, and is assigned to the stations they work at with **can count** on (the cake baker is also
+      flagged **overseer** at the bakery, which requires a second person for its counts; the cake room requires one too, co-signed by the admin or manager).
+- [ ] The store tracks no shifts (`select code, tracks_shifts from stations` over SSH: the store is `false`, every other station `true`).
+- [ ] Templates exist under Shifts, Templates: Day 06:00-14:00 at the till, kitchen, bar, cake room and bakery, Night 22:00-06:00 at the bakery (the demo seeds these;
+      on the shop branch create them). A station with no template simply starts ad hoc, dated by the local day.
+- [ ] The till has a **cash drawer** location (Locations) and the denominations in `config/shifts.php` match the notes and coins in use (ETB 200, 100, 50, 10, 5, 1
+      and 0.50, 0.25, 0.10, 0.05).
+- [ ] Variance reasons are the five (spoilage, breakage, miscount, theft suspected, other + note); edit the Amharic wording with the staff.
+- [ ] Stock is on the ledger at every station (the first opening count compares against it); a first opening of a drawer has no expected figure and is taken as counted.
+- [ ] The cron entries are running (`schedule:run` and `queue:work`); `storage/logs` shows last night's `shifts:verify-chain` lines; the kill switch has been rehearsed once on
+      a staging copy or read through (above).
+- [ ] The tablet at each station is signed in as its station account and the pad idles to its lock screen after 60 s.
+
+On the day:
+
+- [ ] Each station starts its shift (Start shift on the shift bar) and makes the opening count: "Nothing changed" where it is true, a reason where it is not. The cashier declares the drawer.
+- [ ] A late baker who accepts a request at a closed station gets a call-in shift: check it on Shifts and close it at the end of the day.
+- [ ] At the end: Close shift at every station, closing counts, the cashier's cash declaration with the float that stays; the manager or admin approves what differs (never the person who counted); locked counts show their hash.
+- [ ] Next morning: the nightly run was clean; the pending approvals queue is empty; the next opening counts are prefilled from the locked closings.
+- [ ] Write the day's notes in `docs/phases/phase-3-pilot-feedback-template.md`.
+
+Decisions that stay with the owner and are asked of the pilot: whether stock may go negative on a count approval (refused by default), whether a sole admin may
+confirm their own count (refused by default), and the push and Telegram keys (the notifications that tell approvers about a count work in the app without them).
 
 ## Manual operations
 

@@ -1259,7 +1259,7 @@ live ledger in a state where a shift can be opened only through the API.
        short; the review refuses until a reason is chosen; a note is written and the count handed in. The admin finds it in the queue, sees the line
        side by side, approves; the page shows the locked count's fingerprint; the API shows one `count_adjustment` equal to the variance on that line and
        `chain/verify` ok with the head equal to the count's hash. The chef starts the next shift: the handover panel shows the note and the fingerprint, the
-       opening line carries the locked figure, "Nothing changed", submit, the shift is open. Test 2 stays a `test.fixme` with its TODO(p3) marker for 3.7d.
+       opening line carries the locked figure, "Nothing changed", submit, the shift is open. Test 2 stays a `test.fixme` with its phase-3 to-do marker for 3.7d.
        The support helpers got sturdier (`finishDrafts`: a draft made before an item was stocked gets that item added, a line left unexplained goes back to
        the ledger figure; `resolvePendingCounts` approves what an earlier run left waiting; `settleStation` calls it first), because one count waiting at a
        place blocks the next count there and a failed live run would otherwise poison the E2E branch.
@@ -1367,6 +1367,39 @@ live ledger in a state where a shift can be opened only through the API.
    checklist), `domain-model.md`, `dependency-graph.md`, `invariants.md`, `traps.md`, `testing-strategy.md`, `ci-cd.md`,
    `workflows-and-screens.md` and the phase reference corrected where this plan departs, the `gate:p3` tests, the pilot feedback
    template (`docs/phases/phase-3-pilot-feedback-template.md`), the gate report, STATUS `claim-done`.
+   - **As built (step 3.8, `phase-3/gate`).** Commits: `Phase3SeederTest` red first, then the seeder, the gate tests, the ADRs and references, the runbook and the pilot
+     template, the report and STATUS (`docs` done, phase 3 `gate_pending`; `claim-done` is the orchestrator's). No route, table or permission changed, so `docs/openapi.json` and
+     `docs/erd.dbml` are unchanged and in sync. Where the build settled what section 8 left open or got wrong:
+     - **The anchor decides on the branch, not on shifts alone.** Section 8 asked "does the demo branch already have any shift instance"; the live demo has none and holds Phase 0-2 movements, so
+       that test would have anchored it and backdated history under rows the ledger has shown. `Demo\DemoClock::wantsAnchor` anchors only when Phase 3 is requested **and** the demo branch does not
+       exist yet or holds neither a stock movement nor a shift. `DemoSeeder::run` and `SeedDemoCommand` both run the seeders inside `DemoClock::around`. On any other branch the clock is never touched
+       and `Phase3Seeder` writes no history, does the "today" part and prints `history not written` with the reason. Tested: seed Phases 0-2, travel a day, `bakery:seed-demo --phase=3`, nothing
+       older than the newest movement, no closing count, no `count_adjustment`.
+     - **Sample orders are keyed by the real day.** Phase 1 keyed its orders by the local date of "now", which on an anchored branch is three days ago, so a second run on the same real day would have
+       added seven new orders and "a second run writes nothing" would have failed. `Phase1Seeder` now takes the key date from `DemoClock::dayKey` (the real day while anchored, else today as before); a run
+       on a later day still adds that day's orders.
+     - **The history as written.** Anchor day D-3 05:30 local (Phases 0-2), closed and locked 21:30; D-2 and D-1: Day shifts started 06:02 (inside the template window), waste 07:30, a transfer from
+       the store 08:30 (oil to the kitchen on D-2, sugar to the bar on D-1), three cash orders (09:40, 10:50, 12:10) through the new `Demo\DemoOrders` (pad, stations, serve, pay with tender and change), the
+       kitchen note 13:30 on D-1, closings 14:05; the bakery Night shift is scheduled on D-2 by the admin with the bread baker on its roster, started 22:05 and closed 05:55. Planned differences as in
+       section 8 (500 g of flour, +3 of the first product with stock at the bakery, 20.00 short in the drawer, 250 ml of milk pending). 21 shifts in all (15 locked, 1 pending approval, 5 open). A decision is
+       always at least two minutes after the snapshot it decides on (`DemoClock::tick`), so `balanceAt(snapshot_at)` never includes the count's own adjustment.
+     - **Today's shifts are planned on the Day template and started by the admin** (`start` with the scheduled instance and `force`), whatever hour the seed runs: starting by the window would pick
+       the Night template and yesterday's date for the bakery before 06:00. The station's worker makes the opening count and declares the drawer (the float the last closing left); the bar starts
+       carried while its closing waits. Every station worker joins the roster.
+     - **`DemoOrders` and `DemoShiftFlow` are new; `Phase1Seeder` was not refactored to share code with them** (a pure extraction would touch a seeder whose behaviour two gates depend on; the duplication
+       is the order walk of about 40 lines).
+     - **Not every seeded row carries a shift id.** The assertion "every seeded movement is inside a shift" holds for what people do at a station (waste, sales, consumption, count adjustments); a purchase
+       into the store, a transfer leg and a reservation are exempt by rule E1 or sit at an untracked place, and keep a null shift (ADR 0013, as built).
+     - **Gate tests.** Existing tests tagged `gate:p3` in place: `HashChainTest` (the tamper cases), `ShiftAttributionTest`, `PresenceResolverSwapTest`, `ReplayPropertyTest` (random histories),
+       `LedgerEnforcementTest`'s matrix, `CashDeclarationTest`, `ReplayEndpointTest`, `CountStatusTest`, `ShiftStatusTest`, `ShiftWindowTest` (the cross-midnight table) and `CashMathTest`. New in `tests/Gate/`:
+       `EnforcementDefaultGateTest` (the shipped defaults through HTTP: refused without a shift, allowed in one, refused while counting, the store never asked) and `ReplaySeededHistoryTest` (the seeded
+       half of the replay property: every tracked station at the midpoints and at every closing's snapshot, balances against an independent fold, the held shift, the people on duty and the last link).
+       The plan's `Phase3StateMachinesTest`, `CrossMidnightGateTest`, `CashDeclarationGateTest`, `HandoverGateTest`, `Phase3ActorGateTest` are not separate files: the state-machine, window and cash tables
+       exist as the unit and feature tests above, and the handover path is `p3-handover` itself.
+     - **ADRs 0012 and 0013 accepted**, each with an "As built" section; ADR 0012's file is `0012-hash-chain-canonical-json.md` (the manifest's name; it was written as `...-and-canonical-json`).
+       Dated notes on 0008, 0009 and 0010. The Phase 3 to-do marker of the 3.7b note is reworded (the gate forbids the literal).
+     - **Docs.** Runbook: the Phase 3 demo paragraph (fresh branch versus the live one), "Nightly chain verification" with what to do on a break, the pilot day-one checklist; references corrected
+       (domain-model tables and state machines, dependency-graph, invariants, traps, testing-strategy, ci-cd, workflows-and-screens, the phase reference with an as-built list); the pilot feedback template.
 
 As-built notes are appended under each step as the build runs, as in Phases 1 and 2.
 

@@ -113,16 +113,19 @@
       ]
     },
     "3": {
-      "status": "in_progress",
+      "status": "gate_pending",
       "plan": "docs/phases/phase-3-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
-      "report": null,
+      "report": "docs/phases/phase-3-report.md",
       "gate_job": "gate-p3",
       "gate_run_url": null,
       "done_commit": null,
       "done_at": null,
-      "adrs": [],
+      "adrs": [
+        "0012-hash-chain-canonical-json",
+        "0013-shift-attribution-rules"
+      ],
       "adr_waiver": null,
       "contracts_required": [
         "shifts->inventory",
@@ -138,7 +141,7 @@
         "shifts.cash": "done",
         "shifts.handover": "done",
         "web": "done",
-        "docs": "todo",
+        "docs": "done",
         "shifts": "done"
       },
       "playwright_projects": [
