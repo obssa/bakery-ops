@@ -21,7 +21,7 @@ $allowed = [
     'Notifications' => ['Identity', 'Audit'],
     'Payments' => ['Orders', 'Identity', 'Audit'],
     'Shifts' => ['Inventory', 'Identity', 'Payments', 'Orders', 'Catalog', 'Audit'],
-    'Analytics' => ['Orders', 'Payments', 'Production', 'Inventory', 'Shifts', 'Catalog'],
+    'Analytics' => ['Orders', 'Payments', 'Production', 'Inventory', 'Shifts', 'Catalog', 'Identity'],
 ];
 
 foreach ($allowed as $module => $may) {
@@ -209,3 +209,38 @@ arch('no module but Analytics imports Shifts, and Shared never does: the ledger 
     ->expect(['App\Modules\Identity', 'App\Modules\Catalog', 'App\Modules\Inventory', 'App\Modules\Orders', 'App\Modules\Payments', 'App\Modules\Production', 'App\Modules\Notifications', 'App\Modules\Audit', 'App\Shared'])
     ->not->toUse('App\Modules\Shifts')
     ->group('arch', 'module:shifts');
+
+/*
+ * Analytics (step 4.4a on) reads the other modules ONLY through provider-owned Facts ports (phase-4 plan section 2): the `Facts`
+ * class and its readonly row classes (`*Fact`) in each provider's Contracts, plus Catalog\Contracts\* (names and categories) and
+ * Identity\Contracts\ActorDirectory (names of users; it arrives in step 4.5a, allowed from now), and Shared. Everything else of a
+ * provider is forbidden: models, actions, support, enums, HTTP, and every other Contracts class. The lists are read from the
+ * directories on disk, so a class added to a provider later is covered without touching this file. Vacuous until the module exists.
+ */
+$analyticsForbidden = function () use ($providerInternals): array {
+    $forbidden = [];
+    foreach (['Orders', 'Payments', 'Production', 'Inventory', 'Shifts', 'Catalog', 'Identity', 'Notifications', 'Audit'] as $module) {
+        $forbidden = array_merge($forbidden, $providerInternals($module));
+        $contracts = glob(dirname(__DIR__, 2).'/app/Modules/'.$module.'/Contracts/*.php') ?: [];
+        foreach ($contracts as $file) {
+            $class = basename($file, '.php');
+            $isFactsPort = $class === 'Facts' || str_ends_with($class, 'Fact');
+            $allowed = match ($module) {
+                'Catalog' => true,
+                'Identity' => $class === 'ActorDirectory',
+                'Notifications', 'Audit' => false,
+                default => $isFactsPort,
+            };
+            if (! $allowed) {
+                $forbidden[] = 'App\Modules\\'.$module.'\Contracts\\'.$class;
+            }
+        }
+    }
+
+    return $forbidden;
+};
+
+arch('Analytics uses only Facts ports (and their rows), Catalog Contracts, Identity ActorDirectory and Shared: no model, action, support, enum or other Contracts class of a provider')
+    ->expect('App\Modules\Analytics')
+    ->not->toUse($analyticsForbidden())
+    ->group('arch', 'module:analytics');

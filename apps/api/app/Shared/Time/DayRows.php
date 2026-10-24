@@ -54,4 +54,14 @@ final class DayRows
     {
         return $at->utc()->format('Y-m-d H:i:s');
     }
+
+    /** A DATETIME read from the database (UTC text) as ISO-8601 with a Z, null stays null. */
+    public static function iso(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return CarbonImmutable::parse((string) $value, 'UTC')->format('Y-m-d\TH:i:s\Z');
+    }
 }

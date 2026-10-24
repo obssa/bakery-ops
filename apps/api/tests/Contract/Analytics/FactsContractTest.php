@@ -15,10 +15,13 @@ use App\Modules\Orders\Models\Order;
 use App\Modules\Payments\Contracts\Facts as PaymentFacts;
 use App\Modules\Payments\Models\Payment;
 use App\Modules\Production\Contracts\Facts as ProductionFacts;
+use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
+use App\Modules\Production\Models\ProductionRequest;
 use App\Modules\Shifts\Contracts\Facts as ShiftFacts;
 use App\Modules\Shifts\Enums\ShiftStatus;
 use App\Modules\Shifts\Models\ShiftInstance;
+use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use App\Shared\Time\LocalDay;
@@ -150,8 +153,9 @@ it('Payments\Facts::refunds: bucketed by refunded_at; empty is []; a refund read
     $order = $f->send([$m->line($m->croissant)]);
     $f->act('served', $f->lineOf($order, $m->croissant)['id'], $f->waiter)->assertOk();
     $payment = Payment::factory()->create(['branch_id' => $f->branch->id, 'order_id' => $order['id'], 'amount' => $order['totals']['total'], 'received_at' => $this->lastSecond]);
-    app(Orders::class)->refund($order['id'], 'test', $f->manager, [], [], (string) Str::uuid());
-    $orderRefundId = (int) DB::table('order_refunds')->where('order_id', $order['id'])->value('id');
+    // Orders::refund and `order_refunds` arrive with step 4.1b (on hold); this port reads only the money side, and `order_refund_id` has
+    // no foreign key until 4.1b adds it, so a plain id stands in. 4.1b swaps this for the real refund (the expectations do not change).
+    $orderRefundId = 1;
     DB::table('payment_refunds')->insert([
         'branch_id' => $f->branch->id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $order['id'], 'order_refund_id' => $orderRefundId,
         'payment_id' => $payment->id, 'channel_id' => $payment->channel_id, 'amount' => $order['totals']['total'], 'refunded_by_user_id' => $f->manager->id,
@@ -168,9 +172,12 @@ it('Payments\Facts::refunds: bucketed by refunded_at; empty is []; a refund read
 
 it('Production\Facts::batches: bucketed by finished_at, only finished or confirmed batches, quantities at scale 4', function () {
     expect(factRows((new ProductionFacts)->batches($this->both)))->toBe([]);
-    $late = ProductionBatch::factory()->finished()->create(['branch_id' => $this->branch->id, 'finished_at' => $this->lastSecond]);
-    $early = ProductionBatch::factory()->finished()->create(['branch_id' => $this->branch->id, 'finished_at' => $this->firstSecond]);
-    ProductionBatch::factory()->create(['branch_id' => $this->branch->id]); // still started
+    // one cake room for the three requests (the factory would make a second station with the same code per branch)
+    $station = Station::factory()->forCode(StationCode::CakeRoom)->create(['branch_id' => $this->branch->id]);
+    $request = fn (): int => ProductionRequest::factory()->status(RequestStatus::InProgress)->create(['branch_id' => $this->branch->id, 'station_id' => $station->id])->id;
+    $late = ProductionBatch::factory()->finished()->create(['branch_id' => $this->branch->id, 'request_id' => $request(), 'finished_at' => $this->lastSecond]);
+    $early = ProductionBatch::factory()->finished()->create(['branch_id' => $this->branch->id, 'request_id' => $request(), 'finished_at' => $this->firstSecond]);
+    ProductionBatch::factory()->create(['branch_id' => $this->branch->id, 'request_id' => $request()]); // still started
 
     $rows = factRows((new ProductionFacts)->batches($this->both));
 
