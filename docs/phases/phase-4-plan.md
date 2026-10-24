@@ -390,6 +390,34 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `files.upload` routes answer `503 files.unavailable` (the doctor says so first). Tests: `ImageProcessorTest` (orientation 1..8 fixtures made by injecting APP1 blocks
      into a generated JPEG, EXIF and GPS gone, ICC gone, 1600 px, no enlarge, alpha flatten, truncated and polyglot files refused), `ExifOrientationFallbackTest`,
      `FilesPutTest`, `SignedUrlTest`, `FilesDoctorTest`, `FilesCreateNoPublicPathTest`, `DeployableCachesTest` (config cached with and without `FILES_DISK`).
+   - **As built (step 4.2a, `phase-4/files-core`).** Order: the manifest move, the tests (red), then `ExifOrientation`, `ImageProcessor`, `Files`, `StoredFile`, M1, the disks, the
+     doctor, the signed route, lang, ERD, runbook. Where the code disagreed with the plan or the plan left a choice:
+     - **One route is registered now: `GET /api/v1/files/{file}` (`files.show`)**, loaded by `SharedServiceProvider` from `routes/modules/files.php`, middleware `api` + `signed`, served by
+       `Shared\Files\Http\ServeFile` (headers as section 4.1). The contract test fetches the signed URL, so the URL level alone was not enough. It is listed in `tests/Support/public_routes.php` and
+       `PUBLIC_ROUTES` of `scripts/check_invariants.py` already; 4.2b adds the other four routes around it and need not touch these lists for it. A bad or expired signature answers
+       `403 files.invalid_signature` (bilingual, a render in `bootstrap/app.php`); a deleted row or missing object is `404`.
+     - **Error keys.** `FilesError::KEYS`: `files.not_an_image`, `truncated`, `too_many_pixels` (`{max_pixels}`), `too_large` (`{max_bytes}`), `unsupported_type` (a GIF, or WebP when `gd` lacks it),
+       `unavailable` (503, no `gd`), `processing_failed` (500, the re-read failed) and `invalid_signature`. The plan's `files.missing` belongs to the 4.2b request validation.
+     - **Refusal order** (header first, before anything is decoded): not an image, unsupported type, pixels, bytes, then the whole-file check (a JPEG must end at its EOI, a PNG at `IEND`, a WebP at its
+       RIFF size; anything non-zero after the end is `files.not_an_image`, the polyglot case), then decode (a decoder warning is `files.truncated`). Pixels come before bytes because a flat 25 MP photo is small in bytes.
+       The byte limit lives in `ImageProcessor` (`maxBytes`), not in `Files`.
+     - **GD writes a `CREATOR` comment** (libgd's COM segment) next to the JFIF header, so the encoder alone does not leave "no metadata". `ImageProcessor::scrub` drops every COM and APP1 to APP15 segment
+       before the scan; the re-read then checks that none of them is left.
+     - **EXIF orientation** is read from a `php://memory` stream by `exif_read_data` when the extension is there (a `data://` URL needs `allow_url_fopen`, which a shared host may switch off), and by
+       `ExifOrientation::fromJpeg` otherwise or when the extension finds no tag. Orientations 1 to 8 are tested through both readers.
+     - **`Files`**: `put` is idempotent on `(branch_id, client_uuid)` and checks that first (a second call is not even decoded); the object is written first and removed again if the row cannot be saved
+       (a lost race on `client_uuid` returns the winner's row). `delete` removes the object **and** soft-deletes the row (the 4.2b purge calls it; the plan said the object goes only with the purge, which is
+       still the only caller). `signedUrl` takes the disk from the row, not from `config('files.disk')`. `StoredFile` hides `key` and `sha256` from any serialised form. `stream` returns a read resource.
+     - **M1** is `2026_10_29_100100_create_stored_files_table`; the foreign key `payment_refunds.proof_file_id` is `2026_10_29_100200_add_payment_refunds_proof_file_foreign_key` (an `ALTER` of the empty table).
+       `stored_files` moved from `tables_phase_4` to `tables` in the manifest; the ERD has it. The actor stamp columns are nullable (the doctor and seeders have no actor).
+     - **Disks and config.** `files` has `serve => false` as well as `visibility private`, `throw true`; `files_s3` uses the existing `AWS_*` variables and no `url`. `league/flysystem-aws-s3-v3` is pinned at `3.35.3`
+       (exact, like `web-push`) and is used by `SignedUrlTest` (a presigned URL needs no network) and, in 4.2b, the MinIO job. `config/files.php` keeps plain values (comment updated).
+     - **Dockerfile**: `libwebp-dev`, `--with-webp`, `exif` in the extension list. Nothing is fetched. Locally the image was not rebuilt (the running dev image has no `exif`; the exif-agreement tests report "risky" there and
+       run in CI), and the lock was updated but `composer install` could not download the new packages while GitHub was unreachable, so `SignedUrlTest`'s S3 case ran in CI only.
+     - **`files:doctor`** is `App\Shared\Files\Doctor` (rows `check`, `status`, `detail`, also the data 4.2b's `GET /files/doctor` returns) plus `App\Console\Commands\FilesDoctorCommand`; exit 1 when a row is `missing`.
+       `exif`, WebP, FreeType, a low `memory_limit` and a missing `storage/fonts` are `warn`. The runbook says how to read it.
+     - **CI**: `contract:payments->files` is added to `mod-payments`; the unit and `module:shared` tests run in the foundation job. `DeployableCachesTest` caches the config with `FILES_DISK` unset and `files_s3`.
+     - STATUS: `shared.files` is `in_progress` (it goes `done` with 4.2b).
    - **4.2b `phase-4/files-api`**: `POST /files`, `GET /files/{file}/url`, `GET /files/{file}` (signed), `DELETE`, `GET /files/doctor`, `files:purge-orphans`; `files.upload` and
      `payments.view` permissions (M2); the multipart branch of `Idempotency`; log scrub (a Monolog processor removes `signature=` and `expires=` from any logged URL and
      never logs a key); `FilesNoPublicAccessTest` (the object path is not under `public/`, `public/storage` has no `files`, a plain GET of `/files/{id}` without signature is 403);
