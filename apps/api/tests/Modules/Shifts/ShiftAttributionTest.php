@@ -27,6 +27,8 @@ function startShiftAs(object $test, object $person, object $station): int
 }
 
 it('stamps orders, payments and the movements they make with the shift running at the till, and nothing before it', function () {
+    // these cases are about what a shift stamps, and start from stations nobody has opened (the floors open them when a rule is on, the default since step 3.7e)
+    config(['ledger.require_shift_for_station_locations' => false, 'payments.require_shift_for_cash' => false, 'shifts.open_ad_hoc_on_accept' => false]);
     $f = OrderFloor::open($this);
     $m = $f->menu;
     $f->assign($f->waiter, $m->tillStation);
@@ -64,6 +66,8 @@ it('stamps orders, payments and the movements they make with the shift running a
 });
 
 it('stamps a production request made while the cashier\'s shift runs, and a request made before it carries none', function () {
+    // these cases are about what a shift stamps, and start from stations nobody has opened (the floors open them when a rule is on, the default since step 3.7e)
+    config(['ledger.require_shift_for_station_locations' => false, 'payments.require_shift_for_cash' => false, 'shifts.open_ad_hoc_on_accept' => false]);
     $branch = actInBranch(Branch::factory()->create());
     $f = ProductionFixture::build($branch);
     $ask = function ($product) use ($f): int {
@@ -84,6 +88,8 @@ it('stamps a production request made while the cashier\'s shift runs, and a requ
 });
 
 it('stamps nothing for a person whose station has no running shift, even when another station does', function () {
+    // these cases are about what a shift stamps, and start from stations nobody has opened (the floors open them when a rule is on, the default since step 3.7e)
+    config(['ledger.require_shift_for_station_locations' => false, 'payments.require_shift_for_cash' => false, 'shifts.open_ad_hoc_on_accept' => false]);
     $branch = actInBranch(Branch::factory()->create());
     $f = ProductionFixture::build($branch);
     startShiftAs($this, $f->baker, $f->cakeRoomStation);

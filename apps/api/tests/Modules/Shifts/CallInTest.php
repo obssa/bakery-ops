@@ -21,6 +21,8 @@ pest()->group('module:shifts', 'feature');
  */
 
 beforeEach(function () {
+    // the call-in cases start from a cake room nobody has opened (the floor opens one when the ledger rule is on, the default since step 3.7e); each case sets the call-in flag itself
+    config(['ledger.require_shift_for_station_locations' => false, 'payments.require_shift_for_cash' => false]);
     $this->branch = actInBranch(Branch::factory()->create());
     $this->f = ProductionFixture::build($this->branch);
     $this->f->stockCakeRoom();
