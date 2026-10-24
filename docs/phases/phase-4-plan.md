@@ -299,6 +299,9 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
        The nine new `payments->orders` cases carry only `contract:payments->orders:refund` (8 red; the part-payment case passes because it pins existing behaviour),
        which no job runs; `FilesContractTest` carries `contract:payments->files` (8 of 8 red, class `App\Shared\Files\Files` missing), run by `mod-payments` from 4.2a.
        `OrdersConcurrencyTest` (case 12, two forked tills paying the last balance) **passes now**: Orders has locked `forPayment` since step 1.4; it pins the promise.
+     - **New tables of earlier-phase modules are not in `modules.<m>.tables` yet.** `gate_check --mode done` for phases 0 to 3 requires the ERD to cover every listed table, and
+       `stored_files`, `stock_movement_reversals`, `receipt_settings` and `payment_refunds` do not exist. They sit under `tables_phase_4` and move to `tables` in the PR that
+       migrates each (4.1c, 4.2a, 4.3a/4.3d). The analytics tables are listed at once: their module's phase is 4. (gate-p0 caught this on the first push.)
      - **`payments->files` is not in `phases.4.contracts_required`.** The entry script requires every listed contract green when its provider is from an earlier phase,
        and Shared is phase 0. The manifest lists it under `contracts` and under a new `phases.4.intra_phase_contracts` (`payments->orders`, `payments->files`).
      - **`Orders::refund` signature pinned:** `refund(int $orderId, string $reason, User $approver, array $lines, array $dispositions, string $clientUuid): void`; lines are

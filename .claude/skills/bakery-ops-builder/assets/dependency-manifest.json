@@ -56,7 +56,9 @@
       "tables": [
         "branches",
         "stations",
-        "idempotency_keys",
+        "idempotency_keys"
+      ],
+      "tables_phase_4": [
         "stored_files"
       ]
     },
@@ -227,7 +229,9 @@
         "item_costs",
         "transfers",
         "reorder_rules",
-        "stock_alert_states",
+        "stock_alert_states"
+      ],
+      "tables_phase_4": [
         "stock_movement_reversals"
       ]
     },
@@ -346,7 +350,9 @@
       ],
       "tables": [
         "payment_channels",
-        "payments",
+        "payments"
+      ],
+      "tables_phase_4": [
         "receipt_settings",
         "payment_refunds"
       ]
