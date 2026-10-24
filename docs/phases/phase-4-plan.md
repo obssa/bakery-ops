@@ -31,7 +31,27 @@ dashboards, Excel/PDF exports and a Monday summary, plus the order timeline with
 
 ## 1. Entry check
 
-Entry check: see "As built (step 4.1a)" under section 6, item 1, where its summary lines are pasted as run.
+`python scripts/gate_check.py --mode entry --phase 4`, run by step 4.1a (2026-10-24) on the Docker stack. Summary lines of the run with the tests, taken
+before the approval commit (so `clean working tree` and `plan approved` failed then, for that reason only), and of the run after the commits with
+`--no-tests` (the structure lines):
+
+```
+[PASS] phase 3 done                      status=done done_commit=3b37a697ad3e26b8547eafdda55837670dda6044
+[PASS] phase 3 commit in history         3b37a697ad3e is an ancestor of HEAD
+[PASS] gate:p3 green                     group gate:p3: 197 passed (9382 assertions)
+[PASS] clean working tree / plan approved by Ramin / approval author   (after the commits)
+[PASS] contract payments->orders file/first/green   group contract:payments->orders: 5 passed (79 assertions)
+[PASS] contract analytics->facts file / first        FactsContractTest.php; consumer unchanged since previous gate
+[FAIL] contract analytics->facts green   group contract:analytics->facts failed: 10 failed (0 assertions)
+[PASS] dep analytics->{orders,payments,production,inventory,shifts,catalog,shared,identity} stable
+[PASS] Phase4Seeder                      exists
+```
+
+**The only red line is `contract analytics->facts green`** (10 of 10 cases fail: `App\Shared\Time\LocalDay` and the `Facts` ports do not exist). It turns green in
+step 4.1c, after which the entry gate passes. `contract payments->orders green` passes now only because the nine new refund cases carry the group
+`contract:payments->orders:refund`; step 4.1b gives them the original group name too, so that the entry gate and `mod-orders` see them.
+
+What the reading shows (origin/main after Phase 3):
 
 | Item | State |
 |---|---|
@@ -271,6 +291,34 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `payments->files` contract, `analytics` tables, `Notifications.subscribes`, `e2e-p4` profiles); the contract files of section 2
      committed **red**; `Phase4Seeder` skeleton; `config/files.php` and `config/analytics.php` placeholders with plain values (so
      `DeployableCachesTest` keeps passing); the `e2e/p4/` spec files as `test.fixme` stubs so the Playwright projects list at least one test (a project of an `in_progress` phase may not be empty); `gate_check --mode done` forbids `->skip(`, so every stub is turned into a real test by 4.6b and the PR description keeps the list. Phase 4 `in_progress`.
+   - **As built (step 4.1a, `phase-4/plan-and-contracts`).** Commits in the order the plan gave: the plan with the approval (`plan_approved: true`, phase 4
+     `in_progress`, module `contracts` `in_progress`); the manifest, skill-copy, CI and runbook corrections; the three contract files red; the skeletons and stubs;
+     this note. Where the code disagreed with the draft, or the draft left a choice:
+     - **Contracts are red in the group the entry gate reads and invisible to CI.** `contract:analytics->facts` is red (10 of 10) and `mod-analytics` no longer lists it in
+       its `contracts` input (`.github/workflows/ci.yml`; the skill template keeps it) until 4.1c adds it back, because `mod-analytics` would fail the whole run otherwise.
+       The nine new `payments->orders` cases carry only `contract:payments->orders:refund` (8 red; the part-payment case passes because it pins existing behaviour),
+       which no job runs; `FilesContractTest` carries `contract:payments->files` (8 of 8 red, class `App\Shared\Files\Files` missing), run by `mod-payments` from 4.2a.
+       `OrdersConcurrencyTest` (case 12, two forked tills paying the last balance) **passes now**: Orders has locked `forPayment` since step 1.4; it pins the promise.
+     - **`payments->files` is not in `phases.4.contracts_required`.** The entry script requires every listed contract green when its provider is from an earlier phase,
+       and Shared is phase 0. The manifest lists it under `contracts` and under a new `phases.4.intra_phase_contracts` (`payments->orders`, `payments->files`).
+     - **`Orders::refund` signature pinned:** `refund(int $orderId, string $reason, User $approver, array $lines, array $dispositions, string $clientUuid): void`; lines are
+       order-line ids (empty: the whole order), dispositions map a line id to `restock|waste|none`; a refusal is an `OrderError` with a `message_key`. The `client_uuid` is
+       there because `order_refunds` is unique on it (M7). **No refund stock logic and no default disposition exists in this step** (R-C is open); the cases name the
+       disposition explicitly, so they hold whichever defaults Ramin chooses.
+     - **New names the cases pin:** `App\Shared\Events\PaymentVoided(branchId, paymentId, orderId, channelCode, amount, reason, byUserId, approvedByUserId)`,
+       `App\Shared\Events\OrderRefunded` (payload `order_id`, `amount`, ...), `OrderTotalsView::$refunded` and `$netPaid`, `App\Shared\Time\LocalDay::between(from, to)`,
+       the `Facts` classes in each `Contracts` namespace (their `toArray()` keys are in the test), `App\Shared\Files\Files::put/signedUrl` returning an object with
+       `id`, `key`, `width`, `height`, and error keys `files.not_an_image`, `files.truncated`, `files.too_many_pixels`, `files.too_large`.
+     - **The Facts factory setup was not exercised:** all ten cases stop at `LocalDay` before their rows are built, so the factory attributes (orders, payments, batches,
+       shifts, cost history, `stock_alert_states`) are first proved by 4.1c, which may adjust the setup, not the expectations.
+     - **`Phase4Seeder` is a skeleton:** it refuses a branch-less database like `Phase3Seeder`, prints one line and writes nothing; `DemoSeeder` composes it after `Phase3Seeder`
+       (`DemoSeederTest` asserts `seedersUpTo(4)`). `config/files.php` and `config/analytics.php` hold plain values only; nothing reads them yet.
+     - **`DemoClock`** anchors inside `around()` (`subDays(3)`); `anchor()` is the getter. Section 8 now says the days back become a function of the phase (4.6a).
+     - **`e2e-p4` runs `full`, not `full,ws`** (10.9 item 3); the MinIO TODO in `ci.yml` is replaced by a note: e2e uses the local disk, as the live host does.
+     - **Nine `e2e/p4` stubs** (`test.fixme`, one `TODO(p4)` each), 4.6b replaces every one: `pay-photo-split`, `pay-sheet-logic`, `pay-refund`, `pay-void`, `pay-camera-fallback`
+       (project `p4-pay-photo-split`) and `dashboards`, `dashboards-live`, `dashboards-audit`, `dashboards-logic` (project `p4-dashboards`).
+     - **Local run notes:** `DeployableCachesTest`'s two `config:cache` cases time out at 60 s on this PC's Docker (a bare `config:cache` takes about a minute there) and are left to CI;
+       the new config files evaluate without error. `gate:p3` ran green here (197 tests) in about 25 minutes.
    - **4.1b `phase-4/orders-refund`**: M6 and M7 to M9; Inventory `Reversals` (inside the Ledger, same lock order, writes `return` plus the
      reversal row); Orders `Refund` action behind `Orders::refund`, `ReversePayment` listener, `payment.recorded` / `payment.voided` /
      `line.refunded` / `order.refunded` events on the timeline, `OrderRefunded`, `PaymentVoided` events, `OrderResource` gains
