@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "current_phase": 3,
+  "current_phase": 4,
   "invariants_version": 2,
   "phases": {
     "0": {
@@ -113,15 +113,15 @@
       ]
     },
     "3": {
-      "status": "gate_pending",
+      "status": "done",
       "plan": "docs/phases/phase-3-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
       "report": "docs/phases/phase-3-report.md",
       "gate_job": "gate-p3",
-      "gate_run_url": null,
-      "done_commit": null,
-      "done_at": null,
+      "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/40073782837",
+      "done_commit": "3b37a697ad3e26b8547eafdda55837670dda6044",
+      "done_at": "2026-10-24T08:19:03Z",
       "adrs": [
         "0012-hash-chain-canonical-json",
         "0013-shift-attribution-rules"
@@ -150,7 +150,7 @@
       ]
     },
     "4": {
-      "status": "todo",
+      "status": "planning",
       "plan": "docs/phases/phase-4-plan.md",
       "plan_approved": false,
       "plan_approved_by": null,
