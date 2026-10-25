@@ -167,7 +167,7 @@
       ],
       "modules": {
         "contracts": "in_progress",
-        "shared.files": "in_progress",
+        "shared.files": "done",
         "payments": "todo",
         "analytics": "todo",
         "web": "todo",

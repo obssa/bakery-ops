@@ -41,3 +41,20 @@ services:
   minio:
     ports:
       - "9000:9000"
+
+  # Init container for the `files-s3` job: creates the bucket once MinIO is healthy, then exits. Run it with
+  #   COMPOSE_PROFILES=s3 docker compose -f compose.yml -f compose.ci.yml run --rm mc
+  # (same pinned image as minio, which ships the mc client; the credentials are the throwaway CI values of compose.yml)
+  mc:
+    image: bitnamilegacy/minio:2025.7.23
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set ci http://minio:9000 bakery bakerysecret &&
+        mc mb --ignore-existing ci/bakery &&
+        mc ls ci
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    profiles: ["s3"]

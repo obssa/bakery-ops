@@ -394,6 +394,36 @@ Photos are about 180 KB each at 1600 px: 200 digital payments a day is about 1 G
 S3-compatible disk (`FILES_DISK=files_s3`, Cloudflare R2) before the account passes 70% of its quota or the nightly backup gets slow.
 Unattached uploads are purged after 24 hours (`files:purge-orphans`).
 
+### Files (step 4.2b): where they live, quota, backup, the move to S3
+
+- **Where.** The default disk is `files`: `storage/app/private/files/receipts/{branch_id}/{yyyy}/{mm}/{uuid}.jpg` under the app folder,
+  outside `public/`, so the web server never serves it; `rsync --delete` in the deploy protects `storage/`. No original file name is kept.
+  `stored_files` (the database) knows each object's disk, size, sha256 and what it is attached to. The only read path is a signed URL
+  (`GET /api/v1/files/{id}?expires&signature`, five minutes, `Cache-Control: private, no-store`); a plain GET answers 403.
+- **Who.** `files.upload` (admin, manager, cashier) uploads and deletes one's own unattached photo; `payments.view` (same roles) asks for a fresh
+  signed URL; a manager (`payments.void`) may delete any unattached photo; `GET /api/v1/files/doctor` is the admin's. The migration
+  `grant_phase_4_permissions` puts `files.upload` and `payments.view` in the live database at the next deploy, before any screen uses them.
+- **Orphans.** A photo nobody attached within `files.orphan_hours` (24) is removed, object and row, by `files:purge-orphans`, hourly from the
+  existing `schedule:run` cron line. It prints how many it removed and never touches an attached photo.
+- **Logs.** A signed URL is a bearer credential while it lives. The application scrubs `signature=` and `expires=` (and the S3 `X-Amz-*`
+  parameters) from anything it logs and never logs an object key. The web server's own access log cannot be changed on shared hosting; the
+  five-minute life is the mitigation.
+- **Quota.** About 180 KB a photo, about 1 GB a month at 200 digital payments a day. Read the figure in cPanel (Disk Usage); the home folder
+  was 961 MB on 2026-10-24 and `quota -s` reports no quota here. `files:doctor` prints the size of the files folder and the free space.
+  Act before 70% of the account's quota.
+- **Backup.** The nightly backup must include `storage/app/private/files` as well as the database: a database restored without the folder has
+  rows whose objects are gone (the signed URL answers 404, nothing else breaks). Restore both from the same night. A copy of the folder is
+  plain files, so `rsync -a storage/app/private/files/ <backup>/files/` is enough.
+- **Moving to S3 or R2.** (1) Create the bucket and an access key; set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`,
+  `AWS_BUCKET` and `AWS_ENDPOINT` (the bucket's own endpoint, the host the URLs are signed for: it must be reachable from the browser;
+  `AWS_USE_PATH_STYLE_ENDPOINT=true` for MinIO) in `.env`. (2) Copy the folder key for key:
+  `rclone copy storage/app/private/files :s3:<bucket>` (or `aws s3 sync`), so `receipts/...` is the same key in the bucket. (3) Set
+  `FILES_DISK=files_s3` and `php artisan config:cache`. New photos go to the bucket; old rows keep `disk = files` and still resolve while
+  the local folder exists, so a half-moved bucket works. (4) When `select disk, count(*) from stored_files where deleted_at is null group by disk` shows
+  no row on `files`, retire the folder. The CI job `files-s3` proves put, presigned URL over HTTP and delete against MinIO
+  (it never runs against the live host). Two hosts (traps.md): inside a compose stack the app signs for `minio:9000` and a browser would use
+  `localhost:9000`; a signature is bound to the host, so on a real deployment use one public endpoint for both.
+
 ### Dashboards and the cron
 
 `analytics:rebuild`, `analytics:weekly-summary` and `files:purge-orphans` run from the existing `schedule:run` line (section "Cron entries").

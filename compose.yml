@@ -30,7 +30,9 @@ x-api-env: &api-env
   REVERB_SCHEME: http
   FILESYSTEM_DISK: ${FILESYSTEM_DISK:-local}
   AWS_ENDPOINT: http://minio:9000
-  AWS_URL: http://localhost:9000/bakery
+  # two hosts (traps.md): the app container signs and fetches against AWS_ENDPOINT (minio:9000, a name only the compose network knows);
+  # a browser outside the stack would reach the same server at AWS_URL, and a signature is bound to the host it was made for
+  AWS_URL: http://localhost:9000
   AWS_BUCKET: bakery
   AWS_ACCESS_KEY_ID: bakery
   AWS_SECRET_ACCESS_KEY: bakerysecret
@@ -109,20 +111,20 @@ services:
       timeout: 3s
       retries: 20
 
-  # S3-compatible file store for receipt photos (Phase 4). Its own profile, not `full`: the minio/minio image is no
-  # longer published (Docker Hub and quay.io refuse the pull, checked 2026-10-20), and Phases 1-3 store no files. The live
-  # host keeps files on its local private disk (ADR 0006). TODO(p4) pick the S3-compatible image (or keep the local
-  # disk) before the receipt-photo e2e project needs it.
+  # S3-compatible store for the portability job `files-s3` ONLY (phase-4 plan 4.2b, 10.1 R-F): the live host keeps receipt photos on its local
+  # private disk (ADR 0006, 0015). Its own profile, not `full`. The upstream minio/minio images are no longer published (Docker Hub and quay.io
+  # refuse the pull, checked 2026-10-20 and again 2026-10-25), so this is the last archived Bitnami build of the same MinIO server, pinned by
+  # tag. The credentials below are throwaway values for a local container that never leaves the CI runner or the developer PC; they protect
+  # nothing, and no real key is ever written in this repository.
   minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
+    image: bitnamilegacy/minio:2025.7.23
     environment:
       MINIO_ROOT_USER: bakery
       MINIO_ROOT_PASSWORD: bakerysecret
     volumes:
-      - minio_data:/data
+      - minio_data:/bitnami/minio/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 20

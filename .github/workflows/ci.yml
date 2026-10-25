@@ -347,6 +347,43 @@ jobs:
     uses: ./.github/workflows/e2e.yml
     with: { phase: 4, projects: "p4-pay-photo-split p4-dashboards", profiles: "full" }
 
+  # The S3 portability job (phase-4 plan 4.2b, 10.1 R-F): the Files contract against a real S3-compatible store (MinIO) in the e2e compose
+  # stack. CI only, never against the live host (which has no bucket). The app container signs and fetches against AWS_ENDPOINT
+  # (http://minio:9000); AWS_URL (http://localhost:9000) is the browser-side name, see the two-hosts trap in references/traps.md.
+  files-s3:
+    needs: [status, mod-payments, docker-build]
+    if: fromJSON(needs.status.outputs.phase) >= 4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: api-image, path: /tmp }
+      - run: docker load -i /tmp/api.tar
+      - name: Start the stack with MinIO and create the bucket
+        env:
+          COMPOSE_PROFILES: s3
+        run: |
+          docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180 app minio
+          docker compose -f compose.yml -f compose.ci.yml run --rm mc
+      - name: Pest group files-s3 (put, presigned URL over HTTP, delete)
+        env:
+          COMPOSE_PROFILES: s3
+        run: |
+          set -o pipefail
+          docker compose -f compose.yml -f compose.ci.yml exec -T -e FILES_S3=1 app vendor/bin/pest --group=files-s3 --colors=never | tee /tmp/files-s3.txt
+          if grep -Eiq "skipped|No tests (found|executed)" /tmp/files-s3.txt; then echo "::error::files-s3 skipped or ran nothing"; exit 1; fi
+      - name: Logs on failure
+        if: failure()
+        env:
+          COMPOSE_PROFILES: s3
+        run: docker compose -f compose.yml -f compose.ci.yml logs --tail=80 app minio
+      - name: Stop the stack
+        if: always()
+        env:
+          COMPOSE_PROFILES: s3
+        run: docker compose -f compose.yml -f compose.ci.yml down -v
+
   perf-dashboards:
     needs: [status, e2e-p4]
     if: fromJSON(needs.status.outputs.phase) >= 4
@@ -414,7 +451,7 @@ jobs:
       - run: python3 scripts/gate_check.py --mode done --phase 3 --ci
 
   gate-p4:
-    needs: [status, gate-p3, mod-analytics, e2e-p4, perf-dashboards]
+    needs: [status, gate-p3, mod-analytics, e2e-p4, perf-dashboards, files-s3]
     if: fromJSON(needs.status.outputs.phase) >= 4
     runs-on: ubuntu-24.04
     steps:

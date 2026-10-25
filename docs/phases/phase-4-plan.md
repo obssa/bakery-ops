@@ -417,13 +417,38 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      - **`files:doctor`** is `App\Shared\Files\Doctor` (rows `check`, `status`, `detail`, also the data 4.2b's `GET /files/doctor` returns) plus `App\Console\Commands\FilesDoctorCommand`; exit 1 when a row is `missing`.
        `exif`, WebP, FreeType, a low `memory_limit` and a missing `storage/fonts` are `warn`. The runbook says how to read it.
      - **CI**: `contract:payments->files` is added to `mod-payments`; the unit and `module:shared` tests run in the foundation job. `DeployableCachesTest` caches the config with `FILES_DISK` unset and `files_s3`.
-     - STATUS: `shared.files` is `in_progress` (it goes `done` with 4.2b).
+     - STATUS: `shared.files` was `in_progress` here; it went `done` with 4.2b.
    - **4.2b `phase-4/files-api`**: `POST /files`, `GET /files/{file}/url`, `GET /files/{file}` (signed), `DELETE`, `GET /files/doctor`, `files:purge-orphans`; `files.upload` and
      `payments.view` permissions (M2); the multipart branch of `Idempotency`; log scrub (a Monolog processor removes `signature=` and `expires=` from any logged URL and
      never logs a key); `FilesNoPublicAccessTest` (the object path is not under `public/`, `public/storage` has no `files`, a plain GET of `/files/{id}` without signature is 403);
      the portability job `files-s3` (Pest group `files-s3`: `put`, `signedUrl` fetched over HTTP, `delete` against **MinIO** in the e2e compose stack, see 10.1 R-F; `compose.ci.yml`
      gains `minio` and an `mc` init container creating the bucket, `AWS_ENDPOINT=http://minio:9000` for the app container versus `AWS_URL=http://localhost:9000` for the browser,
      the two-hosts trap in traps.md); runbook "Files" section (where they live, quota, backup, the move to S3). `shared.files` goes `done`.
+   - **As built (step 4.2b, `phase-4/files-api`).** Order: the registries (per-method public routes, a multipart replay in the write registry), the tests (red, 40 of 44 failing for the missing
+     routes, command, processor and migration), then the code, the compose stack and CI job, the runbook. Where the code disagreed with the plan or the plan left a choice:
+     - **The controller is `App\Http\Controllers\Api\FilesController`, not in `Shared`.** `Shared` is a leaf that imports no module (`ModuleBoundariesTest`), and the writes are audited by `Audit`. The routes stay in
+       `routes/modules/files.php` (loaded by `SharedServiceProvider`). The audit rows are `AuditedAction::recordEvent('file.upload' | 'file.delete')` with the purpose and size only: `Snapshot::of` would have
+       stored the raw `key` attribute, which 10.1 R-F keeps out of the audit.
+     - **`DELETE /files/{file}` shares its uri with the public signed read.** The public-route lists only knew uris, so they would have treated the DELETE as public and skipped every coverage check. An entry may now
+       be `'METHOD uri'` (`tests/Support/public_routes.php`, `isPublicRoute()`, `PUBLIC_ROUTES` of `scripts/check_invariants.py`); the entry is `GET api/v1/files/{file}`.
+     - **Who may delete and view.** The plan said "the uploader (or `payments.verify`)"; `payments.verify` is not in the registry until 4.3c, so the delete is the uploader's or a `payments.void` holder's (admin, manager).
+       `GET /files/{file}/url` needs `payments.view`, or `files.upload` for one's own unattached upload (403 otherwise). The route middleware is `permission:payments.view|files.upload`; the registry row says `payments.view`.
+       An attached file is `409 files.attached`; the "younger than 24 h" clause is dropped (the purge is the age rule).
+     - **Errors.** `files.missing` (422: no usable file part) and `files.attached` (409) joined `FilesError::KEYS`, both languages. A part the server cut at `upload_max_filesize` is `files.too_large`. The response of
+       POST is `{id, purpose, width, height, bytes, sha256, url, url_expires_at, attached}`; 201 first time, 200 for a used `client_uuid`.
+     - **M2** is `2026_10_30_100100_grant_phase_4_permissions` (thin caller of `GrantRegistryPermissions`), for `files.upload` and `payments.view` only. Each later Phase 4 step that adds a permission (`payments.verify`,
+       `analytics.manage`, `audit.export`) adds its own dated migration calling the same class, because this one has run on the live database by then.
+     - **Multipart `Idempotency`.** The fingerprint replaces each uploaded file by the sha256 of its bytes (never its name or temp path). Same key and file: the stored response is replayed before any controller runs.
+       Same key, another file or field: `422 idempotency.key_reused`. `assertIdempotent()` takes an optional `files` closure so the registry replays `POST /files` as multipart.
+     - **`files:purge-orphans`** (all branches, `chunkById`, through `Files::delete`, exit 1 if any removal failed), hourly with `withoutOverlapping(30)`. It never touches an attached file.
+     - **Log scrub.** `LogScrubProcessor` removes `signature=`, `expires=` and the S3 `X-Amz-*` parameters from message, context and extra, and replaces anything shaped like `receipts/{branch}/...` with `[file key]`. It is
+       installed by the `ScrubLogs` tap on every leaf channel of `config/logging.php`. An exception object in the context is not scrubbed (the files code never puts a URL or a key in a message).
+     - **MinIO.** `minio/minio` and `quay.io/minio/minio` are not pullable any more (checked 2026-10-25). The pinned image is `bitnamilegacy/minio:2025.7.23` (the last archived Bitnami build of the same server; it ships `curl` for
+       the health check and the `mc` client). `compose.yml` keeps `minio` in the `s3` profile; `compose.ci.yml` adds the `mc` init service (bucket `bakery`, throwaway credentials `bakery` / `bakerysecret`, public repo, CI and local use
+       only) and publishes port 9000. The `files-s3` job in `ci.yml` starts `app minio`, runs `mc`, then `pest --group=files-s3` with `FILES_S3=1` (the tests skip without it, so no module job meets MinIO), and fails if
+       anything was skipped. `gate-p4` needs it. The test fetches the presigned URL from inside the app container, with the host it was signed for (`AWS_ENDPOINT`); `AWS_URL` became `http://localhost:9000` as the browser-side name.
+     - **Runbook** `docs/runbook/server.md`, "Files (step 4.2b)": where the files live, who may do what, orphans, logs, quota, backup (database and folder together), the move to S3 or R2.
+     - STATUS: `shared.files` is `done`.
 3. **4.3 payments (full)** (STATUS `payments`), five PRs. Payments is `stable` again after 4.3e.
    - **4.3a `phase-4/channels-admin`**: M3; channel create, rename, reorder, switch off, soft delete, pattern validation (a test table of good and bad patterns, including
      `(a+)+$` refused), `cash_locked`, `GET /receipt-settings` placeholder; bilingual `lang/*/payments.php` keys. Tests: `ChannelAdminTest`, `ChannelPatternTest`,
