@@ -31,7 +31,7 @@ $writeRoutes = function (): array {
     $routes = [];
     foreach (Route::getRoutes()->getRoutes() as $route) {
         /** @var RouteDefinition $route */
-        if (! str_starts_with($route->uri(), 'api/v1') || in_array($route->uri(), publicRoutes(), true)) {
+        if (! str_starts_with($route->uri(), 'api/v1') || isPublicRoute($route)) {
             continue;
         }
         $methods = array_diff(array_intersect($route->methods(), ['POST', 'PUT', 'PATCH', 'DELETE']), readLikeMethods($route->uri()));
@@ -76,7 +76,7 @@ it('replays every registered write endpoint idempotently', function () {
         // route uri so the coverage check above can match it against the router.
         $params = isset($entry['setup']) ? ($entry['setup'])($this) : [];
         $uri = strtr((string) $entry['uri'], is_array($params) ? $params : []);
-        assertIdempotent($this, (string) $entry['method'], $uri, ($entry['payload'])(), (string) $entry['table']);
+        assertIdempotent($this, (string) $entry['method'], $uri, ($entry['payload'])(), (string) $entry['table'], $entry['files'] ?? null);
     }
     expect(true)->toBeTrue();
 })->group('invariants');
@@ -96,7 +96,7 @@ it('lists every read-like write route with a reason; each exists, is protected, 
             ->and(array_key_exists($entry, $routes))->toBeTrue("{$entry} is listed as read-like but no such route exists");
         [$method, $uri] = explode(' ', $entry, 2);
         expect(in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true))->toBeTrue("{$entry}: only write methods need listing")
-            ->and(in_array($uri, publicRoutes(), true))->toBeFalse("{$entry}: a read-like route is still protected");
+            ->and(in_array($uri, publicRoutes(), true) || in_array($method.' '.$uri, publicRoutes(), true))->toBeFalse("{$entry}: a read-like route is still protected");
         $middleware = $routes[$entry]->gatherMiddleware();
         expect($middleware)->toContain('auth:sanctum')
             ->and(in_array('idempotency', $middleware, true))->toBeFalse("{$entry} writes nothing, so it takes no Idempotency-Key");

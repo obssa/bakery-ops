@@ -34,7 +34,7 @@ BRANCH_ALLOWLIST = {
     "pulse_values", "pulse_entries", "pulse_aggregates", "activity_log", "notifications_dedupe",
 }
 APPEND_ONLY_TABLES = ["stock_movements", "audit_log", "order_events", "item_cost_history", "handover_notes", "payment_refunds"]
-PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify", "api/v1/telegram/webhook/{secret}", "api/v1/files/{file}"}
+PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify", "api/v1/telegram/webhook/{secret}", "GET api/v1/files/{file}"}
 # write-method routes that write nothing (mirrors apps/api/tests/Support/read_like_writes.php)
 READ_LIKE_WRITES = {"POST api/v1/broadcasting/auth"}
 MONEY_RX = re.compile(r"(price|amount|total|subtotal|discount|tax|deposit|float)", re.I)
@@ -209,7 +209,8 @@ def check_idempotency(root: str, f: Findings, routes_path: str | None) -> bool:
         if isinstance(mw, str):
             mw = [mw]
         mw_s = " ".join(normalise_middleware(mw))
-        public = uri in PUBLIC_ROUTES
+        # an entry is a uri (every method) or "METHOD uri" (only that method: DELETE /files/{file} shares the uri and is protected)
+        public = uri in PUBLIC_ROUTES or any(f"{m} {uri}" in PUBLIC_ROUTES for m in methods)
         writes = {m for m in methods & {"POST", "PUT", "PATCH", "DELETE"} if f"{m} {uri}" not in READ_LIKE_WRITES}
         if writes and not public and "idempotency" not in mw_s:
             f.add("idempotency", f"{r.get('method')} {uri}: write route without the idempotency middleware (rule 7)")

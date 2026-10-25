@@ -285,6 +285,23 @@ if (! function_exists('publicRoutes')) {
     }
 }
 
+if (! function_exists('isPublicRoute')) {
+    /** Whether the route is public by design: its uri is listed, or 'METHOD uri' for one of its methods (public_routes.php). */
+    function isPublicRoute(\Illuminate\Routing\Route $route): bool
+    {
+        foreach (publicRoutes() as $entry) {
+            if ($entry === $route->uri()) {
+                return true;
+            }
+            if (str_contains($entry, ' ') && in_array(strstr($entry, ' ', true), $route->methods(), true) && substr(strstr($entry, ' '), 1) === $route->uri()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 if (! function_exists('readLikeWrites')) {
     /** @return array<string, string> write-method api/v1 routes that write nothing, 'METHOD uri' => reason (see read_like_writes.php) */
     function readLikeWrites(): array
@@ -315,14 +332,19 @@ if (! function_exists('assertIdempotent')) {
      *
      * @param  array<string, mixed>  $payload
      */
-    function assertIdempotent(TestCase $test, string $method, string $uri, array $payload, string $table): void
+    function assertIdempotent(TestCase $test, string $method, string $uri, array $payload, string $table, ?Closure $files = null): void
     {
         $key = (string) Str::uuid();
         $before = DB::table($table)->count();
 
-        $first = $test->withHeader('Idempotency-Key', $key)->json($method, $uri, $payload);
+        // a multipart entry (POST /files) sends fresh UploadedFile objects with the same bytes each time
+        $send = fn () => $files === null
+            ? $test->withHeader('Idempotency-Key', $key)->json($method, $uri, $payload)
+            : $test->withHeaders(['Idempotency-Key' => $key, 'Accept' => 'application/json'])->call($method, $uri, $payload, [], $files());
+
+        $first = $send();
         $afterFirst = DB::table($table)->count();
-        $second = $test->withHeader('Idempotency-Key', $key)->json($method, $uri, $payload);
+        $second = $send();
 
         expect($first->getStatusCode())->toBeLessThan(300, "first {$method} {$uri} failed: ".$first->getContent());
         expect($afterFirst)->toBe($before + 1, "{$method} {$uri} should write exactly one {$table} row");

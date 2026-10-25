@@ -15,7 +15,7 @@ $protectedRoutes = function (): array {
     $routes = [];
     foreach (Route::getRoutes()->getRoutes() as $route) {
         /** @var RouteDefinition $route */
-        if (str_starts_with($route->uri(), 'api/v1') && ! in_array($route->uri(), publicRoutes(), true)) {
+        if (str_starts_with($route->uri(), 'api/v1') && ! isPublicRoute($route)) {
             $routes[] = $route;
         }
     }
@@ -53,7 +53,7 @@ it('every non-public api/v1 route is registered in tests/Support/route_permissio
 
 it('serves the public routes without authentication', function () {
     foreach (publicRoutes() as $uri) {
-        expect($uri)->toStartWith('api/v1/');
+        expect(ltrim(substr(strstr($uri, ' ') ?: ' '.$uri, 1)))->toStartWith('api/v1/');
     }
     $this->getJson('/api/v1/health')->assertOk();
 })->group('invariants');
