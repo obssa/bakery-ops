@@ -71,8 +71,13 @@ final class FilesController
         }
 
         DB::transaction(function () use ($files, $audit, $row): void {
-            $audit->recordEvent('file.delete', 'stored_file', $row->id, ['purpose' => $row->purpose, 'bytes' => $row->bytes]);
-            $files->delete($row);
+            // step 4.3b: a payment claims a photo under this row's lock (Payments\Support\PaymentWriter), so look again under it
+            $locked = StoredFile::query()->whereKey($row->id)->lockForUpdate()->firstOrFail();
+            if ($locked->attached_type !== null || $locked->attached_at !== null) {
+                throw FilesError::attached();
+            }
+            $audit->recordEvent('file.delete', 'stored_file', $locked->id, ['purpose' => $locked->purpose, 'bytes' => $locked->bytes]);
+            $files->delete($locked);
         });
 
         return response()->noContent();

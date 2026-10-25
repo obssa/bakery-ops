@@ -9,9 +9,9 @@ use App\Shared\StateMachine\StateMachine;
 /**
  * The payment machine (domain-model.md, "State machines"): recorded -> verified | disputed, and recorded | verified ->
  * voided (a manager's PIN, with a reason). Phase 1 only ever writes `recorded`; the other moves are Phase 4's actions
- * (verify against the bank statement, dispute, void), but the table is final now so the exhaustive test pins it and
- * Phase 4 adds no column or state. The payments table enforces the same list with the CHECK constraint
- * payments_status_check.
+ * (verify against the bank statement, dispute, void), and the exhaustive test pins the table. Phase 4 adds no state; its M4 (step
+ * 4.3b) adds the dispute columns, and step 4.3c lets a dispute be resolved (disputed -> verified | voided), changing this table and
+ * Phase1StateMachinesTest together. The payments table enforces the same list with the CHECK constraint payments_status_check.
  */
 enum PaymentStatus: string
 {

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Payments\Http\Controllers\ChannelsController;
+use App\Modules\Payments\Http\Controllers\PaymentReadsController;
 use App\Modules\Payments\Http\Controllers\PaymentsController;
 use App\Modules\Payments\Http\Controllers\ReceiptSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -13,14 +14,23 @@ use Illuminate\Support\Facades\Route;
  * every write also carries idempotency (rule 7). The till's routes ask for payments.take (admin, manager, cashier); the payment
  * write carries a client_uuid in the body and {order} is a number the action looks up through Orders' contract (another branch's
  * order is 404). Step 4.3a adds the channel administration (channels.manage, the admin; {channel} binds through the BranchScoped
- * model, so another branch's or a removed channel is 404) and the receipt settings read (a placeholder until step 4.3e). Every route
- * is listed in tests/Support/route_permissions.php and every write in tests/Support/write_endpoints.php.
+ * model, so another branch's or a removed channel is 404) and the receipt settings read (a placeholder until step 4.3e). Step 4.3b adds
+ * the split bill (payments.take) and the payment reads (payments.view; {payment} is a number the controller looks up through the
+ * BranchScoped model, so another branch's is 404). Every route is listed in tests/Support/route_permissions.php and every write in
+ * tests/Support/write_endpoints.php.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:payments.take')->group(function (): void {
         Route::get('/payment-channels', [ChannelsController::class, 'index'])->name('payments.channels');
         Route::post('/orders/{order}/payments', [PaymentsController::class, 'store'])->whereNumber('order')->middleware('idempotency')->name('payments.store');
+        Route::post('/orders/{order}/payment-batches', [PaymentsController::class, 'batch'])->whereNumber('order')->middleware('idempotency')->name('payments.batches.store');
         Route::get('/receipt-settings', [ReceiptSettingsController::class, 'show'])->name('payments.receipt-settings.show');
+    });
+
+    Route::middleware('permission:payments.view')->group(function (): void {
+        Route::get('/orders/{order}/payments', [PaymentReadsController::class, 'forOrder'])->whereNumber('order')->name('payments.order');
+        Route::get('/payments', [PaymentReadsController::class, 'index'])->name('payments.index');
+        Route::get('/payments/{payment}', [PaymentReadsController::class, 'show'])->whereNumber('payment')->name('payments.show');
     });
 
     Route::middleware(['permission:channels.manage', 'idempotency'])->group(function (): void {

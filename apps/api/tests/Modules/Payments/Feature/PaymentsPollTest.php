@@ -103,6 +103,7 @@ it('renews the tag before the signed receipt URLs it carries expire', function (
 });
 
 it('builds the tag from Payments::fingerprint(): count, highest id, latest change and the settling second', function () {
+    $this->freezeTime();
     $empty = app(Payments::class)->fingerprint();
     expect($empty)->toBe(['count' => 0, 'max_id' => null, 'max_updated_at' => null, 'settling' => null]);
 

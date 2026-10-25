@@ -22,7 +22,8 @@ final class Shifts
 {
     public static function enforced(): bool
     {
-        return (bool) config('ledger.require_shift_for_station_locations') || (bool) config('payments.require_shift_for_cash');
+        // step 4.3b: payments.require_shift asks every channel for the till's shift; unset it follows the cash switch
+        return (bool) config('ledger.require_shift_for_station_locations') || (bool) config('payments.require_shift_for_cash') || config('payments.require_shift') === true;
     }
 
     /**

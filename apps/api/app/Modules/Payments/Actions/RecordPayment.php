@@ -7,55 +7,59 @@ namespace App\Modules\Payments\Actions;
 use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Identity\Models\User;
 use App\Modules\Orders\Contracts\Orders;
+use App\Modules\Payments\Contracts\PaymentInput;
 use App\Modules\Payments\Contracts\RecordedPayment;
-use App\Modules\Payments\Enums\PaymentStatus;
 use App\Modules\Payments\Exceptions\PaymentError;
 use App\Modules\Payments\Models\Payment;
-use App\Modules\Payments\Models\PaymentChannel;
-use App\Modules\Payments\Support\CashTender;
-use App\Shared\Actor\ActorContext;
-use App\Shared\Events\PaymentRecorded;
-use App\Shared\Shifts\OpenShifts;
-use App\Shared\Tenancy\CurrentBranch;
+use App\Modules\Payments\Support\Duplicates;
+use App\Modules\Payments\Support\PaymentChecks;
+use App\Modules\Payments\Support\PaymentWriter;
 use App\Shared\Values\Money;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
- * POST /orders/{order}/payments (phase-1 plan sections 4, 5 and 10; manifest contract payments->orders). Phase 1 takes
- * one cash payment for the whole balance. In order:
- *   1. a client UUID already used answers that payment again (ADR 0003: a replay with a lost Idempotency-Key), 409
- *      payments.client_uuid.reused when it belongs to another order;
- *   2. the channel: it exists, is enabled, needs no receipt photo (every digital channel does, until Phase 4) and, when
- *      it asks for a reference, has one;
- *   3. ONE AuditedAction (payment.record) = one transaction: Orders::forPayment locks the order row; the order must be
- *      sent .. served (409 payments.order.not_payable) and not settled yet (409 payments.order.settled); the amount must
- *      be exactly the balance (422 payments.amount.mismatch: no part payment, no overpayment); cash tendered must cover
- *      it (422 payments.tendered.too_low), change = tendered - amount; the payment row is written, then PaymentRecorded
- *      is dispatched INSIDE the transaction, where Orders' ApplyPayment adds it to the order, settles it and, once it is
- *      served, pays, sells and closes it. A failure anywhere rolls the payment back with it.
- * Step 3.5 adds a fourth rule behind payments.require_shift_for_cash (off by default): cash needs an open shift (409 payments.shift.required).
- * The reference number is stored but never logged (the audit snapshot redacts it). Money is Money (brick/math) and
- * decimal strings, never float.
+ * POST /orders/{order}/payments (phase-1 plan sections 4, 5 and 10; phase-4 plan section 4.3, step 4.3b; manifest contract
+ * payments->orders). In order:
+ *   0. another branch's or an unknown order is a 404; a client UUID already used answers that payment again (ADR 0003: a replay with a
+ *      lost Idempotency-Key), 409 payments.client_uuid.reused when it belongs to another order;
+ *   1-3. PaymentChecks, before anything is locked: the channel (unknown, disabled), the receipt photo (photo_required, photo.invalid),
+ *      the reference (reference_required, reference.invalid);
+ *   then ONE AuditedAction (payment.record) = one transaction: Orders::forPayment locks the order row and
+ *   4. the shift rule, for every channel (Support\ShiftRule; 409 payments.shift.required);
+ *   5. the order's state: sent .. served (409 payments.order.not_payable) and not settled yet (409 payments.order.settled);
+ *   6. 0 < amount <= balance: a part payment is taken (step 4.3b; Phase 1 took only the whole balance), more is 422
+ *      payments.amount.mismatch {balance, amount}; cash tendered must cover the amount (422 payments.tendered.too_low), change =
+ *      tendered - amount;
+ *   the photo's row is locked and checked again (another payment may have claimed it), the payment row is written, the photo attached
+ *   (attached_* and receipt_photo_key), and PaymentRecorded is dispatched INSIDE the transaction, where Orders' ApplyPayment adds it to the
+ *   order and, once the balance reaches zero, settles it, and when it is served pays, sells and closes it. A failure anywhere rolls the
+ *   payment and the attach back with it.
+ * The answer carries the duplicate warnings (Support\Duplicates), never a refusal. The reference number, its normalised form and the
+ * photo's key are stored but never logged (the audit snapshot redacts them). Money is Money (brick/math) and decimal strings, never float.
  */
 final class RecordPayment
 {
-    /** The one channel whose money is counted in hand: it carries tendered cash and change. */
-    private const string CASH = 'cash';
-
     public function __construct(
         private readonly AuditedAction $audit,
         private readonly Orders $orders,
-        private readonly CurrentBranch $branch,
-        private readonly ActorContext $actor,
-        private readonly OpenShifts $shifts,
+        private readonly PaymentChecks $checks,
+        private readonly PaymentWriter $writer,
+        private readonly Duplicates $duplicates,
     ) {}
 
     /**
      * @throws PaymentError
      */
-    public function handle(int $orderId, string $clientUuid, string $channelCode, string $amount, ?string $tenderedAmount, ?string $referenceNo, User $receivedBy): RecordedPayment
-    {
+    public function handle(
+        int $orderId,
+        string $clientUuid,
+        string $channelCode,
+        string $amount,
+        ?string $tenderedAmount,
+        ?string $referenceNo,
+        User $receivedBy,
+        ?int $receiptFileId = null,
+    ): RecordedPayment {
         $this->orders->forPayment($orderId); // another branch's or an unknown order is a 404 before anything else
 
         $existing = $this->existing($clientUuid, $orderId);
@@ -63,17 +67,16 @@ final class RecordPayment
             return $this->replay($existing);
         }
 
-        $referenceNo = $referenceNo === null || trim($referenceNo) === '' ? null : trim($referenceNo);
-        $channel = $this->channel($channelCode, $referenceNo);
+        $checked = $this->checks->check(new PaymentInput($clientUuid, $channelCode, $amount, $tenderedAmount, $referenceNo, $receiptFileId));
 
         try {
-            $payment = $this->audit->run(function () use ($orderId, $clientUuid, $channel, $amount, $tenderedAmount, $referenceNo, $receivedBy): Payment {
+            $payment = $this->audit->run(function () use ($orderId, $clientUuid, $checked, $receivedBy): Payment {
                 $view = $this->orders->forPayment($orderId, true);
                 $replayed = $this->existing($clientUuid, $orderId);
                 if ($replayed instanceof Payment) {
                     throw new AlreadyRecorded($replayed);
                 }
-                $this->assertShiftForCash($channel);
+                $this->writer->assertShift([$checked]);
                 if (! $view->isPayable()) {
                     throw PaymentError::notPayable($view->status);
                 }
@@ -82,44 +85,16 @@ final class RecordPayment
                 }
 
                 $currency = $view->totals->currency;
-                $money = Money::of($amount, $currency);
+                $money = Money::of($checked->input->amount, $currency);
                 $balance = Money::of($view->totals->balance, $currency);
-                if (! $money->isPositive() || ! $money->equals($balance)) {
+                if (! $money->isPositive() || $money->isGreaterThan($balance)) {
                     throw PaymentError::amountMismatch($balance->amount(), $money->amount());
                 }
-                $tender = null;
-                if ($channel->code === self::CASH) {
-                    $tendered = $tenderedAmount === null ? null : Money::of($tenderedAmount, $currency);
-                    if ($tendered instanceof Money && ! CashTender::covers($money, $tendered)) {
-                        throw PaymentError::tenderedTooLow($money->amount(), $tendered->amount());
-                    }
-                    $tender = CashTender::of($money, $tendered);
-                }
+                $tender = $this->writer->tender($checked, $money, $currency);
+                $photo = $this->writer->lockedPhoto($checked, $this->writer->lockPhotos([$checked]));
 
-                $payment = new Payment;
-                $payment->forceFill([
-                    'branch_id' => $this->branch->id(),
-                    'client_uuid' => $clientUuid,
-                    'order_id' => $orderId,
-                    'channel_id' => $channel->id,
-                    'amount' => $money,
-                    'tendered_amount' => $tender?->tendered,
-                    'change_amount' => $tender?->change,
-                    'currency' => $currency,
-                    'reference_no' => $referenceNo,
-                    'status' => PaymentStatus::Recorded,
-                    'received_by_user_id' => $receivedBy->id,
-                    'acting_user_id' => $this->actor->actingUserId(),
-                    'shift_instance_id' => $this->actor->shiftInstanceId(),
-                    'station_id' => $this->actor->stationId(),
-                    'device_id' => $this->actor->deviceId(),
-                    'received_at' => CarbonImmutable::now()->startOfSecond(),
-                ])->save();
-
-                event(new PaymentRecorded($this->branch->id(), $payment->id, $orderId, $channel->code, $money->amount(), $balance->minus($money)->amount()));
-
-                return $payment;
-            }, null, 'payment.record', ['order_id' => $orderId, 'channel_code' => $channel->code]);
+                return $this->writer->write($checked, $orderId, $money, $tender, $currency, $balance->minus($money), null, $receivedBy, $photo);
+            }, null, 'payment.record', ['order_id' => $orderId, 'channel_code' => $checked->channel->code]);
         } catch (AlreadyRecorded $again) {
             return $this->replay($again->payment);
         } catch (UniqueConstraintViolationException $e) {
@@ -132,26 +107,7 @@ final class RecordPayment
             return $this->replay($existing);
         }
 
-        return new RecordedPayment($payment, true, $this->orders->forPayment($orderId));
-    }
-
-    /**
-     * With payments.require_shift_for_cash on, cash needs the actor to carry an OPEN shift (step 3.5): the shared lock on its row
-     * keeps a close (which takes the row FOR UPDATE) from freezing the drawer between this check and the payment row, so a payment
-     * either is inside the declared cash or is refused. A payment that was already taken is answered before this (a replay).
-     * With the flag off nothing is asked of Shifts.
-     *
-     * @throws PaymentError payments.shift.required (409)
-     */
-    private function assertShiftForCash(PaymentChannel $channel): void
-    {
-        if ($channel->code !== self::CASH || ! config('payments.require_shift_for_cash')) {
-            return;
-        }
-        $shift = $this->actor->shiftInstanceId();
-        if ($shift === null || ! $this->shifts->isOpen($shift, true)) {
-            throw PaymentError::shiftRequired();
-        }
+        return new RecordedPayment($payment, true, $this->orders->forPayment($orderId), $this->duplicates->warnings([$payment]));
     }
 
     /**
@@ -169,28 +125,6 @@ final class RecordPayment
 
     private function replay(Payment $payment): RecordedPayment
     {
-        return new RecordedPayment($payment, false, $this->orders->forPayment($payment->order_id));
-    }
-
-    /**
-     * @throws PaymentError payments.channel.unknown, .disabled, .photo_required, .reference_required (422)
-     */
-    private function channel(string $code, ?string $referenceNo): PaymentChannel
-    {
-        $channel = PaymentChannel::query()->where('code', $code)->first();
-        if (! $channel instanceof PaymentChannel) {
-            throw PaymentError::channelUnknown($code);
-        }
-        if (! $channel->is_enabled) {
-            throw PaymentError::channelDisabled($code);
-        }
-        if ($channel->requires_photo) {
-            throw PaymentError::photoRequired($code);
-        }
-        if ($channel->requires_reference && $referenceNo === null) {
-            throw PaymentError::referenceRequired($code);
-        }
-
-        return $channel;
+        return new RecordedPayment($payment, false, $this->orders->forPayment($payment->order_id), $this->duplicates->warnings([$payment]));
     }
 }

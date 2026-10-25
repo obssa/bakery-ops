@@ -27,6 +27,9 @@ final class Files
 {
     public const PURPOSES = ['receipt', 'refund_proof'];
 
+    /** What a file may be attached to (stored_files.attached_type, plan section 3 M1). */
+    public const ATTACHED_TYPES = ['payment', 'payment_refund'];
+
     public function __construct(
         private readonly CurrentBranch $branch,
         private readonly ActorContext $actor,
@@ -124,6 +127,24 @@ final class Files
     public function exists(StoredFile $file): bool
     {
         return Storage::disk($file->disk)->exists($file->key);
+    }
+
+    /**
+     * Claims an unattached file for what it proves (step 4.3b: a payment; 4.3d: a payment refund): attached_type, attached_id and
+     * attached_at, written once, inside the caller's transaction. Lock the row first (StoredFile::query()->lockForUpdate()) when two
+     * writers may race for it. An attached file is never purged and cannot be deleted through the API.
+     *
+     * @throws FilesError files.attached (409) when it proves something already
+     */
+    public function attach(StoredFile $file, string $type, int $id): void
+    {
+        if (! in_array($type, self::ATTACHED_TYPES, true)) {
+            throw new InvalidArgumentException("Unknown attachment [{$type}].");
+        }
+        if ($file->attached_type !== null || $file->attached_at !== null) {
+            throw FilesError::attached();
+        }
+        $file->forceFill(['attached_type' => $type, 'attached_id' => $id, 'attached_at' => now()->startOfSecond()])->save();
     }
 
     /** Removes the object and soft-deletes the row. */

@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * A way the branch takes money (domain-model.md, Payments; docs/phases/phase-1-plan.md section 3, migration 7). The eight
  * defaults are given to every branch (Channels::ensureDefaults); the admin may switch one off (is_enabled) or remove it
  * (soft delete: the payments made on it keep pointing at it). requires_photo and requires_reference say what a payment
- * on it must come with; a channel that requires a photo is not accepted before Phase 4 (acceptedNow). Step 4.3a (phase-4 plan
+ * on it must come with (from step 4.3b the photo is attached to the payment, so every enabled channel is accepted: acceptedNow). Step 4.3a (phase-4 plan
  * M3) adds the admin's own channels (client_uuid, NULL for the defaults), a reference pattern (Support\ReferencePattern) and the
  * bilingual hints the till shows; the cash channel (code `cash`) is locked to taking cash (Support\ChannelRules).
  *
@@ -85,10 +85,10 @@ final class PaymentChannel extends Model
         ];
     }
 
-    /** Whether the till can take money on it today: enabled, and it does not need a receipt photo (Phase 4). */
+    /** Whether the till can take money on it today: enabled (step 4.3b; before it, a channel that needs a receipt photo was not). */
     public function acceptedNow(): bool
     {
-        return $this->is_enabled && ! $this->requires_photo;
+        return $this->is_enabled;
     }
 
     /** The one channel whose money is counted in the drawer (Totals::cash, RecordPayment's tendered cash and change). */

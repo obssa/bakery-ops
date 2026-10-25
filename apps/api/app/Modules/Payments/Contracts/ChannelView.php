@@ -27,10 +27,13 @@ final readonly class ChannelView
         public ?string $photoHintAm = null,
     ) {}
 
-    /** Whether the till can take money on it today: enabled, and no receipt photo needed (the photo attach is step 4.3b). */
+    /**
+     * Whether the till can take money on it today: enabled. Step 4.3b attaches the receipt photo to the payment, so a photo no longer blocks
+     * (Phase 1 to 4.3a answered false for a channel that needs one); the key stays so the Phase 1 client keeps working.
+     */
     public function acceptedNow(): bool
     {
-        return $this->isEnabled && ! $this->requiresPhoto;
+        return $this->isEnabled;
     }
 
     /** The cash channel: the drawer's money, locked to taking cash. */

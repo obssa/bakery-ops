@@ -5,19 +5,25 @@ declare(strict_types=1);
 namespace App\Modules\Payments\Http\Controllers;
 
 use App\Modules\Payments\Contracts\Payments;
+use App\Modules\Payments\Http\Requests\RecordPaymentBatchRequest;
 use App\Modules\Payments\Http\Requests\RecordPaymentRequest;
 use App\Modules\Payments\Http\Resources\PaymentResource;
 use App\Modules\Payments\Support\PaymentAccess;
 use Illuminate\Http\JsonResponse;
 
 /**
- * The till's payment endpoint (phase-1 plan section 4; payments.take, the route's permission middleware, and the same
- * permission for the person acting by short code, PaymentAccess). The channel list moved to ChannelsController in step 4.3a.
+ * The till's payment endpoints (phase-1 plan section 4; phase-4 plan section 4.3, step 4.3b; payments.take, the route's permission
+ * middleware, and the same permission for the person acting by short code, PaymentAccess). The channel list moved to ChannelsController
+ * in step 4.3a; the reads are PaymentReadsController.
  *
- *   POST /orders/{order}/payments   201 {payment, order}; 200 the same body for a client_uuid already recorded;
- *                                   422 payments.channel.* / payments.amount.mismatch / payments.tendered.too_low;
- *                                   409 payments.order.not_payable / payments.order.settled / payments.client_uuid.reused;
- *                                   404 another branch's order. The write is Payments::record (one AuditedAction).
+ *   POST /orders/{order}/payments          201 {payment, order, warnings}; 200 the same body for a client_uuid already recorded;
+ *                                          422 payments.channel.* / payments.photo.invalid / payments.reference.invalid /
+ *                                          payments.amount.mismatch / payments.tendered.too_low; 409 payments.shift.required /
+ *                                          payments.order.not_payable / payments.order.settled / payments.client_uuid.reused;
+ *                                          404 another branch's order. The write is Payments::record (one AuditedAction).
+ *   POST /orders/{order}/payment-batches   201 {payments, order, warnings}; 200 the same body for a batch client_uuid already recorded;
+ *                                          422 payments.batch.sum_mismatch / payments.batch.row_invalid {row, error}; the 409s above.
+ *                                          The write is Payments::recordBatch (one AuditedAction for every row).
  */
 final class PaymentsController
 {
@@ -35,8 +41,22 @@ final class PaymentsController
             $request->tenderedAmount(),
             $request->referenceNo(),
             $receiver,
+            $request->receiptFileId(),
         );
 
         return response()->json((new PaymentResource($recorded))->resolve($request), $recorded->created ? 201 : 200);
+    }
+
+    public function batch(RecordPaymentBatchRequest $request, Payments $payments, int $order): JsonResponse
+    {
+        $receiver = $this->access->receiver();
+
+        $recorded = $payments->recordBatch($order, $request->clientUuid(), $request->rows(), $receiver);
+
+        return response()->json([
+            'payments' => array_map(PaymentResource::payment(...), $recorded->payments),
+            'order' => PaymentResource::order($recorded->order),
+            'warnings' => $recorded->warnings,
+        ], $recorded->created ? 201 : 200);
     }
 }

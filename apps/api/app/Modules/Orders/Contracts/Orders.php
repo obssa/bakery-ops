@@ -76,6 +76,37 @@ final class Orders
     }
 
     /**
+     * How the payment lists name an order (step 4.3b: GET /payments, GET /payments/{payment}): number, business date, table and total, keyed
+     * by id. Ids of another branch's orders, or of none, are left out; one query whatever the count.
+     *
+     * @param  list<int>  $orderIds
+     * @return array<int, OrderSummaryView>
+     */
+    public function summaries(array $orderIds): array
+    {
+        if ($orderIds === []) {
+            return [];
+        }
+        $out = [];
+        foreach (Order::query()->whereIn('id', array_values(array_unique($orderIds)))->get(['id', 'order_no', 'business_date', 'table_code', 'total']) as $order) {
+            $out[$order->id] = new OrderSummaryView($order->id, $order->order_no, $order->business_date?->toDateString(), $order->table_code, $order->total->amount());
+        }
+
+        return $out;
+    }
+
+    /**
+     * The ids of the branch's orders numbered $orderNo, on any business date (numbers restart every day), ascending: what GET
+     * /payments?order_no= filters by.
+     *
+     * @return list<int>
+     */
+    public function idsNumbered(int $orderNo): array
+    {
+        return array_values(array_map('intval', Order::query()->where('order_no', $orderNo)->orderBy('id')->pluck('id')->all()));
+    }
+
+    /**
      * The orders that were open at $at as one station saw them (Phase 3 replays a shift from this). An order is open at
      * $at when it has at least one line at the station, it was sent at or before $at (its order.sent event) and no
      * order.closed, order.cancelled or order.voided event happened at or before $at: an order whose lines are all

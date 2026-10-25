@@ -136,7 +136,7 @@ describe('the branch list', function () {
             2 => $make(['order_id' => $order(12), 'channel_id' => ($this->channelId)('telebirr'), 'amount' => '20.00', 'received_at' => '2026-11-02 21:00:00', 'reference_no' => 'FT-777', 'reference_norm' => 'FT777', 'receipt_file_id' => $file($sha), 'shift_instance_id' => $this->shiftId]),
             3 => $make(['order_id' => $order(13), 'channel_id' => ($this->channelId)('telebirr'), 'amount' => '30.00', 'received_at' => '2026-11-03 10:00:00', 'reference_no' => 'ft 777', 'reference_norm' => 'FT777', 'status' => 'disputed']),
             4 => $make(['order_id' => $order(14), 'channel_id' => ($this->channelId)('cbe_birr'), 'amount' => '40.00', 'received_at' => '2026-11-03 11:00:00', 'receipt_file_id' => $file($sha), 'status' => 'voided']),
-            5 => $make(['order_id' => $order(15), 'channel_id' => ($this->channelId)('abyssinia'), 'amount' => '50.00', 'received_at' => '2026-11-03 12:00:00', 'receipt_file_id' => $file($sha)]),
+            5 => $make(['order_id' => $order(15), 'channel_id' => ($this->channelId)('abyssinia'), 'amount' => '50.00', 'received_at' => '2026-11-03 11:30:00', 'receipt_file_id' => $file($sha)]),
         ];
         // another branch's payment is never listed
         $elsewhere = Branch::factory()->create();

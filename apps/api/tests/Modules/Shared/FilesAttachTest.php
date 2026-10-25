@@ -26,6 +26,7 @@ beforeEach(function () {
 });
 
 it('attaches a file to a payment once, with the time it was claimed', function () {
+    $this->freezeTime();
     $file = ($this->file)();
 
     app(Files::class)->attach($file, 'payment', 41);

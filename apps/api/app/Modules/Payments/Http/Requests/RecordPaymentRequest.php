@@ -9,15 +9,16 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * POST /orders/{order}/payments: the client's id for the payment (ADR 0003), the channel's code, the amount as a
  * decimal string (up to 10 integer digits and 2 decimals, above zero: money is never a JSON number, ADR 0004), the cash
- * handed over for cash, and the bank's or wallet's reference when the channel asks for one. Whether the channel is
- * usable, the amount is the balance and the cash covers it are Payments' rules (RecordPayment), answered with their own
+ * handed over for cash, and the bank's or wallet's reference when the channel asks for one. Step 4.3b adds receipt_file_id, the
+ * stored_files id of the receipt photo (POST /files first). Whether the channel is usable, the photo can be this payment's, the
+ * reference fits, the amount fits the balance and the cash covers it are Payments' rules (RecordPayment), answered with their own
  * message keys.
  */
 final class RecordPaymentRequest extends FormRequest
 {
-    private const string MONEY = '/\A[0-9]{1,10}(\.[0-9]{1,2})?\z/';
+    public const string MONEY = '/\A[0-9]{1,10}(\.[0-9]{1,2})?\z/';
 
-    private const string ZERO = '/\A0+(\.0+)?\z/';
+    public const string ZERO = '/\A0+(\.0+)?\z/';
 
     public function authorize(): bool
     {
@@ -43,6 +44,7 @@ final class RecordPaymentRequest extends FormRequest
             'amount' => ['required', 'string', 'regex:'.self::MONEY, 'not_regex:'.self::ZERO],
             'tendered_amount' => ['sometimes', 'nullable', 'string', 'regex:'.self::MONEY],
             'reference_no' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'receipt_file_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -73,5 +75,12 @@ final class RecordPaymentRequest extends FormRequest
         $value = $this->validated()['reference_no'] ?? null;
 
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    public function receiptFileId(): ?int
+    {
+        $value = $this->validated()['receipt_file_id'] ?? null;
+
+        return is_numeric($value) ? (int) $value : null;
     }
 }

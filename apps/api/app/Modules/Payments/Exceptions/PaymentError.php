@@ -15,6 +15,9 @@ use RuntimeException;
  */
 final class PaymentError extends RuntimeException
 {
+    /** @var list<string> why a receipt_file_id is refused (photoInvalid) */
+    public const array PHOTO_REASONS = ['not_found', 'wrong_purpose', 'attached', 'expired'];
+
     /**
      * @param  array<string, mixed>  $extra
      */
@@ -42,10 +45,20 @@ final class PaymentError extends RuntimeException
         return new self('payments.channel.disabled', 422, ['field' => 'channel_code', 'channel_code' => $code]);
     }
 
-    /** Every channel that needs a receipt photo, until Phase 4 builds the upload. */
+    /** A channel that needs a receipt photo, asked without a receipt_file_id (Phase 1 refused every such channel; step 4.3b takes the photo). */
     public static function photoRequired(string $code): self
     {
-        return new self('payments.channel.photo_required', 422, ['field' => 'channel_code', 'channel_code' => $code]);
+        return new self('payments.channel.photo_required', 422, ['field' => 'receipt_file_id', 'channel_code' => $code]);
+    }
+
+    /**
+     * The receipt_file_id cannot be this payment's photo. $reason is one of PHOTO_REASONS: not_found (unknown, another branch's or removed),
+     * wrong_purpose (not a receipt), attached (it proves another payment, or another row of the same batch) or expired (uploaded more than
+     * payments.photo_max_age_hours ago).
+     */
+    public static function photoInvalid(string $reason): self
+    {
+        return new self('payments.photo.invalid', 422, ['field' => 'receipt_file_id', 'reason' => $reason]);
     }
 
     public static function referenceRequired(string $code): self
@@ -53,10 +66,38 @@ final class PaymentError extends RuntimeException
         return new self('payments.channel.reference_required', 422, ['field' => 'reference_no', 'channel_code' => $code]);
     }
 
-    /** Phase 1 takes the whole balance in one payment: a part payment and an overpayment are both refused. */
+    /** The reference does not match the channel's pattern; the channel's hint pair says what one looks like (null when none is set). */
+    public static function referenceInvalid(string $code, ?string $hintEn, ?string $hintAm): self
+    {
+        return new self('payments.reference.invalid', 422, ['field' => 'reference_no', 'channel_code' => $code, 'hint_en' => $hintEn, 'hint_am' => $hintAm]);
+    }
+
+    /** More than the balance (step 4.3b: a part payment, 0 < amount < balance, is taken; Phase 1 refused it too). The key is kept for the Phase 1 client. */
     public static function amountMismatch(string $balance, string $amount): self
     {
         return new self('payments.amount.mismatch', 422, ['field' => 'amount', 'balance' => $balance, 'amount' => $amount]);
+    }
+
+    /** A batch's amounts must add up to exactly the balance. */
+    public static function batchSumMismatch(string $balance, string $sum): self
+    {
+        return new self('payments.batch.sum_mismatch', 422, ['field' => 'rows', 'balance' => $balance, 'sum' => $sum]);
+    }
+
+    /** Row $row (0-based) of a batch would be refused on its own: the whole batch is, with the row's own refusal as `error`. */
+    public static function batchRowInvalid(int $row, self $error): self
+    {
+        return new self('payments.batch.row_invalid', 422, ['field' => "rows.{$row}", 'row' => $row, 'error' => $error->body()]);
+    }
+
+    /**
+     * The bilingual body of this refusal ({message_key, message_en, message_am, ...extra}).
+     *
+     * @return array<string, mixed>
+     */
+    public function body(): array
+    {
+        return ApiError::body($this->messageKey, $this->extra);
     }
 
     public static function tenderedTooLow(string $amount, string $tendered): self
@@ -76,15 +117,16 @@ final class PaymentError extends RuntimeException
         return new self('payments.order.settled', 409);
     }
 
-    /** A client UUID names one payment, of one order. */
-    public static function clientUuidReused(): self
+    /** A client UUID names one payment (or one batch), of one order. $field names it in a batch (rows.1.client_uuid). */
+    public static function clientUuidReused(string $field = 'client_uuid'): self
     {
-        return new self('payments.client_uuid.reused', 409, ['field' => 'client_uuid']);
+        return new self('payments.client_uuid.reused', 409, ['field' => $field]);
     }
 
     /**
-     * payments.require_shift_for_cash is on and the actor carries no open shift (none at all, or one that is counting or locked):
-     * the cash would be in no drawer's total.
+     * The payment needs the till's shift (Support\ShiftRule: cash with payments.require_shift_for_cash, every channel with
+     * payments.require_shift, which follows the cash switch unless it is set) and the actor carries no open shift (none at all, or one
+     * that is counting or locked): the money would be in no drawer's or channel's total of a shift.
      */
     public static function shiftRequired(): self
     {

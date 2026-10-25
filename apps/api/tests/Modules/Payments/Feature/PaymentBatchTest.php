@@ -63,7 +63,7 @@ beforeEach(function () {
     $this->nothingWritten = function (array $order, array $fileIds = []): void {
         expect(Payment::query()->where('order_id', $order['id'])->count())->toBe(0)
             ->and(Order::query()->findOrFail($order['id'])->paid_total->amount())->toBe('0.00')
-            ->and(AuditLog::query()->where('action', 'payment.batch')->count())->toBe(0);
+            ->and(AuditLog::query()->where('action', 'payment.batch')->get()->filter(fn (AuditLog $a): bool => ($a->context['order_id'] ?? null) === $order['id'])->count())->toBe(0);
         foreach ($fileIds as $id) {
             expect(StoredFile::query()->findOrFail($id)->attached_at)->toBeNull("file {$id} stays free");
         }
