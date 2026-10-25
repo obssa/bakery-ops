@@ -33,7 +33,9 @@ it('lists the eight default channels in their order, with what the till needs to
     $data = $response->json('data');
     expect(array_column($data, 'code'))->toBe(['cash', 'telebirr', 'cbe_birr', 'cbe_bank', 'awash', 'dashen', 'abyssinia', 'coop'])
         ->and(array_column($data, 'sort'))->toBe([1, 2, 3, 4, 5, 6, 7, 8])
-        ->and(array_keys($data[0]))->toBe(['id', 'code', 'name_en', 'name_am', 'is_enabled', 'requires_photo', 'requires_reference', 'sort', 'accepted_now'])
+        // the Phase 1 keys come first, in their order; step 4.3a adds the channel's rules and hints after them (additive)
+        ->and(array_slice(array_keys($data[0]), 0, 9))->toBe(['id', 'code', 'name_en', 'name_am', 'is_enabled', 'requires_photo', 'requires_reference', 'sort', 'accepted_now'])
+        ->and(array_slice(array_keys($data[0]), 9))->toBe(['reference_pattern', 'reference_hint_en', 'reference_hint_am', 'photo_hint_en', 'photo_hint_am', 'is_cash', 'deleted_at'])
         ->and($data[0])->toMatchArray(['code' => 'cash', 'name_en' => 'Cash', 'is_enabled' => true, 'requires_photo' => false, 'requires_reference' => false, 'accepted_now' => true]);
     foreach (array_slice($data, 1) as $channel) {
         expect($channel['is_enabled'])->toBeTrue()

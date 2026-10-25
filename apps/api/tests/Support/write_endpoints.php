@@ -43,6 +43,7 @@ use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Payments\Models\PaymentChannel;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Modules\Shifts\Models\ShiftTemplate;
 use App\Shared\Enums\StationCode;
@@ -650,6 +651,60 @@ return [
             return ['{order}' => (string) $order->json('id')];
         },
         'payload' => fn (): array => ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '90.00', 'tendered_amount' => '100.00'],
+    ],
+
+    // Payment channels (step 4.3a): a create writes the channel row; an edit, the reorder and the soft delete write one audit_log row each
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/payment-channels',
+        'module' => 'payments',
+        'table' => 'payment_channels',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => [
+            'client_uuid' => (string) Str::uuid(), 'code' => 'idem_wallet', 'name_en' => 'Idempotent wallet', 'name_am' => 'ቦርሳ',
+            'requires_photo' => true, 'requires_reference' => true, 'reference_pattern' => '[A-Z0-9]{10}',
+        ],
+    ],
+    [
+        'method' => 'PATCH',
+        'uri' => '/api/v1/payment-channels/{channel}',
+        'module' => 'payments',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return ['{channel}' => (string) PaymentChannel::query()->where('code', 'telebirr')->value('id')];
+        },
+        'payload' => fn (): array => ['name_en' => 'Telebirr wallet', 'name_am' => 'ቴሌብር ቦርሳ', 'reference_pattern' => '\d{10}'],
+    ],
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/payment-channels/order',
+        'module' => 'payments',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        // every live channel of the admin's branch, last first
+        'payload' => fn (): array => ['ids' => PaymentChannel::query()->orderByDesc('sort')->orderByDesc('id')->pluck('id')->all()],
+    ],
+    [
+        'method' => 'DELETE',
+        'uri' => '/api/v1/payment-channels/{channel}',
+        'module' => 'payments',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return ['{channel}' => (string) PaymentChannel::query()->where('code', 'coop')->value('id')];
+        },
+        'payload' => fn (): array => [],
     ],
 
     // Suppliers and purchases (step 2.2b)

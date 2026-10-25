@@ -18,6 +18,7 @@ use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
+use App\Modules\Payments\Models\PaymentChannel;
 use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
 use App\Modules\Production\Models\ProductionRequest;
@@ -156,6 +157,10 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
             'sha256' => str_repeat('a', 64), 'uploaded_by_user_id' => $actorId,
         ])->save();
         $params['{file}'] = (string) $file->id;
+    }
+    if (str_contains($uri, '{channel}')) {
+        // a digital channel of the caller's branch (every branch has the eight defaults; cash is locked, which the action answers with 409)
+        $params['{channel}'] = (string) PaymentChannel::query()->withoutGlobalScopes()->where('branch_id', $branch->id)->where('code', 'telebirr')->value('id');
     }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)
