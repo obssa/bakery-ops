@@ -91,6 +91,41 @@ final class PaymentError extends RuntimeException
         return new self('payments.shift.required', 409);
     }
 
+    /** Step 4.3a: a channel code the branch already has, a removed channel's included (the unique key is (branch, code)). */
+    public static function codeTaken(string $code): self
+    {
+        return new self('payments.channel.code_taken', 422, ['field' => 'code', 'code' => $code]);
+    }
+
+    /**
+     * A reference pattern ReferencePattern refuses; the reason is one of ReferencePattern::REASONS (too_long, does_not_compile,
+     * unsupported, nested_quantifier, backtracks).
+     */
+    public static function patternInvalid(string $reason): self
+    {
+        return new self('payments.channel.pattern_invalid', 422, ['field' => 'reference_pattern', 'reason' => $reason]);
+    }
+
+    /**
+     * The cash channel stays on, stays, and asks for no photo, reference or pattern: the drawer count is built on it. $field is the
+     * change that was refused (null for a removal).
+     */
+    public static function cashLocked(?string $field): self
+    {
+        return new self('payments.channel.cash_locked', 409, ($field === null ? [] : ['field' => $field]) + ['channel_code' => 'cash']);
+    }
+
+    /**
+     * A new order must name every live channel of the branch exactly once.
+     *
+     * @param  list<int>  $missing  live channels the list leaves out
+     * @param  list<int>  $unexpected  ids that are not a live channel of the branch, or that come twice
+     */
+    public static function orderIncomplete(array $missing, array $unexpected): self
+    {
+        return new self('payments.channel.order_incomplete', 422, ['field' => 'ids', 'missing' => $missing, 'unexpected' => $unexpected]);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

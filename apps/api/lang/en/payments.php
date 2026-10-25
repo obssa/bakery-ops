@@ -12,6 +12,10 @@ return [
         'disabled' => 'This payment method is switched off.',
         'photo_required' => 'This payment method needs a photo of the receipt, which cannot be taken yet. Take cash for now.',
         'reference_required' => 'Type the reference number of the transfer.',
+        'code_taken' => 'Another payment method of this branch already has this code (a removed one keeps its code). Choose a different code.',
+        'pattern_invalid' => 'The reference pattern is not accepted. Use at most 120 characters: letters, digits, [classes], \d, \w, \s, groups (...), a choice | and counts such as {10} up to 64. A group that repeats may not hold another repeat or a choice.',
+        'cash_locked' => 'Cash cannot be switched off, removed, or made to ask for a photo, a reference or a reference pattern: the drawer count is built on it.',
+        'order_incomplete' => 'Give every payment method of the branch exactly once, in the new order.',
     ],
     'amount' => [
         'mismatch' => 'The amount must be the whole balance of the order. Part payments and overpayments are not accepted.',

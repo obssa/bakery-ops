@@ -16,10 +16,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * A way the branch takes money (domain-model.md, Payments; docs/phases/phase-1-plan.md section 3, migration 7). The eight
  * defaults are given to every branch (Channels::ensureDefaults); the admin may switch one off (is_enabled) or remove it
  * (soft delete: the payments made on it keep pointing at it). requires_photo and requires_reference say what a payment
- * on it must come with; a channel that requires a photo is not accepted before Phase 4 (acceptedNow).
+ * on it must come with; a channel that requires a photo is not accepted before Phase 4 (acceptedNow). Step 4.3a (phase-4 plan
+ * M3) adds the admin's own channels (client_uuid, NULL for the defaults), a reference pattern (Support\ReferencePattern) and the
+ * bilingual hints the till shows; the cash channel (code `cash`) is locked to taking cash (Support\ChannelRules).
  *
  * @property int $id
  * @property int $branch_id
+ * @property string|null $client_uuid
  * @property string $code
  * @property string $name_en
  * @property string $name_am
@@ -27,6 +30,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property bool $is_enabled
  * @property bool $requires_photo
  * @property bool $requires_reference
+ * @property string|null $reference_pattern
+ * @property string|null $reference_hint_en
+ * @property string|null $reference_hint_am
+ * @property string|null $photo_hint_en
+ * @property string|null $photo_hint_am
  * @property int $sort
  * @property int|null $created_by_user_id
  * @property CarbonImmutable|null $created_at
@@ -41,6 +49,9 @@ final class PaymentChannel extends Model
     use HasFactory;
 
     use SoftDeletes;
+
+    /** The code of the cash channel: every branch has it, and it cannot be switched off, removed or given a photo or reference rule. */
+    public const string CASH = 'cash';
 
     protected $table = 'payment_channels';
 
@@ -78,6 +89,12 @@ final class PaymentChannel extends Model
     public function acceptedNow(): bool
     {
         return $this->is_enabled && ! $this->requires_photo;
+    }
+
+    /** The one channel whose money is counted in the drawer (Totals::cash, RecordPayment's tendered cash and change). */
+    public function isCash(): bool
+    {
+        return $this->code === self::CASH;
     }
 
     protected static function newFactory(): PaymentChannelFactory

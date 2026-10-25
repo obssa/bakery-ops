@@ -46,6 +46,9 @@ final class Channels
 
     public static function view(PaymentChannel $c): ChannelView
     {
-        return new ChannelView($c->id, $c->code, $c->name_en, $c->name_am, $c->is_enabled, $c->requires_photo, $c->requires_reference, $c->sort);
+        return new ChannelView(
+            $c->id, $c->code, $c->name_en, $c->name_am, $c->is_enabled, $c->requires_photo, $c->requires_reference, $c->sort,
+            $c->reference_pattern, $c->reference_hint_en, $c->reference_hint_am, $c->photo_hint_en, $c->photo_hint_am,
+        );
     }
 }
