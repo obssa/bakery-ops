@@ -54,6 +54,8 @@ it('refuses a wrong or tampered signature, and an id the signature was not made 
 });
 
 it('serves nothing through the framework storage route either', function () {
-    $this->get('/storage/'.$this->file->key)->assertNotFound();
-    $this->get('/storage/files/'.$this->file->key)->assertNotFound();
+    // the framework route of the default local disk answers 403 (no signature) or 404; either way no bytes
+    foreach (['/storage/'.$this->file->key, '/storage/files/'.$this->file->key] as $path) {
+        expect(in_array($this->get($path)->getStatusCode(), [403, 404], true))->toBeTrue();
+    }
 });

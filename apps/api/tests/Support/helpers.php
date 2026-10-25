@@ -26,6 +26,7 @@ use Brick\Math\BigDecimal;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Events\CallQueuedListener;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -287,7 +288,7 @@ if (! function_exists('publicRoutes')) {
 
 if (! function_exists('isPublicRoute')) {
     /** Whether the route is public by design: its uri is listed, or 'METHOD uri' for one of its methods (public_routes.php). */
-    function isPublicRoute(\Illuminate\Routing\Route $route): bool
+    function isPublicRoute(Route $route): bool
     {
         foreach (publicRoutes() as $entry) {
             if ($entry === $route->uri()) {
@@ -340,7 +341,7 @@ if (! function_exists('assertIdempotent')) {
         // a multipart entry (POST /files) sends fresh UploadedFile objects with the same bytes each time
         $send = fn () => $files === null
             ? $test->withHeader('Idempotency-Key', $key)->json($method, $uri, $payload)
-            : $test->withHeaders(['Idempotency-Key' => $key, 'Accept' => 'application/json'])->call($method, $uri, $payload, [], $files());
+            : $test->withHeaders(['Idempotency-Key' => $key, 'Accept' => 'application/json'])->{strtolower($method)}($uri, $payload + $files());
 
         $first = $send();
         $afterFirst = DB::table($table)->count();
@@ -349,7 +350,10 @@ if (! function_exists('assertIdempotent')) {
         expect($first->getStatusCode())->toBeLessThan(300, "first {$method} {$uri} failed: ".$first->getContent());
         expect($afterFirst)->toBe($before + 1, "{$method} {$uri} should write exactly one {$table} row");
         expect($second->getStatusCode())->toBe($first->getStatusCode());
-        expect($second->json())->toEqual($first->json());
+        // a 204 has no body to compare as JSON
+        $first->getContent() === ''
+            ? expect($second->getContent())->toBe('')
+            : expect($second->json())->toEqual($first->json());
         expect($second->headers->get('Idempotency-Replayed'))->toBe('true');
         expect(DB::table($table)->count())->toBe($afterFirst, 'replay must not write a second row');
     }

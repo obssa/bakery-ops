@@ -13,6 +13,7 @@ use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use LogicException;
 use Symfony\Component\HttpFoundation\Response;
@@ -115,16 +116,39 @@ final class Idempotency
         return sprintf('idempotency:%d:%d:%s', $branchId, $userId, hash('sha256', $key));
     }
 
-    /** sha256 over method, path and the canonically ordered input: the same key with other input is a reuse. */
+    /**
+     * sha256 over method, path and the canonically ordered input: the same key with other input is a reuse. For a multipart request each
+     * uploaded file stands for the sha256 of its bytes (never the whole body, and never its client-chosen name or temporary path), so the
+     * same key with the same picture replays and the same key with another picture is a reuse (step 4.2b).
+     */
     private static function fingerprint(Request $request): string
     {
-        $input = $request->all();
+        $input = self::withFileHashes($request->all());
         self::sortKeysDeep($input);
 
         return hash('sha256', $request->getMethod().' '.$request->path().' '.json_encode(
             $input,
             JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
         ));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $value
+     * @return array<array-key, mixed>
+     */
+    private static function withFileHashes(array $value): array
+    {
+        foreach ($value as $name => $item) {
+            if ($item instanceof UploadedFile) {
+                $path = $item->isValid() ? $item->getRealPath() : false;
+                $hash = $path === false ? false : hash_file('sha256', $path);
+                $value[$name] = ['uploaded_file_sha256' => $hash === false ? 'unreadable:'.$item->getError() : $hash];
+            } elseif (is_array($item)) {
+                $value[$name] = self::withFileHashes($item);
+            }
+        }
+
+        return $value;
     }
 
     /**

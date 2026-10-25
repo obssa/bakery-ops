@@ -65,6 +65,10 @@ final class PermissionRegistry
         'shifts.view' => self::FLOOR,
         'shifts.manage' => ['admin'],
         'shifts.replay' => ['admin', 'manager'],
+        // Phase 4 (step 4.2b; plan section 10.6). They reach a live database through the grant-only migration
+        // 2026_10_30_100100_grant_phase_4_permissions. files.upload: receipt photos; payments.view: payments, receipts and a photo's signed URL.
+        'files.upload' => ['admin', 'manager', 'cashier'],
+        'payments.view' => ['admin', 'manager', 'cashier'],
     ];
 
     /**

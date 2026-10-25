@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Shared\Files\Files;
 use App\Shared\Files\StoredFile;
 use App\Shared\Models\Branch;
+use App\Shared\Tenancy\BranchScope;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -73,7 +74,7 @@ it('purges every branch, not only the current one, and says how many it removed'
 
     $this->artisan('files:purge-orphans')->expectsOutputToContain('2')->assertSuccessful();
 
-    expect(StoredFile::query()->withoutGlobalScopes()->count())->toBe(0)->and(Storage::disk(config('files.disk'))->allFiles())->toBe([]);
+    expect(StoredFile::query()->withoutGlobalScope(BranchScope::class)->count())->toBe(0)->and(Storage::disk(config('files.disk'))->allFiles())->toBe([]);
 });
 
 it('is a no-op when there is nothing to purge and does not fail on a missing object', function () {

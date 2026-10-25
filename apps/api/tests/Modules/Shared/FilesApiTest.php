@@ -27,7 +27,7 @@ beforeEach(function () {
         $file = UploadedFile::fake()->createWithContent('slip.jpg', $bytes ?? imgJpeg(800, 600));
 
         return $this->withHeaders(['Idempotency-Key' => $key ?? (string) Str::uuid(), 'Accept' => 'application/json'])
-            ->post('/api/v1/files', ['file' => $file, 'purpose' => 'receipt', 'client_uuid' => (string) Str::uuid()] + $extra);
+            ->post('/api/v1/files', $extra + ['file' => $file, 'purpose' => 'receipt', 'client_uuid' => (string) Str::uuid()]);
     };
 });
 
