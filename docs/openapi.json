@@ -1172,6 +1172,461 @@
                 }
             }
         },
+        "/v1/payment-channels": {
+            "get": {
+                "operationId": "payments.channels",
+                "tags": [
+                    "Channels"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_en": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_am": {
+                                                        "type": "string"
+                                                    },
+                                                    "is_enabled": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "requires_photo": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "requires_reference": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "sort": {
+                                                        "type": "integer"
+                                                    },
+                                                    "accepted_now": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "reference_pattern": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "reference_hint_en": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "reference_hint_am": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "photo_hint_en": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "photo_hint_am": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "is_cash": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "deleted_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "code",
+                                                    "name_en",
+                                                    "name_am",
+                                                    "is_enabled",
+                                                    "requires_photo",
+                                                    "requires_reference",
+                                                    "sort",
+                                                    "accepted_now",
+                                                    "reference_pattern",
+                                                    "reference_hint_en",
+                                                    "reference_hint_am",
+                                                    "photo_hint_en",
+                                                    "photo_hint_am",
+                                                    "is_cash",
+                                                    "deleted_at"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "payments.channels.store",
+                "tags": [
+                    "Channels"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreChannelRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/payment-channels/order": {
+            "put": {
+                "operationId": "payments.channels.reorder",
+                "tags": [
+                    "Channels"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReorderChannelsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/payment-channels/{channel}": {
+            "patch": {
+                "operationId": "payments.channels.update",
+                "tags": [
+                    "Channels"
+                ],
+                "parameters": [
+                    {
+                        "name": "channel",
+                        "in": "path",
+                        "required": true,
+                        "description": "The channel ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateChannelRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "code": {
+                                            "type": "string"
+                                        },
+                                        "name_en": {
+                                            "type": "string"
+                                        },
+                                        "name_am": {
+                                            "type": "string"
+                                        },
+                                        "is_enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "requires_photo": {
+                                            "type": "boolean"
+                                        },
+                                        "requires_reference": {
+                                            "type": "boolean"
+                                        },
+                                        "sort": {
+                                            "type": "integer"
+                                        },
+                                        "accepted_now": {
+                                            "type": "boolean"
+                                        },
+                                        "reference_pattern": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "reference_hint_en": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "reference_hint_am": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "photo_hint_en": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "photo_hint_am": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "is_cash": {
+                                            "type": "boolean"
+                                        },
+                                        "deleted_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "code",
+                                        "name_en",
+                                        "name_am",
+                                        "is_enabled",
+                                        "requires_photo",
+                                        "requires_reference",
+                                        "sort",
+                                        "accepted_now",
+                                        "reference_pattern",
+                                        "reference_hint_en",
+                                        "reference_hint_am",
+                                        "photo_hint_en",
+                                        "photo_hint_am",
+                                        "is_cash",
+                                        "deleted_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "payments.channels.destroy",
+                "tags": [
+                    "Channels"
+                ],
+                "parameters": [
+                    {
+                        "name": "channel",
+                        "in": "path",
+                        "required": true,
+                        "description": "The channel ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "code": {
+                                            "type": "string"
+                                        },
+                                        "name_en": {
+                                            "type": "string"
+                                        },
+                                        "name_am": {
+                                            "type": "string"
+                                        },
+                                        "is_enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "requires_photo": {
+                                            "type": "boolean"
+                                        },
+                                        "requires_reference": {
+                                            "type": "boolean"
+                                        },
+                                        "sort": {
+                                            "type": "integer"
+                                        },
+                                        "accepted_now": {
+                                            "type": "boolean"
+                                        },
+                                        "reference_pattern": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "reference_hint_en": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "reference_hint_am": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "photo_hint_en": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "photo_hint_am": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "is_cash": {
+                                            "type": "boolean"
+                                        },
+                                        "deleted_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "code",
+                                        "name_en",
+                                        "name_am",
+                                        "is_enabled",
+                                        "requires_photo",
+                                        "requires_reference",
+                                        "sort",
+                                        "accepted_now",
+                                        "reference_pattern",
+                                        "reference_hint_en",
+                                        "reference_hint_am",
+                                        "photo_hint_en",
+                                        "photo_hint_am",
+                                        "is_cash",
+                                        "deleted_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/inventory/costs/{item}/opening": {
             "post": {
                 "operationId": "inventory.costs.opening",
@@ -4952,80 +5407,6 @@
                 }
             }
         },
-        "/v1/payment-channels": {
-            "get": {
-                "operationId": "payments.channels",
-                "tags": [
-                    "Payments"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "code": {
-                                                        "type": "string"
-                                                    },
-                                                    "name_en": {
-                                                        "type": "string"
-                                                    },
-                                                    "name_am": {
-                                                        "type": "string"
-                                                    },
-                                                    "is_enabled": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "requires_photo": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "requires_reference": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "sort": {
-                                                        "type": "integer"
-                                                    },
-                                                    "accepted_now": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "required": [
-                                                    "id",
-                                                    "code",
-                                                    "name_en",
-                                                    "name_am",
-                                                    "is_enabled",
-                                                    "requires_photo",
-                                                    "requires_reference",
-                                                    "sort",
-                                                    "accepted_now"
-                                                ]
-                                            }
-                                        }
-                                    },
-                                    "required": [
-                                        "data"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    }
-                }
-            }
-        },
         "/v1/orders/{order}/payments": {
             "post": {
                 "operationId": "payments.store",
@@ -5488,6 +5869,77 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/receipt-settings": {
+            "get": {
+                "operationId": "payments.receipt-settings.show",
+                "tags": [
+                    "ReceiptSettings"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "business_name_en": {
+                                            "type": "string"
+                                        },
+                                        "business_name_am": {
+                                            "type": "string"
+                                        },
+                                        "address_en": {
+                                            "type": "null"
+                                        },
+                                        "address_am": {
+                                            "type": "null"
+                                        },
+                                        "phone": {
+                                            "type": "null"
+                                        },
+                                        "tin": {
+                                            "type": "null"
+                                        },
+                                        "footer_en": {
+                                            "type": "null"
+                                        },
+                                        "footer_am": {
+                                            "type": "null"
+                                        },
+                                        "show_amharic": {
+                                            "type": "boolean"
+                                        },
+                                        "ethiopian_dates": {
+                                            "type": "boolean"
+                                        },
+                                        "is_default": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "business_name_en",
+                                        "business_name_am",
+                                        "address_en",
+                                        "address_am",
+                                        "phone",
+                                        "tin",
+                                        "footer_en",
+                                        "footer_am",
+                                        "show_amharic",
+                                        "ethiopian_dates",
+                                        "is_default"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
                     }
                 }
             }
@@ -12422,6 +12874,25 @@
                 ],
                 "title": "RejectTransferRequest"
             },
+            "ReorderChannelsRequest": {
+                "type": "object",
+                "description": "PUT /payment-channels/order: {ids}, the channel ids in their new order (at most 200). That the list names every live channel of the\nbranch exactly once is Payments' rule (ReorderChannels: 422 payments.channel.order_incomplete).",
+                "properties": {
+                    "ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "minItems": 1,
+                        "maxItems": 200
+                    }
+                },
+                "required": [
+                    "ids"
+                ],
+                "title": "ReorderChannelsRequest"
+            },
             "ReorderRuleResource": {
                 "type": "object",
                 "properties": {
@@ -13000,6 +13471,86 @@
                     "name_am"
                 ],
                 "title": "StoreCategoryRequest"
+            },
+            "StoreChannelRequest": {
+                "type": "object",
+                "description": "POST /payment-channels: the client's id for the channel (ADR 0003), a code (lower case letters, digits, underscore and hyphen, at\nmost 32; chosen once, it is what the till sends), both names (at most 120), the two rules, and optionally whether it starts\nenabled, a reference pattern, the hints (each a pair: both languages or neither, at most 120) and its place in the order. Whether\nthe code is free and the pattern safe, and the cash lock, are Payments' rules (SaveChannel), answered with their own message keys.",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                        "maxLength": 32
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "requires_photo": {
+                        "type": "boolean"
+                    },
+                    "requires_reference": {
+                        "type": "boolean"
+                    },
+                    "is_enabled": {
+                        "type": "boolean"
+                    },
+                    "reference_pattern": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "reference_hint_en": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "reference_hint_am": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "photo_hint_en": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "photo_hint_am": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32767
+                    }
+                },
+                "required": [
+                    "client_uuid",
+                    "code",
+                    "name_en",
+                    "name_am",
+                    "requires_photo",
+                    "requires_reference"
+                ],
+                "title": "StoreChannelRequest"
             },
             "StoreDeviceRequest": {
                 "type": "object",
@@ -14135,6 +14686,72 @@
                     }
                 },
                 "title": "UpdateCategoryRequest"
+            },
+            "UpdateChannelRequest": {
+                "type": "object",
+                "description": "PATCH /payment-channels/{channel}: any of the names, the switch, the two rules, the reference pattern (null or an empty string\nclears it), the hints (a pair is changed together) and the place in the order. The code never changes: a body that names one is\nrefused (422 validation.failed on `code`), so a client never believes it renamed a code. The pattern's safety and the cash lock are\nPayments' rules (SaveChannel).",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "is_enabled": {
+                        "type": "boolean"
+                    },
+                    "requires_photo": {
+                        "type": "boolean"
+                    },
+                    "requires_reference": {
+                        "type": "boolean"
+                    },
+                    "reference_pattern": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "reference_hint_en": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "reference_hint_am": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "photo_hint_en": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "photo_hint_am": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "sort": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 32767
+                    }
+                },
+                "title": "UpdateChannelRequest"
             },
             "UpdateDiningTableRequest": {
                 "type": "object",
