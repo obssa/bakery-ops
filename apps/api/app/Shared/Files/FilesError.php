@@ -24,6 +24,8 @@ final class FilesError extends RuntimeException
         'files.unavailable',
         'files.processing_failed',
         'files.invalid_signature',
+        'files.missing',
+        'files.attached',
     ];
 
     /**
@@ -72,6 +74,18 @@ final class FilesError extends RuntimeException
     public static function processingFailed(): self
     {
         return new self('files.processing_failed', 500);
+    }
+
+    /** The request carried no usable file part (step 4.2b, POST /files). */
+    public static function missing(): self
+    {
+        return new self('files.missing', 422);
+    }
+
+    /** A payment or a refund already claims the file, so it cannot be deleted (step 4.2b). */
+    public static function attached(): self
+    {
+        return new self('files.attached', 409);
     }
 
     public function render(): JsonResponse

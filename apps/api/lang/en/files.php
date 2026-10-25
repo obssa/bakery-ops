@@ -15,4 +15,6 @@ return [
     'unavailable' => 'Photo upload is not available on this server right now. Ask an administrator to check it.',
     'processing_failed' => 'The photo could not be prepared. Try again.',
     'invalid_signature' => 'This link is not valid or has expired.',
+    'missing' => 'No picture was sent. Take a photo or choose a picture and try again.',
+    'attached' => 'This photo is already attached to a payment and cannot be deleted.',
 ];
