@@ -20,11 +20,21 @@ it('has an English and an Amharic text for every Payments message, with the same
         'order.not_payable', 'order.settled', 'client_uuid.reused', 'shift.required',
         // step 4.3a: channel administration
         'channel.code_taken', 'channel.pattern_invalid', 'channel.cash_locked', 'channel.order_incomplete',
+        // step 4.3b: photos, reference patterns, split bills and the duplicate warnings
+        'photo.invalid', 'reference.invalid', 'batch.sum_mismatch', 'batch.row_invalid', 'warning.reference_duplicate', 'warning.receipt_duplicate',
     ] as $key) {
         expect($en[$key] ?? null)->toBeString()->not->toBeEmpty("en {$key}")
             ->and($am[$key] ?? null)->toBeString()->not->toBeEmpty("am {$key}")
             ->and($am[$key])->not->toBe($en[$key], "am {$key} is not a copy of the English")
             ->and($am[$key])->toMatch('/\p{Ethiopic}/u');
     }
-    expect(array_keys($en))->toHaveCount(14);
+    expect(array_keys($en))->toHaveCount(20);
+})->group('module:payments');
+
+it('no longer tells the till that photos cannot be taken, that part payments are refused, or that only cash needs a shift (step 4.3b)', function () {
+    $en = Arr::dot(require base_path('lang/en/payments.php'));
+
+    expect($en['channel.photo_required'])->not->toContain('cannot be taken yet')
+        ->and($en['amount.mismatch'])->toContain('more than the balance')
+        ->and($en['shift.required'])->not->toContain('before taking cash');
 })->group('module:payments');

@@ -18,6 +18,7 @@ use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
+use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Models\PaymentChannel;
 use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
@@ -161,6 +162,10 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
     if (str_contains($uri, '{channel}')) {
         // a digital channel of the caller's branch (every branch has the eight defaults; cash is locked, which the action answers with 409)
         $params['{channel}'] = (string) PaymentChannel::query()->withoutGlobalScopes()->where('branch_id', $branch->id)->where('code', 'telebirr')->value('id');
+    }
+    if (str_contains($uri, '{payment}')) {
+        // a payment of the caller's branch taken just now (a cashier sees the last 24 hours, the action's rule)
+        $params['{payment}'] = (string) Payment::factory()->create(['branch_id' => $branch->id, 'received_by_user_id' => $actorId])->id;
     }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)

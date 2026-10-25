@@ -116,7 +116,7 @@ it('runs on a database with the Phase 1 channels and changes none of them; a sec
     expect(array_map(fn (ChannelView $c): string => $c->code, $enabled))->toBe(['cash', 'telebirr', 'cbe_birr', 'cbe_bank', 'dashen', 'abyssinia'])
         ->and($enabled[0]->nameEn)->toBe('Till cash')
         ->and($enabled[0]->acceptedNow())->toBeTrue()
-        ->and($enabled[1]->acceptedNow())->toBeFalse()
+        ->and($enabled[1]->acceptedNow())->toBeTrue() // step 4.3b: accepted_now is is_enabled
         ->and($enabled[4]->acceptedNow())->toBeTrue()
         ->and($enabled[4]->requiresReference)->toBeTrue()
         ->and($enabled[4]->referencePattern)->toBeNull();

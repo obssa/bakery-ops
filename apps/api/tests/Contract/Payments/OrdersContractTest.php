@@ -9,6 +9,7 @@ use App\Shared\Events\OrderPaid;
 use App\Shared\Events\OrderRefunded;
 use App\Shared\Events\PaymentRecorded;
 use App\Shared\Events\PaymentVoided;
+use App\Shared\Models\Branch;
 use Brick\Math\BigDecimal;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -201,6 +202,38 @@ it('keeps the order unsettled when the amount is less than the balance', functio
         ->and(($this->totals)($order['id'])->paid)->toBe('100.00')
         ->and(($this->totals)($order['id'])->balance)->not->toBe('0.00')
         ->and($this->paidEvents)->toBe([]);
+})->group('contract:payments->orders');
+
+// Step 4.3b: the payment lists name each payment's order (GET /payments: {id, order_no, business_date, table_code, total}) and filter by
+// the order's number, so Payments asks Orders for both, by id, never through Orders' models.
+
+it('answers the summaries of the branch\'s orders by id: number, business date, table and total, and leaves out what it does not know', function () {
+    $f = $this->floor;
+    $m = $f->menu;
+    $sent = $f->send([$m->line($m->sandwich), $m->line($m->water)]);
+    $cart = $f->send([$m->line($m->water)], null, ['send' => false]);
+    $theirs = Order::factory()->sent(1)->create(['branch_id' => Branch::factory()->create()->id]);
+
+    $summaries = app(Orders::class)->summaries([$cart['id'], $sent['id'], $theirs->id, 987654]);
+
+    expect(array_keys($summaries))->toEqualCanonicalizing([$sent['id'], $cart['id']])
+        ->and($summaries[$sent['id']]->toArray())->toBe([
+            'id' => $sent['id'], 'order_no' => $sent['order_no'], 'business_date' => $sent['business_date'], 'table_code' => $sent['table_code'], 'total' => '280.00',
+        ])
+        ->and($summaries[$cart['id']]->toArray())->toMatchArray(['order_no' => null, 'business_date' => null, 'total' => '30.00'])
+        ->and(app(Orders::class)->summaries([]))->toBe([]);
+})->group('contract:payments->orders');
+
+it('finds the branch\'s orders by their number, on any business date', function () {
+    $f = $this->floor;
+    $m = $f->menu;
+    $first = $f->send([$m->line($m->water)]);
+    $f->send([$m->line($m->water)]);
+    $older = Order::factory()->sent((int) $first['order_no'])->create(['branch_id' => $f->branch->id, 'business_date' => '2026-01-05', 'created_by_user_id' => $f->admin->id]);
+    Order::factory()->sent((int) $first['order_no'])->create(['branch_id' => Branch::factory()->create()->id]);
+
+    expect(app(Orders::class)->idsNumbered((int) $first['order_no']))->toBe([$first['id'], $older->id])
+        ->and(app(Orders::class)->idsNumbered(99999))->toBe([]);
 })->group('contract:payments->orders');
 
 // ===================================================================================================================================

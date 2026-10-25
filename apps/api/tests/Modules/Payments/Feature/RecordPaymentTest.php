@@ -24,6 +24,9 @@ use Tests\Support\OrderFloor;
  * Phase 1 takes one cash payment for the whole balance: tendered >= amount gives change; every digital channel is
  * refused until Phase 4 (receipt photos); a payment may come before the food (the order is then settled and closes when
  * its last line is served). Orders' side of PaymentRecorded is in tests/Contract/Payments and ApplyPaymentTest.
+ * Step 4.3b changed two cases here (phase-4 plan 4.3): a part payment is taken (only more than the balance is
+ * payments.amount.mismatch), and a digital channel is refused with payments.channel.photo_required only without a
+ * receipt_file_id. TakePaymentTest has the Phase 4 rules in full.
  * Prices of the OrdersMenu: sandwich 250.00, latte 120.00, croissant 60.00, water 30.00.
  */
 
@@ -140,10 +143,10 @@ it('refuses a tendered amount below the amount, writing nothing', function () {
         ->and(($this->row)($order['id'])->paid_total->amount())->toBe('0.00');
 })->group('module:payments', 'feature');
 
-it('takes the whole balance only: a part payment and an overpayment are refused', function () {
+it('refuses more than the balance; a part payment is taken (step 4.3b)', function () {
     $order = ($this->served)();
 
-    foreach (['339.99', '100.00', '340.01', '1000.00'] as $amount) {
+    foreach (['340.01', '1000.00'] as $amount) {
         ($this->pay)($order, ['amount' => $amount, 'tendered_amount' => '2000.00'])
             ->assertStatus(422)
             ->assertJsonPath('message_key', 'payments.amount.mismatch')
@@ -151,9 +154,15 @@ it('takes the whole balance only: a part payment and an overpayment are refused'
             ->assertJsonPath('amount', $amount);
     }
     expect(($this->payments)())->toBe(0)->and(($this->row)($order['id'])->status->value)->toBe('served');
+
+    ($this->pay)($order, ['amount' => '100.00', 'tendered_amount' => '2000.00'])->assertCreated()
+        ->assertJsonPath('order.status', 'served')
+        ->assertJsonPath('order.balance', '240.00');
+    ($this->pay)($order, ['amount' => '240.01'])->assertStatus(422)->assertJsonPath('balance', '240.00');
+    expect(($this->payments)())->toBe(1)->and(($this->row)($order['id'])->settled_at)->toBeNull();
 })->group('module:payments', 'feature');
 
-it('refuses every digital channel until receipts can be photographed (Phase 4)', function () {
+it('refuses every digital channel without a receipt photo (step 4.3b: a receipt_file_id takes it)', function () {
     $order = ($this->served)();
 
     foreach (['telebirr', 'cbe_birr', 'cbe_bank', 'awash', 'dashen', 'abyssinia', 'coop'] as $code) {

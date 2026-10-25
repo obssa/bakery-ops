@@ -5,9 +5,11 @@ declare(strict_types=1);
 use App\Modules\Orders\Models\Order;
 use App\Modules\Payments\Models\Payment;
 use App\Modules\Shifts\Models\ShiftInstance;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\Support\OrderFloor;
+use Tests\Support\ReceiptFiles;
 
 pest()->group('module:payments', 'feature');
 
@@ -17,9 +19,15 @@ pest()->group('module:payments', 'feature');
  * outside the declared cash, and one with no shift would be in no drawer's total. The refusal rolls the whole payment back. The flag is
  * OFF by default everywhere, the live host included (config, .env.example, .env.ci) until step 3.7e flips it with the ledger's and the
  * call-in switches; with it off nothing about payments changes and Shifts is never asked.
+ *
+ * Step 4.3b (phase-4 plan 10.1 R-A): the rule covers EVERY channel, because Totals::byChannel(shift) and the cashier's per-channel
+ * reconciliation are keyed on the payment's own shift. payments.require_shift (PAYMENTS_REQUIRE_SHIFT) is unset by default and then
+ * follows payments.require_shift_for_cash, so the kill switch is still the one cash line; once set it splits the two: false asks only
+ * cash for a shift, true asks every channel, cash included.
  */
 
 beforeEach(function () {
+    Storage::fake(config('files.disk'));
     $this->floor = OrderFloor::open($this);
     $f = $this->floor;
     $f->menu->tillStation->forceFill(['tracks_shifts' => true])->save();
@@ -43,6 +51,11 @@ beforeEach(function () {
             $body + ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => $order['totals']['total']],
         );
     };
+    // a Telebirr part payment with its photo and reference
+    $this->digital = fn (array $order): TestResponse => ($this->pay)($order, [
+        'channel_code' => 'telebirr', 'amount' => '10.00', 'reference_no' => 'FT'.random_int(10000000, 99999999),
+        'receipt_file_id' => ReceiptFiles::upload($this, $f->cashier),
+    ]);
     $this->till = function (string $state) use ($f): ShiftInstance {
         $f->assign($f->cashier, $f->menu->tillStation);
         $shift = ShiftInstance::query()->where('station_id', $f->menu->tillStation->id)->whereNotNull('open_key')->first();
@@ -135,4 +148,53 @@ it('answers a payment that was already taken again, even after the till began co
 
     expect(Payment::query()->count())->toBe(1)
         ->and($again->json('payment.id') ?? $again->json('id'))->toBe($first->json('payment.id') ?? $first->json('id'));
+});
+
+it('asks for the till\'s open shift on every channel by default: a digital payment without one is refused, one inside it is stamped', function () {
+    expect(config('payments.require_shift'))->toBeNull();
+    $order = ($this->order)();
+
+    ($this->digital)($order)->assertStatus(409)->assertJsonPath('message_key', 'payments.shift.required');
+    expect(Payment::query()->count())->toBe(0);
+
+    $shift = ($this->till)('open');
+    ($this->digital)($order)->assertCreated();
+    expect(Payment::query()->sole()->shift_instance_id)->toBe($shift->id);
+
+    $shift->forceFill(['status' => 'counting'])->save();
+    ($this->digital)($order)->assertStatus(409)->assertJsonPath('message_key', 'payments.shift.required');
+});
+
+it('follows the cash switch while PAYMENTS_REQUIRE_SHIFT is unset, and splits from it once it is set', function (mixed $every, bool $cash, bool $cashNeedsShift, bool $digitalNeedsShift) {
+    config(['payments.require_shift' => $every, 'payments.require_shift_for_cash' => $cash]);
+    $order = ($this->order)();
+
+    $paidCash = ($this->pay)($order, ['amount' => '10.00']);
+    $paidDigital = ($this->digital)($order);
+
+    expect($paidCash->getStatusCode())->toBe($cashNeedsShift ? 409 : 201, 'cash: '.$paidCash->getContent())
+        ->and($paidDigital->getStatusCode())->toBe($digitalNeedsShift ? 409 : 201, 'digital: '.$paidDigital->getContent());
+    foreach ([[$paidCash, $cashNeedsShift], [$paidDigital, $digitalNeedsShift]] as [$response, $refused]) {
+        if ($refused) {
+            $response->assertJsonPath('message_key', 'payments.shift.required');
+        }
+    }
+})->with([
+    'unset, cash on (the default)' => [null, true, true, true],
+    'unset, cash off (the kill switch)' => [null, false, false, false],
+    'empty, cash on' => ['', true, true, true],
+    'off, cash on' => [false, true, true, false],
+    'the text false, cash on' => ['false', true, true, false],
+    'on, cash off' => [true, false, true, true],
+    'the text 1, cash off' => ['1', false, true, true],
+    'off, cash off' => [false, false, false, false],
+]);
+
+it('reads PAYMENTS_REQUIRE_SHIFT with no default in the config file and leaves it unset in the repository env files', function () {
+    expect((string) file_get_contents(config_path('payments.php')))->toContain("env('PAYMENTS_REQUIRE_SHIFT')");
+    foreach (['.env.example', '.env.ci'] as $file) {
+        $text = (string) file_get_contents(base_path($file));
+        expect(preg_match('/^PAYMENTS_REQUIRE_SHIFT=/m', $text))->toBe(0, "{$file} sets no value: the cash switch decides")
+            ->and($text)->toContain('# PAYMENTS_REQUIRE_SHIFT=');
+    }
 });

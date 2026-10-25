@@ -46,3 +46,11 @@ it('redacts a payment reference number: it is never logged', function () use ($m
 
     expect($snapshot)->toBe(['reference_no' => '[redacted]', 'amount' => '340.00', 'receipt_photo_key' => null, 'reference_noted' => 'kept']);
 })->group('unit', 'module:audit');
+
+it('redacts a payment\'s normalised reference and its receipt photo key (step 4.3b): neither is ever logged', function () use ($model) {
+    $snapshot = Snapshot::of($model([
+        'reference_norm' => 'FT24001ABC', 'receipt_photo_key' => 'receipts/2/2026/11/0f1e.jpg', 'receipt_file_id' => 9, 'open_key' => 's:4',
+    ]));
+
+    expect($snapshot)->toBe(['reference_norm' => '[redacted]', 'receipt_photo_key' => '[redacted]', 'receipt_file_id' => 9, 'open_key' => 's:4']);
+})->group('unit', 'module:audit');

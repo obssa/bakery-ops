@@ -652,6 +652,32 @@ return [
         },
         'payload' => fn (): array => ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '90.00', 'tendered_amount' => '100.00'],
     ],
+    // Split bills (step 4.3b): a batch of one cash row for the whole balance of the same order; the first request writes one payments row
+    // (the batch's one AuditedAction comes with it)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders/{order}/payment-batches',
+        'module' => 'payments',
+        'table' => 'payments',
+        'setup' => function (TestCase $t) use ($admin, $orderableCake): array {
+            $me = $admin();
+            $cake = $orderableCake($me);
+            $till = Station::factory()->forCode(StationCode::Till)->create(['branch_id' => $me->branch_id]);
+            Shifts::ensureOpen($till);
+            $t->withHeader('X-Station-Id', (string) $till->id);
+            $order = $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson('/api/v1/orders', [
+                'client_uuid' => (string) Str::uuid(),
+                'type' => 'takeaway',
+                'lines' => [['client_uuid' => (string) Str::uuid(), 'item_id' => $cake->id, 'qty' => '2']],
+            ]);
+
+            return ['{order}' => (string) $order->json('id')];
+        },
+        'payload' => fn (): array => [
+            'client_uuid' => (string) Str::uuid(),
+            'rows' => [['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '90.00', 'tendered_amount' => '100.00']],
+        ],
+    ],
 
     // Payment channels (step 4.3a): a create writes the channel row; an edit, the reorder and the soft delete write one audit_log row each
     [

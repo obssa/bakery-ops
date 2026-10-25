@@ -69,7 +69,7 @@ it('creates a channel with its rules and hints, last in the order, audited', fun
     expect(array_keys($response->json()))->toBe(CHANNEL_KEYS);
     $response->assertJson([
         'code' => 'amole', 'name_en' => 'Amole', 'name_am' => 'አሞሌ', 'is_enabled' => true, 'requires_photo' => true, 'requires_reference' => true,
-        'sort' => 9, 'accepted_now' => false, 'reference_pattern' => '[A-Z0-9]{10}', 'reference_hint_en' => 'Ten letters or digits, as on the SMS',
+        'sort' => 9, 'accepted_now' => true, 'reference_pattern' => '[A-Z0-9]{10}', 'reference_hint_en' => 'Ten letters or digits, as on the SMS',
         'reference_hint_am' => 'በኤስኤምኤሱ ላይ እንዳለው አሥር ፊደላት ወይም አሃዞች', 'photo_hint_en' => 'A photo of the confirmation screen',
         'photo_hint_am' => 'የማረጋገጫ ገጹ ፎቶ', 'is_cash' => false, 'deleted_at' => null,
     ]);
@@ -320,7 +320,7 @@ it('keeps Channels::enabled() to its Phase 1 shape, with the new rules added aft
         ->and($enabled[0]->acceptedNow())->toBeTrue()
         ->and($enabled[1]->code)->toBe('telebirr')
         ->and($enabled[1]->isCash())->toBeFalse()
-        ->and($enabled[1]->acceptedNow())->toBeFalse()
+        ->and($enabled[1]->acceptedNow())->toBeTrue()
         ->and($enabled[1]->referencePattern)->toBe('\d{10}')
         ->and($enabled[1]->referenceHintEn)->toBe('Ten digits')
         ->and($enabled[1]->referenceHintAm)->toBe('አሥር አሃዞች')

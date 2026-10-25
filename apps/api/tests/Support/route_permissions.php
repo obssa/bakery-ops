@@ -11,7 +11,7 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {endpoint}, {request}, {table}, {order} (an open cart of the caller's own), {reason}, {count}, {channel} and {line}
+ * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {endpoint}, {request}, {table}, {order} (an open cart of the caller's own), {reason}, {count}, {channel}, {payment} and {line}
  * (a queued line of a sent order of the caller's own, at a station the caller is assigned to) with a row of the right
  * table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
@@ -177,6 +177,13 @@ return [
     'PUT /api/v1/payment-channels/order' => ['permission' => 'channels.manage', 'roles' => ['admin'], 'module' => 'payments'],
     'DELETE /api/v1/payment-channels/{channel}' => ['permission' => 'channels.manage', 'roles' => ['admin'], 'module' => 'payments'],
     'GET /api/v1/receipt-settings' => ['permission' => 'payments.take', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    // Taking and reading payments (step 4.3b): a split bill is taken by the till's roles; the reads ask for payments.view (admin, manager,
+    // cashier; a cashier's GET /payments and GET /payments/{payment} see the last 24 hours and their own shift, the action's rule, 10.2 R-N).
+    // The matrix's {payment} is a payment of the caller's branch taken just now.
+    'POST /api/v1/orders/{order}/payment-batches' => ['permission' => 'payments.take', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'GET /api/v1/orders/{order}/payments' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'GET /api/v1/payments' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'GET /api/v1/payments/{payment}' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
 
     // Shifts (step 3.2b): shifts.view reads at the stations one works at (stations.all everywhere); shifts.manage (the admin) configures
     // and acts for others; shifts.count starts, joins and leaves, and the action checks the station (403 shifts.station.forbidden).

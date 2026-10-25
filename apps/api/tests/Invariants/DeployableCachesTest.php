@@ -59,6 +59,10 @@ it('caches the config with the three shift rules switched off, and on again', fu
         foreach (SHIFT_RULES as $path) {
             expect(data_get($cached, $path))->toBe($expected, "{$path} with the variable {$value}");
         }
+        // step 4.3b (phase-4 plan 10.1 R-A): PAYMENTS_REQUIRE_SHIFT is unset on the server, so the cache holds null and every channel follows
+        // the cash line: the kill switch is still three lines
+        expect(array_key_exists('require_shift', (array) data_get($cached, 'payments')))->toBeTrue()
+            ->and(data_get($cached, 'payments.require_shift'))->toBeNull();
     } finally {
         @unlink($cache);
     }

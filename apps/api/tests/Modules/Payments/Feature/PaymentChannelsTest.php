@@ -10,8 +10,9 @@ use App\Shared\Models\Branch;
 
 /*
  * GET /payment-channels (phase-1 plan section 4; payments.take): the branch's channels in their order, with
- * accepted_now saying whether the till can take one today (Phase 1: cash only; the digital channels need a receipt
- * photo, Phase 4). Also the provided capability Channels (manifest payments.provides) the till and Phase 4 read.
+ * accepted_now saying whether the till can take one today (Phase 1: cash only, the digital channels needed a receipt photo; from
+ * step 4.3b it is is_enabled: the photo is attached, not a block). Also the provided capability Channels (manifest payments.provides)
+ * the till and Phase 4 read.
  */
 
 beforeEach(function () {
@@ -41,7 +42,7 @@ it('lists the eight default channels in their order, with what the till needs to
         expect($channel['is_enabled'])->toBeTrue()
             ->and($channel['requires_photo'])->toBeTrue()
             ->and($channel['requires_reference'])->toBeTrue()
-            ->and($channel['accepted_now'])->toBeFalse("{$channel['code']} needs a receipt photo (Phase 4)");
+            ->and($channel['accepted_now'])->toBeTrue("{$channel['code']} is taken with its receipt photo (step 4.3b)");
     }
     foreach ($data as $channel) {
         expect($channel['name_en'])->toBeString()->not->toBeEmpty()
@@ -81,7 +82,7 @@ it('answers Payments\\Contracts\\Channels: the enabled channels of the branch, a
         ->and($enabled[0])->toBeInstanceOf(ChannelView::class)
         ->and(array_map(fn (ChannelView $c): string => $c->code, $enabled))->not->toContain('awash')
         ->and($enabled[0]->acceptedNow())->toBeTrue()
-        ->and($enabled[1]->acceptedNow())->toBeFalse()
+        ->and($enabled[1]->acceptedNow())->toBeTrue()
         ->and($channels->find('telebirr')?->requiresPhoto)->toBeTrue()
         ->and($channels->find('barter'))->toBeNull();
 
