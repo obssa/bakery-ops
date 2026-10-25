@@ -70,6 +70,8 @@ it('follows the matrix row by row', function (string $permission, array $roles) 
     'plan production: due time, priority, assign, cancel (Phase 2)' => ['production.plan', ['admin', 'manager']],
     'own notification inbox and channels (Phase 2)' => ['notifications.view', ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker']],
     'see costs, margins and cost history (Phase 2)' => ['costs.view', ['admin', 'manager']],
+    'upload receipt photos (Phase 4)' => ['files.upload', ['admin', 'manager', 'cashier']],
+    'view payments and receipts (Phase 4)' => ['payments.view', ['admin', 'manager', 'cashier']],
 ])->group('unit', 'module:identity');
 
 it('knows no role outside the eight and no permission outside the matrix', function () {

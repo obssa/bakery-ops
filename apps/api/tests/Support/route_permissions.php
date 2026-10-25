@@ -220,4 +220,11 @@ return [
     'POST /api/v1/shifts/{shift}/notes' => ['permission' => 'shifts.count', 'roles' => $floor, 'module' => 'shifts'],
     'GET /api/v1/stations/{station}/handover' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
     'GET /api/v1/replay' => ['permission' => 'shifts.replay', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
+    // Files (step 4.2b). The doctor is the admin's (channels.manage). The upload and the delete of one's own unattached file ask for files.upload
+    // (a manager's delete of anyone's is the action's rule, payments.void); the fresh signed URL asks for payments.view or files.upload (same
+    // default roles) and the action checks the uploader for the second. GET /files/{file} is the signed public route (public_routes.php).
+    'GET /api/v1/files/doctor' => ['permission' => 'channels.manage', 'roles' => ['admin'], 'module' => 'shared'],
+    'POST /api/v1/files' => ['permission' => 'files.upload', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'shared'],
+    'GET /api/v1/files/{file}/url' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'shared'],
+    'DELETE /api/v1/files/{file}' => ['permission' => 'files.upload', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'shared'],
 ];

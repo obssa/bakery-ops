@@ -50,7 +50,10 @@ use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
+use App\Shared\Files\Files;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 use Tests\Support\NotificationDrivers;
 use Tests\Support\OrdersMenu;
 use Tests\Support\ProductionFixture;
@@ -1385,5 +1388,34 @@ return [
             return ['{shift}' => (string) $f->running($f->kitchen, $f->chef)->id];
         },
         'payload' => fn (): array => ['client_uuid' => (string) Str::uuid(), 'body' => 'The mixer needs oil'],
+    ],
+    // Files (step 4.2b): the one multipart write (the fingerprint is the fields plus the sha256 of the file) and the delete of an unattached file
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/files',
+        'module' => 'shared',
+        'table' => 'stored_files',
+        'setup' => function (TestCase $t) use ($admin): array {
+            Storage::fake(config('files.disk'));
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => ['purpose' => 'receipt', 'client_uuid' => '7f0c9a3e-5c1d-4a52-9d57-0d3a6a1f2b10'],
+        'files' => fn (): array => ['file' => UploadedFile::fake()->createWithContent('slip.jpg', imgJpeg(640, 480))],
+    ],
+    [
+        'method' => 'DELETE',
+        'uri' => '/api/v1/files/{file}',
+        'module' => 'shared',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            Storage::fake(config('files.disk'));
+            $me = $admin();
+            withActor($me->id);
+
+            return ['{file}' => (string) app(Files::class)->put(imgJpeg(300, 200), 'receipt', (string) Str::uuid())->id];
+        },
+        'payload' => fn (): array => [],
     ],
 ];

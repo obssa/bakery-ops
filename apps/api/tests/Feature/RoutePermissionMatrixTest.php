@@ -26,8 +26,10 @@ use App\Modules\Shifts\Models\ShiftTemplate;
 use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Models\VarianceReason;
 use App\Shared\Enums\StationCode;
+use App\Shared\Files\StoredFile;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
+use Illuminate\Support\Str;
 
 /*
  * Rule 6, generated: tests/Support/route_permissions.php maps every protected api/v1 route to its permission and the
@@ -144,6 +146,16 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
             'branch_id' => $branch->id, 'station_id' => $station->id, 'created_by_user_id' => $actorId, 'started_by_user_id' => $actorId,
         ]);
         $params['{count}'] = (string) StockCount::factory()->forShift($shift, $place->id)->opening()->create(['created_by_user_id' => $actorId])->id;
+    }
+    if (str_contains($uri, '{file}')) {
+        // an unattached upload of the caller's own (anyone else's is the action's rule: 403 for a role without payments.void)
+        $file = new StoredFile;
+        $file->forceFill([
+            'branch_id' => $branch->id, 'client_uuid' => (string) Str::uuid(), 'purpose' => 'receipt', 'disk' => config('files.disk'),
+            'key' => 'receipts/'.$branch->id.'/matrix-'.Str::uuid().'.jpg', 'mime' => 'image/jpeg', 'bytes' => 10, 'width' => 10, 'height' => 10,
+            'sha256' => str_repeat('a', 64), 'uploaded_by_user_id' => $actorId,
+        ])->save();
+        $params['{file}'] = (string) $file->id;
     }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)
