@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Analytics\Read;
 
 use App\Shared\Tenancy\CurrentBranch;
+use App\Shared\Time\LocalDay;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\LazyCollection;
+use InvalidArgumentException;
 use stdClass;
 
 /**
@@ -34,6 +37,14 @@ final class Summaries
 
     private const array PERSON = ['orders_count', 'items_qty', 'revenue', 'payments_count', 'payments_amount', 'voids_count', 'refunds_count', 'lines_prepared',
         'prep_samples', 'prep_seconds_sum'];
+
+    /** The day-by-day tables and the rest of their primary key after (branch_id, day), the order dayRows() reads them in. */
+    private const array DIMENSIONS = [
+        'daily_channel_totals' => ['channel_id'],
+        'daily_item_metrics' => ['item_id'],
+        'daily_station_metrics' => ['station_id'],
+        'daily_user_metrics' => ['user_id', 'role_kind'],
+    ];
 
     public function __construct(private readonly CurrentBranch $branch) {}
 
@@ -170,6 +181,32 @@ final class Summaries
             ->get();
 
         return $this->byDay($rows);
+    }
+
+    /**
+     * Every row of a summary table over a period, a day at a time in primary-key order (the exports' day sheets, step 4.4d), read 500 at a
+     * time so memory stays flat.
+     *
+     * @return LazyCollection<int, stdClass>
+     */
+    public function dayRows(string $table, LocalDay $period): LazyCollection
+    {
+        $query = DB::table($table)->where('branch_id', $this->branch->id())->whereBetween('day', [$period->from, $period->to])->orderBy('day');
+        foreach (self::DIMENSIONS[$table] ?? throw new InvalidArgumentException("Summaries: {$table} has no day rows") as $column) {
+            $query->orderBy($column);
+        }
+
+        return $query->lazy(500);
+    }
+
+    /** How many rows dayRows() gives. */
+    public function countDayRows(string $table, LocalDay $period): int
+    {
+        if (! isset(self::DIMENSIONS[$table])) {
+            throw new InvalidArgumentException("Summaries: {$table} has no day rows");
+        }
+
+        return DB::table($table)->where('branch_id', $this->branch->id())->whereBetween('day', [$period->from, $period->to])->count();
     }
 
     /** The current branch's rows of $table from the window's first day to its last. */
