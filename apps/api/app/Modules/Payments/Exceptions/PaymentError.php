@@ -183,6 +183,15 @@ final class PaymentError extends RuntimeException
         return new self('payments.channel.order_incomplete', 422, ['field' => 'ids', 'missing' => $missing, 'unexpected' => $unexpected]);
     }
 
+    /**
+     * Step 4.3e: an order that is not paid in full has no receipt (a pro-forma may be asked for with ?proforma=1); a cancelled or a voided
+     * order has none at all. $status is the order's OrderStatus value.
+     */
+    public static function receiptUnpaid(string $status): self
+    {
+        return new self('payments.receipt.unpaid', 409, ['status' => $status]);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

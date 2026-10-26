@@ -45,6 +45,8 @@ trap '"$PHP_BIN" artisan up >/dev/null 2>&1 || true' EXIT
 "$PHP_BIN" artisan optimize
 [ -e public/storage ] || "$PHP_BIN" artisan storage:link
 "$PHP_BIN" artisan queue:restart || true
+# step 4.3e: register the receipts' Amharic font in storage/fonts now rather than on the first receipt; never fatal (a receipt does it itself)
+"$PHP_BIN" artisan receipts:fonts || echo "receipts:fonts failed: the first receipt registers the font itself (docs/runbook/server.md, Receipts)"
 
 # rsync mirrors the runner's modes; LiteSpeed needs a traversable site folder.
 chmod 711 "$APP_DIR"

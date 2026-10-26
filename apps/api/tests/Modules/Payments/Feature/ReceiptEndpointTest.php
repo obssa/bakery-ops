@@ -78,7 +78,7 @@ it('refuses the receipt of an order that is not paid in full, unless a pro-forma
         ->assertJsonStructure(['message_en', 'message_am']);
     $proforma = ($this->get)($order['id'], '?proforma=1')->assertOk();
 
-    expect(Receipts::text((string) $proforma->getContent()))->toContain('PRO-FORMA')->toContain('15.00', 'the balance still due');
+    expect(Receipts::text((string) $proforma->getContent()))->toContain('PRO-FORMA')->toContain('15.00'); // the balance still due
 });
 
 it('has no receipt for a cancelled or a voided order, pro-forma or not', function (string $status) {

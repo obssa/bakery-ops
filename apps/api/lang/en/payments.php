@@ -57,4 +57,9 @@ return [
         'reason_required' => 'Say why the payment is voided, in at most 255 characters.',
         'pin_required' => 'A manager must type their PIN (4 to 6 digits) to approve the void.',
     ],
+    // step 4.3e: receipts
+    'receipt' => [
+        'unpaid' => 'This order has no receipt: it is not paid in full. Ask for a pro-forma instead, or take the rest of the payment first.',
+        'link_invalid' => 'This receipt link is not valid, or it has expired. Ask the bakery for a new one.',
+    ],
 ];

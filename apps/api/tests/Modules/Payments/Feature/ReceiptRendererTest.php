@@ -74,7 +74,7 @@ it('prints the order number, the total as 12.50, the Amharic channel name and th
         ->toContain('9876')
         ->not->toContain('FT26TX00')
         ->toContain('7.50')
-        ->toContain('2.50', 'the change of the cash payment')
+        ->toContain('2.50') // the change of the cash payment
         ->toContain('Black tea')
         ->toContain('ሻይ');
     foreach ($this->staff as $name) {

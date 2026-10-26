@@ -20,10 +20,20 @@ declare(strict_types=1);
  * photo_max_age_hours: a receipt photo is attached to a payment only within this many hours of its upload (payments.photo.invalid,
  * reason expired), so an old photo found on the tablet is not passed off as today's transfer.
  *
+ * receipts (step 4.3e): fonts_dir is dompdf's font folder, where the bundled Noto Sans Ethiopic is registered on first use (null: storage/fonts,
+ * kept across deploys); a signed receipt link lives link_ttl_hours unless asked otherwise, at most link_max_ttl_hours; a receipt is at most
+ * max_pages pages.
+ *
  * Plain values only: no closures, so `config:cache` keeps working on the shared host (DeployableCachesTest).
  */
 return [
     'require_shift_for_cash' => (bool) env('PAYMENTS_REQUIRE_SHIFT_FOR_CASH', true),
     'require_shift' => env('PAYMENTS_REQUIRE_SHIFT'),
     'photo_max_age_hours' => 12,
+    'receipts' => [
+        'fonts_dir' => null,
+        'link_ttl_hours' => 72,
+        'link_max_ttl_hours' => 168,
+        'max_pages' => 2,
+    ],
 ];

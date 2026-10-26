@@ -6,6 +6,7 @@ use App\Modules\Payments\Http\Controllers\ChannelsController;
 use App\Modules\Payments\Http\Controllers\PaymentDecisionsController;
 use App\Modules\Payments\Http\Controllers\PaymentReadsController;
 use App\Modules\Payments\Http\Controllers\PaymentsController;
+use App\Modules\Payments\Http\Controllers\ReceiptsController;
 use App\Modules\Payments\Http\Controllers\ReceiptSettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,18 +25,24 @@ use Illuminate\Support\Facades\Route;
  * protection, tests/Support/public_routes.php). /payments/reconciliation and /payments/export are not a {payment}: it takes digits only.
  * Every route is listed in tests/Support/route_permissions.php and every write in tests/Support/write_endpoints.php.
  */
+Route::prefix('api/v1')->middleware(['api', 'signed'])->group(function (): void {
+    Route::get('/receipts/{order}', [ReceiptsController::class, 'show'])->whereNumber('order')->name('payments.receipts.show');
+});
+
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:payments.take')->group(function (): void {
         Route::get('/payment-channels', [ChannelsController::class, 'index'])->name('payments.channels');
         Route::post('/orders/{order}/payments', [PaymentsController::class, 'store'])->whereNumber('order')->middleware('idempotency')->name('payments.store');
         Route::post('/orders/{order}/payment-batches', [PaymentsController::class, 'batch'])->whereNumber('order')->middleware('idempotency')->name('payments.batches.store');
         Route::get('/receipt-settings', [ReceiptSettingsController::class, 'show'])->name('payments.receipt-settings.show');
+        Route::post('/orders/{order}/receipt-link', [ReceiptsController::class, 'link'])->whereNumber('order')->middleware('idempotency')->name('payments.receipt.link');
     });
 
     Route::middleware('permission:payments.view')->group(function (): void {
         Route::get('/orders/{order}/payments', [PaymentReadsController::class, 'forOrder'])->whereNumber('order')->name('payments.order');
         Route::get('/payments', [PaymentReadsController::class, 'index'])->name('payments.index');
         Route::get('/payments/{payment}', [PaymentReadsController::class, 'show'])->whereNumber('payment')->name('payments.show');
+        Route::get('/orders/{order}/receipt.pdf', [ReceiptsController::class, 'pdf'])->whereNumber('order')->name('payments.receipt.pdf');
     });
 
     // step 4.3c: the admin's decisions on a payment (payments.verify), and the void a manager's PIN approves (asked with orders.void_request)
