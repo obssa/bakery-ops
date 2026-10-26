@@ -166,5 +166,15 @@ return [
             'gate' => null,
             'deep_link' => '/admin/payments?payment={payment_id}',
         ],
+        // Phase 4 (step 4.4d): the summary of a week (plan 10.2 R-L: Telegram and the inbox, not email). The people who run the analytics
+        // (analytics.manage) hear of it on every channel they have switched on; one line per week and run (the Monday job is "scheduled",
+        // each manual send its own run). The line opens the dashboards on that week; its body carries the signed link to the week's PDF.
+        'weekly_summary' => [
+            'severity' => 'info',
+            'channels' => ['in_app', 'push', 'telegram'],
+            'inbox_key' => 'weekly_summary:{week_start}:{run}',
+            'gate' => null,
+            'deep_link' => '/admin/analytics?from={week_start}&to={week_end}',
+        ],
     ],
 ];

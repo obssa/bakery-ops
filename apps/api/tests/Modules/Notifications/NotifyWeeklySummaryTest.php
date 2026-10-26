@@ -76,7 +76,8 @@ it('writes one line per person per week and run: a redelivery adds nothing, anot
         ->and($line->severity)->toBe('info')
         ->and($line->dedupe_key)->toBe('weekly_summary:2026-11-16:scheduled')
         ->and($line->deep_link)->toBe('/admin/analytics?from=2026-11-16&to=2026-11-22')
-        ->and($line->payload['caused_by_user_id'] ?? 'missing')->toBeNull('the Monday job is nobody');
+        ->and(array_key_exists('caused_by_user_id', $line->payload))->toBeTrue()
+        ->and($line->payload['caused_by_user_id'])->toBeNull('the Monday job is nobody');
 });
 
 it('says how the week went, each name in the reader\'s language, with a signed link to the PDF in that language', function () {

@@ -25,3 +25,8 @@ Schedule::command('shifts:verify-chain')->dailyAt('03:00')->timezone('Africa/Add
 // cron line runs them), so they take seconds; a run that overruns is not started twice.
 Schedule::command('analytics:rebuild --nightly')->dailyAt('00:05')->timezone(config('analytics.timezone', 'Africa/Addis_Ababa'))->withoutOverlapping(30);
 Schedule::command('analytics:rebuild --since-last')->dailyAt('05:30')->timezone(config('analytics.timezone', 'Africa/Addis_Ababa'))->withoutOverlapping(30);
+
+// The weekly summary (phase-4 plan section 5 and 10.2 R-L, step 4.4d): on Monday at 07:00 in the shop's time, after the nightly run has queued
+// Saturday and Sunday and the 05:30 run has healed the late locks, the summary of the week that ended last night is announced once per
+// branch (WeeklySummaryReady; Notifications tells the admin in the inbox, by Telegram and push where those are on).
+Schedule::command('analytics:weekly-summary')->weeklyOn(1, '07:00')->timezone(config('analytics.timezone', 'Africa/Addis_Ababa'))->withoutOverlapping(30);

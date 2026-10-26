@@ -96,6 +96,12 @@ return [
             'title' => 'Payment disputed: order #:order_no',
             'body' => ':amount ETB paid by :channel on order #:order_no was disputed: :reason. Check it against the bank statement, then verify or void it.',
         ],
+        // Phase 4, step 4.4d: how the week went (Monday morning, or sent by hand)
+        'weekly_summary' => [
+            'title' => 'Weekly summary: :from to :to',
+            'body' => 'Revenue :revenue ETB (:revenue_change on :revenue_before ETB the week before), :orders orders (:orders_before the week before). Best margins: :best. Lowest margins: :worst. Channels: :channels. Refunds :refunds ETB, voids :voids ETB. Count variances: :variance_lines lines, cash :cash_variance ETB. Stock-outs: :stockouts. The full summary (PDF, 7 days): :pdf',
+            'body_no_link' => 'Revenue :revenue ETB (:revenue_change on :revenue_before ETB the week before), :orders orders (:orders_before the week before). Best margins: :best. Lowest margins: :worst. Channels: :channels. Refunds :refunds ETB, voids :voids ETB. Count variances: :variance_lines lines, cash :cash_variance ETB. Stock-outs: :stockouts.',
+        ],
     ],
 
     'chain_kind' => [
@@ -110,6 +116,12 @@ return [
         'closing' => 'closing',
     ],
     'count_more' => 'and :more more',
+
+    // the weekly summary's words for an empty list and for a week before with nothing to compare (step 4.4d)
+    'weekly' => [
+        'none' => 'none',
+        'no_change' => 'nothing to compare',
+    ],
 
     // Step 2.5b: the refusal of a driver that is not switched on (message_key notifications.driver.disabled), and the few
     // lines the Telegram bot answers with (written in the language of the person when it knows them, else in both).

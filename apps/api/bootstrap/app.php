@@ -61,9 +61,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (UnauthorizedException $e, Request $request) => $api($request) ? ApiError::json('auth.forbidden', 403) : null);
         $exceptions->render(fn (ModelNotFoundException $e, Request $request) => $api($request) ? ApiError::json('http.not_found', 404) : null);
         $exceptions->render(fn (NotFoundHttpException $e, Request $request) => $api($request) ? ApiError::json('http.not_found', 404) : null);
-        // a signed link: a receipt's (step 4.3e) says so in the customer's words, a stored image's (step 4.2a) keeps its own key
+        // a signed link: a receipt's (step 4.3e) and a weekly summary's (step 4.4d) say so in their reader's words, a stored image's (step 4.2a)
+        // keeps its own key
         $exceptions->render(fn (InvalidSignatureException $e, Request $request) => $api($request)
-            ? ApiError::json($request->is('api/v1/receipts/*') ? 'payments.receipt.link_invalid' : 'files.invalid_signature', 403)
+            ? ApiError::json(match (true) {
+                $request->is('api/v1/receipts/*') => 'payments.receipt.link_invalid',
+                $request->is('api/v1/weekly-summaries/*') => 'analytics.weekly.link_invalid',
+                default => 'files.invalid_signature',
+            }, 403)
             : null);
         $exceptions->render(fn (ThrottleRequestsException $e, Request $request) => $api($request) ? ApiError::json('http.too_many_requests', 429)->withHeaders($e->getHeaders()) : null);
 

@@ -19,6 +19,8 @@ use App\Shared\Live\Broadcasts\OrderPaidBroadcast;
 use App\Shared\Live\Broadcasts\OrderSentBroadcast;
 use App\Shared\Live\Broadcasts\OrderVoidedBroadcast;
 use App\Shared\Live\Broadcasts\StockChangedBroadcast;
+use App\Shared\Reports\NoWeeklySummaryLinks;
+use App\Shared\Reports\WeeklySummaryLinks;
 use App\Shared\Shifts\NoOpenShifts;
 use App\Shared\Shifts\OpenShifts;
 use App\Shared\Tenancy\CurrentBranch;
@@ -44,6 +46,8 @@ final class SharedServiceProvider extends ServiceProvider
         $this->app->scoped(ActorContext::class, static fn (): ActorContext => new ActorContext);
         // which shift runs at a station: Shifts rebinds it (step 3.2b); until then nothing runs (dependency-graph.md, cycle 1)
         $this->app->scoped(OpenShifts::class, static fn (): OpenShifts => new NoOpenShifts);
+        // the signed link to a weekly summary's PDF: Analytics rebinds it (step 4.4d); until then none can be made
+        $this->app->scoped(WeeklySummaryLinks::class, static fn (): WeeklySummaryLinks => new NoWeeklySummaryLinks);
     }
 
     public function boot(): void
