@@ -539,7 +539,9 @@
       "needs": {
         "orders": [
           "Orders\\Facts::sales(range)",
-          "Orders\\Facts::lines(range)"
+          "Orders\\Facts::lines(range)",
+          "Orders\\Facts::voids(range)",
+          "Orders\\Facts::stationLines(range)"
         ],
         "payments": [
           "Payments\\Facts::payments(range)",
@@ -836,7 +838,8 @@
         "each port names its clock (orders settled_at, payments received_at, refunds refunded_at, batches finished_at, movements created_at, shifts opening and lock dates)",
         "facts exclude voided payments and voided/cancelled/open orders; branch isolation; deterministic (day, id) order",
         "closingBalances(day) equals Stock::balanceAt(end of local day); unitCosts(day) equals the item_cost_history row in force",
-        "Shifts\\Facts::instances returns a shift once for any range holding a local day of its life (a Night shift)"
+        "Shifts\\Facts::instances returns a shift once for any range holding a local day of its life (a Night shift)",
+        "step 4.4a additions: Orders voids (voided_at / cancelled_at) and stationLines (once per local day a line was readied, served or rejected); PaymentFact duplicate_reference; RefundFact order_refund_id; StockOutFact station_id; ShiftFact variance_line_count and cash_variance of its final counts; Catalog ItemSummary categoryId"
       ],
       "note": "committed red by 4.1a; the mod-analytics job adds the group to its contracts input in step 4.1c, when the ports exist"
     },

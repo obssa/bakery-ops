@@ -169,7 +169,7 @@
         "contracts": "in_progress",
         "shared.files": "done",
         "payments": "in_progress",
-        "analytics": "todo",
+        "analytics": "in_progress",
         "web": "todo",
         "docs": "todo"
       },
@@ -258,7 +258,7 @@
     },
     "analytics": {
       "phase": 4,
-      "status": "todo",
+      "status": "in_progress",
       "stable_since": null
     }
   }

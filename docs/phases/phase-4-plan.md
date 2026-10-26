@@ -117,7 +117,7 @@ PostgreSQL both), and every migration is a thin portable DDL (no partial indexes
 | M12 | `create_analytics_days_table` | Analytics | `analytics_days`: PK `(branch_id, day)`, `day` DATE (local), `version` INT UNSIGNED, `rebuilt_at` DATETIME(6), `trigger` VARCHAR(16) CHECK in (`shift_locked`, `nightly`, `manual`, `touch`, `seed`), `duration_ms` INT UNSIGNED, `row_counts` JSON, `fingerprint` CHAR(64) (sha256 of the canonical sums of every summary row of the day, so two rebuilds can be compared with one string), `changed` BOOL (the fingerprint differs from the previous run). It is the lock target of `Rebuild::day` and the freshness feed. Derived data: physical delete allowed (ADR 0014). |
 | M13 | `create_daily_sales_tables` | Analytics | `daily_sales` PK `(branch_id, day)`: `orders_count` INT, `items_qty` DECIMAL(14,4), `subtotal` / `discount_total` / `tax_total` / **`revenue`** DECIMAL(12,2), `avg_ticket` DECIMAL(12,2), `voided_count`, `voided_total`, `cancelled_count`, `refund_count`, `refund_total`, `net_revenue` (= revenue - refund_total, cash basis), `dine_in_revenue`, `takeaway_revenue`, `delivery_revenue`, `advance_revenue`, `rebuilt_at`. `daily_hour_sales` PK `(branch_id, day, hour)` `hour` TINYINT 0-23: `orders_count`, `items_qty`, `revenue`. |
 | M14 | `create_daily_channel_totals_table` | Analytics | PK `(branch_id, day, channel_id)`: `receipts_count`, **`amount`** DECIMAL(12,2), `refund_count`, `refund_amount`, `net_amount`, `without_reference_count`, `without_photo_count`, `verified_count`, `disputed_count`, `duplicate_reference_count`, `rebuilt_at`. |
-| M15 | `create_daily_item_metrics_table` | Analytics | PK `(branch_id, day, item_id)`: `category_id`, `kind` CHAR(10), `units_sold_qty`, `refunded_qty`, `produced_qty`, `consumed_qty`, `waste_qty`, `purchased_qty`, `adjusted_qty` (signed), `stockout_count`, `closing_on_hand_qty` (all DECIMAL(14,4)), `revenue`, `cogs_total`, `margin_total`, `closing_value_total` (DECIMAL(12,2)), `cogs_complete` BOOL (false when a used ingredient has no cost yet), `rebuilt_at`. |
+| M15 | `create_daily_item_metrics_table` | Analytics | PK `(branch_id, day, item_id)`: `category_id`, `kind` VARCHAR(10) (as built; CHAR pads on PostgreSQL), `units_sold_qty`, `refunded_qty`, `produced_qty`, `consumed_qty`, `waste_qty`, `purchased_qty`, `adjusted_qty` (signed), `closing_on_hand_qty` (all DECIMAL(14,4)), `stockout_count` INT, `revenue`, `cogs_total`, `margin_total`, `closing_value_total` (DECIMAL(12,2)), `cogs_complete` BOOL (false when a used ingredient has no cost yet), `rebuilt_at`. |
 | M16 | `create_daily_station_and_user_metrics_tables` | Analytics | `daily_station_metrics` PK `(branch_id, day, station_id)`: `tickets_count`, `lines_served`, `lines_rejected`, `avg_prep_seconds` INT NULL, `p90_prep_seconds` INT NULL, `batches_finished`, `produced_qty`, `waste_qty`, `shifts_count`, `shifts_locked_count`, `variance_line_count`, `cash_variance_total` DECIMAL(12,2), `stockout_count`. `daily_user_metrics` PK `(branch_id, day, user_id, role_kind)` `role_kind` in (`waiter`, `cashier`, `station`): `orders_count`, `items_qty`, `revenue`, `payments_count`, `payments_amount`, `voids_count`, `refunds_count`, `lines_prepared`, `avg_prep_seconds`. (The manifest names four tables; `daily_hour_sales` and `daily_user_metrics` are this plan's additions for the hour and waiter/cashier dimensions of architecture section 8, 10.9.) |
 | M17 | `add_audit_log_read_indexes` | Audit | `(branch_id, id)`, `(branch_id, action, id)`, `(branch_id, subject_type, subject_id, id)`, `(branch_id, actor_id, id)` for the Audit UI's filters. Only indexes: the append-only triggers do not care. |
 
@@ -128,6 +128,8 @@ Invariant consequences, decided here so the checks do not surprise the build:
   operational writes); `BranchIdTest` still demands `branch_id NOT NULL` + FK + index on all of them (it is part of every primary key).
   `NumericColumnsTest` stays satisfied: money DECIMAL(12,2), quantities DECIMAL(14,4), no column named `*cost*` outside the (14,4) rule
   (`cogs_total` is a total of money, 12,2).
+  **As built (4.4a):** Analytics has no models (it writes with the query builder), so `SoftDeletesTest` and `BranchScopedTest`, which read
+  models, need no allowlist; `BranchIdTest` and `NumericColumnsTest` pass unchanged.
 - `payment_refunds`, `order_refunds`, `order_refund_lines`, `stock_movement_reversals` join the append-only list of `AppendOnlyTest`.
 - `docs/erd.dbml` and `docs/openapi.json` are regenerated in the PR that adds each table / route (`erd-check`, `openapi-check`).
 
@@ -702,13 +704,77 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `item_cost_history`), rounded **once** per item-day half-up, so the figure never changes just because a later purchase moved the average; a product without a recipe or an ingredient without a
      cost sets `cogs_complete = false` and counts 0, never an estimate. **Atomicity and idempotency:** `Rebuild::day` (1) upserts the `analytics_days` row with a no-op update (never lock a row
      that may not exist: the first-row race of traps.md), (2) `SELECT ... FOR UPDATE` it, (3) reads every Facts port inside that transaction (a consistent snapshot after the lock), (4) builds all rows
-     in memory, (5) `DELETE`s that `(branch, day)` from each summary table and bulk `INSERT`s the rows in primary-key order, (6) writes `version+1`, the fingerprint and `changed`. A failure rolls
+     in memory, (5) `DELETE`s that `(branch, day)` from each summary table and bulk `INSERT`s the rows in primary-key order (as built: upserts in primary-key order, then the
+     day's stale rows deleted by their full key, never a range, see the As built note), (6) writes `version+1`, the fingerprint and `changed`. A failure rolls
      everything back, so a day is either the old rows or the new rows. Two rebuilds of unchanged facts produce **identical rows** (the fingerprint equals; only `rebuilt_at` and `version` move).
      The console `analytics:rebuild {--branch=} {--from=} {--to=} {--nightly} {--since-last} {--sync}`; the queued `RebuildDay` job (`ShouldBeUnique` by `branch:day`, `uniqueFor` 120, `tries` 3, a
      failure is logged with the day and never the facts). `CurrentBranch::runAs($branchId, ...)` is used for a queued or console rebuild (verify in the PR whether Phase 2's queued actor already
      provides it; if not, add the helper to Shared with its own test). Tests: `RebuildDayTest` (every column against a hand-built oracle for a fixture day), `RebuildIdempotentTest` (twice: same fingerprint, same rows),
      `RebuildBoundaryTest` (orders at 23:59 and 00:01 local, a Night shift, the day before and after), `RebuildRaceTest` (two forks, `concurrency` group, one wins, rows never doubled, never missing),
      `RebuildRollbackTest` (an exception in the middle leaves the old rows), `RebuildCogsTest`, `RebuildRefundDayTest` (a refund on D+1 of an order of D lands on D+1), ADR 0014 (proposed).
+   - **As built (step 4.4a, `phase-4/analytics-rebuild`).** Order: the contract cases for what the tables need of the ports and the
+     `CurrentBranch::runAs` test (red: 7 + 5), then the provider work with `app/Modules/Analytics` untouched; the module's tests (red: 64 on the
+     missing classes, tables and command); M12 to M16 and the six builders; `Rebuild::day`, the job and the command; ERD, manifest, STATUS,
+     ADR 0014 (proposed) and this note. Where the code disagreed with the plan or the plan left a choice:
+     - **The ports did not carry everything the columns need**, so they grew first, contract-first (`contract:analytics->facts`, now 17 cases;
+       every field added at the end of its row with a default): `Orders\Facts::voids(range)` (`VoidFact`: voided orders by `voided_at`,
+       cancelled ones by `cancelled_at`, the total, the owner, who asked) and `Orders\Facts::stationLines(range)` (`StationLineFact`: a station
+       line once per local day on which it was readied, served or rejected, whatever its order became, with all four instants and the
+       preparer), because `lines()` is bucketed by the order's `settled_at` and leaves rejected lines out; `PaymentFact::duplicateReference`
+       (Payments' own R-B rule, one indexed `EXISTS`, so no reference leaves Payments); `RefundFact::orderRefundId` (a refund over two
+       payments is one refund); `StockOutFact::stationId` (the location's station); `ShiftFact::varianceLineCount` and `cashVariance` (the
+       shift's counts that are approved or locked and not superseded); Catalog `ItemSummary::categoryId`. The manifest's `analytics.needs`
+       and the contract's case list say so.
+     - **`CurrentBranch::runAs($branchId, $callback)`** did not exist (Phase 2's queued work uses `ActorContext::runAs` and sets the branch by
+       hand in `RestoresActor`), so it is in Shared with `CurrentBranchRunAsTest`: the branch for the callback, exactly the previous state
+       afterwards (also on a throw), `BranchNotResolved::unknown` for a missing branch. An unresolved branch means no branch filter at all,
+       so every rebuild resolves it.
+     - **M12 to M16** are `2026_11_04_100100` to `100500` (`analytics_days`; `daily_sales` + `daily_hour_sales`; `daily_channel_totals`;
+       `daily_item_metrics`; `daily_station_metrics` + `daily_user_metrics`): `branch_id` leads every primary key, FKs to the dimension's table,
+       CHECKs `analytics_days_trigger_check` (the column `trigger` is a MySQL reserved word, quoted through the grammar), `daily_hour_sales_hour_check`,
+       `daily_item_metrics_kind_check`, `daily_user_metrics_role_kind_check`; `kind` is VARCHAR(10) and `stockout_count` an INT (section 3
+       corrected); INDEX `(branch_id, item_id, day)` for the product page. New and empty, safe on live. The manifest already listed the
+       seven tables under `tables` (4.1a), so nothing moved. Analytics has no models (query builder only), so `SoftDeletesTest` and
+       `BranchScopedTest` need no allowlist.
+     - **A day is replaced by upserts, never by a range `DELETE`** (section 6 item (5) corrected). Each table's day is written as upserts in
+       primary-key order and the rows it no longer has are deleted by their full key. A range `DELETE` takes a gap lock after the day, and a
+       rebuild of the neighbouring day that inserts a row into that gap deadlocks with it: `RebuildRaceTest` found InnoDB deadlocks (1213) within
+       30 rounds both when the delete ran on an empty day and, with the empty delete skipped, when rows appeared on both sides of the day
+       border; with the upserts, none.
+     - **The figures, where the plan left a choice** (ADR 0014 has the clock table): `daily_sales` has a row for every built day, zeros on a
+       quiet one; the other tables only where there is a figure. Tickets are the orders whose lines the station readied or rejected that day;
+       prep time is `accepted_at` to `ready_at` of the lines readied that day (a line readied straight from the queue has no sample), the
+       mean half-up and the nearest-rank 90th percentile in whole seconds. A shift counts on every local day from its opening to its lock (to
+       its cancellation for a cancelled one; from its opening on while it runs; never if it never opened); its variance lines and cash
+       variance count on its `date` only. `without_reference_count` and `without_photo_count` count literally, as the 4.3e reconciliation does
+       (cash has neither). `voids_count` is on the `waiter` row of the person who asked for the void; `refunds_count` on the `cashier` row of
+       the person who paid it back. `consumed_qty` is `production_consume` (batches and station lines at READY); `sale`, `transfer`,
+       `reservation*` and `return` movements are not item figures (units sold come from the lines). An item with stock but no cost has
+       `closing_value_total` 0. `refunded_qty` is 0 until order refunds exist (4.1b; the money side of refunds is counted already).
+     - **COGS** as R-K: the snapshotted version's required lines (optional ones left out, as `RecipeCost`), each at `unitCosts(day)`, exact,
+       rounded half-up once per item-day; a line with no version is costed at the product's own cost. A modifier's recipe delta is not costed
+       (`LineFact` does not carry it). **For Ramin:** display-case products made in the house (croissants, cakes) snapshot no recipe version
+       (Orders records one only for made-to-order lines) and have no cost of their own (costs come from purchases and opening costs only), so
+       their `cogs_complete` is false and their COGS 0 until Orders snapshots the version on such lines or Production values its output.
+     - **`Rebuild::day`** refuses an unknown trigger, a malformed day, a day after today in the branch's zone (`InvalidArgumentException`)
+       and a missing branch (`BranchNotResolved`) before writing anything. The placeholder row of the upsert (version 0, no fingerprint) only
+       exists inside the transaction. `AnalyticsDayRebuilt` (`App\Shared\Events`: day, trigger, version, changed) is dispatched after the
+       commit, never for a rollback.
+     - **`RebuildDay`** (`Analytics\Jobs`): unique by `{branch}:{day}` for 120 s, 3 tries, `failed()` logs `analytics.rebuild.failed` with the
+       branch, the day, the trigger and the class of the error only (a query error's message carries its bound values).
+     - **`analytics:rebuild`**: exactly one of `--from[/--to]` (trigger `manual`, at most `analytics.rebuild_max_days` = 400, never after today),
+       `--nightly` (`analytics.rebuild_days_back` days before today in each branch's zone) or `--since-last` (every local day in the life of a
+       shift locked after that day's `rebuilt_at`, among the shifts of the last `analytics.since_last_days` = 7 days; trigger `shift_locked`);
+       `--branch`, `--sync`. A bad call exits 2 and writes nothing; a failed day is logged as the job does and the command exits 1. No
+       schedule yet (4.4b).
+     - **Tests**: unit `SalesBuilderTest`, `HourBuilderTest`, `ChannelBuilderTest`, `ItemBuilderTest`, `StationBuilderTest`, `UserBuilderTest`,
+       `FingerprintTest` (25, plain `Facts` rows from `Tests\Support\AnalyticsFacts`); feature `AnalyticsSchemaTest`, `RebuildDayTest` (a day made
+       through the real actions with the three shift rules on, every column against figures worked out by hand), `RebuildIdempotentTest`,
+       `RebuildBoundaryTest`, `RebuildRollbackTest` (the failure planted by a query listener half way through the writes), `RebuildCogsTest`,
+       `RebuildRefundDayTest` (factory `payment_refunds` rows), `RebuildCommandTest` (Queue::fake and its sync twin); `tests/Gate/RebuildRaceTest`
+       (forked, `concurrency`, 30 rounds each: the same day, and two neighbouring days from nothing, over the same rows and over rows that come
+       and go at the border; `Innodb_deadlocks` unchanged). No test turns a shift rule off.
+     - STATUS: phase 4's `analytics` step and the module are `in_progress`.
    - **4.4b `phase-4/analytics-triggers`**: the listeners of section 5 (`RebuildAfterShiftLocked`, `TouchToday` debounce), the scheduler entries, `POST /analytics/rebuild`, `GET /analytics/freshness`,
      `analytics.manage` and `analytics.view_own` use. Tests: `ShiftLockedTriggersRebuildTest` (a locked Night shift queues both days), `TouchTodayDebounceTest` (20 payments in a minute: one job),
      `NightlyScheduleTest` (the entries exist with `timezone('Africa/Addis_Ababa')`, `withoutOverlapping`; a `Carbon::setTestNow` run at 00:05 local rebuilds the two days), `RebuildEndpointTest`
