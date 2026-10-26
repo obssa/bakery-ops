@@ -182,17 +182,16 @@ final class Summaries
      * The window's rows of $table grouped by period and $keys, with SUM($sums).
      *
      * @param  list<string>  $keys
-     * @param  list<string>  $sums
+     * @param  list<literal-string>  $sums  plain column names of the table (this class's constants), so the SQL is the code's own
      */
     private function grouped(string $table, Window $window, array $keys, array $sums): Builder
     {
-        $grammar = DB::getQueryGrammar();
         $query = $this->span($table, $window)->selectRaw('CASE WHEN day >= ? THEN 0 ELSE 1 END AS period', [$window->current->from]);
         foreach ($keys as $key) {
             $query->addSelect($key);
         }
         foreach ($sums as $column) {
-            $query->addSelect(new Expression('SUM('.$grammar->wrap($column).') AS '.$grammar->wrap($column)));
+            $query->addSelect(new Expression('SUM('.$column.') AS '.$column));
         }
 
         return $query->groupBy(['period', ...$keys]);
