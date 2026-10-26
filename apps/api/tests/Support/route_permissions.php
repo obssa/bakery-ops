@@ -11,7 +11,7 @@ declare(strict_types=1);
  *
  * `identity.authenticated` is the gate ability every active user holds (GET /me, POST /logout): it is a permission
  * check in the middleware sense (can:) without being a matrix permission. Uris keep the literal route placeholders;
- * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {endpoint}, {request}, {table}, {order} (an open cart of the caller's own), {reason}, {count}, {channel}, {payment} and {line}
+ * the matrix test substitutes {id}, {item}, {category}, {location}, {transfer}, {notification}, {endpoint}, {request}, {table}, {order} (an open cart of the caller's own), {reason}, {count}, {channel}, {payment}, {report} (sales) and {line}
  * (a queued line of a sent order of the caller's own, at a station the caller is assigned to) with a row of the right
  * table in the caller's branch, and
  * runs each module's routes in that module's Pest group (module:<module>).
@@ -270,4 +270,8 @@ return [
     'GET /api/v1/analytics/stations' => ['permission' => 'analytics.view_own', 'roles' => $all, 'module' => 'analytics'],
     'GET /api/v1/analytics/staff' => ['permission' => 'analytics.view_own', 'roles' => $all, 'module' => 'analytics'],
     'GET /api/v1/analytics/shifts' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
+    // the exports and the weekly summary (step 4.4d): an export is a dashboard's (analytics.view: admin, manager); sending the weekly summary
+    // by hand is the admin's (analytics.manage). GET /weekly-summaries/{week} is public by design (signed link, tests/Support/public_routes.php).
+    'GET /api/v1/analytics/exports/{report}' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
+    'POST /api/v1/analytics/weekly-summary/send' => ['permission' => 'analytics.manage', 'roles' => ['admin'], 'module' => 'analytics'],
 ];
