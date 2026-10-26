@@ -84,4 +84,34 @@ test.describe("p3 admin shifts", () => {
       await context.close();
     }
   });
+
+  // A crash seen on the live site: the admin overview's stations panel and the admin shifts screens both read GET /me under one query
+  // key, one caching the whole answer and the other its work_stations list. Opening the overview first and then the Shifts tab (a client
+  // navigation, so the query cache is kept) handed the setup check an object where it wanted a list, and the page fell over with
+  // "e.stations.filter is not a function". A full reload of the Shifts page hid it. Read-only, so it carries @live.
+  test("the Shifts tab opens after the admin overview without a page error @live", async ({ page }) => {
+    const credentials = requireAdmin(test.skip);
+    const { api: admin } = await loginOnce(credentials.phone, credentials.password);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    let meAnswers = 0;
+    page.on("response", (response) => {
+      if (response.request().method() === "GET" && new URL(response.url()).pathname === "/api/v1/me" && response.ok()) meAnswers += 1;
+    });
+
+    await openAs(page, admin, "en/admin/");
+    await expect(page.getByRole("heading", { name: "Admin console", level: 1 })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "Stations and shifts" })).toBeVisible({ timeout: 30_000 });
+    // the session's own GET /me, then the stations panel's: the panel's answer is in the query cache before the tab is clicked
+    await expect.poll(() => meAnswers, { timeout: 30_000 }).toBeGreaterThanOrEqual(2);
+
+    await page.getByRole("navigation", { name: "Admin sections" }).getByRole("link", { name: "Shifts", exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/en\/admin\/shifts\/?$/, { timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: "Shifts", level: 1 })).toBeVisible({ timeout: 30_000 });
+    // the setup check answers (it runs once the stations and the templates are both in): the step that threw
+    const setup = page.getByRole("region", { name: "Setup check" });
+    await expect(setup.getByText(/^(Everything is in place|Shifts work best when these are fixed)/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "Shifts running now" })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
