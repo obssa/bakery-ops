@@ -3081,6 +3081,50 @@
                 }
             }
         },
+        "/v1/analytics/freshness": {
+            "get": {
+                "operationId": "analytics.freshness",
+                "tags": [
+                    "Freshness"
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/stations/{station}/handover": {
             "get": {
                 "operationId": "shifts.handover",
@@ -7811,6 +7855,100 @@
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/analytics/rebuild": {
+            "post": {
+                "operationId": "analytics.rebuild",
+                "tags": [
+                    "Rebuild"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RebuildRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "from": {
+                                            "type": "string"
+                                        },
+                                        "to": {
+                                            "type": "string"
+                                        },
+                                        "sync": {
+                                            "type": "boolean"
+                                        },
+                                        "queued": {
+                                            "type": "integer"
+                                        },
+                                        "days": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "from",
+                                        "to",
+                                        "sync",
+                                        "queued",
+                                        "days"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "from": {
+                                            "type": "string"
+                                        },
+                                        "to": {
+                                            "type": "string"
+                                        },
+                                        "sync": {
+                                            "type": "boolean"
+                                        },
+                                        "days": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "from",
+                                        "to",
+                                        "sync",
+                                        "days"
+                                    ]
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -15150,6 +15288,27 @@
                 },
                 "title": "ReadAllRequest"
             },
+            "RebuildRequest": {
+                "type": "object",
+                "description": "POST /analytics/rebuild (phase-4 plan section 4.6, step 4.4b): {from, to?, sync?}. `from` and `to` are local dates (YYYY-MM-DD, from not\nafter to; a missing `to` is `from`), `sync` a boolean (false by default). Never a day after today (422 analytics.range.future {today}); at\nmost analytics.rebuild_inline_max_days (7) days with sync, analytics.rebuild_queue_max_days (31) without (422 analytics.range.too_large\n{max_days}); anything else 422 validation.failed.",
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "sync": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "from"
+                ],
+                "title": "RebuildRequest"
+            },
             "ReceiptLinkRequest": {
                 "type": "object",
                 "description": "POST /orders/{order}/receipt-link (step 4.3e): {ttl_hours?: a whole number of 1 to payments.receipts.link_max_ttl_hours (168),\npayments.receipts.link_ttl_hours (72) when left out, locale?: en|am|both}. Anything else is 422 validation.failed.",
@@ -16903,7 +17062,8 @@
                                 "shifts.replay",
                                 "files.upload",
                                 "payments.view",
-                                "payments.verify"
+                                "payments.verify",
+                                "analytics.manage"
                             ]
                         }
                     },
@@ -17639,7 +17799,8 @@
                                 "shifts.replay",
                                 "files.upload",
                                 "payments.view",
-                                "payments.verify"
+                                "payments.verify",
+                                "analytics.manage"
                             ]
                         }
                     },
