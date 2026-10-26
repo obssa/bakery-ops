@@ -10,11 +10,14 @@ use App\Shared\Models\IdempotencyKey;
 use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
 use Closure;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
+use JsonException;
 use LogicException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -27,6 +30,11 @@ use Symfony\Component\HttpFoundation\Response;
  *   - the same key with a different fingerprint is 422;
  *   - 5xx responses are not stored, so a transient failure can be retried with the same key;
  *   - snapshots expire after config('bakery.idempotency.ttl_hours').
+ * Secrets (step 4.3e): the fields named in SECRET_FIELDS (a PIN, a short code, a password) are left out of the fingerprint at any depth, so
+ * nobody who reads idempotency_keys can find a 4 to 6 digit PIN by hashing the rest of the body with every candidate. The same key with every
+ * other field equal is therefore the same request whatever secret came with it: a success is replayed (the PIN is not checked again), and a
+ * refusal of a request that carried a secret is not stored at all (a wrong PIN wrote nothing, and the same key with the right PIN must be
+ * checked again). An answer that itself carries a secret (the short-code reset hands the new code back) is stored encrypted with the app key.
  * Runs after authentication: it needs a resolved CurrentBranch and an authenticated ActorContext.
  */
 final class Idempotency
@@ -36,6 +44,13 @@ final class Idempotency
     public const string REPLAYED_HEADER = 'Idempotency-Replayed';
 
     private const array WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
+    /**
+     * The request fields that hold a secret, matched by name at any depth: the approver's PIN of a void, a person's short code and their
+     * password (People). None of them is part of a fingerprint, and an answer carrying one is stored encrypted. The migration
+     * 2026_11_03_100100_clear_secret_fingerprints_of_idempotency_keys keeps its own copy of the list for the rows written before.
+     */
+    public const array SECRET_FIELDS = ['password', 'pin', 'short_code'];
 
     public function __construct(
         private readonly CurrentBranch $branch,
@@ -63,6 +78,7 @@ final class Idempotency
         $branchId = $this->branch->id();
         $userId = $this->actor->requireUserId();
         $fingerprint = self::fingerprint($request);
+        $carriesSecret = self::holdsSecret($request->all());
 
         $lock = Cache::lock(self::lockName($branchId, $userId, $key), self::lockSeconds());
         if (! $lock->get()) {
@@ -86,13 +102,14 @@ final class Idempotency
                     return ApiError::json('idempotency.key_reused', 422);
                 }
                 if ($stored->response_status !== null && $stored->response_body !== null) {
-                    return self::replay($stored);
+                    // an encrypted answer the app key no longer opens cannot be replayed, and running the write again could repeat it
+                    return self::replay($stored) ?? ApiError::json('idempotency.key_reused', 422);
                 }
             }
 
             $response = $next($request);
 
-            if ($response->getStatusCode() < 500) {
+            if (self::keeps($response->getStatusCode(), $carriesSecret)) {
                 IdempotencyKey::query()->updateOrCreate(
                     ['branch_id' => $branchId, 'user_id' => $userId, 'key' => $key],
                     [
@@ -117,13 +134,26 @@ final class Idempotency
     }
 
     /**
-     * sha256 over method, path and the canonically ordered input: the same key with other input is a reuse. For a multipart request each
-     * uploaded file stands for the sha256 of its bytes (never the whole body, and never its client-chosen name or temporary path), so the
-     * same key with the same picture replays and the same key with another picture is a reuse (step 4.2b).
+     * Whether an answer is stored: never a server error (the client may retry), and for a request that carried a secret only a success,
+     * because a refusal there may be about the secret itself (a wrong or malformed PIN) and the fingerprint cannot tell two PINs apart.
+     */
+    private static function keeps(int $status, bool $carriesSecret): bool
+    {
+        if ($status >= 500) {
+            return false;
+        }
+
+        return ! $carriesSecret || ($status >= 200 && $status < 300);
+    }
+
+    /**
+     * sha256 over method, path and the canonically ordered input without its secret fields: the same key with other input is a reuse. For a
+     * multipart request each uploaded file stands for the sha256 of its bytes (never the whole body, and never its client-chosen name or
+     * temporary path), so the same key with the same picture replays and the same key with another picture is a reuse (step 4.2b).
      */
     private static function fingerprint(Request $request): string
     {
-        $input = self::withFileHashes($request->all());
+        $input = self::withoutSecrets(self::withFileHashes($request->all()));
         self::sortKeysDeep($input);
 
         return hash('sha256', $request->getMethod().' '.$request->path().' '.json_encode(
@@ -153,6 +183,37 @@ final class Idempotency
 
     /**
      * @param  array<array-key, mixed>  $value
+     * @return array<array-key, mixed>
+     */
+    private static function withoutSecrets(array $value): array
+    {
+        foreach ($value as $name => $item) {
+            if (in_array($name, self::SECRET_FIELDS, true)) {
+                unset($value[$name]);
+            } elseif (is_array($item)) {
+                $value[$name] = self::withoutSecrets($item);
+            }
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $value
+     */
+    private static function holdsSecret(array $value): bool
+    {
+        foreach ($value as $name => $item) {
+            if (in_array($name, self::SECRET_FIELDS, true) || (is_array($item) && self::holdsSecret($item))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $value
      */
     private static function sortKeysDeep(array &$value): void
     {
@@ -175,18 +236,31 @@ final class Idempotency
         if (str_contains($contentType, 'json')) {
             $decoded = json_decode($content, true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return ['kind' => 'json', 'data' => $decoded];
+                return self::holdsSecret($decoded)
+                    ? ['kind' => 'encrypted', 'data' => Crypt::encryptString($content)]
+                    : ['kind' => 'json', 'data' => $decoded];
             }
         }
 
         return ['kind' => 'raw', 'data' => $content, 'content_type' => $contentType];
     }
 
-    private static function replay(IdempotencyKey $stored): Response
+    /** The stored answer again, or null when an encrypted one cannot be opened (the app key changed, or the row was altered). */
+    private static function replay(IdempotencyKey $stored): ?Response
     {
         $snapshot = $stored->response_body ?? [];
         $status = (int) $stored->response_status;
         $data = $snapshot['data'] ?? null;
+
+        if (($snapshot['kind'] ?? 'raw') === 'encrypted') {
+            try {
+                $data = json_decode(Crypt::decryptString(is_string($data) ? $data : ''), true, 512, JSON_THROW_ON_ERROR);
+            } catch (DecryptException|JsonException) {
+                return null;
+            }
+
+            return (new JsonResponse(is_array($data) ? $data : [], $status))->header(self::REPLAYED_HEADER, 'true');
+        }
 
         if (($snapshot['kind'] ?? 'raw') === 'json') {
             $response = new JsonResponse(is_array($data) ? $data : [], $status);
