@@ -264,8 +264,8 @@ it('answers what a receipt prints of an order: number, date, type, table, the ch
                 'line_id' => $sandwich['id'], 'item_id' => $m->sandwich->id, 'name_en' => 'Chicken sandwich', 'name_am' => $m->sandwich->name_am,
                 'qty' => '2.0000', 'unit_price' => '250.00', 'modifier_price' => '60.00', 'line_total' => '620.00',
                 'modifiers' => [
-                    ['name_en' => 'Extra chicken', 'name_am' => 'ተጨማሪ ዶሮ', 'price_delta' => '60.00'],
                     ['name_en' => 'No onion', 'name_am' => 'ያለ ሽንኩርት', 'price_delta' => '0.00'],
+                    ['name_en' => 'Extra chicken', 'name_am' => 'ተጨማሪ ዶሮ', 'price_delta' => '60.00'],
                 ],
             ],
             [

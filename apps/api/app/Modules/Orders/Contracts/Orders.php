@@ -9,6 +9,7 @@ use App\Modules\Orders\Enums\OrderEventType;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
 use App\Modules\Orders\Models\OrderLine;
+use App\Modules\Orders\Models\OrderLineModifier;
 use App\Modules\Orders\Support\OrderTotals;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -93,6 +94,55 @@ final class Orders
         }
 
         return $out;
+    }
+
+    /**
+     * What a receipt prints of an order (step 4.3e: GET /orders/{order}/receipt.pdf and the signed receipt link): number, business date,
+     * type, table, status, when it was sent, settled, paid and closed, its money (as totals()) and its charged lines with their bilingual
+     * names and modifiers, oldest first. Rejected and voided lines are not charged and are left out. Three queries.
+     *
+     * @throws ModelNotFoundException an order that does not exist or belongs to another branch
+     */
+    public function forReceipt(int $orderId): OrderReceiptView
+    {
+        $order = Order::query()->findOrFail($orderId);
+        $totals = new OrderTotals($order->subtotal, $order->discount, $order->tax, $order->total);
+        $money = $totals->toArray($order->paid_total);
+        $lines = OrderLine::query()->where('order_id', $order->id)->orderBy('id')
+            ->with(['item:id,name_en,name_am', 'modifiers' => fn ($q) => $q->orderBy('id')])
+            ->get()
+            ->filter(static fn (OrderLine $line): bool => OrderTotals::charges($line->status))
+            ->map(static fn (OrderLine $line): ReceiptLineView => new ReceiptLineView(
+                $line->id,
+                $line->item_id,
+                $line->item->name_en,
+                $line->item->name_am,
+                $line->qty->toString(),
+                $line->unit_price_snapshot->amount(),
+                $line->modifier_price_snapshot->amount(),
+                $line->line_total->amount(),
+                array_values(array_map(static fn (OrderLineModifier $m): array => [
+                    'name_en' => $m->name_en,
+                    'name_am' => $m->name_am,
+                    'price_delta' => $m->price_delta_snapshot->amount(),
+                ], $line->modifiers->all())),
+            ))
+            ->all();
+
+        return new OrderReceiptView(
+            $order->id,
+            $order->order_no,
+            $order->business_date?->toDateString(),
+            $order->type->value,
+            $order->table_code,
+            $order->status->value,
+            $order->sent_at,
+            $order->settled_at,
+            $order->paid_at,
+            $order->closed_at,
+            new OrderTotalsView($money['subtotal'], $money['discount'], $money['tax'], $money['total'], $money['paid'], $money['balance'], $order->currency),
+            array_values($lines),
+        );
     }
 
     /**
