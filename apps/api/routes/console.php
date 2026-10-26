@@ -18,3 +18,10 @@ Schedule::command('inventory:sweep-alerts')->hourly()->withoutOverlapping(10);
 Schedule::command('files:purge-orphans')->hourly()->withoutOverlapping(30);
 
 Schedule::command('shifts:verify-chain')->dailyAt('03:00')->timezone('Africa/Addis_Ababa')->withoutOverlapping(60);
+
+// The analytics summaries (phase-4 plan sections 5 and 10.5, ADR 0014), on the same schedule:run line, in the shop's time. At 00:05 the nightly
+// run queues yesterday and the day before for every branch (the first closes the day that just ended, the second heals a shift that locked
+// late); at 05:30 the days of every shift that locked after they were last built. Both only queue one RebuildDay a day (the database queue's
+// cron line runs them), so they take seconds; a run that overruns is not started twice.
+Schedule::command('analytics:rebuild --nightly')->dailyAt('00:05')->timezone(config('analytics.timezone', 'Africa/Addis_Ababa'))->withoutOverlapping(30);
+Schedule::command('analytics:rebuild --since-last')->dailyAt('05:30')->timezone(config('analytics.timezone', 'Africa/Addis_Ababa'))->withoutOverlapping(30);

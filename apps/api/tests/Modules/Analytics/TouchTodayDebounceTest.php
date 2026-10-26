@@ -11,9 +11,8 @@ use App\Shared\Events\PaymentRecorded;
 use App\Shared\Events\PaymentVerified;
 use App\Shared\Events\PaymentVoided;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Events\CallQueuedListener;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -107,8 +106,7 @@ it('is queued on the default queue and only after the commit', function () {
     $queued = Queue::pushed(CallQueuedListener::class, fn (CallQueuedListener $job): bool => $job->class === TouchToday::class);
     expect($queued)->toHaveCount(1)
         ->and($queued->first()->queue)->toBeNull('the default queue: the cron worker drains only that one')
-        ->and(is_subclass_of(TouchToday::class, ShouldQueue::class))->toBeTrue()
-        ->and(is_subclass_of(TouchToday::class, ShouldHandleEventsAfterCommit::class))->toBeTrue();
+        ->and(is_subclass_of(TouchToday::class, ShouldQueueAfterCommit::class))->toBeTrue();
 });
 
 it('touches nothing when the transaction that took the payment rolls back', function () {

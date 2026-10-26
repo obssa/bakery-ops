@@ -7,8 +7,7 @@ use App\Modules\Analytics\Listeners\RebuildAfterShiftLocked;
 use App\Shared\Events\ShiftLocked;
 use App\Shared\Models\Branch;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Events\CallQueuedListener;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -76,19 +75,26 @@ it('asks for the one day of a shift that opens and locks on the same local day',
     expect(($this->asked)())->toBe([[$this->branch->id, '2026-11-20', 'shift_locked', null]]);
 });
 
-it('asks for every day from the shift\'s date to the day it locked, never a day after today, and nothing for a branch that does not exist', function () {
+it('asks for every day from the shift\'s date to the day it locked: a shift whose difference waited three days is four', function () {
     Queue::fake([RebuildDay::class]);
     $this->travelTo(CarbonImmutable::parse('2026-11-23 09:00:00', 'UTC')); // Monday, 12:00 local
     $b = $this->branch->id;
 
     app(RebuildAfterShiftLocked::class)->handle(($this->locked)('2026-11-20', '2026-11-23T08:00:00+00:00'));
+
     expect(($this->asked)())->toBe([[$b, '2026-11-20', 'shift_locked', null], [$b, '2026-11-21', 'shift_locked', null], [$b, '2026-11-22', 'shift_locked', null], [$b, '2026-11-23', 'shift_locked', null]]);
+});
 
-    app(RebuildAfterShiftLocked::class)->handle(($this->locked)('2026-11-23', '2026-11-24T08:00:00+00:00'));
-    expect(collect(($this->asked)())->pluck(1)->max())->toBe('2026-11-23', 'a lock stamped after today asks for today at most');
+it('never asks for a day after today, and nothing for a branch that does not exist', function () {
+    Queue::fake([RebuildDay::class]);
+    $this->travelTo(CarbonImmutable::parse('2026-11-23 09:00:00', 'UTC')); // Monday, 12:00 local
+    $b = $this->branch->id;
 
+    // a lock stamped tomorrow (a clock ahead of this one): today at most
+    app(RebuildAfterShiftLocked::class)->handle(($this->locked)('2026-11-22', '2026-11-24T08:00:00+00:00'));
     app(RebuildAfterShiftLocked::class)->handle(($this->locked)('2026-11-20', '2026-11-21T03:30:00+00:00', 999_999));
-    expect(($this->asked)())->toHaveCount(5);
+
+    expect(($this->asked)())->toBe([[$b, '2026-11-22', 'shift_locked', null], [$b, '2026-11-23', 'shift_locked', null]]);
 });
 
 it('is queued on the default queue after the commit, and only after it', function () {
@@ -99,7 +105,6 @@ it('is queued on the default queue after the commit, and only after it', functio
     $queued = Queue::pushed(CallQueuedListener::class, fn (CallQueuedListener $job): bool => $job->class === RebuildAfterShiftLocked::class);
     expect($queued)->toHaveCount(1)
         ->and($queued->first()->queue)->toBeNull()
-        ->and(is_subclass_of(RebuildAfterShiftLocked::class, ShouldQueue::class))->toBeTrue()
-        ->and(is_subclass_of(RebuildAfterShiftLocked::class, ShouldHandleEventsAfterCommit::class))->toBeTrue()
+        ->and(is_subclass_of(RebuildAfterShiftLocked::class, ShouldQueueAfterCommit::class))->toBeTrue()
         ->and(app('events')->getRawListeners()[ShiftLocked::class] ?? [])->toContain([RebuildAfterShiftLocked::class, 'handle']);
 });

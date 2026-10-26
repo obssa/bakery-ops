@@ -6,7 +6,7 @@ namespace App\Modules\Analytics\Console;
 
 use App\Modules\Analytics\Contracts\Rebuild;
 use App\Modules\Analytics\Enums\RebuildTrigger;
-use App\Modules\Analytics\Jobs\RebuildDay;
+use App\Modules\Analytics\Support\RebuildQueue;
 use App\Modules\Shifts\Contracts\Facts as ShiftFacts;
 use App\Modules\Shifts\Contracts\ShiftFact;
 use App\Shared\Models\Branch;
@@ -29,7 +29,9 @@ use Throwable;
  *   --since-last                          every local day in the life of a shift that locked after the day was last built, for the shifts
  *                                         of the last analytics.since_last_days days (shift_locked).
  * --branch=id narrows to one branch (every branch otherwise). A bad call exits 2 and writes nothing; a day whose rebuild fails is
- * logged with the branch and the day only, the others still run, and the command exits 1. The scheduler entries are step 4.4b's.
+ * logged with the branch and the day only, the others still run, and the command exits 1. Without --sync each day goes through
+ * Support\RebuildQueue (the freshness feed sees it asked for). The scheduler runs `--nightly` at 00:05 and `--since-last` at 05:30
+ * Africa/Addis_Ababa (routes/console.php, step 4.4b).
  */
 final class RebuildCommand extends Command
 {
@@ -45,7 +47,7 @@ final class RebuildCommand extends Command
     /** @var string */
     protected $description = 'Rebuild the analytics summary tables of local days, here or on the queue, one day at a time';
 
-    public function handle(Rebuild $rebuild, CurrentBranch $current, ShiftFacts $shifts): int
+    public function handle(Rebuild $rebuild, CurrentBranch $current, ShiftFacts $shifts, RebuildQueue $queue): int
     {
         $range = $this->option('from') !== null || $this->option('to') !== null;
         if ((int) $range + (int) $this->option('nightly') + (int) $this->option('since-last') !== 1) {
@@ -74,7 +76,7 @@ final class RebuildCommand extends Command
             return self::INVALID;
         }
 
-        return $this->option('sync') ? $this->runHere($rebuild, $plan) : $this->queue($plan);
+        return $this->option('sync') ? $this->runHere($rebuild, $plan) : $this->queue($queue, $plan);
     }
 
     /**
@@ -185,10 +187,10 @@ final class RebuildCommand extends Command
     /**
      * @param  list<array{0: int, 1: string, 2: string}>  $plan
      */
-    private function queue(array $plan): int
+    private function queue(RebuildQueue $queue, array $plan): int
     {
         foreach ($plan as [$branchId, $day, $trigger]) {
-            RebuildDay::dispatch($branchId, $day, $trigger);
+            $queue->ask($branchId, $day, RebuildTrigger::from($trigger));
             $this->line(sprintf('Branch %d, %s: queued', $branchId, $day));
         }
         $this->line(sprintf('%d day(s) queued.', count($plan)));

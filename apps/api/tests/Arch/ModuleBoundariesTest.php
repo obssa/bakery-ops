@@ -3,6 +3,7 @@
 declare(strict_types=1);
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 
 /*
  * The module dependency graph as executable rules (dependency-graph.md, ADR 0001).
@@ -248,8 +249,7 @@ arch('Analytics uses only Facts ports (and their rows), Catalog Contracts, Ident
     ->not->toUse($analyticsForbidden())
     ->group('arch', 'module:analytics');
 
-arch('every Analytics listener is queued and waits for the commit: a rebuild never slows or joins the request that caused the event (step 4.4b)')
+arch('every Analytics listener is queued after the commit: a rebuild never slows or joins the request that caused the event, nor follows one that rolled back (step 4.4b; a queued listener reads ShouldQueueAfterCommit, not ShouldHandleEventsAfterCommit)')
     ->expect('App\Modules\Analytics\Listeners')
-    ->toImplement(ShouldQueue::class)
-    ->toImplement(ShouldHandleEventsAfterCommit::class)
+    ->toImplement(ShouldQueueAfterCommit::class)
     ->group('arch', 'module:analytics');

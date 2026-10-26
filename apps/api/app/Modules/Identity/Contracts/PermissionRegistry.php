@@ -73,6 +73,10 @@ final class PermissionRegistry
         // live database. payments.verify: verify and dispute payments against the bank's statement (later the reconciliation and the export),
         // see every payment of the branch (a cashier sees their own shift and the last 24 hours), delete anyone's unattached receipt photo.
         'payments.verify' => ['admin', 'manager'],
+        // Step 4.4b (plan section 10.6): its own grant-only migration 2026_11_05_100100_grant_analytics_manage_permission (the plan named it for M2,
+        // which had run on the live database without it). analytics.manage: the on-demand rebuild of the summary tables (later the weekly
+        // summary's test send); configuration-like, so the admin's only.
+        'analytics.manage' => ['admin'],
     ];
 
     /**
