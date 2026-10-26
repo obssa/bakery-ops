@@ -643,7 +643,8 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
        again (the web's `VoidDialog` takes a new key after a failure anyway). Refusals of other requests are stored and replayed as before; multipart (4.2b) is
        fingerprinted exactly as before. **Also found:** `POST /users/{id}/short-code/reset` answers the new short code, and the stored answer held it in clear;
        an answer whose JSON holds a secret field is now stored as `{kind: encrypted}` with the app key and replayed unchanged (one the key no longer opens is
-       `422 idempotency.key_reused`, never a second run).
+       `422 idempotency.key_reused`, never a second run). When the app key cannot encrypt at all, that answer is not stored (never in clear) and a retry
+       runs again; e2e-p2 found it, because the compose stack's `APP_KEY` was 35 bytes, which AES-256 refuses; `compose.ci.yml` now has a 32-byte one.
      - **The rows already on live.** A row is replayed for 24 hours (`bakery.idempotency.ttl_hours`) but **nothing purges one**: an expired row is deleted
        only when its own key comes back (the model's "swept" was never built), so every write since Phase 1 is still in the table. Migration
        `2026_11_03_100100_clear_secret_fingerprints_of_idempotency_keys` deletes no row; it sets `request_hash` to a value no sha256 can equal for every
