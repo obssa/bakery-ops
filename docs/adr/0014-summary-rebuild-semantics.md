@@ -71,8 +71,20 @@ is made. Step 4.4a builds it (`App\Modules\Analytics\Contracts\Rebuild`); 4.4b a
    yesterday and the day before, the second heals a late lock), `manual` (`analytics:rebuild`, `POST /analytics/rebuild`), `touch`
    (today, debounced after a payment) and `seed`. Every job is one branch and one day (`RebuildDay`, unique per `branch:day` for 120 s,
    3 tries; a failure is logged with the branch, the day and the class of the error, never the facts or the message), because a
-   cron-drained worker has about 50 s. The schedule and the listeners are step 4.4b. An interactive request never aggregates raw tables;
-   the one exception is the admin's bounded `sync` rebuild of at most 7 days.
+   cron-drained worker has about 50 s. An interactive request never aggregates raw tables; the one exception is the admin's bounded
+   `sync` rebuild of at most 7 days. As built in step 4.4b:
+   - the listeners (`RebuildAfterShiftLocked` on `ShiftLocked`; `TouchToday` on `PaymentRecorded`, `PaymentVerified`, `PaymentDisputed`,
+     `PaymentVoided`, `OrderPaid`, `OrderVoided`) are `ShouldQueueAfterCommit`: a payment's events are dispatched inside its transaction, and
+     a queued listener does not read `ShouldHandleEventsAfterCommit`;
+   - a shift lock asks for every local day from the shift's `date` to the day it locked (at most 31, never after today); a touch asks for
+     the event's own local day 60 s out;
+   - `RebuildDay` lets its unique lock go when it **starts** (`ShouldBeUniqueUntilProcessing`): the job reads every fact after it started,
+     so whatever was asked for before is in it, and a payment taken while it runs asks for the next rebuild instead of waiting for the
+     nightly run. Two jobs of one day that overlap queue up on the day's row lock (decision 6);
+   - every job goes onto the queue through `Support\RebuildQueue`, which notes in the cache when the day was asked for: a day is "running"
+     (the freshness feed) while it was asked for after its `rebuilt_at`; a note lives 15 minutes, so a lost job stops counting;
+   - the schedule (`routes/console.php`): `analytics:rebuild --nightly` at 00:05 and `--since-last` at 05:30 Africa/Addis_Ababa, both
+     `withoutOverlapping`, both only queueing.
 10. **What the dashboards may read.** Only the summary tables, `analytics_days` and the name tables behind Catalog, Payments and Identity
     contracts (step 4.4c, a query-log test). Every answer says `as_of` (the oldest `rebuilt_at` it used) and the days of its range with
     no `analytics_days` row, shown as "not built", never as zero (R-U).
@@ -80,7 +92,10 @@ is made. Step 4.4a builds it (`App\Modules\Analytics\Contracts\Rebuild`); 4.4b a
 ## Consequences
 
 - Today's figures lag the till by at most about three minutes (one cron tick plus the touch delay); past days are as fresh as the last
-  shift lock or the nightly run. The freshness feed (4.4b) makes that visible.
+  shift lock or the nightly run. The freshness feed (`GET /analytics/freshness`, 4.4b: each day's version, `rebuilt_at`, trigger and
+  `changed`, the days not built, and `running`) makes that visible; its ETag is the days' versions, so a dashboard polls with `304`s.
+- A verification, dispute or void of a payment received on an earlier day changes that day's channel figures; the touch rebuilds the
+  event's day (today), so the earlier day follows at the nightly run (if it was yesterday or the day before) or by hand.
 - A rebuild costs one read of each port for one day and a few hundred row writes; the nightly run is two per branch.
 - The Facts ports grew with the tables' needs (step 4.4a, contract-first): `Orders\Facts::voids` and `::stationLines`,
   `PaymentFact::duplicateReference`, `RefundFact::orderRefundId`, `StockOutFact::stationId`, `ShiftFact::varianceLineCount` and

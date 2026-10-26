@@ -23,7 +23,7 @@ L5  Orders         → Inventory, Catalog, Identity, Shared, Audit          (Pay
     Notifications  → Identity, Shared                                      (inbound: events only)
 L6  Payments       → Orders, Identity, Shared(Files), Audit
     Shifts         → Inventory, Identity, Payments(read), Orders(read: openAt), Catalog, Shared, Audit   (nothing imports Shifts: it binds Shared's OpenShifts and Identity's two Phase 2 interfaces)
-L7  Analytics      → read-only Facts ports of Orders, Payments, Production, Inventory, Shifts, Catalog
+L7  Analytics      → read-only Facts ports of Orders, Payments, Production, Inventory, Shifts, Catalog; Audit (the rebuild's audit row)
 ```
 
 `App\Shared` is the leaf: branches, stations, `BranchScoped`, `Bilingual`, `Quantity`/`Money`,
@@ -62,7 +62,7 @@ These are the contract surfaces. Expose each as a final service class (or interf
 | Shifts | Payments | `Totals::cash(shift)` (keyed on the payment's own shift), `Totals::byChannel(shift)`, `Channels::find`; Payments asks `OpenShifts` before a cash payment (`payments.require_shift_for_cash`) |
 | Shifts | Orders | `Orders::openAt(station, time)` for the replay |
 | Shifts | Catalog | `Items::summaries`, `Items::deleted` (a count refuses or drops a line for a deleted item) |
-| Analytics | all | provider-owned `Facts` query classes only (Orders `sales`/`lines`, Payments `payments`/`refunds`, Production `batches`, Inventory `movements`/`closingBalances`/`stockOuts`/`unitCosts`, Shifts `instances`), Shared `LocalDay`; listens to `ShiftLocked`; announces `WeeklySummaryReady` (Notifications subscribes: event only) |
+| Analytics | all | provider-owned `Facts` query classes only (Orders `sales`/`lines`, Payments `payments`/`refunds`, Production `batches`, Inventory `movements`/`closingBalances`/`stockOuts`/`unitCosts`, Shifts `instances`), Shared `LocalDay`; listens to `ShiftLocked` and, debounced, to the payment and order events that move today (step 4.4b); Audit `AuditedAction` for the on-demand rebuild's audit row; announces `WeeklySummaryReady` (Notifications subscribes: event only) |
 | Payments | Shared | `Files::put`, `signedUrl` (contract `payments->files`) |
 
 ## Frontend surfaces and what they consume

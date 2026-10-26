@@ -533,7 +533,8 @@
         "shifts",
         "catalog",
         "shared",
-        "identity"
+        "identity",
+        "audit"
       ],
       "read_only": true,
       "needs": {
@@ -567,7 +568,11 @@
           "ActorDirectory::names(ids)"
         ],
         "shared": [
-          "LocalDay"
+          "LocalDay",
+          "events: ShiftLocked, PaymentRecorded, PaymentVerified, PaymentDisputed, PaymentVoided, OrderPaid, OrderVoided (step 4.4b listeners)"
+        ],
+        "audit": [
+          "AuditedAction (the audit row of POST /analytics/rebuild, step 4.4b)"
         ],
         "notifications": [
           "event only: WeeklySummaryReady"

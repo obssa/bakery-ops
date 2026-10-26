@@ -461,6 +461,24 @@ Unattached uploads are purged after 24 hours (`files:purge-orphans`).
 No extra cron entry is needed. k6 is never run against this host; to time the dashboards on the live demo branch use
 `php artisan analytics:bench` (step 4.4d), which makes the same timed calls in process and exits non-zero over budget.
 
+How the summary tables stay current (step 4.4b, ADR 0014). Every rebuild is one local day of one branch, a `RebuildDay` job on the
+database queue, run by the `queue:work` cron line:
+
+- **Today, during service.** A payment (taken, verified, disputed, voided) or an order paid or voided asks for today's rebuild 60 s later.
+  The job is unique per branch and day, so a busy minute gives one rebuild. Expect the dashboards' today to be at most about three
+  minutes behind the till (the listener's cron tick, the 60 s, the job's cron tick).
+- **A locked shift** rebuilds every local day from its date to the day it locked: a Night shift that locks in the morning rebuilds both.
+- **00:05 Addis Ababa**: `analytics:rebuild --nightly` queues yesterday and the day before for every branch. **05:30**:
+  `analytics:rebuild --since-last` queues the days of every shift that locked after they were last built (the last 7 days).
+- **By hand**, from the admin's screen or the API: `POST /api/v1/analytics/rebuild {from, to, sync}` (admin only). `sync: true` rebuilds
+  up to 7 days at once in the request; otherwise up to 31 days go on the queue. From a shell, for any range up to 400 days:
+  `/opt/alt/php83/usr/bin/php ~/bakery-ops.orcamind.dev/artisan analytics:rebuild --from=2026-11-01 --to=2026-11-30` (queued) or with
+  `--sync` (here and now, one day at a time; prints each day's version and row counts).
+- **Is it current?** `GET /api/v1/analytics/freshness?from=&to=` lists each built day's version, `rebuilt_at` and trigger, the days not
+  built yet, and `running` (a rebuild was asked for and has not run). A day stays `running` for at most 15 minutes when its job is lost;
+  `php artisan queue:failed` shows a job that failed (`analytics.rebuild.failed` in the log names the branch, the day and the error's class).
+- **Nothing to clean up.** The summary tables are derived: a rebuild replaces the day, and rebuilding a day twice gives the same rows.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.

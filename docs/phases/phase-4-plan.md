@@ -238,8 +238,8 @@ the days' `version`s, so a dashboard that polls every 30 s gets `304` until a re
 | `GET /analytics/stations` | `analytics.view`; `analytics.view_own` limited to the caller's stations | read | `{stations: [{station, lines_served, lines_rejected, avg_prep_seconds, p90_prep_seconds, batches_finished, produced_qty, waste_qty, variance_line_count, shifts_count}]}` |
 | `GET /analytics/staff` | `analytics.view`; `analytics.view_own` limited to the caller | read | `?role_kind=waiter|cashier|station` `{users: [{user {id, name}, orders_count, revenue, payments_count, payments_amount, voids_count, refunds_count, lines_prepared, avg_prep_seconds}]}` |
 | `GET /analytics/shifts` | `analytics.view` | read | `{days: [{day, shifts_count, shifts_locked_count, variance_line_count, cash_variance_total}]}` |
-| `GET /analytics/freshness` | `analytics.view_own` | read, polled 30 s | `{as_of, days: [{day, version, rebuilt_at, trigger, changed}], running: bool}` (the dashboard's "updated 2 min ago" and its refetch trigger) |
-| `POST /analytics/rebuild` | `analytics.manage` | key | `{from, to, sync?: bool}`; `sync` only for at most 7 days and runs inline (what the live E2E uses, no cron wait); otherwise one `RebuildDay` job per day is queued | `202 {queued: n}` / `200 {days: [...]}`; an `AuditedAction` `analytics.rebuild` records the range | `422 analytics.range.too_large` (31 days queued, 7 inline), `409 analytics.rebuild.running` |
+| `GET /analytics/freshness` | `analytics.view_own` | read, polled 30 s | `{as_of, days: [{day, version, rebuilt_at, trigger, changed}], running: bool}` (the dashboard's "updated 2 min ago" and its refetch trigger); as built (4.4b) also `from`, `to`, `timezone` and `stale_days`, `days` lists the built days only, the ETag is every built day's version and `rebuilt_at` plus `running` (no settling bucket: a version is seen whole or not at all) |
+| `POST /analytics/rebuild` | `analytics.manage` | key | `{from, to, sync?: bool}`; `sync` only for at most 7 days and runs inline (what the live E2E uses, no cron wait); otherwise one `RebuildDay` job per day is queued; as built (4.4b) `to` defaults to `from` | `202 {queued: n}` / `200 {days: [...]}`; an `AuditedAction` `analytics.rebuild` records the range; as built both answers also carry `from`, `to`, `sync`, the 202 `days` (the dates queued), the 200 `days` each Rebuild result `{day, trigger, rows, version, changed, duration_ms, fingerprint}`; the audit row is `recordEvent` `{from, to, sync, days}`, written before the work | `422 analytics.range.too_large` (31 days queued, 7 inline) `{max_days}`, `409 analytics.rebuild.running` (as built: a queued rebuild of overlapping days still waits; `{from, to, asked_at}`), as built also `422 analytics.range.future {today}` |
 | `GET /analytics/exports/{report}` | `analytics.view` | read | `report` in `sales`, `channels`, `items`, `stations`, `staff`, `shifts`; `?format=xlsx|pdf|csv`, `?locale=en|am`, the common range | the file (xlsx via a streaming writer, 20 000 rows max; PDF is a 1 to 3 page summary with the same figures and the freshness stamp); `422 analytics.export.too_large` |
 | `POST /analytics/weekly-summary/send` | `analytics.manage` | key | `{week_of?}` | `202`; builds the same summary the Monday job does and announces `WeeklySummaryReady` (a way to test the Telegram path) | |
 
@@ -273,6 +273,14 @@ so Notifications and Analytics never import a producer.
 and `delay` = 60 s, using the database cache's atomic lock (supported by the live host's `database` cache). So during service the dashboard's
 today row is at most about three minutes behind (one cron tick plus the delay), the rebuild runs at most once every two minutes, and nothing
 ever aggregates raw tables in a request. A day that is not today is rebuilt by the shift lock, the nightly job or by hand.
+
+**As built (4.4b):** both listeners are `ShouldQueueAfterCommit` (a queued listener does not read `ShouldHandleEventsAfterCommit`, and
+`PaymentRecorded` / `PaymentVoided` leave inside the payment's transaction). `TouchToday` rebuilds the event's own local day (never a day after
+today), so a payment at 23:59:30 handled at 00:00:40 rebuilds the day it was taken on; it listens to `PaymentRecorded`, `PaymentVerified`,
+`PaymentDisputed`, `PaymentVoided`, `OrderPaid` and `OrderVoided` (refunds join with 4.1b and 4.3d). `RebuildDay` is `ShouldBeUniqueUntilProcessing`:
+the lock goes when the job starts, so a payment taken while a rebuild runs asks for the next one instead of waiting for the nightly run (with
+`ShouldBeUnique` it would be dropped until then). `RebuildAfterShiftLocked` asks for every local day from the shift's `date` to the day it locked,
+at most 31, never after today.
 
 **Scheduler** (the existing `schedule:run` cron line, `routes/console.php`; all `withoutOverlapping`):
 
@@ -779,6 +787,51 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `analytics.manage` and `analytics.view_own` use. Tests: `ShiftLockedTriggersRebuildTest` (a locked Night shift queues both days), `TouchTodayDebounceTest` (20 payments in a minute: one job),
      `NightlyScheduleTest` (the entries exist with `timezone('Africa/Addis_Ababa')`, `withoutOverlapping`; a `Carbon::setTestNow` run at 00:05 local rebuilds the two days), `RebuildEndpointTest`
      (403 matrix, 7 days inline, 31 queued, idempotent replay).
+   - **As built (step 4.4b, `phase-4/analytics-triggers`).** Order: the tests and the registries (red: the new routes, classes, permission, lang file
+     and schedule entries are missing; the changed tests of 4.4a and Orders say what the listeners change), then the code, then OpenAPI, ERD (no new
+     table), the manifest, ADR 0014's triggers and this note. Where the code disagreed with the plan or the plan left a choice:
+     - **The listeners are `ShouldQueueAfterCommit`.** Laravel queues a listener without looking at `ShouldHandleEventsAfterCommit` (that interface
+       only defers a listener that runs in the request), and `PaymentRecorded` and `PaymentVoided` are dispatched inside the payment's transaction,
+       so a rolled-back payment would otherwise still have touched the day (`TouchTodayDebounceTest` proves it does not). `ModuleBoundariesTest`
+       requires it of `App\Modules\Analytics\Listeners`.
+     - **`RebuildAfterShiftLocked`** asks for every local day from the event's `date` (the shift's local start date) to the local day of its
+       `locked_at`, at most `analytics.rebuild_queue_max_days` (31, its date and the days just before the lock), never after today; a branch that no
+       longer exists is skipped.
+     - **`TouchToday`** listens to `PaymentRecorded`, `PaymentVerified`, `PaymentDisputed`, `PaymentVoided`, `OrderPaid` and `OrderVoided`
+       (`AnalyticsServiceProvider::TOUCHES_TODAY`; `OrderRefunded` and `RefundPaid` join with 4.1b and 4.3d) and asks for the event's own local day
+       (its `occurredAt` in the branch's zone, never after today), `analytics.touch_delay_seconds` (60) out. A verification, dispute or void of a
+       payment of an earlier day changes that day's channel figures; the earlier day follows at the nightly run or by hand (ADR 0014).
+     - **`RebuildDay` is `ShouldBeUniqueUntilProcessing`** (a `ShouldBeUnique`): unique per `branch:day` for `analytics.touch_unique_seconds` (120)
+       at most, and the lock goes when the job starts. The job reads every fact after it started, so nothing asked for before is lost, and a payment
+       taken while it runs asks for the next rebuild; with `ShouldBeUnique` that payment would wait for the nightly run. Two jobs of one day queue up
+       on the day's `analytics_days` row lock (`RebuildRaceTest`, 4.4a).
+     - **`Support\RebuildQueue`** is the one way onto the queue (the listeners, `analytics:rebuild` without `--sync`, the endpoint). It notes in the
+       cache when a day was asked for (`analytics:asked:{branch}:{day}`, `analytics.asked_ttl_seconds` = 900); a day is `running` while it was asked
+       for after its `rebuilt_at`, so nothing is cleared when a job ends, and a lost job stops counting after 15 minutes. A queued manual rebuild also
+       notes its range per branch: a second request over the same days is `409 analytics.rebuild.running {from, to, asked_at}` until every day of the
+       first was built after it was asked for. An inline (`sync`) rebuild of the same days is not refused by another inline one: they queue up on the
+       row locks.
+     - **Schedule** (`routes/console.php`): `analytics:rebuild --nightly` daily at 00:05 and `--since-last` daily at 05:30, `timezone` from
+       `analytics.timezone` (`Africa/Addis_Ababa`), `withoutOverlapping(30)`; both only queue. `NightlyScheduleTest` runs the entry's own command line
+       in the test process (`schedule:run` starts a process of its own).
+     - **`POST /analytics/rebuild`**: `to` defaults to `from`; `422 analytics.range.future {today}` beside the plan's `422 analytics.range.too_large
+       {max_days}` (7 with `sync`, 31 without: `analytics.rebuild_inline_max_days`, `analytics.rebuild_queue_max_days`). The audit row is
+       `recordEvent('analytics.rebuild', 'analytics_day', null, {from, to, sync, days})`, written before the work, so it records the ask even when an
+       inline rebuild fails; the rebuilds are not audited (ADR 0014). For it, Analytics now depends on Audit (`AuditedAction` only; 10.9 item 20).
+     - **`GET /analytics/freshness`** reads the common range (`Http\Requests\RangeRequest`, for 4.4c too: default the last `analytics.range_default_days`
+       (30) days, at most `analytics.range_max_days` (400), never after today) and answers `{from, to, timezone, as_of, days, stale_days, running}`:
+       `days` the built days, `as_of` the oldest of their `rebuilt_at` (null when none is built). The ETag is the range, every built day's version and
+       `rebuilt_at` (a day deleted and rebuilt starts again at version 1) and `running`; it needs no settling bucket. `FreshnessEndpointTest` still
+       travels past the 5 s window before its `304`.
+     - **`analytics.manage`** (admin) joins the registry with its own grant-only migration, `2026_11_05_100100_grant_analytics_manage_permission`
+       (10.6 corrected). `analytics.view` and `analytics.view_own` were in the registry from Phase 0.
+     - **Tests:** `ShiftLockedTriggersRebuildTest` (the Night shift locked through the real close and submit with the three shift rules on, after
+       `ShiftsFixture` pinned them off for its own mechanics), `TouchTodayDebounceTest` (20 cash payments: one job, held in the database cache's
+       `cache_locks`), `NightlyScheduleTest`, `RebuildEndpointTest`, `FreshnessEndpointTest`, `GrantAnalyticsManagePermissionMigrationTest`,
+       `AnalyticsLangTest`. Changed: `RebuildDayTest` (its real payments touch the day first, so its manual rebuild is that version + 1),
+       `ApplyPaymentTest` and `VoidOrderTest` (they name `TouchToday` among the queued listeners), `RebuildCommandTest`. No test turns a shift rule off.
+     - CI runs `QUEUE_CONNECTION=sync`, so every payment, void and shift lock of the suite now also rebuilds its day in the test process.
+     - STATUS: phase 4's `analytics` step and the module stay `in_progress`.
    - **4.4c `phase-4/analytics-dashboards`**: the read endpoints of 4.6, the scoping for `analytics.view_own`, `ConditionalPoll` ETags from the days' versions. Tests: one feature test per endpoint
      (happy path, range errors, 403 per role, `304`), `DashboardsReadSummariesOnlyTest` (the **query-log assertion**: every statement of every `/analytics/*` request touches only
      `daily_*`, `analytics_days`, and the name tables behind the Catalog/Payments/Identity contracts (`items`, `categories`, `payment_channels`, `users`, `stations`) plus the framework's own
@@ -994,7 +1047,7 @@ as soon as 4.2b is deployed and before any route uses them):
 | `files.upload` | admin, manager, cashier | `POST /files` and one's own unattached upload |
 | `payments.view` | admin, manager, cashier (cashier scoped, R-N) | order payments, `GET /payments`, a file's signed URL, receipts |
 | `payments.verify` | admin, manager | verify, dispute, reconciliation, export, deleting an unattached file, the payment reads unscoped (as built in 4.3c through its own grant migration `2026_11_02_100100_grant_payments_verify_permission`) |
-| `analytics.manage` | admin | rebuild, weekly-summary test |
+| `analytics.manage` | admin | rebuild, weekly-summary test (as built in 4.4b through its own grant migration `2026_11_05_100100_grant_analytics_manage_permission`: 4.2b's M2 had run on the live database without it) |
 | `audit.export` | admin | audit export |
 
 Already in the registry and used as they are: `channels.manage` (admin), `payments.take` (admin, manager, cashier), `payments.void` (admin, manager: the approver's PIN for void and refund),
@@ -1047,6 +1100,9 @@ Each is corrected in the PR named (the manifest, the skill copy under `.claude/s
 17. **`order_events_event_check`** lists the events and has no payment or refund event, while the architecture wants payment photos on the order timeline: M9 extends it (DDL only).
 18. **`daily_sales.revenue == SUM(orders.total)`** (gate) has no stated clock; ADR 0014 fixes it as `settled_at` (R-J).
 19. **Dashboards "hit no raw tables"** needs a definition because names come from `items`, `categories`, `payment_channels`, `users`, `stations`: the allowlist of 4.4c.
+20. **Analytics -> Audit**: the manifest's `analytics.depends_on` had no Audit, but `POST /analytics/rebuild` is a write and writes its audit row through
+    `AuditedAction`. 4.4b adds `audit` to `analytics.depends_on` and `needs`, and `ModuleBoundariesTest` allows Analytics Audit's `AuditedAction` and
+    nothing else of Audit.
 
 ## 11. Risks from `references/traps.md` that apply
 
