@@ -78,7 +78,8 @@ cron `queue:work --stop-when-empty --max-time=50` entry above (see "Cron entries
 4. `rsync --delete` copies the release; `scripts/deploy/rsync-excludes.txt` protects `.env*`, `storage/`,
    `public/storage`, `bootstrap/cache/`, `public/.htaccess` and files cPanel creates.
 5. `scripts/deploy/release.sh` on the server: rebuilds `public/.htaccess` (cPanel's PHP handler block +
-   Laravel's rules), storage skeleton, `migrate --force`, `optimize`, `storage:link`, `queue:restart`, permissions, up.
+   Laravel's rules), storage skeleton, `migrate --force`, `optimize`, `storage:link`, `queue:restart`, `receipts:fonts` (step 4.3e, never fatal),
+   permissions, up.
 6. `scripts/deploy/smoke.sh` checks `/api/v1/health`, `/up`, JSON 404s, the `/` redirect, and with the web deployed `/app/`,
    `/app/en/` and `/app/am/` (200 with the right `<html lang>`); the not-found fallback and the immutable `_next/static`
    cache header are reported as warnings.
@@ -428,6 +429,31 @@ Unattached uploads are purged after 24 hours (`files:purge-orphans`).
   no row on `files`, retire the folder. The CI job `files-s3` proves put, presigned URL over HTTP and delete against MinIO
   (it never runs against the live host). Two hosts (traps.md): inside a compose stack the app signs for `minio:9000` and a browser would use
   `localhost:9000`; a signature is bound to the host, so on a real deployment use one public endpoint for both.
+
+### Receipts (step 4.3e): the font folder, memory, `receipts:fonts`
+
+- **What.** `GET /api/v1/orders/{order}/receipt.pdf` (payment readers) and the signed customer link of `POST /api/v1/orders/{order}/receipt-link`
+  (`GET /api/v1/receipts/{order}?branch&expires&signature`, 72 hours by default, at most 168) answer a PDF made by dompdf in the request: no queue,
+  no external service, no network fetch (dompdf runs with remote files, PHP and JavaScript off). A receipt is at most two A4 pages, a few kB.
+  It prints no person's name and only the last 4 characters of a payment reference; the PDF is `Cache-Control: private, no-store`.
+- **The font folder.** Latin text prints in Helvetica (a PDF core font, nothing embedded); Amharic in Noto Sans Ethiopic (SIL Open Font
+  License 1.1), bundled in the release at `resources/fonts/noto-sans-ethiopic/` with its `OFL.txt`, embedded in each PDF as a subset. dompdf
+  reads fonts from one writable folder, `storage/fonts` (`rsync --delete` protects `storage/`, so it survives deploys): the first receipt, or
+  `php artisan receipts:fonts`, copies the TTF there with its metrics (`.ufm`) and adds it to dompdf's `installed-fonts.json`, under the
+  cache lock `receipts:fonts` (the database cache's lock here), every file written under a temporary name and renamed into place. dompdf also
+  writes small `*.ufm.json` metric caches there. Nothing else writes the folder; deleting it is safe (the next receipt rebuilds it).
+- **`receipts:fonts`.** `release.sh` runs it after `queue:restart` on every deploy, so the first receipt of the day does not pay for it. It writes
+  nothing when the font is installed and prints "already installed"; it never fails a deploy (`|| echo ...`). By hand:
+  `/opt/alt/php83/usr/bin/php ~/bakery-ops.orcamind.dev/artisan receipts:fonts`. Exit 1 with "could not be registered" means `storage/fonts`
+  is not writable by the account (fix the permission: `chmod 755 storage/fonts`) or the bundled file is missing (a broken release: redeploy).
+  `files:doctor` also reports a missing or read-only `storage/fonts` as `warn`.
+- **Memory and time.** About 40 MB of PHP memory and well under a second per receipt (measured in the Docker image; subsetting DejaVu Sans
+  instead of using Helvetica took 3 to 5 seconds, which is why Latin text uses the core font). A `memory_limit` of 128M is enough; 256M is what
+  `files:doctor` asks for the photos anyway. A name with a letter Helvetica lacks (a Polish L) falls back to DejaVu Sans and that receipt takes
+  a few seconds longer.
+- **Exports.** `GET /api/v1/payments/export?format=csv|xlsx` (admin, manager) streams at most 20 000 payments (`payments.export_max_rows`);
+  the xlsx is written by OpenSpout to a temporary file under the system temp folder and removed once sent, a few MB of memory whatever the
+  rows. Each export is an audit row `payment.export`. No photo URL or object key is ever in a file.
 
 ### Dashboards and the cron
 

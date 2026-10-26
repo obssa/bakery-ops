@@ -349,9 +349,7 @@
       "tables": [
         "payment_channels",
         "payments",
-        "payment_refunds"
-      ],
-      "tables_phase_4": [
+        "payment_refunds",
         "receipt_settings"
       ]
     },

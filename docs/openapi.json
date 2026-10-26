@@ -7152,6 +7152,209 @@
                 }
             }
         },
+        "/v1/payments/reconciliation": {
+            "get": {
+                "operationId": "payments.reconciliation",
+                "tags": [
+                    "PaymentReports"
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "channel_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/payments/export": {
+            "get": {
+                "operationId": "payments.export",
+                "tags": [
+                    "PaymentReports"
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "channel_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "recorded",
+                                "verified",
+                                "disputed",
+                                "voided"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "shift_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "order_no",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "reference",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 64
+                        }
+                    },
+                    {
+                        "name": "missing_photo",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "0",
+                                "1",
+                                "true",
+                                "false"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "flagged",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "0",
+                                "1",
+                                "true",
+                                "false"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "csv",
+                                "xlsx"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "locale",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "en",
+                                "am"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/orders/{order}/payment-batches": {
             "post": {
                 "operationId": "payments.batches.store",
@@ -7630,54 +7833,109 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "business_name_en": {
-                                            "type": "string"
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "business_name_en": {
+                                                    "type": "string"
+                                                },
+                                                "business_name_am": {
+                                                    "type": "string"
+                                                },
+                                                "address_en": {
+                                                    "type": "string"
+                                                },
+                                                "address_am": {
+                                                    "type": "string"
+                                                },
+                                                "phone": {
+                                                    "type": "string"
+                                                },
+                                                "tin": {
+                                                    "type": "string"
+                                                },
+                                                "footer_en": {
+                                                    "type": "string"
+                                                },
+                                                "footer_am": {
+                                                    "type": "string"
+                                                },
+                                                "show_amharic": {
+                                                    "type": "string"
+                                                },
+                                                "ethiopian_dates": {
+                                                    "type": "string"
+                                                },
+                                                "is_default": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "business_name_en",
+                                                "business_name_am",
+                                                "address_en",
+                                                "address_am",
+                                                "phone",
+                                                "tin",
+                                                "footer_en",
+                                                "footer_am",
+                                                "show_amharic",
+                                                "ethiopian_dates",
+                                                "is_default"
+                                            ]
                                         },
-                                        "business_name_am": {
-                                            "type": "string"
-                                        },
-                                        "address_en": {
-                                            "type": "null"
-                                        },
-                                        "address_am": {
-                                            "type": "null"
-                                        },
-                                        "phone": {
-                                            "type": "null"
-                                        },
-                                        "tin": {
-                                            "type": "null"
-                                        },
-                                        "footer_en": {
-                                            "type": "null"
-                                        },
-                                        "footer_am": {
-                                            "type": "null"
-                                        },
-                                        "show_amharic": {
-                                            "type": "boolean"
-                                        },
-                                        "ethiopian_dates": {
-                                            "type": "boolean"
-                                        },
-                                        "is_default": {
-                                            "type": "boolean"
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "business_name_en": {
+                                                    "type": "string"
+                                                },
+                                                "business_name_am": {
+                                                    "type": "string"
+                                                },
+                                                "address_en": {
+                                                    "type": "null"
+                                                },
+                                                "address_am": {
+                                                    "type": "null"
+                                                },
+                                                "phone": {
+                                                    "type": "null"
+                                                },
+                                                "tin": {
+                                                    "type": "null"
+                                                },
+                                                "footer_en": {
+                                                    "type": "null"
+                                                },
+                                                "footer_am": {
+                                                    "type": "null"
+                                                },
+                                                "show_amharic": {
+                                                    "type": "boolean"
+                                                },
+                                                "ethiopian_dates": {
+                                                    "type": "boolean"
+                                                },
+                                                "is_default": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "business_name_en",
+                                                "business_name_am",
+                                                "address_en",
+                                                "address_am",
+                                                "phone",
+                                                "tin",
+                                                "footer_en",
+                                                "footer_am",
+                                                "show_amharic",
+                                                "ethiopian_dates",
+                                                "is_default"
+                                            ]
                                         }
-                                    },
-                                    "required": [
-                                        "business_name_en",
-                                        "business_name_am",
-                                        "address_en",
-                                        "address_am",
-                                        "phone",
-                                        "tin",
-                                        "footer_en",
-                                        "footer_am",
-                                        "show_amharic",
-                                        "ethiopian_dates",
-                                        "is_default"
                                     ]
                                 }
                             }
@@ -7685,6 +7943,367 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "payments.receipt-settings.update",
+                "tags": [
+                    "ReceiptSettings"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateReceiptSettingsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "business_name_en": {
+                                                    "type": "string"
+                                                },
+                                                "business_name_am": {
+                                                    "type": "string"
+                                                },
+                                                "address_en": {
+                                                    "type": "string"
+                                                },
+                                                "address_am": {
+                                                    "type": "string"
+                                                },
+                                                "phone": {
+                                                    "type": "string"
+                                                },
+                                                "tin": {
+                                                    "type": "string"
+                                                },
+                                                "footer_en": {
+                                                    "type": "string"
+                                                },
+                                                "footer_am": {
+                                                    "type": "string"
+                                                },
+                                                "show_amharic": {
+                                                    "type": "string"
+                                                },
+                                                "ethiopian_dates": {
+                                                    "type": "string"
+                                                },
+                                                "is_default": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "business_name_en",
+                                                "business_name_am",
+                                                "address_en",
+                                                "address_am",
+                                                "phone",
+                                                "tin",
+                                                "footer_en",
+                                                "footer_am",
+                                                "show_amharic",
+                                                "ethiopian_dates",
+                                                "is_default"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "business_name_en": {
+                                                    "type": "string"
+                                                },
+                                                "business_name_am": {
+                                                    "type": "string"
+                                                },
+                                                "address_en": {
+                                                    "type": "null"
+                                                },
+                                                "address_am": {
+                                                    "type": "null"
+                                                },
+                                                "phone": {
+                                                    "type": "null"
+                                                },
+                                                "tin": {
+                                                    "type": "null"
+                                                },
+                                                "footer_en": {
+                                                    "type": "null"
+                                                },
+                                                "footer_am": {
+                                                    "type": "null"
+                                                },
+                                                "show_amharic": {
+                                                    "type": "boolean"
+                                                },
+                                                "ethiopian_dates": {
+                                                    "type": "boolean"
+                                                },
+                                                "is_default": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "business_name_en",
+                                                "business_name_am",
+                                                "address_en",
+                                                "address_am",
+                                                "phone",
+                                                "tin",
+                                                "footer_en",
+                                                "footer_am",
+                                                "show_amharic",
+                                                "ethiopian_dates",
+                                                "is_default"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/receipts/{order}": {
+            "get": {
+                "operationId": "payments.receipts.show",
+                "tags": [
+                    "Receipts"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "locale",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Content-Length": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "no-referrer"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/v1/orders/{order}/receipt-link": {
+            "post": {
+                "operationId": "payments.receipt.link",
+                "tags": [
+                    "Receipts"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ReceiptLinkRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "url": {
+                                            "type": "string"
+                                        },
+                                        "expires_at": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "url",
+                                        "expires_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/orders/{order}/receipt.pdf": {
+            "get": {
+                "operationId": "payments.receipt.pdf",
+                "tags": [
+                    "Receipts"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "locale",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "en",
+                                "am",
+                                "both"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "proforma",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "0",
+                                "1",
+                                "true",
+                                "false"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Content-Length": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "no-referrer"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
@@ -14531,6 +15150,26 @@
                 },
                 "title": "ReadAllRequest"
             },
+            "ReceiptLinkRequest": {
+                "type": "object",
+                "description": "POST /orders/{order}/receipt-link (step 4.3e): {ttl_hours?: a whole number of 1 to payments.receipts.link_max_ttl_hours (168),\npayments.receipts.link_ttl_hours (72) when left out, locale?: en|am|both}. Anything else is 422 validation.failed.",
+                "properties": {
+                    "ttl_hours": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 168
+                    },
+                    "locale": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "am",
+                            "both"
+                        ]
+                    }
+                },
+                "title": "ReceiptLinkRequest"
+            },
             "RecordPaymentBatchRequest": {
                 "type": "object",
                 "description": "POST /orders/{order}/payment-batches (phase-4 plan section 4.3, step 4.3b): the client's id for the batch (ADR 0003; stored as every\nrow's batch_uuid) and 1 to 6 rows, each shaped like POST /orders/{order}/payments (its own client_uuid, distinct within the batch, the\nchannel's code, the amount above zero as a decimal string, tendered cash, the reference, the receipt photo's id). That the amounts add\nup to the balance and each row is takeable are Payments' rules (RecordPaymentBatch), answered with their own message keys.",
@@ -16707,6 +17346,77 @@
                     }
                 },
                 "title": "UpdateLocationRequest"
+            },
+            "UpdateReceiptSettingsRequest": {
+                "type": "object",
+                "description": "PUT /receipt-settings (phase-4 plan section 4.2 and M5, step 4.3e): the whole form each time, so a field left out is cleared. The\nbusiness name in both languages (up to 120); the address and the footer as bilingual pairs (both or neither, up to 255 each); a phone of\ndigits, spaces, +, - and brackets; a TIN of letters, digits and dashes (up to 32); show_amharic and ethiopian_dates as booleans.\nAnything else is 422 validation.failed.",
+                "properties": {
+                    "business_name_en": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "business_name_am": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "address_en": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "address_am": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "phone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^\\+?[0-9][0-9 ()\\-]{4,31}$",
+                        "maxLength": 32
+                    },
+                    "tin": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^[0-9A-Za-z\\-]{1,32}$",
+                        "maxLength": 32
+                    },
+                    "footer_en": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "footer_am": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    },
+                    "show_amharic": {
+                        "type": "boolean"
+                    },
+                    "ethiopian_dates": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "business_name_en",
+                    "business_name_am",
+                    "show_amharic",
+                    "ethiopian_dates"
+                ],
+                "title": "UpdateReceiptSettingsRequest"
             },
             "UpdateReorderRuleRequest": {
                 "type": "object",

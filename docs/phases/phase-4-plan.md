@@ -181,8 +181,8 @@ shift rule (10.1 R-A), then the order's state, then **`0 < amount <= balance`** 
 | `GET /orders/{order}/payments` | `payments.view` | read | | `200 {data: [Payment], balance}`; each `Payment` = `{id, channel {id, code, name_en, name_am}, amount, tendered_amount, change_amount, reference_no, status, received_at, received_by {id, name}, shift_id, receipt {file_id, url, url_expires_at} or null, verified_at, disputed_at, dispute_reason, refunded_amount, void_reason, voided_at}`, as built also `order_id`, `client_uuid`, `currency`, `batch_uuid` and `flags {duplicate_reference, duplicate_receipt}`; the signed URL is made on read | `404` |
 | `GET /payments` | `payments.view` | read, **polled** (ETag from `Payments::fingerprint()`: count, max id, max `updated_at`, plus the `settling` second while the newest row is younger than 5 s, the lesson of `Stock::fingerprint`) | `?from=&to=` (local dates), `?channel_id=`, `?status=`, `?shift_id=`, `?order_no=`, `?reference=`, `?missing_photo=1`, `?flagged=1` (duplicate reference/receipt or disputed), `?cursor=`, `?limit=` (50, max 200) | `200 {data: [Payment + order {id, order_no, business_date, table_code, total}], next_cursor, server_time}` newest first | `422 validation.failed` |
 | `GET /payments/{payment}` | `payments.view` | read | | `200 Payment` with `order`, `refunds [PaymentRefund]` | `404` |
-| `GET /payments/reconciliation` | `payments.verify` | read, polled | `?from=&to=` (max 62 days), `?channel_id=` | `200 {days: [{day, channels: [{channel, receipts, amount, with_photo, without_photo, with_reference, verified, disputed, voided, refunds, refund_amount, net_amount}]}], totals}` computed from `payments` and `payment_refunds` (this is Payments reading its own tables, not a summary) | |
-| `GET /payments/export` | `payments.verify` | read | the same filters + `?format=csv|xlsx` | the file, at most 20 000 rows (`422 payments.export.too_large`), signed photo URLs are **not** in it | |
+| `GET /payments/reconciliation` | `payments.verify` | read, polled | `?from=&to=` (max 62 days), `?channel_id=` | `200 {days: [{day, channels: [{channel, receipts, amount, with_photo, without_photo, with_reference, verified, disputed, voided, refunds, refund_amount, net_amount}]}], totals}` computed from `payments` and `payment_refunds` (this is Payments reading its own tables, not a summary); as built also `from`, `to`, `timezone`, and `totals` = the sums plus `channels` | `422 payments.reconciliation.range_too_large {max_days}` (as built), `422 validation.failed` |
+| `GET /payments/export` | `payments.verify` | read | the same filters + `?format=csv|xlsx` | the file, at most 20 000 rows (`422 payments.export.too_large`), signed photo URLs are **not** in it; as built the filters are those of `GET /payments` without paging, plus `?locale=en|am` | `422 payments.export.too_large {max_rows, rows}`, `422 validation.failed` |
 
 ### 4.4 Verify, dispute, void and refund (Payments, steps 4.3c and 4.3d)
 
@@ -214,8 +214,8 @@ the outgoing transfer). No payment is edited except its `refunded_amount`.
 | Method + path | Permission | Idempotent | Request | Response | Errors |
 |---|---|---|---|---|---|
 | `GET /orders/{order}/receipt.pdf` | `payments.view` | read | `?locale=en|am|both` (default: the receipt settings) | `200 application/pdf` (dompdf, Noto Sans Ethiopic embedded as a subset, Western digits), at most 2 pages: business name/TIN, order no and date (Addis time, and the Ethiopian date when enabled), lines with modifiers, subtotal/discount/tax/total, one line per payment (channel, reference tail only: last 4 characters), change, refunds if any, footer | `404`, `409 payments.receipt.unpaid` (a receipt of an unpaid order is a pro-forma, header says so: `?proforma=1` only) |
-| `POST /orders/{order}/receipt-link` | `payments.take` | key | `{ttl_hours?: 72}` (max 168) | `200 {url, expires_at}`: a signed link to the public receipt page | `404` |
-| `GET /receipts/{order}` | **signed**, no bearer | read | | `200` the same PDF; no names of staff on it; `Cache-Control: private, no-store` | `403`, `404` |
+| `POST /orders/{order}/receipt-link` | `payments.take` | key | `{ttl_hours?: 72}` (max 168), as built also `locale?` | `200 {url, expires_at}`: a signed link to the public receipt page | `404`, `409 payments.receipt.unpaid` (as built), `422` |
+| `GET /receipts/{order}` | **signed**, no bearer | read | | `200` the same PDF; no names of staff on it; `Cache-Control: private, no-store` | `403` (as built `payments.receipt.link_invalid`), `404`, `409 payments.receipt.unpaid` |
 
 ### 4.6 Analytics (Analytics, steps 4.4b to 4.4d)
 
@@ -630,6 +630,67 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `GET /payments/export` (OpenSpout for xlsx, plain CSV; see 10.8 R-E), runbook "Receipts" (fonts folder, memory). Tests: `ReceiptRendererTest` (text extracted from the PDF contains the
      order number, the total as `12.50`, the Amharic channel name and no staff name; two pages at most for a 60-line order), `ReceiptLinkTest` (signature, expiry, tamper),
      `ReconciliationTest`, `PaymentsExportTest` (opens with the same reader library, row count, no photo URL in it). Payments `module-stable`.
+   - **As built (step 4.3e, `phase-4/receipts-reconciliation`).** Order: the security fix of the Idempotency fingerprint (tests red, then the fix and its
+     migration); the contract case for the new Orders read (red, then `Orders::forReceipt`); the tests and registries of the step (red: 84 of 91); the
+     pinned packages and the font; `EthiopianDate`; M5 and the settings PUT; the receipts; the reconciliation and the export; OpenAPI, ERD, manifest,
+     runbook and this note. Where the code disagreed with the plan or the plan left a choice:
+     - **Security fix first (found by 4.3c).** `Idempotency` stored a sha256 of the whole body as `request_hash`; on the PIN voids (`POST /orders/{order}/void`,
+       `POST /payments/{payment}/void`) and the People writes (`POST /users` with a password and a short code, `PATCH /users/{id}` with a password) the body
+       held a secret a reader of `idempotency_keys` could recover offline. `Idempotency::SECRET_FIELDS` (`password`, `pin`, `short_code`, matched by name at any
+       depth) is the one list: those fields are left out of the fingerprint, so the stored hash is the hash of the body without them. The same key with every
+       other field equal is the same request: a success is replayed whatever PIN comes with it. A request that carried a secret keeps **only a success**: a
+       refusal (a wrong PIN, a locked prompt, a malformed PIN, a refused void) wrote nothing and is not stored, so the same key with the right PIN is checked
+       again (the web's `VoidDialog` takes a new key after a failure anyway). Refusals of other requests are stored and replayed as before; multipart (4.2b) is
+       fingerprinted exactly as before. **Also found:** `POST /users/{id}/short-code/reset` answers the new short code, and the stored answer held it in clear;
+       an answer whose JSON holds a secret field is now stored as `{kind: encrypted}` with the app key and replayed unchanged (one the key no longer opens is
+       `422 idempotency.key_reused`, never a second run).
+     - **The rows already on live.** A row is replayed for 24 hours (`bakery.idempotency.ttl_hours`) but **nothing purges one**: an expired row is deleted
+       only when its own key comes back (the model's "swept" was never built), so every write since Phase 1 is still in the table. Migration
+       `2026_11_03_100100_clear_secret_fingerprints_of_idempotency_keys` deletes no row; it sets `request_hash` to a value no sha256 can equal for every
+       expired row (it never replays), every unexpired refusal (it wrote nothing) and every unexpired success that is the answer of a route with a secret (a
+       voided order or payment, a user, a short-code reset, any answer holding a secret field), and sets a stored `short_code` to null. The table records no
+       route, so a row is judged by what it holds; release.sh migrates in maintenance mode, so every row then was written by the old code. An unexpired
+       success of any other route keeps its hash and still replays. A second run changes nothing.
+     - **`Orders::forReceipt`** (new, `OrderReceiptView`, `ReceiptLineView`, contract case in `OrdersContractTest`, group `contract:payments->orders`): number,
+       business date, type, table, status, sent/settled/paid/closed, the money, the charged lines with their modifiers; no person. The modifiers come in the
+       order Orders writes them (the case first expected the client's order).
+     - **M5** is `2026_11_03_100200_create_receipt_settings_table` (column sizes: names 120, address and footer 255, phone and TIN 32). No `client_uuid` (one
+       row per branch, unique `branch_id`: a retry finds the same row) and no `deleted_at` (changed in place, never deleted: SoftDeletesTest allowlist). PUT
+       replaces the whole form (a field left out is cleared); address and footer are pairs (both or neither); one AuditedAction `receipt_settings.update`; the
+       first save is a no-op `insertOrIgnore` and then a lock, never a lock on a missing row.
+     - **The receipt.** `ReceiptRenderer` uses `Dompdf\Dompdf` with its own `Options` (remote files, PHP and JavaScript off, HTML5 parser, subsetting on); the
+       package's config is not used. A4. **Latin text and the Western digits print in Helvetica** (a PDF core font, not embedded), Amharic in Noto Sans
+       Ethiopic embedded as a subset, DejaVu Sans only for a letter neither has: subsetting DejaVu Sans for every receipt took 3 to 5 s in PHP, the core font
+       keeps a receipt near 0.2 s and a few kB. At most `payments.receipts.max_pages` (2): a compact layout, then the last lines folded into one row ("and N more
+       items" with their sum); a 60-line order prints every line on two pages (an order is at most 50 lines through `POST /orders`). A line prints its unit
+       price with the modifiers' deltas, the quantity without trailing zeros. A receipt is dated when the order was settled; a pro-forma (`?proforma=1`, any
+       order not paid in full) is dated now, says so at the top and shows the balance. Cancelled and voided orders have neither (`409 payments.receipt.unpaid
+       {status}`). The locale is `?locale=`, else both when `show_amharic`, else English. Voided payments are left off; refunds (none until 4.3d) print with
+       the net paid. `EthiopianDate` lives in `Shared\Time` (4.5f's web converter is its twin).
+     - **Fonts.** `NotoSansEthiopic-Regular.ttf` is the unhinted TTF of notofonts' release `NotoSansEthiopic-v2.102` (sha256 `86b9c07c...166d4`, pinned in
+       `ReceiptFonts::SOURCE_SHA256`), with `OFL.txt`. `ReceiptFonts` registers it (TTF, `.ufm`, `installed-fonts.json` entry for normal and bold) into
+       `storage/fonts` (`payments.receipts.fonts_dir` in tests) under the cache lock `receipts:fonts`, every file written to a temporary name and renamed.
+       `receipts:fonts` warms it; `release.sh` runs it after `queue:restart`, never fatal. `storage/fonts` is ignored by git.
+     - **The link.** `POST /orders/{order}/receipt-link` also takes `locale`, refuses an order not paid in full (409), and writes one audit row `receipt.link`
+       (order, lifetime, expiry, locale; never the URL). The signature covers order, branch, locale and expiry; a bad or expired one is `403
+       payments.receipt.link_invalid` (`bootstrap/app.php` picks the key by path; a file's stays `files.invalid_signature`). The public route sets the
+       branch the link names as the current branch, so every read is scoped as for a signed-in user; it adds `X-Robots-Tag: noindex, nofollow`.
+     - **Reconciliation.** One grouped query per table for the whole range (a CASE over the days' UTC bounds, built from literal pieces, every value a binding),
+       so the `(branch_id, received_at)` and `(branch_id, refunded_at)` indexes serve it. Every day of the range is listed oldest first; a day lists the
+       channels that had a payment or a refund (a channel that only paid money back shows a negative net), in the admin's order. The last 7 local days by
+       default (a missing `to` is today, a missing `from` six days before it); more than `payments.reconciliation_max_days` (62) is `422
+       payments.reconciliation.range_too_large {max_days}`. Polled: Payments' fingerprint plus the refunds' own (count, max id, settling).
+     - **Export.** The filters of `GET /payments` (`PaymentList`) without paging (a cursor or a limit is 422), oldest first, 500 a query. CSV is UTF-8 with a
+       byte-order mark; a typed text that a spreadsheet would run as a formula is prefixed with an apostrophe. XLSX goes through OpenSpout's streaming writer
+       into a temporary file, sent and removed. **Money stays text in the xlsx**: a numeric cell needs a PHP float, which the money rule forbids, so the
+       decimal string is written as stored (4.4d decides again for the analytics exports). `has_photo` is yes or no; no URL or object key anywhere. One audit
+       row `payment.export` (format, locale, filters with a reference blanked, row count). `payments.export_max_rows` (20 000) is a config value.
+     - **Packages.** `barryvdh/laravel-dompdf` 3.1.2 (dompdf 3.1.6), `openspout/openspout` 4.32.0 (5.x needs PHP 8.4), `smalot/pdfparser` 2.13.1 (dev: the
+       tests read the PDF back), all exact pins.
+     - **Tests that changed**: `PaymentsLangTest` (29 keys), `ReceiptSettingsTest` (extended), `SoftDeletesTest` (allowlist), `VoidOrderTest`, `PaymentVoidTest`
+       and `UsersEndpointsTest` (two new cases each), `OrdersContractTest` (one case). No test turns a shift rule off.
+     - **Not done here:** Payments `module-stable` is not run, because step 4.3d (refunds, on hold for R-C) still changes Payments; phase 4's `payments` step
+       stays `in_progress`. Domain refusals are still logged at ERROR (for Ramin, as 4.3c said).
 4. **4.4 analytics** (STATUS `analytics`), four PRs. Analytics `stable` after 4.4d.
    - **4.4a `phase-4/analytics-rebuild`**: M12 to M16; the `Analytics` module skeleton (`AnalyticsServiceProvider`, module boundaries); `Contracts\Rebuild::day(branch, localDate, trigger)`
      returning `RebuildResult {rows, version, changed, duration_ms}`; the computation split into small pure builders, one per table (`SalesBuilder`, `HourBuilder`, `ChannelBuilder`,
