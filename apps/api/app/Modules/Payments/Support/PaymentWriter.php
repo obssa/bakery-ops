@@ -163,7 +163,7 @@ final class PaymentWriter
             $this->files->attach($photo, 'payment', $row->id);
         }
 
-        event(new PaymentRecorded($this->branch->id(), $row->id, $orderId, $payment->channel->code, $amount->amount(), $balanceAfter->amount()));
+        event(new PaymentRecorded($this->branch->id(), $row->id, $orderId, $payment->channel->code, $amount->amount(), $balanceAfter->amount(), null, $photo instanceof StoredFile));
 
         return $row;
     }

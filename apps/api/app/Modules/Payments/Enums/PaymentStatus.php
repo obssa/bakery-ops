@@ -7,11 +7,11 @@ namespace App\Modules\Payments\Enums;
 use App\Shared\StateMachine\StateMachine;
 
 /**
- * The payment machine (domain-model.md, "State machines"): recorded -> verified | disputed, and recorded | verified ->
- * voided (a manager's PIN, with a reason). Phase 1 only ever writes `recorded`; the other moves are Phase 4's actions
- * (verify against the bank statement, dispute, void), and the exhaustive test pins the table. Phase 4 adds no state; its M4 (step
- * 4.3b) adds the dispute columns, and step 4.3c lets a dispute be resolved (disputed -> verified | voided), changing this table and
- * Phase1StateMachinesTest together. The payments table enforces the same list with the CHECK constraint payments_status_check.
+ * The payment machine (domain-model.md, "State machines"): recorded -> verified | disputed, recorded | verified -> voided (a manager's PIN,
+ * with a reason), and since step 4.3c disputed -> verified | voided (a dispute is resolved: the payment is found after all, or it is voided;
+ * phase-4 plan 10.8 R-Q). Phase 1 only ever writes `recorded`; the other moves are Phase 4's actions (VerifyPayment, DisputePayment,
+ * VoidPayment), and the exhaustive tests pin the table (Phase1StateMachinesTest, tests/Unit/Payments/PaymentStatusTest). Phase 4 adds no
+ * state; its M4 (step 4.3b) added the dispute columns. The payments table enforces the same list with the CHECK constraint payments_status_check.
  */
 enum PaymentStatus: string
 {
@@ -28,7 +28,7 @@ enum PaymentStatus: string
         return [
             self::Recorded->value => [self::Verified, self::Disputed, self::Voided],
             self::Verified->value => [self::Voided],
-            self::Disputed->value => [],
+            self::Disputed->value => [self::Verified, self::Voided],
             self::Voided->value => [],
         ];
     }

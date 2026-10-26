@@ -15,6 +15,7 @@ use App\Modules\Notifications\Listeners\NotifyChainBroken;
 use App\Modules\Notifications\Listeners\NotifyCountSubmitted;
 use App\Modules\Notifications\Listeners\NotifyLineReady;
 use App\Modules\Notifications\Listeners\NotifyLineRejected;
+use App\Modules\Notifications\Listeners\NotifyPaymentDisputed;
 use App\Modules\Notifications\Listeners\NotifyProductionAssigned;
 use App\Modules\Notifications\Listeners\NotifyProductionRequested;
 use App\Modules\Notifications\Listeners\NotifyStockLow;
@@ -27,6 +28,7 @@ use App\Shared\Events\ChainBroken;
 use App\Shared\Events\CountSubmitted;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
+use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\ProductionAssigned;
 use App\Shared\Events\ProductionRequested;
 use App\Shared\Events\StockLow;
@@ -70,6 +72,7 @@ final class NotificationsServiceProvider extends ServiceProvider
         Event::listen(CountSubmitted::class, [NotifyCountSubmitted::class, 'handle']);
         Event::listen(VarianceDecided::class, [NotifyVarianceDecided::class, 'handle']);
         Event::listen(ChainBroken::class, [NotifyChainBroken::class, 'handle']);
+        Event::listen(PaymentDisputed::class, [NotifyPaymentDisputed::class, 'handle']);
 
         $this->loadRoutesFrom(base_path('routes/modules/notifications.php'));
 

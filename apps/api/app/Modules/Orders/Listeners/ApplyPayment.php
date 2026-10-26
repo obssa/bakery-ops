@@ -20,7 +20,8 @@ use LogicException;
  * the payment's own transaction and under the order's row lock (Payments takes the same lock before it checks the
  * balance; a second SELECT ... FOR UPDATE inside one transaction is free), so the payment row, paid_total, the
  * settlement and the ledger's sale rows all commit together or not at all:
- *   - the amount is added to paid_total (Orders::totals reads it back);
+ *   - the amount is added to paid_total (Orders::totals reads it back) and payment.recorded goes on the timeline (step 4.3c: the payment, its
+ *     channel, its amount and whether a receipt photo came; never the photo's key or a URL);
  *   - when the balance reaches zero the order is settled (settled_at, order.settled);
  *   - a settled order that is served goes paid, sells its display-case lines and closes (Settlement); one that is not
  *     served yet waits, and LineWork closes it when its last line is served.
@@ -49,6 +50,12 @@ final class ApplyPayment
         }
 
         $order->paid_total = $paid;
+        $this->timeline->record($order, OrderEventType::PaymentRecorded, [
+            'payment_id' => $event->paymentId,
+            'channel_code' => $event->channelCode,
+            'amount' => $amount->amount(),
+            'receipt' => $event->hasReceipt,
+        ]);
         if ($paid->equals($order->total)) {
             $order->settled_at = CarbonImmutable::now()->startOfSecond();
             $this->timeline->record($order, OrderEventType::OrderSettled, ['payment_id' => $event->paymentId, 'paid' => $paid->amount()]);

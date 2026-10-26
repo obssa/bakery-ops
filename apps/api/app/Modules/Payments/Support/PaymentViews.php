@@ -10,6 +10,8 @@ use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Models\PaymentChannel;
 use App\Shared\Files\Files;
 use App\Shared\Files\StoredFile;
+use App\Shared\Values\Money;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A payment as the reads answer it (phase-4 plan section 4.3, step 4.3b: GET /orders/{order}/payments, GET /payments, GET
@@ -24,6 +26,23 @@ final class PaymentViews
         private readonly Orders $orders,
         private readonly Duplicates $duplicates,
     ) {}
+
+    /**
+     * One payment as GET /payments/{payment} answers it, and as the status changes of step 4.3c (verify, dispute, void) answer it: the payment with
+     * its order and its refunds (payment_refunds, none before step 4.3d).
+     *
+     * @return array<string, mixed>
+     */
+    public function detail(Payment $payment): array
+    {
+        $view = $this->present([$payment], true)[0];
+        $view['refunds'] = DB::table('payment_refunds')->where('branch_id', $payment->branch_id)->where('payment_id', $payment->id)->orderBy('id')
+            ->get(['id', 'amount', 'channel_id', 'refunded_at'])
+            ->map(fn (object $r): array => ['id' => (int) $r->id, 'amount' => Money::of((string) $r->amount)->amount(), 'channel_id' => (int) $r->channel_id, 'refunded_at' => (string) $r->refunded_at])
+            ->all();
+
+        return $view;
+    }
 
     /**
      * @param  list<Payment>  $payments

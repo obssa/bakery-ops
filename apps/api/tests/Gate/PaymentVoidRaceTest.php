@@ -15,9 +15,10 @@ use Tests\Support\OrderFloor;
 
 /*
  * A void racing the last payment of the same bill (phase-4 plan section 7, PaymentVoidRaceTest; step 4.3c). A served order of 30.00 has a part
- * payment of 10.00; at the same moment one till voids that part payment (with the manager's PIN) and another takes the 20.00 left. Each is a real
- * request through the whole HTTP stack in its own forked process. Both lock the order row first (Orders::forPayment, FOR UPDATE), so they run one
- * after the other and the second sees what the first did:
+ * payment of 10.00; one till voids that part payment (with the admin's PIN) while another takes the 20.00 left. Each is a real request through
+ * the whole HTTP stack in its own forked process; the payment starts 0 to 580 ms after the void (20 ms more each round), so the rounds sweep
+ * across the moment the void, done with its PIN, reaches the order's lock. Both lock the order row first (Orders::forPayment, FOR UPDATE), so
+ * they run one after the other and the second sees what the first did (both orders must be seen):
  *   - the void goes first: the order is back to 30.00 to pay, and the 20.00 is taken as a part payment (the order stays open);
  *   - the payment goes first: the bill is paid, the order closes, and the void is refused (409 payments.void.order_closed: refund it instead).
  * Either way paid_total equals the sum of the order's payments that are not voided, the order is never closed with a voided payment in its
@@ -44,7 +45,8 @@ beforeEach(function () {
     $this->f->assign($this->f->manager, $this->f->menu->tillStation); // the second till is the manager's, in the same till shift
     withActor($this->f->admin->id);
     app(ShortCodes::class)->set($this->f->admin, '864209');
-    $this->post = fn (User $as, string $uri, array $body): Closure => function () use ($as, $uri, $body): array {
+    $this->post = fn (User $as, string $uri, array $body, int $delayMs = 0): Closure => function () use ($as, $uri, $body, $delayMs): array {
+        usleep($delayMs * 1000);
         loginAs($as);
         $response = $this->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson($uri, $body);
 
@@ -71,9 +73,11 @@ it('serialises a void and the last payment of one bill on the order lock: one of
         }
         $sales = DB::table('stock_movements')->where('reason', 'sale')->count();
 
+        // the void checks a PIN before it takes the order's lock, so the payment starts later and later (0 to 580 ms): the early rounds race the
+        // payment's lock against the void's checks, the middle ones meet at the lock, the late ones let the void lock first
         $results = Forks::together([
             ($this->post)($f->cashier, "/api/v1/payments/{$partId}/void", ['reason' => 'Keyed on the wrong bill', 'pin' => '864209']),
-            ($this->post)($f->manager, "/api/v1/orders/{$order['id']}/payments", ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '20.00']),
+            ($this->post)($f->manager, "/api/v1/orders/{$order['id']}/payments", ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '20.00'], ($round - 1) * 20),
         ]);
 
         $outcomes = array_map(fn (array $r): string => ($r['ok'] ?? false) ? $r['value']['status'].' '.$r['value']['message_key'] : 'error '.($r['error'] ?? '?'), $results);
@@ -91,11 +95,13 @@ it('serialises a void and the last payment of one bill on the order lock: one of
         if (! $row->paid_total->equals($counted) || $payments->count() !== 2) {
             $failures[] = "round {$round}: paid_total {$row->paid_total->amount()} but the payments that count add up to {$counted->amount()}";
         }
-        $seen[$voidFirst ? 'void first' : ($payFirst ? 'pay first' : 'other')] = true;
+        $outcome = $voidFirst ? 'void first' : ($payFirst ? 'pay first' : 'other');
+        $seen[$outcome] = ($seen[$outcome] ?? 0) + 1;
     }
 
-    expect($failures)->toBe([])->and(paymentVoidRaceDeadlocks())->toBe($deadlocksBefore, 'the engine detected no deadlock at all');
-    fwrite(STDERR, 'PaymentVoidRaceTest outcomes seen: '.implode(', ', array_keys($seen)).PHP_EOL);
+    fwrite(STDERR, 'PaymentVoidRaceTest outcomes seen: '.json_encode($seen).PHP_EOL);
+    expect($failures)->toBe([])->and(paymentVoidRaceDeadlocks())->toBe($deadlocksBefore, 'the engine detected no deadlock at all')
+        ->and(array_keys($seen))->toEqualCanonicalizing(['void first', 'pay first'], 'both orders of the race happened');
     $oracle = ledgerOracle($f->branch->id);
     expect($oracle['movements'])->toBe($oracle['balances'])->and($oracle['balances'])->toBe($oracle['view']);
 })->group('concurrency', 'module:payments', 'feature');

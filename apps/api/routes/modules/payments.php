@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Payments\Http\Controllers\ChannelsController;
+use App\Modules\Payments\Http\Controllers\PaymentDecisionsController;
 use App\Modules\Payments\Http\Controllers\PaymentReadsController;
 use App\Modules\Payments\Http\Controllers\PaymentsController;
 use App\Modules\Payments\Http\Controllers\ReceiptSettingsController;
@@ -16,8 +17,9 @@ use Illuminate\Support\Facades\Route;
  * order is 404). Step 4.3a adds the channel administration (channels.manage, the admin; {channel} binds through the BranchScoped
  * model, so another branch's or a removed channel is 404) and the receipt settings read (a placeholder until step 4.3e). Step 4.3b adds
  * the split bill (payments.take) and the payment reads (payments.view; {payment} is a number the controller looks up through the
- * BranchScoped model, so another branch's is 404). Every route is listed in tests/Support/route_permissions.php and every write in
- * tests/Support/write_endpoints.php.
+ * BranchScoped model, so another branch's is 404). Step 4.3c adds verify and dispute (payments.verify: admin, manager) and the void (asked with
+ * orders.void_request, approved inside by the PIN of a payments.void holder). Every route is listed in tests/Support/route_permissions.php and
+ * every write in tests/Support/write_endpoints.php.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:payments.take')->group(function (): void {
@@ -31,6 +33,15 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/orders/{order}/payments', [PaymentReadsController::class, 'forOrder'])->whereNumber('order')->name('payments.order');
         Route::get('/payments', [PaymentReadsController::class, 'index'])->name('payments.index');
         Route::get('/payments/{payment}', [PaymentReadsController::class, 'show'])->whereNumber('payment')->name('payments.show');
+    });
+
+    // step 4.3c: the admin's decisions on a payment (payments.verify), and the void a manager's PIN approves (asked with orders.void_request)
+    Route::middleware(['permission:payments.verify', 'idempotency'])->group(function (): void {
+        Route::post('/payments/{payment}/verify', [PaymentDecisionsController::class, 'verify'])->whereNumber('payment')->name('payments.verify');
+        Route::post('/payments/{payment}/dispute', [PaymentDecisionsController::class, 'dispute'])->whereNumber('payment')->name('payments.dispute');
+    });
+    Route::middleware(['permission:orders.void_request', 'idempotency'])->group(function (): void {
+        Route::post('/payments/{payment}/void', [PaymentDecisionsController::class, 'void'])->whereNumber('payment')->name('payments.void');
     });
 
     Route::middleware(['permission:channels.manage', 'idempotency'])->group(function (): void {

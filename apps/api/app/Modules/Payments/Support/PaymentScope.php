@@ -12,7 +12,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Which payments a viewer of the payment reads sees (phase-4 plan 10.2 R-N, step 4.3b). An admin and a manager (they hold
- * payments.void, the approvers; step 4.3c's payments.verify has the same holders) see every payment of the branch: of() answers null. Anyone
+ * payments.verify, step 4.3c; step 4.3b used payments.void, which has the same default holders, until it existed) see every payment of the
+ * branch: of() answers null. Anyone
  * else with payments.view (a cashier) sees the payments received in the last 24 hours, counted from the start of the current minute so
  * the list and its ETag agree for a whole minute, and those taken in the shift they carry now.
  */
@@ -26,7 +27,7 @@ final readonly class PaymentScope
 
     public static function of(User $viewer, ActorContext $actor): ?self
     {
-        if ($viewer->can('payments.void')) {
+        if ($viewer->can('payments.verify')) {
             return null;
         }
 

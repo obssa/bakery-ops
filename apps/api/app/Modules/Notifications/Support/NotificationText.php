@@ -137,6 +137,12 @@ final class NotificationText
                 'seq' => (string) $this->int($type, $p, 'first_bad_chain_seq'),
                 'kind' => $this->template('chain_kind.'.$this->str($type, $p, 'kind'), $locale),
             ],
+            'payment_disputed' => [
+                'order_no' => (string) $this->int($type, $p, 'order_no'),
+                'amount' => $this->str($type, $p, 'amount'),
+                'channel' => $this->str($type, $p, $in('channel_name')),
+                'reason' => $this->str($type, $p, 'reason'),
+            ],
             default => throw UnknownNotificationType::named($type),
         };
     }

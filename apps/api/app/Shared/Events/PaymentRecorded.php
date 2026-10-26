@@ -13,7 +13,8 @@ use Carbon\CarbonImmutable;
  * when the balance reaches zero, settles the order (paid and closed once it is served, with the display-case lines sold).
  * A refusal or a failure in the listener rolls the payment back with it. Ids and decimal strings only, so Orders
  * never imports Payments and Payments never imports Orders' models. balance_after is what Payments computed from
- * Orders::totals; the listener takes the amount and works out the balance from its own columns.
+ * Orders::totals; the listener takes the amount and works out the balance from its own columns. has_receipt (step 4.3c, its first consumer:
+ * payment.recorded on the order's timeline) says whether a receipt photo came with the payment; never the photo's key or a URL.
  */
 final class PaymentRecorded extends DomainEvent
 {
@@ -25,12 +26,13 @@ final class PaymentRecorded extends DomainEvent
         public readonly string $amount,
         public readonly string $balanceAfter,
         ?CarbonImmutable $occurredAt = null,
+        public readonly bool $hasReceipt = false,
     ) {
         parent::__construct($branchId, $occurredAt);
     }
 
     /**
-     * @return array{payment_id: int, order_id: int, channel_code: string, amount: string, balance_after: string}
+     * @return array{payment_id: int, order_id: int, channel_code: string, amount: string, balance_after: string, has_receipt: bool}
      */
     public function payload(): array
     {
@@ -40,6 +42,7 @@ final class PaymentRecorded extends DomainEvent
             'channel_code' => $this->channelCode,
             'amount' => $this->amount,
             'balance_after' => $this->balanceAfter,
+            'has_receipt' => $this->hasReceipt,
         ];
     }
 }

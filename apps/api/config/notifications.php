@@ -157,5 +157,14 @@ return [
                 'store' => '/admin/inventory?shift={shift_id}',
             ],
         ],
+        // Phase 4 (step 4.3c): a payment was disputed. The people who verify payments (payments.verify) hear of it once per payment (a payment
+        // is disputed once) on every channel they have switched on; the line opens the payment on the admin's payments screen (step 4.5c).
+        'payment_disputed' => [
+            'severity' => 'warning',
+            'channels' => ['in_app', 'push', 'telegram'],
+            'inbox_key' => 'payment_disputed:{payment_id}',
+            'gate' => null,
+            'deep_link' => '/admin/payments?payment={payment_id}',
+        ],
     ],
 ];

@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
  *
  *   POST   /files            files.upload    201 File; 200 the same body for a client_uuid already stored (multipart; Idempotency-Key)
  *   GET    /files/{file}/url payments.view   200 {url, expires_at}; files.upload holders get their own unattached upload only (403 otherwise)
- *   DELETE /files/{file}     files.upload    204; only an unattached file, by its uploader or a payments.void holder; 409 files.attached
+ *   DELETE /files/{file}     files.upload    204; only an unattached file, by its uploader or a payments.verify holder (step 4.3c; payments.void before it existed); 409 files.attached
  *   GET    /files/doctor     channels.manage 200 {data: [{check, status, detail}]} as the web PHP sees them (compare with `files:doctor`)
  *
  * The audit rows carry the purpose and the size, never the object key or a URL.
@@ -64,7 +64,7 @@ final class FilesController
     {
         $row = StoredFile::query()->findOrFail($file);
         $user = $request->user();
-        $mayDelete = $user !== null && ((int) $row->uploaded_by_user_id === (int) $user->getAuthIdentifier() || $user->can('payments.void'));
+        $mayDelete = $user !== null && ((int) $row->uploaded_by_user_id === (int) $user->getAuthIdentifier() || $user->can('payments.verify'));
         abort_unless($mayDelete, 403);
         if ($row->attached_type !== null || $row->attached_at !== null) {
             throw FilesError::attached();

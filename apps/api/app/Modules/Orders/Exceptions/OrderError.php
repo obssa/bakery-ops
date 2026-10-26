@@ -40,6 +40,15 @@ final class OrderError extends RuntimeException
         return new self('orders.order.not_voidable', 409, ['status' => $status->value]);
     }
 
+    /**
+     * Step 4.3c: a payment of an order that is paid or closed cannot be voided (ReversePayment); the money is refunded instead. The key is Payments'
+     * (lang/<locale>/payments.php), because the refusal is the answer of POST /payments/{payment}/void; Orders only names it.
+     */
+    public static function paymentVoidOrderClosed(OrderStatus $status): self
+    {
+        return new self('payments.void.order_closed', 409, ['status' => $status->value]);
+    }
+
     /** Paid, settled or closed: the money was taken, so it is a refund (Phase 4), not a void. */
     public static function paid(OrderStatus $status): self
     {

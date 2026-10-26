@@ -91,6 +91,11 @@ return [
             'title' => 'Counts record broken: :place',
             'body' => 'The locked counts of :place no longer match their seal at entry :seq (:kind). A locked count was changed or removed outside the app. Open the record and check who had access.',
         ],
+        // Phase 4, step 4.3c: a payment could not be matched against the bank statement
+        'payment_disputed' => [
+            'title' => 'Payment disputed: order #:order_no',
+            'body' => ':amount ETB paid by :channel on order #:order_no was disputed: :reason. Check it against the bank statement, then verify or void it.',
+        ],
     ],
 
     'chain_kind' => [

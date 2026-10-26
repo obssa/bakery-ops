@@ -47,4 +47,14 @@ return [
     'client_uuid' => [
         'reused' => 'This payment id was already used for another order.',
     ],
+    // step 4.3c: disputing and voiding a payment
+    'dispute' => [
+        'reason_required' => 'Say why the payment is disputed, in 3 to 255 characters.',
+    ],
+    'void' => [
+        'order_closed' => 'This order is paid and closed, so its payments cannot be voided. Refund the order instead.',
+        'refunded' => 'Money from this payment was already given back, so it cannot be voided.',
+        'reason_required' => 'Say why the payment is voided, in at most 255 characters.',
+        'pin_required' => 'A manager must type their PIN (4 to 6 digits) to approve the void.',
+    ],
 ];

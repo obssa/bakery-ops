@@ -133,6 +133,21 @@ final class PaymentError extends RuntimeException
         return new self('payments.shift.required', 409);
     }
 
+    /**
+     * Step 4.3c: the payment's order is paid or closed, so the sale is finished and the payment is not voided: the order is refunded instead
+     * (Orders' ReversePayment refuses it with the same key, OrderError::paymentVoidOrderClosed). $status is the order's.
+     */
+    public static function voidOrderClosed(string $status): self
+    {
+        return new self('payments.void.order_closed', 409, ['status' => $status]);
+    }
+
+    /** Step 4.3c: money already went back from this payment (refunded_amount, step 4.3d's refunds), so voiding it would count the money twice. */
+    public static function voidRefunded(string $refundedAmount): self
+    {
+        return new self('payments.void.refunded', 409, ['refunded_amount' => $refundedAmount]);
+    }
+
     /** Step 4.3a: a channel code the branch already has, a removed channel's included (the unique key is (branch, code)). */
     public static function codeTaken(string $code): self
     {

@@ -69,6 +69,10 @@ final class PermissionRegistry
         // 2026_10_30_100100_grant_phase_4_permissions. files.upload: receipt photos; payments.view: payments, receipts and a photo's signed URL.
         'files.upload' => ['admin', 'manager', 'cashier'],
         'payments.view' => ['admin', 'manager', 'cashier'],
+        // Step 4.3c (plan section 10.6): its own grant-only migration 2026_11_02_100100_grant_payments_verify_permission, because M2 has run on the
+        // live database. payments.verify: verify and dispute payments against the bank's statement (later the reconciliation and the export),
+        // see every payment of the branch (a cashier sees their own shift and the last 24 hours), delete anyone's unattached receipt photo.
+        'payments.verify' => ['admin', 'manager'],
     ];
 
     /**

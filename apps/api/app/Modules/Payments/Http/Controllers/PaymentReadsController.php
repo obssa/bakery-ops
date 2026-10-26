@@ -14,11 +14,9 @@ use App\Modules\Payments\Support\PaymentScope;
 use App\Modules\Payments\Support\PaymentViews;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Live\ConditionalPoll;
-use App\Shared\Values\Money;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -73,13 +71,7 @@ final class PaymentReadsController
             throw (new ModelNotFoundException)->setModel(Payment::class, [$payment]);
         }
 
-        $view = $this->views->present([$row], true)[0];
-        $view['refunds'] = DB::table('payment_refunds')->where('branch_id', $row->branch_id)->where('payment_id', $row->id)->orderBy('id')
-            ->get(['id', 'amount', 'channel_id', 'refunded_at'])
-            ->map(fn (object $r): array => ['id' => (int) $r->id, 'amount' => Money::of((string) $r->amount)->amount(), 'channel_id' => (int) $r->channel_id, 'refunded_at' => (string) $r->refunded_at])
-            ->all();
-
-        return response()->json($view);
+        return response()->json($this->views->detail($row));
     }
 
     private function viewer(Request $request): User
