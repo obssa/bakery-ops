@@ -33,6 +33,7 @@ final class UserBuilder
      */
     public function build(string $day, string $timezone, array $sales, array $lines, array $voids, array $payments, array $refunds, array $stationLines): array
     {
+        /** @var array<int, array<string, array{orders: int, items: BigDecimal, revenue: BigDecimal, payments: int, paid: BigDecimal, voids: int, refunds: array<int, true>, prepared: int, prep: list<int>}>> $p */
         $p = [];
         $blank = static fn (): array => [
             'orders' => 0, 'items' => BigDecimal::zero(), 'revenue' => BigDecimal::zero(), 'payments' => 0, 'paid' => BigDecimal::zero(),
@@ -52,7 +53,9 @@ final class UserBuilder
         foreach ($lines as $line) {
             $owner = $ownerOf[$line->orderId] ?? null;
             if ($owner !== null) {
-                $p[$owner]['waiter']['items'] = $p[$owner]['waiter']['items']->plus($line->qty);
+                $c = $p[$owner]['waiter'] ?? $blank();
+                $c['items'] = $c['items']->plus($line->qty);
+                $p[$owner]['waiter'] = $c;
             }
         }
         foreach ($voids as $void) {

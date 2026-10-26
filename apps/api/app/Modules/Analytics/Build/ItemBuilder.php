@@ -102,7 +102,7 @@ final class ItemBuilder
                 'day' => $day,
                 'item_id' => $itemId,
                 'category_id' => $summary?->categoryId,
-                'kind' => $summary?->kind ?? ($itemLines === [] ? 'ingredient' : 'product'),
+                'kind' => $summary !== null ? $summary->kind : ($itemLines === [] ? 'ingredient' : 'product'),
                 'units_sold_qty' => Figures::qty($units),
                 'refunded_qty' => Figures::qty(BigDecimal::zero()),
                 'produced_qty' => Figures::qty($figures['produced']),
