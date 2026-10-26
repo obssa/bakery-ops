@@ -21,8 +21,11 @@ use stdClass;
  * ends of the range are inclusive local dates in the branch's timezone (LocalDay).
  *
  * payments(): the clock is `received_at`; voided payments are left out, a disputed one is kept (it is money received, flagged).
+ *   `duplicate_reference` is Payments' own rule (10.8 R-B, Support\Duplicates): another live payment of the branch on the same
+ *   channel with the same normalised reference, wherever it falls in time (step 4.4a; one indexed EXISTS per row, the
+ *   `(branch_id, channel_id, reference_norm)` index of M4).
  * refunds(): the clock is `refunded_at`; it reads `payment_refunds`, which nothing writes before step 4.3d, so it yields nothing
- * until then. Branch-scoped through the model for payments and by the current branch for refunds, resolved per use.
+ * until then. Each row names its `order_refund_id` (step 4.4a: a refund paid back over two payments is one refund). Branch-scoped through the model for payments and by the current branch for refunds, resolved per use.
  */
 final class Facts
 {
@@ -35,6 +38,11 @@ final class Facts
             fn (CarbonImmutable $start, CarbonImmutable $end) => Payment::query()->toBase()
                 ->join('payment_channels', 'payment_channels.id', '=', 'payments.channel_id')
                 ->select('payments.*', 'payment_channels.code as channel_code')
+                ->selectRaw(
+                    'exists (select 1 from payments twin where twin.branch_id = payments.branch_id and twin.channel_id = payments.channel_id'
+                    .' and twin.reference_norm = payments.reference_norm and twin.id <> payments.id and twin.status <> ?) as duplicate_reference',
+                    [PaymentStatus::Voided->value],
+                )
                 ->where('payments.status', '!=', PaymentStatus::Voided->value)
                 ->where('payments.received_at', '>=', DayRows::sql($start))
                 ->where('payments.received_at', '<', DayRows::sql($end)),
@@ -52,6 +60,7 @@ final class Facts
                 (int) $row->received_by_user_id,
                 $row->shift_instance_id === null ? null : (int) $row->shift_instance_id,
                 (string) DayRows::iso($row->received_at),
+                (bool) $row->duplicate_reference,
             ),
         );
     }
@@ -81,6 +90,7 @@ final class Facts
                 (int) $row->refunded_by_user_id,
                 $row->shift_instance_id === null ? null : (int) $row->shift_instance_id,
                 (string) DayRows::iso($row->refunded_at),
+                (int) $row->order_refund_id,
             ),
         );
     }

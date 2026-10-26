@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Contracts;
 
 /**
- * One out episode that began on a local day (Inventory\Contracts\Facts::stockOuts). Plain values, no model (phase-4 plan section 2); decimals are strings, instants are UTC ISO-8601.
+ * One out episode that began on a local day (Inventory\Contracts\Facts::stockOuts), with the station that owns its location (step 4.4a). Plain values, no model (phase-4 plan section 2); decimals are strings, instants are UTC ISO-8601.
  */
 final readonly class StockOutFact
 {
@@ -16,6 +16,7 @@ final readonly class StockOutFact
         public ?int $locationId,
         public string $activeSince,
         public ?string $clearedAt,
+        public ?int $stationId = null,
     ) {}
 
     /**
@@ -30,6 +31,7 @@ final readonly class StockOutFact
             'location_id' => $this->locationId,
             'active_since' => $this->activeSince,
             'cleared_at' => $this->clearedAt,
+            'station_id' => $this->stationId,
         ];
     }
 }

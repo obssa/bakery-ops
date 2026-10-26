@@ -23,6 +23,14 @@ use stdClass;
  * The clock is `settled_at` (the instant the balance reached zero; plan 10.2 R-J), bucketed by the branch's timezone through
  * LocalDay; both ends of the range are inclusive. Only `paid` and `closed` orders count: open, sent..served, cancelled and voided
  * orders are not sales. Branch-scoped through the models (the current branch), resolved per use.
+ *
+ * Two more reads (step 4.4a), each on its own clock (ADR 0014):
+ *   voids(range)         voided orders on the local day of `voided_at` and cancelled ones on the day of `cancelled_at`, with
+ *                        their total, owner and who asked for the void (a cancelled order records no asker);
+ *   stationLines(range)  every line made at a station (station_id set) once for each local day of the range on which it was
+ *                        readied, served or rejected, whatever its order became (work done is work done; a voided order's
+ *                        ready lines were still made). The row carries all four instants, so the reader buckets each figure
+ *                        by its own: prep time by `ready_at`, served by `served_at`, rejected by `rejected_at`.
  */
 final class Facts
 {
@@ -84,6 +92,71 @@ final class Facts
                 (string) $row->status,
                 DayRows::iso($row->accepted_at),
                 DayRows::iso($row->ready_at),
+                $row->prepared_by_user_id === null ? null : (int) $row->prepared_by_user_id,
+            ),
+        );
+    }
+
+    /** @return Generator<int, VoidFact> */
+    public function voids(LocalDay $range): Generator
+    {
+        $voided = OrderStatus::Voided->value;
+        $cancelled = OrderStatus::Cancelled->value;
+
+        return DayRows::generate(
+            $range,
+            'orders.id',
+            fn (CarbonImmutable $start, CarbonImmutable $end) => Order::query()->toBase()
+                ->select('orders.*')
+                ->where(fn ($q) => $q
+                    ->where(fn ($v) => $v->where('orders.status', $voided)
+                        ->where('orders.voided_at', '>=', DayRows::sql($start))
+                        ->where('orders.voided_at', '<', DayRows::sql($end)))
+                    ->orWhere(fn ($c) => $c->where('orders.status', $cancelled)
+                        ->where('orders.cancelled_at', '>=', DayRows::sql($start))
+                        ->where('orders.cancelled_at', '<', DayRows::sql($end)))),
+            fn (stdClass $row, string $day): VoidFact => new VoidFact(
+                (int) $row->id,
+                $day,
+                (string) $row->status,
+                (string) $row->type,
+                Money::of((string) $row->total)->amount(),
+                $row->owner_user_id === null ? null : (int) $row->owner_user_id,
+                $row->status === $voided && $row->voided_by_user_id !== null ? (int) $row->voided_by_user_id : null,
+                (string) DayRows::iso($row->status === $voided ? $row->voided_at : $row->cancelled_at),
+            ),
+        );
+    }
+
+    /** @return Generator<int, StationLineFact> */
+    public function stationLines(LocalDay $range): Generator
+    {
+        $on = static fn ($q, string $column, CarbonImmutable $start, CarbonImmutable $end) => $q
+            ->where($column, '>=', DayRows::sql($start))
+            ->where($column, '<', DayRows::sql($end));
+
+        return DayRows::generate(
+            $range,
+            'order_lines.id',
+            fn (CarbonImmutable $start, CarbonImmutable $end) => OrderLine::query()->toBase()
+                ->select('order_lines.*')
+                ->whereNotNull('order_lines.station_id')
+                ->where(fn ($q) => $q
+                    ->where(fn ($w) => $on($w, 'order_lines.ready_at', $start, $end))
+                    ->orWhere(fn ($w) => $on($w, 'order_lines.served_at', $start, $end))
+                    ->orWhere(fn ($w) => $on($w, 'order_lines.rejected_at', $start, $end))),
+            fn (stdClass $row, string $day): StationLineFact => new StationLineFact(
+                (int) $row->id,
+                (int) $row->order_id,
+                $day,
+                (int) $row->item_id,
+                (int) $row->station_id,
+                Quantity::of((string) $row->qty)->toString(),
+                (string) $row->status,
+                DayRows::iso($row->accepted_at),
+                DayRows::iso($row->ready_at),
+                DayRows::iso($row->served_at),
+                DayRows::iso($row->rejected_at),
                 $row->prepared_by_user_id === null ? null : (int) $row->prepared_by_user_id,
             ),
         );

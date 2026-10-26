@@ -78,6 +78,7 @@ final class Items
                 $item->kind->value,
                 $item->fulfilment->value,
                 $item->is_active && ! $item->trashed(),
+                $item->category_id === null ? null : (int) $item->category_id,
             );
         }
 

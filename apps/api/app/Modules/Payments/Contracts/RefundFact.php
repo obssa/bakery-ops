@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Payments\Contracts;
 
 /**
- * One money-side refund row on the day of its refunded_at (Payments\Contracts\Facts::refunds). Plain values, no model (phase-4 plan section 2); decimals are strings, instants are UTC ISO-8601.
+ * One money-side refund row on the day of its refunded_at (Payments\Contracts\Facts::refunds). orderRefundId: the refund the row is a share of (step 4.4a). Plain values, no model (phase-4 plan section 2); decimals are strings, instants are UTC ISO-8601.
  */
 final readonly class RefundFact
 {
@@ -20,6 +20,7 @@ final readonly class RefundFact
         public int $refundedByUserId,
         public ?int $shiftInstanceId,
         public string $refundedAt,
+        public int $orderRefundId = 0,
     ) {}
 
     /**
@@ -38,6 +39,7 @@ final readonly class RefundFact
             'refunded_by_user_id' => $this->refundedByUserId,
             'shift_instance_id' => $this->shiftInstanceId,
             'refunded_at' => $this->refundedAt,
+            'order_refund_id' => $this->orderRefundId,
         ];
     }
 }

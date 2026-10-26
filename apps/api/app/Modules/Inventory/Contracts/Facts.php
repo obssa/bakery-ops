@@ -23,7 +23,8 @@ use stdClass;
  *   movements(range): ledger rows on the local day of `created_at`, ordered (day, id), chunked.
  *   closingBalances(day): what every item holds at every place at the end of that local day: the same sums as Stock::balanceAt
  *     (created_at <= the last second before the next local midnight), so it equals the oracle; items never moved are not listed.
- *   stockOuts(range): the `out` episodes (stock_alert_states) whose `active_since` falls on a day of the range, ordered (day, id).
+ *   stockOuts(range): the `out` episodes (stock_alert_states) whose `active_since` falls on a day of the range, ordered (day, id),
+ *     each with the station that owns its location (null for a place no station owns; step 4.4a).
  *   unitCosts(day): per item the item_cost_history row in force at the end of that local day (the last one written before the next
  *     local midnight), ordered by item id; an item with no history yet is not listed.
  * Branch-scoped through the models (the current branch), resolved per use.
@@ -71,12 +72,13 @@ final class Facts
     {
         return DayRows::generate(
             $range,
-            'id',
+            'stock_alert_states.id',
             fn (CarbonImmutable $start, CarbonImmutable $end) => StockAlertState::query()->toBase()
-                ->select('id', 'item_id', 'location_id', 'active_since', 'cleared_at')
-                ->where('type', StockAlertState::OUT)
-                ->where('active_since', '>=', DayRows::sql($start))
-                ->where('active_since', '<', DayRows::sql($end)),
+                ->leftJoin('locations', 'locations.id', '=', 'stock_alert_states.location_id')
+                ->select('stock_alert_states.id', 'stock_alert_states.item_id', 'stock_alert_states.location_id', 'stock_alert_states.active_since', 'stock_alert_states.cleared_at', 'locations.station_id')
+                ->where('stock_alert_states.type', StockAlertState::OUT)
+                ->where('stock_alert_states.active_since', '>=', DayRows::sql($start))
+                ->where('stock_alert_states.active_since', '<', DayRows::sql($end)),
             fn (stdClass $row, string $day): StockOutFact => new StockOutFact(
                 (int) $row->id,
                 $day,
@@ -84,6 +86,7 @@ final class Facts
                 $row->location_id === null ? null : (int) $row->location_id,
                 (string) DayRows::iso($row->active_since),
                 DayRows::iso($row->cleared_at),
+                $row->station_id === null ? null : (int) $row->station_id,
             ),
         );
     }

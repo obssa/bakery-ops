@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Payments\Contracts;
 
 /**
- * One non-voided payment on the day of its received_at (Payments\Contracts\Facts::payments). Plain values, no model (phase-4 plan section 2); decimals are strings, instants are UTC ISO-8601.
+ * One non-voided payment on the day of its received_at (Payments\Contracts\Facts::payments). duplicateReference: another live payment of the branch on the same channel has the same normalised reference (step 4.4a). Plain values, no model (phase-4 plan section 2); decimals are strings, instants are UTC ISO-8601.
  */
 final readonly class PaymentFact
 {
@@ -23,6 +23,7 @@ final readonly class PaymentFact
         public int $receivedByUserId,
         public ?int $shiftInstanceId,
         public string $receivedAt,
+        public bool $duplicateReference = false,
     ) {}
 
     /**
@@ -44,6 +45,7 @@ final readonly class PaymentFact
             'received_by_user_id' => $this->receivedByUserId,
             'shift_instance_id' => $this->shiftInstanceId,
             'received_at' => $this->receivedAt,
+            'duplicate_reference' => $this->duplicateReference,
         ];
     }
 }
