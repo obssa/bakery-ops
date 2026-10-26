@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Contracts\Items;
+use App\Modules\Catalog\Enums\Fulfilment;
+use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Inventory\Contracts\Facts as InventoryFacts;
 use App\Modules\Inventory\Contracts\Stock;
@@ -10,17 +13,23 @@ use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\ItemCostHistory;
 use App\Modules\Orders\Contracts\Facts as OrderFacts;
 use App\Modules\Orders\Contracts\Orders;
+use App\Modules\Orders\Enums\LineStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Payments\Contracts\Facts as PaymentFacts;
 use App\Modules\Payments\Models\Payment;
+use App\Modules\Payments\Models\PaymentChannel;
 use App\Modules\Production\Contracts\Facts as ProductionFacts;
 use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Models\ProductionBatch;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Modules\Shifts\Contracts\Facts as ShiftFacts;
+use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Enums\ShiftStatus;
 use App\Modules\Shifts\Models\ShiftInstance;
+use App\Modules\Shifts\Models\StockCount;
+use App\Modules\Shifts\Models\StockCountLine;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -281,4 +290,182 @@ it('Shifts\Facts::instances: a shift once, with date, opened_at, closed_at and l
             ->and(array_key_exists('closed_at', $rows[0]))->toBeTrue();
     }
     expect(factRows((new ShiftFacts)->instances(LocalDay::between('2026-11-22', '2026-11-22'))))->toBe([]);
+});
+
+/*
+ * Step 4.4a: what the summary tables need beyond the ten cases of 4.1a/4.1c. Each is ADDITIVE to a port (a new method, or a new field
+ * at the end of a row), committed red before the provider work, with `app/Modules/Analytics` still empty (the contract-first rule).
+ *   Orders\Facts::voids(range)         voided orders on the day of voided_at, cancelled ones on the day of cancelled_at (daily_sales.voided_*,
+ *                                      cancelled_count; daily_user_metrics.voids_count by who asked)
+ *   Orders\Facts::stationLines(range)  station lines on every day one was readied, served or rejected (prep times, lines_served, lines_rejected,
+ *                                      tickets; the clocks of ADR 0014 are the line's own, not the order's settled_at)
+ *   PaymentFact::duplicateReference    the duplicate rule of Payments (10.8 R-B), so daily_channel_totals.duplicate_reference_count needs no reference
+ *   RefundFact::orderRefundId          the refund a money row belongs to (daily_sales.refund_count counts refunds, not their payment rows)
+ *   StockOutFact::stationId            the station of the location (daily_station_metrics.stockout_count)
+ *   ShiftFact::varianceLineCount / cashVariance  the final counts of the shift (daily_station_metrics.variance_line_count, cash_variance_total)
+ *   Catalog ItemSummary::categoryId    daily_item_metrics.category_id
+ */
+
+it('Orders\Facts::voids: voided orders on the local day of voided_at, cancelled ones on the day of cancelled_at, with the total and who asked', function () {
+    expect(factRows((new OrderFacts)->voids($this->both)))->toBe([]);
+    $voided = Order::factory()->create([
+        'branch_id' => $this->branch->id, 'status' => OrderStatus::Voided, 'subtotal' => '80.00', 'total' => '80.00',
+        'voided_at' => $this->lastSecond, 'voided_by_user_id' => $this->admin->id, 'void_reason' => 'wrong table',
+    ]);
+    $cancelled = Order::factory()->create(['branch_id' => $this->branch->id, 'status' => OrderStatus::Cancelled, 'cancelled_at' => $this->firstSecond]);
+    ($this->order)('90.00', $this->lastSecond); // a sale is not a void
+    $other = Branch::factory()->create();
+    Order::factory()->create(['branch_id' => $other->id, 'status' => OrderStatus::Voided, 'voided_at' => $this->lastSecond]);
+
+    $rows = factRows((new OrderFacts)->voids($this->both));
+
+    expect(array_column($rows, 'order_id'))->toBe([$voided->id, $cancelled->id], 'ordered by (day, id), no sale, no other branch')
+        ->and(array_column($rows, 'day'))->toBe(['2026-11-20', '2026-11-21'], 'each on its own clock, bucketed by Africa/Addis_Ababa')
+        ->and(array_column($rows, 'status'))->toBe(['voided', 'cancelled'])
+        ->and($rows[0]['total'])->toBe('80.00')
+        ->and($rows[0]['voided_by_user_id'])->toBe($this->admin->id)
+        ->and($rows[1]['voided_by_user_id'])->toBeNull()
+        ->and(array_key_exists('owner_user_id', $rows[0]))->toBeTrue();
+    expect(factRows((new OrderFacts)->voids(LocalDay::between('2026-11-21', '2026-11-21'))))->toHaveCount(1);
+});
+
+it('Orders\Facts::stationLines: a station line on every local day on which it was readied, served or rejected, whatever its order became', function () {
+    expect(factRows((new OrderFacts)->stationLines($this->both)))->toBe([]);
+    $kitchen = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $this->branch->id]);
+    $order = Order::factory()->create(['branch_id' => $this->branch->id, 'status' => OrderStatus::Voided, 'voided_at' => $this->firstSecond]);
+    $line = fn (array $attributes): OrderLine => OrderLine::factory()->atStation($kitchen)->create($attributes + ['order_id' => $order->id]);
+    $acrossMidnight = $line([
+        'status' => LineStatus::Served, 'accepted_at' => $this->lastSecond->subMinutes(12), 'ready_at' => $this->lastSecond,
+        'served_at' => $this->firstSecond, 'prepared_by_user_id' => $this->admin->id, 'qty' => '2',
+    ]);
+    $rejected = $line(['status' => LineStatus::Rejected, 'rejected_at' => $this->firstSecond, 'reject_reason' => 'out_of_stock']);
+    $line([]); // queued: nothing happened to it yet
+    OrderLine::factory()->create(['order_id' => $order->id, 'status' => LineStatus::Ready, 'ready_at' => $this->lastSecond]); // display case: no station
+    $other = Branch::factory()->create();
+    $otherKitchen = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $other->id]);
+    OrderLine::factory()->atStation($otherKitchen)->create([
+        'order_id' => Order::factory()->create(['branch_id' => $other->id])->id, 'status' => LineStatus::Ready, 'ready_at' => $this->lastSecond,
+    ]);
+
+    $rows = factRows((new OrderFacts)->stationLines($this->both));
+
+    expect(array_map(fn (array $r): array => [$r['line_id'], $r['day']], $rows))
+        ->toBe([[$acrossMidnight->id, '2026-11-20'], [$acrossMidnight->id, '2026-11-21'], [$rejected->id, '2026-11-21']], 'once per day it touched, ordered (day, id)')
+        ->and($rows[0]['station_id'])->toBe($kitchen->id)
+        ->and($rows[0]['order_id'])->toBe($order->id)
+        ->and($rows[0]['ready_at'])->toBe('2026-11-20T20:59:59Z')
+        ->and($rows[0]['served_at'])->toBe('2026-11-20T21:00:00Z')
+        ->and($rows[0]['accepted_at'])->toBe('2026-11-20T20:47:59Z')
+        ->and($rows[0]['prepared_by_user_id'])->toBe($this->admin->id)
+        ->and($rows[0]['qty'])->toBe('2.0000')
+        ->and($rows[2]['rejected_at'])->toBe('2026-11-20T21:00:00Z')
+        ->and($rows[2]['status'])->toBe('rejected');
+    expect(factRows((new OrderFacts)->stationLines(LocalDay::between('2026-11-20', '2026-11-20'))))->toHaveCount(1);
+});
+
+it('Payments\Facts::payments flags a duplicate reference: another live payment of the branch on the same channel with the same normalised reference', function () {
+    $order = ($this->order)('100.00', $this->lastSecond);
+    $channel = fn (string $code): int => (int) PaymentChannel::query()->where('code', $code)->value('id');
+    $make = fn (array $attributes): Payment => Payment::factory()->create($attributes + [
+        'branch_id' => $this->branch->id, 'order_id' => $order->id, 'received_at' => $this->lastSecond, 'amount' => '10.00',
+    ]);
+    $first = $make(['channel_id' => $channel('telebirr'), 'reference_no' => 'FT-123', 'reference_norm' => 'FT123']);
+    $second = $make(['channel_id' => $channel('telebirr'), 'reference_no' => 'ft 123', 'reference_norm' => 'FT123']);
+    $alone = $make(['channel_id' => $channel('telebirr'), 'reference_no' => 'FT999', 'reference_norm' => 'FT999']);
+    $otherChannel = $make(['channel_id' => $channel('cbe_birr'), 'reference_no' => 'FT999', 'reference_norm' => 'FT999']);
+    $make(['channel_id' => $channel('cbe_birr'), 'reference_no' => 'FT-555', 'reference_norm' => 'FT555', 'status' => 'voided']);
+    $voidedTwin = $make(['channel_id' => $channel('cbe_birr'), 'reference_no' => 'FT555', 'reference_norm' => 'FT555']);
+    $cash = $make([]);
+
+    $flags = [];
+    foreach (factRows((new PaymentFacts)->payments($this->both)) as $row) {
+        $flags[$row['payment_id']] = $row['duplicate_reference'];
+    }
+
+    expect($flags)->toBe([
+        $first->id => true, $second->id => true, $alone->id => false, $otherChannel->id => false, $voidedTwin->id => false, $cash->id => false,
+    ], 'same channel and normalised reference; a voided payment is nobody else\'s duplicate and is not read');
+});
+
+it('Payments\Facts::refunds: each money row names the refund it belongs to', function () {
+    $order = ($this->order)('100.00', $this->lastSecond);
+    $payment = Payment::factory()->create(['branch_id' => $this->branch->id, 'order_id' => $order->id, 'amount' => '100.00', 'received_at' => $this->lastSecond]);
+    DB::table('payment_refunds')->insert([
+        'branch_id' => $this->branch->id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $order->id, 'order_refund_id' => 7,
+        'payment_id' => $payment->id, 'channel_id' => $payment->channel_id, 'amount' => '40.00', 'refunded_by_user_id' => $this->admin->id,
+        'approved_by_user_id' => $this->admin->id, 'refunded_at' => $this->lastSecond, 'created_at' => $this->lastSecond,
+    ]);
+
+    $rows = factRows((new PaymentFacts)->refunds($this->both));
+
+    expect($rows)->toHaveCount(1)->and($rows[0]['order_refund_id'])->toBe(7)->and($rows[0]['amount'])->toBe('40.00');
+});
+
+it('Inventory\Facts::stockOuts: an episode names the station of its location (null for a place no station owns)', function () {
+    $station = Station::factory()->create(['branch_id' => $this->branch->id]);
+    $kitchen = stockLocation($this->branch, LocationType::Kitchen, $station);
+    $store = stockLocation($this->branch, LocationType::Store);
+    $flour = Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id]);
+    foreach ([$kitchen, $store] as $place) {
+        DB::table('stock_alert_states')->insert([
+            'branch_id' => $this->branch->id, 'item_id' => $flour->id, 'location_id' => $place->id, 'location_key' => $place->id, 'type' => 'out',
+            'is_active' => 1, 'active_since' => $this->lastSecond, 'cleared_at' => null, 'available_at_start' => '0.0000',
+            'created_at' => $this->lastSecond, 'updated_at' => $this->lastSecond,
+        ]);
+    }
+
+    $rows = factRows((new InventoryFacts)->stockOuts($this->both));
+
+    expect(array_column($rows, 'location_id'))->toBe([$kitchen->id, $store->id])
+        ->and(array_column($rows, 'station_id'))->toBe([$station->id, null]);
+});
+
+it('Shifts\Facts::instances: a shift carries the variance lines and the cash variance of its final counts (a draft, rejected or superseded count is left out)', function () {
+    $kitchen = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $this->branch->id]);
+    $shelf = stockLocation($this->branch, LocationType::Kitchen, $kitchen);
+    $fridge = stockLocation($this->branch, LocationType::Kitchen, $kitchen);
+    $lived = ['date' => '2026-11-20', 'opened_at' => $this->lastSecond->subHours(10), 'locked_at' => $this->lastSecond->subHour()];
+    $shift = ShiftInstance::factory()->locked()->create(['branch_id' => $this->branch->id, 'station_id' => $kitchen->id] + $lived);
+    $item = fn (): Item => Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id]);
+    $closing = StockCount::factory()->forShift($shift, $shelf->id)->closing()->status(CountStatus::Approved)->create();
+    StockCountLine::factory()->forCount($closing, $item()->id)->counted('9', '10')->create();
+    StockCountLine::factory()->forCount($closing, $item()->id)->counted('5', '5')->create();
+    StockCountLine::factory()->forCount($closing, $item()->id)->counted('3', '2.5')->create();
+    $draft = StockCount::factory()->forShift($shift, $fridge->id)->opening()->create();
+    StockCountLine::factory()->forCount($draft, $item()->id)->counted('1', '2')->create();
+    $rejected = StockCount::factory()->forShift($shift, $fridge->id)->closing()->status(CountStatus::Rejected)->create();
+    StockCountLine::factory()->forCount($rejected, $item()->id)->counted('1', '2')->create();
+
+    $till = Station::factory()->forCode(StationCode::Till)->create(['branch_id' => $this->branch->id]);
+    $drawer = stockLocation($this->branch, LocationType::CashDrawer, $till);
+    $tillShift = ShiftInstance::factory()->locked()->create(['branch_id' => $this->branch->id, 'station_id' => $till->id] + $lived);
+    $drawerCount = StockCount::factory()->forShift($tillShift, $drawer->id)->closing()->create();
+    DB::table('cash_declarations')->insert([
+        'branch_id' => $this->branch->id, 'count_id' => $drawerCount->id, 'shift_instance_id' => $tillShift->id, 'denominations' => '[]',
+        'counted_total' => '95.00', 'expected_total' => '100.00', 'variance_total' => '-5.00', 'currency' => 'ETB',
+        'created_at' => $this->lastSecond, 'updated_at' => $this->lastSecond,
+    ]);
+    DB::table('stock_counts')->where('id', $drawerCount->id)->update([
+        'status' => 'approved', 'counted_by_user_id' => $this->admin->id, 'snapshot_at' => $this->lastSecond, 'submitted_at' => $this->lastSecond,
+    ]);
+    $bar = Station::factory()->forCode(StationCode::Bar)->create(['branch_id' => $this->branch->id]);
+    $quiet = ShiftInstance::factory()->locked()->create(['branch_id' => $this->branch->id, 'station_id' => $bar->id] + $lived);
+
+    $byShift = [];
+    foreach (factRows((new ShiftFacts)->instances(LocalDay::of('2026-11-20'))) as $row) {
+        $byShift[$row['shift_id']] = [$row['variance_line_count'], $row['cash_variance']];
+    }
+
+    expect($byShift)->toBe([$shift->id => [2, null], $tillShift->id => [0, '-5.00'], $quiet->id => [0, null]]);
+});
+
+it('Catalog Items::summaries names the category of each item (daily_item_metrics groups products by it)', function () {
+    $category = Category::factory()->product()->create(['branch_id' => $this->branch->id]);
+    $croissant = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $this->branch->id, 'category_id' => $category->id]);
+    $flour = Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id]);
+
+    $summaries = app(Items::class)->summaries([$croissant->id, $flour->id]);
+
+    expect($summaries[$croissant->id]->categoryId)->toBe($category->id)
+        ->and($summaries[$flour->id]->categoryId)->toBeNull();
 });
