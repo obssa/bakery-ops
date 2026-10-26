@@ -19,7 +19,8 @@ use Tests\Support\ReceiptFiles;
  * lock it relies on, tests/Contract/Payments/OrdersConcurrencyTest.php). Each payment is a real POST through the whole HTTP stack, in its own
  * forked process on its own connection. RecordPayment locks the order (Orders::forPayment, FOR UPDATE), then takes the till's shift shared,
  * then the photo's row FOR UPDATE, so the second payment sees the first one's balance:
- *   - both pay the whole balance: one is taken, the other is told the order is settled (409 payments.order.settled);
+ *   - both pay the whole balance of a served order: one is taken and closes the order, the other is told it cannot be paid any more
+ *     (409 payments.order.not_payable, status closed; an order not served yet would answer payments.order.settled);
  *   - their parts together are more than the balance: one is taken, the other is told the amount is more than the balance (422
  *     payments.amount.mismatch, with the balance it saw);
  * paid_total is never more than the total, the loser's photo stays free, and the engine detects no deadlock (Innodb_deadlocks, 30 rounds each).
@@ -62,7 +63,7 @@ beforeEach(function () {
     };
 });
 
-it('takes one of two payments of the whole last balance; the other is told the order is settled (30 rounds)', function () {
+it('takes one of two payments of the whole last balance; the other is told the order is closed (30 rounds)', function () {
     $f = $this->f;
     $deadlocksBefore = splitPaymentRaceDeadlocks();
     $failures = [];
@@ -79,7 +80,7 @@ it('takes one of two payments of the whole last balance; the other is told the o
         $outcomes = array_map(fn (array $r): string => ($r['ok'] ?? false) ? $r['value']['status'].' '.$r['value']['message_key'] : 'error '.($r['error'] ?? '?'), $results);
         $sorted = $outcomes;
         sort($sorted);
-        if ($sorted !== ['201 ', '409 payments.order.settled']) {
+        if ($sorted !== ['201 ', '409 payments.order.not_payable']) {
             $failures[] = "round {$round}: ".json_encode($outcomes);
         }
         $paid = Order::query()->findOrFail($order['id'])->paid_total->amount();

@@ -114,3 +114,13 @@ Accepted at the Phase 3 gate. Rules 1 to 10 hold as written, with these facts fr
 - **Rule 9** is code, pinned by `CountsPropertyTest`. **Rule 10** is `Totals::cash`, keyed on the payment's own shift (contract case 2, amended).
 - **Seeds.** The demo seeders open their shifts through `DemoShifts::ensureOpen`; `Phase3Seeder` writes the history through the same actions the screens
   call, and runs every seeded movement and cash payment inside the right open shift.
+
+## Note (step 4.3b, 2026-10-26): a payment on every channel carries the till's shift
+
+Phase 4 takes payments on every enabled channel (phase-4 plan section 4.3). Rule 10 (`Totals::cash`, keyed on the payment's own shift) already
+held for every channel through `Totals::byChannel(shift)`; what changes is the guard. `payments.require_shift_for_cash` asked an open shift of
+cash only; plan 10.1 R-A asks it of **every** channel, because a Telebirr or bank payment with no shift would be in no shift's reconciliation.
+It is built without a fourth kill-switch line: `config/payments.php` gains `require_shift` (`PAYMENTS_REQUIRE_SHIFT`), unset by default, and
+`Payments\Support\ShiftRule` reads it as "follow the cash switch" while it is unset. So `PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false` still switches
+the rule off (for every channel), and the runbook's kill switch stays three lines; setting the new variable splits the two rules. The shared
+lock on the shift row (rule 6, the freeze) is the same for every channel, taken after the order's row lock and before the receipt photo's.

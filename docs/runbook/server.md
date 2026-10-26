@@ -266,7 +266,7 @@ Three rules are on by default in the code (`config/ledger.php`, `config/shifts.p
 |---|---|---|
 | `LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` | The stock ledger refuses a movement that changes on-hand stock at a location of a station that tracks shifts unless a shift is open there (`409 inventory.shift.required`). Locations of no station (the E2E branch's display case, the store) and a count's own correction are exempt. | Stock moves at any station with no shift, as before Phase 3; rows carry the shift only when one runs. |
 | `SHIFTS_OPEN_AD_HOC_ON_ACCEPT` | A baker who accepts a production request at a station with no running shift opens a call-in shift (`origin = call_in`, carried); the accept, the batch and its movements carry it. | Nothing is opened; the accept carries a shift only if one already runs (the baker joins it). |
-| `PAYMENTS_REQUIRE_SHIFT_FOR_CASH` | A cash payment at the till needs the cashier to carry an open shift (`409 payments.shift.required`); the web till's Pay button waits for a running shift. | Cash is taken with or without a shift, as before; the till's cash count still works on whatever payments carry the shift. |
+| `PAYMENTS_REQUIRE_SHIFT_FOR_CASH` | A cash payment at the till needs the cashier to carry an open shift (`409 payments.shift.required`); the web till's Pay button waits for a running shift. Since step 4.3b the same holds for **every** channel (Telebirr, the banks): `Totals::byChannel(shift)` and the cashier's per-channel reconciliation are keyed on the payment's own shift. | Every channel is taken with or without a shift, as before; the till's cash count still works on whatever payments carry the shift. |
 
 **Kill switch** (nothing is deployed and no data is lost; shifts already opened stay and are closed or cancelled from the screens). On the server,
 as the account user, in the release's `.env` (`~/bakery-ops.orcamind.dev/.env`; copy it to `.env.bak` first):
@@ -283,8 +283,13 @@ PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false
 ```
 
 (or edit the three lines in place if they are already there; the last value wins only when there is one line per variable, so remove duplicates).
-The change takes effect with `config:cache`; verify with `php artisan tinker --execute="var_dump(config('ledger.require_shift_for_station_locations'), config('shifts.open_ad_hoc_on_accept'), config('payments.require_shift_for_cash'));"`
-(three `false`). To switch a rule back on, delete its line (or set `true`) and run `config:cache` again; a deploy runs `optimize` and so keeps whatever the `.env` says.
+
+**Every channel, one line (step 4.3b, phase-4 plan 10.1 R-A).** `config/payments.php` also reads `PAYMENTS_REQUIRE_SHIFT`, the rule for the digital channels.
+The live `.env` does not set it, so it follows `PAYMENTS_REQUIRE_SHIFT_FOR_CASH`: the kill switch above switches the shift rule off for cash and for every
+other channel at once, and it is still three lines. Set `PAYMENTS_REQUIRE_SHIFT` only to split the two rules: `false` keeps the rule for cash and drops it
+for the other channels; `true` asks every channel, cash included, even with the cash line `false`. Leave it out otherwise.
+The change takes effect with `config:cache`; verify with `php artisan tinker --execute="var_dump(config('ledger.require_shift_for_station_locations'), config('shifts.open_ad_hoc_on_accept'), config('payments.require_shift_for_cash'), config('payments.require_shift'));"`
+(three `false`, then `NULL`: the every-channel rule follows the cash line). To switch a rule back on, delete its line (or set `true`) and run `config:cache` again; a deploy runs `optimize` and so keeps whatever the `.env` says.
 
 The web build carries one matching switch, `NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH=true` (set in `deploy.yml` for the static export): the till's Pay button
 blocks when no shift runs. With the cash rule off on the server the button still blocks until the next release is built with it `false`; the API would accept the payment

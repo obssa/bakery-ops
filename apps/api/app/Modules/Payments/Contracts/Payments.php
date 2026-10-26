@@ -82,7 +82,7 @@ final class Payments
             && CarbonImmutable::parse($touched, 'UTC')->greaterThan($now->subSeconds(OverlapCursor::fromConfig()->windowSeconds()));
 
         return [
-            'count' => (int) ($row?->n ?? 0),
+            'count' => (int) ($row->n ?? 0),
             'max_id' => is_numeric($row?->max_id) ? (int) $row->max_id : null,
             'max_updated_at' => $touched,
             'settling' => $young ? $now->getTimestamp() : null,

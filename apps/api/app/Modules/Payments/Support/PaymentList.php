@@ -108,7 +108,7 @@ final class PaymentList
         $rows = array_slice($rows, 0, $limit);
         $last = $rows === [] ? null : $rows[count($rows) - 1];
 
-        return [array_values($rows), $more && $last instanceof Payment ? (string) $last->id : null];
+        return [$rows, $more && $last instanceof Payment ? (string) $last->id : null];
     }
 
     private static function on(mixed $flag): bool
