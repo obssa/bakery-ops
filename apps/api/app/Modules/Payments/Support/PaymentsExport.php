@@ -11,6 +11,8 @@ use App\Modules\Payments\Models\PaymentChannel;
 use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
 use Generator;
+use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
@@ -22,7 +24,8 @@ use RuntimeException;
  * response, XLSX through OpenSpout's streaming writer into a temporary file that is sent and removed (an xlsx is a zip, written whole when
  * it is closed). Money is the decimal string as stored; times are local (the branch's zone), with the local day beside them. A photo is
  * has_photo yes or no: never a signed URL or an object key. In CSV a text a spreadsheet would run as a formula (one that starts with =, +,
- * -, @, a tab or a return) is prefixed with an apostrophe; an xlsx cell is typed text and never runs.
+ * -, @, a tab or a return) is prefixed with an apostrophe; an xlsx cell is written as a text cell and never runs (OpenSpout's Row::fromValues
+ * would make a formula cell of a text that starts with =, so the cells are made here; step 4.4d found it).
  */
 final class PaymentsExport
 {
@@ -92,7 +95,7 @@ final class PaymentsExport
             $writer->getCurrentSheet()->setName('Payments');
             $header = true;
             foreach ($this->rows($filters, $scope, $locale) as $row) {
-                $writer->addRow($header ? Row::fromValues($row, (new Style)->setFontBold()) : Row::fromValues($row));
+                $writer->addRow(new Row(array_map(self::cell(...), $row), $header ? (new Style)->setFontBold() : null));
                 $header = false;
             }
         } finally {
@@ -173,6 +176,12 @@ final class PaymentsExport
 
             yield array_map(static fn (string $column): string => $row[$column], self::COLUMNS);
         }
+    }
+
+    /** A text cell, or an empty one: never a formula, whatever the text starts with. */
+    private static function cell(string $value): Cell
+    {
+        return $value === '' ? Cell::fromValue(null) : new StringCell($value, null);
     }
 
     private static function guarded(string $value): string
