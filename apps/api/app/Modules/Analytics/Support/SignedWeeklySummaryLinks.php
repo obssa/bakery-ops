@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\URL;
  */
 final class SignedWeeklySummaryLinks implements WeeklySummaryLinks
 {
-    public function link(int $branchId, string $weekStart, string $locale): ?SignedLink
+    public function link(int $branchId, string $weekStart, string $locale): SignedLink
     {
         $expires = CarbonImmutable::now()->addDays(max(1, (int) config('analytics.weekly_link_days', 7)));
         $url = URL::temporarySignedRoute('analytics.weekly-summary.pdf', $expires, [

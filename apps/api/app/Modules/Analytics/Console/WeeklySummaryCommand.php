@@ -40,13 +40,13 @@ final class WeeklySummaryCommand extends Command
     {
         $week = $this->option('week');
         $only = $this->option('branch');
-        if ($week !== null && (! is_string($week) || preg_match('/^\d{4}-\d{2}-\d{2}$/', $week) !== 1)) {
+        if (is_string($week) && preg_match('/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/', $week) !== 1) {
             $this->error('--week is a date: YYYY-MM-DD');
 
             return 2;
         }
         /** @var Collection<int, Branch> $branches */
-        $branches = Branch::query()->when(is_string($only) && $only !== '', fn ($q) => $q->whereKey((int) $only))->orderBy('id')->get();
+        $branches = Branch::query()->when($only !== null && $only !== '', fn ($q) => $q->whereKey((int) $only))->orderBy('id')->get();
 
         $code = self::SUCCESS;
         foreach ($branches as $branch) {

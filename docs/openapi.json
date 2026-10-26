@@ -2923,6 +2923,84 @@
                 }
             }
         },
+        "/v1/analytics/exports/{report}": {
+            "get": {
+                "operationId": "analytics.exports",
+                "tags": [
+                    "Exports"
+                ],
+                "parameters": [
+                    {
+                        "name": "report",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "xlsx",
+                                "pdf",
+                                "csv"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "locale",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "en",
+                                "am"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": [
+                                        "object",
+                                        "string"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/files/doctor": {
             "get": {
                 "operationId": "files.doctor",
@@ -14952,6 +15030,131 @@
                     }
                 }
             }
+        },
+        "/v1/weekly-summaries/{week}": {
+            "get": {
+                "operationId": "analytics.weekly-summary.pdf",
+                "tags": [
+                    "WeeklySummary"
+                ],
+                "parameters": [
+                    {
+                        "name": "week",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Content-Length": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "Referrer-Policy": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "no-referrer"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            },
+                            "X-Robots-Tag": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "noindex, nofollow"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/v1/analytics/weekly-summary/send": {
+            "post": {
+                "operationId": "analytics.weekly-summary.send",
+                "tags": [
+                    "WeeklySummary"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WeeklySummaryRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "week_start": {
+                                            "type": "string"
+                                        },
+                                        "week_end": {
+                                            "type": "string"
+                                        },
+                                        "run": {
+                                            "type": "string"
+                                        },
+                                        "summary": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "required": [
+                                        "week_start",
+                                        "week_end",
+                                        "run",
+                                        "summary"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -18630,6 +18833,17 @@
                     "pin"
                 ],
                 "title": "VoidPaymentRequest"
+            },
+            "WeeklySummaryRequest": {
+                "type": "object",
+                "description": "POST /analytics/weekly-summary/send (phase-4 plan section 4.6, step 4.4d): {week_of?}, any local date (YYYY-MM-DD) of the week to send;\nwithout it the last complete week (on a Monday, the week that ended last night). A week that is not over (its Sunday is today or later)\nis 422 analytics.weekly.week_open {week_start, week_end}; anything else wrong 422 validation.failed.",
+                "properties": {
+                    "week_of": {
+                        "type": "string",
+                        "format": "date"
+                    }
+                },
+                "title": "WeeklySummaryRequest"
             }
         },
         "responses": {
