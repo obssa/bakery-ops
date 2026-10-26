@@ -189,6 +189,15 @@ return [
     'POST /api/v1/payments/{payment}/verify' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
     'POST /api/v1/payments/{payment}/dispute' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
     'POST /api/v1/payments/{payment}/void' => ['permission' => 'orders.void_request', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    // Receipts, reconciliation and the export (step 4.3e): the admin saves the receipt settings (channels.manage); a receipt is read by the payment
+    // readers (payments.view) and its signed link made by the till's roles (payments.take; the matrix's {order} is an open cart, which has no
+    // receipt: 409 payments.receipt.unpaid, no 403); the reconciliation and the export are the payment checkers' (payments.verify: admin, manager).
+    // GET /receipts/{order} is public by design (signed link, tests/Support/public_routes.php).
+    'PUT /api/v1/receipt-settings' => ['permission' => 'channels.manage', 'roles' => ['admin'], 'module' => 'payments'],
+    'GET /api/v1/orders/{order}/receipt.pdf' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'POST /api/v1/orders/{order}/receipt-link' => ['permission' => 'payments.take', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'GET /api/v1/payments/reconciliation' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
+    'GET /api/v1/payments/export' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
 
     // Shifts (step 3.2b): shifts.view reads at the stations one works at (stations.all everywhere); shifts.manage (the admin) configures
     // and acts for others; shifts.count starts, joins and leaves, and the action checks the station (403 shifts.station.forbidden).

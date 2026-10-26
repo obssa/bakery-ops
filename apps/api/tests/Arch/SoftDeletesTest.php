@@ -31,6 +31,7 @@ $noSoftDeletes = [
     'App\Modules\Notifications\Models\NotificationDedupe',  // the delivery gate of an episodic alert: active, then cleared (cleared_at, is_active NULL), kept as history
     'App\Modules\Notifications\Models\NotificationDelivery',  // history of what was sent outside the app: pending, then sent, failed or gone by status, never deleted
     'App\Modules\Payments\Models\Payment',  // never deleted: recorded, then verified, disputed or voided by status (Phase 4); the till's money trail
+    'App\Modules\Payments\Models\ReceiptSettings',  // one row per branch (unique branch_id), changed in place by PUT /receipt-settings and audited; never deleted (no delete path), a branch that saved nothing reads the defaults
     'App\Modules\Production\Models\ProductionRequest',  // never deleted: requested, accepted, in progress, pending confirmation, then done or cancelled by status; a done one is the reason behind its batch's movements
     'App\Modules\Production\Models\ProductionBatch',  // never deleted: started, finished, then confirmed by status; a confirmed one names the production_output movement it wrote
     'App\Modules\Shifts\Models\ShiftInstance',  // never deleted: scheduled, opening, open, counting, pending approval, then locked or cancelled by status; the stamps, counts and cash of other rows point at it

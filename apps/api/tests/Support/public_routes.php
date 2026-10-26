@@ -18,4 +18,7 @@ return [
     // Signed URL of a stored image (step 4.2a): an <img> cannot send a bearer token, so the `signed` middleware (id + expiry + signature) is the protection.
     // An entry may be 'METHOD uri' when only that method is public: DELETE /files/{file} shares the uri and is a protected write.
     'GET api/v1/files/{file}',
+    // The receipt a customer opens from a signed link (step 4.3e): no bearer token on a customer's phone, so the `signed` middleware (order, branch,
+    // locale and expiry under the signature) is the protection; it answers the PDF only, never cached.
+    'GET api/v1/receipts/{order}',
 ];

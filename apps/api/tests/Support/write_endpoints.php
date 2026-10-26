@@ -720,6 +720,35 @@ return [
         },
         'payload' => fn (): array => ['reason' => 'Keyed on the wrong bill', 'pin' => '864209'],
     ],
+    // Receipts (step 4.3e): the first save of the receipt settings writes the branch's receipt_settings row; a receipt link writes one audit_log
+    // row (receipt.link, without the URL) for an order paid in full
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/receipt-settings',
+        'module' => 'payments',
+        'table' => 'receipt_settings',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => ['business_name_en' => 'Idempotent Bakery', 'business_name_am' => 'ዳቦ ቤት', 'show_amharic' => true, 'ethiopian_dates' => false],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders/{order}/receipt-link',
+        'module' => 'payments',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $order = Order::factory()->sent()->create([
+                'branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'total' => '150.00', 'paid_total' => '150.00', 'settled_at' => now(),
+            ]);
+
+            return ['{order}' => (string) $order->id];
+        },
+        'payload' => fn (): array => ['ttl_hours' => 24],
+    ],
 
     // Payment channels (step 4.3a): a create writes the channel row; an edit, the reorder and the soft delete write one audit_log row each
     [
