@@ -1,10 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import type { Locale, Me, ShiftStatus, StationCode, WorkStation } from "@/lib/api/types";
-import { authed, can, useSession } from "@/lib/session";
+import { useWorkStations } from "@/lib/api/adminShifts";
+import type { Locale, ShiftStatus, StationCode, WorkStation } from "@/lib/api/types";
+import { can, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { Badge, Panel } from "../ui";
 import { focusRing } from "../styles";
@@ -52,15 +52,11 @@ export function StationsPanel() {
   const me = useSession((s) => s.me);
   const allowed = can(me, "stations.all");
 
-  const fresh = useQuery({
-    queryKey: ["me-work-stations"],
-    queryFn: () => authed<Me>("/me"),
-    enabled: allowed,
-    refetchInterval: 15_000,
-  });
+  // the same query (and so the same cached shape, the list) as the admin shifts screens this overview links to
+  const fresh = useWorkStations({ enabled: allowed, refetchInterval: 15_000 });
   if (!allowed) return null;
 
-  const stations = fresh.data?.work_stations ?? me?.work_stations ?? [];
+  const stations = fresh.data ?? me?.work_stations ?? [];
   return (
     <Panel title={t("stations_title")} className="mt-6">
       <p className="mb-4 text-base text-neutral-600">{t("stations_intro")}</p>
