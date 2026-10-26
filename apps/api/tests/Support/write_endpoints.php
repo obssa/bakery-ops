@@ -43,6 +43,7 @@ use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Models\NotificationEndpoint;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
+use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Models\PaymentChannel;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Modules\Shifts\Models\ShiftTemplate;
@@ -677,6 +678,47 @@ return [
             'client_uuid' => (string) Str::uuid(),
             'rows' => [['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '90.00', 'tendered_amount' => '100.00']],
         ],
+    ],
+
+    // Verify, dispute and void (step 4.3c): each is one AuditedAction on the payment, so the first request writes one audit_log row. The void's
+    // payment is a part payment of a sent order whose paid_total holds it (Orders' ReversePayment takes it back out); the admin's own PIN approves.
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/payments/{payment}/verify',
+        'module' => 'payments',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+
+            return ['{payment}' => (string) Payment::factory()->create(['branch_id' => $me->branch_id, 'received_by_user_id' => $me->id])->id];
+        },
+        'payload' => fn (): array => ['note' => 'Matched the statement'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/payments/{payment}/dispute',
+        'module' => 'payments',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+
+            return ['{payment}' => (string) Payment::factory()->create(['branch_id' => $me->branch_id, 'received_by_user_id' => $me->id])->id];
+        },
+        'payload' => fn (): array => ['reason' => 'Not on the bank statement'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/payments/{payment}/void',
+        'module' => 'payments',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            app(ShortCodes::class)->set($me, '864209');
+            $order = Order::factory()->sent()->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id, 'total' => '150.00', 'paid_total' => '100.00']);
+
+            return ['{payment}' => (string) Payment::factory()->create(['branch_id' => $me->branch_id, 'order_id' => $order->id, 'received_by_user_id' => $me->id])->id];
+        },
+        'payload' => fn (): array => ['reason' => 'Keyed on the wrong bill', 'pin' => '864209'],
     ],
 
     // Payment channels (step 4.3a): a create writes the channel row; an edit, the reorder and the soft delete write one audit_log row each

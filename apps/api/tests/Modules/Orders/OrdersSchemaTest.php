@@ -383,6 +383,8 @@ it('constrains order type, status and channel, line status and reject reason, an
             'order.created', 'order.lines_replaced', 'order.sent', 'order.send_refused', 'line.queued', 'line.accepted',
             'line.ready', 'line.rejected', 'line.served', 'line.voided', 'order.in_progress', 'order.ready', 'order.served',
             'order.settled', 'order.paid', 'order.closed', 'order.cancelled', 'order.voided',
+            // step 4.3c (phase-4 plan M9, the payment half): the payments on the order's timeline
+            'payment.recorded', 'payment.voided',
         ]);
 
     foreach (OrderType::values() as $type) {

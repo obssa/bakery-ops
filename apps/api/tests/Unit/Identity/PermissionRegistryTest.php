@@ -72,6 +72,7 @@ it('follows the matrix row by row', function (string $permission, array $roles) 
     'see costs, margins and cost history (Phase 2)' => ['costs.view', ['admin', 'manager']],
     'upload receipt photos (Phase 4)' => ['files.upload', ['admin', 'manager', 'cashier']],
     'view payments and receipts (Phase 4)' => ['payments.view', ['admin', 'manager', 'cashier']],
+    'verify and dispute payments against the bank statement (Phase 4)' => ['payments.verify', ['admin', 'manager']],
 ])->group('unit', 'module:identity');
 
 it('knows no role outside the eight and no permission outside the matrix', function () {

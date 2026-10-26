@@ -75,8 +75,8 @@ it('creates notifications with branch_id NOT NULL, both languages, a JSON payloa
         ->and(Schema::hasColumn('notifications', 'deleted_at'))->toBeFalse('history: the inbox is never deleted');
 })->group('module:notifications', 'feature');
 
-it('accepts the thirteen types and three severities of the plan (migration 11 added the three of Phase 3) and refuses any other', function () {
-    $types = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken'];
+it('accepts the fourteen types and three severities of the plan (migration 11 added the three of Phase 3, step 4.3c payment_disputed) and refuses any other', function () {
+    $types = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed'];
     foreach ($types as $type) {
         DB::table('notifications')->insert(inboxRow(['_reuse' => true, 'type' => $type]));
     }
@@ -84,7 +84,7 @@ it('accepts the thirteen types and three severities of the plan (migration 11 ad
         DB::table('notifications')->insert(inboxRow(['_reuse' => true, 'severity' => $severity]));
     }
 
-    expect(DB::table('notifications')->count())->toBe(16)
+    expect(DB::table('notifications')->count())->toBe(17)
         ->and(fn () => DB::table('notifications')->insert(inboxRow(['_reuse' => true, 'type' => 'shift_opened'])))->toThrow(QueryException::class)
         ->and(fn () => DB::table('notifications')->insert(inboxRow(['_reuse' => true, 'severity' => 'fatal'])))->toThrow(QueryException::class);
 })->group('module:notifications', 'feature');

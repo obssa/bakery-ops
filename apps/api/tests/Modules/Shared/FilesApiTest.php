@@ -171,11 +171,16 @@ it('refuses to delete an attached file with 409 files.attached', function () {
     expect(StoredFile::query()->find($id))->not->toBeNull();
 });
 
-it('lets only the uploader (or an approver with payments.void) delete', function () {
+it('lets only the uploader (or a holder of payments.verify, since step 4.3c) delete', function () {
     loginAs($this->cashier);
     $id = ($this->upload)()->json('id');
 
     loginAs(makeUser($this->branch, 'cashier'));
+    $this->withHeaders(idempotencyKey())->deleteJson("/api/v1/files/{$id}")->assertForbidden();
+    // the rule is payments.verify (the plan's), no longer payments.void (4.2b's stand-in): an approver without it is refused
+    $approver = makeUser($this->branch, 'cashier');
+    $approver->givePermissionTo('payments.void');
+    loginAs($approver);
     $this->withHeaders(idempotencyKey())->deleteJson("/api/v1/files/{$id}")->assertForbidden();
 
     loginAs(makeUser($this->branch, 'manager'));

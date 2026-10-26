@@ -39,7 +39,8 @@ $machines = [
     PaymentStatus::class => [
         'recorded' => ['verified', 'disputed', 'voided'],
         'verified' => ['voided'],
-        'disputed' => [],
+        // step 4.3c (phase-4 plan M4 note, 10.8 R-Q): a dispute is resolved, verified after all or voided
+        'disputed' => ['verified', 'voided'],
         'voided' => [],
     ],
 ];

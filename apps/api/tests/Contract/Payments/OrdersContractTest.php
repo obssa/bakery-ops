@@ -29,7 +29,8 @@ use Tests\Support\Shifts;
  * Phase 4 (step 4.1a) appends the cases 5 to 13 at the end of the file: the refund path, the void of a payment, part payments and
  * the extra totals. They are RED until step 4.1b builds `Orders::refund`, the `ReversePayment` listener and `Inventory\Reversals`,
  * and carry the group `contract:payments->orders:refund`, which no CI job runs yet: `mod-orders` keeps running the four Phase 1
- * cases under `contract:payments->orders`. Step 4.1b gives the cases the first group name too, once they are green.
+ * cases under `contract:payments->orders`. Step 4.1b gives the cases the first group name too, once they are green. Step 4.3c took over
+ * the void side of 4.1b (PaymentVoided, Orders' ReversePayment, payment.voided on the timeline), so case 10 (the void) carries both names.
  * Orders is set up through its own API (OrderFloor); the payment is simulated by dispatching the event exactly as
  * Payments will, inside a transaction. It runs in Orders' CI job (mod-orders) for the life of the project.
  */
@@ -453,7 +454,7 @@ it('takes a voided payment out of paid_total while the order is sent..served, an
     });
     expect($thrown)->toBe('payments.void.order_closed')
         ->and(Order::query()->findOrFail($closed['id'])->paid_total->amount())->toBe($closedPaid);
-})->group(REFUND_GROUP);
+})->group(REFUND_GROUP, 'contract:payments->orders'); // step 4.3c built the void side (PaymentVoided, ReversePayment): CI runs it (mod-orders)
 
 it('keeps the order unsettled after a part payment, settles it with the last one, and sells the display-case lines exactly once', function () {
     $f = $this->floor;

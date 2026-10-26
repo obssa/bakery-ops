@@ -222,4 +222,17 @@ describe('the branch list', function () {
         expect(($this->get)('/api/v1/payments', $f->manager)->json('data'))->toHaveCount(6)
             ->and(($this->get)('/api/v1/payments', $f->admin)->json('data'))->toHaveCount(6);
     });
+
+    it('scopes by payments.verify since step 4.3c: a cashier given it sees everything, one given only payments.void stays scoped', function () {
+        $f = $this->floor;
+        $approver = makeUser($f->branch, 'cashier', ['name' => 'Tigist']);
+        $approver->givePermissionTo('payments.void');
+        $verifier = makeUser($f->branch, 'cashier', ['name' => 'Yonas']);
+        $verifier->givePermissionTo('payments.verify');
+
+        expect(($this->get)('/api/v1/payments', $approver)->assertOk()->json('data'))->toBe([], 'no shift and nothing from the last 24 hours')
+            ->and(($this->get)('/api/v1/payments', $verifier)->assertOk()->json('data'))->toHaveCount(5);
+        ($this->get)("/api/v1/payments/{$this->p[1]->id}", $approver)->assertNotFound();
+        ($this->get)("/api/v1/payments/{$this->p[1]->id}", $verifier)->assertOk();
+    });
 });

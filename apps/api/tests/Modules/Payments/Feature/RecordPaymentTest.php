@@ -353,6 +353,7 @@ it('dispatches PaymentRecorded once, inside the payment transaction, and rolls b
             'channel_code' => 'cash',
             'amount' => '340.00',
             'balance_after' => '0.00',
+            'has_receipt' => false, // step 4.3c: the order's timeline says whether a receipt photo came (payment.recorded)
         ]);
 
     // a listener that fails takes the payment with it

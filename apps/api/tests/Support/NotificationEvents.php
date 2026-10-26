@@ -9,6 +9,7 @@ use App\Shared\Events\ChainBroken;
 use App\Shared\Events\CountSubmitted;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
+use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\ProductionAssigned;
 use App\Shared\Events\ProductionRequested;
 use App\Shared\Events\StockLow;
@@ -206,5 +207,20 @@ final class NotificationEvents
         $a = $over + ['locationId' => 3, 'locationEn' => 'Kitchen shelf', 'locationAm' => 'የወጥ ቤት መደርደሪያ'];
 
         return new ChainBroken($branchId, $a['locationId'], $a['locationEn'], $a['locationAm'], $seq, $kind, $countId, $causedBy);
+    }
+
+    /**
+     * Step 4.3c: a payment of order 17 disputed by $byUserId (Payments' DisputePayment builds it the same way).
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public static function paymentDisputed(int $branchId, int $byUserId, int $paymentId = 71, array $over = []): PaymentDisputed
+    {
+        $a = $over + [
+            'orderId' => 21, 'orderNo' => 17, 'channelCode' => 'telebirr', 'channelEn' => 'Telebirr', 'channelAm' => 'ቴሌብር', 'amount' => '25.00',
+            'reason' => 'Not on the bank statement',
+        ];
+
+        return new PaymentDisputed($branchId, $paymentId, $a['orderId'], $a['orderNo'], $a['channelCode'], $a['channelEn'], $a['channelAm'], $a['amount'], $a['reason'], $byUserId);
     }
 }

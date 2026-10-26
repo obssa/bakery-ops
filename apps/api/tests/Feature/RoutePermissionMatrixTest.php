@@ -150,7 +150,7 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
         $params['{count}'] = (string) StockCount::factory()->forShift($shift, $place->id)->opening()->create(['created_by_user_id' => $actorId])->id;
     }
     if (str_contains($uri, '{file}')) {
-        // an unattached upload of the caller's own (anyone else's is the action's rule: 403 for a role without payments.void)
+        // an unattached upload of the caller's own (anyone else's is the action's rule: 403 for a role without payments.verify)
         $file = new StoredFile;
         $file->forceFill([
             'branch_id' => $branch->id, 'client_uuid' => (string) Str::uuid(), 'purpose' => 'receipt', 'disk' => config('files.disk'),

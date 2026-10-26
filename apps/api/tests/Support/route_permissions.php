@@ -184,6 +184,11 @@ return [
     'GET /api/v1/orders/{order}/payments' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
     'GET /api/v1/payments' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
     'GET /api/v1/payments/{payment}' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    // Verify, dispute and void (step 4.3c): verify and dispute ask for payments.verify (admin, manager); a void is asked by anyone with
+    // orders.void_request (admin, manager, cashier) and approved by the PIN of a payments.void holder inside the action (an empty body is 422).
+    'POST /api/v1/payments/{payment}/verify' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
+    'POST /api/v1/payments/{payment}/dispute' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
+    'POST /api/v1/payments/{payment}/void' => ['permission' => 'orders.void_request', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
 
     // Shifts (step 3.2b): shifts.view reads at the stations one works at (stations.all everywhere); shifts.manage (the admin) configures
     // and acts for others; shifts.count starts, joins and leaves, and the action checks the station (403 shifts.station.forbidden).
@@ -236,7 +241,7 @@ return [
     'GET /api/v1/stations/{station}/handover' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
     'GET /api/v1/replay' => ['permission' => 'shifts.replay', 'roles' => ['admin', 'manager'], 'module' => 'shifts'],
     // Files (step 4.2b). The doctor is the admin's (channels.manage). The upload and the delete of one's own unattached file ask for files.upload
-    // (a manager's delete of anyone's is the action's rule, payments.void); the fresh signed URL asks for payments.view or files.upload (same
+    // (a manager's delete of anyone's is the action's rule, payments.verify since step 4.3c); the fresh signed URL asks for payments.view or files.upload (same
     // default roles) and the action checks the uploader for the second. GET /files/{file} is the signed public route (public_routes.php).
     'GET /api/v1/files/doctor' => ['permission' => 'channels.manage', 'roles' => ['admin'], 'module' => 'shared'],
     'POST /api/v1/files' => ['permission' => 'files.upload', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'shared'],

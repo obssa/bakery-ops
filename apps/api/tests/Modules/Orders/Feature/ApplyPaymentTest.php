@@ -151,3 +151,25 @@ it('announces OrderPaid once, after the commit, with its inert companion on the 
         ->and($companions[0]->broadcastWhen())->toBeFalse();
     assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');
+
+it('writes payment.recorded on the timeline before the settlement, with the channel, the amount and whether a receipt photo came, never a key or a URL', function () {
+    $f = $this->floor;
+    $m = $f->menu;
+    $order = $f->send([$m->line($m->water)]);
+    $f->act('served', $order['lines'][0]['id'], $f->waiter)->assertOk();
+    withActor($f->cashier->id);
+    DB::transaction(function () use ($f, $order): void {
+        event(new PaymentRecorded($f->branch->id, 41, $order['id'], 'telebirr', '10.00', '20.00', null, true));
+    });
+    ($this->pay)($order['id'], '20.00');
+
+    $timeline = ($this->timeline)($order['id']);
+    $recorded = array_values(array_filter($timeline, fn (array $e): bool => $e[0] === 'payment.recorded'));
+    expect($recorded)->toBe([
+        ['payment.recorded', ['payment_id' => 41, 'channel_code' => 'telebirr', 'amount' => '10.00', 'receipt' => true]],
+        ['payment.recorded', ['payment_id' => 1, 'channel_code' => 'cash', 'amount' => '20.00', 'receipt' => false]],
+    ])
+        ->and(array_column(array_slice($timeline, -4), 0))->toBe(['payment.recorded', 'order.settled', 'order.paid', 'order.closed']);
+    $row = OrderEvent::query()->where('order_id', $order['id'])->where('event', 'payment.recorded')->orderBy('id')->first();
+    expect($row->user_id)->toBe($f->cashier->id)->and($row->order_line_id)->toBeNull()->and($row->station_id)->toBeNull();
+})->group('module:orders', 'feature');

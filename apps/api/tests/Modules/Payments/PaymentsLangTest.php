@@ -22,13 +22,15 @@ it('has an English and an Amharic text for every Payments message, with the same
         'channel.code_taken', 'channel.pattern_invalid', 'channel.cash_locked', 'channel.order_incomplete',
         // step 4.3b: photos, reference patterns, split bills and the duplicate warnings
         'photo.invalid', 'reference.invalid', 'batch.sum_mismatch', 'batch.row_invalid', 'warning.reference_duplicate', 'warning.receipt_duplicate',
+        // step 4.3c: dispute and void
+        'dispute.reason_required', 'void.order_closed', 'void.refunded', 'void.reason_required', 'void.pin_required',
     ] as $key) {
         expect($en[$key] ?? null)->toBeString()->not->toBeEmpty("en {$key}")
             ->and($am[$key] ?? null)->toBeString()->not->toBeEmpty("am {$key}")
             ->and($am[$key])->not->toBe($en[$key], "am {$key} is not a copy of the English")
             ->and($am[$key])->toMatch('/\p{Ethiopic}/u');
     }
-    expect(array_keys($en))->toHaveCount(20);
+    expect(array_keys($en))->toHaveCount(25);
 })->group('module:payments');
 
 it('no longer tells the till that photos cannot be taken, that part payments are refused, or that only cash needs a shift (step 4.3b)', function () {
