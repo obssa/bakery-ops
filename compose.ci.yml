@@ -11,7 +11,7 @@ services:
     environment:
       APP_ENV: testing
       APP_DEBUG: "false"
-      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
+      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seSE=
       OCTANE_WORKERS: "1"
       # The three Phase 3 shift rules are ON by default in the code (step 3.7e), so the e2e stack runs them without an override.
       BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-null}
@@ -25,13 +25,13 @@ services:
     image: bakery-ops-api:ci
     environment:
       APP_ENV: testing
-      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
+      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seSE=
 
   ws:
     image: bakery-ops-api:ci
     environment:
       APP_ENV: testing
-      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
+      APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seSE=
       REVERB_APP_ID: ci
       REVERB_APP_KEY: ci-key
       REVERB_APP_SECRET: ci-secret

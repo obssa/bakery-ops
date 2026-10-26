@@ -10,16 +10,16 @@ use App\Shared\Models\IdempotencyKey;
 use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
 use Closure;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
-use JsonException;
+use Illuminate\Support\Facades\Log;
 use LogicException;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 /**
  * Rule 7 / ADR 0003. Every POST/PUT/PATCH/DELETE needs an Idempotency-Key. Scope is (branch, user, key):
@@ -109,13 +109,14 @@ final class Idempotency
 
             $response = $next($request);
 
-            if (self::keeps($response->getStatusCode(), $carriesSecret)) {
+            $snapshot = self::keeps($response->getStatusCode(), $carriesSecret) ? self::snapshot($request, $response) : null;
+            if ($snapshot !== null) {
                 IdempotencyKey::query()->updateOrCreate(
                     ['branch_id' => $branchId, 'user_id' => $userId, 'key' => $key],
                     [
                         'request_hash' => $fingerprint,
                         'response_status' => $response->getStatusCode(),
-                        'response_body' => self::snapshot($response),
+                        'response_body' => $snapshot,
                         'expires_at' => CarbonImmutable::now()->addHours(self::ttlHours()),
                     ],
                 );
@@ -227,25 +228,38 @@ final class Idempotency
     }
 
     /**
-     * @return array<string, mixed>
+     * The answer as it is stored: JSON, raw text, or encrypted when it carries a secret. Null when an answer with a secret cannot be encrypted
+     * (no usable app key): it is then not stored at all, never in clear, the client still gets it, and a retry runs the write again.
+     *
+     * @return array<string, mixed>|null
      */
-    private static function snapshot(Response $response): array
+    private static function snapshot(Request $request, Response $response): ?array
     {
         $content = (string) $response->getContent();
         $contentType = (string) $response->headers->get('Content-Type', 'text/plain');
         if (str_contains($contentType, 'json')) {
             $decoded = json_decode($content, true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return self::holdsSecret($decoded)
-                    ? ['kind' => 'encrypted', 'data' => Crypt::encryptString($content)]
-                    : ['kind' => 'json', 'data' => $decoded];
+                if (! self::holdsSecret($decoded)) {
+                    return ['kind' => 'json', 'data' => $decoded];
+                }
+                try {
+                    return ['kind' => 'encrypted', 'data' => Crypt::encryptString($content)];
+                } catch (Throwable $e) {
+                    Log::warning('idempotency: an answer that carries a secret was not stored, the app key cannot encrypt it', [
+                        'path' => $request->path(),
+                        'error' => $e::class,
+                    ]);
+
+                    return null;
+                }
             }
         }
 
         return ['kind' => 'raw', 'data' => $content, 'content_type' => $contentType];
     }
 
-    /** The stored answer again, or null when an encrypted one cannot be opened (the app key changed, or the row was altered). */
+    /** The stored answer again, or null when an encrypted one cannot be opened (the app key changed or is unusable, or the row was altered). */
     private static function replay(IdempotencyKey $stored): ?Response
     {
         $snapshot = $stored->response_body ?? [];
@@ -255,7 +269,7 @@ final class Idempotency
         if (($snapshot['kind'] ?? 'raw') === 'encrypted') {
             try {
                 $data = json_decode(Crypt::decryptString(is_string($data) ? $data : ''), true, 512, JSON_THROW_ON_ERROR);
-            } catch (DecryptException|JsonException) {
+            } catch (Throwable) {
                 return null;
             }
 
