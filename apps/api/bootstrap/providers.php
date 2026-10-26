@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Analytics\AnalyticsServiceProvider;
 use App\Modules\Audit\AuditServiceProvider;
 use App\Modules\Catalog\CatalogServiceProvider;
 use App\Modules\Identity\IdentityServiceProvider;
@@ -24,4 +25,5 @@ return [
     PaymentsServiceProvider::class,
     ProductionServiceProvider::class,
     ShiftsServiceProvider::class,
+    AnalyticsServiceProvider::class,
 ];

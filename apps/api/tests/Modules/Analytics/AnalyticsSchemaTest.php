@@ -76,6 +76,7 @@ it('refuses a trigger, an hour, a kind or a role kind outside its list', functio
     expect(fn () => DB::table('daily_item_metrics')->insert(['branch_id' => $branch->id, 'day' => '2026-11-20', 'item_id' => $item->id, 'kind' => 'service', 'rebuilt_at' => '2026-11-20 21:00:00']))
         ->toThrow(QueryException::class);
 
+    seedRoles();
     $user = makeUser($branch, 'cashier');
     $person = ['branch_id' => $branch->id, 'day' => '2026-11-20', 'user_id' => $user->id, 'rebuilt_at' => '2026-11-20 21:00:00'];
     foreach (['waiter', 'cashier', 'station'] as $kind) {

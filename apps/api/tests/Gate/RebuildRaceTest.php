@@ -13,9 +13,10 @@ use Tests\Support\Forks;
  * Two rebuilds at the same moment (phase-4 plan section 7, RebuildRaceTest; traps.md "First-row race"). Each is a forked process on its
  * own connection calling Rebuild::day. The day's analytics_days row is the lock: it is created by an upsert that changes nothing (never
  * a SELECT ... FOR UPDATE of a row that may not exist), then locked, so the second rebuild waits for the first and then rebuilds again
- * from the same facts. Every other round starts with no row at all, so both race to create it. A summary table's day is deleted only
- * when it has rows (a DELETE of an empty range would take a gap lock that two rebuilds of neighbouring days could then deadlock on).
- * Both succeed, one after the other; the rows are never doubled nor missing; the engine detects no deadlock (30 rounds each).
+ * from the same facts. Every other round starts with no row at all, so both race to create it. Two rebuilds of NEIGHBOURING days run
+ * truly in parallel: a summary table's day is written by upserts and stale rows are deleted by their full key, never as a range (a
+ * range DELETE locks the gap after the day, and the neighbour's insert into that gap deadlocked within 30 rounds here: SummaryWriter).
+ * Both succeed; the rows are never doubled nor missing; the engine detects no deadlock (30 rounds each).
  * CommitsForConcurrency: the children connect on their own and must see the committed rows.
  */
 
@@ -82,26 +83,46 @@ it('serialises two rebuilds of the same day: both succeed in turn, the rows are 
     expect($failures)->toBe([])->and(rebuildRaceDeadlocks())->toBe($deadlocksBefore, 'the engine detected no deadlock at all');
 })->group('concurrency', 'module:analytics', 'feature');
 
-it('rebuilds two neighbouring days at once without a deadlock, each from scratch (30 rounds)', function () {
+it('rebuilds two neighbouring days at once without a deadlock: from nothing, over the same rows, and over rows that come and go (30 rounds)', function () {
+    // rows that come and go at the border of the two days: on the 20th a payment on the branch's LAST channel (its row sorts last in
+    // the day), on the 21st the cash payments (cash is the FIRST channel: its row sorts first); both sit in the one gap between the days
+    $sale = $this->d->sale('2026-11-20 16:00:00', [[$this->d->product(), '1', '25.00']]);
+    $last = DB::table('payment_channels')->where('branch_id', $this->d->branch->id)->max('id');
+    $lastChannelCode = (string) DB::table('payment_channels')->where('id', $last)->value('code');
+    $toggled = [$this->d->pay($sale, $lastChannelCode, '25.00', '2026-11-20 16:00:00', ['reference_no' => 'R1', 'reference_norm' => 'R1'])->id];
+    $toggled = array_merge($toggled, DB::table('payments')->where('branch_id', $this->d->branch->id)->where('channel_id', $this->d->channel('cash'))
+        ->where('received_at', '>=', '2026-11-20 21:00:00')->pluck('id')->all());
+    $borderRows = function (bool $live) use ($toggled): void {
+        DB::table('payments')->whereIn('id', $toggled)->update(['status' => $live ? 'recorded' : 'voided', 'voided_at' => $live ? null : '2026-11-21 22:00:00']);
+    };
     $oracle = [];
-    foreach (['2026-11-20', '2026-11-21'] as $day) {
-        ($this->job)($day)();
-        $oracle[$day] = AnalyticsDay::rows($this->d->branch->id, $day);
+    foreach ([true, false] as $live) {
+        $borderRows($live);
+        foreach (['2026-11-20', '2026-11-21'] as $day) {
+            ($this->job)($day)();
+            $oracle[(int) $live][$day] = AnalyticsDay::rows($this->d->branch->id, $day);
+        }
     }
+    expect($oracle[0]['2026-11-20']['daily_channel_totals'])->not->toBe($oracle[1]['2026-11-20']['daily_channel_totals'])
+        ->and($oracle[0]['2026-11-21']['daily_channel_totals'])->not->toBe($oracle[1]['2026-11-21']['daily_channel_totals']);
+    $live = false;
     $deadlocksBefore = rebuildRaceDeadlocks();
     $failures = [];
 
     foreach (range(1, 30) as $round) {
-        ($this->forget)('2026-11-20');
-        ($this->forget)('2026-11-21');
+        match ($round % 3) {
+            0 => array_map($this->forget, ['2026-11-20', '2026-11-21']),  // both from nothing: they race to create their first rows
+            1 => null,                                                     // both over the same rows
+            default => $borderRows($live = ! $live),                         // rows come back at the border, or go away
+        };
         $results = Forks::together([($this->job)('2026-11-20'), ($this->job)('2026-11-21')]);
 
-        $outcomes = array_map(fn (array $r): string => ($r['ok'] ?? false) ? (string) $r['value'] : 'error '.($r['error'] ?? '?'), $results);
-        if ($outcomes !== ['1', '1']) {
+        $outcomes = array_map(fn (array $r): string => ($r['ok'] ?? false) ? 'ok' : 'error '.($r['error'] ?? '?'), $results);
+        if ($outcomes !== ['ok', 'ok']) {
             $failures[] = "round {$round}: ".json_encode($outcomes);
         }
-        foreach ($oracle as $day => $rows) {
-            if (AnalyticsDay::rows($this->d->branch->id, $day) !== $rows) {
+        foreach (['2026-11-20', '2026-11-21'] as $day) {
+            if (AnalyticsDay::rows($this->d->branch->id, $day) !== $oracle[(int) $live][$day]) {
                 $failures[] = "round {$round}: {$day} is not one rebuild's";
             }
         }
