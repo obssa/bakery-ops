@@ -321,3 +321,30 @@ it('dispatches OrderVoided once, after the commit, with its companion on the sta
         ->and($companions[0]->broadcastWhen())->toBeFalse();
     assertNothingQueuedButStockEvaluation();
 })->group('module:orders', 'feature');
+
+// step 4.3e: the PIN is left out of the Idempotency fingerprint (tests/Modules/Shared/IdempotencySecretsTest.php has the middleware's rules)
+it('stores a fingerprint of the void without the PIN, which the body with the PIN does not reproduce', function () {
+    $key = (string) Str::uuid();
+
+    ($this->void)(null, [], null, $key)->assertOk();
+
+    $flags = JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    $path = 'POST api/v1/orders/'.$this->order['id'].'/void ';
+    $hash = (string) DB::table('idempotency_keys')->where('key', $key)->value('request_hash');
+    expect($hash)->toBe(hash('sha256', $path.json_encode(['reason' => 'Customer left before the food came'], $flags)))
+        ->and($hash)->not->toBe(hash('sha256', $path.json_encode(['pin' => $this->managerPin, 'reason' => 'Customer left before the food came'], $flags)));
+})->group('module:orders', 'feature');
+
+it('checks the PIN again when a refused void is retried with the same key, and replays a done void whatever PIN comes with it', function () {
+    $key = (string) Str::uuid();
+
+    ($this->void)(null, ['pin' => '000000'], null, $key)->assertStatus(403)->assertJsonPath('message_key', 'identity.pin.rejected');
+    expect(DB::table('idempotency_keys')->where('key', $key)->exists())->toBeFalse('a refusal of a request with a PIN is not kept');
+    $done = ($this->void)(null, [], null, $key)->assertOk()->assertHeaderMissing('Idempotency-Replayed');
+    expect(Order::query()->findOrFail($this->order['id'])->status->value)->toBe('voided');
+
+    $again = ($this->void)(null, ['pin' => '000000'], null, $key);
+    $again->assertOk()->assertHeader('Idempotency-Replayed', 'true');
+    expect($again->json())->toBe($done->json())
+        ->and(DB::table('audit_log')->where('action', 'order.void')->count())->toBe(1);
+})->group('module:orders', 'feature');

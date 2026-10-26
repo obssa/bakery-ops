@@ -9,6 +9,8 @@ use App\Modules\Identity\Models\User;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /*
  * People (admin console): users, roles, per-user permission overrides, short-code reset (section 6 "People").
@@ -196,4 +198,31 @@ it('replays a user creation idempotently', function () {
     assertIdempotent($this, 'POST', '/api/v1/users', [
         'name' => 'Replay', 'phone' => '+251944000004', 'password' => 'long-enough-pass', 'locale' => 'en', 'role' => 'waiter',
     ], 'users');
+})->group('module:identity', 'feature');
+
+// step 4.3e: no secret of the People writes is readable from idempotency_keys (tests/Modules/Shared/IdempotencySecretsTest.php has the rules)
+it('keeps the password and the short code out of the stored fingerprint of a new user', function () {
+    $key = (string) Str::uuid();
+    $body = ['name' => 'Sara', 'phone' => '+251922000009', 'password' => 'correct-horse-9', 'locale' => 'en', 'role' => 'cashier', 'short_code' => '482913'];
+
+    $this->withHeaders(['Idempotency-Key' => $key])->postJson('/api/v1/users', $body)->assertCreated();
+
+    $flags = JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    $rest = ['locale' => 'en', 'name' => 'Sara', 'phone' => '+251922000009', 'role' => 'cashier'];
+    $hash = (string) DB::table('idempotency_keys')->where('key', $key)->value('request_hash');
+    expect($hash)->toBe(hash('sha256', 'POST api/v1/users '.json_encode($rest, $flags)))
+        ->and(json_encode(DB::table('idempotency_keys')->get()))->not->toContain('482913')->not->toContain('correct-horse-9');
+})->group('module:identity', 'feature');
+
+it('stores the answer of a short-code reset encrypted: the new code is not in the table, and a replay hands back the same code', function () {
+    $user = makeUser($this->branch, 'waiter');
+    $key = (string) Str::uuid();
+
+    $first = $this->withHeaders(['Idempotency-Key' => $key])->postJson("/api/v1/users/{$user->id}/short-code/reset")->assertOk();
+    $code = (string) $first->json('short_code');
+    $second = $this->withHeaders(['Idempotency-Key' => $key])->postJson("/api/v1/users/{$user->id}/short-code/reset");
+
+    $second->assertOk()->assertHeader('Idempotency-Replayed', 'true')->assertJsonPath('short_code', $code);
+    expect(json_encode(DB::table('idempotency_keys')->get()))->not->toContain($code)
+        ->and(app(ShortCodes::class)->verify($this->branch->id, $code, 'test')->id)->toBe($user->id);
 })->group('module:identity', 'feature');
