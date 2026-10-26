@@ -440,8 +440,11 @@ Unattached uploads are purged after 24 hours (`files:purge-orphans`).
   License 1.1), bundled in the release at `resources/fonts/noto-sans-ethiopic/` with its `OFL.txt`, embedded in each PDF as a subset. dompdf
   reads fonts from one writable folder, `storage/fonts` (`rsync --delete` protects `storage/`, so it survives deploys): the first receipt, or
   `php artisan receipts:fonts`, copies the TTF there with its metrics (`.ufm`) and adds it to dompdf's `installed-fonts.json`, under the
-  cache lock `receipts:fonts` (the database cache's lock here), every file written under a temporary name and renamed into place. dompdf also
-  writes small `*.ufm.json` metric caches there. Nothing else writes the folder; deleting it is safe (the next receipt rebuilds it).
+  cache lock `pdf:fonts` (`receipts:fonts` before step 4.4d; the database cache's lock here), every file written under a temporary name and
+  renamed into place. dompdf also writes small `*.ufm.json` metric caches there. Since step 4.4d every PDF of the system shares the folder
+  and the font (`Shared\Pdf`: the receipts, the analytics exports, the weekly summary); its config key is `pdf.fonts_dir` (null: `storage/fonts`;
+  it was `payments.receipts.fonts_dir`, which nothing on the host set). Nothing else writes the folder; deleting it is safe (the next PDF
+  rebuilds it).
 - **`receipts:fonts`.** `release.sh` runs it after `queue:restart` on every deploy, so the first receipt of the day does not pay for it. It writes
   nothing when the font is installed and prints "already installed"; it never fails a deploy (`|| echo ...`). By hand:
   `/opt/alt/php83/usr/bin/php ~/bakery-ops.orcamind.dev/artisan receipts:fonts`. Exit 1 with "could not be registered" means `storage/fonts`
@@ -458,8 +461,8 @@ Unattached uploads are purged after 24 hours (`files:purge-orphans`).
 ### Dashboards and the cron
 
 `analytics:rebuild`, `analytics:weekly-summary` and `files:purge-orphans` run from the existing `schedule:run` line (section "Cron entries").
-No extra cron entry is needed. k6 is never run against this host; to time the dashboards on the live demo branch use
-`php artisan analytics:bench` (step 4.4d), which makes the same timed calls in process and exits non-zero over budget.
+No extra cron entry is needed. k6 is never run against this host. The in-process timing command of R-G, `php artisan analytics:bench`, is
+not built yet (step 4.4d left it to the gate step 4.6b with `DashboardBudgetGateTest`); `DashboardBudgetTest` times the reads in CI.
 
 How the summary tables stay current (step 4.4b, ADR 0014). Every rebuild is one local day of one branch, a `RebuildDay` job on the
 database queue, run by the `queue:work` cron line:
@@ -483,6 +486,30 @@ database queue, run by the `queue:work` cron line:
   in `stale_days`, never shown as zero. **Once after the 4.4c deploy**, rebuild the days built before it, so their mean prep times count
   (`prep_samples` and `prep_seconds_sum` are new and zero on older rows): `analytics:rebuild --from=<the first day in analytics_days>
   --to=<today>` (queued, at most 400 days; the dashboards show the old rows meanwhile, with fewer prep samples).
+
+### Analytics exports and the weekly summary (step 4.4d)
+
+- **Exports.** `GET /api/v1/analytics/exports/{sales|channels|items|stations|staff|shifts}?from=&to=&format=xlsx|csv|pdf&locale=en|am`
+  (admin, manager) is made in the request from the summary tables only, like the dashboards: no queue, no network. The xlsx is written by
+  OpenSpout to a temporary file in the system temp folder and removed once sent (a few MB whatever the rows; its figures are number cells
+  holding the decimal strings exactly); the CSV is the report's first table, streamed; the PDF is one to three landscape pages through the
+  shared PDF setup above (well under a second). At most `analytics.export_max_rows` (20 000) rows, counted before anything is written (`422
+  analytics.export.too_large`). Each export is an audit row `analytics.export` (report, format, language, range, rows). A day that is not
+  built is an empty cell in the files and is named in their About sheet and the PDF's stamp: rebuild it first when the file must be whole.
+- **The weekly summary.** `analytics:weekly-summary` runs on Monday at 07:00 Addis Ababa from the `schedule:run` line (after the 00:05 and 05:30
+  rebuilds), builds the summary of the week that ended last night for every branch from the summary tables, and announces it once per branch
+  and week: the cache key `analytics:weekly-summary:{branch}:{monday}` (eight days, the database cache) stops a second run that week. The
+  admins (`analytics.manage`) get it in the bell, and by Telegram and push once those are turned on (section "Turning on web push and
+  Telegram"); nothing goes by email (R-L). The message carries a signed link to the week's PDF in the reader's language, valid seven days
+  (`analytics.weekly_link_days`): `GET /api/v1/weekly-summaries/{monday}?branch&locale&expires&signature`, no login needed (a phone opening it
+  from Telegram has none), never cached; a changed or expired link is `403 analytics.weekly.link_invalid`. The link is a credential while it
+  lives: it is in the inbox line of the people it was sent to, never in a queued job, an event or the log.
+- **Send it again, or try the Telegram path:** the admin's `POST /api/v1/analytics/weekly-summary/send {week_of?}` (any date of the week; the
+  last complete week by default; a week that is not over is `422 analytics.weekly.week_open`) builds and announces it every time it is asked,
+  a new line each time. From a shell: `/opt/alt/php83/usr/bin/php ~/bakery-ops.orcamind.dev/artisan analytics:weekly-summary --week=2026-11-16`
+  (announces only a week not announced yet; `--branch=<id>` for one branch; exit 2 for a week that is not over).
+- **When it did not arrive:** the queue's cron line delivers it within a minute or two; `php artisan queue:failed` shows a failed
+  `NotifyWeeklySummary`, and `analytics.weekly_summary.failed` in the log names the branch and week of a summary that could not be built.
 
 ## Manual operations
 
