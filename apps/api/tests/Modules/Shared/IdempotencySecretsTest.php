@@ -7,7 +7,9 @@ use App\Shared\Models\Branch;
 use App\Shared\Models\IdempotencyKey;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Tests\Support\ResolveTestContext;
@@ -174,4 +176,22 @@ it('fingerprints a multipart upload exactly as before: its fields and the sha256
         'file' => ['uploaded_file_sha256' => hash('sha256', $bytes)],
         'purpose' => 'receipt',
     ]))->and($this->handled)->toBe(1);
+});
+
+it('keeps no answer with a secret when the app key cannot encrypt it, and still answers', function () {
+    // e2e-p2 found it: the compose stack's APP_KEY was 35 bytes, which AES-256 refuses, and the short-code reset answered 500
+    config(['app.key' => 'base64:'.base64_encode('too-short-for-aes')]);
+    app()->forgetInstance('encrypter');
+    Crypt::clearResolvedInstance('encrypter');
+    Log::spy();
+    $key = (string) Str::uuid();
+
+    $first = $this->withHeader('Idempotency-Key', $key)->postJson('/_shared-test/reset', ['user' => 5]);
+    $second = $this->withHeader('Idempotency-Key', $key)->postJson('/_shared-test/reset', ['user' => 5]);
+
+    $first->assertOk()->assertJsonStructure(['short_code']);
+    $second->assertOk()->assertHeaderMissing(Idempotency::REPLAYED_HEADER);
+    expect(($this->stored)($key))->toBeNull()->and($this->handled)->toBe(2);
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context = []): bool => str_contains($message, 'not stored')
+        && ! str_contains(json_encode($context), (string) $first->json('short_code')))->twice();
 });
