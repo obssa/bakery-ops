@@ -46,7 +46,9 @@ beforeEach(function () {
 });
 
 afterEach(function () {
-    @unlink($this->path);
+    if (is_file($this->path)) {
+        unlink($this->path);
+    }
 });
 
 it('writes a money or quantity figure as a number cell holding its decimal string exactly', function () {
@@ -61,7 +63,7 @@ it('writes a money or quantity figure as a number cell holding its decimal strin
     expect($xml)->toContain('<v>60.00</v>')->toContain('<v>0.10</v>')->toContain('<v>9999999999.99</v>')
         ->toContain('<v>1.5000</v>')->toContain('<v>-2.2500</v>')->toContain('<v>0.0001</v>')->toContain('<v>33.33</v>')->toContain('<v>-12.50</v>')
         ->and($xml)->not->toContain("\u{E000}", 'no marker is left in the file')
-        ->and($xml)->not->toContain('<is><t>60.00</t>', 'the figure is not a text');
+        ->and($xml)->not->toContain('<is><t>60.00</t>');
 
     $rows = ($this->sheets)()['Sales'];
     expect($rows)->toHaveCount(4)
@@ -87,7 +89,8 @@ it('formats money and percents with two places and leaves quantities as they are
     $styles = (string) $zip->getFromName('xl/styles.xml');
     $zip->close();
 
-    expect($styles)->toContain('formatCode="0.00"');
+    // 0.00 is a built-in format of the spreadsheet (number format 2)
+    expect($styles)->toContain('numFmtId="2"');
 });
 
 it('keeps every text as text: a formula, a number-looking text and a stray marker never become a formula or a number', function () {
@@ -102,17 +105,14 @@ it('keeps every text as text: a formula, a number-looking text and a stray marke
 
     $xml = ($this->xml)();
     expect($xml)->not->toContain('<f>')
+        ->and($xml)->toContain('t="inlineStr"><is><t>=HYPERLINK(&quot;http://example.test&quot;,&quot;x&quot;)</t>')
+        ->and($xml)->toContain('t="inlineStr"><is><t>+SUM(A1:A9)</t>')
         ->and($xml)->not->toContain("\u{E000}")
         ->and($xml)->not->toContain('<v>12.50</v>');
 
-    $values = array_map(fn (array $row) => [$row[0]::class, $row[0]->getValue()], array_slice(($this->sheets)()['Names'], 1));
-    expect($values)->toBe([
-        [StringCell::class, '=HYPERLINK("http://example.test","x")'],
-        [StringCell::class, '+SUM(A1:A9)'],
-        [StringCell::class, '12.50'],
-        [StringCell::class, '12.50'],
-        [StringCell::class, 'ክሮሳንት'],
-    ]);
+    // OpenSpout's reader hands any text that starts with = back as a FormulaCell; the file above holds a text cell
+    $values = array_map(fn (array $row) => $row[0]->getValue(), array_slice(($this->sheets)()['Names'], 1));
+    expect($values)->toBe(['=HYPERLINK("http://example.test","x")', '+SUM(A1:A9)', '12.50', '12.50', 'ክሮሳንት']);
 });
 
 it('writes the sheets in order with their names, each with its own header row', function () {

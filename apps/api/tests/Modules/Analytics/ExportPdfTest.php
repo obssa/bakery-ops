@@ -42,10 +42,10 @@ it('prints the sales summary on one page with the title, the range, the stamp, t
         ->and(Exports::pdfPages($pdf))->toBe(1)
         ->and($text)->toContain((string) trans('reports.titles.sales'))
         ->and($text)->toContain('2026-11-16')->toContain('2026-11-18')->toContain('Africa/Addis_Ababa')
-        ->and($text)->toContain('2026-11-22 08:00', 'as of: the oldest rebuild of the range, local time')
+        ->and($text)->toContain('2026-11-22 08:00')
         ->and($text)->toContain((string) trans_choice('reports.pdf.not_built', 1, ['count' => 1]))
-        ->and($text)->toContain('240.25', 'the revenue of the range')
-        ->and($text)->toContain('180.00')->toContain('60.25')->toContain('80.08', 'the average ticket of the range, made once from the sums');
+        ->and($text)->toContain('240.25')
+        ->and($text)->toContain('180.00')->toContain('60.25')->toContain('80.08');
 });
 
 it('answers it as a download named after the report and the range, never cached', function () {
@@ -78,13 +78,13 @@ it('prints a long range of sales by month and keeps it within three pages', func
     $text = Exports::pdfText($pdf);
     expect(Exports::pdfPages($pdf))->toBeLessThanOrEqual(3)
         ->and($text)->toContain('2026-11')->toContain('2025-10')
-        ->and($text)->not->toContain('2026-11-17', 'by month, not day by day');
+        ->and($text)->not->toContain('2026-11-17');
 });
 
 it('prints a range of up to 92 days by week', function () {
     $text = Exports::pdfText(($this->pdf)('shifts', ['from' => '2026-09-01', 'to' => '2026-11-22']));
 
-    expect($text)->toContain('2026-11-16', 'the Monday of the last week')->not->toContain('2026-11-17');
+    expect($text)->toContain('2026-11-16')->not->toContain('2026-11-17');
 });
 
 it('cuts a table that would run past three pages and says how many rows the spreadsheet has beyond it', function () {
@@ -98,7 +98,7 @@ it('cuts a table that would run past three pages and says how many rows the spre
     $text = Exports::pdfText($pdf);
     $more = '/'.str_replace(preg_quote(':count', '/'), '[0-9]+', preg_quote((string) trans('reports.pdf.more'), '/')).'/';
     expect(Exports::pdfPages($pdf))->toBeGreaterThanOrEqual(2)->toBeLessThanOrEqual(3)
-        ->and($text)->toContain('Product 001', 'the largest first')
+        ->and($text)->toContain('Product 001')
         ->and($text)->not->toContain('Product 260')
         ->and($text)->toMatch($more);
 });

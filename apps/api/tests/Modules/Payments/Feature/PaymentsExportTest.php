@@ -167,7 +167,8 @@ it('keeps a typed text from running as a formula in the xlsx too: a text cell, n
     $rows = ($this->rows)($response, 'xlsx');
 
     $row = array_combine($rows[0], $rows[1]);
-    expect($sheet)->not->toContain('<f>', 'OpenSpout makes a formula cell of any text that starts with =')
+    // OpenSpout's Row::fromValues makes a formula cell of any text that starts with =
+    expect($sheet)->not->toContain('<f>')
         ->and($row['reference_no'])->toBe('=HYPERLINK("http://example.test","x")')
         ->and($row['dispute_reason'])->toBe('=1+1');
 });
