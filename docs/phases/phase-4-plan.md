@@ -49,7 +49,8 @@ before the approval commit (so `clean working tree` and `plan approved` failed t
 
 **The only red line is `contract analytics->facts green`** (10 of 10 cases fail: `App\Shared\Time\LocalDay` and the `Facts` ports do not exist). It turns green in
 step 4.1c, after which the entry gate passes. `contract payments->orders green` passes now only because the nine new refund cases carry the group
-`contract:payments->orders:refund`; step 4.1b gives them the original group name too, so that the entry gate and `mod-orders` see them.
+`contract:payments->orders:refund`; step 4.1b gives them the original group name too, so that the entry gate and `mod-orders` see them (case 10, the void, has carried
+both names since step 4.3c, which built the void side).
 
 What the reading shows (origin/main after Phase 3):
 
@@ -110,7 +111,7 @@ PostgreSQL both), and every migration is a thin portable DDL (no partial indexes
 | M6 | `create_stock_movement_reversals_table` | Inventory | `stock_movement_reversals`: `id`, `branch_id`, `movement_id` (the new `return` row) UNIQUE FK, `reverses_movement_id` UNIQUE FK `stock_movements`, `created_at`. **Append-only** (the update/delete triggers, as `order_events`). The unique `reverses_movement_id` is what makes "reversed once" a database fact, without a partial index. Written only by `Inventory\Contracts\Reversals`, inside the Ledger transaction. |
 | M7 | `create_order_refunds_tables` | Orders | `order_refunds`: `id`, `branch_id`, `client_uuid` (UNIQUE with branch), `order_id`, `reason` VARCHAR(255), `amount` DECIMAL(12,2) CHECK `> 0`, `is_full` BOOL, `requested_by_user_id`, `approved_by_user_id`, actor stamp (`acting_user_id?`, `shift_instance_id?`, `station_id?`, `device_id?`), `created_at`; `order_refund_lines`: `id`, `branch_id`, `order_refund_id`, `order_line_id` UNIQUE (a line is refunded once), `qty` DECIMAL(14,4), `line_amount` DECIMAL(12,2), `disposition` CHECK in (`restock`, `waste`, `none`), `movement_ids` JSON (the reversing movements), `created_at`. Both **append-only**. |
 | M8 | `add_refund_columns_to_orders` | Orders | `orders.refunded_total` DECIMAL(12,2) DEFAULT 0 CHECK `>= 0` (and `<= paid_total` as a trigger-free application rule, pinned by a test), `orders.refunded_at` DATETIME NULL; `order_lines.refunded_at` DATETIME NULL. |
-| M9 | `extend_order_events_check` | Orders | drops and re-adds `order_events_event_check` with four more events: `payment.recorded`, `payment.voided`, `line.refunded`, `order.refunded`. DDL only; the append-only triggers are untouched (a test re-runs `AppendOnlyTest` after it). `ApplyPayment` now also writes `payment.recorded` (payload: `payment_id`, `channel_code`, `amount`, `receipt` bool; **never a URL or a key**). |
+| M9 | `extend_order_events_check` | Orders | drops and re-adds `order_events_event_check` with four more events: `payment.recorded`, `payment.voided`, `line.refunded`, `order.refunded`. DDL only; the append-only triggers are untouched (a test re-runs `AppendOnlyTest` after it). `ApplyPayment` now also writes `payment.recorded` (payload: `payment_id`, `channel_code`, `amount`, `receipt` bool; **never a URL or a key**). **Split in two (step 4.3c):** the payment half (`payment.recorded`, `payment.voided`) is `2026_11_02_100200_extend_order_events_check_for_payments`, built by 4.3c with the void; 4.1b adds `line.refunded` and `order.refunded` in a migration of its own that lists all 22 events. |
 | M10 | `create_payment_refunds_table` | Payments | `payment_refunds`: `id`, `branch_id`, `client_uuid` (UNIQUE with branch), `order_id`, `order_refund_id` FK, `payment_id` FK, `channel_id` FK, `amount` DECIMAL(12,2) CHECK `> 0`, `reference_no` VARCHAR(64) NULL (of the outgoing transfer), `proof_file_id` FK `stored_files` NULL, `refunded_by_user_id`, `approved_by_user_id`, actor stamp, `refunded_at` DATETIME, `created_at`. INDEX `(branch_id, refunded_at)`, `(payment_id)`. **Append-only.** |
 | M11 | `add_facts_indexes` | Orders, Payments, Production, Inventory | read indexes for the Facts queries, each added only if `EXPLAIN` in the provider's test shows the existing one is not used: `orders (branch_id, settled_at)`, `orders (branch_id, voided_at)`, `payments (branch_id, status, received_at)`, `production_batches (branch_id, finished_at)`, `stock_movements (branch_id, created_at, reason)`, `shift_instances (branch_id, date)`. DDL on tables of tens of thousands of rows, inside the release window (as 10.7 of the Phase 3 plan). |
 | M12 | `create_analytics_days_table` | Analytics | `analytics_days`: PK `(branch_id, day)`, `day` DATE (local), `version` INT UNSIGNED, `rebuilt_at` DATETIME(6), `trigger` VARCHAR(16) CHECK in (`shift_locked`, `nightly`, `manual`, `touch`, `seed`), `duration_ms` INT UNSIGNED, `row_counts` JSON, `fingerprint` CHAR(64) (sha256 of the canonical sums of every summary row of the day, so two rebuilds can be compared with one string), `changed` BOOL (the fingerprint differs from the previous run). It is the lock target of `Rebuild::day` and the freshness feed. Derived data: physical delete allowed (ADR 0014). |
@@ -194,6 +195,13 @@ written; the PIN is never stored, logged or audited.
 | `POST /payments/{payment}/verify` | `payments.verify` | key | `{note?}` | `200 Payment` `recorded or disputed -> verified`; a repeat answers `200`; emits `PaymentVerified` | `409 state_machine.illegal_transition` |
 | `POST /payments/{payment}/dispute` | `payments.verify` | key | `{reason}` (3 to 255) | `200 Payment` `recorded -> disputed`; emits `PaymentDisputed` | `422 payments.dispute.reason_required`, `409` |
 | `POST /payments/{payment}/void` | `orders.void_request` + approver PIN of a `payments.void` holder | key | `{reason, pin}` | `200 Payment` `status voided`; one `AuditedAction` `payment.void`; emits `PaymentVoided` (Orders' `ReversePayment` takes it out of `paid_total` and unsettles the order in the same transaction) | `409 payments.void.order_closed` (the order is `paid`/`closed`: refund it instead), `409 payments.void.refunded` (money already went back), `403 auth.pin_invalid`, `423 auth.pin_locked`, `422 payments.void.reason_required` |
+
+**As built (step 4.3c)**, where the code differs from the table: `Payment` is the body of `GET /payments/{payment}` (the read shape plus `order` and `refunds`) for all three. A
+refused PIN is `403 identity.pin.rejected` and a locked prompt `423 identity.short_code.locked` (Identity's keys, as `POST /orders/{order}/void` answers). A missing or
+wrong reason is `422 validation.failed` with `errors.reason` carrying the text of `payments.dispute.reason_required` or `payments.void.reason_required` (the request rule,
+as `VoidOrderRequest` does); a PIN of the wrong shape carries `payments.void.pin_required`. A voided payment is `409 state_machine.illegal_transition` for all three, and
+for the dispute so are verified and disputed ones. `payments.void.order_closed` carries the order's `status`, `payments.void.refunded` the `refunded_amount`; the refunded
+check comes first (a refunded payment's order is closed). The verify note is kept in the audit context only (no column).
 | `POST /orders/{order}/refund` | `orders.void_request` + approver PIN of a `payments.void` holder | key + `client_uuid` | `{client_uuid, reason, pin, lines?: [{line_id, disposition: restock|waste|none}], allocation?: [{payment_id, amount}], refund_reference?, refund_proof_file_id?}`; no `lines` = the whole order with the default dispositions of 10.2 R-C | `201 {refund {id, amount, is_full}, payments: [PaymentRefund], movements: [{id, item_id, qty, reverses}], order}` (`200` replay). One `AuditedAction` `order.refund` calling `Orders::refund` (stock and order side) then writing the `payment_refunds` rows, all in one transaction under the order's row lock | `409 orders.refund.not_refundable` `{status}`, `409 orders.refund.line_refunded` `{line_ids}`, `409 orders.refund.window_closed` `{hours}`, `422 orders.refund.partial_not_allowed` (the order carries a discount or tax: only a whole-order refund is defined, 10.2 R-D), `409 inventory.shift.required` `{location_id}`, `409 payments.shift.required` (a cash refund needs the till's open shift, the drawer must lose the money inside a declared shift), `422 orders.refund.reason_required`, `403`, `423` |
 
 Allocation of the money: the refund amount is the sum of the refunded lines' `line_total` (the whole `total` for a full refund). It is returned
@@ -328,6 +336,15 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `refunded_total` and `refunds`. `OrderStatus` is **not** changed (an order stays `closed` after a refund; `refunded_total` says how much
      came back), so the exhaustive state-machine table of Phase 1 does not move. Contract cases 5 to 13 of `payments->orders` and 13 to 15 of
      `orders->inventory` go green with Payments untouched; `VoidOrderTest` still refuses a paid order (`orders.order.paid`).
+   - **Moved to step 4.3c (2026-10-26), while 4.1b waits for Ramin's answer on R-C.** A void is not a refund (it writes no stock movement and does not touch R-C), so
+     4.3c built the void side of 4.1b and **4.1b no longer does**: the `PaymentVoided` event (`App\Shared\Events`, the signature 4.1a pinned), Orders' `ReversePayment`
+     listener, `payment.recorded` (written by `ApplyPayment`, with `PaymentRecorded` gaining `has_receipt`) and `payment.voided` on the timeline, and the payment half
+     of M9 (`2026_11_02_100200_extend_order_events_check_for_payments`); contract case 10 (the void) is green and carries `contract:payments->orders` too. **What 4.1b
+     still builds:** M6, M7, M8 and the refund half of M9 (a new migration adding `line.refunded` and `order.refunded` to the 20 events the CHECK now lists; the
+     4.3c migration is not edited, it has run on live by then), Inventory `Reversals`, the `Refund` action behind `Orders::refund`, `OrderRefunded`,
+     `line.refunded` / `order.refunded`, `OrderTotalsView::$refunded` / `$netPaid`, `OrderResource`'s `refunded_total` and `refunds`, and contract cases 5 to 9, 11
+     and 13 (case 11, part payments, passes already and only needs the group name). `ReversePayment` refuses a `paid`/`closed` order with
+     `OrderError::paymentVoidOrderClosed` (key `payments.void.order_closed`); 4.1b's refund needs no change to it.
    - **4.1c `phase-4/facts-ports`**: M11; Shared `Time\LocalDay` (a `from`/`to` pair of local dates, `utcBounds(tz)`, `dayOf(instant, tz)`,
      inclusive ends; the branch's timezone, default `Africa/Addis_Ababa`); the five `Facts` classes with their readonly DTOs under each
      provider's `Contracts/` (`Orders\Contracts\Facts::sales/lines`, `Payments\Contracts\Facts::payments/refunds` (refunds read `payment_refunds`: M10 lands in
@@ -549,7 +566,59 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      - STATUS: phase 4's `payments` step stays `in_progress`; the top-level module stays `stable`.
    - **4.3c `phase-4/payments-verify-void`**: `PaymentStatus` `disputed -> verified|voided` with `Phase1StateMachinesTest` (moved from M4, see 4.3b), `verify`, `dispute`, `void` with the PIN path, `PaymentVerified/Disputed/Voided` events, `NotifyPaymentDisputed` (Notifications, with its
      bilingual copy), the `payments.verify` permission; tests `PaymentVerifyTest`, `PaymentDisputeTest`, `PaymentVoidTest` (void a part payment of a served order and pay again; void refused for
-     `paid`; void of a refunded payment refused), `PaymentVoidRaceTest` (a void racing a last payment: the order lock serialises, `concurrency` group).
+     `paid`; void of a refunded payment refused), `PaymentVoidRaceTest` (a void racing a last payment: the order lock serialises, `concurrency` group). **Taken over from 4.1b**
+     (on hold for R-C; see the note under 4.1b): the `PaymentVoided` event, Orders' `ReversePayment` listener, `payment.recorded` / `payment.voided` on the timeline with
+     the payment half of M9, and contract case 10 green under `contract:payments->orders`. Nothing refund-specific.
+   - **As built (step 4.3c, `phase-4/payments-verify-void`).** Order: the tests and the registries (red: every new file failing on a missing class, route, permission or
+     migration; the Phase 1 to 4.3b tests that change, below), then the events, the three migrations, the permission, the machine, Orders' side, the three actions and
+     the controller, Notifications, lang; then OpenAPI, ERD and this note. Where the code disagreed with the plan or the plan left a choice:
+     - **Migrations** (dates of the merge day): `2026_11_02_100100_grant_payments_verify_permission` (thin caller of `GrantRegistryPermissions`, M2 is not edited);
+       `2026_11_02_100200_extend_order_events_check_for_payments` (the payment half of M9: the 18 Phase 1 events plus `payment.recorded`, `payment.voided`; its `down()`
+       refuses while a payment event exists, the timeline being append-only); `2026_11_02_100300_extend_notification_types_for_payments` (`payment_disputed`; the plan
+       did not list it, the inbox CHECK needs it). No column: the approver of a void is in the audit context and on the timeline (`approved_by_user_id`), not on the
+       payment row, which keeps `voided_by_user_id` = who asked; the verify note is in the audit context only.
+     - **Endpoints.** `PaymentDecisionsController` calls the actions (`VerifyPayment`, `DisputePayment`, `VoidPayment`) directly, as `OrdersController` calls
+       `VoidOrder`; the `Payments` contract is unchanged. All three answer the `GET /payments/{payment}` body (`PaymentViews::detail`, which `show` now uses too). The
+       person checked is the one acting by short code, else the account (`PaymentAccess::person`), for `payments.verify` and for `orders.void_request`.
+     - **Verify**: `recorded|disputed -> verified` (`verified_by_user_id`, `verified_at`; from `disputed` also `dispute_resolved_at`, the dispute's columns stay). A
+       payment that is verified already answers 200 and writes nothing (no audit row, no event), also when another request verified it while this one waited for the
+       row lock (`AlreadyVerified` rolls the empty transaction back). `PaymentVerified {payment_id, order_id, channel_code, amount, by_user_id}` after the commit.
+     - **Dispute**: only `recorded` (a verified or disputed payment is `409 state_machine.illegal_transition`). `PaymentDisputed` after the commit carries `order_no`
+       (from `Orders::summaries`) and `channel_name_en/am` so Notifications reads nothing else. A disputed payment still counts (totals, the drawer, 10.8 R-Q).
+     - **Void**: the checks run before the PIN and again under the locks, in the order voided (`409 state_machine.illegal_transition`), refunded (`409
+       payments.void.refunded {refunded_amount}`; a refunded payment's order is closed, so this comes before), order `paid`/`closed` (`409 payments.void.order_closed
+       {status}`); a refused void spends no PIN attempt. Then `verifyPinFor('payments.void')` outside the transaction, then one `AuditedAction` `payment.void` (actor =
+       the asker, context `{reason, approved_by_user_id, order_id}`): `Orders::forPayment(lock)` first, then the payment row (`PaymentLock`), so a void and a payment
+       of one order are serialised by the order lock and verify/dispute (payment lock only) never wait in the opposite order. A disputed payment that is voided gets
+       `dispute_resolved_at`. **A payment of a voided order can be voided** (a part payment taken before `POST /orders/{order}/void`: its money goes back, the order
+       stays voided); the plan only refuses `paid`/`closed`, and `VoidOrder` still voids a part-paid order as in Phase 1. Cancelled and open orders never carry a payment.
+     - **Orders' side** (taken over from 4.1b). `ReversePayment` (sync, in the void's transaction): refuses `paid`/`closed` with `OrderError::paymentVoidOrderClosed`
+       (key `payments.void.order_closed`, Payments' lang file), else `paid_total -= amount`, `settled_at = null`, `version + 1` and `payment.voided {payment_id,
+       channel_code, amount, reason, by_user_id, approved_by_user_id}` with the approver in the row's `approved_by_user_id`; a void of more than the order holds is a
+       `LogicException` (rolls back). `ApplyPayment` writes `payment.recorded {payment_id, channel_code, amount, receipt}` before `order.settled`, so the last three events
+       of a closing payment are still `order.settled`, `order.paid`, `order.closed`. `PaymentRecorded` gained `has_receipt` (its first consumer), as the last
+       constructor argument after `occurredAt`, so every Phase 1 caller and test keeps its call.
+     - **Notification** `payment_disputed`: severity `warning`, `in_app`, `push`, `telegram`, inbox key `payment_disputed:{payment_id}` (a payment is disputed once),
+       deep link `/admin/payments?payment={payment_id}` (the screen of 4.5c). Recipients: the holders of `payments.verify` (admin, manager: the plan's "admins and
+       managers") without the person who disputed it. Queued after commit, run as the disputer.
+     - **`payments.verify`** replaces `payments.void` in the cashier scope of the payment reads (`PaymentScope`) and, as the plan's 4.1 row says, in the delete rule of
+       an unattached file (`FilesController`; 4.2b's stand-in). Same default holders, so nothing changes for the roles; a hand-made grant now follows the new name.
+     - **`PaymentVoidRaceTest`** (`tests/Gate`, `concurrency` + `module:payments`): the void checks a PIN before it locks the order, so a payment started at the same
+       moment always wins; the payment's start is swept from 0 to 580 ms (20 ms a round, 30 rounds) and the test requires both orders to happen: locally 9 rounds
+       "pay first" (the void is `409 payments.void.order_closed`) and 21 "void first" (the 20.00 is a part payment, the order stays open); `paid_total` always equals the
+       payments that are not voided, the water is sold at most once, no InnoDB deadlock. 4.6b adds it to `gate:p4`.
+     - **Contract**: case 10 (the void) carries `contract:payments->orders` as well as `contract:payments->orders:refund`, so `mod-orders` runs it; the other refund cases
+       stay red under their own group for 4.1b.
+     - **Phase 1 to 4.3b tests that changed**: `Phase1StateMachinesTest` (`disputed -> verified|voided`), `OrdersSchemaTest` (two events), `RecordPaymentTest` (the
+       `PaymentRecorded` payload has `has_receipt`), `ApplyPaymentTest` (one new case), `PaymentReadsTest` (one new case: the scope follows `payments.verify`),
+       `FilesApiTest` (the delete rule), `NotificationTextTest` and `NotificationsSchemaTest` (the new type), `PaymentsLangTest` (25 keys), `PermissionRegistryTest`
+       (one row). No test turns a shift rule off.
+     - **Findings left as they are**: domain refusals (`PaymentError`, `OrderError`, `IllegalTransition`) are reported to the log at ERROR level app-wide (nothing
+       marks them as not reportable); and `Idempotency` stores a sha256 of the request body as `request_hash`, which for a void (as for `POST /orders/{order}/void`
+       since Phase 1) is computed over the PIN too: the PIN itself is never stored, logged or audited (`PaymentVoidTest`), but a 4 to 6 digit PIN under a hash of an
+       otherwise known body is guessable offline by whoever reads the table. Both are cross-cutting and are for Ramin to decide.
+     - The entry gate with `--no-tests` still fails "contract payments->orders first", as on main, because Payments has had code since Phase 1.
+     - STATUS: phase 4's `payments` step stays `in_progress`; the top-level module stays `stable`.
    - **4.3d `phase-4/payments-refund`**: (M10 is already there) `Payments::refund` (the endpoint's use case): PIN, `Orders::refund` for the stock and order side, allocation LIFO over payments,
      `payment_refunds` rows, `RefundPaid`, the shift rule for the cash share, `Totals::cash` net of refunds and `Totals::byChannel` with `refunds` (so Shifts' code and its `cash_declarations`
      arithmetic need **no change**; `CashFiguresTest` gets a case proving expected cash falls by the refund), `Payments\Facts::refunds` filled. `contract:shifts->payments` case lands green here.
@@ -796,7 +865,7 @@ as soon as 4.2b is deployed and before any route uses them):
 |---|---|---|
 | `files.upload` | admin, manager, cashier | `POST /files` and one's own unattached upload |
 | `payments.view` | admin, manager, cashier (cashier scoped, R-N) | order payments, `GET /payments`, a file's signed URL, receipts |
-| `payments.verify` | admin, manager | verify, dispute, reconciliation, export, deleting an unattached file |
+| `payments.verify` | admin, manager | verify, dispute, reconciliation, export, deleting an unattached file, the payment reads unscoped (as built in 4.3c through its own grant migration `2026_11_02_100100_grant_payments_verify_permission`) |
 | `analytics.manage` | admin | rebuild, weekly-summary test |
 | `audit.export` | admin | audit export |
 

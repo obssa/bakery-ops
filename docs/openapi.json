@@ -5407,6 +5407,968 @@
                 }
             }
         },
+        "/v1/payments/{payment}/verify": {
+            "post": {
+                "operationId": "payments.verify",
+                "tags": [
+                    "PaymentDecisions"
+                ],
+                "parameters": [
+                    {
+                        "name": "payment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VerifyPaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "order_id": {
+                                            "type": "string"
+                                        },
+                                        "client_uuid": {
+                                            "type": "string"
+                                        },
+                                        "channel": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "code": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "code": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "amount": {
+                                            "type": "string"
+                                        },
+                                        "tendered_amount": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "change_amount": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "currency": {
+                                            "type": "string"
+                                        },
+                                        "reference_no": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "received_at": {
+                                            "type": "string"
+                                        },
+                                        "received_by": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "name": {}
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "shift_id": {
+                                            "type": "string"
+                                        },
+                                        "batch_uuid": {
+                                            "type": "string"
+                                        },
+                                        "receipt": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "file_id": {
+                                                    "type": "string"
+                                                },
+                                                "url": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "url_expires_at": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "file_id",
+                                                "url",
+                                                "url_expires_at"
+                                            ]
+                                        },
+                                        "verified_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "disputed_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "dispute_reason": {
+                                            "type": "string"
+                                        },
+                                        "refunded_amount": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "0.00"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "void_reason": {
+                                            "type": "string"
+                                        },
+                                        "voided_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "flags": {
+                                            "type": "object",
+                                            "properties": {
+                                                "duplicate_reference": {
+                                                    "type": "boolean"
+                                                },
+                                                "duplicate_receipt": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "duplicate_reference",
+                                                "duplicate_receipt"
+                                            ]
+                                        },
+                                        "order": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "order_no": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "business_date": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "table_code": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "total": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "order_no",
+                                                "business_date",
+                                                "table_code",
+                                                "total"
+                                            ]
+                                        },
+                                        "refunds": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "amount": {
+                                                        "type": "string"
+                                                    },
+                                                    "channel_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "refunded_at": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "amount",
+                                                    "channel_id",
+                                                    "refunded_at"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "order_id",
+                                        "client_uuid",
+                                        "channel",
+                                        "amount",
+                                        "tendered_amount",
+                                        "change_amount",
+                                        "currency",
+                                        "reference_no",
+                                        "status",
+                                        "received_at",
+                                        "received_by",
+                                        "shift_id",
+                                        "batch_uuid",
+                                        "receipt",
+                                        "verified_at",
+                                        "disputed_at",
+                                        "dispute_reason",
+                                        "refunded_amount",
+                                        "void_reason",
+                                        "voided_at",
+                                        "flags",
+                                        "order",
+                                        "refunds"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/payments/{payment}/dispute": {
+            "post": {
+                "operationId": "payments.dispute",
+                "tags": [
+                    "PaymentDecisions"
+                ],
+                "parameters": [
+                    {
+                        "name": "payment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DisputePaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "order_id": {
+                                            "type": "string"
+                                        },
+                                        "client_uuid": {
+                                            "type": "string"
+                                        },
+                                        "channel": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "code": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "code": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "amount": {
+                                            "type": "string"
+                                        },
+                                        "tendered_amount": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "change_amount": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "currency": {
+                                            "type": "string"
+                                        },
+                                        "reference_no": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "received_at": {
+                                            "type": "string"
+                                        },
+                                        "received_by": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "name": {}
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "shift_id": {
+                                            "type": "string"
+                                        },
+                                        "batch_uuid": {
+                                            "type": "string"
+                                        },
+                                        "receipt": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "file_id": {
+                                                    "type": "string"
+                                                },
+                                                "url": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "url_expires_at": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "file_id",
+                                                "url",
+                                                "url_expires_at"
+                                            ]
+                                        },
+                                        "verified_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "disputed_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "dispute_reason": {
+                                            "type": "string"
+                                        },
+                                        "refunded_amount": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "0.00"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "void_reason": {
+                                            "type": "string"
+                                        },
+                                        "voided_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "flags": {
+                                            "type": "object",
+                                            "properties": {
+                                                "duplicate_reference": {
+                                                    "type": "boolean"
+                                                },
+                                                "duplicate_receipt": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "duplicate_reference",
+                                                "duplicate_receipt"
+                                            ]
+                                        },
+                                        "order": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "order_no": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "business_date": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "table_code": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "total": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "order_no",
+                                                "business_date",
+                                                "table_code",
+                                                "total"
+                                            ]
+                                        },
+                                        "refunds": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "amount": {
+                                                        "type": "string"
+                                                    },
+                                                    "channel_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "refunded_at": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "amount",
+                                                    "channel_id",
+                                                    "refunded_at"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "order_id",
+                                        "client_uuid",
+                                        "channel",
+                                        "amount",
+                                        "tendered_amount",
+                                        "change_amount",
+                                        "currency",
+                                        "reference_no",
+                                        "status",
+                                        "received_at",
+                                        "received_by",
+                                        "shift_id",
+                                        "batch_uuid",
+                                        "receipt",
+                                        "verified_at",
+                                        "disputed_at",
+                                        "dispute_reason",
+                                        "refunded_amount",
+                                        "void_reason",
+                                        "voided_at",
+                                        "flags",
+                                        "order",
+                                        "refunds"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/payments/{payment}/void": {
+            "post": {
+                "operationId": "payments.void",
+                "tags": [
+                    "PaymentDecisions"
+                ],
+                "parameters": [
+                    {
+                        "name": "payment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/VoidPaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "order_id": {
+                                            "type": "string"
+                                        },
+                                        "client_uuid": {
+                                            "type": "string"
+                                        },
+                                        "channel": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "code": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "code": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_en": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "null"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "code",
+                                                        "name_en",
+                                                        "name_am"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "amount": {
+                                            "type": "string"
+                                        },
+                                        "tendered_amount": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "change_amount": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "currency": {
+                                            "type": "string"
+                                        },
+                                        "reference_no": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "received_at": {
+                                            "type": "string"
+                                        },
+                                        "received_by": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "name": {}
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        },
+                                        "shift_id": {
+                                            "type": "string"
+                                        },
+                                        "batch_uuid": {
+                                            "type": "string"
+                                        },
+                                        "receipt": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "file_id": {
+                                                    "type": "string"
+                                                },
+                                                "url": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "url_expires_at": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "file_id",
+                                                "url",
+                                                "url_expires_at"
+                                            ]
+                                        },
+                                        "verified_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "disputed_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "dispute_reason": {
+                                            "type": "string"
+                                        },
+                                        "refunded_amount": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "0.00"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "void_reason": {
+                                            "type": "string"
+                                        },
+                                        "voided_at": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "flags": {
+                                            "type": "object",
+                                            "properties": {
+                                                "duplicate_reference": {
+                                                    "type": "boolean"
+                                                },
+                                                "duplicate_receipt": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "duplicate_reference",
+                                                "duplicate_receipt"
+                                            ]
+                                        },
+                                        "order": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "order_no": {
+                                                    "type": [
+                                                        "integer",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "business_date": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "table_code": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "total": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "order_no",
+                                                "business_date",
+                                                "table_code",
+                                                "total"
+                                            ]
+                                        },
+                                        "refunds": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "amount": {
+                                                        "type": "string"
+                                                    },
+                                                    "channel_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "refunded_at": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "amount",
+                                                    "channel_id",
+                                                    "refunded_at"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "order_id",
+                                        "client_uuid",
+                                        "channel",
+                                        "amount",
+                                        "tendered_amount",
+                                        "change_amount",
+                                        "currency",
+                                        "reference_no",
+                                        "status",
+                                        "received_at",
+                                        "received_by",
+                                        "shift_id",
+                                        "batch_uuid",
+                                        "receipt",
+                                        "verified_at",
+                                        "disputed_at",
+                                        "dispute_reason",
+                                        "refunded_amount",
+                                        "void_reason",
+                                        "voided_at",
+                                        "flags",
+                                        "order",
+                                        "refunds"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/orders/{order}/payments": {
             "get": {
                 "operationId": "payments.order",
@@ -12868,6 +13830,21 @@
                 ],
                 "title": "DeviceResource"
             },
+            "DisputePaymentRequest": {
+                "type": "object",
+                "description": "POST /payments/{payment}/dispute (step 4.3c): why the payment is disputed, 3 to 255 characters (the column's size) after trimming; blanks are no\nreason. Every refusal of the field carries the same bilingual text (payments.dispute.reason_required) in the 422 validation.failed answer.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 255
+                    }
+                },
+                "required": [
+                    "reason"
+                ],
+                "title": "DisputePaymentRequest"
+            },
             "DoneBatchRequest": {
                 "type": "object",
                 "description": "POST /production/batches/{batch}/done: how many were made and how many were wasted, in the product base unit, as decimal strings\n(never floats, ADR 0004), each zero or more with at most four decimals, the two together above zero. Whether the baker may press\nDone on this batch, and whether the stock is there, are the action's questions (FinishBatch).",
@@ -15286,7 +16263,8 @@
                                 "shifts.manage",
                                 "shifts.replay",
                                 "files.upload",
-                                "payments.view"
+                                "payments.view",
+                                "payments.verify"
                             ]
                         }
                     },
@@ -15950,7 +16928,8 @@
                                 "shifts.manage",
                                 "shifts.replay",
                                 "files.upload",
-                                "payments.view"
+                                "payments.view",
+                                "payments.verify"
                             ]
                         }
                     },
@@ -16129,6 +17108,20 @@
                 ],
                 "title": "UserResource"
             },
+            "VerifyPaymentRequest": {
+                "type": "object",
+                "description": "POST /payments/{payment}/verify (step 4.3c): an optional note of at most 255 characters (where it was found on the statement), kept in the audit\nrow's context only.",
+                "properties": {
+                    "note": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 255
+                    }
+                },
+                "title": "VerifyPaymentRequest"
+            },
             "VerifyShortCodeRequest": {
                 "type": "object",
                 "properties": {
@@ -16173,6 +17166,25 @@
                     "pin"
                 ],
                 "title": "VoidOrderRequest"
+            },
+            "VoidPaymentRequest": {
+                "type": "object",
+                "description": "POST /payments/{payment}/void (step 4.3c): why (free text, required, up to 255 characters, the column's size; blanks are no reason) and the PIN\nof the manager or admin who approves it (their short code: 4 to 6 digits, typed on the asker's screen), as POST /orders/{order}/void asks. The\nPIN is read once for Identity's check and never kept.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "pin": {
+                        "type": "string",
+                        "pattern": "^[0-9]{4,6}$"
+                    }
+                },
+                "required": [
+                    "reason",
+                    "pin"
+                ],
+                "title": "VoidPaymentRequest"
             }
         },
         "responses": {
