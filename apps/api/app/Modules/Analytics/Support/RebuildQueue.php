@@ -77,8 +77,8 @@ final class RebuildQueue
     }
 
     /**
-     * The queued manual rebuild of the branch that holds a day of $from to $to and has a day not built since it was asked for, or null (and
-     * the note is dropped once every day of it was built).
+     * The queued manual rebuild of the branch that holds a day of $from to $to and has a day not built since it was asked for (asked_at as
+     * ISO 8601 UTC), or null (and the note is dropped once every day of it was built).
      *
      * @return array{from: string, to: string, asked_at: string}|null
      */
@@ -98,7 +98,7 @@ final class RebuildQueue
         }
         foreach (LocalDay::between($last['from'], $last['to'], 'UTC')->days() as $day) {
             if (! isset($builtAt[$day]) || self::before($builtAt[$day], $last['asked_at'])) {
-                return ['from' => $last['from'], 'to' => $last['to'], 'asked_at' => $last['asked_at']];
+                return ['from' => $last['from'], 'to' => $last['to'], 'asked_at' => CarbonImmutable::parse($last['asked_at'], 'UTC')->toIso8601ZuluString()];
             }
         }
         $this->store()->forget(self::MANUAL.$branchId);

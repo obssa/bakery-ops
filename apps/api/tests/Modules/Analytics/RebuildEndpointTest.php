@@ -153,6 +153,7 @@ it('answers 409 analytics.rebuild.running while a queued rebuild of overlapping 
         ->assertJsonPath('message_key', 'analytics.rebuild.running')
         ->assertJsonPath('from', '2026-11-20')
         ->assertJsonPath('to', '2026-11-21')
+        ->assertJsonPath('asked_at', '2026-11-22T06:00:00Z')
         ->assertJsonPath('message_am', fn (string $text): bool => preg_match('/\p{Ethiopic}/u', $text) === 1);
     ($this->ask)(['from' => '2026-11-21', 'sync' => true])->assertStatus(409);
     // a day the waiting rebuild does not hold may be rebuilt
