@@ -169,7 +169,7 @@
         "contracts": "in_progress",
         "shared.files": "done",
         "payments": "in_progress",
-        "analytics": "in_progress",
+        "analytics": "done",
         "web": "todo",
         "docs": "todo"
       },
@@ -258,8 +258,8 @@
     },
     "analytics": {
       "phase": 4,
-      "status": "in_progress",
-      "stable_since": null
+      "status": "stable",
+      "stable_since": "2026-10-26T22:42:42Z"
     }
   }
 }
