@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Alerts;
 
+use App\Modules\Catalog\Models\Item;
 use App\Modules\Inventory\Jobs\EvaluateBalance;
 use App\Modules\Inventory\Ledger\LedgerReader;
+use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\ReorderRule;
 use App\Modules\Inventory\Models\StockAlertState;
 use App\Shared\Tenancy\BranchScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
@@ -20,7 +23,10 @@ use Illuminate\Database\Eloquent\Collection;
  * Bounded: the episodes and the rules are read in chunks by id (never every balance at once), and a branch-wide key (an episode or
  * rule that names no place) is evaluated through the lowest-numbered stock place of its item, as ReorderRules does, one lookup per
  * chunk. A balance is queued once per sweep however many rules and episodes name it. Runs in a process with no current branch, so
- * it reads the tables without the branch scope; each job carries its own branch id.
+ * it reads the tables without the branch scope; each job carries its own branch id. The rules and episodes of an item deleted since,
+ * or of a place removed since, are left out: there is no balance left to watch (step 4.4c; the E2E branch retires its stale
+ * ingredients, and their evaluations failed three times an hour on the live host). A switched-off item is still swept: it is still
+ * stocked. A branch-wide key is evaluated through a place still in use.
  */
 final class AlertSweeper
 {
@@ -35,15 +41,39 @@ final class AlertSweeper
         $queued = 0;
 
         StockAlertState::query()->withoutGlobalScope(BranchScope::class)->where('is_active', 1)
+            ->whereIn('item_id', self::liveItems())
+            ->where(fn ($q) => $q->whereNull('location_id')->orWhereIn('location_id', self::livePlaces()))
             ->chunkById($chunk, function (Collection $episodes) use (&$seen, &$queued): void {
                 $queued += $this->queue($episodes, $seen);
             });
         ReorderRule::query()->withoutGlobalScope(BranchScope::class)->where('is_active', true)
+            ->whereIn('item_id', self::liveItems())
+            ->where(fn ($q) => $q->whereNull('location_id')->orWhereIn('location_id', self::livePlaces()))
             ->chunkById($chunk, function (Collection $rules) use (&$seen, &$queued): void {
                 $queued += $this->queue($rules, $seen);
             });
 
         return $queued;
+    }
+
+    /**
+     * The ids of the items that are not deleted, in every branch (a subquery: a switched-off item is still stocked and still swept).
+     *
+     * @return Builder<Item>
+     */
+    private static function liveItems(): Builder
+    {
+        return Item::query()->withoutGlobalScope(BranchScope::class)->select('id');
+    }
+
+    /**
+     * The ids of the places that are not removed, in every branch (a subquery).
+     *
+     * @return Builder<Location>
+     */
+    private static function livePlaces(): Builder
+    {
+        return Location::query()->withoutGlobalScope(BranchScope::class)->select('id');
     }
 
     /**

@@ -546,7 +546,8 @@
         ],
         "payments": [
           "Payments\\Facts::payments(range)",
-          "Payments\\Facts::refunds(range)"
+          "Payments\\Facts::refunds(range)",
+          "Payments\\Facts::channels(ids) (step 4.4c: the dashboards name the channels)"
         ],
         "production": [
           "Production\\Facts::batches(range)"
@@ -562,10 +563,11 @@
           "listens to ShiftLocked"
         ],
         "catalog": [
-          "names, categories"
+          "names, categories",
+          "Items::labels(ids) (step 4.4c: names, kind, base unit, category, is_new in one query)"
         ],
         "identity": [
-          "ActorDirectory::names(ids)"
+          "ActorDirectory::names(ids), ::stations(ids), ::workStationIds(user) (step 4.4c; analytics.view_own scopes by the caller's stations)"
         ],
         "shared": [
           "LocalDay",
@@ -844,7 +846,8 @@
         "facts exclude voided payments and voided/cancelled/open orders; branch isolation; deterministic (day, id) order",
         "closingBalances(day) equals Stock::balanceAt(end of local day); unitCosts(day) equals the item_cost_history row in force",
         "Shifts\\Facts::instances returns a shift once for any range holding a local day of its life (a Night shift)",
-        "step 4.4a additions: Orders voids (voided_at / cancelled_at) and stationLines (once per local day a line was readied, served or rejected); PaymentFact duplicate_reference; RefundFact order_refund_id; StockOutFact station_id; ShiftFact variance_line_count and cash_variance of its final counts; Catalog ItemSummary categoryId"
+        "step 4.4a additions: Orders voids (voided_at / cancelled_at) and stationLines (once per local day a line was readied, served or rejected); PaymentFact duplicate_reference; RefundFact order_refund_id; StockOutFact station_id; ShiftFact variance_line_count and cash_variance of its final counts; Catalog ItemSummary categoryId",
+        "step 4.4c additions: Payments Facts::channels(ids) names removed and switched-off channels, never another branch's, in one query; Catalog Items::labels(ids) (kind, base unit, category names, is_new at local midnight, deleted items named) in one query; Identity ActorDirectory names people (left ones too) and stations, and lists a person's work stations (assignments, or every station with stations.all)"
       ],
       "note": "committed red by 4.1a; the mod-analytics job adds the group to its contracts input in step 4.1c, when the ports exist"
     },

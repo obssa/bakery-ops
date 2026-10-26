@@ -146,8 +146,9 @@ final class LedgerReader
     }
 
     /**
-     * The lowest-numbered stock place (never the cash drawer) that holds a balance row of each item, across every branch and without
-     * the branch scope: the alert sweep evaluates a branch-wide rule through it, in a process that has no current branch.
+     * The lowest-numbered stock place (never the cash drawer, never a removed place: step 4.4c) that holds a balance row of each item,
+     * across every branch and without the branch scope: the alert sweep evaluates a branch-wide rule through it, in a process that has
+     * no current branch.
      *
      * @param  list<int>  $itemIds
      * @return array<int, int> item id => location id
@@ -162,6 +163,7 @@ final class LedgerReader
             ->toBase()
             ->join('locations', 'locations.id', '=', 'stock_balances.location_id')
             ->where('locations.type', '!=', 'cash_drawer')
+            ->whereNull('locations.deleted_at')
             ->whereIn('stock_balances.item_id', $itemIds)
             ->groupBy('stock_balances.item_id')
             ->selectRaw('stock_balances.item_id as item_id, MIN(stock_balances.location_id) as place')

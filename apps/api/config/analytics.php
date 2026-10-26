@@ -15,7 +15,9 @@
  *   asked_ttl_seconds         how long a day stays "asked for" in the freshness feed when its job never runs (a lost job)
  *   range_default_days        the /analytics reads default to this many days, today included
  *   range_max_days            the longest range an /analytics read accepts
- * budget_* are read from step 4.4c on.
+ *   launch_weeks              the product page follows a product this many weeks from its first sale (step 4.4c)
+ *   budget_p95_ms             DashboardBudgetTest: the 95th percentile of 30 timed in-process requests of each dashboard read (step 4.4c)
+ *   budget_max_queries        DashboardBudgetTest: the most statements a dashboard read makes of its own (after the auth and actor plumbing)
  */
 return [
     'timezone' => 'Africa/Addis_Ababa',
@@ -29,6 +31,7 @@ return [
     'asked_ttl_seconds' => 900,
     'range_default_days' => 30,
     'range_max_days' => 400,
+    'launch_weeks' => 12,
     'budget_p95_ms' => 400,
     'budget_max_queries' => 8,
 ];

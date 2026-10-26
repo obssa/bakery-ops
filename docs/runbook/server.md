@@ -478,6 +478,11 @@ database queue, run by the `queue:work` cron line:
   built yet, and `running` (a rebuild was asked for and has not run). A day stays `running` for at most 15 minutes when its job is lost;
   `php artisan queue:failed` shows a job that failed (`analytics.rebuild.failed` in the log names the branch, the day and the error's class).
 - **Nothing to clean up.** The summary tables are derived: a rebuild replaces the day, and rebuilding a day twice gives the same rows.
+- **The dashboards** (step 4.4c: `GET /api/v1/analytics/overview`, `/sales`, `/sales/hourly`, `/channels`, `/items`, `/items/{id}`,
+  `/stations`, `/staff`, `/shifts`) read these tables only and answer `304` until a day of their range is rebuilt; a day not built is listed
+  in `stale_days`, never shown as zero. **Once after the 4.4c deploy**, rebuild the days built before it, so their mean prep times count
+  (`prep_samples` and `prep_seconds_sum` are new and zero on older rows): `analytics:rebuild --from=<the first day in analytics_days>
+  --to=<today>` (queued, at most 400 days; the dashboards show the old rows meanwhile, with fewer prep samples).
 
 ## Manual operations
 

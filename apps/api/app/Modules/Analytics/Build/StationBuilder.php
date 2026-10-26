@@ -14,7 +14,8 @@ use Brick\Math\BigDecimal;
  * daily_station_metrics (phase-4 plan M16; ADR 0014; 10.5). Per station, each figure on its own clock in the branch's local days:
  *   - the station lines (Orders\Facts::stationLines gives a line once per day it touched): tickets = the orders whose lines were
  *     readied or rejected that day; lines_served by served_at; lines_rejected by rejected_at; prep = accepted_at to ready_at of the
- *     lines readied that day (mean and nearest-rank 90th percentile, whole seconds; null with no sample);
+ *     lines readied that day (mean and nearest-rank 90th percentile, whole seconds; null with no sample), and (step 4.4c) how many
+ *     samples there were and their seconds added, so the dashboards' mean over a range is exact;
  *   - batches by finished_at (the port's day);
  *   - shifts: a shift that opened counts on every local day from its opening to its lock (else its cancellation; a running shift has no
  *     end yet), so a Night shift counts on two days; one that never opened is not counted. Its variance lines and cash variance belong
@@ -101,6 +102,8 @@ final class StationBuilder
                 'lines_rejected' => $c['rejected'],
                 'avg_prep_seconds' => Figures::mean($c['prep']),
                 'p90_prep_seconds' => Figures::percentile($c['prep'], 90),
+                'prep_samples' => count($c['prep']),
+                'prep_seconds_sum' => array_sum($c['prep']),
                 'batches_finished' => $c['batches'],
                 'produced_qty' => Figures::qty($c['produced']),
                 'waste_qty' => Figures::qty($c['waste']),

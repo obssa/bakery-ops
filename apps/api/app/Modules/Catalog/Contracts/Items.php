@@ -86,6 +86,51 @@ final class Items
     }
 
     /**
+     * The items of the ids as ItemLabel, keyed by id and in id order (step 4.4c: what the dashboards name the summaries' items by): both
+     * names, the kind, the base unit, the category with its names, is_new in the branch's calendar and whether the item is live. A deleted
+     * item and a removed category are named too; another branch's ids and unknown ids are left out. One query, however many ids.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, ItemLabel>
+     */
+    public function labels(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $today = CarbonImmutable::now($this->branch->timezone())->toDateString();
+        $rows = Item::query()->withTrashed()->toBase()
+            ->leftJoin('units as unit', 'unit.id', '=', 'items.unit_id')
+            ->leftJoin('units as base', 'base.id', '=', 'unit.base_unit_id')
+            ->leftJoin('categories as category', 'category.id', '=', 'items.category_id')
+            ->whereIn('items.id', array_values(array_unique($ids)))
+            ->orderBy('items.id')
+            ->get([
+                'items.id', 'items.name_en', 'items.name_am', 'items.kind', 'items.category_id', 'items.is_active', 'items.is_new_until', 'items.deleted_at',
+                'unit.code as unit_code', 'base.code as base_code', 'category.name_en as category_name_en', 'category.name_am as category_name_am',
+            ]);
+
+        $labels = [];
+        foreach ($rows as $row) {
+            $newUntil = $row->is_new_until === null ? null : substr((string) $row->is_new_until, 0, 10);
+            $labels[(int) $row->id] = new ItemLabel(
+                (int) $row->id,
+                (string) $row->name_en,
+                (string) $row->name_am,
+                (string) $row->kind,
+                (string) ($row->base_code ?? $row->unit_code),
+                $row->category_id === null ? null : (int) $row->category_id,
+                $row->category_id === null ? null : (string) $row->category_name_en,
+                $row->category_id === null ? null : (string) $row->category_name_am,
+                $newUntil !== null && $today <= $newUntil,
+                (bool) $row->is_active && $row->deleted_at === null,
+            );
+        }
+
+        return $labels;
+    }
+
+    /**
      * The ids among $ids that are soft-deleted (step 3.3c; Shifts asks before a count's lines are locked in the Ledger, which only
      * takes live items). Unknown ids and another branch's are not reported.
      *

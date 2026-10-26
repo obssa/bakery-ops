@@ -57,7 +57,8 @@ it('builds every person figure of a day against a hand-made oracle', function ()
 
     $row = fn (int $user, string $kind, array $figures): array => array_merge([
         'day' => $D, 'user_id' => $user, 'role_kind' => $kind, 'orders_count' => 0, 'items_qty' => '0.0000', 'revenue' => '0.00', 'payments_count' => 0,
-        'payments_amount' => '0.00', 'voids_count' => 0, 'refunds_count' => 0, 'lines_prepared' => 0, 'avg_prep_seconds' => null,
+        'payments_amount' => '0.00', 'voids_count' => 0, 'refunds_count' => 0, 'lines_prepared' => 0, 'avg_prep_seconds' => null, 'prep_samples' => 0,
+        'prep_seconds_sum' => 0,
     ], $figures);
 
     expect($rows)->toBe([
@@ -67,7 +68,7 @@ it('builds every person figure of a day against a hand-made oracle', function ()
         $row(12, 'waiter', ['voids_count' => 1]),
         $row(30, 'cashier', ['payments_count' => 2, 'payments_amount' => '150.00', 'refunds_count' => 1]),
         $row(31, 'cashier', ['refunds_count' => 1]),
-        $row(40, 'station', ['lines_prepared' => 2, 'avg_prep_seconds' => 350]),
+        $row(40, 'station', ['lines_prepared' => 2, 'avg_prep_seconds' => 350, 'prep_samples' => 2, 'prep_seconds_sum' => 700]),
         $row(41, 'station', ['lines_prepared' => 1]),
     ]);
 })->group('unit', 'module:analytics');

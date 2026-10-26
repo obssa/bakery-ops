@@ -88,6 +88,11 @@ is made. Step 4.4a builds it (`App\Modules\Analytics\Contracts\Rebuild`); 4.4b a
 10. **What the dashboards may read.** Only the summary tables, `analytics_days` and the name tables behind Catalog, Payments and Identity
     contracts (step 4.4c, a query-log test). Every answer says `as_of` (the oldest `rebuilt_at` it used) and the days of its range with
     no `analytics_days` row, shown as "not built", never as zero (R-U).
+    As built (step 4.4c): the query-log test splits each request where the endpoint resolves its `RangeRequest`; the endpoint may name the
+    summaries, the name tables (`items`, `units`, `categories`, `payment_channels`, `users`, `stations`, `user_station_assignments`) and the
+    framework's, the shared plumbing before it what every route reads (including the station's shift stamp). A range is summed over its
+    built days only; a point of a series with no built day has null figures. Mean prep times add up exactly (`prep_samples` and
+    `prep_seconds_sum`, sum over sum); a 90th percentile is not made from the days' percentiles (a one-day range only, and the worst day's).
 
 ## Consequences
 

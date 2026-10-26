@@ -259,4 +259,15 @@ return [
     // Analytics (step 4.4b): the freshness feed the dashboards poll is everyone's (analytics.view_own); the on-demand rebuild is the admin's (analytics.manage)
     'GET /api/v1/analytics/freshness' => ['permission' => 'analytics.view_own', 'roles' => $all, 'module' => 'analytics'],
     'POST /api/v1/analytics/rebuild' => ['permission' => 'analytics.manage', 'roles' => ['admin'], 'module' => 'analytics'],
+    // the dashboards (step 4.4c): analytics.view (admin, manager); stations and staff also analytics.view_own (everyone), each limited to the
+    // caller's own stations or own rows by the endpoint
+    'GET /api/v1/analytics/overview' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
+    'GET /api/v1/analytics/sales' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
+    'GET /api/v1/analytics/sales/hourly' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
+    'GET /api/v1/analytics/channels' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
+    'GET /api/v1/analytics/items' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
+    'GET /api/v1/analytics/items/{item}' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
+    'GET /api/v1/analytics/stations' => ['permission' => 'analytics.view_own', 'roles' => $all, 'module' => 'analytics'],
+    'GET /api/v1/analytics/staff' => ['permission' => 'analytics.view_own', 'roles' => $all, 'module' => 'analytics'],
+    'GET /api/v1/analytics/shifts' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
 ];

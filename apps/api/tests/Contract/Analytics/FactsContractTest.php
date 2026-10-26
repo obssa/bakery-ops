@@ -6,6 +6,8 @@ use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Item;
+use App\Modules\Identity\Contracts\ActorDirectory;
+use App\Modules\Identity\Contracts\Stations as IdentityStations;
 use App\Modules\Inventory\Contracts\Facts as InventoryFacts;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Enums\LocationType;
@@ -468,4 +470,103 @@ it('Catalog Items::summaries names the category of each item (daily_item_metrics
 
     expect($summaries[$croissant->id]->categoryId)->toBe($category->id)
         ->and($summaries[$flour->id]->categoryId)->toBeNull();
+});
+
+/*
+ * Step 4.4c: the dashboards name what the summaries count (phase-4 plan section 4.6) through the providers' contracts only, and in one query
+ * each, so a dashboard stays inside its query budget (DashboardBudgetTest): channels through the Payments port, items (with their base unit
+ * and category) through Catalog, people and stations through Identity's ActorDirectory. A row that was removed since it was counted is still
+ * named, never another branch's.
+ */
+
+it('Payments\Facts::channels names the channels of the ids, a switched-off or removed one too, never another branch\'s, in one query', function () {
+    expect((new PaymentFacts)->channels([]))->toBe([]);
+    $cash = PaymentChannel::query()->where('code', 'cash')->firstOrFail();
+    $telebirr = PaymentChannel::query()->where('code', 'telebirr')->firstOrFail();
+    $telebirr->forceFill(['is_enabled' => false])->save();
+    $awash = PaymentChannel::query()->where('code', 'awash')->firstOrFail();
+    $awash->delete();
+    $other = Branch::factory()->create();
+    $foreign = (int) PaymentChannel::query()->withoutGlobalScopes()->where('branch_id', $other->id)->where('code', 'cash')->value('id');
+    actInBranch($this->branch);
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+    $rows = (new PaymentFacts)->channels([$awash->id, $telebirr->id, $cash->id, $foreign, 999999, $cash->id]);
+
+    expect($queries)->toBe(1)
+        ->and(array_keys($rows))->toBe([$cash->id, $telebirr->id, $awash->id])
+        ->and($rows[$cash->id]->toArray())->toBe(['channel_id' => $cash->id, 'code' => 'cash', 'name_en' => 'Cash', 'name_am' => 'ጥሬ ገንዘብ', 'is_enabled' => true, 'is_removed' => false])
+        ->and($rows[$telebirr->id]->isEnabled)->toBeFalse()
+        ->and($rows[$awash->id]->isRemoved)->toBeTrue()
+        ->and($rows[$awash->id]->nameEn)->toBe('Awash Bank');
+});
+
+it('Catalog Items::labels names the items of the ids with their kind, base unit, category and the new flag, a deleted one too, never another branch\'s, in one query', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-11-22 20:59:59', 'UTC')); // 23:59:59 local on the 22nd
+    expect(app(Items::class)->labels([]))->toBe([]);
+    $category = Category::factory()->product()->create(['branch_id' => $this->branch->id, 'name_en' => 'Pastry', 'name_am' => 'ኬክ']);
+    $croissant = Item::factory()->product(Fulfilment::ToStock)->create([
+        'branch_id' => $this->branch->id, 'category_id' => $category->id, 'name_en' => 'Croissant', 'name_am' => 'ክሮሳንት', 'is_new_until' => '2026-11-22',
+    ]);
+    $flour = Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'name_en' => 'Flour', 'name_am' => 'ዱቄት', 'is_new_until' => '2026-11-21']);
+    $gone = Item::factory()->product(Fulfilment::ToOrder)->create(['branch_id' => $this->branch->id]);
+    $gone->delete();
+    $category->delete();
+    $foreign = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => Branch::factory()->create()->id]);
+    actInBranch($this->branch);
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+    $labels = app(Items::class)->labels([$gone->id, $flour->id, $croissant->id, $foreign->id, 999999]);
+
+    expect($queries)->toBe(1)
+        ->and(array_keys($labels))->toBe([$croissant->id, $flour->id, $gone->id])
+        ->and($labels[$croissant->id]->toArray())->toBe([
+            'id' => $croissant->id, 'name_en' => 'Croissant', 'name_am' => 'ክሮሳንት', 'kind' => 'product', 'unit' => 'pcs',
+            'category' => ['id' => $category->id, 'name_en' => 'Pastry', 'name_am' => 'ኬክ'], 'is_new' => true, 'is_active' => true,
+        ])
+        ->and($labels[$flour->id]->toArray())->toMatchArray(['kind' => 'ingredient', 'unit' => 'g', 'category' => null, 'is_new' => false, 'is_active' => true])
+        ->and($labels[$gone->id]->isActive)->toBeFalse();
+
+    $this->travelTo(CarbonImmutable::parse('2026-11-22 21:00:00', 'UTC')); // local midnight: no longer new
+    expect(app(Items::class)->labels([$croissant->id])[$croissant->id]->isNew)->toBeFalse();
+});
+
+it('Identity ActorDirectory names people (a deleted one too) and stations, never another branch\'s, and lists the stations a person works at', function () {
+    $directory = app(ActorDirectory::class);
+    expect($directory->names([]))->toBe([])->and($directory->stations([]))->toBe([]);
+    $kitchen = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $this->branch->id, 'name_en' => 'Kitchen', 'name_am' => 'ማብሰያ ቤት']);
+    $bar = Station::factory()->forCode(StationCode::Bar)->create(['branch_id' => $this->branch->id]);
+    $closed = Station::factory()->forCode(StationCode::CakeRoom)->create(['branch_id' => $this->branch->id]);
+    $chef = makeUser($this->branch, 'chef', ['name' => 'Chaltu']);
+    app(IdentityStations::class)->replace($chef, [['station_id' => $kitchen->id, 'can_count' => true, 'is_overseer' => false]]);
+    $left = makeUser($this->branch, 'waiter', ['name' => 'Abebe']);
+    $left->delete();
+    $closed->delete();
+    $otherBranch = Branch::factory()->create();
+    $foreigner = makeUser($otherBranch, 'waiter');
+    $foreignStation = Station::factory()->forCode(StationCode::Kitchen)->create(['branch_id' => $otherBranch->id]);
+    actInBranch($this->branch);
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+    $names = $directory->names([$left->id, $chef->id, $foreigner->id, 999999]);
+    $stations = $directory->stations([$closed->id, $kitchen->id, $foreignStation->id]);
+
+    expect($queries)->toBe(2, 'one query for the people, one for the stations')
+        ->and($names)->toBe([$chef->id => 'Chaltu', $left->id => 'Abebe'])
+        ->and(array_keys($stations))->toBe([$kitchen->id, $closed->id])
+        ->and($stations[$kitchen->id]->toArray())->toBe(['id' => $kitchen->id, 'code' => 'kitchen', 'name_en' => 'Kitchen', 'name_am' => 'ማብሰያ ቤት', 'is_active' => true])
+        ->and($stations[$closed->id]->isActive)->toBeFalse()
+        ->and($directory->workStationIds($chef->id))->toBe([$kitchen->id])
+        ->and($directory->workStationIds($this->admin->id))->toBe([$kitchen->id, $bar->id], 'stations.all: every station of the branch')
+        ->and($directory->workStationIds($left->id))->toBe([], 'a person who cannot act works nowhere')
+        ->and($directory->workStationIds($foreigner->id))->toBe([]);
 });

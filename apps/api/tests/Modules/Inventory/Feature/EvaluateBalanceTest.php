@@ -221,3 +221,36 @@ it('runs as the person who caused it and leaves the process as it found it', fun
         ->and(app(ActorContext::class)->actingUserId())->toBeNull()
         ->and(app(CurrentBranch::class)->idOrNull())->toBe($other->id);
 })->group('module:inventory', 'feature');
+
+/*
+ * Step 4.4c (a fix seen on the live host, 2026-10-26): an evaluation of an item deleted since its balance moved, or of a place removed since,
+ * failed three times (InvalidMovement: the Ledger locks live rows only) whoever queued it: the hourly sweep, a rule change, a late movement
+ * event. There is nothing left to evaluate: the job completes quietly and writes nothing. An open episode stays as it is (ADR 0011: only an
+ * evaluation of a live balance opens or closes one), so the deleted item announces nothing more, neither a repeat nor a recovery, and is
+ * evaluated again if it is ever restored.
+ */
+it('completes quietly and writes nothing for an item deleted, or a place removed, since the balance moved', function (string $what) {
+    stockIn($this->cake, $this->display, '1');
+    DB::table('stock_alert_states')->insert([
+        'branch_id' => $this->branch->id, 'item_id' => $this->cake->id, 'location_id' => $this->display->id, 'location_key' => $this->display->id, 'type' => 'out',
+        'is_active' => 1, 'active_since' => now(), 'available_at_start' => '0', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $what === 'item' ? $this->cake->delete() : $this->display->delete();
+    $before = DB::table('stock_alert_states')->orderBy('id')->get()->all();
+    Event::fake([StockOut::class, StockRecovered::class]);
+    $writes = [];
+    DB::listen(function ($query) use (&$writes): void {
+        if (preg_match('/^\s*(insert|update|delete)\b/i', $query->sql) === 1) {
+            $writes[] = $query->sql;
+        }
+    });
+
+    ($this->run)(($this->job)($this->cake, $this->display));
+    EvaluateBalance::dispatchSync($this->branch->id, $this->cake->id, $this->display->id);
+
+    expect($writes)->toBe([])
+        ->and(DB::table('stock_alert_states')->orderBy('id')->get()->all())->toEqual($before)
+        ->and(DB::table('failed_jobs')->count())->toBe(0);
+    Event::assertNotDispatched(StockOut::class);
+    Event::assertNotDispatched(StockRecovered::class);
+})->with(['a deleted item' => 'item', 'a removed place' => 'place'])->group('module:inventory', 'feature');

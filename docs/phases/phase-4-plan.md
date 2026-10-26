@@ -227,7 +227,7 @@ today (`422 analytics.range.future`), `?compare=previous` adds the same-length p
 `rebuilt_at` of the days they used) and `stale_days` (days in range with no `analytics_days` row). All are conditional: the ETag is built from
 the days' `version`s, so a dashboard that polls every 30 s gets `304` until a rebuild moves it.
 
-| Method + path | Permission | Idempotent | Response (`data`) |
+| Method + path | Permission | Idempotent | Response (`data`; as built (4.4c) every dashboard read answers `{from, to, timezone, as_of, stale_days, data, previous?}`, see its As built note) |
 |---|---|---|---|
 | `GET /analytics/overview` | `analytics.view` | read | `{revenue, net_revenue, orders_count, avg_ticket, items_qty, refund_total, voided_total, by_type {...}, channels [{channel, amount, share}], top_items [5], previous {...}?}` |
 | `GET /analytics/sales` | `analytics.view` | read | `?group=day|week|month` (weeks start Monday, local) `{series: [{key, orders_count, revenue, net_revenue, avg_ticket}]}` |
@@ -235,8 +235,8 @@ the days' `version`s, so a dashboard that polls every 30 s gets `304` until a re
 | `GET /analytics/channels` | `analytics.view` | read | `{channels: [{channel {id, code, name_en, name_am}, receipts_count, amount, refund_amount, net_amount, share, without_reference_count, without_photo_count, verified_count, disputed_count, duplicate_reference_count}], series}` |
 | `GET /analytics/items` | `analytics.view` | read | `?kind=product|ingredient&category_id=&sort=revenue|units|margin|waste&limit=50` `{items: [{item {id, name_en, name_am, is_new}, units_sold_qty, revenue, cogs_total, margin_total, margin_pct, cogs_complete, produced_qty, waste_qty, stockout_count}]}` |
 | `GET /analytics/items/{item}` | `analytics.view` | read | the product page: `{item, totals, series: [{day, units_sold_qty, revenue, margin_total, produced_qty, waste_qty, stockout_count, closing_on_hand_qty}], since_launch: {first_sale_day, weekly_units: [...]}}` (new products flagged) |
-| `GET /analytics/stations` | `analytics.view`; `analytics.view_own` limited to the caller's stations | read | `{stations: [{station, lines_served, lines_rejected, avg_prep_seconds, p90_prep_seconds, batches_finished, produced_qty, waste_qty, variance_line_count, shifts_count}]}` |
-| `GET /analytics/staff` | `analytics.view`; `analytics.view_own` limited to the caller | read | `?role_kind=waiter|cashier|station` `{users: [{user {id, name}, orders_count, revenue, payments_count, payments_amount, voids_count, refunds_count, lines_prepared, avg_prep_seconds}]}` |
+| `GET /analytics/stations` | `analytics.view`; `analytics.view_own` limited to the caller's stations (as built: `permission:analytics.view\|analytics.view_own`) | read | `{stations: [{station, lines_served, lines_rejected, avg_prep_seconds, p90_prep_seconds, batches_finished, produced_qty, waste_qty, variance_line_count, shifts_count}]}` |
+| `GET /analytics/staff` | `analytics.view`; `analytics.view_own` limited to the caller (as built: `permission:analytics.view\|analytics.view_own`) | read | `?role_kind=waiter|cashier|station` `{users: [{user {id, name}, orders_count, revenue, payments_count, payments_amount, voids_count, refunds_count, lines_prepared, avg_prep_seconds}]}` |
 | `GET /analytics/shifts` | `analytics.view` | read | `{days: [{day, shifts_count, shifts_locked_count, variance_line_count, cash_variance_total}]}` |
 | `GET /analytics/freshness` | `analytics.view_own` | read, polled 30 s | `{as_of, days: [{day, version, rebuilt_at, trigger, changed}], running: bool}` (the dashboard's "updated 2 min ago" and its refetch trigger); as built (4.4b) also `from`, `to`, `timezone` and `stale_days`, `days` lists the built days only, the ETag is every built day's version and `rebuilt_at` plus `running` (no settling bucket: a version is seen whole or not at all) |
 | `POST /analytics/rebuild` | `analytics.manage` | key | `{from, to, sync?: bool}`; `sync` only for at most 7 days and runs inline (what the live E2E uses, no cron wait); otherwise one `RebuildDay` job per day is queued; as built (4.4b) `to` defaults to `from` | `202 {queued: n}` / `200 {days: [...]}`; an `AuditedAction` `analytics.rebuild` records the range; as built both answers also carry `from`, `to`, `sync`, the 202 `days` (the dates queued), the 200 `days` each Rebuild result `{day, trigger, rows, version, changed, duration_ms, fingerprint}`; the audit row is `recordEvent` `{from, to, sync, days}`, written before the work | `422 analytics.range.too_large` (31 days queued, 7 inline) `{max_days}`, `409 analytics.rebuild.running` (as built: a queued rebuild of overlapping days still waits; `{from, to, asked_at}`), as built also `422 analytics.range.future {today}` |
@@ -838,6 +838,79 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      (`personal_access_tokens`, permission tables, `idempotency_keys`, `cache`); a statement on `orders`, `order_lines`, `payments`, `payment_refunds`, `stock_movements`, `stock_balances`,
      `production_*`, `shift_*`, `stock_counts*`, `audit_log` fails the test, and a planted violation proves the assertion bites), `DashboardNumbersTest` (each figure equals the oracle sum over the seeded day),
      `DashboardBudgetTest` (query count per endpoint <= 8, and 30 timed requests each; the substitute of 10.2 R-G).
+   - **As built (step 4.4c, `phase-4/analytics-dashboards`).** Order: the contract cases for the names the dashboards need (red: 3), the provider
+     work with `app/Modules/Analytics` untouched; the module's tests and the registries (red: the nine routes, the request and read classes, the
+     prep columns); the code; OpenAPI and ERD; this note, the manifest, ADR 0014 and the runbook. A separate stock-alert fix rides along (below).
+     Where the code disagreed with the plan or the plan left a choice:
+     - **The answer.** Every dashboard read answers `{from, to, timezone, as_of, stale_days, data, previous?}`: the figures under `data`, the
+       freshness of section 4.6 beside them, and with `?compare=previous` a `previous` of the same shape for the same number of local days just
+       before the range (the 29 January to 28 February before March). `as_of` and `stale_days` are each period's own. Section 4.6's table lists
+       what is under `data`; the plan's "`previous {...}?` inside the overview" became this one envelope for every read.
+     - **Not built is never zero (R-U).** A sum over a range adds its built days; the days not built are in `stale_days`. A point of a series (a
+       day, a week, a month) with no built day has null figures (`built_days` 0); a built day the dimension did not move is a true zero.
+     - **The ETag** is the read's scope, the branch, today's local date (`is_new` turns at local midnight), both periods, the read's options and
+       the caller's scope (the stations or the person of `analytics.view_own`), and every built day's version and `rebuilt_at` over the span
+       read (with the product page's weeks since launch). No settling bucket, as the freshness feed. One query before a `304`. A name changed
+       since the last rebuild of the range shows with the next rebuild.
+     - **Names, contract-first** (`contract:analytics->facts`, 20 cases): `Payments\Contracts\Facts::channels(ids)` (`ChannelFact`, a removed
+       channel too), `Catalog\Contracts\Items::labels(ids)` (`ItemLabel`: both names, kind, base unit, category with both names, `is_new` in the
+       branch's calendar, live or not; one query with the units and categories joined, where `Items::summaries` makes one per unit) and a new
+       `Identity\Contracts\ActorDirectory` (`names(ids)`, `stations(ids)` as `StationLabel`, `workStationIds(user)`), the class the manifest's
+       `analytics.needs` and `ModuleBoundariesTest` already named; the arch rule now also allows its `StationLabel` view. Step 4.5a may bind
+       its Shared seam for Audit to it.
+     - **Which tables, defined (10.9 item 19).** `DashboardsReadSummariesOnlyTest` records every statement of every GET `/analytics/*` route
+       (read from the router; `POST /analytics/rebuild` is the one other route and the documented exception of 10.1) in two phases split where
+       the endpoint resolves its `RangeRequest`. The endpoint may name only `daily_*`, `analytics_days`, the name tables (`items`, `units`,
+       `categories`, `payment_channels`, `users`, `stations`, `user_station_assignments`) and the framework's (`personal_access_tokens`, the
+       permission tables, `idempotency_keys`, `cache`). The plumbing before it (auth, the `actor` middleware, the permission check) may name
+       only what every route's plumbing reads: those, `branches`, `devices`, `acting_sessions` and the station's shift stamp
+       (`shift_instances`), which the brief's list did not foresee and which is never allowed to an endpoint. A planted endpoint that reads
+       `orders` and `shift_instances` is caught.
+     - **Prep times over a range are exact.** A day's `avg_prep_seconds` is rounded and does not say how many lines it is the mean of, so
+       `2026_11_06_100100_add_prep_totals_to_daily_metrics` adds `prep_samples` and `prep_seconds_sum` to `daily_station_metrics` and
+       `daily_user_metrics` (the builders write them; the 4.4a tests that compare whole rows say so) and a range's mean is sum over sum,
+       half-up. A 90th percentile of many days cannot be made from the days' percentiles: `p90_prep_seconds` is given for a one-day range
+       only, and beside it `worst_day_p90_prep_seconds`. A day built before the migration counts no samples until it is rebuilt (runbook).
+     - **The reads as built.** `/overview`: revenue, net revenue, orders, `avg_ticket` (revenue / orders, once, 0.00 without an order),
+       items, refunds, voids, cancellations, `by_type`, channels with `share` (percent of the money taken, 2 dp, null when nothing was)
+       most money first, the five products with the most revenue (then units, then id). `/sales?group=day|week|month`: points keyed by the
+       day, the Monday or `YYYY-MM`, cut at the range's ends, with `days` and `built_days`. `/sales/hourly`: the 24 local hours. `/channels`:
+       the totals and the checker's counts per channel and a series grouped as `/sales` (`group` too). `/items?kind=&category_id=&sort=&limit=`:
+       per item (the category the item had on each day), largest first by revenue, units, margin or waste, ties by id, `limit` 1 to 200,
+       `margin_pct` null without revenue, `cogs_incomplete_days`. `/items/{item}`: the totals, a point a day with every column of
+       `daily_item_metrics`, and `since_launch` (the first sale in all the built history and its units week by week from that day,
+       seven-day weeks, at most `analytics.launch_weeks` = 12, cut at today); 404 `http.not_found` for an item of another branch.
+       `/stations` (shift-days: a Night shift counts on both days), `/staff` (by role kind, then person), `/shifts` (a point a day over the
+       stations and the totals of the variances only, each belonging to one day). Money and quantities are decimal strings summed with
+       brick/math or exact DECIMAL sums (`Read\Sum` refuses a float).
+     - **`analytics.view_own`.** `/stations` and `/staff` take `permission:analytics.view|analytics.view_own` (every role). Whether the caller
+       reads everything is the signed-in account's `analytics.view`, as the middleware checks; the own scope is the person at the device (the
+       acting-as person of a shared pad, else the signed-in one): their stations (assignments, or every station with `stations.all`), or
+       their own rows. A waiter, who works at no station, reads an empty list. No permission is new, so no grant migration.
+     - **Known gaps, shown as they are.** `/items` keeps `cogs_complete` false (and its cost 0) for display-case products made in the house,
+       whose lines snapshot no recipe version (4.4a's note); a modifier's recipe delta is not costed. Refund figures are the summaries' (zero
+       until 4.1b and 4.3d). `DashboardNumbersTest` pins the croissant's `cogs_complete = false` beside the sandwich's exact cost.
+     - **Budget (R-G).** `DashboardBudgetTest`, on 90 built days compared with the 90 before (60 products, 20 ingredients, eight channels, five
+       stations, twelve people): every read with `compare=previous` makes at most 8 statements of its own (counted from its `RangeRequest`;
+       2 to 7 as built, the chef's stations the most) and 30 timed in-process requests after 3 warm-ups have a p95 under 400 ms (locally 25
+       to 70 ms); the figures are printed to the CI log. The query budget leaves out the shared plumbing (0 to 3 statements before it).
+     - **Tests**: unit `DashboardWindowTest`; feature `OverviewEndpointTest`, `SalesEndpointTest`, `HourlySalesEndpointTest`,
+       `ChannelsEndpointTest`, `ItemsEndpointTest`, `ItemPageEndpointTest`, `StationsEndpointTest`, `StaffEndpointTest`, `ShiftsEndpointTest`
+       (each: the figures over rows written straight into the summaries by `Tests\Support\SummaryRows`, `compare`, the range errors, 403 or
+       the scope per role, a `304` after the settling window and a new tag after a rebuild), `DashboardsReadSummariesOnlyTest`,
+       `DashboardNumbersTest` (two days through the real actions with the three shift rules on, every figure against sums of the operational
+       tables), `DashboardBudgetTest`. Changed: `AnalyticsSchemaTest`, `RebuildDayTest`, `StationBuilderTest`, `UserBuilderTest` (the prep
+       columns), `ModuleBoundariesTest` (`StationLabel`), `FactsContractTest` (3 cases). No test turns a shift rule off.
+     - **The stock-alert fix (Inventory, test first, its own commits).** On the live host the hourly sweep (`AlertSweeper`) queued the
+       evaluation of every reorder rule and open episode, also those of the E2E branch's retired (soft-deleted) ingredients, and
+       `EvaluateBalance` failed three times an hour for each (the Ledger locks live rows only): 3,529 rows in `failed_jobs` on 2026-10-26.
+       The sweep now leaves out the rules and episodes of a deleted item or a removed place, a branch-wide rule is evaluated through a place
+       still in use (`LedgerReader::lowestStockPlaces`), and `EvaluateBalance` of a balance whose item or place is no longer live returns at
+       once and writes nothing, whoever queued it (the sweep, a rule change, a late movement event). An open episode of such an item stays as
+       it is (ADR 0011: only an evaluation of a live balance opens or closes one), so nothing more is announced and a restored item is evaluated
+       again. A switched-off item is still swept: it is still stocked, and the Ledger keeps its balances. Tests: `SweepAlertsCommandTest` (2
+       cases), `EvaluateBalanceTest` (1 case, two datasets). The failed rows already on the host are left for Ramin.
+     - STATUS: phase 4's `analytics` step and the module stay `in_progress`.
    - **4.4d `phase-4/analytics-exports-weekly`**: exports (`openspout/openspout` for xlsx, dompdf for the PDF summaries, CSV), `WeeklySummary` builder (previous Monday to Sunday: revenue and
      orders against the week before, best and worst products by margin, channel split, refunds and voids, variance lines, stock-outs; reads summaries only), `analytics:weekly-summary`,
      `WeeklySummaryReady`, `NotifyWeeklySummary` in Notifications with bilingual copy and the signed 7-day PDF link. Tests: `ExportOpensTest` (the xlsx is read back with the same library: sheet names,
@@ -1099,7 +1172,7 @@ Each is corrected in the PR named (the manifest, the skill copy under `.claude/s
 16. **Entry gate wants `Phase4Seeder` to exist**; the real one is the last step, so a skeleton lands first (4.1a), as Phase 3 did with placeholders.
 17. **`order_events_event_check`** lists the events and has no payment or refund event, while the architecture wants payment photos on the order timeline: M9 extends it (DDL only).
 18. **`daily_sales.revenue == SUM(orders.total)`** (gate) has no stated clock; ADR 0014 fixes it as `settled_at` (R-J).
-19. **Dashboards "hit no raw tables"** needs a definition because names come from `items`, `categories`, `payment_channels`, `users`, `stations`: the allowlist of 4.4c.
+19. **Dashboards "hit no raw tables"** needs a definition because names come from `items`, `categories`, `payment_channels`, `users`, `stations`: the allowlist of 4.4c. As built (4.4c): the endpoint's own statements may also name `units` (an item's base unit, joined by `Items::labels`) and `user_station_assignments` (the caller's stations), and the plumbing every route runs before the endpoint (auth, the `actor` middleware, the permission check) may name `branches`, `devices`, `acting_sessions` and the station's shift stamp on `shift_instances`; see the As built note of 4.4c.
 20. **Analytics -> Audit**: the manifest's `analytics.depends_on` had no Audit, but `POST /analytics/rebuild` is a write and writes its audit row through
     `AuditedAction`. 4.4b adds `audit` to `analytics.depends_on` and `needs`, and `ModuleBoundariesTest` allows Analytics Audit's `AuditedAction` and
     nothing else of Audit.

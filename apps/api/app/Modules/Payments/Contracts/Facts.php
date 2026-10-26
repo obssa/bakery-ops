@@ -6,6 +6,7 @@ namespace App\Modules\Payments\Contracts;
 
 use App\Modules\Payments\Enums\PaymentStatus;
 use App\Modules\Payments\Models\Payment;
+use App\Modules\Payments\Models\PaymentChannel;
 use App\Shared\Tenancy\CurrentBranch;
 use App\Shared\Time\DayRows;
 use App\Shared\Time\LocalDay;
@@ -25,7 +26,9 @@ use stdClass;
  *   channel with the same normalised reference, wherever it falls in time (step 4.4a; one indexed EXISTS per row, the
  *   `(branch_id, channel_id, reference_norm)` index of M4).
  * refunds(): the clock is `refunded_at`; it reads `payment_refunds`, which nothing writes before step 4.3d, so it yields nothing
- * until then. Each row names its `order_refund_id` (step 4.4a: a refund paid back over two payments is one refund). Branch-scoped through the model for payments and by the current branch for refunds, resolved per use.
+ * until then. Each row names its `order_refund_id` (step 4.4a: a refund paid back over two payments is one refund).
+ * channels(ids): the names of the channels the summaries count (step 4.4c), a removed one too; keyed by id, not a generator.
+ * Branch-scoped through the model for payments and channels and by the current branch for refunds, resolved per use.
  */
 final class Facts
 {
@@ -93,5 +96,25 @@ final class Facts
                 (int) $row->order_refund_id,
             ),
         );
+    }
+
+    /**
+     * The channels of the ids as ChannelFact, keyed by id and in id order (step 4.4c: the dashboards name the channels their summaries
+     * count): a switched-off or removed channel is named too, another branch's ids and unknown ids are left out. One query.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, ChannelFact>
+     */
+    public function channels(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $named = [];
+        foreach (PaymentChannel::query()->withTrashed()->whereKey(array_values(array_unique($ids)))->orderBy('id')->get() as $channel) {
+            $named[$channel->id] = new ChannelFact($channel->id, $channel->code, $channel->name_en, $channel->name_am, $channel->is_enabled, $channel->trashed());
+        }
+
+        return $named;
     }
 }
