@@ -18,8 +18,11 @@ use Illuminate\Support\Facades\Route;
  * model, so another branch's or a removed channel is 404) and the receipt settings read (a placeholder until step 4.3e). Step 4.3b adds
  * the split bill (payments.take) and the payment reads (payments.view; {payment} is a number the controller looks up through the
  * BranchScoped model, so another branch's is 404). Step 4.3c adds verify and dispute (payments.verify: admin, manager) and the void (asked with
- * orders.void_request, approved inside by the PIN of a payments.void holder). Every route is listed in tests/Support/route_permissions.php and
- * every write in tests/Support/write_endpoints.php.
+ * orders.void_request, approved inside by the PIN of a payments.void holder). Step 4.3e adds the receipts (the PDF: payments.view; a signed
+ * link: payments.take), the receipt settings PUT (channels.manage), the reconciliation and the export (payments.verify), and the one public
+ * route of Payments: GET /receipts/{order}, a customer's receipt behind a signed link (no bearer token; the `signed` middleware is the
+ * protection, tests/Support/public_routes.php). /payments/reconciliation and /payments/export are not a {payment}: it takes digits only.
+ * Every route is listed in tests/Support/route_permissions.php and every write in tests/Support/write_endpoints.php.
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:payments.take')->group(function (): void {
@@ -49,5 +52,6 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::put('/payment-channels/order', [ChannelsController::class, 'reorder'])->name('payments.channels.reorder');
         Route::patch('/payment-channels/{channel}', [ChannelsController::class, 'update'])->whereNumber('channel')->name('payments.channels.update');
         Route::delete('/payment-channels/{channel}', [ChannelsController::class, 'destroy'])->whereNumber('channel')->name('payments.channels.destroy');
+        Route::put('/receipt-settings', [ReceiptSettingsController::class, 'update'])->name('payments.receipt-settings.update');
     });
 });
