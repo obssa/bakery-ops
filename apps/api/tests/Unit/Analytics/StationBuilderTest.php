@@ -52,12 +52,12 @@ it('builds every station figure of a day against a hand-made oracle', function (
 
     $row = fn (int $station, array $figures): array => array_merge([
         'day' => $D, 'station_id' => $station, 'tickets_count' => 0, 'lines_served' => 0, 'lines_rejected' => 0, 'avg_prep_seconds' => null,
-        'p90_prep_seconds' => null, 'batches_finished' => 0, 'produced_qty' => '0.0000', 'waste_qty' => '0.0000', 'shifts_count' => 0,
+        'p90_prep_seconds' => null, 'prep_samples' => 0, 'prep_seconds_sum' => 0, 'batches_finished' => 0, 'produced_qty' => '0.0000', 'waste_qty' => '0.0000', 'shifts_count' => 0,
         'shifts_locked_count' => 0, 'variance_line_count' => 0, 'cash_variance_total' => '0.00', 'stockout_count' => 0,
     ], $figures);
 
     expect($rows)->toBe([
-        $row(1, ['tickets_count' => 3, 'lines_served' => 2, 'lines_rejected' => 1, 'avg_prep_seconds' => 640, 'p90_prep_seconds' => 1199,
+        $row(1, ['tickets_count' => 3, 'lines_served' => 2, 'lines_rejected' => 1, 'avg_prep_seconds' => 640, 'p90_prep_seconds' => 1199, 'prep_samples' => 3, 'prep_seconds_sum' => 1919,
             'shifts_count' => 1, 'shifts_locked_count' => 1, 'variance_line_count' => 2, 'stockout_count' => 2]),
         $row(2, ['tickets_count' => 1, 'lines_served' => 1, 'shifts_count' => 1, 'shifts_locked_count' => 1]),
         $row(3, ['batches_finished' => 2, 'produced_qty' => '36.0000', 'waste_qty' => '1.0000', 'shifts_count' => 2, 'shifts_locked_count' => 2, 'variance_line_count' => 3]),
@@ -75,7 +75,9 @@ it('takes the 90th percentile by nearest rank and rounds the mean half-up to a w
     $row = (new StationBuilder)->build(F::DAY, F::TZ, $lines, [], [], [])[0];
 
     // 60, 120, ... 600 and 1 s: the sum is 3301 over 11 lines = 300.09 -> 300; rank ceil(0.9 x 11) = 10 -> 540
-    expect($row['avg_prep_seconds'])->toBe(300)->and($row['p90_prep_seconds'])->toBe(540)->and($row['tickets_count'])->toBe(11);
+    expect($row['avg_prep_seconds'])->toBe(300)->and($row['p90_prep_seconds'])->toBe(540)->and($row['tickets_count'])->toBe(11)
+        // step 4.4c: the samples and their sum, so a range's mean is exact (GET /analytics/stations)
+        ->and($row['prep_samples'])->toBe(11)->and($row['prep_seconds_sum'])->toBe(3301);
 })->group('unit', 'module:analytics');
 
 it('counts a running shift on every day from its opening, and nothing for a day before it opened', function () {

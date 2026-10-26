@@ -26,11 +26,12 @@ $columns = [
     'daily_item_metrics' => ['branch_id', 'day', 'item_id', 'category_id', 'kind', 'units_sold_qty', 'refunded_qty', 'produced_qty', 'consumed_qty',
         'waste_qty', 'purchased_qty', 'adjusted_qty', 'stockout_count', 'closing_on_hand_qty', 'revenue', 'cogs_total', 'margin_total',
         'closing_value_total', 'cogs_complete', 'rebuilt_at'],
+    // prep_samples and prep_seconds_sum: step 4.4c (a range's exact mean prep time)
     'daily_station_metrics' => ['branch_id', 'day', 'station_id', 'tickets_count', 'lines_served', 'lines_rejected', 'avg_prep_seconds',
-        'p90_prep_seconds', 'batches_finished', 'produced_qty', 'waste_qty', 'shifts_count', 'shifts_locked_count', 'variance_line_count',
+        'p90_prep_seconds', 'prep_samples', 'prep_seconds_sum', 'batches_finished', 'produced_qty', 'waste_qty', 'shifts_count', 'shifts_locked_count', 'variance_line_count',
         'cash_variance_total', 'stockout_count', 'rebuilt_at'],
     'daily_user_metrics' => ['branch_id', 'day', 'user_id', 'role_kind', 'orders_count', 'items_qty', 'revenue', 'payments_count', 'payments_amount',
-        'voids_count', 'refunds_count', 'lines_prepared', 'avg_prep_seconds', 'rebuilt_at'],
+        'voids_count', 'refunds_count', 'lines_prepared', 'avg_prep_seconds', 'prep_samples', 'prep_seconds_sum', 'rebuilt_at'],
 ];
 
 $primaryKeys = [

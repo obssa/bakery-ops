@@ -116,12 +116,13 @@ it('writes every column of every summary table of the day as worked out by hand'
     $item = fn ($it, string $kind, array $figures): array => ['day' => $D, 'item_id' => $it->id, 'category_id' => null, 'kind' => $kind] + array_merge($zeroItem, $figures);
     $station = fn (int $id, array $figures): array => array_merge([
         'day' => $D, 'station_id' => $id, 'tickets_count' => 0, 'lines_served' => 0, 'lines_rejected' => 0, 'avg_prep_seconds' => null, 'p90_prep_seconds' => null,
-        'batches_finished' => 0, 'produced_qty' => '0.0000', 'waste_qty' => '0.0000', 'shifts_count' => 0, 'shifts_locked_count' => 0,
+        'prep_samples' => 0, 'prep_seconds_sum' => 0, 'batches_finished' => 0, 'produced_qty' => '0.0000', 'waste_qty' => '0.0000', 'shifts_count' => 0, 'shifts_locked_count' => 0,
         'variance_line_count' => 0, 'cash_variance_total' => '0.00', 'stockout_count' => 0,
     ], $figures);
     $person = fn ($user, string $kind, array $figures): array => array_merge([
         'day' => $D, 'user_id' => $user->id, 'role_kind' => $kind, 'orders_count' => 0, 'items_qty' => '0.0000', 'revenue' => '0.00', 'payments_count' => 0,
-        'payments_amount' => '0.00', 'voids_count' => 0, 'refunds_count' => 0, 'lines_prepared' => 0, 'avg_prep_seconds' => null,
+        'payments_amount' => '0.00', 'voids_count' => 0, 'refunds_count' => 0, 'lines_prepared' => 0, 'avg_prep_seconds' => null, 'prep_samples' => 0,
+        'prep_seconds_sum' => 0,
     ], $figures);
 
     expect(AnalyticsDay::rows($b1, $D))->toBe([
@@ -163,8 +164,10 @@ it('writes every column of every summary table of the day as worked out by hand'
                 'cogs_total' => '36.00', 'margin_total' => '24.00', 'closing_value_total' => '612.00']),
         ],
         'daily_station_metrics' => [
-            $station($m->kitchenStation->id, ['tickets_count' => 1, 'lines_served' => 1, 'avg_prep_seconds' => 600, 'p90_prep_seconds' => 600, 'shifts_count' => 1]),
-            $station($m->barStation->id, ['tickets_count' => 1, 'lines_served' => 1, 'avg_prep_seconds' => 180, 'p90_prep_seconds' => 180, 'shifts_count' => 1]),
+            $station($m->kitchenStation->id, ['tickets_count' => 1, 'lines_served' => 1, 'avg_prep_seconds' => 600, 'p90_prep_seconds' => 600, 'prep_samples' => 1,
+                'prep_seconds_sum' => 600, 'shifts_count' => 1]),
+            $station($m->barStation->id, ['tickets_count' => 1, 'lines_served' => 1, 'avg_prep_seconds' => 180, 'p90_prep_seconds' => 180, 'prep_samples' => 1,
+                'prep_seconds_sum' => 180, 'shifts_count' => 1]),
             $station($m->tillStation->id, ['shifts_count' => 1, 'stockout_count' => 1]),
             $station($batch->station_id, ['batches_finished' => 1, 'produced_qty' => '12.0000', 'waste_qty' => '1.0000']),
         ],
@@ -172,8 +175,8 @@ it('writes every column of every summary table of the day as worked out by hand'
             $person($f->manager, 'waiter', ['voids_count' => 1]),
             $person($f->cashier, 'cashier', ['payments_count' => 3, 'payments_amount' => '740.00', 'refunds_count' => 1]),
             $person($f->waiter, 'waiter', ['orders_count' => 2, 'items_qty' => '6.0000', 'revenue' => '740.00']),
-            $person($f->chef, 'station', ['lines_prepared' => 1, 'avg_prep_seconds' => 600]),
-            $person($f->barista, 'station', ['lines_prepared' => 1, 'avg_prep_seconds' => 180]),
+            $person($f->chef, 'station', ['lines_prepared' => 1, 'avg_prep_seconds' => 600, 'prep_samples' => 1, 'prep_seconds_sum' => 600]),
+            $person($f->barista, 'station', ['lines_prepared' => 1, 'avg_prep_seconds' => 180, 'prep_samples' => 1, 'prep_seconds_sum' => 180]),
         ],
     ]);
 
