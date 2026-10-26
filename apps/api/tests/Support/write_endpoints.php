@@ -1570,4 +1570,17 @@ return [
         },
         'payload' => fn (): array => [],
     ],
+    // Analytics (step 4.4b): the on-demand rebuild of today, here and now; the row it adds is its audit row (the summary rows are derived data)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/analytics/rebuild',
+        'module' => 'analytics',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => ['from' => CarbonImmutable::now('Africa/Addis_Ababa')->toDateString(), 'sync' => true],
+    ],
 ];

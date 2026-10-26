@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Analytics\Listeners\TouchToday;
 use App\Modules\Identity\Contracts\ShortCodes;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
@@ -319,7 +320,8 @@ it('dispatches OrderVoided once, after the commit, with its companion on the sta
         ])
         ->and($companions[0]->broadcastAs())->toBe('order_voided')
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    assertNothingQueuedButStockEvaluation();
+    // step 4.4b: Analytics touches today for the void (queued after the commit)
+    assertNothingQueuedButStockEvaluation([TouchToday::class]);
 })->group('module:orders', 'feature');
 
 // step 4.3e: the PIN is left out of the Idempotency fingerprint (tests/Modules/Shared/IdempotencySecretsTest.php has the middleware's rules)

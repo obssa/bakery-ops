@@ -256,4 +256,7 @@ return [
     'POST /api/v1/files' => ['permission' => 'files.upload', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'shared'],
     'GET /api/v1/files/{file}/url' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'shared'],
     'DELETE /api/v1/files/{file}' => ['permission' => 'files.upload', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'shared'],
+    // Analytics (step 4.4b): the freshness feed the dashboards poll is everyone's (analytics.view_own); the on-demand rebuild is the admin's (analytics.manage)
+    'GET /api/v1/analytics/freshness' => ['permission' => 'analytics.view_own', 'roles' => $all, 'module' => 'analytics'],
+    'POST /api/v1/analytics/rebuild' => ['permission' => 'analytics.manage', 'roles' => ['admin'], 'module' => 'analytics'],
 ];

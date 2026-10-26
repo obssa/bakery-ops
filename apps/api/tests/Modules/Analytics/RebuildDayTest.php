@@ -98,6 +98,10 @@ it('writes every column of every summary table of the day as worked out by hand'
         'created_at' => '2026-11-20 09:00:00', 'updated_at' => '2026-11-20 09:00:00',
     ]);
 
+    // step 4.4b: the payments and the orders paid have touched the day already (the queue is sync here), before the rows above
+    $touched = DB::table('analytics_days')->where('branch_id', $b1)->where('day', '2026-11-20')->first();
+    expect($touched?->trigger)->toBe('touch')->and((int) $touched?->version)->toBeGreaterThan(0);
+
     $this->travelTo(CarbonImmutable::parse('2026-11-21 03:00:00', 'UTC'));
     $result = app(Rebuild::class)->day($b1, '2026-11-20', 'manual');
 
@@ -176,11 +180,11 @@ it('writes every column of every summary table of the day as worked out by hand'
     $day = DB::table('analytics_days')->where('branch_id', $b1)->where('day', $D)->first();
     $counts = ['daily_sales' => 1, 'daily_hour_sales' => 2, 'daily_channel_totals' => 2, 'daily_item_metrics' => 13, 'daily_station_metrics' => 4, 'daily_user_metrics' => 5];
     expect($result->rows)->toBe($counts)
-        ->and($result->version)->toBe(1)
-        ->and($result->changed)->toBeTrue()
+        ->and($result->version)->toBe((int) $touched->version + 1)
+        ->and($result->changed)->toBeTrue('the rows written after the last touch changed the day')
         ->and($result->durationMs)->toBeGreaterThanOrEqual(0)
         ->and($result->fingerprint)->toMatch('/^[0-9a-f]{64}$/')
-        ->and((int) $day->version)->toBe(1)
+        ->and((int) $day->version)->toBe($result->version)
         ->and($day->trigger)->toBe('manual')
         ->and((bool) $day->changed)->toBeTrue()
         ->and($day->fingerprint)->toBe($result->fingerprint)

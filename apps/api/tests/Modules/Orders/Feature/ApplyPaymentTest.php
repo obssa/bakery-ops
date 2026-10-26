@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Analytics\Listeners\TouchToday;
 use App\Modules\Orders\Actions\VoidOrder;
 use App\Modules\Orders\Exceptions\OrderError;
 use App\Modules\Orders\Models\Order;
@@ -149,7 +150,8 @@ it('announces OrderPaid once, after the commit, with its inert companion on the 
         ->and(array_map(fn ($c): string => $c->name, $companions[0]->broadcastOn()))->toBe(["private-branch.{$f->branch->id}.orders"])
         ->and($companions[0]->broadcastAs())->toBe('order_paid')
         ->and($companions[0]->broadcastWhen())->toBeFalse();
-    assertNothingQueuedButStockEvaluation();
+    // step 4.4b: Analytics touches today for the payment and for the order paid (queued after the commit)
+    assertNothingQueuedButStockEvaluation([TouchToday::class, TouchToday::class]);
 })->group('module:orders', 'feature');
 
 it('writes payment.recorded on the timeline before the settlement, with the channel, the amount and whether a receipt photo came, never a key or a URL', function () {

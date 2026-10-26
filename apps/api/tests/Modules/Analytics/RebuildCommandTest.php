@@ -9,6 +9,7 @@ use App\Shared\Enums\StationCode;
 use App\Shared\Models\Station;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -124,6 +125,7 @@ it('refuses a call that does not say which days, a range the wrong way round, a 
 it('is a unique, queued job of one branch and day, tried three times, that builds its own branch whatever branch is current', function () {
     $job = new RebuildDay($this->d->branch->id, '2026-11-20', 'manual');
     expect($job)->toBeInstanceOf(ShouldQueue::class)->toBeInstanceOf(ShouldBeUnique::class)
+        ->toBeInstanceOf(ShouldBeUniqueUntilProcessing::class) // step 4.4b: the lock goes when the job starts, so a touch during a rebuild asks again
         ->and($job->uniqueFor)->toBe(120)
         ->and($job->tries)->toBe(3);
 
