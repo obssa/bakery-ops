@@ -192,6 +192,18 @@ final class PaymentError extends RuntimeException
         return new self('payments.receipt.unpaid', 409, ['status' => $status]);
     }
 
+    /** Step 4.3e: GET /payments/reconciliation reads at most payments.reconciliation_max_days local days at once. */
+    public static function reconciliationRangeTooLarge(int $maxDays): self
+    {
+        return new self('payments.reconciliation.range_too_large', 422, ['field' => 'from', 'max_days' => $maxDays]);
+    }
+
+    /** Step 4.3e: GET /payments/export writes at most payments.export_max_rows rows; $rows is how many the filters find. */
+    public static function exportTooLarge(int $maxRows, int $rows): self
+    {
+        return new self('payments.export.too_large', 422, ['max_rows' => $maxRows, 'rows' => $rows]);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

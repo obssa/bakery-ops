@@ -24,6 +24,10 @@ declare(strict_types=1);
  * kept across deploys); a signed receipt link lives link_ttl_hours unless asked otherwise, at most link_max_ttl_hours; a receipt is at most
  * max_pages pages.
  *
+ * reconciliation_max_days: the longest range GET /payments/reconciliation reads (422 payments.reconciliation.range_too_large beyond).
+ * export_max_rows: the most rows GET /payments/export writes (422 payments.export.too_large beyond), so a file stays within the shared
+ * host's memory and time.
+ *
  * Plain values only: no closures, so `config:cache` keeps working on the shared host (DeployableCachesTest).
  */
 return [
@@ -36,4 +40,6 @@ return [
         'link_max_ttl_hours' => 168,
         'max_pages' => 2,
     ],
+    'reconciliation_max_days' => 62,
+    'export_max_rows' => 20000,
 ];

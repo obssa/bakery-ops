@@ -109,7 +109,8 @@ it('writes CSV as UTF-8 with a byte-order mark, and the headers and channel name
 
 it('applies the filters of GET /payments', function () {
     ($this->payment)('cash', '100.00', '2026-10-19 08:00:00');
-    $kept = ($this->payment)('telebirr', '70.00', '2026-10-20 10:00:00', ['reference_no' => 'FT-7 77']);
+    // a factory row has no reference_norm of its own: RecordPayment writes it (ReferenceNumber), so it is given here
+    $kept = ($this->payment)('telebirr', '70.00', '2026-10-20 10:00:00', ['reference_no' => 'FT-7 77', 'reference_norm' => 'FT777']);
     ($this->payment)('telebirr', '30.00', '2026-10-21 10:00:00', ['reference_no' => 'FT888', 'status' => 'voided', 'voided_at' => now(), 'voided_by_user_id' => $this->manager->id, 'void_reason' => 'x']);
 
     $byDay = ($this->rows)(($this->export)('format=csv&from=2026-10-20&to=2026-10-20')->assertOk(), 'csv');

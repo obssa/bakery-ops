@@ -57,9 +57,15 @@ return [
         'reason_required' => 'Say why the payment is voided, in at most 255 characters.',
         'pin_required' => 'A manager must type their PIN (4 to 6 digits) to approve the void.',
     ],
-    // step 4.3e: receipts
+    // step 4.3e: receipts, the reconciliation and the export
     'receipt' => [
         'unpaid' => 'This order has no receipt: it is not paid in full. Ask for a pro-forma instead, or take the rest of the payment first.',
         'link_invalid' => 'This receipt link is not valid, or it has expired. Ask the bakery for a new one.',
+    ],
+    'reconciliation' => [
+        'range_too_large' => 'The reconciliation reads at most 62 days at once. Choose a shorter range.',
+    ],
+    'export' => [
+        'too_large' => 'Too many payments for one file. Choose fewer days, a channel or a status.',
     ],
 ];

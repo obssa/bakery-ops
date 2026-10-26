@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Payments\Http\Controllers\ChannelsController;
 use App\Modules\Payments\Http\Controllers\PaymentDecisionsController;
 use App\Modules\Payments\Http\Controllers\PaymentReadsController;
+use App\Modules\Payments\Http\Controllers\PaymentReportsController;
 use App\Modules\Payments\Http\Controllers\PaymentsController;
 use App\Modules\Payments\Http\Controllers\ReceiptsController;
 use App\Modules\Payments\Http\Controllers\ReceiptSettingsController;
@@ -43,6 +44,12 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/payments', [PaymentReadsController::class, 'index'])->name('payments.index');
         Route::get('/payments/{payment}', [PaymentReadsController::class, 'show'])->whereNumber('payment')->name('payments.show');
         Route::get('/orders/{order}/receipt.pdf', [ReceiptsController::class, 'pdf'])->whereNumber('order')->name('payments.receipt.pdf');
+    });
+
+    // step 4.3e: the payment checkers' reports (payments.verify)
+    Route::middleware('permission:payments.verify')->group(function (): void {
+        Route::get('/payments/reconciliation', [PaymentReportsController::class, 'reconciliation'])->name('payments.reconciliation');
+        Route::get('/payments/export', [PaymentReportsController::class, 'export'])->name('payments.export');
     });
 
     // step 4.3c: the admin's decisions on a payment (payments.verify), and the void a manager's PIN approves (asked with orders.void_request)
