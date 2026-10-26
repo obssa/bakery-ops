@@ -211,3 +211,49 @@ it('reports how many evaluations it queued', function () {
 
     $this->artisan('inventory:sweep-alerts')->expectsOutputToContain('1')->assertSuccessful();
 });
+
+/*
+ * Step 4.4c (a fix seen on the live host, 2026-10-26): the hourly sweep queued the evaluation of every rule and episode, also those of an
+ * item deleted since (the E2E branch retires its stale ingredients), and the job then failed three times an hour for each. A deleted item,
+ * or a place removed since, has no balance left to watch: the sweep leaves its rules and episodes out. A switched-off item is still
+ * stocked and still swept (the Ledger keeps its balances; switching it off only takes it off the menus).
+ */
+it('leaves out the rules and open episodes of a deleted item or a removed place, and still sweeps a switched-off item', function () {
+    $gone = Item::factory()->ingredient('g')->create(['branch_id' => $this->branch->id]);
+    $off = Item::factory()->ingredient('g')->create(['branch_id' => $this->branch->id, 'is_active' => false]);
+    $shelved = Item::factory()->ingredient('g')->create(['branch_id' => $this->branch->id]);
+    $shelf = stockLocation($this->branch, LocationType::Store);
+    foreach ([$gone, $off] as $item) {
+        stockIn($item, $this->store, '10');
+    }
+    stockIn($shelved, $shelf, '10');
+    ($this->rule)($gone, $this->store);
+    ($this->rule)($gone, null);
+    ($this->rule)($off, $this->store);
+    ($this->rule)($shelved, $shelf);
+    DB::table('stock_alert_states')->insert([
+        'branch_id' => $this->branch->id, 'item_id' => $gone->id, 'location_id' => $this->store->id, 'location_key' => $this->store->id, 'type' => 'out',
+        'is_active' => 1, 'active_since' => now(), 'available_at_start' => '0', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $gone->delete();
+    $shelf->delete();
+    Queue::fake();
+
+    ($this->sweep)();
+
+    expect(($this->pushed)())->toBe([($this->key)($off, $this->store)]);
+});
+
+it('evaluates a branch-wide rule through its lowest-numbered place that is still in use', function () {
+    $removed = stockLocation($this->branch, LocationType::Store);
+    $kept = stockLocation($this->branch, LocationType::Store);
+    stockIn($this->flour, $removed, '5');
+    stockIn($this->flour, $kept, '5');
+    ($this->rule)($this->flour, null);
+    $removed->delete();
+    Queue::fake();
+
+    ($this->sweep)();
+
+    expect(($this->pushed)())->toBe([($this->key)($this->flour, $kept)]);
+});
