@@ -11,6 +11,7 @@ use App\Shared\Events\PaymentRecorded;
 use App\Shared\Events\PaymentVoided;
 use App\Shared\Models\Branch;
 use Brick\Math\BigDecimal;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -235,6 +236,53 @@ it('finds the branch\'s orders by their number, on any business date', function 
 
     expect(app(Orders::class)->idsNumbered((int) $first['order_no']))->toBe([$first['id'], $older->id])
         ->and(app(Orders::class)->idsNumbered(99999))->toBe([]);
+})->group('contract:payments->orders');
+
+// Step 4.3e: a receipt prints the order (number, business date, type, table, when it was settled) and its charged lines with their modifiers
+// and money, in both languages; Payments asks Orders for that through one read, never through Orders' models. No person is named in it.
+
+it('answers what a receipt prints of an order: number, date, type, table, the charged lines with their modifiers, and the money', function () {
+    $f = $this->floor;
+    $m = $f->menu;
+    $order = $f->send([$m->line($m->sandwich, '2', [$m->extraChicken, $m->noOnion]), $m->line($m->latte, '1', [$m->large]), $m->line($m->water, '3')]);
+    $sandwich = $f->lineOf($order, $m->sandwich);
+    $f->act('reject', $f->lineOf($order, $m->latte)['id'], $f->barista, ['reason' => 'ingredient_spoiled'])->assertOk();
+
+    $view = app(Orders::class)->forReceipt($order['id']);
+
+    expect($view->orderId)->toBe($order['id'])
+        ->and($view->orderNo)->toBe($order['order_no'])
+        ->and($view->businessDate)->toBe($order['business_date'])
+        ->and($view->type)->toBe($order['type'])
+        ->and($view->tableCode)->toBe($order['table_code'])
+        ->and($view->status)->toBe(($this->status)($order['id']))
+        ->and($view->settledAt)->toBeNull()
+        ->and($view->totals->toArray())->toBe(app(Orders::class)->totals($order['id'])->toArray())
+        ->and($view->totals->total)->toBe('710.00', 'two sandwiches with extra chicken (2 x 310.00) and three waters; the rejected latte is not charged')
+        ->and(array_map(fn ($line) => $line->toArray(), $view->lines))->toBe([
+            [
+                'line_id' => $sandwich['id'], 'item_id' => $m->sandwich->id, 'name_en' => 'Chicken sandwich', 'name_am' => $m->sandwich->name_am,
+                'qty' => '2.0000', 'unit_price' => '250.00', 'modifier_price' => '60.00', 'line_total' => '620.00',
+                'modifiers' => [
+                    ['name_en' => 'Extra chicken', 'name_am' => 'ተጨማሪ ዶሮ', 'price_delta' => '60.00'],
+                    ['name_en' => 'No onion', 'name_am' => 'ያለ ሽንኩርት', 'price_delta' => '0.00'],
+                ],
+            ],
+            [
+                'line_id' => $f->lineOf($order, $m->water)['id'], 'item_id' => $m->water->id, 'name_en' => $m->water->name_en, 'name_am' => $m->water->name_am,
+                'qty' => '3.0000', 'unit_price' => '30.00', 'modifier_price' => '0.00', 'line_total' => '90.00', 'modifiers' => [],
+            ],
+        ]);
+
+    // settled and closed once paid in full; another branch's order is not found
+    ($this->serveAll)(['lines' => [$sandwich, $f->lineOf($order, $m->water)]]);
+    ($this->pay)($order['id']);
+    $paid = app(Orders::class)->forReceipt($order['id']);
+    $theirs = Order::factory()->sent(1)->create(['branch_id' => Branch::factory()->create()->id]);
+    expect($paid->status)->toBe('closed')
+        ->and($paid->settledAt?->toIso8601String())->toBe(Order::query()->findOrFail($order['id'])->settled_at?->toIso8601String())
+        ->and($paid->totals->balance)->toBe('0.00')
+        ->and(fn () => app(Orders::class)->forReceipt($theirs->id))->toThrow(ModelNotFoundException::class);
 })->group('contract:payments->orders');
 
 // ===================================================================================================================================
