@@ -20,9 +20,9 @@ beforeEach(function () {
     $this->d = Dashboards::open($this);
     $d = $this->d;
     $this->lemon = $d->product('Lemon cake', 'የሎሚ ኬክ', ['is_new_until' => '2026-11-30']);
-    $sold = fn (string $day, string $units, string $revenue, array $more = []) => $d->rows->built($day)->item($day, $this->lemon->id, [
+    $sold = fn (string $day, string $units, string $revenue, array $more = []) => $d->rows->built($day)->item($day, $this->lemon->id, $more + [
         'units_sold_qty' => $units, 'revenue' => $revenue, 'cogs_total' => '0.00', 'margin_total' => $revenue,
-    ] + $more);
+    ]);
     $sold('2026-11-03', '2.0000', '100.00');
     $sold('2026-11-05', '1.0000', '50.00');
     $sold('2026-11-10', '4.0000', '200.00');

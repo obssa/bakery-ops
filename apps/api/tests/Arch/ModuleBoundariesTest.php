@@ -215,7 +215,7 @@ arch('no module but Analytics imports Shifts, and Shared never does: the ledger 
 /*
  * Analytics (step 4.4a on) reads the other modules ONLY through provider-owned Facts ports (phase-4 plan section 2): the `Facts`
  * class and its readonly row classes (`*Fact`) in each provider's Contracts, plus Catalog\Contracts\* (names and categories) and
- * Identity\Contracts\ActorDirectory (names of users; it arrives in step 4.5a, allowed from now), Audit\Contracts\AuditedAction (the
+ * Identity\Contracts\ActorDirectory with its StationLabel view (names of people and stations, a person's stations; step 4.4c), Audit\Contracts\AuditedAction (the
  * audit row of POST /analytics/rebuild, step 4.4b), and Shared. Everything else of a
  * provider is forbidden: models, actions, support, enums, HTTP, and every other Contracts class. The lists are read from the
  * directories on disk, so a class added to a provider later is covered without touching this file. Vacuous until the module exists.
@@ -230,7 +230,7 @@ $analyticsForbidden = function () use ($providerInternals): array {
             $isFactsPort = $class === 'Facts' || str_ends_with($class, 'Fact');
             $allowed = match ($module) {
                 'Catalog' => true,
-                'Identity' => $class === 'ActorDirectory',
+                'Identity' => in_array($class, ['ActorDirectory', 'StationLabel'], true),
                 'Audit' => $class === 'AuditedAction',
                 'Notifications' => false,
                 default => $isFactsPort,
@@ -244,7 +244,7 @@ $analyticsForbidden = function () use ($providerInternals): array {
     return $forbidden;
 };
 
-arch('Analytics uses only Facts ports (and their rows), Catalog Contracts, Identity ActorDirectory, Audit AuditedAction and Shared: no model, action, support, enum or other Contracts class of a provider')
+arch('Analytics uses only Facts ports (and their rows), Catalog Contracts, Identity ActorDirectory (and its StationLabel), Audit AuditedAction and Shared: no model, action, support, enum or other Contracts class of a provider')
     ->expect('App\Modules\Analytics')
     ->not->toUse($analyticsForbidden())
     ->group('arch', 'module:analytics');

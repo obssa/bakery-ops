@@ -14,8 +14,9 @@ use Illuminate\Foundation\Http\FormRequest;
  * ?from=&to= local dates (YYYY-MM-DD, from not after to). By default the last analytics.range_default_days (30) days, today included, in the
  * branch's zone; a missing `to` is today, a missing `from` that many days before `to`. A day after today is 422 analytics.range.future
  * {today}; more than analytics.range_max_days (400) days is 422 analytics.range.too_large {max_days}; anything else 422 validation.failed.
+ * The dashboards' requests extend it (DashboardRequest: ?compare=previous, and each read's own options).
  */
-final class RangeRequest extends FormRequest
+class RangeRequest extends FormRequest
 {
     public function authorize(): bool
     {

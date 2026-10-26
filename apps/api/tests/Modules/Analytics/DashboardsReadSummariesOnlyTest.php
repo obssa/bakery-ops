@@ -102,7 +102,7 @@ beforeEach(function () {
         $this->phase = 'plumbing';
         $path = substr(str_replace('{item}', (string) $this->croissant->id, $uri), strlen('api/v1/analytics/'));
 
-        return $this->d->get($path, $query, $as, $headers)->assertSuccessful();
+        return $this->d->get($path, $query, $as, $headers);
     };
 });
 
@@ -119,7 +119,7 @@ it('reads only the summaries, the names behind the contracts and the framework\'
     $ran = 0;
     foreach (($this->reads)() as $uri => $calls) {
         foreach ($calls as [$query, $as]) {
-            $tag = (string) ($this->read)($uri, $query, $as)->headers->get('ETag');
+            $tag = (string) ($this->read)($uri, $query, $as)->assertOk()->headers->get('ETag');
             ($this->read)($uri, $query, $as, ['If-None-Match' => $tag])->assertStatus(304);
             $ran += 2;
         }

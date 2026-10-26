@@ -17,7 +17,8 @@ use Brick\Math\BigDecimal;
  * not the role they hold:
  *   waiter   the orders they own settled that day (orders, items of their lines, revenue) and the voids they asked for that day;
  *   cashier  the payments they took that day and the refunds they paid back (a refund over several payments is one refund);
- *   station  the station lines they readied that day, and the mean prep time of those accepted first.
+ *   station  the station lines they readied that day, and the mean prep time of those accepted first (with, step 4.4c, the number
+ *            of those samples and their seconds added, for an exact mean over a range).
  * A person with nothing in a kind has no row of that kind; rows ascend by (user, role kind). Pure.
  */
 final class UserBuilder
@@ -106,6 +107,8 @@ final class UserBuilder
                     'refunds_count' => count($c['refunds']),
                     'lines_prepared' => $c['prepared'],
                     'avg_prep_seconds' => Figures::mean($c['prep']),
+                    'prep_samples' => count($c['prep']),
+                    'prep_seconds_sum' => array_sum($c['prep']),
                 ];
             }
         }

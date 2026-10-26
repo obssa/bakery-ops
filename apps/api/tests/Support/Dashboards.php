@@ -75,13 +75,13 @@ final class Dashboards
     /** @param  array<string, mixed>  $attributes */
     public function product(string $nameEn, string $nameAm, array $attributes = []): Item
     {
-        return Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $this->branch->id, 'name_en' => $nameEn, 'name_am' => $nameAm] + $attributes);
+        return Item::factory()->product(Fulfilment::ToStock)->create($attributes + ['branch_id' => $this->branch->id, 'name_en' => $nameEn, 'name_am' => $nameAm]);
     }
 
     /** @param  array<string, mixed>  $attributes */
     public function ingredient(string $nameEn, string $nameAm, array $attributes = []): Item
     {
-        return Item::factory()->ingredient('kg')->create(['branch_id' => $this->branch->id, 'name_en' => $nameEn, 'name_am' => $nameAm] + $attributes);
+        return Item::factory()->ingredient('kg')->create($attributes + ['branch_id' => $this->branch->id, 'name_en' => $nameEn, 'name_am' => $nameAm]);
     }
 
     public function category(string $nameEn, string $nameAm): Category
