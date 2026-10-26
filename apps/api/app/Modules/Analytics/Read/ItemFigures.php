@@ -45,6 +45,19 @@ final class ItemFigures
     }
 
     /**
+     * The rows sorted by a figure, largest first, then by item id, cut at $limit (all of them without one).
+     *
+     * @param  array<int, stdClass>  $rows
+     * @return array<int, stdClass>
+     */
+    public static function ranked(array $rows, string $column, ?int $limit = null): array
+    {
+        uksort($rows, static fn (int $a, int $b): int => Sum::compare(Sum::qty($rows[$b]->{$column}), Sum::qty($rows[$a]->{$column})) ?: $a <=> $b);
+
+        return $limit === null ? $rows : array_slice($rows, 0, $limit, true);
+    }
+
+    /**
      * The sums of some daily_item_metrics rows, as Summaries::items gives them for a period.
      *
      * @param  iterable<stdClass>  $rows

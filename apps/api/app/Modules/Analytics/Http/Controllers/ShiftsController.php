@@ -7,10 +7,9 @@ namespace App\Modules\Analytics\Http\Controllers;
 use App\Modules\Analytics\Http\Requests\DashboardRequest;
 use App\Modules\Analytics\Read\BuiltDays;
 use App\Modules\Analytics\Read\Dashboard;
-use App\Modules\Analytics\Read\Sum;
+use App\Modules\Analytics\Read\ShiftDays;
 use App\Modules\Analytics\Read\Summaries;
 use App\Shared\Tenancy\CurrentBranch;
-use Brick\Math\BigDecimal;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -31,28 +30,7 @@ final class ShiftsController
             $rows = $summaries->shiftDays($window);
             $data = [];
             foreach ($window->periods() as $p => $period) {
-                $days = [];
-                $lines = 0;
-                $cash = BigDecimal::zero();
-                foreach ($period->days() as $day) {
-                    if (! $built->has($day)) {
-                        $days[] = ['day' => $day, 'built' => false, 'shifts_count' => null, 'shifts_locked_count' => null, 'variance_line_count' => null, 'cash_variance_total' => null];
-
-                        continue;
-                    }
-                    $row = $rows[$day] ?? null;
-                    $lines += Sum::int($row?->variance_line_count);
-                    $cash = $cash->plus(Sum::money($row?->cash_variance_total));
-                    $days[] = [
-                        'day' => $day,
-                        'built' => true,
-                        'shifts_count' => Sum::int($row?->shifts_count),
-                        'shifts_locked_count' => Sum::int($row?->shifts_locked_count),
-                        'variance_line_count' => Sum::int($row?->variance_line_count),
-                        'cash_variance_total' => Sum::money($row?->cash_variance_total),
-                    ];
-                }
-                $data[$p] = ['days' => $days, 'totals' => ['variance_line_count' => $lines, 'cash_variance_total' => Sum::money($cash)]];
+                $data[$p] = ShiftDays::of($period, $built, $rows);
             }
 
             return $data;
