@@ -507,8 +507,8 @@ export function useDayLabel(): (day: string, withYear?: boolean) => string {
 
 export const TH = "py-2 pr-4 font-medium";
 export const TH_NUM = "py-2 pr-4 text-right font-medium";
-export const TD = "py-3 pr-4 align-top";
-export const TD_NUM = "py-3 pr-4 text-right align-top tabular-nums";
+export const TD = "py-3 pr-4 align-middle";
+export const TD_NUM = "whitespace-nowrap py-3 pr-4 text-right align-middle tabular-nums";
 
 /** A bordered table that scrolls sideways on a narrow screen. */
 export function TableFrame({ children }: { children: ReactNode }) {

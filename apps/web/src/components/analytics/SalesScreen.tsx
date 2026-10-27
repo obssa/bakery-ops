@@ -6,6 +6,7 @@ import { useHourly, useSales, type SeriesGroup } from "@/lib/api/analytics";
 import { Bars } from "../charts/Bars";
 import { Line } from "../charts/Line";
 import { PageHeader } from "../ui";
+import { focusRing } from "../styles";
 import { Choices, ExportBar, FreshnessBar, pageQuery, RangeControl, ReadError, Section, SkeletonRows, TableFrame, TD, TD_NUM, TH, TH_NUM, useAnalyticsPage, useFigures, useFreshness } from "./shared";
 
 // Admin > Analytics > Sales (step 4.5e; analytics.view): revenue and orders by day, by Monday-to-Sunday week (local) or by month
@@ -124,29 +125,32 @@ function Hours() {
         <div className="space-y-6">
           <p className="text-sm text-neutral-600">{t("sales.hourly_note")}</p>
           <Bars label={t("sales.hourly_label", { range: spanLabel(range, locale) })} points={hours.map((hour) => ({ key: String(hour.hour), label: hourLabel(hour.hour), value: hour.revenue }))} format={f.amount} />
-          <TableFrame>
-            <table className="w-full border-collapse text-left text-base">
-              <caption className="sr-only">{t("sales.hourly")}</caption>
-              <thead>
-                <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-                  <th scope="col" className={TH}>{t("col.hour")}</th>
-                  <th scope="col" className={TH_NUM}>{t("col.orders")}</th>
-                  <th scope="col" className={TH_NUM}>{t("col.items")}</th>
-                  <th scope="col" className={TH_NUM}>{t("col.revenue")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hours.map((hour) => (
-                  <tr key={hour.hour} className="border-b border-neutral-100">
-                    <th scope="row" className={`${TD} font-medium tabular-nums`}>{hourLabel(hour.hour)}</th>
-                    <td className={TD_NUM}>{f.count(hour.orders_count)}</td>
-                    <td className={TD_NUM}>{f.qty(hour.items_qty)}</td>
-                    <td className={TD_NUM}>{f.amount(hour.revenue)}</td>
+          <details>
+            <summary className={`inline-flex min-h-12 cursor-pointer items-center rounded-md px-2 text-base font-medium text-blue-800 hover:bg-blue-50 ${focusRing}`}>{t("sales.hourly_table")}</summary>
+            <TableFrame>
+              <table className="w-full border-collapse text-left text-base">
+                <caption className="sr-only">{t("sales.hourly")}</caption>
+                <thead>
+                  <tr className="border-b border-neutral-200 text-sm text-neutral-600">
+                    <th scope="col" className={TH}>{t("col.hour")}</th>
+                    <th scope="col" className={TH_NUM}>{t("col.orders")}</th>
+                    <th scope="col" className={TH_NUM}>{t("col.items")}</th>
+                    <th scope="col" className={TH_NUM}>{t("col.revenue")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableFrame>
+                </thead>
+                <tbody>
+                  {hours.map((hour) => (
+                    <tr key={hour.hour} className="border-b border-neutral-100">
+                      <th scope="row" className={`${TD} font-medium tabular-nums`}>{hourLabel(hour.hour)}</th>
+                      <td className={TD_NUM}>{f.count(hour.orders_count)}</td>
+                      <td className={TD_NUM}>{f.qty(hour.items_qty)}</td>
+                      <td className={TD_NUM}>{f.amount(hour.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableFrame>
+          </details>
         </div>
       )}
     </Section>

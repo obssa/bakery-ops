@@ -50,8 +50,9 @@ function Vertical({ label, points, values, height, format, extent }: { label: st
   const slot = points.length > 0 ? width / points.length : 0;
   const first = points[0];
   const last = points[points.length - 1];
+  // a few points (the weeks since a launch) keep bars of a readable width instead of one bar across the page
   return (
-    <div>
+    <div style={{ maxWidth: Math.max(points.length * 72, 240) }}>
       <p aria-hidden="true" className="text-sm tabular-nums text-neutral-500">
         {format(extent.max)}
       </p>

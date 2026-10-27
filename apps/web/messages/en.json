@@ -1808,7 +1808,7 @@
     "removed_name": "{name} (removed)",
     "money": "{amount} ETB",
     "pct": "{value} %",
-    "prep": "{minutes} min {seconds} s",
+    "prep": "{minutes, plural, =0 {} other {# min }}{seconds} s",
     "week_of": "Week of {date}",
     "built_of": "{built} of {days}",
     "chart": {
@@ -1971,7 +1971,8 @@
       "chart_label": "Revenue over {range}, as a line",
       "hourly": "Sales by hour of the day",
       "hourly_note": "Each hour is summed over every built day of the range, in Addis Ababa time.",
-      "hourly_label": "Revenue by hour over {range}, as bars"
+      "hourly_label": "Revenue by hour over {range}, as bars",
+      "hourly_table": "Show the figures by hour"
     },
     "channels": {
       "title": "Payment methods",
@@ -2022,7 +2023,7 @@
       "kind_product": "Product",
       "kind_ingredient": "Ingredient",
       "category": "Category: {category}",
-      "unit": "Counted in {unit}",
+      "unit": "Unit: {unit}",
       "totals": "Totals over the range",
       "margin_pct": "Margin {pct}",
       "by_day": "Day by day",

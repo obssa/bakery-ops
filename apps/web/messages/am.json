@@ -1808,7 +1808,7 @@
     "removed_name": "{name} (የተወገደ)",
     "money": "{amount} ብር",
     "pct": "{value} %",
-    "prep": "{minutes} ደቂቃ {seconds} ሰከንድ",
+    "prep": "{minutes, plural, =0 {} other {# ደቂቃ }}{seconds} ሰከንድ",
     "week_of": "የ{date} ሳምንት",
     "built_of": "{built} ከ{days}",
     "chart": {
@@ -1971,7 +1971,8 @@
       "chart_label": "ገቢ በ{range}፣ በመስመር",
       "hourly": "ሽያጭ በቀኑ ሰዓት",
       "hourly_note": "እያንዳንዱ ሰዓት በክልሉ የተሰሉ ቀናት ሁሉ ላይ ተደምሯል፣ በአዲስ አበባ ሰዓት።",
-      "hourly_label": "ገቢ በሰዓት በ{range}፣ በአምዶች"
+      "hourly_label": "ገቢ በሰዓት በ{range}፣ በአምዶች",
+      "hourly_table": "አሃዞቹን በሰዓት አሳይ"
     },
     "channels": {
       "title": "የክፍያ መንገዶች",
@@ -2022,7 +2023,7 @@
       "kind_product": "ምርት",
       "kind_ingredient": "ግብዓት",
       "category": "ምድብ፦ {category}",
-      "unit": "የሚቆጠረው በ{unit}",
+      "unit": "መለኪያ፦ {unit}",
       "totals": "በክልሉ ያሉ ድምሮች",
       "margin_pct": "ትርፍ {pct}",
       "by_day": "ቀን በቀን",
