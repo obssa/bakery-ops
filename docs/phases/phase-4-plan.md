@@ -1276,7 +1276,7 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
        there (the header shows the 50.00 in cash it holds beyond its cost) and that payment voided too, nothing owed or held. `pay-refund` and
        `dashboards-audit` stay stubs. No test turns a shift rule off.
      - **Local run notes**: against a second local API container (eight CLI-server workers, opcache without timestamp checks, a sync queue, port
-       8001; not a repo change): `pay-timeline-logic` with the project's other pure specs 43 passed; the two flows of `pay-timeline` passed, the first
+       8001; not a repo change): `pay-timeline-logic` with the project's other pure specs 42 passed; the two flows of `pay-timeline` passed, the first
        in 2.2 min once the API was warm (its first, cold run reached its last check when the 240 s ran out: the first receipt PDF took 29 s there) and
        the void flow in 1.2 min. The whole project runs in CI.
      - STATUS: phase 4's `web` step stays `in_progress` (the refund UI waits for 4.3d).
