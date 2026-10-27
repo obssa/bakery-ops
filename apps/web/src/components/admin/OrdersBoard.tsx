@@ -11,9 +11,11 @@ import { useOrderNo } from "@/lib/orderNo";
 import { BOARD_STATUSES, boardOf, createBoardFeed, isPayable, isSettled, type BoardFilters } from "@/lib/live/orders";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useSession } from "@/lib/session";
+import { kindLabelKey } from "@/lib/orderRecord";
 import { useNow } from "@/lib/useNow";
 import { useTables } from "../pad/TablesPanel";
 import { HistoryLink } from "../audit/HistoryLink";
+import { RecordLink } from "./RecordLink";
 import { VoidDialog } from "../till/VoidDialog";
 import { Alert, Badge, Button, Field, PageHeader, Select } from "../ui";
 import { focusRing } from "../styles";
@@ -21,7 +23,8 @@ import { focusRing } from "../styles";
 // The admin Orders live board (/admin/orders): every active order of the branch through a LiveFeed over GET /orders,
 // grouped by status, with each order's lines, stations, owner, table and age. A click opens its timeline (GET
 // /orders/{order}: the events, oldest first). Read-only in Phase 1 except Void, which asks for a manager's PIN like the
-// till does. Filters narrow the board by table and by status.
+// till does. Filters narrow the board by table and by status. Step 4.5d: the timeline's words come from the order record's list of kinds
+// (lib/orderRecord.ts, the payment events included), and the panel links to the order's full record for the people who may open it.
 
 const LINE_TONE: Record<LineStatus, "neutral" | "blue" | "green" | "amber" | "red"> = {
   queued: "neutral",
@@ -31,27 +34,6 @@ const LINE_TONE: Record<LineStatus, "neutral" | "blue" | "green" | "amber" | "re
   rejected: "red",
   voided: "neutral",
 };
-
-const EVENT_KEYS = new Set([
-  "order.created",
-  "order.lines_replaced",
-  "order.sent",
-  "order.send_refused",
-  "line.queued",
-  "line.accepted",
-  "line.ready",
-  "line.rejected",
-  "line.served",
-  "line.voided",
-  "order.in_progress",
-  "order.ready",
-  "order.served",
-  "order.settled",
-  "order.paid",
-  "order.closed",
-  "order.cancelled",
-  "order.voided",
-]);
 
 function LineRow({ line }: { line: Line }) {
   const t = useTranslations("adminOrders");
@@ -132,7 +114,8 @@ function Timeline({ order, onClose, onVoid }: { order: Order; onClose: () => voi
           <ol className="space-y-2 border-l-2 border-neutral-200 pl-4">
             {detail.data.events.map((event) => {
               const line = event.order_line_id !== null ? lines.get(event.order_line_id) : undefined;
-              const label = EVENT_KEYS.has(event.event) ? t(`ev_${event.event.replace(".", "_")}` as "ev_order_sent") : event.event;
+              const key = kindLabelKey(event.event);
+              const label = key ? t(key as "ev_order_sent") : event.event;
               const at = new Date(event.at);
               return (
                 <li key={event.id} className="text-base text-neutral-900">
@@ -153,6 +136,7 @@ function Timeline({ order, onClose, onVoid }: { order: Order; onClose: () => voi
             {t("void")}
           </Button>
         ) : null}
+        <RecordLink orderId={order.id} label={t("open_record")} />
         <HistoryLink kind="order" id={order.id} />
       </div>
     </section>

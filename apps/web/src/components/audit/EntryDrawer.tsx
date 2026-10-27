@@ -5,9 +5,10 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useAuditEntry } from "@/lib/api/audit";
 import { useRosterPeople } from "@/lib/api/adminShifts";
 import type { AuditDetail } from "@/lib/api/types";
-import { diffOf, foldOpen, personFieldId, valuesOf, type DiffRow, type DiffStatus, type Shown, type TextPart, type ValueRow } from "@/lib/audit";
+import { diffOf, foldOpen, personFieldId, subjectKindOf, valuesOf, type DiffRow, type DiffStatus, type Shown, type TextPart, type ValueRow } from "@/lib/audit";
 import { useErrorText } from "@/lib/errors";
 import { useDateFormat } from "@/lib/useDates";
+import { RecordLink } from "../admin/RecordLink";
 import { addisStamp } from "../payments/shared";
 import { Alert, Badge, Button, Drawer } from "../ui";
 import { SubjectCell } from "./SubjectCell";
@@ -96,6 +97,11 @@ function EntryBody({ entry }: { entry: AuditDetail }) {
         </Fact>
         <Fact term={t("entry.subject")}>
           <SubjectCell entry={entry} />
+          {subjectKindOf(entry.subject_type) === "order" && entry.subject_id !== null ? (
+            <span className="block">
+              <RecordLink orderId={entry.subject_id} label={t("entry.open_record")} inline />
+            </span>
+          ) : null}
         </Fact>
         <Fact term={t("entry.station")}>{entry.station_id !== null ? names.station(entry.station_id) : "—"}</Fact>
         <Fact term={t("entry.shift")}>{entry.shift_id !== null ? t("shift_no", { id: entry.shift_id }) : "—"}</Fact>

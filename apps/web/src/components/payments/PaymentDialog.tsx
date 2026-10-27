@@ -10,6 +10,7 @@ import { canDispute, canVerify, reasonIssue, REASON_MAX } from "@/lib/adminPayme
 import { useErrorText } from "@/lib/errors";
 import { keepsKey } from "@/lib/paySheet";
 import { useDateFormat } from "@/lib/useDates";
+import { RecordLink } from "../admin/RecordLink";
 import { HistoryLink } from "../audit/HistoryLink";
 import { Alert, Button, Field, Modal, Textarea, TextInput } from "../ui";
 import { PhotoThumb, PhotoViewer } from "./PhotoViewer";
@@ -146,8 +147,9 @@ function Details({ payment, canDecide, onPhoto, onChanged }: { payment: PaymentD
           ) : (
             <p className="text-base text-neutral-700">{t("detail.photo_none")}</p>
           )}
-          <div className="pt-2">
+          <div className="flex flex-col items-start gap-2 pt-2">
             <HistoryLink kind="payment" id={payment.id} />
+            {order ? <RecordLink orderId={order.id} label={t("detail.open_record")} /> : null}
           </div>
         </div>
       </div>

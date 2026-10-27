@@ -10,11 +10,12 @@ import { compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { isSettled, UNPAID_STATUSES } from "@/lib/live/orders";
 import { useOrderNo } from "@/lib/orderNo";
+import { keepsKey } from "@/lib/paySheet";
 import { Alert, Button, Field, Modal, TextInput } from "../ui";
 
 // Voiding at the till: a reason, and the PIN of a manager or admin (their short code) typed on this screen. The API checks the PIN and
 // answers with its own bilingual message when it is refused (403) or locked (423); the dialog shows that message and keeps the reason.
-// Used by the till queue and by the admin Orders board.
+// Used by the till queue, the admin Orders board and the order record (step 4.5d, which opens it on one payment: `payment`).
 //
 // - An order with no payment is voided as a whole (POST /orders/{order}/void, Phase 1): the stock held for it is released.
 // - An order with payments that is not closed (step 4.5b, the void of step 4.3c): one payment is voided (POST /payments/{payment}/void),
@@ -48,7 +49,18 @@ function RefundPlaceholder({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function VoidDialog({ order, onClose, onVoided }: { order: Order; onClose: () => void; onVoided: () => void }) {
+export function VoidDialog({
+  order,
+  payment,
+  onClose,
+  onVoided,
+}: {
+  order: Order;
+  /** the payment to void, chosen already (the order record's "Void payment" of one payment); the others stay offered */
+  payment?: number;
+  onClose: () => void;
+  onVoided: () => void;
+}) {
   const t = useTranslations("till");
   const locale = useLocale() as Locale;
   const no = useOrderNo(order);
@@ -60,12 +72,12 @@ export function VoidDialog({ order, onClose, onVoided }: { order: Order; onClose
   const payments = useOrderPayments(hasPayments && !closed ? order.id : null);
   const voidable = (payments.data?.data ?? []).filter((p) => p.status !== "voided" && compareDecimal(p.refunded_amount, "0", 2) === 0);
 
-  const [target, setTarget] = useState<Target | null>(hasPayments ? null : "order");
+  const [target, setTarget] = useState<Target | null>(payment ?? (hasPayments ? null : "order"));
   const [reason, setReason] = useState("");
   const [pin, setPin] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  // one key per attempt: a retry of the same request (a double tap) is the same write
+  // one key per request: a retry of the same request (a double tap, a lost answer) is the same write
   const [attempt, setAttempt] = useState(() => uuid());
 
   const title = hasPayments && !wholeAllowed ? t("void_payment_title", { no }) : t("void_title", { no });
@@ -85,7 +97,9 @@ export function VoidDialog({ order, onClose, onVoided }: { order: Order; onClose
     } catch (failure) {
       setError(failure);
       setPin("");
-      setAttempt(uuid());
+      // a refusal (a wrong PIN, a void the order no longer allows) wrote nothing: the next try is a new request with a new key. When the
+      // outcome is unknown (no answer, a 5xx) the key is kept, so a void that did go through is answered again, not refused (4.5b's rule)
+      if (!keepsKey(failure)) setAttempt(uuid());
       setPending(false);
     }
   }

@@ -63,7 +63,7 @@ test.describe("p4 order record", () => {
       const panel = page.getByRole("region", { name: `Order ${label} timeline` });
       await panel.getByRole("link", { name: "Open the full record" }).click();
       await expect(page).toHaveURL(new RegExp(`/admin/orders/record/?\\?id=${sent.id}$`));
-      await expect(page.getByRole("heading", { level: 1, name: `Order ${label}` })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("heading", { level: 1, name: `Order ${label}`, exact: true })).toBeVisible({ timeout: 30_000 });
 
       // the header's money, as the API wrote it
       const facts = page.getByRole("region", { name: "Order details" });
@@ -90,21 +90,21 @@ test.describe("p4 order record", () => {
 
       // the payments: channel, amount, the reference's tail only, who took it, the photo
       const payments = page.getByRole("region", { name: "Payments" });
-      const walletCard = payments.getByRole("article", { name: `Payment ${walletPayment.id}` });
+      const walletCard = payments.getByRole("article", { name: `Payment ${walletPayment.id}`, exact: true });
       await expect(walletCard).toContainText(wallet.name_en);
       await expect(walletCard).toContainText("180.00 ETB");
       await expect(walletCard).toContainText(`…${reference.slice(-4)}`);
       await expect(walletCard).not.toContainText(reference);
       await expect(walletCard).toContainText(fixture.cashier.name);
       await expect(walletCard).toContainText("Recorded");
-      await expect(walletCard.getByRole("link", { name: `Open payment ${walletPayment.id}` })).toHaveAttribute("href", new RegExp(`/admin/payments/?\\?payment=${walletPayment.id}$`));
-      const cashCard = payments.getByRole("article", { name: `Payment ${cashPayment.id}` });
+      await expect(walletCard.getByRole("link", { name: `Open payment ${walletPayment.id}`, exact: true })).toHaveAttribute("href", new RegExp(`/admin/payments/?\\?payment=${walletPayment.id}$`));
+      const cashCard = payments.getByRole("article", { name: `Payment ${cashPayment.id}`, exact: true });
       await expect(cashCard).toContainText("No photo");
-      await expect(cashCard.getByRole("link", { name: `Audit history of payment ${cashPayment.id}` })).toBeVisible();
+      await expect(cashCard.getByRole("link", { name: `Audit history of payment ${cashPayment.id}`, exact: true })).toBeVisible();
 
       // the photo: the viewer asks for a fresh signed address, and the picture loads
       const signed = page.waitForResponse((r) => r.url().includes(`/api/v1/files/${photo.id}/url`) && r.request().method() === "GET");
-      await walletCard.getByRole("button", { name: `Receipt photo of payment ${walletPayment.id}` }).click();
+      await walletCard.getByRole("button", { name: `Receipt photo of payment ${walletPayment.id}`, exact: true }).click();
       expect((await signed).status()).toBe(200);
       const viewer = page.getByRole("dialog", { name: `Receipt photo of payment ${walletPayment.id}` });
       const picture = viewer.getByRole("img", { name: `Receipt photo of payment ${walletPayment.id}` });
@@ -154,9 +154,9 @@ test.describe("p4 order record", () => {
       ]);
 
       await openAs(page, fixture.admin, `en/admin/orders/record/?id=${sent.id}`);
-      await expect(page.getByRole("heading", { level: 1, name: `Order ${label}` })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("heading", { level: 1, name: `Order ${label}`, exact: true })).toBeVisible({ timeout: 30_000 });
       const payments = page.getByRole("region", { name: "Payments" });
-      const card = payments.getByRole("article", { name: `Payment ${transfer.id}` });
+      const card = payments.getByRole("article", { name: `Payment ${transfer.id}`, exact: true });
       await expect(card).toContainText("70.00 ETB", { timeout: 30_000 });
 
       const keys: string[] = [];
@@ -164,7 +164,7 @@ test.describe("p4 order record", () => {
         if (request.method() === "POST" && request.url().includes(`/api/v1/payments/${transfer.id}/void`)) keys.push(request.headers()["idempotency-key"] ?? "");
       };
       page.on("request", onRequest);
-      await card.getByRole("button", { name: `Void payment ${transfer.id}` }).click();
+      await card.getByRole("button", { name: `Void payment ${transfer.id}`, exact: true }).click();
       const dialog = page.getByRole("dialog", { name: `Void a payment of order ${label}` });
       await expect(dialog.getByRole("radio", { name: new RegExp(`${bank.name_en} 70\\.00 ETB`) })).toBeChecked({ timeout: 15_000 });
       const reason = `E2E record ${run}: the transfer was for another order`;
@@ -192,7 +192,7 @@ test.describe("p4 order record", () => {
       await expect(voided).toContainText(reason);
       await expect(voided).toContainText(bank.name_en);
       await expect(card).toContainText("Voided");
-      await expect(card.getByRole("button", { name: `Void payment ${transfer.id}` })).toHaveCount(0);
+      await expect(card.getByRole("button", { name: `Void payment ${transfer.id}`, exact: true })).toHaveCount(0);
       await expect(page.getByRole("region", { name: "Order details" }).getByRole("status", { name: "Balance" })).toContainText("70.00 ETB");
       const after = await fixture.admin.get<{ data: { id: number; status: string }[]; balance: string }>(`/orders/${sent.id}/payments`);
       expect(after.balance).toBe("70.00");
