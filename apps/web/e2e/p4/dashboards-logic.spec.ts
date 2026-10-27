@@ -21,22 +21,30 @@ import {
   queryTouches,
   rangeFromParams,
   rangeIssue,
+  rangeLabel,
   rangeParams,
   rebuildPlan,
   seriesKeyOf,
   seriesLabel,
+  spanLabel,
   spanOf,
   weekStart,
   type FreshnessDay,
 } from "../../src/lib/analytics";
 import { barsLayout, extentOf, lineSegments, pathOf } from "../../src/lib/charts";
+import { DATE_DISPLAYS, displayStorageKey, isoDayText, monthNames, readDisplay, stampText, writeDisplay, type DateDisplay, type DateFormat } from "../../src/lib/dates";
 import { resolveDeepLink } from "../../src/lib/deeplink";
+import { ethiopianMonthDays, fromEthiopian, isEthiopianLeapYear, toEthiopian } from "../../src/lib/ethiopianDate";
+import amMessages from "../../messages/am.json";
+import enMessages from "../../messages/en.json";
 
 // Phase 4 gate project p4-dashboards (docs/phases/phase-4-plan.md section 7), step 4.5e: the analytics screens' rules as plain logic (no
 // browser, no API). The range maths in the branch's local dates (the presets, the previous period, Monday weeks, the API's 400-day and
 // "not after today" checks, the address), the freshness feed's version changes and the queries they invalidate, the Rebuild button's
 // requests, the change from the previous period on decimal strings, the payments-list drills, and the charts' scaling: decimal strings
-// become numbers only for pixel positions, never for a figure that is shown. The Ethiopian date labels are step 4.5f's.
+// become numbers only for pixel positions, never for a figure that is shown. Step 4.5f adds the Ethiopian calendar: the converter (the twin of
+// the API's Shared\Time\EthiopianDate, its unit table ported here), the labels in that calendar or in both, the timestamps and shift dates
+// through the same formatter, and the per-person display preference kept in the browser.
 
 const params = (query: Record<string, string>) => new URLSearchParams(query);
 const TODAY = "2026-10-27"; // a Tuesday
@@ -298,7 +306,151 @@ test.describe("dashboards-logic", () => {
     expect(lineSegments([], { width: 400, height: 100 })).toEqual([]);
   });
 
-  test.fixme("Ethiopian date labels on the dashboards (step 4.5f)", async () => {
-    // TODO(p4): 4.5f: dayLabel and seriesLabel in lib/analytics.ts switch to the Ethiopian calendar when the person asks for it.
+  // --- the Ethiopian calendar (step 4.5f): labels only, nothing stored changes ------------------------------------------------------------
+
+  // The unit table of apps/api/tests/Unit/Shared/EthiopianDateTest.php (Shared\Time\EthiopianDate, which prints the receipt's date), ported
+  // case for case so the web's converter is its twin, and the cases this step adds: the days around 1 January and the leap year 2019 E.C.
+  const TWIN_TABLE: [string, number, number, number][] = [
+    ["2023-09-12", 2016, 1, 1], // new year 2016, the year after a leap year: 12 September
+    ["2023-09-11", 2015, 13, 6], // Pagume 6 of 2015 (a leap year: 2015 + 1 is divisible by 4)
+    ["2024-09-10", 2016, 13, 5], // Pagume 5 of 2016, its last day
+    ["2024-09-11", 2017, 1, 1], // new year 2017: 11 September
+    ["2024-01-07", 2016, 4, 28], // Christmas 2016 on Tahsas 28
+    ["2025-01-07", 2017, 4, 29], // Christmas 2017 on Tahsas 29
+    ["2025-09-11", 2018, 1, 1], // new year 2018
+    ["2026-10-26", 2019, 2, 16], // a day in Tikimt 2019
+    ["2026-09-05", 2018, 12, 30], // the last day of Nehase 2018
+    ["2026-09-06", 2018, 13, 1], // Pagume 1 of 2018
+    ["2024-02-29", 2016, 6, 21], // a Gregorian leap day
+  ];
+  const AROUND_JANUARY: [string, number, number, number][] = [
+    ["2025-12-31", 2018, 4, 22],
+    ["2026-01-01", 2018, 4, 23],
+    ["2026-12-31", 2019, 4, 22],
+    ["2027-01-01", 2019, 4, 23],
+  ];
+  const LEAP_2019: [string, number, number, number][] = [
+    ["2027-09-10", 2019, 13, 5],
+    ["2027-09-11", 2019, 13, 6], // 2019 E.C. is a leap year: Pagume 6, and the new year moves to 12 September
+    ["2027-09-12", 2020, 1, 1],
+    ["2028-09-11", 2021, 1, 1], // and back to the 11th the year after
+  ];
+  const PHP_MONTHS_EN = ["Meskerem", "Tikimt", "Hidar", "Tahsas", "Tir", "Yekatit", "Megabit", "Miyazya", "Ginbot", "Sene", "Hamle", "Nehase", "Pagume"];
+  const PHP_MONTHS_AM = ["መስከረም", "ጥቅምት", "ኅዳር", "ታኅሣሥ", "ጥር", "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ", "ሐምሌ", "ነሐሴ", "ጳጉሜ"];
+  const months = { en: monthNames(enMessages.dates.ethiopian_months), am: monthNames(amMessages.dates.ethiopian_months) };
+  const as = (locale: "en" | "am", display: DateDisplay): DateFormat => ({ locale, display, months: months[locale] });
+
+  test("the Ethiopian converter is the twin of the API's: its unit table, the days around 1 January, the leap year 2019, both ways", () => {
+    for (const [gregorian, year, month, dayOf] of [...TWIN_TABLE, ...AROUND_JANUARY, ...LEAP_2019]) {
+      expect(toEthiopian(gregorian), gregorian).toEqual({ year, month, day: dayOf });
+      expect(fromEthiopian({ year, month, day: dayOf }), `${year}-${month}-${dayOf}`).toBe(gregorian);
+    }
+    // the month names are the API's, in both languages (messages/*.json)
+    expect(months.en).toEqual(PHP_MONTHS_EN);
+    expect(months.am).toEqual(PHP_MONTHS_AM);
+  });
+
+  test("the leap rule: Pagume has 6 days in a year whose number plus one is divisible by 4; every day from 1900 to 2100 goes there and back", () => {
+    expect([2011, 2015, 2019, 2023].map(isEthiopianLeapYear)).toEqual([true, true, true, true]);
+    expect([2016, 2017, 2018, 2020].map(isEthiopianLeapYear)).toEqual([false, false, false, false]);
+    expect(ethiopianMonthDays(2019, 13)).toBe(6);
+    expect(ethiopianMonthDays(2018, 13)).toBe(5);
+    expect(ethiopianMonthDays(2018, 1)).toBe(30);
+    expect(ethiopianMonthDays(2018, 12)).toBe(30);
+    // a day the calendar does not have is refused, never rolled over into the next month
+    expect(fromEthiopian({ year: 2018, month: 13, day: 6 })).toBeNull();
+    expect(fromEthiopian({ year: 2019, month: 13, day: 7 })).toBeNull();
+    expect(fromEthiopian({ year: 2019, month: 2, day: 31 })).toBeNull();
+    expect(fromEthiopian({ year: 2019, month: 14, day: 1 })).toBeNull();
+    expect(fromEthiopian({ year: 2019, month: 0, day: 1 })).toBeNull();
+    let days = 0;
+    for (let date = "1900-01-01"; date <= "2100-12-31"; date = addDays(date, 1)) {
+      const ethiopian = toEthiopian(date);
+      if (ethiopian.day < 1 || ethiopian.day > ethiopianMonthDays(ethiopian.year, ethiopian.month)) throw new Error(`${date} is ${JSON.stringify(ethiopian)}`);
+      if (fromEthiopian(ethiopian) !== date) throw new Error(`${date} came back as ${fromEthiopian(ethiopian)}`);
+      days++;
+    }
+    expect(days).toBe(73_414);
+  });
+
+  test("the dashboards' labels in the Ethiopian calendar, or in both; a bare locale and the addresses stay Gregorian", () => {
+    // a bare locale is the Gregorian calendar, as before this step
+    expect(dayLabel(TODAY, "en")).toBe(dayLabel(TODAY, as("en", "gregorian")));
+    expect(seriesLabel(TODAY, "day", as("en", "gregorian"))).toBe("Tue 27 Oct");
+
+    expect(dayLabel(TODAY, as("en", "ethiopian"))).toBe("Tikimt 17");
+    expect(dayLabel(TODAY, as("en", "ethiopian"), true)).toBe("Tikimt 17, 2019");
+    expect(dayLabel(TODAY, as("am", "ethiopian"))).toBe("ጥቅምት 17");
+    expect(dayLabel(TODAY, as("am", "ethiopian"), true)).toBe("ጥቅምት 17 ቀን 2019 ዓ.ም.");
+    expect(dayLabel(TODAY, as("en", "both"))).toBe("27 Oct (Tikimt 17)");
+    expect(dayLabel(TODAY, as("en", "both"), true)).toBe("27 Oct 2026 (Tikimt 17, 2019)");
+    expect(dayLabel("2023-09-11", as("en", "ethiopian"), true)).toBe("Pagume 6, 2015");
+
+    expect(seriesLabel(TODAY, "day", as("en", "ethiopian"))).toBe("Tue Tikimt 17");
+    expect(seriesLabel(TODAY, "day", as("en", "both"))).toBe("Tue 27 Oct (Tikimt 17)");
+    expect(seriesLabel("2026-10-26", "week", as("en", "ethiopian"))).toBe("Tikimt 16");
+    // a month of the series is a Gregorian month (the API buckets by YYYY-MM): in Ethiopian it reads as the days it covers
+    expect(seriesLabel("2026-10", "month", as("en", "ethiopian"))).toBe("Meskerem 21 – Tikimt 21, 2019");
+    expect(seriesLabel("2026-09", "month", as("en", "ethiopian"))).toBe("Nehase 26, 2018 – Meskerem 20, 2019");
+    expect(seriesLabel("2026-10", "month", as("en", "both"))).toBe("Oct 2026 (Meskerem 21 – Tikimt 21, 2019)");
+    expect(seriesLabel("2026-10", "month", as("am", "ethiopian"))).toBe("መስከረም 21 – ጥቅምት 21 ቀን 2019 ዓ.ም.");
+
+    const week = { from: "2026-10-21", to: TODAY };
+    expect(rangeLabel(week, as("en", "ethiopian"))).toBe("Tikimt 11, 2019 – Tikimt 17, 2019");
+    expect(rangeLabel({ from: TODAY, to: TODAY }, as("en", "ethiopian"))).toBe("Tikimt 17, 2019");
+    expect(rangeLabel(week, as("en", "both"))).toBe("21 Oct 2026 – 27 Oct 2026 (Tikimt 11, 2019 – Tikimt 17, 2019)");
+    expect(spanLabel(week, as("en", "ethiopian"))).toBe("Tikimt 11 – Tikimt 17");
+    expect(spanLabel(week, as("am", "ethiopian"))).toBe("ጥቅምት 11 – ጥቅምት 17");
+    expect(spanLabel({ from: TODAY, to: TODAY }, as("en", "both"))).toBe("27 Oct (Tikimt 17)");
+
+    // the range controls keep Gregorian ISO dates underneath: only the labels change
+    expect(rangeParams({ preset: "custom", from: "2026-10-21", to: TODAY })).toEqual({ from: "2026-10-21", to: TODAY });
+    expect(rangeFromParams(params({ from: "2026-10-21", to: TODAY }), TODAY)).toEqual({ preset: "custom", from: "2026-10-21", to: TODAY });
+  });
+
+  test("timestamps and shift dates go through the same formatter: Addis Ababa's local day, the 24-hour clock kept", () => {
+    expect(stampText("2026-10-27T11:05:00Z", as("en", "gregorian"))).toBe("2026-10-27 14:05");
+    expect(stampText("2026-10-27T11:05:00Z", as("en", "ethiopian"))).toBe("Tikimt 17, 2019 14:05");
+    expect(stampText("2026-10-27T11:05:00Z", as("am", "ethiopian"))).toBe("ጥቅምት 17 ቀን 2019 ዓ.ም. 14:05");
+    expect(stampText("2026-10-27T11:05:00Z", as("en", "both"))).toBe("2026-10-27 14:05 (Tikimt 17, 2019)");
+    // 21:30 UTC on the 26th is 00:30 on the 27th in Addis Ababa, as the API's EthiopianDate reads a local time
+    expect(stampText("2026-10-26T21:30:00Z", as("en", "ethiopian"))).toBe("Tikimt 17, 2019 00:30");
+    expect(stampText(null, as("en", "ethiopian"))).toBe("—");
+    expect(stampText("not a time", as("en", "ethiopian"))).toBe("not a time");
+    // a shift's date (a local date) reads as it always did in Gregorian
+    expect(isoDayText(TODAY, as("en", "gregorian"))).toBe(TODAY);
+    expect(isoDayText(TODAY, as("en", "ethiopian"))).toBe("Tikimt 17, 2019");
+    expect(isoDayText(TODAY, as("am", "both"))).toBe("2026-10-27 (ጥቅምት 17 ቀን 2019 ዓ.ም.)");
+    expect(isoDayText("2026-02-30", as("en", "ethiopian"))).toBe("2026-02-30");
+  });
+
+  test("the display preference: one per signed-in user, kept in the browser; blocked storage still reads Gregorian", () => {
+    const kept = new Map<string, string>();
+    const storage = { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => void kept.set(key, value) };
+    expect(DATE_DISPLAYS).toEqual(["gregorian", "ethiopian", "both"]);
+    expect(readDisplay(() => storage, 7)).toBe("gregorian");
+    expect(writeDisplay(() => storage, 7, "ethiopian")).toBe(true);
+    expect(readDisplay(() => storage, 7)).toBe("ethiopian");
+    expect(readDisplay(() => storage, 8)).toBe("gregorian"); // another person on the same device keeps their own
+    expect(kept.get(displayStorageKey(7))).toBe("ethiopian");
+    kept.set(displayStorageKey(9), "julian");
+    expect(readDisplay(() => storage, 9)).toBe("gregorian"); // a value this app never wrote
+    // private mode, blocked site data, no storage at all
+    const blocked = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+    };
+    expect(readDisplay(() => blocked, 7)).toBe("gregorian");
+    expect(writeDisplay(() => blocked, 7, "both")).toBe(false);
+    expect(
+      readDisplay(() => {
+        throw new Error("SecurityError");
+      }, 7),
+    ).toBe("gregorian");
+    expect(readDisplay(() => null, 7)).toBe("gregorian");
   });
 });
