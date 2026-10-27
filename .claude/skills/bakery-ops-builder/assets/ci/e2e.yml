@@ -21,6 +21,13 @@ on:
         required: false
         type: string
         default: ""
+      history_days:
+        description: >-
+          days of demo history Phase4Seeder plays into the fresh demo branch (DEMO_HISTORY_DAYS); empty keeps the seeder's default
+          (90). Only phases 4 and up have a history.
+        required: false
+        type: string
+        default: ""
 
 jobs:
   playwright:
@@ -45,7 +52,9 @@ jobs:
           docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180
 
       - name: Migrate and seed up to phase ${{ inputs.phase }}
-        run: docker compose -f compose.yml -f compose.ci.yml exec -T -e SEED_PHASE=${{ inputs.phase }} app php artisan migrate:fresh --force --seed --seeder=DemoSeeder
+        env:
+          HISTORY_DAYS: ${{ inputs.history_days }}
+        run: docker compose -f compose.yml -f compose.ci.yml exec -T -e SEED_PHASE=${{ inputs.phase }} ${HISTORY_DAYS:+-e DEMO_HISTORY_DAYS=$HISTORY_DAYS} app php artisan migrate:fresh --force --seed --seeder=DemoSeeder
 
       - uses: pnpm/action-setup@v4
         with: { version: 9 }
