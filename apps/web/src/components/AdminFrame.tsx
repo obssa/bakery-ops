@@ -3,28 +3,32 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
+import { can, useSession } from "@/lib/session";
 import { RequireAuth } from "./RequireAuth";
 import { focusRing } from "./styles";
 
 // The admin console's own frame: signed-in only, with its sections as tabs: Catalog and People (Phase 0), the live
-// Orders board (Phase 1), Inventory with its own sub-tabs (Phase 2). The header's "Admin console" link is the overview.
-const SECTIONS = [
+// Orders board (Phase 1), Inventory with its own sub-tabs (Phase 2), Shifts (Phase 3), Payments (Phase 4, step 4.5c: shown
+// to whoever holds one of its permissions). The header's "Admin console" link is the overview.
+const SECTIONS: readonly { href: string; key: string; anyOf?: readonly string[] }[] = [
   { href: "/admin/catalog", key: "catalog" },
   { href: "/admin/people", key: "people" },
   { href: "/admin/orders", key: "orders" },
   { href: "/admin/inventory", key: "inventory" },
   { href: "/admin/planner", key: "planner" },
   { href: "/admin/shifts", key: "shifts" },
-] as const;
+  { href: "/admin/payments", key: "payments", anyOf: ["payments.view", "channels.manage"] },
+];
 
 export function AdminFrame({ children }: { children: ReactNode }) {
   const t = useTranslations("admin");
   const pathname = usePathname().replace(/\/+$/, "");
+  const me = useSession((s) => s.me);
 
   return (
     <RequireAuth>
-      <nav aria-label={t("sections")} className="mb-6 flex gap-1 border-b border-neutral-200">
-        {SECTIONS.map(({ href, key }) => {
+      <nav aria-label={t("sections")} className="mb-6 flex flex-wrap gap-1 border-b border-neutral-200">
+        {SECTIONS.filter(({ anyOf }) => !anyOf || anyOf.some((permission) => can(me, permission))).map(({ href, key }) => {
           const current = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link

@@ -78,7 +78,7 @@ test.describe("p4 admin payments", () => {
       await pattern.fill("FT[0-9");
       await expect(form.getByRole("status", { name: "Pattern check" })).toContainText("cannot read");
       await pattern.fill("FT[0-9]{6}");
-      await expect(form.getByRole("status", { name: "Pattern check" })).toContainText("reads well");
+      await expect(form.getByRole("status", { name: "Pattern check" })).toContainText("reads the pattern well");
       const sample = form.getByLabel("Try a reference");
       await sample.fill("FT123456");
       await expect(form.getByRole("status", { name: "Sample check" })).toHaveText("Matches the pattern.");
@@ -89,7 +89,7 @@ test.describe("p4 admin payments", () => {
       const post = page.waitForResponse((r) => r.url().endsWith("/api/v1/payment-channels") && r.request().method() === "POST");
       await form.getByRole("button", { name: "Add payment method" }).click();
       expect((await post).status()).toBe(201);
-      await expect(form.getByRole("status")).toContainText(`Saved: ${name}`);
+      await expect(form.getByRole("status").filter({ hasText: `Saved: ${name}` })).toBeVisible();
       created = await channelByCode(admin, code);
       expect(created).toMatchObject({ is_enabled: true, requires_photo: false, requires_reference: true, reference_pattern: "FT[0-9]{6}", reference_hint_en: "FT and six digits" });
       const mine = rowOf(list, name);

@@ -14,6 +14,7 @@ const CARDS = [
   { href: "/admin/inventory", title: "inventory", body: "inventory_desc" },
   { href: "/admin/planner", title: "planner", body: "planner_desc" },
   { href: "/admin/shifts", title: "shifts", body: "shifts_desc" },
+  { href: "/admin/payments", title: "payments", body: "payments_desc" },
 ] as const;
 
 export default async function AdminHome(props: LocaleProps) {
