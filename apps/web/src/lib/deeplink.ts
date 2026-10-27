@@ -7,6 +7,8 @@ const PAGES = new Set<string>([
   ...SCREENS.map((screen) => screen.href),
   "/admin/catalog",
   "/admin/orders",
+  // step 4.5d: the order record (?id=)
+  "/admin/orders/record",
   "/admin/people",
   "/admin/inventory",
   "/admin/inventory/ledger",

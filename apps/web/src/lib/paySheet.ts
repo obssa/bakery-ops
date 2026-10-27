@@ -250,3 +250,11 @@ export function keepsKey(error: unknown): boolean {
   if (status === 0 || status >= 500) return true;
   return key === "idempotency.in_flight";
 }
+
+/** A reference's last 4 characters, as the printed receipt shows it (the till's receipt preview, the order record of step 4.5d). */
+export function referenceTail(reference: string | null | undefined): string | null {
+  if (!reference) return null;
+  const trimmed = reference.trim();
+  if (trimmed === "") return null;
+  return trimmed.length <= 4 ? trimmed : `…${trimmed.slice(-4)}`;
+}
