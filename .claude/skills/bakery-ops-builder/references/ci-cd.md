@@ -45,7 +45,7 @@ status ─┬─ api-lint → api-arch ─┬→ mod-identity → mod-catalog �
            gate-p1 ◄ [gate-p0, mod-orders, mod-payments, e2e-p1]
            gate-p2 ◄ [gate-p1, mod-production, mod-notifications, e2e-p2]
            gate-p3 ◄ [gate-p2, mod-shifts, rules-off-gates, e2e-p3]
-           gate-p4 ◄ [gate-p3, mod-analytics, e2e-p4, perf-dashboards]
+           gate-p4 ◄ [gate-p3, mod-analytics, e2e-p4, perf-dashboards] (+ files-s3 ◄ [mod-payments, docker-build], the S3 proof); seeds 90 days, runs gate:p4
            gate-p5 ◄ [gate-p4, e2e-p5, i18n-check (strict), backup-drill]
 ```
 
@@ -61,7 +61,7 @@ survive, only parallelism is lost.
 | `status` | `jq -r .current_phase docs/phases/STATUS.json` → output `phase` |
 | `api-lint` | composer install (cached), `pint --test`, `phpstan analyse` (result cache) |
 | `api-arch` | `php scripts/migration-lint.php`, `pest --group=arch,invariants` |
-| `mod-<x>` | services postgres + redis; `artisan migrate --force --env=testing`; `pest --group=module:<x>[,property,concurrency]`; then `pest --group=<consumers' contracts against x>` (skipped when the group has no tests yet) |
+| `mod-<x>` | (the reusable `module-tests.yml`, timeout `timeout_minutes`, 20 by default; `mod-inventory` 30: it measured 18 to 19 minutes in Phase 4) services postgres + redis; `artisan migrate --force --env=testing`; `pest --group=module:<x>[,property,concurrency]`; then `pest --group=<consumers' contracts against x>` (skipped when the group has no tests yet) |
 | `invariants` | `python scripts/check_invariants.py --all` (uses `artisan route:list --json` for routes) |
 | `openapi-check` | `artisan scramble:export` → diff against `docs/openapi.json` |
 | `erd-check` | `php scripts/erd-check.php` (tables in `information_schema` vs `docs/erd.dbml`) |
@@ -70,8 +70,9 @@ survive, only parallelism is lost.
 | `i18n-check` | `node scripts/i18n-check.mjs` (`--strict` when phase ≥ 5) |
 | `docker-build` | `docker/build-push-action` with `cache-from/to: type=gha`, `outputs: type=docker,dest=api.tar` → artifact |
 | `e2e-p<N>` | download artifacts; `docker load`; `docker compose -f compose.yml -f compose.ci.yml up -d --wait`; `artisan migrate:fresh --seed --seeder=DemoSeeder -- --phase=N`; setup-node 24 + Playwright browser cache; `npx playwright test --project=p<N>-*`, with `--pass-with-no-tests` only while phase N is `todo`/`planning`/`plan_approved` (once it is `in_progress` or later, each of its projects must list at least one test); upload `test-results` on failure |
-| `perf-dashboards` | k6 against the CI compose stack with the 90-day seed, thresholds `p(95)<1000` (never against the live host; the timed Pest substitute `DashboardBudgetGateTest` is part of `gate:p4`) |
+| `perf-dashboards` | after `mod-analytics`, beside `e2e-p4`: the compose stack with the 90-day seed (`DEMO_HISTORY_DAYS` unset, about 12 minutes; timeout 40), the demo admin signed in by `curl`, every read warmed once, then k6 in its pinned image (`grafana/k6:1.3.0@sha256:...`, `scripts/perf/dashboards.k6.js`): two admins read every `/analytics/*` dashboard of the 90 days compared with the 90 before, every answer 200, `p(95)<1000` per read and in all; the per-read figures go to the step summary. Never against the live host; the timed in-process substitute is `DashboardBudgetGateTest` (in `gate:p4`) and `php artisan analytics:bench` (any host) |
 | `gate-p<N>` | `python scripts/gate_check.py --mode done --phase N --ci` |
+| `gate-p4` | first seeds the demo bakery once on the compose stack (`SEED_PHASE=4`, `DEMO_HISTORY_DAYS=$GATE_SEED_DAYS`, 90), then runs `pest --group=gate:p4` in the app container in one process with `GATE_SEED_DATABASE=bakery` and `GATE_SEED_DAYS`: the seeded tests (`Tests\Support\SeededGate`) point their own connection at the seeded database (phpunit.xml pins `bakery_test` with a `<server>` entry) and fail, never skip, when fewer days are built; the race tests of the group keep `bakery_test` (DatabaseTruncation). A skipped test fails the step. Then `gate_check.py --mode done --phase 4 --ci`. Timeout 45 |
 
 Live updates in e2e (ADR 0009): `e2e-p1` and later run the polling transport, as the live host does
 (`BROADCAST_CONNECTION=null`, `NEXT_PUBLIC_LIVE_TRANSPORT=poll`), so no `ws` service is needed. Reverb is its own

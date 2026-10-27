@@ -54,6 +54,13 @@ flows and the phase plan's endpoint list: every bullet below is a behaviour the 
 - Split payments until the balance is zero. Complete writes `sale` movements for display-case lines and
   closes the order. Receipt print (ESC/POS bridge) or send link.
 - Voids and refunds need a reason and a manager/admin PIN and create reversing movements.
+- *As built in Phase 4:* the pay sheet lists the enabled channels (cash first, then the admin's order), split rows until the balance is zero
+  recorded together (`POST /orders/{order}/payment-batches`, one Idempotency-Key), the photo shrunk in the browser and re-encoded on the
+  server (ADR 0015), a reference checked against the channel's pattern and hint, change due on cash; a duplicate reference or receipt is a
+  warning, never a block. Every channel needs the till's open shift (ADR 0013 note). The receipt is a PDF or a signed link (ESC/POS is
+  Phase 5). A **void** of a payment is for an order not paid yet: no stock moves, the balance re-opens (step 4.3c). A **refund** of a paid
+  order (reversing `return` movements for restocked lines, `payment_refunds` LIFO over the order's payments, cash out of the drawer inside
+  the shift) waits for R-C (ADR 0016, proposed): until then the till's dialog and the order record say refunds are not available yet.
 
 ### Receiving ingredients — Phase 2
 - Admin or storekeeper creates a purchase (supplier, invoice, lines with unit cost). Confirming writes
@@ -97,7 +104,11 @@ flows and the phase plan's endpoint list: every bullet below is a behaviour the 
 | Manage payment channels | ✓ | – | – | – | – | – | – | – |
 | Manage users, roles, short codes | ✓ | – | – | – | – | – | – | – |
 | View analytics | ✓ | ✓ | own shift totals | own orders | own station | own station | own station | own station |
+| Rebuild analytics, send the weekly summary (`analytics.manage`) | ✓ | – | – | – | – | – | – | – |
+| Verify / dispute payments, reconciliation, payments export (`payments.verify`) | ✓ | ✓ | – | – | – | – | – | – |
+| View payments (`payments.view`; the cashier's own shift or the last 24 h) | ✓ | ✓ | scoped | – | – | – | – | – |
 | View audit log | ✓ | read | – | – | – | – | – | – |
+| Export the audit log (`audit.export`) | ✓ | – | – | – | – | – | – | – |
 
 The matrix is data: `apps/api/tests/Support/route_permissions.php` maps every route to its permission and
 the roles that hold it by default, and a generated test hits every route as every role. A route missing

@@ -50,8 +50,8 @@ These are the contract surfaces. Expose each as a final service class (or interf
 | Orders | Identity | `verifyShortCode`, `ActingAsSession`, `can(..., station)`, `verifyPinFor('orders.void')` |
 | Orders | Shared | `ActorContext`, `Idempotency`, live-update events (broadcast companions behind `BROADCAST_CONNECTION`, polling cursors; ADR 0009) |
 | Orders | Payments | listens to `PaymentRecorded` → `markPaidIfSettled` (never imports Payments) |
-| Payments | Orders | `Orders::totals(order) → {total, paid, balance}`; P4 `Orders::refund` |
-| Payments | Identity | `can('payments.take')`, `verifyPinFor('payments.void')` |
+| Payments | Orders | `Orders::totals(order) → {total, paid, balance}`, `Orders::forPayment(lock)`, `Orders::summaries(ids)` and `idsNumbered(n)` (the payments list, P4); Orders listens to `PaymentVoided` → `ReversePayment` (P4, step 4.3c: inside the void's transaction); P4 `Orders::refund` (step 4.1b, on hold for R-C) |
+| Payments | Identity | `can('payments.take')`, `verifyPinFor('payments.void')`; P4 `payments.view`, `payments.verify` (the cashier's scope of the payment reads), `Recipients` for `payment_disputed` (in Notifications) |
 | Payments | Shared | `Files::put` (P4), `Idempotency` |
 | Production | Catalog | `Recipes::activeFor` scaled by yield, `items.default_batch_qty`, `Routing::stationFor` |
 | Production | Inventory | `Stock::of`, `Ledger::appendMany` (consume + output atomically), `Transfers::request`, listens to `StockOut` |
@@ -63,7 +63,10 @@ These are the contract surfaces. Expose each as a final service class (or interf
 | Shifts | Orders | `Orders::openAt(station, time)` for the replay |
 | Shifts | Catalog | `Items::summaries`, `Items::deleted` (a count refuses or drops a line for a deleted item) |
 | Analytics | all | provider-owned `Facts` query classes only (Orders `sales`/`lines`, Payments `payments`/`refunds`, Production `batches`, Inventory `movements`/`closingBalances`/`stockOuts`/`unitCosts`, Shifts `instances`), Shared `LocalDay`; listens to `ShiftLocked` and, debounced, to the payment and order events that move today (step 4.4b); Audit `AuditedAction` for the on-demand rebuild's audit row; announces `WeeklySummaryReady` (Notifications subscribes: event only) |
-| Payments | Shared | `Files::put`, `signedUrl` (contract `payments->files`) |
+| Payments | Shared | `Files::put`, `attach`, `signedUrl` (contract `payments->files`); `Shared\Pdf` (`PdfFonts`, `PdfRenderer`) for the receipt, shared with Analytics' exports; `Shared\Exports\XlsxFile` |
+| Audit (UI, P4) | Identity | through Shared's `ActorNames` (bound to Identity's `ActorDirectory`): Audit stays a leaf above Shared and names people without importing Identity (step 4.5a) |
+| Analytics | Identity, Catalog, Payments (names) | `ActorDirectory::names/stations/workStationIds` (the `view_own` scope), `Items::labels`, `Payments\Contracts\Facts::channels` (step 4.4c, contract-first) |
+| `analytics:bench` (app level, P4) | Identity, Analytics | `App\Console\Commands\AnalyticsBenchCommand` and `App\Console\Support\DashboardBench` live outside the modules (as `bakery:seed-demo` does): they sign in as a person of Identity (`Recipients::byPermission('analytics.view')`) and read Analytics' routes through the HTTP kernel; no module imports them |
 
 ## Frontend surfaces and what they consume
 
@@ -104,6 +107,8 @@ These are the contract surfaces. Expose each as a final service class (or interf
   P1's availability check and P0's reservation gate need them. P2 adds versions publishing and cost.
 - P1: Payments gets its final `payment_channels` and `payments` schema with all eight channels seeded,
   but only cash can pass validation until photo upload exists in P4.
+- P4 (as built): every channel takes payments from step 4.3b (the till's pay sheet in 4.5b); the refund side (Orders' `refund`, Inventory's
+  `Reversals`, `payment_refunds` rows) waits for R-C, so `payment_refunds` exists empty (step 4.1c) and `Payments\Facts::refunds` reads it.
 - P1: `LineReady` reaches the waiter through the live-update transport directly (polled orders feed on the live host,
   `user.{id}` once a WebSocket transport is on); P2 adds the persisted notification.
 - P1–P2: `orders.shift_instance_id` and movement `shift_instance_id` stay null for rows written before Phase 3 (nothing is backfilled), and for exempt movements (reservations) and untracked places afterwards.

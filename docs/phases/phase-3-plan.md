@@ -2108,5 +2108,5 @@ and the polled queue work without them).
   are written and reviewed, not executed in CI, as in every earlier phase.
 - **Scope creep.** The step list of the manifest is the scope; the additions of this plan (`opening`, `cancelled`, `shifts->orders`,
   `tracks_shifts`, the cash-as-a-count model, `shifts:verify-chain`, the setup check, `X-Station-Id`) are each argued above and
-  each is smaller than the problem it prevents; anything else is a `TODO(p4)` marker, and `gate_check --mode done` forbids
-  markers for this phase.
+  each is smaller than the problem it prevents; anything else is a TODO marker of a later phase (`TODO(p<N>)`), and `gate_check --mode done`
+  forbids the markers of the phase it closes.

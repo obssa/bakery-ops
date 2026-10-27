@@ -337,7 +337,7 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
        (`DemoSeederTest` asserts `seedersUpTo(4)`). `config/files.php` and `config/analytics.php` hold plain values only; nothing reads them yet.
      - **`DemoClock`** anchors inside `around()` (`subDays(3)`); `anchor()` is the getter. Section 8 now says the days back become a function of the phase (4.6a).
      - **`e2e-p4` runs `full`, not `full,ws`** (10.9 item 3); the MinIO TODO in `ci.yml` is replaced by a note: e2e uses the local disk, as the live host does.
-     - **Nine `e2e/p4` stubs** (`test.fixme`, one `TODO(p4)` each), 4.6b replaces every one: `pay-photo-split`, `pay-sheet-logic`, `pay-refund`, `pay-void`, `pay-camera-fallback`
+     - **Nine `e2e/p4` stubs** (`test.fixme`, one Phase 4 TODO marker each), 4.6b replaces every one but the refund flows': `pay-photo-split`, `pay-sheet-logic`, `pay-refund`, `pay-void`, `pay-camera-fallback`
        (project `p4-pay-photo-split`) and `dashboards`, `dashboards-live`, `dashboards-audit`, `dashboards-logic` (project `p4-dashboards`).
      - **Local run notes:** `DeployableCachesTest`'s two `config:cache` cases time out at 60 s on this PC's Docker (a bare `config:cache` takes about a minute there) and are left to CI;
        the new config files evaluate without error. `gate:p3` ran green here (197 tests) in about 25 minutes.
@@ -1510,7 +1510,7 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
        `jobs` table; the E2E Test Branch is created after it and never touched. `gate-p4`'s seeded tests (`ChannelTotalsEqualPaymentsTest`, `RevenueEqualsOrdersTest`,
        `RebuildIdempotentGateTest`, `DashboardsReadSummariesOnlyGateTest`, `DashboardBudgetGateTest`) should run in a job that seeds once that way and then runs only their
        group in the app container, against that database and without `RefreshDatabase` or `DatabaseTruncation` (either would wipe the seed; `phpunit.xml`'s
-       `DB_DATABASE=bakery_test` is not forced, so the container's `DB_DATABASE` wins, which is also why no other group may run in that process); they find the branch through
+       `DB_DATABASE=bakery_test` is not forced, so the container's `DB_DATABASE` wins, which is also why no other group may run in that process; *corrected in 4.6b:* phpunit.xml pins it with a `<server>` entry, which no environment variable overrides, so the seeded tests point their connection at the seeded database themselves, see 4.6b's note); they find the branch through
        `Phase0Seeder::existingBranch()` and should fail, not skip, when it has fewer than 90 built days. `dashboards.spec.ts` (`p4-dashboards`, in `e2e-p4` after the seed) sees the
        60-day fallback; `perf-dashboards` keeps the 90-day figure, so it seeds in a job of its own without `history_days` (the e2e job with `history_days` empty; about
        13 to 16 minutes, so give that job a timeout above e2e.yml's 30 minutes only if the Playwright part is long). Both can sign in as the demo admin
@@ -1801,6 +1801,6 @@ Each is corrected in the PR named (the manifest, the skill copy under `.claude/s
 | Disk quota | photos fill the account and its backup | R-M: doctor, 70% rule, orphan purge, S3 path ready |
 | Playwright | dev server late hydration, storage shared, service workers | tests run the built app; `serviceWorkers: 'block'`; one context per role; waits on API state; file inputs via `setInputFiles` on the real `<input>`, never a timer |
 | Shared E2E branch | accumulated data, a failed run leaves a shift or a count waiting, login limit | run-unique names, `settleStation`, `ensureOpenShift`, per-run token file, `Retry-After` (section 7) |
-| Phase scope creep | building OCR, WhatsApp links, ESC/POS because the schema is there | out of scope and written down: OCR of receipts, direct bank verification, ESC/POS, outbox, email; no `TODO(p4)` markers may remain at the gate |
+| Phase scope creep | building OCR, WhatsApp links, ESC/POS because the schema is there | out of scope and written down: OCR of receipts, direct bank verification, ESC/POS, outbox, email; no Phase 4 TODO markers may remain at the gate (`gate_check --mode done`) |
 | Test debt | `->skip(` or `fixme` left in a gate project | the 4.1a Playwright `fixme`s are listed in the PR and removed by 4.6b; `gate_check --mode done` enforces |
 | Contract before consumer | writing Payments or Analytics code before the contract is green | 4.1a commits the files red, 4.1b/4.1c turn them green, `app/Modules/Analytics` does not exist until 4.4a |

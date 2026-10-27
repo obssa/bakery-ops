@@ -13,6 +13,7 @@ carries the actor stamp (`created_by_user_id`, `acting_user_id?`, `shift_instanc
 | `branches` | name, timezone (default Africa/Addis_Ababa), currency (ETB), settings JSONB | the tenant |
 | `stations` | branch_id, code (`till`, `kitchen`, `bar`, `cake_room`, `bakery`, `store`), name_en, name_am, requires_overseer | where lines route and who counts what |
 | `idempotency_keys` | branch_id, user_id, key, request_hash, response_status, response_body JSONB, expires_at | scope `(branch, user, key)`; Redis `SET NX` guards the race |
+| `stored_files` (Phase 4, `Shared\Files`) | branch_id, client_uuid, purpose (`receipt`, `refund_proof`), disk, key (`receipts/{branch}/{yyyy}/{mm}/{uuid}.jpg`, unique), mime, bytes, width, height, sha256, actor stamp (nullable), attached_type?, attached_id?, attached_at?, deleted_at | the only record of an uploaded photo; re-encoded JPEG, no original name; read only through a five-minute signed URL; attached once; an orphan is purged after 24 h (ADR 0015) |
 
 ## Audit (Phase 0)
 
@@ -76,6 +77,8 @@ Reason → effect map lives in one class (`MovementReason`):
 
 ## Orders (Phase 1; refund Phase 4)
 
+Phase 4 (step 4.3c) adds `payment.recorded` and `payment.voided` to `order_events` (a void of a payment before the order is paid takes the amount out of `paid_total` and clears `settled_at`). The refund tables (`order_refunds`, `order_refund_lines`, `orders.refunded_total`, Inventory's `stock_movement_reversals`) are planned for step 4.1b, on hold for R-C (ADR 0016, proposed).
+
 | Table | Key fields | Notes |
 |---|---|---|
 | `dining_tables` | branch_id, code, name_en, name_am, seats, sort, is_active, deleted_at | the pad's table grid; state (free, ordering, waiting, served, bill) is computed from open orders |
@@ -89,8 +92,10 @@ Reason → effect map lives in one class (`MovementReason`):
 
 | Table | Key fields | Notes |
 |---|---|---|
-| `payment_channels` | branch_id, code (`cash`, `telebirr`, `cbe_birr`, `cbe_bank`, `awash`, `dashen`, `abyssinia`, `coop`, …), name_en, name_am, is_enabled, requires_photo, requires_reference, sort | admin can add, rename, reorder, disable |
-| `payments` | order_id, channel_id, amount, reference_no?, receipt_photo_key?, received_by_user_id, received_at, status (`recorded`, `verified`, `disputed`, `voided`), void_reason, voided_by, client_uuid | several per order (split); photo key is an object-store key, URLs are signed on read |
+| `payment_channels` | branch_id, client_uuid? (a channel made through the API), code (`cash`, `telebirr`, `cbe_birr`, `cbe_bank`, `awash`, `dashen`, `abyssinia`, `coop`, …), name_en, name_am, is_enabled, requires_photo, requires_reference, reference_pattern? (a regex body), reference_hint_en/am?, photo_hint_en/am?, sort, deleted_at | admin can add, rename, reorder, disable, set the rules (Phase 4, step 4.3a); cash cannot be switched off |
+| `payments` | order_id, channel_id, amount (> 0), reference_no?, reference_norm? (upper case, no separators: the duplicate check), receipt_photo_key? and receipt_file_id? (`stored_files`), batch_uuid? (a split recorded together), received_by_user_id, received_at, shift_instance_id (the till's shift, every channel: ADR 0013 note), status (`recorded`, `verified`, `disputed`, `voided`), verified_by/at, disputed_by/at, dispute_reason, dispute_resolved_at, void_reason, voided_by, refunded_amount (0 until refunds), client_uuid | several per order (split, step 4.3b); a duplicate reference or receipt is a warning, never a block; a disputed payment still counts; URLs are signed on read |
+| `receipt_settings` (Phase 4) | branch_id (unique), business_name_en/am, address_en/am, phone, tin, footer_en/am, show_amharic, ethiopian_dates | one row per branch, the defaults when missing; the receipt PDF (dompdf) and its signed link |
+| `payment_refunds` (Phase 4, written from step 4.3d) | branch_id, client_uuid, order_id, order_refund_id, payment_id, channel_id, amount (> 0), reference_no?, proof_file_id?, refunded_by_user_id, approved_by_user_id, actor stamp, refunded_at | append-only; a payment's share of a refund, LIFO over the order's payments (ADR 0016, proposed: refunds wait on R-C) |
 
 ## Production (Phase 2)
 
@@ -124,9 +129,20 @@ Reason → effect map lives in one class (`MovementReason`):
 
 ## Analytics (Phase 4)
 
-`daily_sales`, `daily_station_metrics`, `daily_item_metrics`, `daily_channel_totals`, each with `branch_id`,
-`day` (local date), rebuilt by `Rebuild::day(branch, date)` idempotently after `ShiftLocked`, nightly, or
-on demand. Dashboards read only these.
+Derived tables (ADR 0014, as built in steps 4.4a to 4.4c): no `client_uuid`, no actor stamp, no `deleted_at`, `branch_id` leads every
+primary key, written only by `Rebuild::day(branch, localDate, trigger)` (one transaction under the `analytics_days` row lock, idempotent by
+fingerprint) after `ShiftLocked`, a debounced touch of today, the nightly run, on demand and by the seed. Dashboards read only these and
+the name tables.
+
+| Table | Key | Figures |
+|---|---|---|
+| `analytics_days` | (branch_id, day) | version, rebuilt_at (µs), trigger (`shift_locked`, `nightly`, `manual`, `touch`, `seed`), duration_ms, row_counts JSON, fingerprint (sha256), changed; the lock target and the freshness feed |
+| `daily_sales` | (branch_id, day) | orders_count, items_qty, subtotal, discount_total, tax_total, revenue (by `settled_at`), avg_ticket, voided_count/total, cancelled_count, refund_count/total (by `refunded_at`), net_revenue, revenue by order type; a row for every built day |
+| `daily_hour_sales` | (branch_id, day, hour) | orders_count, items_qty, revenue |
+| `daily_channel_totals` | (branch_id, day, channel_id) | receipts_count, amount (not voided, by `received_at`), refund_count/amount, net_amount, without_reference/photo, verified, disputed, duplicate_reference counts |
+| `daily_item_metrics` | (branch_id, day, item_id) | category_id, kind, units sold, refunded, produced, consumed, waste, purchased, adjusted, closing on hand, stockout_count, revenue, cogs_total, margin_total, closing_value_total, cogs_complete |
+| `daily_station_metrics` | (branch_id, day, station_id) | tickets, lines served/rejected, prep_samples, prep_seconds_sum, avg and p90 prep, batches, produced, waste, shifts, locked shifts, variance lines, cash variance, stock-outs |
+| `daily_user_metrics` | (branch_id, day, user_id, role_kind) | orders, items, revenue, payments count/amount, voids, refunds, lines prepared, prep samples and sum, avg prep |
 
 ## State machines (exhaustive tables are unit-tested: every disallowed pair throws `IllegalTransition`)
 
@@ -138,5 +154,5 @@ on demand. Dashboards read only these.
 | production_batch | started → finished → confirmed |
 | shift_instance | scheduled → opening \| open \| cancelled; opening → open \| cancelled; open → counting; counting → pending_approval \| locked; pending_approval → counting (a recount) \| locked; locked and cancelled terminal. `opening` while the opening counts are made (a carried start, a call-in and a station with nothing to count open at once); a shift locks when the newest revision of every count it has is locked, and cannot lock with an unresolved count |
 | stock_count | draft → awaiting_cosign (a station that requires an overseer) \| pending_approval (a difference) \| approved; awaiting_cosign → pending_approval \| approved \| rejected; pending_approval → approved \| rejected; approved → locked in the same transaction (a hash-chain link); rejected and locked terminal; an admin unlock does not move the status: it gives the locked count a revision (`seq` + 1, `superseded_by_id`). Line `reason_status`: none → pending → accepted \| rejected |
-| payment | recorded → verified \| disputed; recorded/verified → voided (PIN) |
+| payment | recorded → verified \| disputed \| voided; verified → voided; disputed → verified \| voided (a dispute is resolved; Phase 4, step 4.3c); a void needs a reason and a manager's PIN and is refused once the order is paid or closed (it is refunded instead) |
 | transfer | requested → confirmed \| rejected |
