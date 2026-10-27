@@ -1,10 +1,11 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { marginOf, seriesLabel, spanLabel } from "@/lib/analytics";
 import { ApiError } from "@/lib/api/client";
 import { useItemPage, type ItemPage, type Answer } from "@/lib/api/analytics";
+import { useDateFormat } from "@/lib/useDates";
 import { Bars } from "../charts/Bars";
 import { Line } from "../charts/Line";
 import { Alert, Badge, PageHeader } from "../ui";
@@ -93,7 +94,7 @@ function Header({ answer, loading }: { answer: Answer<ItemPage> | undefined; loa
 
 function Body({ answer }: { answer: Answer<ItemPage> | undefined }) {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const f = useFigures();
   const { range } = useAnalyticsPage();
   const loading = answer === undefined;
@@ -126,7 +127,7 @@ function Body({ answer }: { answer: Answer<ItemPage> | undefined }) {
           <SkeletonRows rows={6} label={t("loading")} />
         ) : (
           <div className="space-y-6">
-            <Line label={t("product.chart_label", { range: spanLabel(range, locale) })} points={answer.data.series.map((day) => ({ key: day.day, label: seriesLabel(day.day, "day", locale), value: day.units_sold_qty }))} format={f.qty} />
+            <Line label={t("product.chart_label", { range: spanLabel(range, dates) })} points={answer.data.series.map((day) => ({ key: day.day, label: seriesLabel(day.day, "day", dates), value: day.units_sold_qty }))} format={f.qty} />
             <Days answer={answer} />
           </div>
         )}
@@ -137,7 +138,7 @@ function Body({ answer }: { answer: Answer<ItemPage> | undefined }) {
 
 function Launch({ answer }: { answer: Answer<ItemPage> | undefined }) {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const f = useFigures();
   const day = useDayLabel();
   const launch = answer?.data.since_launch;
@@ -166,7 +167,7 @@ function Launch({ answer }: { answer: Answer<ItemPage> | undefined }) {
                 {launch.weekly_units.map((week) => (
                   <tr key={week.week} className="border-b border-neutral-100">
                     <th scope="row" className={`${TD} font-medium`}>{t("product.week", { n: week.week })}</th>
-                    <td className={TD}>{spanLabel(week, locale)}</td>
+                    <td className={TD}>{spanLabel(week, dates)}</td>
                     <td className={TD_NUM}>{week.built_days === 0 ? t("not_built") : f.qty(week.units_sold_qty)}</td>
                     <td className={TD_NUM}>{week.built_days === 0 ? t("not_built") : f.amount(week.revenue)}</td>
                   </tr>
@@ -182,7 +183,7 @@ function Launch({ answer }: { answer: Answer<ItemPage> | undefined }) {
 
 function Days({ answer }: { answer: Answer<ItemPage> }) {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const f = useFigures();
   return (
     <TableFrame>
@@ -203,7 +204,7 @@ function Days({ answer }: { answer: Answer<ItemPage> }) {
         <tbody>
           {[...answer.data.series].reverse().map((day) => (
             <tr key={day.day} className="border-b border-neutral-100">
-              <th scope="row" className={`${TD} font-medium`}>{seriesLabel(day.day, "day", locale)}</th>
+              <th scope="row" className={`${TD} font-medium`}>{seriesLabel(day.day, "day", dates)}</th>
               {!day.built ? (
                 <td colSpan={7} className={`${TD} text-right text-neutral-500`}>{t("not_built")}</td>
               ) : (

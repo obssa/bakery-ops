@@ -1,9 +1,10 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { differenceOf, percentChange, seriesLabel, type AnalyticsRange } from "@/lib/analytics";
 import { useOverview, useSales, type Answer, type Overview } from "@/lib/api/analytics";
+import { useDateFormat } from "@/lib/useDates";
 import { Bars } from "../charts/Bars";
 import { Sparkline } from "../charts/Sparkline";
 import { PageHeader } from "../ui";
@@ -107,11 +108,11 @@ function Headline({ answer, compare, range, showSpark }: { answer: Answer<Overvi
 /** Revenue day by day inside the revenue tile; asked for only after the overview answered. */
 function RevenueSpark({ range }: { range: AnalyticsRange }) {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const f = useFigures();
   const sales = useSales(range, "day");
   if (!sales.data) return <span aria-hidden="true" className="mt-2 block h-9 animate-pulse rounded bg-neutral-100" />;
-  const points = sales.data.data.series.map((point) => ({ key: point.key, label: seriesLabel(point.key, "day", locale), value: point.revenue }));
+  const points = sales.data.data.series.map((point) => ({ key: point.key, label: seriesLabel(point.key, "day", dates), value: point.revenue }));
   return <Sparkline label={t("overview.spark_label")} points={points} format={f.amount} table={{ caption: t("overview.spark_label"), keyHeading: t("col.day"), valueHeading: t("col.revenue"), missingText: t("not_built") }} />;
 }
 

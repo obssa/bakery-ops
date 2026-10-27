@@ -1,10 +1,11 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { paymentsDrill, seriesLabel, seriesTotals, spanLabel, type ChannelCount } from "@/lib/analytics";
 import { useChannelFigures, type ChannelFigures, type SeriesGroup } from "@/lib/api/analytics";
 import { can, useSession } from "@/lib/session";
+import { useDateFormat } from "@/lib/useDates";
 import { Line } from "../charts/Line";
 import { PageHeader } from "../ui";
 import { focusRing } from "../styles";
@@ -22,7 +23,7 @@ const COUNTS: readonly ChannelCount[] = ["without_reference_count", "without_pho
 
 export function ChannelsScreen() {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const f = useFigures();
   const page = useAnalyticsPage();
   const { range, params, today } = page;
@@ -31,7 +32,7 @@ export function ChannelsScreen() {
   const figures = useChannelFigures(range, group);
   const data = figures.data?.data;
   const query = (next: Partial<{ range: typeof range; group: SeriesGroup }>) => pageQuery(next.range ?? range, { group: (next.group ?? group) === "day" ? "" : (next.group ?? group) });
-  const label = (key: string) => (group === "week" ? t("week_of", { date: seriesLabel(key, group, locale) }) : seriesLabel(key, group, locale));
+  const label = (key: string) => (group === "week" ? t("week_of", { date: seriesLabel(key, group, dates) }) : seriesLabel(key, group, dates));
   const totals = data ? seriesTotals(data.series) : [];
 
   return (
@@ -59,7 +60,7 @@ export function ChannelsScreen() {
                 <SkeletonRows rows={4} label={t("loading")} />
               ) : (
                 <Line
-                  label={t("channels.chart_label", { range: spanLabel(range, locale) })}
+                  label={t("channels.chart_label", { range: spanLabel(range, dates) })}
                   points={data.series.map((point, i) => ({ key: point.key, label: label(point.key), value: totals[i] ?? null }))}
                   format={f.amount}
                   table={{ summary: t("chart.show_figures"), caption: t(`channels.by_${group}`), keyHeading: t(`col.${group}`), valueHeading: t("col.amount"), missingText: t("not_built") }}

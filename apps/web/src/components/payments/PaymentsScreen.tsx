@@ -27,6 +27,7 @@ import { createPaymentsFeed } from "@/lib/live/payments";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { businessToday } from "@/lib/orderNo";
 import { can, useSession } from "@/lib/session";
+import { useDateFormat } from "@/lib/useDates";
 import { Alert, Button, Field, PageHeader, Select, Status, TextInput } from "../ui";
 import { PaymentDialog } from "./PaymentDialog";
 import { PhotoThumb, PhotoViewer } from "./PhotoViewer";
@@ -42,6 +43,7 @@ const PATH = "/admin/payments";
 
 export function PaymentsScreen() {
   const t = useTranslations("adminPayments");
+  const dates = useDateFormat();
   const params = useSearchParams();
   const router = useRouter();
   const me = useSession((s) => s.me);
@@ -139,7 +141,7 @@ export function PaymentsScreen() {
               <p className="text-base text-neutral-600">{t("list.end")}</p>
             ) : null}
             {olderError ? <OlderError error={olderError} /> : null}
-            {snapshot.state.serverTime ? <p className="ml-auto text-sm text-neutral-500">{t("updated", { time: addisStamp(snapshot.state.serverTime) })}</p> : null}
+            {snapshot.state.serverTime ? <p className="ml-auto text-sm text-neutral-500">{t("updated", { time: addisStamp(snapshot.state.serverTime, dates) })}</p> : null}
           </div>
         ) : null}
       </div>
@@ -315,6 +317,7 @@ function ExportBar({ filters, query }: { filters: PaymentFilters; query: Record<
 
 function PaymentsTable({ rows, onOpen, onPhoto }: { rows: PaymentListRow[]; onOpen: (id: number) => void; onPhoto: (row: PaymentListRow) => void }) {
   const t = useTranslations("adminPayments");
+  const dates = useDateFormat();
   const channelName = useChannelName();
   const orderLabel = useOrderLabel();
   return (
@@ -348,7 +351,7 @@ function PaymentsTable({ rows, onOpen, onPhoto }: { rows: PaymentListRow[]; onOp
               <tr key={row.id} className="border-b border-neutral-100 last:border-0">
                 <td className={`${TD} tabular-nums text-neutral-700`}>{row.id}</td>
                 <td className={`${TD} whitespace-nowrap`}>
-                  {addisStamp(row.received_at)}
+                  {addisStamp(row.received_at, dates)}
                   {row.received_by.name ? <span className="block text-sm text-neutral-600">{t("list.by", { name: row.received_by.name })}</span> : null}
                 </td>
                 <td className={TD}>

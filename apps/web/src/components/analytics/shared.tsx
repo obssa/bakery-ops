@@ -40,6 +40,7 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { businessToday } from "@/lib/orderNo";
 import { keepsKey } from "@/lib/paySheet";
 import { can, useSession } from "@/lib/session";
+import { useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
 import { addisStamp, saveBlob } from "../payments/shared";
 import { Alert, Badge, Button, Field, Status, TextInput } from "../ui";
@@ -160,7 +161,7 @@ export function AnalyticsGate({ children }: { children: ReactNode }) {
 /** Today, 7, 30 or 90 days, or a custom range in the branch's local dates; the choice goes to the address. */
 export function RangeControl({ range, today, onChange, children }: { range: AnalyticsRange; today: string; onChange: (range: AnalyticsRange) => void; children?: ReactNode }) {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const [custom, setCustom] = useState(range.preset === "custom");
   return (
     <section aria-label={t("range.title")} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
@@ -175,7 +176,7 @@ export function RangeControl({ range, today, onChange, children }: { range: Anal
             {t("range.custom")}
           </Button>
         </div>
-        <p className="text-base text-neutral-700">{rangeLabel(range, locale)}</p>
+        <p className="text-base text-neutral-700">{rangeLabel(range, dates)}</p>
         {children ? <div className="ml-auto flex flex-wrap items-center gap-3">{children}</div> : null}
       </div>
       {custom ? <CustomRange key={`${range.from}|${range.to}`} range={range} today={today} onApply={onChange} /> : null}
@@ -251,6 +252,7 @@ type Freshness = ReturnType<typeof useFreshness>;
 /** "Updated 2 min ago" (the oldest rebuild of the days read), a running rebuild, the days not built with the Rebuild button. */
 export function FreshnessBar({ state, asOf }: { state: Freshness; asOf?: string | null }) {
   const t = useTranslations("analytics");
+  const dates = useDateFormat();
   const now = useNow(30_000);
   const freshness = state.freshness;
   const stamp = freshness ? freshness.as_of : (asOf ?? null);
@@ -263,7 +265,7 @@ export function FreshnessBar({ state, asOf }: { state: Freshness; asOf?: string 
       <div className="flex flex-wrap items-center gap-3">
         {known ? (
           <Badge tone={ago.unit === "never" ? "amber" : "neutral"}>
-            <span title={stamp ? addisStamp(stamp) : undefined}>{ago.unit === "never" ? t("fresh.never") : t(`fresh.${ago.unit}`, { count: ago.count })}</span>
+            <span title={stamp ? addisStamp(stamp, dates) : undefined}>{ago.unit === "never" ? t("fresh.never") : t(`fresh.${ago.unit}`, { count: ago.count })}</span>
           </Badge>
         ) : null}
         {freshness?.running ? (
@@ -282,7 +284,7 @@ export function FreshnessBar({ state, asOf }: { state: Freshness; asOf?: string 
 /** The days of the range with no summaries: named (never counted as zero), and rebuilt on request by an admin (analytics.manage). */
 function NotBuilt({ days, running, onRebuilt, onDone }: { days: string[]; running: boolean; onRebuilt: () => void; onDone: (message: string | null) => void }) {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const errorText = useErrorText();
   const client = useQueryClient();
   const headingId = useId();
@@ -332,7 +334,7 @@ function NotBuilt({ days, running, onRebuilt, onDone }: { days: string[]; runnin
         {t("stale.title")}
       </h2>
       <p className="text-base text-amber-900">
-        {t("stale.body", { count: days.length, days: runs.map((run) => spanLabel(run, locale)).join(", ") })}
+        {t("stale.body", { count: days.length, days: runs.map((run) => spanLabel(run, dates)).join(", ") })}
       </p>
       {manager ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -499,10 +501,10 @@ export function useFigures() {
   };
 }
 
-/** A local date as the dashboards label it (lib/analytics.ts dayLabel; step 4.5f switches it). */
+/** A local date as the dashboards label it (lib/analytics.ts dayLabel), in the person's calendar (step 4.5f). */
 export function useDayLabel(): (day: string, withYear?: boolean) => string {
-  const locale = useLocale();
-  return (day, withYear = false) => dayLabel(day, locale, withYear);
+  const dates = useDateFormat();
+  return (day, withYear = false) => dayLabel(day, dates, withYear);
 }
 
 export const TH = "py-2 pr-4 font-medium";

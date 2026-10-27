@@ -4,8 +4,10 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import type { Locale, PaymentListRow, PaymentStatus, PaymentView } from "@/lib/api/types";
 import { chipsOf, type PaymentChip } from "@/lib/adminPayments";
+import { stampText, type DateFormatLike } from "@/lib/dates";
 import { otherDayLabel } from "@/lib/orderNo";
 import { can, useSession } from "@/lib/session";
+import { useDateFormat } from "@/lib/useDates";
 import { Badge } from "../ui";
 import { focusRing } from "../styles";
 
@@ -51,14 +53,14 @@ export function useChannelName(): (channel: { code: string | null; name_en: stri
   return (channel) => (locale === "am" ? channel.name_am || channel.name_en : channel.name_en || channel.name_am) || channel.code || "—";
 }
 
-/** "3" for an order of today, "3 of 21 Oct" for an earlier business day's (numbers restart daily). */
+/** "3" for an order of today, "3 of 21 Oct" for an earlier business day's (numbers restart daily), the date in the person's calendar. */
 export function useOrderLabel(): (order: PaymentListRow["order"]) => string {
   const t = useTranslations("common");
-  const locale = useLocale() as Locale;
+  const dates = useDateFormat();
   return (order) => {
     if (!order || order.order_no === null) return "—";
     const no = String(order.order_no);
-    const date = otherDayLabel(order.business_date, locale);
+    const date = otherDayLabel(order.business_date, dates);
     return date ? t("order_no_dated", { no, date }) : no;
   };
 }
@@ -95,13 +97,13 @@ export function Money({ amount, currency = "ETB" }: { amount: string | null; cur
   return <span className="tabular-nums">{t("money", { amount, currency })}</span>;
 }
 
-/** An ISO instant as "2026-10-27 14:05" in the bakery's time zone (Africa/Addis_Ababa), the same in both languages. */
-export function addisStamp(iso: string | null): string {
-  if (!iso) return "—";
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  const local = new Date(at.getTime() + 3 * 60 * 60 * 1000).toISOString();
-  return `${local.slice(0, 10)} ${local.slice(11, 16)}`;
+/**
+ * An ISO instant as "2026-10-27 14:05" in the bakery's time zone (Africa/Addis_Ababa), the same in both languages; with the person's date
+ * format (lib/useDates.ts useDateFormat, step 4.5f) in their calendar: "Tikimt 17, 2019 14:05", or both. Every timestamp of the admin
+ * screens goes through here (lib/dates.ts stampText).
+ */
+export function addisStamp(iso: string | null, fmt: DateFormatLike = "en"): string {
+  return stampText(iso, fmt);
 }
 
 /** Saves a file the API answered (a Blob) under a name: the export, read with the bearer token. */

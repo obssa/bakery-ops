@@ -27,6 +27,7 @@ import {
 } from "@/lib/adminPayments";
 import { useErrorText } from "@/lib/errors";
 import { keepsKey } from "@/lib/paySheet";
+import { useDateFormat } from "@/lib/useDates";
 import { Alert, Badge, Button, Field, PageHeader, Panel, TextInput } from "../ui";
 import { QueryBox } from "../inventory/shared";
 import { addisStamp, TD, TH, useChannelName } from "./shared";
@@ -103,6 +104,7 @@ function Rules({ channel }: { channel: PaymentChannel }) {
 
 function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: PaymentChannel) => void }) {
   const t = useTranslations("adminPayments");
+  const dates = useDateFormat();
   const name = useChannelName();
   const errorText = useErrorText();
   const reorder = useReorderChannels();
@@ -272,7 +274,7 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                       </td>
                       <td className={`${TD} whitespace-nowrap`}>
                         <Badge>{t("channels.removed")}</Badge>
-                        <span className="mt-1 block text-sm text-neutral-600">{addisStamp(row.deleted_at)}</span>
+                        <span className="mt-1 block text-sm text-neutral-600">{addisStamp(row.deleted_at, dates)}</span>
                       </td>
                     </tr>
                   );

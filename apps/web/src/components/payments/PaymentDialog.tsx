@@ -9,6 +9,7 @@ import type { PaymentDetail } from "@/lib/api/types";
 import { canDispute, canVerify, reasonIssue, REASON_MAX } from "@/lib/adminPayments";
 import { useErrorText } from "@/lib/errors";
 import { keepsKey } from "@/lib/paySheet";
+import { useDateFormat } from "@/lib/useDates";
 import { Alert, Button, Field, Modal, Textarea, TextInput } from "../ui";
 import { PhotoThumb, PhotoViewer } from "./PhotoViewer";
 import { addisStamp, Money, PaymentStatusCell, useChannelName, useOrderLabel } from "./shared";
@@ -89,6 +90,7 @@ export function PaymentDialog({
 
 function Details({ payment, canDecide, onPhoto, onChanged }: { payment: PaymentDetail; canDecide: boolean; onPhoto: () => void; onChanged: (payment: PaymentDetail) => void }) {
   const t = useTranslations("adminPayments");
+  const dates = useDateFormat();
   const channelName = useChannelName();
   const orderLabel = useOrderLabel();
   const order = payment.order;
@@ -123,12 +125,12 @@ function Details({ payment, canDecide, onPhoto, onChanged }: { payment: PaymentD
               <Money amount={order.total} currency={payment.currency} />
             </Row>
           ) : null}
-          <Row term={t("detail.received")}>{addisStamp(payment.received_at)}</Row>
+          <Row term={t("detail.received")}>{addisStamp(payment.received_at, dates)}</Row>
           <Row term={t("detail.received_by")}>{payment.received_by.name ?? "—"}</Row>
-          {payment.verified_at ? <Row term={t("detail.verified_at")}>{addisStamp(payment.verified_at)}</Row> : null}
-          {payment.disputed_at ? <Row term={t("detail.disputed_at")}>{addisStamp(payment.disputed_at)}</Row> : null}
+          {payment.verified_at ? <Row term={t("detail.verified_at")}>{addisStamp(payment.verified_at, dates)}</Row> : null}
+          {payment.disputed_at ? <Row term={t("detail.disputed_at")}>{addisStamp(payment.disputed_at, dates)}</Row> : null}
           {payment.dispute_reason ? <Row term={t("detail.dispute_reason")}>{payment.dispute_reason}</Row> : null}
-          {payment.voided_at ? <Row term={t("detail.voided_at")}>{addisStamp(payment.voided_at)}</Row> : null}
+          {payment.voided_at ? <Row term={t("detail.voided_at")}>{addisStamp(payment.voided_at, dates)}</Row> : null}
           {payment.void_reason ? <Row term={t("detail.void_reason")}>{payment.void_reason}</Row> : null}
           {payment.refunded_amount !== "0.00" ? (
             <Row term={t("detail.refunded")}>

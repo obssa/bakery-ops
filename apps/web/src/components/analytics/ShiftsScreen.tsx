@@ -1,8 +1,9 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { seriesLabel, spanLabel } from "@/lib/analytics";
 import { useShiftFigures } from "@/lib/api/analytics";
+import { useDateFormat } from "@/lib/useDates";
 import { Bars } from "../charts/Bars";
 import { PageHeader } from "../ui";
 import { ExportBar, FreshnessBar, pageQuery, RangeControl, ReadError, Section, SkeletonRows, TableFrame, TD, TD_NUM, TH, TH_NUM, useAnalyticsPage, useFigures, useFreshness } from "./shared";
@@ -14,7 +15,7 @@ import { ExportBar, FreshnessBar, pageQuery, RangeControl, ReadError, Section, S
 
 export function ShiftsScreen() {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const f = useFigures();
   const page = useAnalyticsPage();
   const { range, today } = page;
@@ -36,7 +37,7 @@ export function ShiftsScreen() {
             <SkeletonRows rows={7} label={t("loading")} />
           ) : (
             <div className="space-y-6">
-              <Bars label={t("shifts.chart_label", { range: spanLabel(range, locale) })} points={data.days.map((day) => ({ key: day.day, label: seriesLabel(day.day, "day", locale), value: day.cash_variance_total }))} format={f.amount} height={140} />
+              <Bars label={t("shifts.chart_label", { range: spanLabel(range, dates) })} points={data.days.map((day) => ({ key: day.day, label: seriesLabel(day.day, "day", dates), value: day.cash_variance_total }))} format={f.amount} height={140} />
               <TableFrame>
                 <table className="w-full border-collapse text-left text-base">
                   <caption className="sr-only">{t("shifts.table")}</caption>
@@ -52,7 +53,7 @@ export function ShiftsScreen() {
                   <tbody>
                     {[...data.days].reverse().map((day) => (
                       <tr key={day.day} className="border-b border-neutral-100">
-                        <th scope="row" className={`${TD} font-medium`}>{seriesLabel(day.day, "day", locale)}</th>
+                        <th scope="row" className={`${TD} font-medium`}>{seriesLabel(day.day, "day", dates)}</th>
                         {!day.built ? (
                           <td colSpan={4} className={`${TD} text-right text-neutral-500`}>{t("not_built")}</td>
                         ) : (

@@ -1,8 +1,9 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { hourLabel, seriesLabel, spanLabel } from "@/lib/analytics";
 import { useHourly, useSales, type SeriesGroup } from "@/lib/api/analytics";
+import { useDateFormat } from "@/lib/useDates";
 import { Bars } from "../charts/Bars";
 import { Line } from "../charts/Line";
 import { PageHeader } from "../ui";
@@ -45,12 +46,12 @@ export function SalesScreen() {
 
 function Series({ group, onGroup }: { group: SeriesGroup; onGroup: (group: SeriesGroup) => void }) {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const f = useFigures();
   const { range } = useAnalyticsPage();
   const sales = useSales(range, group);
   const series = sales.data?.data.series ?? [];
-  const label = (key: string) => (group === "week" ? t("week_of", { date: seriesLabel(key, group, locale) }) : seriesLabel(key, group, locale));
+  const label = (key: string) => (group === "week" ? t("week_of", { date: seriesLabel(key, group, dates) }) : seriesLabel(key, group, dates));
 
   return (
     <Section title={t(`sales.by_${group}`)} actions={<Choices label={t("sales.group")} options={GROUPS} value={group} onChange={onGroup} text={(option) => t(`group.${option}`)} />}>
@@ -60,7 +61,7 @@ function Series({ group, onGroup }: { group: SeriesGroup; onGroup: (group: Serie
         <SkeletonRows rows={6} label={t("loading")} />
       ) : (
         <div className="space-y-6">
-          <Line label={t("sales.chart_label", { range: spanLabel(range, locale) })} points={series.map((point) => ({ key: point.key, label: label(point.key), value: point.revenue }))} format={f.amount} />
+          <Line label={t("sales.chart_label", { range: spanLabel(range, dates) })} points={series.map((point) => ({ key: point.key, label: label(point.key), value: point.revenue }))} format={f.amount} />
           <TableFrame>
             <table className="w-full border-collapse text-left text-base">
               <caption className="sr-only">{t(`sales.by_${group}`)}</caption>
@@ -106,7 +107,7 @@ function Series({ group, onGroup }: { group: SeriesGroup; onGroup: (group: Serie
 
 function Hours() {
   const t = useTranslations("analytics");
-  const locale = useLocale();
+  const dates = useDateFormat();
   const f = useFigures();
   const { range } = useAnalyticsPage();
   const hourly = useHourly(range);
@@ -124,7 +125,7 @@ function Hours() {
       ) : (
         <div className="space-y-6">
           <p className="text-sm text-neutral-600">{t("sales.hourly_note")}</p>
-          <Bars label={t("sales.hourly_label", { range: spanLabel(range, locale) })} points={hours.map((hour) => ({ key: String(hour.hour), label: hourLabel(hour.hour), value: hour.revenue }))} format={f.amount} />
+          <Bars label={t("sales.hourly_label", { range: spanLabel(range, dates) })} points={hours.map((hour) => ({ key: String(hour.hour), label: hourLabel(hour.hour), value: hour.revenue }))} format={f.amount} />
           <details>
             <summary className={`inline-flex min-h-12 cursor-pointer items-center rounded-md px-2 text-base font-medium text-blue-800 hover:bg-blue-50 ${focusRing}`}>{t("sales.hourly_table")}</summary>
             <TableFrame>

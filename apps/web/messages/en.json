@@ -2069,5 +2069,27 @@
       "stations": "My stations",
       "stations_empty": "No figures for your stations in this range."
     }
+  },
+  "dates": {
+    "label": "Dates",
+    "hint": "How dates read for you on this device. Every date stays the same underneath.",
+    "gregorian": "Gregorian calendar",
+    "ethiopian": "Ethiopian calendar",
+    "both": "Both calendars",
+    "ethiopian_months": {
+      "1": "Meskerem",
+      "2": "Tikimt",
+      "3": "Hidar",
+      "4": "Tahsas",
+      "5": "Tir",
+      "6": "Yekatit",
+      "7": "Megabit",
+      "8": "Miyazya",
+      "9": "Ginbot",
+      "10": "Sene",
+      "11": "Hamle",
+      "12": "Nehase",
+      "13": "Pagume"
+    }
   }
 }

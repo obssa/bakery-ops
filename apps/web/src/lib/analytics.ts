@@ -1,4 +1,5 @@
 import type { ChannelPoint, FreshnessDay, ItemFigures, ReportName, SeriesGroup } from "./api/analytics";
+import { dayText, monthText, rangeText, spanText, type DateFormatLike } from "./dates";
 import { addDecimal, compareDecimal, divideDecimal, subtractDecimal } from "./decimal";
 
 export type { FreshnessDay } from "./api/analytics";
@@ -8,7 +9,7 @@ export type { FreshnessDay } from "./api/analytics";
 // ends counted) and its arithmetic is calendar arithmetic on UTC dates, so no time zone enters it: the dates already are Addis Ababa's.
 // The API checks every range again (at most 400 days, never after today) and answers analytics.range.* in both languages. Figures stay
 // decimal strings (decimal.ts): a change from the previous period is worked on scaled integers, never a float. The date labels of the
-// dashboards are made here, in one place, so step 4.5f can switch them to the Ethiopian calendar.
+// dashboards are made here, in one place, through the one formatter of lib/dates.ts (step 4.5f: the Ethiopian calendar when asked for).
 
 export const RANGE_MAX_DAYS = 400;
 export const REBUILD_SYNC_MAX_DAYS = 7;
@@ -131,33 +132,31 @@ export function seriesKeyOf(date: string, group: SeriesGroup): string {
   return date;
 }
 
-// --- labels (one place: step 4.5f switches them to the Ethiopian calendar) -----------------------------------------------------------------
+// --- labels (one place; step 4.5f: through lib/dates.ts, in the person's calendar) -------------------------------------------------------------
 
-function intlOf(locale: string): string {
-  return locale === "am" ? "am-ET" : "en-GB";
+// The dashboards' date labels. `fmt` is the person's date format (lib/useDates.ts: the page's language, the calendar they chose and the
+// Ethiopian month names), or a bare locale, which reads in the Gregorian calendar. The ranges underneath stay Gregorian local dates.
+
+/** A local date for people: "27 Oct" ("27 Oct 2026" with the year); "Tikimt 17" ("Tikimt 17, 2019") in the Ethiopian calendar. */
+export function dayLabel(date: string, fmt: DateFormatLike, withYear = false): string {
+  return dayText(date, fmt, { withYear });
 }
 
-/** A local date for people: "27 Oct" ("27 Oct 2026" with the year). */
-export function dayLabel(date: string, locale: string, withYear = false): string {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString(intlOf(locale), { day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}), timeZone: "UTC" });
-}
-
-/** A series key for people: a day with its weekday ("Tue 27 Oct"), a week by its Monday ("26 Oct"), a month ("Oct 2026"). */
-export function seriesLabel(key: string, group: SeriesGroup, locale: string): string {
-  if (group === "month") return new Date(`${key}-01T12:00:00Z`).toLocaleDateString(intlOf(locale), { month: "short", year: "numeric", timeZone: "UTC" });
-  if (group === "week") return dayLabel(key, locale);
-  return new Date(`${key}T12:00:00Z`).toLocaleDateString(intlOf(locale), { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+/** A series key for people: a day with its weekday ("Tue 27 Oct"), a week by its Monday ("26 Oct"), a month ("Oct 2026", or the Ethiopian days it covers). */
+export function seriesLabel(key: string, group: SeriesGroup, fmt: DateFormatLike): string {
+  if (group === "month") return monthText(key, fmt);
+  if (group === "week") return dayLabel(key, fmt);
+  return dayText(key, fmt, { weekday: true });
 }
 
 /** A range for people: "27 Oct 2026", or "21 Oct 2026 – 27 Oct 2026". */
-export function rangeLabel(range: DayRange, locale: string): string {
-  const to = dayLabel(range.to, locale, true);
-  return range.from === range.to ? to : `${dayLabel(range.from, locale, true)} – ${to}`;
+export function rangeLabel(range: DayRange, fmt: DateFormatLike): string {
+  return rangeText(range, fmt);
 }
 
 /** The days of a week or a run for people: "27 Oct", or "21 Oct – 27 Oct". */
-export function spanLabel(range: DayRange, locale: string): string {
-  return range.from === range.to ? dayLabel(range.from, locale) : `${dayLabel(range.from, locale)} – ${dayLabel(range.to, locale)}`;
+export function spanLabel(range: DayRange, fmt: DateFormatLike): string {
+  return spanText(range, fmt);
 }
 
 /** A local hour of the day: "07:00". */
