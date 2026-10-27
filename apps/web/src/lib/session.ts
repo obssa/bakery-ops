@@ -138,8 +138,8 @@ export async function authed<T>(path: string, options: Omit<RequestOptions, "tok
   }
 }
 
-/** A file (a receipt PDF) with the current token; a 401 signs this device out, as `authed` does. */
-export async function authedBlob(path: string, options: { query?: RequestOptions["query"]; timeoutMs?: number } = {}): Promise<Blob> {
+/** A file (a receipt PDF, a payments export) with the current token; a 401 signs this device out, as `authed` does. */
+export async function authedBlob(path: string, options: { query?: RequestOptions["query"]; timeoutMs?: number; accept?: string } = {}): Promise<Blob> {
   const { token } = useSession.getState();
   try {
     return await requestBlob(path, { ...options, token });

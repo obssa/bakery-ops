@@ -497,6 +497,91 @@ export interface OrderPayments {
   balance: DecimalString;
 }
 
+export type PaymentStatus = PaymentView["status"];
+
+export const PAYMENT_STATUSES: readonly PaymentStatus[] = ["recorded", "verified", "disputed", "voided"];
+
+/** A payment as GET /payments lists it (step 4.3b): the read shape with its order (numbers restart daily). */
+export interface PaymentListRow extends PaymentView {
+  order: { id: number; order_no: number | null; business_date: string | null; table_code: string | null; total: DecimalString } | null;
+}
+
+/** GET /payments: one page, newest first; `next_cursor` is the last id seen, null on the last page. */
+export interface PaymentsPage {
+  data: PaymentListRow[];
+  next_cursor: string | null;
+  server_time: string;
+}
+
+/** A payment's refund as GET /payments/{payment} lists it (none before step 4.3d). */
+export interface PaymentRefundView {
+  id: number;
+  amount: DecimalString;
+  channel_id: number;
+  refunded_at: string;
+}
+
+/** GET /payments/{payment}, and the answer of verify, dispute and void (step 4.3c). */
+export interface PaymentDetail extends PaymentListRow {
+  refunds: PaymentRefundView[];
+}
+
+/** GET /files/{file}/url (step 4.2b): a fresh signed URL of a stored photo. */
+export interface SignedFileUrl {
+  url: string;
+  expires_at: string;
+}
+
+/** One local day and channel of GET /payments/reconciliation (step 4.3e), and the shape of its totals. */
+export interface ReconciliationCell {
+  receipts: number;
+  amount: DecimalString;
+  with_photo: number;
+  without_photo: number;
+  with_reference: number;
+  verified: number;
+  disputed: number;
+  voided: number;
+  refunds: number;
+  refund_amount: DecimalString;
+  net_amount: DecimalString;
+}
+
+export interface ReconciliationChannelRow extends ReconciliationCell {
+  channel: { id: number; code: string; name_en: string; name_am: string };
+}
+
+/** GET /payments/reconciliation: every day of the range, oldest first; a day lists the channels that had a payment or a refund. */
+export interface Reconciliation {
+  from: string;
+  to: string;
+  timezone: string;
+  days: { day: string; channels: ReconciliationChannelRow[] }[];
+  totals: ReconciliationCell & { channels: ReconciliationChannelRow[] };
+}
+
+/** POST /payment-channels body (step 4.3a). */
+export interface NewPaymentChannel {
+  client_uuid: string;
+  code: string;
+  name_en: string;
+  name_am: string;
+  is_enabled: boolean;
+  requires_photo: boolean;
+  requires_reference: boolean;
+  reference_pattern: string | null;
+  reference_hint_en: string | null;
+  reference_hint_am: string | null;
+  photo_hint_en: string | null;
+  photo_hint_am: string | null;
+}
+
+/** PATCH /payment-channels/{channel} body: any of these; the code never changes. */
+export type PaymentChannelChanges = Partial<Omit<NewPaymentChannel, "client_uuid" | "code">>;
+
+/** PUT /receipt-settings body (step 4.3e): the whole form each time. */
+export type ReceiptSettingsInput = Omit<ReceiptSettings, "is_default">;
+
 /** GET /receipt-settings (step 4.3e): what the printed receipt carries at its top. */
 export interface ReceiptSettings {
   business_name_en: string;

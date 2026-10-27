@@ -149,14 +149,14 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 }
 
 /**
- * A GET whose answer is a file (the receipt PDF of step 4.5b), with the same headers, time limit and errors as `request`: a refusal is
- * still the API's bilingual JSON body.
+ * A GET whose answer is a file (the receipt PDF of step 4.5b, the payments export of step 4.5c), with the same headers, time limit and
+ * errors as `request`: a refusal is still the API's bilingual JSON body. `accept` names the file's type (a PDF by default).
  */
 export async function requestBlob(
   path: string,
-  options: { query?: RequestOptions["query"]; token?: string | null; signal?: AbortSignal; timeoutMs?: number } = {},
+  options: { query?: RequestOptions["query"]; token?: string | null; signal?: AbortSignal; timeoutMs?: number; accept?: string } = {},
 ): Promise<Blob> {
-  const headers: Record<string, string> = { Accept: "application/pdf, application/json", ...stationHeaders() };
+  const headers: Record<string, string> = { Accept: `${options.accept ?? "application/pdf"}, application/json`, ...stationHeaders() };
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   const limit = withTimeout(options.signal, options.timeoutMs ?? READ_TIMEOUT_MS);
   let response: Response;

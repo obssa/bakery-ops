@@ -14,6 +14,11 @@ const PAGES = new Set<string>([
   "/admin/inventory/suppliers",
   "/admin/inventory/transfers",
   "/admin/inventory/reorder",
+  // step 4.5c: the payment_disputed line links to /admin/payments?payment={id} (step 4.3c)
+  "/admin/payments",
+  "/admin/payments/reconciliation",
+  "/admin/payments/channels",
+  "/admin/payments/receipts",
 ]);
 
 // The API's notification registry names the stock paths it had before the admin Inventory pages existed (stock alerts:

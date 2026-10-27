@@ -109,9 +109,10 @@ const compiled = new Map<string, RegExp | null>();
 
 /**
  * The channel's pattern as the API reads it (ReferencePattern: the body matched against the whole reference). A body this browser cannot
- * compile, in the strict (u) mode or the plain one, is null: it is not checked here, and the API decides.
+ * compile, in the strict (u) mode or the plain one, is null: it is not checked here, and the API decides. The admin's channel form of
+ * step 4.5c checks a pattern being typed with it.
  */
-function patternOf(body: string): RegExp | null {
+export function patternOf(body: string): RegExp | null {
   if (!compiled.has(body)) {
     let found: RegExp | null = null;
     for (const flags of ["u", ""]) {
