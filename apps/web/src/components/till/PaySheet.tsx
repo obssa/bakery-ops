@@ -206,7 +206,8 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
   const network = error instanceof ApiError && error.isNetwork;
 
   return (
-    <Modal label={t("pay_title", { no })} onClose={onClose} size="lg">
+    // while the batch is on its way the sheet stays open: the cashier must see whether it was taken and the change to give
+    <Modal label={t("pay_title", { no })} onClose={pending ? () => {} : onClose} size="lg">
       <h2 className="text-lg font-semibold text-neutral-900">{t("pay_title", { no })}</h2>
       <div className="grid gap-2 sm:grid-cols-2">
         <p className="flex items-baseline justify-between gap-4 rounded-md bg-neutral-100 px-4 py-3 text-xl font-semibold text-neutral-900">
@@ -308,7 +309,7 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
             >
               {pending ? t("paying") : t("complete")}
             </Button>
-            <Button type="button" variant="secondary" className="min-h-14" onClick={onClose}>
+            <Button type="button" variant="secondary" className="min-h-14" disabled={pending} onClick={onClose}>
               {t("close")}
             </Button>
           </div>
