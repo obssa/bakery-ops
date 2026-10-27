@@ -77,6 +77,9 @@ final class PermissionRegistry
         // which had run on the live database without it). analytics.manage: the on-demand rebuild of the summary tables (later the weekly
         // summary's test send); configuration-like, so the admin's only.
         'analytics.manage' => ['admin'],
+        // Step 4.5a (plan section 10.6): its own grant-only migration 2026_11_08_100200_grant_audit_export_permission (M2 has run on the live
+        // database without it). audit.export: GET /audit-log/export, the whole log as a file; audit.view (above) reads it on the screen.
+        'audit.export' => ['admin'],
     ];
 
     /**
