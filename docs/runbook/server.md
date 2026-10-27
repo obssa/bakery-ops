@@ -86,6 +86,9 @@ cron `queue:work --stop-when-empty --max-time=50` entry above (see "Cron entries
    A failure runs `scripts/deploy/rollback.sh` (code only) and fails the job.
 7. `live-e2e` runs the Playwright tests tagged `@live` against the live URL.
 
+The deploy pipeline (`deploy.yml`, `release.sh`) never runs a seeder: a release migrates, it never seeds, and the live demo branch gets no
+backdated history (phase-4 plan 10.2 R-I; the 90-day history exists only on CI's compose stacks).
+
 ## Web shell under /app (public/.htaccess)
 
 `deploy.yml` builds the Next.js app with `NEXT_OUTPUT=export` and copies `out/` to `public/app/`. Laravel's
@@ -422,7 +425,7 @@ Unattached uploads are purged after 24 hours (`files:purge-orphans`).
   `stored_files` (the database) knows each object's disk, size, sha256 and what it is attached to. The only read path is a signed URL
   (`GET /api/v1/files/{id}?expires&signature`, five minutes, `Cache-Control: private, no-store`); a plain GET answers 403.
 - **Who.** `files.upload` (admin, manager, cashier) uploads and deletes one's own unattached photo; `payments.view` (same roles) asks for a fresh
-  signed URL; a manager (`payments.void`) may delete any unattached photo; `GET /api/v1/files/doctor` is the admin's. The migration
+  signed URL; a holder of `payments.verify` (admin, manager; `payments.void` before step 4.3c) may delete any unattached photo; `GET /api/v1/files/doctor` is the admin's. The migration
   `grant_phase_4_permissions` puts `files.upload` and `payments.view` in the live database at the next deploy, before any screen uses them.
 - **Orphans.** A photo nobody attached within `files.orphan_hours` (24) is removed, object and row, by `files:purge-orphans`, hourly from the
   existing `schedule:run` cron line. It prints how many it removed and never touches an attached photo.
@@ -476,8 +479,16 @@ Unattached uploads are purged after 24 hours (`files:purge-orphans`).
 ### Dashboards and the cron
 
 `analytics:rebuild`, `analytics:weekly-summary` and `files:purge-orphans` run from the existing `schedule:run` line (section "Cron entries").
-No extra cron entry is needed. k6 is never run against this host. The in-process timing command of R-G, `php artisan analytics:bench`, is
-not built yet (step 4.4d left it to the gate step 4.6b with `DashboardBudgetGateTest`); `DashboardBudgetTest` times the reads in CI.
+No extra cron entry is needed. k6 is never run against this host (it loads CI's compose stack only, the `perf-dashboards` job).
+
+**Timing the dashboards here (`analytics:bench`, step 4.6b).** `/opt/alt/php83/usr/bin/php ~/bakery-ops.orcamind.dev/artisan analytics:bench --branch=<id>`
+(the branch's id, from the admin's branch list or `select id, name from branches`; `--requests=30` by default) reads every dashboard of
+the 90 days up to yesterday, compared with the 90 before, in this PHP process as the branch's first active admin: 3 warm-ups and 30 timed
+requests per read. It prints a line per read (status, statements of its own and in all, p50, p95, slowest) and exits 0 when every read
+answers 200 within 8 statements of its own and a p95 under 400 ms, 1 when one does not, 2 for a bad call. It writes nothing (no token, no
+audit row, no summary; the permission cache of the database store is filled as by any page view) and loads nothing from outside, so it may
+run during service, but it keeps one CPU busy for a minute or two: run it outside the shop's busy hours. It measures PHP and the database;
+the browser adds the network and Cloudflare (the `@live` dashboards test logs that figure against its soft budget of 2500 ms).
 
 How the summary tables stay current (step 4.4b, ADR 0014). Every rebuild is one local day of one branch, a `RebuildDay` job on the
 database queue, run by the `queue:work` cron line:
@@ -495,6 +506,16 @@ database queue, run by the `queue:work` cron line:
 - **Is it current?** `GET /api/v1/analytics/freshness?from=&to=` lists each built day's version, `rebuilt_at` and trigger, the days not
   built yet, and `running` (a rebuild was asked for and has not run). A day stays `running` for at most 15 minutes when its job is lost;
   `php artisan queue:failed` shows a job that failed (`analytics.rebuild.failed` in the log names the branch, the day and the error's class).
+- **A day that says "not built" (`stale_days`).** Every dashboard answer and the freshness feed list the days of the range that have no
+  `analytics_days` row; the screens show them as "not built", never as zero. A day is missing when nothing ever rebuilt it: a day before
+  Phase 4 was deployed, a day whose rebuild job failed three times, or a day of a branch the nightly run has not reached yet. What to do:
+  (1) `GET /api/v1/analytics/freshness?from=&to=` (or the dashboard's notice) names the days; if they are `running`, wait for the queue's
+  cron tick (a minute or two). (2) Otherwise rebuild them: the admin's Rebuild button (it sends the days not built, newest first, at most
+  31 days a request, inline up to 7), or `analytics:rebuild --from=<first> --to=<last> --sync` from the shell. (3) A day that still will not
+  build: `php artisan queue:failed` and `analytics.rebuild.failed` in the log name the branch, the day and the error's class; the rebuild
+  of a day is one transaction, so a failed one left the old rows (or none) in place. A day whose figures look old but is built is "stale"
+  only in the ordinary sense: its `rebuilt_at` is before the latest payment; the touch of today, a shift lock or the nightly run brings it
+  up to date, and a rebuild by hand does it at once.
 - **Nothing to clean up.** The summary tables are derived: a rebuild replaces the day, and rebuilding a day twice gives the same rows.
 - **The dashboards** (step 4.4c: `GET /api/v1/analytics/overview`, `/sales`, `/sales/hourly`, `/channels`, `/items`, `/items/{id}`,
   `/stations`, `/staff`, `/shifts`) read these tables only and answer `304` until a day of their range is rebuilt; a day not built is listed
