@@ -103,9 +103,11 @@ test.describe("p4 analytics dashboards", () => {
         await tab.click();
         await expect(own.getByRole("heading", { level: 1, name: "My figures" })).toBeVisible({ timeout: 30_000 });
         await own.getByRole("button", { name: "Today", exact: true }).click();
+        // a row per kind of work (the orders the cashier took as a waiter's, the payments as a cashier's), every one the cashier's own
         const mine = own.getByRole("table", { name: "My work" });
-        await expect(rowOf(mine, fixture.cashier.name)).toBeVisible({ timeout: 30_000 });
-        await expect(mine.getByRole("rowheader")).toHaveText([fixture.cashier.name]);
+        await expect(rowOf(mine, fixture.cashier.name).filter({ hasText: "Cashier" })).toBeVisible({ timeout: 30_000 });
+        const people = (await mine.getByRole("rowheader").allTextContents()).map((text) => text.trim());
+        expect([...new Set(people)]).toEqual([fixture.cashier.name]);
       } finally {
         await context.close();
       }

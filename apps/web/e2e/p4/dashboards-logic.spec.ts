@@ -6,6 +6,7 @@ import {
   analyticsKeys,
   changedDays,
   dayLabel,
+  dayRuns,
   daysBetween,
   differenceOf,
   exportFileName,
@@ -183,6 +184,12 @@ test.describe("dashboards-logic", () => {
       { from: addDays(TODAY, -30), to: TODAY, sync: false },
       { from: addDays(TODAY, -61), to: addDays(TODAY, -31), sync: false },
       { from: "2026-07-30", to: addDays(TODAY, -62), sync: false },
+    ]);
+    // the notice names them as runs of days
+    expect(dayRuns(["2026-10-25", "2026-10-20", "2026-10-21", "2026-10-22", TODAY])).toEqual([
+      { from: "2026-10-20", to: "2026-10-22" },
+      { from: "2026-10-25", to: "2026-10-25" },
+      { from: TODAY, to: TODAY },
     ]);
     expect(rebuildPlan(["2026-06-01", TODAY])).toEqual([
       { from: TODAY, to: TODAY, sync: true },

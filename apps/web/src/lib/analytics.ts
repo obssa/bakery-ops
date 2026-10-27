@@ -197,6 +197,18 @@ export function changedDays(before: FreshnessDay[] | null, after: FreshnessDay[]
   return [...moved].sort();
 }
 
+/** Days grouped into runs of consecutive days, oldest first: how the notice names the days not built ("1 Oct – 7 Oct, 12 Oct"). */
+export function dayRuns(days: string[]): DayRange[] {
+  const sorted = [...new Set(days.filter(isLocalDate))].sort();
+  const runs: DayRange[] = [];
+  for (const day of sorted) {
+    const last = runs[runs.length - 1];
+    if (last && addDays(last.to, 1) === day) last.to = day;
+    else runs.push({ from: day, to: day });
+  }
+  return runs;
+}
+
 // --- query keys: one per answer shape (two shapes under one key crashed PR #71) ---------------------------------------------------------------
 
 export interface ItemsOptions {
