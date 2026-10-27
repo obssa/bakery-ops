@@ -19,7 +19,7 @@ use Illuminate\Http\Request;
  * The capability every module's writes go through (manifest: audit.provides). run() executes the write inside one
  * database transaction together with its audit_log row: who (ActorContext: user, acting-as, shift, station, device),
  * from where (request IP), what (action name, subject morph + id), and the subject's attributes before and after
- * with secrets redacted (Snapshot). If the action throws, the transaction rolls back and no audit row survives.
+ * with secrets redacted (Snapshot; the context too since step 4.5a). If the action throws, the transaction rolls back and no audit row survives.
  *
  * Resolved fresh from the container per use (ActorContext and CurrentBranch are scoped bindings): never hold an
  * instance across requests.
@@ -92,7 +92,8 @@ final class AuditedAction
             'subject_id' => is_numeric($subjectId) ? (int) $subjectId : null,
             'before' => $before,
             'after' => $after,
-            'context' => $context === [] ? null : $context,
+            // redacted like the snapshots (step 4.5a; until then a context was stored as given)
+            'context' => $context === [] ? null : Snapshot::redact($context),
             'shift_instance_id' => $this->actor->shiftInstanceId(),
             'station_id' => $this->actor->stationId(),
             'device_id' => $this->actor->deviceId(),
