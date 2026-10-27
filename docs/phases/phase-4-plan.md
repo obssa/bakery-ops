@@ -1205,8 +1205,81 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      - **Local run notes**: the flows ran against a second local API container (eight CLI-server workers, opcache on without timestamp checks, a sync
        queue, port 8001; not a repo change): `pay-admin-logic` and `pay-admin` 21 passed.
      - STATUS: phase 4's `web` step stays `in_progress`.
-   - **4.5d `phase-4/web-order-timeline`**: `/admin/orders/[id]` (record page by `?id=`, export-safe) merges `GET /orders/{order}` (events) with `GET /orders/{order}/payments` (photo thumbnails, signed
+   - **4.5d `phase-4/web-order-timeline`**: `/admin/orders/record` (as built; the plan said `/admin/orders/[id]`: a record page by `?id=`, export-safe) merges `GET /orders/{order}` (events) with `GET /orders/{order}/payments` (photo thumbnails, signed
      on read, re-signed when a viewer opens after 5 min), shows void/refund/payment events with who approved, and the refund action. The orders board links to it.
+   - **As built (step 4.5d, `phase-4/web-order-timeline`).** Order: the tests red (the pure rules failing on the missing `lib/orderRecord.ts`,
+     the two browser flows on the missing page), then the rules and the strings, then the page, the links into it and the reused pieces; this note.
+     Where the code disagreed with the plan or the plan left a choice:
+     - **The address.** `/admin/orders/record?id=` (the plan said `/admin/orders/[id]`: the static export has no dynamic segment, so a query, as 4.5e's
+       product page), under the Orders tab; `lib/deeplink.ts` knows it. A missing or malformed id is said in words and never sent; another branch's order
+       or none reads "This branch has no such order" (the API's 404).
+     - **Who opens it: `payments.verify`** (the admin and the manager). The reads behind it ask for less (`GET /orders/{order}`: `orders.create`;
+       `GET /orders/{order}/payments`: `payments.view`; the cashier holds both), so the gate is a choice: the record is the payment checkers' page (the
+       voids, the decisions, the audit links), and a cashier reads "Your account cannot open this page". The links into it are shown to the same people.
+     - **Two reads that exist, no API change.** `GET /orders/{order}` under the orders board's key `["order", id, version]` (the same shape; the page has
+       no feed version, so `null`) and `GET /orders/{order}/payments` under the till void dialog's `["order-payments", id]` (the same shape). A void made
+       on the page reads both again. **Not polled**: neither read answers an ETag (no `ConditionalPoll`), so a poll would read whole bodies and re-sign
+       every photo each time, and an order on this page is mostly finished; the page has Refresh with a line saying when it was read and that it does not
+       update by itself (the audit log's way). No feed was added, so ADR 0009's note is unchanged.
+     - **The merge** (`recordEntries`): the timeline's events as written, plus for each payment what the timeline does not hold: its recording when no
+       `payment.recorded` names it (a Phase 1 payment, before 4.3c wrote the event), its dispute and its verification (the payment row's `disputed_at` and
+       `verified_at`: never on the timeline), and its void when no `payment.voided` names it. Oldest first by instant (parsed, so an offset does not
+       matter; a time that cannot be read goes last); inside one second a payment known only by its row comes first (it is what settled the order), then
+       the events by id, then the decisions by payment, in the order recorded, disputed, verified, voided. The kinds are one table (`ENTRY_KINDS`: the 20
+       timeline events and the payment's two decisions, each with its tone and whether it is about a payment or names an approver); a kind not listed
+       shows as the API wrote it. The orders board's timeline takes its words from the same table, so its payment events now read as words too.
+     - **Who did it.** An event carries ids only: who did it is the person acting by short code at a shared screen, else the account (the account is
+       named too when they differ); the approver is the row's `approved_by_user_id` (the order's void, each line it removed, a payment's void). Names: the
+       people list (`GET /users` for `people.manage`, the People screen's `["users"]`, as 4.5f reads it), then the names the page's own rows carry (the
+       order's owner, whoever took each payment, the viewer and the person acting at their screen), else `#id`; so a manager reads an approver's name
+       only when it is one of those. A dispute and a verification name nobody: the payment row has no column for who decided (4.3c keeps it in the audit
+       context), so the entry says the payment's audit history names them. No API change was needed.
+     - **The header**: the number (dated when it is not today's), business day, type and table, waiter, where it was taken, when it was created, its
+       status, total, paid and the balance as the API wrote them, with the balance's state (`balanceView`): still owed, paid in full, holding more than it
+       costs (a part-paid order voided as a whole keeps its payment until that is voided too: said so, and the page offers that void), or nothing to pay. The two reads are two requests,
+       so the page checks that the payments that are not voided add up to the order's paid and that the two balances agree, and asks for a Refresh when
+       they do not. Below it the lines with their station, status and total.
+     - **The payments**: channel, amount, the reference's last four characters only (`referenceTail`, moved from `ReceiptPanel` to `lib/paySheet.ts`),
+       status and chips (4.5c's `PaymentStatusCell`), who took it and when, the cash handed over with the change, the dispute and the void with their
+       reasons, the verification, the amount paid back when there is one, the photo; then "Open payment {id}" (`/admin/payments?payment={id}`, 4.5c's
+       dialog), "Audit history" (each named "Audit history of payment {id}": `HistoryLink` gained `label`, so every link's name is unique in the page;
+       the order's own stays "Audit history") and "Void payment {id}".
+     - **The photo** (`photoOf`): a signed address, a file no longer stored (the read's URL is null: said in words, no viewer) or none. 4.5c's
+       `PhotoThumb` and `PhotoViewer` as they are: the viewer always asks `GET /files/{file}/url` when it opens, and a picture that fails to load asks
+       once more. `urlsStale`: a viewer opened 4 min 45 s or more after the payments were read (an address lives 300 s) also reads the payments again,
+       so the thumbnails get fresh addresses as well.
+     - **The existing writes only.** The void of the whole order (while it is sent and not paid in full, the board's rule) and of one payment (while the
+       order is not paid or closed, the payment neither voided nor paid back; also the payment a part-paid order kept when it was voided whole, which
+       4.3c allows and the board never reached), both through 4.5b's `VoidDialog`. It gained `payment` (it opens on the payment chosen; the others stay
+       offered), a voided order counts as not closed there (the till and the board never open it on one), and the key rule: after a refusal (a wrong
+       PIN, a void the order no longer allows) the next try carries a new Idempotency-Key, and the key is kept only when the outcome is unknown
+       (`keepsKey`; before, every failure took a new key). The board and the till get the same rule.
+     - **The receipt** once the order is paid in full (settled, paid or closed; never a cancelled or voided one, as `ReceiptBuilder` decides): 4.5b's
+       two actions moved out of `ReceiptPanel` into `ReceiptActions`, each shown to the holders of its permission (the PDF: `payments.view`; the link:
+       `payments.take`); the till shows both, as before.
+     - **The refund is deferred to 4.3d.** The plan puts "the refund action" on this page; refunds (4.1b, 4.3d) wait for Ramin's answer on R-C. Its place
+       is `RefundPlaceholder` in `components/admin/OrderRecord.tsx` (a `TODO(p4): 4.3d`), shown for an order paid in full: refunds are not available yet,
+       and before the order closes a wrong payment is voided instead. The refund's timeline kinds (`line.refunded`, `order.refunded`) are one line each in
+       `ENTRY_KINDS` (its own TODO) with their two strings; nothing else in the merge changes.
+     - **Links in**: the orders board's timeline panel ("Open the full record"), the payment dialog ("Open the order's record") and an audit entry whose
+       subject is an order ("Open the order's record"). The analytics pages show no order number, so they link nowhere.
+     - **Dates** through `lib/dates.ts` (`addisStamp`, `dayText` with the person's format), so the Ethiopian preference reaches the page.
+     - **Strings**: 94 keys under `orderRecord`, five under `adminOrders` (the four payment kinds and "Open the full record"), one each under
+       `adminPayments.detail` and `audit.entry`, English and Amharic.
+     - **Tests**: `pay-timeline-logic` (10 pure cases: the merge and its ties, the voided payment, the decisions, the names with the `#id` fallback, the
+       photo and the reference's tail, the header's money and the reads in step, the re-sign timing, the voids and the receipt offered, the address, every
+       kind worded in both languages) and `pay-timeline` (two flows, @live): a run-unique order split into cash and the run's wallet with a photo in a
+       colour of its own, opened from the board; the header's money, the timeline in the API's order naming the cashier, the payments with the
+       reference's tail only, the photo from a fresh address loaded at 1200 px, the receipt downloaded, the refund's place, the order's audit history; and
+       a second order's bank transfer voided on the page, a wrong PIN refused and the next try under a new key, the manager's PIN approving it, the void
+       naming who asked and who approved, 70.00 owed again; the cashier with no link on the board and refused on the page; then the order voided whole
+       there (the header shows the 50.00 in cash it holds beyond its cost) and that payment voided too, nothing owed or held. `pay-refund` and
+       `dashboards-audit` stay stubs. No test turns a shift rule off.
+     - **Local run notes**: against a second local API container (eight CLI-server workers, opcache without timestamp checks, a sync queue, port
+       8001; not a repo change): `pay-timeline-logic` with the project's other pure specs 43 passed; the two flows of `pay-timeline` passed, the first
+       in 2.2 min once the API was warm (its first, cold run reached its last check when the 240 s ran out: the first receipt PDF took 29 s there) and
+       the void flow in 1.2 min. The whole project runs in CI.
+     - STATUS: phase 4's `web` step stays `in_progress` (the refund UI waits for 4.3d).
    - **4.5e `phase-4/web-analytics`**: `/admin/analytics` (Overview with period compare, Sales by day/week/month and by hour, Channels, Products with the product page `/admin/analytics/product?id=`,
      Stations, Staff, Shifts), a date-range control (today, 7, 30, 90 days, custom), `as_of` badge, stale-day notice with a Rebuild button for `analytics.manage`, export buttons, skeletons (first paint
      of data is what `p4-dashboards` times), role-limited view for `analytics.view_own` (one page `/admin/analytics/me`). `lib/analytics.ts` (range maths in the branch's local dates, week = Monday).
@@ -1382,7 +1455,7 @@ As-built notes are appended under each step as the build runs, as in Phases 1 to
 - **Live-host realities in tests**: queue tests keep `Queue::fake` plus a `sync` twin; the touch debounce is tested with the database cache lock; every poll test asserts `304` on an unchanged second request and
   a changed tag inside the 5-second settling window of `Payments::fingerprint()`.
 - **Playwright** (`apps/web/e2e/p4/`, projects exist in `playwright.config.ts`):
-  - `p4-pay-photo-split` (`testMatch /pay/`): `pay-photo-split.spec.ts` @live (the gate), `pay-sheet-logic.spec.ts` (pure), `pay-refund.spec.ts` @live, `pay-void.spec.ts` @live, `pay-camera-fallback.spec.ts`, and from 4.5c `pay-admin.spec.ts` @live (the admin payments screens) and `pay-admin-logic.spec.ts` (pure).
+  - `p4-pay-photo-split` (`testMatch /pay/`): `pay-photo-split.spec.ts` @live (the gate), `pay-sheet-logic.spec.ts` (pure), `pay-refund.spec.ts` @live, `pay-void.spec.ts` @live, `pay-camera-fallback.spec.ts`, and from 4.5c `pay-admin.spec.ts` @live (the admin payments screens) and `pay-admin-logic.spec.ts` (pure), and from 4.5d `pay-timeline.spec.ts` @live (the order record page) and `pay-timeline-logic.spec.ts` (pure).
   - `p4-dashboards` (`testMatch /dashboards/`): `dashboards.spec.ts` (CI, the 90-day seed: first KPI visible under 1000 ms), `dashboards-live.spec.ts` @live (exact figures on a run-unique channel,
     soft budget), `dashboards-audit.spec.ts` @live (the audit screen shows this run's refund with its approver), `dashboards-logic.spec.ts` (range maths). From 4.5e
     `dashboards-logic.spec.ts` holds the range maths and the charts' scaling (pure; the Ethiopian labels wait for 4.5f) and `dashboards-live.spec.ts` the
