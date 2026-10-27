@@ -170,7 +170,7 @@
         "shared.files": "done",
         "payments": "in_progress",
         "analytics": "done",
-        "web": "todo",
+        "web": "in_progress",
         "docs": "todo"
       },
       "playwright_projects": [

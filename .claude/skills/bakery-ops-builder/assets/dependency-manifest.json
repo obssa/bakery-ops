@@ -69,13 +69,18 @@
       ],
       "needs": {
         "shared": [
-          "ActorContext"
+          "ActorContext",
+          "CurrentBranch",
+          "LocalDay",
+          "Contracts\\ActorNames (names of people by id; Identity binds it to its ActorDirectory, step 4.5a)",
+          "Exports\\XlsxFile"
         ]
       },
       "provides": [
         "AuditedAction::run(callable, subject, action) with before/after JSONB snapshots",
         "audit_log append-only (DB trigger)",
-        "subjects referenced by morph strings only"
+        "subjects referenced by morph strings only",
+        "the audit-log read API (step 4.5a): GET /audit-log (audit.view; filters, keyset paged, newest first), GET /audit-log/{id} (before, after, context), GET /audit-log/export (audit.export; csv or xlsx, at most 50 000 rows); before, after and context redacted on every read (Snapshot), so rows written before a rule existed show nothing it hides"
       ],
       "tables": [
         "audit_log"
@@ -110,7 +115,8 @@
         "devices table + optional X-Device-Id (enforced Phase 5)",
         "interface StationPresenceResolver::onDuty(station)",
         "interface ShiftAttacher::attach(user, station)",
-        "Phase 2 default bindings AssignedUsersResolver (StationPresenceResolver) and NullShiftAttacher (ShiftAttacher) live HERE, not in Production, so the production->identity contract can be green with zero Production code; Phase 3 rebinds to Shifts"
+        "Phase 2 default bindings AssignedUsersResolver (StationPresenceResolver) and NullShiftAttacher (ShiftAttacher) live HERE, not in Production, so the production->identity contract can be green with zero Production code; Phase 3 rebinds to Shifts",
+        "binds Shared Contracts\\ActorNames to ActorDirectory (step 4.5a), so Audit names people without importing Identity"
       ],
       "tables": [
         "users",

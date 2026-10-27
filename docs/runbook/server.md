@@ -511,6 +511,19 @@ database queue, run by the `queue:work` cron line:
 - **When it did not arrive:** the queue's cron line delivers it within a minute or two; `php artisan queue:failed` shows a failed
   `NotifyWeeklySummary`, and `analytics.weekly_summary.failed` in the log names the branch and week of a summary that could not be built.
 
+### The audit log (step 4.5a)
+
+- **Reading it.** `GET /api/v1/audit-log` (admin, manager: `audit.view`) pages the branch's rows newest first (`?from=&to=` local dates,
+  `actor_id`, an `action` prefix, `subject_type`, `subject_id`, `station_id`, `shift_id`, `cursor`, `limit` up to 200); `GET
+  /api/v1/audit-log/{id}` adds the row's before, after and context. `audit_log` stays append-only: the API never writes to it, it redacts
+  what it shows on every read (PINs, reference numbers, file ids and object keys, device fingerprints, signed URLs), so rows written before
+  a rule existed are shown redacted and are never rewritten. Its read indexes came with the 4.5a deploy (M17, indexes only).
+- **Exporting it.** `GET /api/v1/audit-log/export?format=csv|xlsx&locale=en|am` with the same filters (admin only: `audit.export`, granted by
+  the 4.5a deploy's migration) streams at most `audit.export_max_rows` (50 000) rows, oldest first, counted before anything is written (`422
+  audit.export.too_large`): narrow the dates or the action when it refuses. The xlsx goes through a temporary file in the system temp folder,
+  removed once sent; a before/after longer than a spreadsheet cell is a note there (the CSV keeps it whole). Each export is itself an audit
+  row `audit.export`.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.

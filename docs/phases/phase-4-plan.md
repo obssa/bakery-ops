@@ -75,7 +75,7 @@ Upstream capabilities this phase consumes, and how each is proven before use:
 | Shifts (unchanged code) | Payments | `Totals::cash(shift)` now **net of cash refunds** | `contract:shifts->payments` gets one case (4.3d) |
 | Analytics | Orders, Payments, Production, Inventory, Shifts, Catalog, Identity | provider-owned `Facts` classes (new), `Recipes::version`, `RecipeCost`/`item_cost_history`, names | `contract:analytics->facts` (4.1a/c) |
 | Analytics | Notifications | **event only**: `WeeklySummaryReady` | listener test in `mod-notifications` |
-| Audit UI | Identity | **new** Shared `ActorDirectory::names(ids)` bound by Identity (Audit stays a leaf) | `ActorDirectoryTest` |
+| Audit UI | Identity | **new** Shared `ActorDirectory::names(ids)` bound by Identity (Audit stays a leaf); as built (4.5a) `Shared\Contracts\ActorNames::names(ids)`, bound to Identity's `ActorDirectory` of 4.4c | `ActorNamesBindingTest` (as built) |
 
 ## 2. Contract tests to write first (green before any consumer code)
 
@@ -119,7 +119,7 @@ PostgreSQL both), and every migration is a thin portable DDL (no partial indexes
 | M14 | `create_daily_channel_totals_table` | Analytics | PK `(branch_id, day, channel_id)`: `receipts_count`, **`amount`** DECIMAL(12,2), `refund_count`, `refund_amount`, `net_amount`, `without_reference_count`, `without_photo_count`, `verified_count`, `disputed_count`, `duplicate_reference_count`, `rebuilt_at`. |
 | M15 | `create_daily_item_metrics_table` | Analytics | PK `(branch_id, day, item_id)`: `category_id`, `kind` VARCHAR(10) (as built; CHAR pads on PostgreSQL), `units_sold_qty`, `refunded_qty`, `produced_qty`, `consumed_qty`, `waste_qty`, `purchased_qty`, `adjusted_qty` (signed), `closing_on_hand_qty` (all DECIMAL(14,4)), `stockout_count` INT, `revenue`, `cogs_total`, `margin_total`, `closing_value_total` (DECIMAL(12,2)), `cogs_complete` BOOL (false when a used ingredient has no cost yet), `rebuilt_at`. |
 | M16 | `create_daily_station_and_user_metrics_tables` | Analytics | `daily_station_metrics` PK `(branch_id, day, station_id)`: `tickets_count`, `lines_served`, `lines_rejected`, `avg_prep_seconds` INT NULL, `p90_prep_seconds` INT NULL, `batches_finished`, `produced_qty`, `waste_qty`, `shifts_count`, `shifts_locked_count`, `variance_line_count`, `cash_variance_total` DECIMAL(12,2), `stockout_count`. `daily_user_metrics` PK `(branch_id, day, user_id, role_kind)` `role_kind` in (`waiter`, `cashier`, `station`): `orders_count`, `items_qty`, `revenue`, `payments_count`, `payments_amount`, `voids_count`, `refunds_count`, `lines_prepared`, `avg_prep_seconds`. (The manifest names four tables; `daily_hour_sales` and `daily_user_metrics` are this plan's additions for the hour and waiter/cashier dimensions of architecture section 8, 10.9.) |
-| M17 | `add_audit_log_read_indexes` | Audit | `(branch_id, id)`, `(branch_id, action, id)`, `(branch_id, subject_type, subject_id, id)`, `(branch_id, actor_id, id)` for the Audit UI's filters. Only indexes: the append-only triggers do not care. |
+| M17 | `add_audit_log_read_indexes` | Audit | `(branch_id, id)`, `(branch_id, action, id)`, `(branch_id, subject_type, subject_id, id)`, `(branch_id, actor_id, id)` for the Audit UI's filters, as built (4.5a) also `(branch_id, acting_user_id, id)` (the person's filter reads both columns). Only indexes: the append-only triggers do not care. |
 
 Invariant consequences, decided here so the checks do not surprise the build:
 
@@ -248,9 +248,9 @@ the days' `version`s, so a dashboard that polls every 30 s gets `304` until a re
 
 | Method + path | Permission | Idempotent | Request | Response | Errors |
 |---|---|---|---|---|---|
-| `GET /audit-log` | `audit.view` (admin, manager: read) | read | `?from=&to=` (local dates), `?actor_id=`, `?action=` (prefix match: `payment.`), `?subject_type=`, `?subject_id=`, `?station_id=`, `?shift_id=`, `?cursor=` (id), `?limit=` (50, max 200) | `200 {data: [{id, at, actor {id, name}, acting_user {id, name}?, action, subject_type, subject_id, station_id, shift_id, device_id, ip, summary}], next_cursor}` newest first; `name` comes from Shared `ActorDirectory` (Identity binds it; Audit imports nothing else) | `422` |
-| `GET /audit-log/{id}` | `audit.view` | read | | `200` the row with `before` and `after` JSON as stored (already redacted by `Snapshot`: no PIN, no `reference_no`, no signed URL, no file key) | `404` |
-| `GET /audit-log/export` | `audit.export` (admin) | read | the filters + `?format=csv|xlsx`, at most 50 000 rows | the file | `422 audit.export.too_large` |
+| `GET /audit-log` | `audit.view` (admin, manager: read) | read | `?from=&to=` (local dates), `?actor_id=`, `?action=` (prefix match: `payment.`), `?subject_type=`, `?subject_id=`, `?station_id=`, `?shift_id=`, `?cursor=` (id), `?limit=` (50, max 200) | `200 {data: [{id, at, actor {id, name}, acting_user {id, name}?, action, subject_type, subject_id, station_id, shift_id, device_id, ip, summary}], next_cursor}` newest first; `name` comes from Shared `ActorDirectory` (Identity binds it; Audit imports nothing else); as built (4.5a) the seam is `Shared\Contracts\ActorNames`, `actor_id` finds the person as `actor_id` or `acting_user_id`, `summary` is `{changed, more, reason}` (see the As built note) | `422` (as built `validation.failed`) |
+| `GET /audit-log/{id}` | `audit.view` | read | | `200` the row with `before` and `after` JSON as stored (already redacted by `Snapshot`: no PIN, no `reference_no`, no signed URL, no file key); as built (4.5a) also `context`, and all three redacted again on every read (rows older than a rule) | `404` |
+| `GET /audit-log/export` | `audit.export` (admin) | read | the filters + `?format=csv|xlsx`, at most 50 000 rows; as built (4.5a) also `?locale=en|am`, oldest first | the file | `422 audit.export.too_large` (as built `{max_rows, rows}`) |
 
 ## 5. Domain events and listeners
 
@@ -1014,6 +1014,59 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
    `*-logic.spec.ts` pattern). No chart library is added (10.8 R-H): `components/charts/{Sparkline,Bars,Line}.tsx` are small inline SVG with `role="img"` and a table fallback.
    - **4.5a `phase-4/audit-read-api`**: API only: M17, Shared `ActorDirectory` (+ Identity binding), the three audit routes, `audit.export`, `Snapshot` redaction additions (`receipt_file_id`, signed URL
      shapes). Tests: `AuditLogListTest`, `AuditLogFiltersTest`, `AuditExportTest`, `AuditIsALeafTest` (arch: Audit imports only Shared), 403 matrix (manager reads, cashier 403).
+   - **As built (step 4.5a, `phase-4/audit-read-api`).** Order: the tests and the registries (red, two commits: the list, filters, export,
+     redaction on read and the leaf rule; then M17, the seam, the grant, the lang file and Snapshot's rules), then main merged (4.4d's
+     `Shared\Exports\XlsxFile`), then the code in small commits (the seam, Snapshot, the migrations and the registry, the routes), OpenAPI and
+     ERD, this note, the manifest, the runbook and STATUS. Where the code disagreed with the plan or the plan left a choice:
+     - **The seam is `Shared\Contracts\ActorNames`** (`names(ids)`: id => name in id order), not a second class named `ActorDirectory`:
+       Identity's `ActorDirectory` of 4.4c implements it and `IdentityServiceProvider` binds it, per use; Shared binds `NoActorNames` (nobody
+       has a name) until then, as with `NoOpenShifts`. A list page asks it once for every actor and acting user on the page; an id nobody of the
+       branch has is named null, a person who has left is still named. `tests/Arch/AuditIsALeafTest.php` reads the forbidden list from disk
+       (every other module, every top-level namespace of `app/` but Shared, and the scaffold's `App\Models`, `App\Http`, `App\Providers`,
+       `App\Console`); the older rule in `ModuleBoundariesTest` stays.
+     - **M17** is `2026_11_08_100100_add_audit_log_read_indexes`: the plan's four and `(branch_id, acting_user_id, id)`, because the person's
+       filter (`actor_id`) finds the person as the account signed in or as the person acting by short code at a shared pad (on a shared till
+       the signed-in account is the till's and the waiter is the acting user). Indexes only; `AuditLogReadIndexesTest` drops and adds them over
+       rows and finds the rows byte for byte and the triggers still refusing.
+     - **The list.** Newest first by id, keyset paged (`cursor` the last id, `limit` 1 to 200, 50 by default, `next_cursor` a string as in
+       `GET /payments`, null on the last page); `at` is UTC ISO 8601. Filters: `from`/`to` local dates of `at` (LocalDay), `action` a literal
+       prefix (`LIKE ... ESCAPE '!'`, so `payment_` does not find `paymentXchannel`), the rest equal; they AND. `summary` is `{changed, more,
+       reason}`: the fields whose value differs between before and after (missing on one side counts as null), without `id`, `branch_id`,
+       `created_at` and `updated_at`, sorted, at most 10 with the count of the rest, and `context.reason` when it is a text. An event's payload
+       (before null) lists its fields; a redacted field shows as changed only when it went from null to set or back. `GET /audit-log/{id}`
+       adds `before`, `after` and `context`; another branch's row is 404 `http.not_found`.
+     - **Redaction, on write and on read.** `Snapshot` now works at every depth of an array, and `AuditedAction` applies it to the context too
+       (it was stored as given). New key rules: `receipt_file_id` and `proof_file_id` (the trail says a photo was attached; the payment reads show
+       it in their own scope; 4.3b had kept the id, so `SnapshotTest` and `TakePaymentTest` changed), `key`, `object_key`, `*_object_key`, and
+       `fingerprint` (a device's X-Device-Id, which a pad sends to be taken for that device; enforced from Phase 5). Value rules, in any text: a
+       signed URL (`signature=`, `X-Amz-Signature`/`Credential`, `X-Goog-Signature`/`Credential` in a URL or a path) and an object key of the
+       file store (`{purpose}/{branch}/{yyyy}/{mm}/{uuid}.{ext}`), each replaced where it stands; a text that holds JSON (a JSON column as the
+       model stores it) is redacted inside and kept byte for byte when there is nothing to hide. Redacting twice changes nothing, so **every
+       read** applies the rules to before, after and context, and the rows stay untouched. **What older rows can hold** (read from the writers'
+       history, not from the live table): the `fingerprint` of every `device.enrol` and `device.revoke` since Phase 0, the `receipt_file_id` of
+       every payment write since 4.3b, and contexts, which were never redacted (as built they carry reasons, notes, ids, channel codes and
+       amounts: no PIN and no reference). No row holds a reference number, a PIN, a file key or a signed URL: `reference_no` was redacted from
+       the day payments existed (step 1.4), `receipt_photo_key` and `reference_norm` from the step that first wrote them (4.3b), and no audited
+       payload carries a URL. The next gap would have been the weekly summary's inbox line (4.4d): its `data` holds the signed PDF links and
+       `notification.read` snapshots the line, so marking it read would have logged a link; the value rule redacts it on write and on read.
+       `AuditRedactionOnReadTest` plants such rows raw and reads them through the list, the row, the CSV and the xlsx.
+     - **The export** reuses `Shared\Exports\XlsxFile` (main merged with 4.4d before it was used): every text a text cell, never a formula;
+       the ids number cells; a JSON longer than a cell holds (32 767 characters) is `audit.export.too_long` naming the row in the xlsx, and whole
+       in the CSV. CSV: byte-order mark and the apostrophe guard on every text. Oldest first; the columns `id, at` (local), `actor_id, actor,
+       acting_user_id, acting_user, action, subject_type, subject_id, station_id, shift_id, device_id, ip, changed` (every changed field),
+       `reason, before, after, context` (redacted JSON), headers in `?locale=en|am` (`lang/{en,am}/audit.php`). At most `audit.export_max_rows`
+       (50 000, `config/audit.php`), counted before anything is written. The file ends at the newest id there was when it was asked for, so the
+       export's own audit row `audit.export` (format, locale, filters, rows) is never in it.
+     - **Permissions.** `audit.view` (admin, manager) is in the registry since Phase 0; `audit.export` (admin) is new, with its own grant-only
+       migration `2026_11_08_100200_grant_audit_export_permission` (10.6 corrected). The 403 matrix runs the three routes in `module:audit`
+       (the `api-arch` job); its `{id}` there is a row of the caller's branch. `PermissionRegistryTest` gained `audit.export` and the missing
+       `analytics.manage` row.
+     - **Tests**: `AuditLogListTest`, `AuditLogFiltersTest`, `AuditExportTest`, `AuditRedactionOnReadTest`, `AuditLogReadIndexesTest`,
+       `AuditLangTest` (`module:audit`), `tests/Arch/AuditIsALeafTest.php`, `ActorNamesBindingTest` and `GrantAuditExportPermissionMigrationTest`
+       (Identity), `SnapshotTest` (five cases), `AuditedActionTest` (the context). Changed: `SnapshotTest`'s 4.3b case and `TakePaymentTest`
+       (`receipt_file_id` is redacted), `PermissionRegistryTest`, `RoutePermissionMatrixTest`. No test turns a shift rule off. The summaries-only
+       query-log test (4.4c) covers `/analytics` only; the audit routes read `audit_log` and the names, which is their job.
+     - STATUS: phase 4's `web` step is `in_progress` (4.5a opens the web group, though it is API only).
    - **4.5b `phase-4/web-pay-sheet`**: `components/till/PaySheet.tsx` replaced by the full sheet. Behaviour: amount due and balance at the top; one **row per payment**: a channel picker (enabled
      channels in admin order, the `cash` row first), an amount (defaults to the remaining balance, decimal string arithmetic in `lib/money.ts`), for cash the tendered amount and the change due, for
      a channel with `requires_reference` a reference field with the channel's hint and pattern checked live, for `requires_photo` a **camera button** (`<input type="file" accept="image/*" capture="environment">`)
@@ -1215,7 +1268,7 @@ as soon as 4.2b is deployed and before any route uses them):
 | `payments.view` | admin, manager, cashier (cashier scoped, R-N) | order payments, `GET /payments`, a file's signed URL, receipts |
 | `payments.verify` | admin, manager | verify, dispute, reconciliation, export, deleting an unattached file, the payment reads unscoped (as built in 4.3c through its own grant migration `2026_11_02_100100_grant_payments_verify_permission`) |
 | `analytics.manage` | admin | rebuild, weekly-summary test (as built in 4.4b through its own grant migration `2026_11_05_100100_grant_analytics_manage_permission`: 4.2b's M2 had run on the live database without it) |
-| `audit.export` | admin | audit export |
+| `audit.export` | admin | audit export (as built in 4.5a through its own grant migration `2026_11_08_100200_grant_audit_export_permission`: M2 had run on the live database without it) |
 
 Already in the registry and used as they are: `channels.manage` (admin), `payments.take` (admin, manager, cashier), `payments.void` (admin, manager: the approver's PIN for void and refund),
 `orders.void_request` (admin, manager, cashier: asks for a void or a refund), `analytics.view` (admin, manager), `analytics.view_own` (everyone), `audit.view` (admin, manager), `stations.all`.
