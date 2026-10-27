@@ -14,9 +14,10 @@ import { buildPayFixture, payBatch, removeChannel, serveAll, takeawayOrder, tidy
 //    uses: no wait for the queue's touch of today or the nightly run). The overview's first figure paints from the overview query alone; the
 //    time is logged against the soft budget of 2500 ms (a measure, not a failure: the hard budget is p4-dashboards' 90-day seed in 4.6b).
 //    The payment methods page shows exactly the run's channel: one receipt, 250.00, no photo (its count opens the payments list of that
-//    method without a photo); the product page shows the run's product: two sold, 250.00, new, and "cost incomplete" (a display-case
-//    product made in the house has no cost of sales yet, 4.4a) instead of a margin. The cashier's own page (analytics.view_own) holds only
-//    the cashier's row, and the cashier's Analytics tab leads there.
+//    method without a photo). The product page shows the run's product: two sold, 250.00, new (its is_new_until is set two weeks out),
+//    its first week since launch, and "cost incomplete" instead of a margin (a display-case product made in the house has no cost of
+//    sales yet, 4.4a). The cashier's own page (analytics.view_own) holds only the cashier's rows, and the cashier's Analytics tab leads
+//    there.
 // 2. CI only: a range of past days nobody built is named as not built, and the admin's Rebuild builds it inline (on the live host this
 //    would rebuild days of the shared E2E branch that nothing needs; the rebuild endpoint itself is proved there by flow 1).
 //
@@ -38,6 +39,9 @@ test.describe("p4 analytics dashboards", () => {
     const { wallet, bank } = fixture.channels;
     let orderId: number | null = null;
     try {
+      // the run's product is new for two weeks (Catalog's is_new_until, in the branch's calendar): the product page flags it
+      const today = businessToday();
+      await fixture.admin.patch(`/items/${fixture.product.id}`, { is_new_until: shiftDay(today, 13) });
       const sent = await takeawayOrder(fixture, "2");
       orderId = sent.id;
       expect(sent.totals.total).toBe("250.00");
@@ -45,7 +49,6 @@ test.describe("p4 analytics dashboards", () => {
       const [payment] = await payBatch(fixture, sent.id, [{ channel_code: bank.code, amount: "250.00", reference_no: `E2E-${run}` }]);
       expect(payment.amount).toBe("250.00");
 
-      const today = businessToday();
       const rebuilt = await rebuildDays(fixture.admin, today);
       expect(rebuilt.map((d) => d.day)).toEqual([today]);
 
@@ -83,7 +86,7 @@ test.describe("p4 analytics dashboards", () => {
       // the product page of the run's product: its day, new, and its cost said to be incomplete instead of a margin
       await page.goto(`en/admin/analytics/product/?id=${fixture.product.id}&range=today`);
       await expect(page.getByRole("heading", { level: 1, name: fixture.product.name_en })).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByText("New", { exact: true }).first()).toBeVisible();
+      await expect(page.getByText("New", { exact: true })).toBeVisible();
       await expect(page.getByRole("group", { name: "Units sold", exact: true })).toContainText("2", { timeout: 30_000 });
       await expect(page.getByRole("group", { name: "Revenue", exact: true })).toContainText("250.00 ETB");
       await expect(page.getByRole("group", { name: "Margin", exact: true })).toContainText("Cost incomplete");
@@ -105,7 +108,7 @@ test.describe("p4 analytics dashboards", () => {
         await own.getByRole("button", { name: "Today", exact: true }).click();
         // a row per kind of work (the orders the cashier took as a waiter's, the payments as a cashier's), every one the cashier's own
         const mine = own.getByRole("table", { name: "My work" });
-        await expect(rowOf(mine, fixture.cashier.name).filter({ hasText: "Cashier" })).toBeVisible({ timeout: 30_000 });
+        await expect(rowOf(mine, fixture.cashier.name).filter({ has: own.getByRole("cell", { name: "Cashier", exact: true }) })).toBeVisible({ timeout: 30_000 });
         const people = (await mine.getByRole("rowheader").allTextContents()).map((text) => text.trim());
         expect([...new Set(people)]).toEqual([fixture.cashier.name]);
       } finally {
