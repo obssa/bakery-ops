@@ -169,5 +169,8 @@ are read once by cursor on request, and a 304 keeps what is shown. Its ETag is `
 and a bucket of half the signed URLs' lifetime, so a list that keeps answering 304 still gets fresh photo URLs before the old ones expire; the photo viewer
 asks `GET /files/{file}/url` for a fresh one each time it opens anyway. The reconciliation polls `GET /payments/reconciliation` every 30 s visible and 60 s
 hidden, behind the payments' fingerprint and the refunds' own (count, highest id, the same settling second). A verify or a dispute answers the payment, which
-replaces the row at once and asks the list to look again. The analytics freshness feed (`GET /analytics/freshness`, 30 s, 4.4b) is read by the dashboards
-of step 4.5e. A write that tests expect to be answered 304 afterwards travels past the settling window first, as in Phase 3.
+replaces the row at once and asks the list to look again. The analytics dashboards of step 4.5e poll only the freshness feed (`GET /analytics/freshness`,
+4.4b) for the days a page reads, every 30 s while visible and every 2 minutes while hidden (`lib/live/analytics.ts`); its ETag is the days' versions and
+`running`, so it needs no settling window. The dashboards themselves are not polled: when a day's version or rebuilt_at moves, the page invalidates the
+queries that read that day, and each read sends its last ETag, so one whose days did not move answers 304. A write that tests expect to be answered 304
+afterwards travels past the settling window first, as in Phase 3.

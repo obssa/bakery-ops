@@ -1210,6 +1210,72 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
    - **4.5e `phase-4/web-analytics`**: `/admin/analytics` (Overview with period compare, Sales by day/week/month and by hour, Channels, Products with the product page `/admin/analytics/product?id=`,
      Stations, Staff, Shifts), a date-range control (today, 7, 30, 90 days, custom), `as_of` badge, stale-day notice with a Rebuild button for `analytics.manage`, export buttons, skeletons (first paint
      of data is what `p4-dashboards` times), role-limited view for `analytics.view_own` (one page `/admin/analytics/me`). `lib/analytics.ts` (range maths in the branch's local dates, week = Monday).
+   - **As built (step 4.5e, `phase-4/web-analytics`).** Order: the tests red (the pure rules failing on the missing `lib/analytics.ts`, the browser
+     flows on the missing pages), then the rules, the chart geometry, the client's reads and the freshness feed with the ESLint rule of ADR 0004, then the
+     screens and the strings; this note and the ADR 0009 wording. Where the code disagreed with the plan or the plan left a choice:
+     - **Pages under one tab.** `/admin/analytics` (Overview), `/sales`, `/channels` (named "Payment methods" on screen, as 4.5c names them), `/products`,
+       `/product?id=` (the record page, export-safe), `/stations`, `/staff`, `/shifts` and `/me`, under pills that carry the range. The admin console's
+       Analytics tab is shown to holders of `analytics.view` or `analytics.view_own`; for a person without `analytics.view` it leads to `/me`, and every
+       `analytics.view` page sends such a person there too (`AnalyticsGate`), so the console's card and any link land somewhere they may read. The
+       overview has its card. `lib/deeplink.ts` knows the nine pages: the weekly summary's line (`/admin/analytics?from={week_start}&to={week_end}`,
+       4.4d) opens the overview on that week.
+     - **The range lives in the address** (`lib/analytics.ts`): `?range=today|7|30|90` (30, the API's default, leaves the address clean) or
+       `?from=&to=` (dates win over a preset; a missing `to` is today and a missing `from` the 30 days up to `to`, as `RangeRequest` reads them). A
+       malformed value is dropped. A range past today or longer than 400 days is kept as it was asked for, and the API's `analytics.range.*` is shown in
+       the page's language; the custom form checks the same rules first (`rangeIssue`). Each page's own options are there too: `compare=previous`
+       (overview), `group` (sales, channels), `kind`, `category_id`, `sort` (products), `role_kind` (staff), `id` (the product page).
+     - **Reads.** `lib/api/analytics.ts`, one query key per answer shape (`analyticsKeys`: `overview`, `sales`, `sales-hourly`, `channels`, `items`,
+       `item`, `stations`, `staff`, `shifts`, each with the range and the options). Each read sends its last ETag and keeps its last answer per signed-in
+       token and address (at most 60), so a read asked again for nothing answers 304. A refusal (4xx) is not retried.
+     - **Freshness** (`lib/live/analytics.ts`): `GET /analytics/freshness` for the days the page reads (with `compare`, the period before too, unless
+       the span is over 400 days), every 30 s visible and every 2 minutes hidden, a 304 keeps the state. The dashboards are not polled: the feed keeps
+       its answer before the last, and the days whose version or `rebuilt_at` moved (a day built for the first time or gone included: `changedDays`)
+       invalidate the queries that read them (`queryTouches`; the product page always, it also reads its weeks since launch). The overview starts the
+       feed (and its sparkline's sales read) only after its own answer, so the first figure waits for nothing but the overview query. The badge is
+       the feed's `as_of` ("Updated 2 min ago"; "Not built yet" when none is).
+     - **Not built is never zero** (R-U, 4.4c): the days not built are named as runs of days (`dayRuns`); a range with no built day shows "—" on the
+       tiles; a series point with no built day reads "Not built", a line breaks there and a bar's column is shaded.
+     - **Rebuild** (`analytics.manage` only; others read "An admin can rebuild them"): `rebuildPlan` sends the days not built newest first, each request
+       at most 31 days back from its newest day, inline (`sync`) only for 7 days or fewer; a built day between two that are not is rebuilt with them
+       (a rebuild of unchanged facts writes the same figures). The requests go one after another, each with its own Idempotency-Key, kept only when
+       the outcome is unknown (4.5b's `keepsKey`). A 200 invalidates the rebuilt days at once; a 202 shows `running` from the feed and the button
+       waits for it. The result line sits outside the notice, which goes with the next look of the feed.
+     - **Overview**: eight tiles (cancelled orders too: the API answers `cancelled_count`); with `compare=previous` each says its change in percent
+       (one decimal, half up, `divideDecimal`) and the difference, or that the period before is not built or had none. Revenue by order type and
+       the payment methods' shares are horizontal bars; the five best sellers open their product pages. The revenue tile's sparkline (sales by day)
+       is drawn for a range of two days or more.
+     - **Payment methods**: the counts that open the payments list (4.5c's `filterParams`, for a holder of `payments.view`, when above zero) are only
+       those with an exact filter there: verified (`status=verified`), disputed (`status=disputed`) and without a photo (`missing_photo=1`, never
+       for cash, whose payments the list's filter leaves out). A missing reference has no filter and the list's `flagged` also holds disputes and
+       duplicate photos, so those two counts are not links. Above the table, the money of every method together by day, week or month.
+     - **Products and the product page**: categories from `GET /categories` (the kind's live ones); "Cost incomplete" (a badge and a note) wherever
+       `cogs_complete` is false, with no cost, margin or margin percent shown as a fact; the product page's tiles, its units a day (a line), since launch
+       (the first sale, the weekly units as bars and a table), its days, the new flag (Catalog's `is_new`), a 404 said in words.
+     - **Stations, Staff, Shifts**: a 90th percentile only for a one-day range (the worst day's otherwise, as 4.4c answers); staff by kind of work
+       (`role_kind` choices); shifts a day per row with the variances' totals and the cash variance as bars (a shortage below the zero line).
+     - **My figures**: the same two reads, which the API limits for `analytics.view_own`; a holder of `analytics.view` sees only their own row and
+       stations there too (`me.user.id`, `me.work_stations`). No export (the exports need `analytics.view`).
+     - **Exports**: Excel, CSV and PDF of each page's report (sales, channels, items, stations, staff, shifts) over the range in the page's language,
+       read with the bearer token (`authedBlob` with `accept`, 120 s) and named in the browser `analytics-{report}-{from}-{to}.{format}`.
+     - **Charts** (no library, 10.8 R-H): `lib/charts.ts` lays bars (vertical, or horizontal for categories) and lines out from the decimal strings with
+       `decimalRatio` (decimal.ts, scaled integers): the only numbers made are pixel positions. `components/charts/{Bars,Line,Sparkline}.tsx` are inline
+       SVG with `role="img"` and an accessible name; their table (`ChartTable`) is folded under a bar or line chart and visually hidden under a
+       sparkline; a chart drawn beside a full table of the same figures has no fold.
+     - **The ESLint rule ADR 0004 named did not exist**: `eslint.config.mjs` now refuses `parseFloat` and `Number()` of a name that says money, a
+       quantity or a share of them, in `src` and `e2e` (the whole web app passed it).
+     - **Labels in one place** for 4.5f: `dayLabel`, `seriesLabel`, `rangeLabel`, `spanLabel` in `lib/analytics.ts` (Intl, `en-GB` and `am-ET`).
+     - **Strings**: 236 keys under `analytics` plus `admin.analytics` and `admin.analytics_desc`, English and Amharic.
+     - **Tests**: `dashboards-logic` (14 pure cases; the Ethiopian labels a `test.fixme` for 4.5f) and `dashboards-live`: the `@live` flow (a
+       run-unique product made new for two weeks and sold for 250.00 on the run's bank transfer, today rebuilt inline; the overview's first figure
+       timed and logged against the soft budget of 2500 ms; the payment methods page exact for the run's channel with its drill; the product page with
+       its units, the new flag, its first week and "Cost incomplete"; the cashier's own page and tab) and a CI-only flow (seven past days nobody built,
+       chosen per process, named as not built and rebuilt inline by the admin's button). `dashboards.spec.ts` and `dashboards-audit.spec.ts` stay
+       4.6b's stubs. No test turns a shift rule off.
+     - **Local run notes**: against a second local API container (eight CLI-server workers, opcache without timestamp checks, a sync queue, port 8001;
+       not a repo change) the `p4-dashboards` project passed 16 with 3 skipped; the first figure took 9 to 20 s there (the local API answers in
+       seconds), a measure only. The time includes `GET /me`, which every signed-in page waits for before it renders; 4.6b's budget may start the
+       overview read with the stored token.
+     - STATUS: phase 4's `web` step stays `in_progress`.
    - **4.5f `phase-4/web-audit-ethiopian`**: `/admin/audit` (filters, the detail drawer with the before/after diff, export for admin), and the optional Ethiopian date display (`lib/ethiopianDate.ts`, a pure
      converter with a unit table for the new year, Pagume 5 and 6 and the leap rule, a per-user display preference; the receipt prints it when `ethiopian_dates` is on). Ethiopian dates are labels only: nothing stored changes.
 6. **4.6 docs and seeds** (STATUS `docs`), two PRs.
@@ -1242,7 +1308,9 @@ As-built notes are appended under each step as the build runs, as in Phases 1 to
 - **Playwright** (`apps/web/e2e/p4/`, projects exist in `playwright.config.ts`):
   - `p4-pay-photo-split` (`testMatch /pay/`): `pay-photo-split.spec.ts` @live (the gate), `pay-sheet-logic.spec.ts` (pure), `pay-refund.spec.ts` @live, `pay-void.spec.ts` @live, `pay-camera-fallback.spec.ts`, and from 4.5c `pay-admin.spec.ts` @live (the admin payments screens) and `pay-admin-logic.spec.ts` (pure).
   - `p4-dashboards` (`testMatch /dashboards/`): `dashboards.spec.ts` (CI, the 90-day seed: first KPI visible under 1000 ms), `dashboards-live.spec.ts` @live (exact figures on a run-unique channel,
-    soft budget), `dashboards-audit.spec.ts` @live (the audit screen shows this run's refund with its approver), `dashboards-logic.spec.ts` (range maths).
+    soft budget), `dashboards-audit.spec.ts` @live (the audit screen shows this run's refund with its approver), `dashboards-logic.spec.ts` (range maths). From 4.5e
+    `dashboards-logic.spec.ts` holds the range maths and the charts' scaling (pure; the Ethiopian labels wait for 4.5f) and `dashboards-live.spec.ts` the
+    run's channel and product after an inline rebuild of today with the soft budget logged, the person's own page, and a CI-only flow of the Rebuild button.
   - Earlier projects keep running; `p1-order-flow` and `p3-handover` prove the cash path and the shift rules are not broken.
   - **How the live and shared-branch specs stay deterministic** (the lessons of 3.7a to 3.7e): they sign in as the E2E branch's admin through `Api.login` (per-run token file, a `429` waits for `Retry-After`);
     they start by `settleStation` for the till, kitchen and bar (a leftover opening or counting shift from an earlier failed run is closed and its count resolved) and end with `ensureOpenShift`; every
