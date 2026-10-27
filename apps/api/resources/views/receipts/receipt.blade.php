@@ -1,5 +1,5 @@
 {{--
-    A receipt (step 4.3e), printed by App\Modules\Payments\Support\Receipts\ReceiptRenderer with dompdf. $r is the Receipt; $l(key) a label of
+    A receipt (step 4.3e), printed by App\Modules\Payments\Support\Receipts\ReceiptRenderer through Shared's PdfRenderer (dompdf). $r is the Receipt; $l(key) a label of
     lang/{en,am}/receipts.php in the receipt's language(s); $n(en, am) a name in them; $qty(q) a quantity without trailing zeros; $lines the
     lines printed and $more the ones folded into one row ({count, total}) when the receipt would not fit its pages. Amharic text is in
     span.am (Noto Sans Ethiopic), the rest in Helvetica (a PDF core font: nothing embedded); dompdf falls back per character along the

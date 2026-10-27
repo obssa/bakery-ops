@@ -7,6 +7,7 @@ namespace App\Modules\Analytics\Http\Controllers;
 use App\Modules\Analytics\Http\Requests\SeriesRequest;
 use App\Modules\Analytics\Read\Buckets;
 use App\Modules\Analytics\Read\BuiltDays;
+use App\Modules\Analytics\Read\ChannelFigures;
 use App\Modules\Analytics\Read\Dashboard;
 use App\Modules\Analytics\Read\Names;
 use App\Modules\Analytics\Read\Sum;
@@ -27,8 +28,6 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class ChannelsController
 {
-    private const array COUNTS = ['without_reference_count', 'without_photo_count', 'verified_count', 'disputed_count', 'duplicate_reference_count'];
-
     public function index(SeriesRequest $request, CurrentBranch $branch, Dashboard $dashboard, Summaries $summaries, Names $names): Response
     {
         $window = $request->window($branch->timezone());
@@ -50,47 +49,13 @@ final class ChannelsController
             foreach ($window->periods() as $p => $period) {
                 $data[$p] = [
                     'group' => $group,
-                    'channels' => self::channels($totals[$p] ?? [], $named),
+                    'channels' => ChannelFigures::list($totals[$p] ?? [], $named),
                     'series' => array_map(static fn (array $bucket): array => self::point($bucket, $built, $days), Buckets::of($period, $group)),
                 ];
             }
 
             return $data;
         });
-    }
-
-    /**
-     * @param  array<int, stdClass>  $rows
-     * @param  array<int, array<string, mixed>>  $named
-     * @return list<array<string, mixed>>
-     */
-    private static function channels(array $rows, array $named): array
-    {
-        $taken = '0.00';
-        foreach ($rows as $row) {
-            $taken = Sum::plus($taken, $row->amount);
-        }
-        uksort($rows, static fn (int $a, int $b): int => Sum::compare(Sum::money($rows[$b]->amount), Sum::money($rows[$a]->amount)) ?: $a <=> $b);
-
-        $out = [];
-        foreach ($rows as $id => $row) {
-            $amount = Sum::money($row->amount);
-            $line = [
-                'channel' => Names::of($named, $id),
-                'receipts_count' => Sum::int($row->receipts_count),
-                'amount' => $amount,
-                'refund_count' => Sum::int($row->refund_count),
-                'refund_amount' => Sum::money($row->refund_amount),
-                'net_amount' => Sum::money($row->net_amount),
-                'share' => Sum::percent($amount, $taken),
-            ];
-            foreach (self::COUNTS as $count) {
-                $line[$count] = Sum::int($row->{$count});
-            }
-            $out[] = $line;
-        }
-
-        return $out;
     }
 
     /**

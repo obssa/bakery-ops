@@ -4,20 +4,18 @@ declare(strict_types=1);
 
 namespace App\Modules\Payments\Support\Receipts;
 
+use App\Shared\Pdf\PdfRenderer;
 use App\Shared\Values\Money;
 use App\Shared\Values\Quantity;
-use Dompdf\Dompdf;
-use Dompdf\Options;
 use Illuminate\Contracts\View\Factory as ViewFactory;
 use Illuminate\Support\HtmlString;
 
 /**
- * Prints a Receipt as a PDF (phase-4 plan section 4.5, step 4.3e) with dompdf, on A4, from resources/views/receipts/receipt.blade.php.
- * dompdf runs with its own options here, not the package config: no remote files, no PHP or JavaScript in the document, the HTML5 parser,
- * font subsetting (only the glyphs a receipt uses are embedded), and the font folder of ReceiptFonts, which registers the bundled Noto
- * Sans Ethiopic there first. Latin text and the Western digits print in Helvetica, a PDF core font that is not embedded; Amharic in Noto
- * Sans Ethiopic, embedded as a subset; a letter neither has (a name with a Polish L) falls back to dompdf's DejaVu Sans. That keeps a
- * receipt at a few kilobytes and its render well under a second: subsetting DejaVu Sans for every receipt took seconds in PHP.
+ * Prints a Receipt as a PDF (phase-4 plan section 4.5, step 4.3e) on A4, from resources/views/receipts/receipt.blade.php, through Shared's
+ * PdfRenderer (dompdf with its own options: no remote files, no PHP or JavaScript in the document, font subsetting, the bundled Noto Sans
+ * Ethiopic registered first; step 4.4d moved that setup to Shared\Pdf so the analytics PDFs share it). Latin text and the Western digits
+ * print in Helvetica, a PDF core font that is not embedded; Amharic in Noto Sans Ethiopic, embedded as a subset; a letter neither has (a
+ * name with a Polish L) falls back to dompdf's DejaVu Sans. That keeps a receipt at a few kilobytes and its render well under a second.
  *
  * At most payments.receipts.max_pages pages (2), whatever the order: a receipt that runs longer is printed again in a compact layout, and
  * if that is still too long its last lines are folded into one row ("and N more items", with their sum) until it fits. A two-page
@@ -29,14 +27,13 @@ final class ReceiptRenderer
     private const int MAX_ATTEMPTS = 6;
 
     public function __construct(
-        private readonly ReceiptFonts $fonts,
+        private readonly PdfRenderer $pdf,
         private readonly ViewFactory $views,
     ) {}
 
     /** The PDF of $receipt, as bytes. */
     public function render(Receipt $receipt): string
     {
-        $this->fonts->ensure();
         $maxPages = max(1, (int) config('payments.receipts.max_pages', 2));
 
         $lines = $receipt->lines;
@@ -99,34 +96,9 @@ final class ReceiptRenderer
             'qty' => fn (string $qty): string => self::quantity($qty),
         ])->render();
 
-        $dompdf = new Dompdf($this->options());
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->addInfo('Title', trim($title));
-        $dompdf->addInfo('Creator', 'bakery-ops');
-        $dompdf->render();
-        $pages = $dompdf->getCanvas()->get_page_count();
+        $document = $this->pdf->render($html, trim($title));
 
-        return [(string) $dompdf->output(), $pages];
-    }
-
-    private function options(): Options
-    {
-        $dir = $this->fonts->dir();
-
-        return new Options([
-            'fontDir' => $dir,
-            'fontCache' => $dir,
-            'tempDir' => sys_get_temp_dir(),
-            'chroot' => [resource_path(), $dir],
-            'defaultFont' => 'Helvetica',
-            'defaultPaperSize' => 'a4',
-            'isRemoteEnabled' => false,
-            'isPhpEnabled' => false,
-            'isJavascriptEnabled' => false,
-            'isHtml5ParserEnabled' => true,
-            'isFontSubsettingEnabled' => true,
-        ]);
+        return [$document->bytes, $document->pages];
     }
 
     /**

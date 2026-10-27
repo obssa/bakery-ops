@@ -7,7 +7,7 @@ namespace App\Modules\Analytics\Http\Controllers;
 use App\Modules\Analytics\Http\Requests\StaffRequest;
 use App\Modules\Analytics\Read\Dashboard;
 use App\Modules\Analytics\Read\Names;
-use App\Modules\Analytics\Read\Sum;
+use App\Modules\Analytics\Read\PersonFigures;
 use App\Modules\Analytics\Read\Summaries;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Tenancy\CurrentBranch;
@@ -43,37 +43,11 @@ final class StaffController
 
             $data = [];
             foreach (array_keys($window->periods()) as $p) {
-                $people = $rows[$p] ?? [];
-                usort($people, static fn (stdClass $a, stdClass $b): int => array_search($a->role_kind, StaffRequest::ROLE_KINDS, true) <=> array_search($b->role_kind, StaffRequest::ROLE_KINDS, true)
-                    ?: (int) $a->user_id <=> (int) $b->user_id);
-                $data[$p] = ['users' => array_map(static fn (stdClass $row): array => self::figures(Names::of($named, (int) $row->user_id), $row), $people)];
+                $people = PersonFigures::sorted($rows[$p] ?? []);
+                $data[$p] = ['users' => array_map(static fn (stdClass $row): array => PersonFigures::of(Names::of($named, (int) $row->user_id), $row), $people)];
             }
 
             return $data;
         });
-    }
-
-    /**
-     * @param  array<string, mixed>  $person
-     * @return array<string, mixed>
-     */
-    private static function figures(array $person, stdClass $row): array
-    {
-        $samples = Sum::int($row->prep_samples);
-
-        return [
-            'user' => $person,
-            'role_kind' => (string) $row->role_kind,
-            'orders_count' => Sum::int($row->orders_count),
-            'items_qty' => Sum::qty($row->items_qty),
-            'revenue' => Sum::money($row->revenue),
-            'payments_count' => Sum::int($row->payments_count),
-            'payments_amount' => Sum::money($row->payments_amount),
-            'voids_count' => Sum::int($row->voids_count),
-            'refunds_count' => Sum::int($row->refunds_count),
-            'lines_prepared' => Sum::int($row->lines_prepared),
-            'prep_samples' => $samples,
-            'avg_prep_seconds' => Sum::meanSeconds(Sum::int($row->prep_seconds_sum), $samples),
-        ];
     }
 }

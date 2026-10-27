@@ -55,7 +55,7 @@ final class ItemsController
             $items = $summaries->items($window, $kind, $categoryId);
             $chosen = [];
             foreach (array_keys($window->periods()) as $p) {
-                $chosen[$p] = self::ranked($items[$p] ?? [], ItemsRequest::SORTS[$sort], $limit);
+                $chosen[$p] = ItemFigures::ranked($items[$p] ?? [], ItemsRequest::SORTS[$sort], $limit);
             }
             $named = $names->items(array_values(array_unique(array_merge(...array_map(fn (array $rows): array => array_keys($rows), $chosen)))));
 
@@ -97,19 +97,6 @@ final class ItemsController
 
             return $data;
         }, $launch);
-    }
-
-    /**
-     * The rows sorted by the column, largest first, then by item id, cut at the limit.
-     *
-     * @param  array<int, stdClass>  $rows
-     * @return array<int, stdClass>
-     */
-    private static function ranked(array $rows, string $column, int $limit): array
-    {
-        uksort($rows, static fn (int $a, int $b): int => Sum::compare(Sum::qty($rows[$b]->{$column}), Sum::qty($rows[$a]->{$column})) ?: $a <=> $b);
-
-        return array_slice($rows, 0, $limit, true);
     }
 
     /** The days since the launch the product page follows: from the first sale, at most analytics.launch_weeks weeks, never after today. */

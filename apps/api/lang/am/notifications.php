@@ -94,6 +94,12 @@ return [
             'title' => 'ክፍያ ላይ ጥያቄ ቀርቧል፦ ትዕዛዝ #:order_no',
             'body' => 'በ:channel የተከፈለው :amount ብር (ትዕዛዝ #:order_no) ጥያቄ ቀርቦበታል፦ :reason። ከባንክ መግለጫው ጋር ያመሳክሩት፤ ከዚያ ያረጋግጡት ወይም ይሰርዙት።',
         ],
+        // ደረጃ 4.4d፡ ሳምንቱ እንዴት እንደሄደ (ሰኞ ጠዋት፣ ወይም በእጅ ሲላክ)
+        'weekly_summary' => [
+            'title' => 'የሳምንቱ ማጠቃለያ፦ ከ:from እስከ :to',
+            'body' => 'ገቢ :revenue ብር (ካለፈው ሳምንት :revenue_before ብር ጋር ሲነጻጸር :revenue_change)፣ :orders ትዕዛዞች (ባለፈው ሳምንት :orders_before)። ከፍተኛ ትርፍ፦ :best። ዝቅተኛ ትርፍ፦ :worst። የክፍያ መንገዶች፦ :channels። ተመላሾች :refunds ብር፣ ስረዛዎች :voids ብር። የቆጠራ ልዩነቶች፦ :variance_lines መስመሮች፣ ጥሬ ገንዘብ :cash_variance ብር። ክምችት ያለቀባቸው፦ :stockouts። ሙሉ ማጠቃለያው (PDF፣ ለ7 ቀናት)፦ :pdf',
+            'body_no_link' => 'ገቢ :revenue ብር (ካለፈው ሳምንት :revenue_before ብር ጋር ሲነጻጸር :revenue_change)፣ :orders ትዕዛዞች (ባለፈው ሳምንት :orders_before)። ከፍተኛ ትርፍ፦ :best። ዝቅተኛ ትርፍ፦ :worst። የክፍያ መንገዶች፦ :channels። ተመላሾች :refunds ብር፣ ስረዛዎች :voids ብር። የቆጠራ ልዩነቶች፦ :variance_lines መስመሮች፣ ጥሬ ገንዘብ :cash_variance ብር። ክምችት ያለቀባቸው፦ :stockouts።',
+        ],
     ],
 
     'chain_kind' => [
@@ -107,6 +113,11 @@ return [
         'opening' => 'የመክፈቻ',
         'closing' => 'የመዝጊያ',
     ],
+    'weekly' => [
+        'none' => 'የለም',
+        'no_change' => 'የሚነጻጸር የለም',
+    ],
+
     'count_more' => 'እና ሌሎች :more',
 
     // ደረጃ 2.5b፡ ያልበራ የማሳወቂያ መንገድ ሲጠየቅ የሚሰጥ መልስ፣ እና የቴሌግራም ቦት የሚመልሳቸው አጫጭር መልዕክቶች።

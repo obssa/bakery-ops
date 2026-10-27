@@ -1583,4 +1583,18 @@ return [
         },
         'payload' => fn (): array => ['from' => CarbonImmutable::now('Africa/Addis_Ababa')->toDateString(), 'sync' => true],
     ],
+    // the weekly summary sent by hand (step 4.4d): the last complete week; the row it adds is its audit row (the inbox lines are Notifications'
+    // and written after the commit by the queued listener)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/analytics/weekly-summary/send',
+        'module' => 'analytics',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => [],
+    ],
 ];

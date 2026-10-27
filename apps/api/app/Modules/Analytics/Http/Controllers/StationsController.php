@@ -7,7 +7,7 @@ namespace App\Modules\Analytics\Http\Controllers;
 use App\Modules\Analytics\Http\Requests\DashboardRequest;
 use App\Modules\Analytics\Read\Dashboard;
 use App\Modules\Analytics\Read\Names;
-use App\Modules\Analytics\Read\Sum;
+use App\Modules\Analytics\Read\StationFigures;
 use App\Modules\Analytics\Read\Summaries;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Tenancy\CurrentBranch;
@@ -51,7 +51,7 @@ final class StationsController
                 $stations = $rows[$p] ?? [];
                 ksort($stations);
                 $data[$p] = ['stations' => array_map(
-                    static fn (int $id, stdClass $row): array => self::figures(Names::of($named, $id), $row, $oneDay),
+                    static fn (int $id, stdClass $row): array => StationFigures::of(Names::of($named, $id), $row, $oneDay),
                     array_keys($stations),
                     $stations,
                 )];
@@ -59,34 +59,5 @@ final class StationsController
 
             return $data;
         });
-    }
-
-    /**
-     * @param  array<string, mixed>  $station
-     * @return array<string, mixed>
-     */
-    private static function figures(array $station, stdClass $row, bool $oneDay): array
-    {
-        $samples = Sum::int($row->prep_samples);
-        $worst = $row->worst_day_p90_prep_seconds === null ? null : Sum::int($row->worst_day_p90_prep_seconds);
-
-        return [
-            'station' => $station,
-            'tickets_count' => Sum::int($row->tickets_count),
-            'lines_served' => Sum::int($row->lines_served),
-            'lines_rejected' => Sum::int($row->lines_rejected),
-            'prep_samples' => $samples,
-            'avg_prep_seconds' => Sum::meanSeconds(Sum::int($row->prep_seconds_sum), $samples),
-            'p90_prep_seconds' => $oneDay ? $worst : null,
-            'worst_day_p90_prep_seconds' => $worst,
-            'batches_finished' => Sum::int($row->batches_finished),
-            'produced_qty' => Sum::qty($row->produced_qty),
-            'waste_qty' => Sum::qty($row->waste_qty),
-            'shifts_count' => Sum::int($row->shifts_count),
-            'shifts_locked_count' => Sum::int($row->shifts_locked_count),
-            'variance_line_count' => Sum::int($row->variance_line_count),
-            'cash_variance_total' => Sum::money($row->cash_variance_total),
-            'stockout_count' => Sum::int($row->stockout_count),
-        ];
     }
 }

@@ -152,6 +152,27 @@ it('keeps a typed text from running as a formula in a spreadsheet', function () 
     expect($row['reference_no'])->toBe("'=HYPERLINK(\"x\")")->and($row['dispute_reason'])->toBe("'+not on the statement");
 });
 
+it('keeps a typed text from running as a formula in the xlsx too: a text cell, never a formula cell (found by step 4.4d)', function () {
+    ($this->payment)('telebirr', '70.00', '2026-10-20 10:00:00', ['reference_no' => '=HYPERLINK("http://example.test","x")', 'status' => 'disputed', 'disputed_at' => now(),
+        'disputed_by_user_id' => $this->manager->id, 'dispute_reason' => '=1+1']);
+
+    $response = ($this->export)('format=xlsx')->assertOk();
+    $path = tempnam(sys_get_temp_dir(), 'export-test-');
+    file_put_contents($path, $response->streamedContent());
+    $zip = new ZipArchive;
+    $zip->open($path);
+    $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+    $zip->close();
+    unlink($path);
+    $rows = ($this->rows)($response, 'xlsx');
+
+    $row = array_combine($rows[0], $rows[1]);
+    // OpenSpout's Row::fromValues makes a formula cell of any text that starts with =
+    expect($sheet)->not->toContain('<f>')
+        ->and($row['reference_no'])->toBe('=HYPERLINK("http://example.test","x")')
+        ->and($row['dispute_reason'])->toBe('=1+1');
+});
+
 it('audits each export with its format, filters and row count', function () {
     ($this->payment)('cash', '10.00', '2026-10-20 08:00:00');
 

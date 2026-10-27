@@ -240,8 +240,9 @@ the days' `version`s, so a dashboard that polls every 30 s gets `304` until a re
 | `GET /analytics/shifts` | `analytics.view` | read | `{days: [{day, shifts_count, shifts_locked_count, variance_line_count, cash_variance_total}]}` |
 | `GET /analytics/freshness` | `analytics.view_own` | read, polled 30 s | `{as_of, days: [{day, version, rebuilt_at, trigger, changed}], running: bool}` (the dashboard's "updated 2 min ago" and its refetch trigger); as built (4.4b) also `from`, `to`, `timezone` and `stale_days`, `days` lists the built days only, the ETag is every built day's version and `rebuilt_at` plus `running` (no settling bucket: a version is seen whole or not at all) |
 | `POST /analytics/rebuild` | `analytics.manage` | key | `{from, to, sync?: bool}`; `sync` only for at most 7 days and runs inline (what the live E2E uses, no cron wait); otherwise one `RebuildDay` job per day is queued; as built (4.4b) `to` defaults to `from` | `202 {queued: n}` / `200 {days: [...]}`; an `AuditedAction` `analytics.rebuild` records the range; as built both answers also carry `from`, `to`, `sync`, the 202 `days` (the dates queued), the 200 `days` each Rebuild result `{day, trigger, rows, version, changed, duration_ms, fingerprint}`; the audit row is `recordEvent` `{from, to, sync, days}`, written before the work | `422 analytics.range.too_large` (31 days queued, 7 inline) `{max_days}`, `409 analytics.rebuild.running` (as built: a queued rebuild of overlapping days still waits; `{from, to, asked_at}`), as built also `422 analytics.range.future {today}` |
-| `GET /analytics/exports/{report}` | `analytics.view` | read | `report` in `sales`, `channels`, `items`, `stations`, `staff`, `shifts`; `?format=xlsx|pdf|csv`, `?locale=en|am`, the common range | the file (xlsx via a streaming writer, 20 000 rows max; PDF is a 1 to 3 page summary with the same figures and the freshness stamp); `422 analytics.export.too_large` |
-| `POST /analytics/weekly-summary/send` | `analytics.manage` | key | `{week_of?}` | `202`; builds the same summary the Monday job does and announces `WeeklySummaryReady` (a way to test the Telegram path) | |
+| `GET /analytics/exports/{report}` | `analytics.view` | read | `report` in `sales`, `channels`, `items`, `stations`, `staff`, `shifts`; `?format=xlsx|pdf|csv`, `?locale=en|am`, the common range | the file (xlsx via a streaming writer, 20 000 rows max; PDF is a 1 to 3 page summary with the same figures and the freshness stamp); `422 analytics.export.too_large`; as built (4.4d) `{max_rows, rows}` beside it, an unknown report is `404`, xlsx by default, the rows are those the file holds (every table of an xlsx, the first of a CSV or a PDF), one audit row `analytics.export`, see its As built note |
+| `POST /analytics/weekly-summary/send` | `analytics.manage` | key | `{week_of?}` | `202`; builds the same summary the Monday job does and announces `WeeklySummaryReady` (a way to test the Telegram path); as built (4.4d) `202 {week_start, week_end, run, summary}`, every send a new run (`manual-<uuid>`), one audit row `analytics.weekly_summary.send` | as built `422 analytics.weekly.week_open {week_start, week_end}` for a week that is not over |
+| `GET /weekly-summaries/{week}` (as built, 4.4d) | **signed**, no bearer (the link of the weekly message) | read | `?branch&locale&expires&signature` | `200` the week's PDF, `Cache-Control: private, no-store`, `X-Robots-Tag: noindex, nofollow` | `403 analytics.weekly.link_invalid`, `404` |
 
 ### 4.7 Audit (Audit, step 4.5a; a gap in the manifest, 10.9)
 
@@ -267,7 +268,7 @@ so Notifications and Analytics never import a producer.
 | `OrderPaid`, `OrderVoided` (exist) | | Analytics `TouchToday` | queued |
 | `ShiftLocked` (exists, "no listener in Phase 3") | shift_id, station_id, date, locked_at, ... | Analytics `RebuildAfterShiftLocked`: the local dates from the shift's opening to its lock (one or two: a Night shift touches `date` and `date+1`), one unique job each | **yes** |
 | `AnalyticsDayRebuilt` (new, Analytics) | day, trigger, version, changed | none (the freshness feed reads `analytics_days`); useful to tests | n/a |
-| `WeeklySummaryReady` (new, Analytics) | week_start, week_end, headline figures, top items (en/am names), channel split, link (signed, 7 days) | Notifications `NotifyWeeklySummary` (admins; in-app + Telegram; push optional) | queued |
+| `WeeklySummaryReady` (new, Analytics) | week_start, week_end, headline figures, top items (en/am names), channel split, link (signed, 7 days); as built (4.4d) no link (the rule above: never a URL): `run`, `by_user_id` and the whole WeeklySummary, and Notifications makes the signed link when it writes the line (Shared `WeeklySummaryLinks`, bound by Analytics) | Notifications `NotifyWeeklySummary` (admins; in-app + Telegram; push optional; as built the holders of `analytics.manage`) | queued |
 
 `TouchToday` is **debounced**: it dispatches `RebuildDay(branch, today, trigger=touch)` as a `ShouldBeUnique` job with `uniqueFor` = 120 s
 and `delay` = 60 s, using the database cache's atomic lock (supported by the live host's `database` cache). So during service the dashboard's
@@ -916,6 +917,99 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `WeeklySummaryReady`, `NotifyWeeklySummary` in Notifications with bilingual copy and the signed 7-day PDF link. Tests: `ExportOpensTest` (the xlsx is read back with the same library: sheet names,
      header row in the requested locale, row count, numbers stored as numbers with the decimal string exactly), `ExportPdfTest`, `ExportTooLargeTest`, `WeeklySummaryTest` (figures equal the
      summaries; dispatches once for a Monday; `Event::fake` plus a `sync` twin that creates the inbox line), `NotifyWeeklySummaryTest` (Telegram driver array in CI). `analytics` `module-stable`.
+   - **As built (step 4.4d, `phase-4/analytics-exports-weekly`).** Order: the tests and the registries (red: the new classes, routes, lang
+     files, type and schedule entry are missing); a fix found on the way in 4.3e's payments xlsx (its own commit); the shared PDF setup and the
+     xlsx writer; the dashboards' figure rules moved into `Read`; the exports; the weekly summary with its event, link seam, Notifications
+     listener and migration; OpenAPI and ERD; this note, the runbook and STATUS. Where the code disagreed with the plan or the plan left a choice:
+     - **xlsx figures are numbers that hold their decimal strings exactly.** The plan's test wants "numbers stored as numbers with the decimal
+       string exactly". The money rule forbids the PHP float that OpenSpout's numeric cell takes, which is why 4.3e kept money as text. Both
+       hold here: `Shared\Exports\XlsxFile` writes a figure (`DecimalCell`: money and percents at scale 2 with the built-in format 0.00,
+       quantities at scale 4 as they are) as a text cell with a private-use marker in front. Once OpenSpout has closed the file, each sheet's
+       XML is streamed through once more, cut after a cell's end so memory stays flat, and every marked cell becomes a number cell holding the
+       same characters (`<v>60.00</v>`). The marker is stripped from every other text, so typed text can never become a number. A count is an
+       integer cell, and a figure that is not there (a day not built) is an empty cell, never a zero. The payments export of 4.3e keeps money
+       as text.
+     - **Found in 4.3e's payments xlsx:** OpenSpout's `Row::fromValues` makes a formula cell of any text that starts with `=`, so a typed
+       reference or dispute reason could run as a formula. `PaymentsExport` and `XlsxFile` now build every text as a text cell; tests on both.
+     - **The PDF setup is Shared's.** `Shared\Pdf\PdfFonts` (was Payments' `ReceiptFonts`; config `pdf.fonts_dir`, was
+       `payments.receipts.fonts_dir`; lock `pdf:fonts`) and `PdfRenderer` (the 4.3e options, A4 portrait or landscape, bytes and pages).
+       `ReceiptRenderer` prints through it. `receipts:fonts` keeps its name, so `release.sh` does not change. Analytics could not use Payments'
+       class (ModuleBoundariesTest), and two copies of the font setup would drift.
+     - **The exports** (`Export\Reports`, `Export\ReportFiles`; `ExportsController`). A report is the dashboard's own table, then its rows
+       day by day: Sales and Hours; Channels and Channels by day; Items and Items by day (products and ingredients, most revenue first);
+       Stations and Stations by day; Staff and Staff by day (by kind of work, then person); Shifts and Shifts by station. The figures come from
+       the dashboards' own rules, which moved from the 4.4c controllers into `Read\SalesPoint`, `ChannelFigures`, `StationFigures`,
+       `PersonFigures`, `ShiftDays` and `ItemFigures::ranked`, so a file and a dashboard cannot disagree. The day sheets read the summary table
+       500 rows at a time (`Summaries::dayRows`, in primary-key order).
+       - xlsx: every table, then About (the report, the range, the zone, the oldest rebuild as local time, the days not built, when the file
+         was written). Sheet names, headers and values (yes/no, kinds, kinds of work, names) come from `lang/{en,am}/reports.php`.
+       - csv: the first table, with the byte-order mark and the formula guard of 4.3e.
+       - pdf: landscape A4 through `Shared\Pdf`, at most three pages: the title, the range, the freshness stamp, the report's totals and its
+         first table, with only the columns a page has room for. Sales and shifts are printed a row a day up to 31 days, a week up to 92 and a
+         month beyond. A table that still runs past three pages is laid out again shorter and ends with "N more rows are in the spreadsheet
+         export".
+       - The rows counted against `analytics.export_max_rows` (20 000) are the rows the file holds: every table of an xlsx, the first of a CSV
+         or a PDF. Header rows and About do not count. They are counted from the summaries before anything is written.
+       - The audit row is `analytics.export` {report, format, locale, from, to, rows}, written after the count. A download is named
+         `analytics-{report}-{from}-{to}.{format}`, `Cache-Control: private, no-store`. An unknown report is 404 (the route knows the six).
+       - `DashboardsReadSummariesOnlyTest` reads every report in every format once (files are not conditional). An export's one INSERT INTO
+         `audit_log` is the only statement on that table allowed to an endpoint, and reading it is still caught.
+     - **The weekly summary** (`Weekly\WeeklySummary`): the previous complete Monday-to-Sunday week in the branch's zone (on a Monday, the week
+       that ended last night; on a Sunday, the week before), from the summaries and the names only (its test holds it to them with a query
+       log).
+       - Revenue and orders against the week before, with the change in percent (2 dp half-up, null when the week before had none), net
+         revenue, the average ticket, refunds (on the day paid back), voids and cancellations.
+       - Margins: three products with the best margin and three with the lowest, lowest first, never one in both lists; only products that
+         sold, each with its units, revenue, margin, margin percent and `cogs_complete`.
+       - The money per channel with its share, the count variances of the shifts dated in the week, the stock-outs (all items) and the five
+         items that ran out most, and its freshness (as_of, the days not built).
+     - **`analytics:weekly-summary {--branch=} {--week=}`**, scheduled `weeklyOn(1, '07:00')` in `analytics.timezone`, `withoutOverlapping(30)`,
+       after the 00:05 and 05:30 rebuilds.
+       - It announces a branch and week **once**: the cache key `analytics:weekly-summary:{branch}:{monday}` is taken atomically for eight
+         days, and given back if the build fails. Run "scheduled".
+       - A week that is not over is exit 2. A failed branch is logged as `analytics.weekly_summary.failed` (branch, week, error class) and
+         makes the exit code 1.
+     - **`POST /analytics/weekly-summary/send`** (analytics.manage, Idempotency-Key, `{week_of?}`: any date of the week; the last complete week
+       by default).
+       - It builds the same summary and announces it again every time, as run `manual-<uuid>`, so each send is a new message and a new try of
+         the Telegram path. A replay of the same key answers the stored 202 and announces nothing.
+       - `202 {week_start, week_end, run, summary}`, one audit row `analytics.weekly_summary.send` {week_start, week_end, run}.
+       - A week that is not over is `422 analytics.weekly.week_open {week_start, week_end}`.
+     - **No URL in the event** (section 5 corrected): the table listed "link" in `WeeklySummaryReady`'s payload, against the section's own rule
+       (never a PIN, a key or a URL). The event carries `run`, `by_user_id` and the whole summary. `NotifyWeeklySummary` asks Shared
+       `Reports\WeeklySummaryLinks` (bound by Analytics' `SignedWeeklySummaryLinks`; Shared's default answers null) for a seven-day signed link
+       per language when it writes the line. The link is then in the inbox line's body and payload (`pdf_url_en`, `pdf_url_am`,
+       `pdf_expires_at`) of the people it was sent to, and never in a queued job or a failed one.
+     - **The PDF of the week** is the third public route of the API: `GET /weekly-summaries/{week}?branch&locale&expires&signature` (signed;
+       `public_routes.php` and `check_invariants.py`).
+       - It sets the branch the link names as the current branch, builds the summary when it is opened (so its stamp says as of when) and
+         answers one A4 page through `Shared\Pdf`. It is not cached and not indexed.
+       - A changed or expired link is `403 analytics.weekly.link_invalid` (`bootstrap/app.php` picks the key by path). A week that is not a
+         Monday is 404.
+     - **Notifications.**
+       - `NotifyWeeklySummary` (queued after commit) tells the holders of `analytics.manage` (the admin, as the plan's "admins"); the person
+         who sends one by hand is told too. Type `weekly_summary`: info, in-app, push and Telegram, inbox key `weekly_summary:{week_start}:{run}`,
+         deep link `/admin/analytics?from=..&to=..`.
+       - The text is written from the payload in both languages: revenue and its signed change, orders, the margins, the channel shares, the
+         refunds and voids, the variances, the stock-outs and the link. A body without the link is used when none could be made. Names are cut
+         at 40 characters.
+       - Migration `2026_11_07_100100_extend_notifications_for_weekly_summary` adds the type to `notifications_type_check`, as 4.3c did, and
+         widens `body_en` and `body_am` from 500 to 1000 characters (the figures, the names and the signed link, about 180 characters, do not
+         fit in 500). It is DDL only and safe on live.
+       - Push and Telegram stay off on the live host until Ramin creates their keys; CI's array driver stands in for them
+         (`NotifyWeeklySummaryTest`).
+     - **Not built here:** `php artisan analytics:bench` of 10.2 R-G (the runbook had named this step for it). It belongs with the gate's
+       `DashboardBudgetGateTest` in 4.6b; the runbook says so. Refund figures stay the summaries' zeros until 4.1b and 4.3d. The display-case
+       COGS gap of 4.4a shows in the exports and the summary's margins as it does on the dashboards.
+     - **Tests:**
+       - Unit: `XlsxFileTest`.
+       - Feature: `PdfFontsTest` (moved from Payments), `PdfRendererTest`, `ExportOpensTest`, `ExportPdfTest`, `ExportTooLargeTest`,
+         `ReportsLangTest`, `WeeklySummaryTest` (with the schedule entry), `NotifyWeeklySummaryTest`.
+       - Changed: `PaymentsExportTest` (the xlsx formula case), `ReceiptFontsTest` (only `receipts:fonts`), `DashboardsReadSummariesOnlyTest`,
+         `AnalyticsLangTest`, `NotificationTextTest`, `NotificationsSchemaTest`, `RoutePermissionMatrixTest` (`{report}`).
+       - No test turns a shift rule off.
+     - STATUS: phase 4's `analytics` step is `done` and the module `stable` (`phase_status.py module-stable analytics`, after CI's
+       `mod-analytics` passed).
 5. **4.5 web** (STATUS `web`), six PRs, Next 15 static export under `/app`, en and am, 48 px targets, tablets first; pure rules in `lib/*.ts` tested without a browser (the Phase 3
    `*-logic.spec.ts` pattern). No chart library is added (10.8 R-H): `components/charts/{Sparkline,Bars,Line}.tsx` are small inline SVG with `role="img"` and a table fallback.
    - **4.5a `phase-4/audit-read-api`**: API only: M17, Shared `ActorDirectory` (+ Identity binding), the three audit routes, `audit.export`, `Snapshot` redaction additions (`receipt_file_id`, signed URL

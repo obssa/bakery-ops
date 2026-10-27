@@ -21,4 +21,8 @@ return [
     // The receipt a customer opens from a signed link (step 4.3e): no bearer token on a customer's phone, so the `signed` middleware (order, branch,
     // locale and expiry under the signature) is the protection; it answers the PDF only, never cached.
     'GET api/v1/receipts/{order}',
+    // The PDF of a week's summary, opened from the link in the weekly summary's Telegram message or inbox line (step 4.4d): a phone that opens
+    // it from Telegram has no bearer token, so the `signed` middleware (week, branch, locale and expiry under the signature, seven days) is the
+    // protection; it answers the PDF only, read from the summaries, never cached.
+    'GET api/v1/weekly-summaries/{week}',
 ];

@@ -18,6 +18,9 @@
  *   launch_weeks              the product page follows a product this many weeks from its first sale (step 4.4c)
  *   budget_p95_ms             DashboardBudgetTest: the 95th percentile of 30 timed in-process requests of each dashboard read (step 4.4c)
  *   budget_max_queries        DashboardBudgetTest: the most statements a dashboard read makes of its own (after the auth and actor plumbing)
+ *   export_max_rows           GET /analytics/exports/{report}: the most rows a file holds (every table of an xlsx, the first of a CSV or a
+ *                             PDF), so a file stays within the shared host's memory and time (step 4.4d; the payments export's limit)
+ *   weekly_link_days          the signed link to the PDF of a weekly summary lives this many days (step 4.4d)
  */
 return [
     'timezone' => 'Africa/Addis_Ababa',
@@ -34,4 +37,6 @@ return [
     'launch_weeks' => 12,
     'budget_p95_ms' => 400,
     'budget_max_queries' => 8,
+    'export_max_rows' => 20000,
+    'weekly_link_days' => 7,
 ];

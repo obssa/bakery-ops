@@ -167,6 +167,10 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
         // a payment of the caller's branch taken just now (a cashier sees the last 24 hours, the action's rule)
         $params['{payment}'] = (string) Payment::factory()->create(['branch_id' => $branch->id, 'received_by_user_id' => $actorId])->id;
     }
+    if (str_contains($uri, '{report}')) {
+        // an analytics export (step 4.4d): every report is the same permission
+        $params['{report}'] = 'sales';
+    }
     if (str_contains($uri, '{order}')) {
         // an open cart of the caller's own (an order of someone else is refused by the action, not by the matrix)
         $params['{order}'] = (string) Order::factory()->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;

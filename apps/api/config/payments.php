@@ -20,9 +20,8 @@ declare(strict_types=1);
  * photo_max_age_hours: a receipt photo is attached to a payment only within this many hours of its upload (payments.photo.invalid,
  * reason expired), so an old photo found on the tablet is not passed off as today's transfer.
  *
- * receipts (step 4.3e): fonts_dir is dompdf's font folder, where the bundled Noto Sans Ethiopic is registered on first use (null: storage/fonts,
- * kept across deploys); a signed receipt link lives link_ttl_hours unless asked otherwise, at most link_max_ttl_hours; a receipt is at most
- * max_pages pages.
+ * receipts (step 4.3e): a signed receipt link lives link_ttl_hours unless asked otherwise, at most link_max_ttl_hours; a receipt is at most
+ * max_pages pages. dompdf's font folder is config/pdf.php's fonts_dir since step 4.4d (every PDF shares it).
  *
  * reconciliation_max_days: the longest range GET /payments/reconciliation reads (422 payments.reconciliation.range_too_large beyond).
  * export_max_rows: the most rows GET /payments/export writes (422 payments.export.too_large beyond), so a file stays within the shared
@@ -35,7 +34,6 @@ return [
     'require_shift' => env('PAYMENTS_REQUIRE_SHIFT'),
     'photo_max_age_hours' => 12,
     'receipts' => [
-        'fonts_dir' => null,
         'link_ttl_hours' => 72,
         'link_max_ttl_hours' => 168,
         'max_pages' => 2,

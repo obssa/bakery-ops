@@ -32,14 +32,18 @@ function useAllowed(permission: string): boolean {
   return useSession((s) => s.status === "signed-in" && can(s.me, permission));
 }
 
-/** The stations the person works at (every station for stations.all), from GET /me; looked at again every 30 s. */
-export function useWorkStations() {
-  const enabled = useSession((s) => s.status === "signed-in");
+/**
+ * The stations the person works at (every station for stations.all), from GET /me; looked at again every 30 s unless the caller asks for
+ * a tighter poll. The only reader of the ["me-work-stations"] key, so the key always holds the list: when the admin overview's stations
+ * panel cached the whole /me answer under it, the shifts screens opened next from the overview received an object and fell over.
+ */
+export function useWorkStations({ enabled = true, refetchInterval = 30_000 }: { enabled?: boolean; refetchInterval?: number } = {}) {
+  const signedIn = useSession((s) => s.status === "signed-in");
   return useQuery({
     queryKey: ["me-work-stations"],
     queryFn: async (): Promise<WorkStation[]> => (await authed<Me>("/me")).work_stations,
-    enabled,
-    refetchInterval: 30_000,
+    enabled: signedIn && enabled,
+    refetchInterval,
   });
 }
 

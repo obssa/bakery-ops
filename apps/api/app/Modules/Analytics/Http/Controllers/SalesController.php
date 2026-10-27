@@ -9,11 +9,10 @@ use App\Modules\Analytics\Http\Requests\SeriesRequest;
 use App\Modules\Analytics\Read\Buckets;
 use App\Modules\Analytics\Read\BuiltDays;
 use App\Modules\Analytics\Read\Dashboard;
+use App\Modules\Analytics\Read\SalesPoint;
 use App\Modules\Analytics\Read\Sum;
 use App\Modules\Analytics\Read\Summaries;
 use App\Shared\Tenancy\CurrentBranch;
-use Brick\Math\BigDecimal;
-use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -37,7 +36,7 @@ final class SalesController
             $data = [];
             foreach ($window->periods() as $p => $period) {
                 $data[$p] = ['group' => $group, 'series' => array_map(
-                    static fn (array $bucket): array => self::point($bucket, $built, $days),
+                    static fn (array $bucket): array => SalesPoint::of($bucket, $built, $days),
                     Buckets::of($period, $group),
                 )];
             }
@@ -64,41 +63,5 @@ final class SalesController
 
             return $data;
         });
-    }
-
-    /**
-     * @param  array{key: string, from: string, to: string, days: list<string>}  $bucket
-     * @param  array<string, stdClass>  $days
-     * @return array<string, mixed>
-     */
-    private static function point(array $bucket, BuiltDays $built, array $days): array
-    {
-        $point = ['key' => $bucket['key'], 'from' => $bucket['from'], 'to' => $bucket['to'], 'days' => count($bucket['days']), 'built_days' => $built->count($bucket['days'])];
-        if ($point['built_days'] === 0) {
-            return $point + ['orders_count' => null, 'items_qty' => null, 'revenue' => null, 'refund_total' => null, 'net_revenue' => null, 'avg_ticket' => null];
-        }
-        $orders = 0;
-        $items = $revenue = $refunds = $net = BigDecimal::zero();
-        foreach ($bucket['days'] as $day) {
-            $row = $days[$day] ?? null;
-            if ($row === null) {
-                continue;
-            }
-            $orders += Sum::int($row->orders_count);
-            $items = $items->plus((string) $row->items_qty);
-            $revenue = $revenue->plus((string) $row->revenue);
-            $refunds = $refunds->plus((string) $row->refund_total);
-            $net = $net->plus((string) $row->net_revenue);
-        }
-        $revenue = Sum::money($revenue);
-
-        return $point + [
-            'orders_count' => $orders,
-            'items_qty' => Sum::qty($items),
-            'revenue' => $revenue,
-            'refund_total' => Sum::money($refunds),
-            'net_revenue' => Sum::money($net),
-            'avg_ticket' => Sum::avgTicket($revenue, $orders),
-        ];
     }
 }

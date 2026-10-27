@@ -571,7 +571,8 @@
         ],
         "shared": [
           "LocalDay",
-          "events: ShiftLocked, PaymentRecorded, PaymentVerified, PaymentDisputed, PaymentVoided, OrderPaid, OrderVoided (step 4.4b listeners)"
+          "events: ShiftLocked, PaymentRecorded, PaymentVerified, PaymentDisputed, PaymentVoided, OrderPaid, OrderVoided (step 4.4b listeners)",
+          "Pdf (PdfRenderer, PdfFonts), Exports XlsxFile, the WeeklySummaryReady event and the Reports WeeklySummaryLinks seam, which Analytics binds (step 4.4d: the exports and the weekly summary)"
         ],
         "audit": [
           "AuditedAction (the audit row of POST /analytics/rebuild, step 4.4b)"

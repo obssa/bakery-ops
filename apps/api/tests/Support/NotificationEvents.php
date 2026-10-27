@@ -18,6 +18,7 @@ use App\Shared\Events\StockRecovered;
 use App\Shared\Events\TransferDecided;
 use App\Shared\Events\TransferRequested;
 use App\Shared\Events\VarianceDecided;
+use App\Shared\Events\WeeklySummaryReady;
 
 /**
  * The events Notifications listens to, built the way their producers build them (the payload shapes are the contract:
@@ -222,5 +223,49 @@ final class NotificationEvents
         ];
 
         return new PaymentDisputed($branchId, $paymentId, $a['orderId'], $a['orderNo'], $a['channelCode'], $a['channelEn'], $a['channelAm'], $a['amount'], $a['reason'], $byUserId);
+    }
+
+    /**
+     * Step 4.4d: the summary of the week 2026-11-16 to 2026-11-22 as Analytics' WeeklySummary builds it (the figures of WeeklySummaryTest),
+     * announced by the Monday job unless $over says otherwise (weekStart, weekEnd, run, byUserId, and summary: figures to replace).
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public static function weeklySummaryReady(int $branchId, array $over = []): WeeklySummaryReady
+    {
+        $summary = ($over['summary'] ?? []) + [
+            'week_start' => '2026-11-16', 'week_end' => '2026-11-22', 'previous_start' => '2026-11-09', 'previous_end' => '2026-11-15', 'timezone' => 'Africa/Addis_Ababa',
+            'as_of' => '2026-11-22T05:00:00Z', 'stale_days' => ['2026-11-19', '2026-11-20', '2026-11-21', '2026-11-22'],
+            'revenue' => '300.00', 'revenue_before' => '240.00', 'revenue_change_pct' => '25.00',
+            'orders_count' => 4, 'orders_before' => 2, 'orders_change_pct' => '100.00',
+            'net_revenue' => '280.00', 'avg_ticket' => '75.00',
+            'refund_count' => 1, 'refund_total' => '20.00', 'voided_count' => 1, 'voided_total' => '30.00', 'cancelled_count' => 1,
+            'best_items' => [
+                ['item_id' => 11, 'name_en' => 'Croissant', 'name_am' => 'ክሮሳንት', 'units_sold_qty' => '3.0000', 'revenue' => '180.00', 'margin_total' => '134.50', 'margin_pct' => '74.72', 'cogs_complete' => true],
+                ['item_id' => 12, 'name_en' => 'Bread', 'name_am' => 'ዳቦ', 'units_sold_qty' => '1.0000', 'revenue' => '30.25', 'margin_total' => '10.25', 'margin_pct' => '33.88', 'cogs_complete' => true],
+            ],
+            'worst_items' => [
+                ['item_id' => 15, 'name_en' => 'Cake', 'name_am' => 'ኬክ', 'units_sold_qty' => '1.0000', 'revenue' => '59.75', 'margin_total' => '-5.00', 'margin_pct' => '-8.37', 'cogs_complete' => true],
+            ],
+            'channels' => [
+                ['channel_id' => 1, 'code' => 'cash', 'name_en' => 'Cash', 'name_am' => 'ጥሬ ገንዘብ', 'amount' => '160.25', 'share' => '66.70'],
+                ['channel_id' => 2, 'code' => 'telebirr', 'name_en' => 'Telebirr', 'name_am' => 'ቴሌብር', 'amount' => '80.00', 'share' => '33.30'],
+            ],
+            'variance_line_count' => 3, 'cash_variance_total' => '5.50',
+            'stockout_count' => 4,
+            'stockout_items' => [
+                ['item_id' => 21, 'name_en' => 'Flour', 'name_am' => 'ዱቄት', 'stockout_count' => 2],
+                ['item_id' => 11, 'name_en' => 'Croissant', 'name_am' => 'ክሮሳንት', 'stockout_count' => 1],
+            ],
+        ];
+
+        return new WeeklySummaryReady(
+            $branchId,
+            $over['weekStart'] ?? '2026-11-16',
+            $over['weekEnd'] ?? '2026-11-22',
+            $over['run'] ?? 'scheduled',
+            $summary,
+            $over['byUserId'] ?? null,
+        );
     }
 }

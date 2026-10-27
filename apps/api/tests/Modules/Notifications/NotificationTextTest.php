@@ -33,6 +33,7 @@ function samplePayloads(): array
         'variance_decided' => NotificationEvents::varianceDecided(1, 5, 6, 'rejected')->payload(),
         'chain_broken' => NotificationEvents::chainBroken(1)->payload(),
         'payment_disputed' => NotificationEvents::paymentDisputed(1, 5)->payload(),
+        'weekly_summary' => NotificationEvents::weeklySummaryReady(1)->payload(),
     ];
 }
 
@@ -52,8 +53,8 @@ it('writes an English and an Amharic title and body for every type in the regist
         }
         expect(mb_strlen($rendered->title->en))->toBeLessThanOrEqual(160)
             ->and(mb_strlen($rendered->title->am))->toBeLessThanOrEqual(160)
-            ->and(mb_strlen($rendered->body->en))->toBeLessThanOrEqual(500)
-            ->and(mb_strlen($rendered->body->am))->toBeLessThanOrEqual(500);
+            ->and(mb_strlen($rendered->body->en))->toBeLessThanOrEqual(1000)
+            ->and(mb_strlen($rendered->body->am))->toBeLessThanOrEqual(1000);
     }
 })->group('module:notifications', 'unit');
 
@@ -162,7 +163,7 @@ it('refuses a type it does not know and a payload that lacks what the text needs
 })->group('module:notifications', 'unit');
 
 it('knows every type of the registry with a severity, channels and keys, and only the types the inbox table accepts', function () {
-    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed'];
+    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary'];
 
     foreach (NotificationTypes::all() as $type) {
         expect($accepted)->toContain($type)

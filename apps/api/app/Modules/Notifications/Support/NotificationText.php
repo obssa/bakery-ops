@@ -61,6 +61,7 @@ final class NotificationText
             'variance_decided' => ['text.variance_decided.'.($this->str($type, $payload, 'decision') === 'rejected' ? 'rejected' : 'approved'), 'body'],
             'transfer_decided' => ['text.transfer_decided.'.($this->str($type, $payload, 'status') === 'rejected' ? 'rejected' : 'confirmed'), 'body'],
             'chain_broken' => ['text.chain_broken', 'body'],
+            'weekly_summary' => ['text.weekly_summary', is_string($payload['pdf_url_en'] ?? null) ? 'body' : 'body_no_link'],
             default => ["text.{$type}", 'body'],
         };
     }
@@ -143,6 +144,24 @@ final class NotificationText
                 'channel' => $this->str($type, $p, $in('channel_name')),
                 'reason' => $this->str($type, $p, 'reason'),
             ],
+            'weekly_summary' => [
+                'from' => $this->str($type, $p, 'week_start'),
+                'to' => $this->str($type, $p, 'week_end'),
+                'revenue' => $this->str($type, $p, 'revenue'),
+                'revenue_before' => $this->str($type, $p, 'revenue_before'),
+                'revenue_change' => $this->change($type, $p, 'revenue_change_pct', $locale),
+                'orders' => (string) $this->int($type, $p, 'orders_count'),
+                'orders_before' => (string) $this->int($type, $p, 'orders_before'),
+                'best' => $this->margins($type, $p, 'best_items', $locale),
+                'worst' => $this->margins($type, $p, 'worst_items', $locale),
+                'channels' => $this->shares($type, $p, $locale),
+                'refunds' => $this->str($type, $p, 'refund_total'),
+                'voids' => $this->str($type, $p, 'voided_total'),
+                'variance_lines' => (string) $this->int($type, $p, 'variance_line_count'),
+                'cash_variance' => $this->str($type, $p, 'cash_variance_total'),
+                'stockouts' => $this->stockouts($type, $p, $locale),
+                'pdf' => $this->optional($type, $p, 'pdf_url_'.$locale) ?? $this->optional($type, $p, 'pdf_url_en') ?? '',
+            ],
             default => throw UnknownNotificationType::named($type),
         };
     }
@@ -179,6 +198,115 @@ final class NotificationText
         }
 
         return implode(', ', $parts);
+    }
+
+    /**
+     * A change in percent, signed ("+25.00%", "-3.50%"), or the words for "nothing to compare with" when the week before had nothing.
+     *
+     * @param  array<string, mixed>  $p
+     */
+    private function change(string $type, array $p, string $key, string $locale): string
+    {
+        $pct = $this->optional($type, $p, $key);
+        if ($pct === null) {
+            return $this->template('weekly.no_change', $locale);
+        }
+
+        return ($pct !== '' && $pct[0] === '-' ? $pct : '+'.$pct).'%';
+    }
+
+    /**
+     * The products of a margin list, in the reader's language: "Croissant 134.50 (74.72%), Bread 10.25 (33.88%)", or "none".
+     *
+     * @param  array<string, mixed>  $p
+     */
+    private function margins(string $type, array $p, string $key, string $locale): string
+    {
+        $parts = [];
+        foreach ($this->rows($type, $p, $key) as $item) {
+            $margin = $item['margin_total'] ?? null;
+            $pct = $item['margin_pct'] ?? null;
+            if (! is_string($margin)) {
+                throw MissingPayloadKey::for($type, $key);
+            }
+            $parts[] = $this->named($item, $locale, $type, $key).' '.$margin.(is_string($pct) ? ' ('.$pct.'%)' : '');
+        }
+
+        return $parts === [] ? $this->template('weekly.none', $locale) : implode(', ', $parts);
+    }
+
+    /**
+     * The channels and their shares of the money taken: "Cash 66.70%, Telebirr 33.30%" (four at most), or "none".
+     *
+     * @param  array<string, mixed>  $p
+     */
+    private function shares(string $type, array $p, string $locale): string
+    {
+        $parts = [];
+        foreach (array_slice($this->rows($type, $p, 'channels'), 0, 4) as $channel) {
+            $share = $channel['share'] ?? null;
+            $amount = $channel['amount'] ?? null;
+            $parts[] = $this->named($channel, $locale, $type, 'channels').' '.(is_string($share) ? $share.'%' : (is_string($amount) ? $amount : ''));
+        }
+
+        return $parts === [] ? $this->template('weekly.none', $locale) : implode(', ', $parts);
+    }
+
+    /**
+     * How many stock-outs the week had and the items that ran out most: "4 (Flour 2, Croissant 1)", or "none".
+     *
+     * @param  array<string, mixed>  $p
+     */
+    private function stockouts(string $type, array $p, string $locale): string
+    {
+        $count = $this->int($type, $p, 'stockout_count');
+        if ($count === 0) {
+            return $this->template('weekly.none', $locale);
+        }
+        $parts = [];
+        foreach (array_slice($this->rows($type, $p, 'stockout_items'), 0, 3) as $item) {
+            $times = $item['stockout_count'] ?? null;
+            $parts[] = $this->named($item, $locale, $type, 'stockout_items').' '.(is_int($times) ? (string) $times : '');
+        }
+
+        return $parts === [] ? (string) $count : $count.' ('.implode(', ', $parts).')';
+    }
+
+    /**
+     * @param  array<string, mixed>  $p
+     * @return list<array<string, mixed>>
+     */
+    private function rows(string $type, array $p, string $key): array
+    {
+        $rows = $p[$key] ?? null;
+        if (! is_array($rows)) {
+            throw MissingPayloadKey::for($type, $key);
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                throw MissingPayloadKey::for($type, $key);
+            }
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * A row's name in the reader's language (English when it has no Amharic one), at most 40 characters.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function named(array $row, string $locale, string $type, string $key): string
+    {
+        $am = $row['name_am'] ?? null;
+        $name = $locale === 'am' && is_string($am) && trim($am) !== '' ? $am : ($row['name_en'] ?? null);
+        if (! is_string($name)) {
+            throw MissingPayloadKey::for($type, $key);
+        }
+
+        return mb_strimwidth($name, 0, 40, '…');
     }
 
     /** 5.0000 -> 5, 2.5000 -> 2.5, 100 -> 100: strip zeros only after a decimal point, as a string. */

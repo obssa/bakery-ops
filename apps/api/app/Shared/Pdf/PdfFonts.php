@@ -2,29 +2,30 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\Payments\Support\Receipts;
+namespace App\Shared\Pdf;
 
 use FontLib\Font;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
 /**
- * The Amharic face of the receipts (phase-4 plan 10.8 R-P, step 4.3e). Noto Sans Ethiopic Regular, the unhinted TTF of the notofonts
- * release NotoSansEthiopic-v2.102 (https://github.com/notofonts/ethiopic), is bundled in resources/fonts/noto-sans-ethiopic under the SIL
- * Open Font License 1.1 (OFL.txt next to it). It has Ethiopic glyphs only: Latin text and digits print in Helvetica (ReceiptRenderer), and
- * dompdf picks the face per character from the font-family list.
+ * The Amharic face of every PDF the system prints (phase-4 plan 10.8 R-P): the receipts (step 4.3e), the analytics exports and the weekly
+ * summary (step 4.4d), all through PdfRenderer. Noto Sans Ethiopic Regular, the unhinted TTF of the notofonts release NotoSansEthiopic-v2.102
+ * (https://github.com/notofonts/ethiopic), is bundled in resources/fonts/noto-sans-ethiopic under the SIL Open Font License 1.1 (OFL.txt
+ * next to it). It has Ethiopic glyphs only: Latin text and digits print in Helvetica, and dompdf picks the face per character from the
+ * font-family list. Moved here from Payments (it was ReceiptFonts) when the analytics PDFs needed it too.
  *
- * dompdf reads fonts from one folder (payments.receipts.fonts_dir, else storage/fonts, which survives a deploy): the TTF, its metrics
- * (.ufm) and installed-fonts.json, the family => weight => file map. ensure() puts the font there the first time a receipt needs it, as
- * the normal and the bold weight (there is one face, so a bold heading in Amharic still has its glyphs). It runs under the cache lock
- * receipts:fonts (the database cache's lock on the live host), so two first receipts never write the folder together; each file is written
- * under a temporary name and renamed into place, so a reader never sees half a file. `php artisan receipts:fonts` warms it after a deploy.
+ * dompdf reads fonts from one folder (pdf.fonts_dir, else storage/fonts, which survives a deploy): the TTF, its metrics (.ufm) and
+ * installed-fonts.json, the family => weight => file map. ensure() puts the font there the first time a PDF needs it, as the normal and the
+ * bold weight (there is one face, so a bold heading in Amharic still has its glyphs). It runs under the cache lock pdf:fonts (the database
+ * cache's lock on the live host), so two first PDFs never write the folder together; each file is written under a temporary name and renamed
+ * into place, so a reader never sees half a file. `php artisan receipts:fonts` (Payments) warms it after a deploy.
  */
-final class ReceiptFonts
+final class PdfFonts
 {
     public const string FAMILY = 'noto sans ethiopic';
 
-    public const string LOCK = 'receipts:fonts';
+    public const string LOCK = 'pdf:fonts';
 
     /** The sha256 of the bundled TTF; the installed copy carries the first 12 characters in its name, so a new font file is installed anew. */
     public const string SOURCE_SHA256 = '86b9c07c049e68438388d00a34033fa28cabeef91b26e1bbed67512d360166d4';
@@ -33,7 +34,7 @@ final class ReceiptFonts
 
     public function dir(): string
     {
-        $dir = config('payments.receipts.fonts_dir');
+        $dir = config('pdf.fonts_dir');
 
         return is_string($dir) && $dir !== '' ? rtrim($dir, '/\\') : storage_path('fonts');
     }
@@ -84,18 +85,18 @@ final class ReceiptFonts
     {
         $dir = $this->dir();
         if (! is_dir($dir) && ! @mkdir($dir, 0775, true) && ! is_dir($dir)) {
-            throw new RuntimeException("The receipt font folder cannot be created: {$dir}");
+            throw new RuntimeException("The PDF font folder cannot be created: {$dir}");
         }
         $bytes = file_get_contents($this->source());
         if ($bytes === false || hash('sha256', $bytes) !== self::SOURCE_SHA256) {
-            throw new RuntimeException('The bundled receipt font is missing or changed: '.$this->source());
+            throw new RuntimeException('The bundled PDF font is missing or changed: '.$this->source());
         }
         $base = $dir.'/'.$this->installedName();
         $this->write($base.'.ttf', $bytes);
 
         $font = Font::load($base.'.ttf');
         if ($font === null) {
-            throw new RuntimeException('The receipt font cannot be read: '.$base.'.ttf');
+            throw new RuntimeException('The PDF font cannot be read: '.$base.'.ttf');
         }
         $font->parse();
         $tmp = $base.'.ufm.'.bin2hex(random_bytes(4));
@@ -103,7 +104,7 @@ final class ReceiptFonts
         $font->close();
         if (! is_file($tmp) || ! rename($tmp, $base.'.ufm')) {
             @unlink($tmp);
-            throw new RuntimeException('The receipt font metrics cannot be written: '.$base.'.ufm');
+            throw new RuntimeException('The PDF font metrics cannot be written: '.$base.'.ufm');
         }
 
         $families = $this->families();
@@ -128,7 +129,7 @@ final class ReceiptFonts
         $tmp = $path.'.'.bin2hex(random_bytes(4));
         if (file_put_contents($tmp, $bytes) !== strlen($bytes) || ! rename($tmp, $path)) {
             @unlink($tmp);
-            throw new RuntimeException("The receipt font folder cannot be written: {$path}");
+            throw new RuntimeException("The PDF font folder cannot be written: {$path}");
         }
     }
 }

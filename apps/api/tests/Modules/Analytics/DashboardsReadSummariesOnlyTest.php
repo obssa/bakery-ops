@@ -7,6 +7,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Routing\Route as RouteDefinition;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Tests\Support\Dashboards;
 
 pest()->group('module:analytics', 'feature');
@@ -22,8 +23,11 @@ pest()->group('module:analytics', 'feature');
  *     contracts (items with their units and categories, payment_channels, users, stations, and user_station_assignments for the caller's
  *     own stations) and the framework's own (personal_access_tokens, the permission tables, idempotency_keys, cache).
  * orders, order_lines, payments, payment_refunds, stock_movements, stock_balances, production_*, shift_*, stock_counts* and audit_log are
- * never allowed to an endpoint. POST /analytics/rebuild is the one exception and the only write: it rebuilds from the facts on purpose (10.1).
- * A planted endpoint that reads orders and shift_instances proves the assertion bites.
+ * never allowed to an endpoint. POST /analytics/rebuild is the one exception that reads the facts: it rebuilds from them on purpose (10.1).
+ * The exports (GET /analytics/exports/{report}, step 4.4d) read as the dashboards do and write one audit row each: the one INSERT INTO
+ * audit_log of an export is allowed, and nothing else of audit_log (reading it is still a violation). They are not conditional, so they
+ * are read once. POST /analytics/weekly-summary/send (step 4.4d) is the other write of the module; WeeklySummaryTest holds its builder to
+ * the summaries. A planted endpoint that reads orders and shift_instances proves the assertion bites.
  */
 
 const DASHBOARD_SUMMARIES = ['analytics_days', 'daily_sales', 'daily_hour_sales', 'daily_channel_totals', 'daily_item_metrics', 'daily_station_metrics', 'daily_user_metrics'];
@@ -32,6 +36,8 @@ const DASHBOARD_FRAMEWORK = ['personal_access_tokens', 'roles', 'permissions', '
 const DASHBOARD_PLUMBING = ['personal_access_tokens', 'users', 'branches', 'roles', 'permissions', 'model_has_roles', 'model_has_permissions', 'role_has_permissions',
     'cache', 'cache_locks', 'devices', 'acting_sessions', 'user_station_assignments', 'stations', 'shift_instances'];
 const DASHBOARD_FORBIDDEN = '/^(orders|order_lines|payments|payment_refunds|stock_movements|stock_balances|production_.*|shift_.*|stock_counts.*|audit_log)$/';
+/** The one statement on audit_log an export may make: its own audit row. */
+const DASHBOARD_EXPORT_AUDIT = '/^\s*insert\s+into\s+[`"]?audit_log[`"]?\s/i';
 
 /** The tables a statement names. @return list<string> */
 function dashboardTables(string $sql): array
@@ -52,6 +58,9 @@ function dashboardViolations(array $statements): array
     $violations = [];
     foreach ($statements as $statement) {
         $allowed = $statement['phase'] === 'endpoint' ? array_merge(DASHBOARD_SUMMARIES, DASHBOARD_NAMES, DASHBOARD_FRAMEWORK) : DASHBOARD_PLUMBING;
+        if (($statement['export'] ?? false) && $statement['phase'] === 'endpoint' && preg_match(DASHBOARD_EXPORT_AUDIT, $statement['sql']) === 1) {
+            continue;
+        }
         foreach (dashboardTables($statement['sql']) as $table) {
             $forbidden = $statement['phase'] === 'endpoint' && preg_match(DASHBOARD_FORBIDDEN, $table) === 1;
             if ($forbidden || ! in_array($table, $allowed, true)) {
@@ -79,8 +88,9 @@ beforeEach(function () {
     }
     $this->statements = [];
     $this->phase = 'plumbing';
+    $this->exporting = false;
     DB::listen(function (QueryExecuted $query): void {
-        $this->statements[] = ['sql' => $query->sql, 'phase' => $this->phase];
+        $this->statements[] = ['sql' => $query->sql, 'phase' => $this->phase, 'export' => $this->exporting];
     });
     app()->afterResolving(RangeRequest::class, function (): void {
         $this->phase = 'endpoint';
@@ -97,22 +107,34 @@ beforeEach(function () {
         'api/v1/analytics/stations' => [[['compare' => 'previous'], 'admin'], [[], 'chef'], [[], 'waiter']],
         'api/v1/analytics/staff' => [[['compare' => 'previous'], 'manager'], [['role_kind' => 'station'], 'chef'], [[], 'cashier']],
         'api/v1/analytics/shifts' => [[['compare' => 'previous'], 'admin']],
+        // the exports (step 4.4d): every report, each format, read once (they are files, not conditional)
+        'api/v1/analytics/exports/{report}' => [
+            [['_report' => 'sales', 'format' => 'xlsx'], 'admin'], [['_report' => 'channels', 'format' => 'csv'], 'manager'], [['_report' => 'items', 'format' => 'pdf'], 'admin'],
+            [['_report' => 'stations', 'format' => 'xlsx', 'locale' => 'am'], 'admin'], [['_report' => 'staff', 'format' => 'csv'], 'admin'], [['_report' => 'shifts', 'format' => 'pdf'], 'manager'],
+        ],
     ];
     $this->read = function (string $uri, array $query, string $as, array $headers = []) {
         $this->phase = 'plumbing';
-        $path = substr(str_replace('{item}', (string) $this->croissant->id, $uri), strlen('api/v1/analytics/'));
+        $this->exporting = str_contains($uri, '{report}');
+        $path = substr(str_replace(['{item}', '{report}'], [(string) $this->croissant->id, (string) ($query['_report'] ?? '')], $uri), strlen('api/v1/analytics/'));
+        unset($query['_report']);
 
-        return $this->d->get($path, $query, $as, $headers);
+        $response = $this->d->get($path, $query, $as, $headers);
+        if ($this->exporting && $response->baseResponse instanceof StreamedResponse) {
+            $response->streamedContent();
+        }
+
+        return $response;
     };
 });
 
-it('covers every read route of /api/v1/analytics; the on-demand rebuild is the only other route', function () {
+it('covers every read route of /api/v1/analytics; the on-demand rebuild and the weekly summary\'s send are the only other routes', function () {
     $routes = collect(Route::getRoutes()->getRoutes())->filter(fn (RouteDefinition $r): bool => str_starts_with($r->uri(), 'api/v1/analytics'));
     $reads = $routes->filter(fn (RouteDefinition $r): bool => in_array('GET', $r->methods(), true))->map(fn (RouteDefinition $r): string => $r->uri())->sort()->values()->all();
     $others = $routes->reject(fn (RouteDefinition $r): bool => in_array('GET', $r->methods(), true))->map(fn (RouteDefinition $r): string => implode('|', $r->methods()).' '.$r->uri())->values()->all();
 
     expect($reads)->toBe(collect(array_keys(($this->reads)()))->sort()->values()->all())
-        ->and($others)->toBe(['POST api/v1/analytics/rebuild']);
+        ->and($others)->toBe(['POST api/v1/analytics/rebuild', 'POST api/v1/analytics/weekly-summary/send']);
 });
 
 it('reads only the summaries, the names behind the contracts and the framework\'s tables, also when it answers 304', function () {
@@ -120,14 +142,18 @@ it('reads only the summaries, the names behind the contracts and the framework\'
     foreach (($this->reads)() as $uri => $calls) {
         foreach ($calls as [$query, $as]) {
             $tag = (string) ($this->read)($uri, $query, $as)->assertOk()->headers->get('ETag');
+            $ran++;
+            if (str_contains($uri, '{report}')) {
+                continue;
+            }
             ($this->read)($uri, $query, $as, ['If-None-Match' => $tag])->assertStatus(304);
-            $ran += 2;
+            $ran++;
         }
     }
 
     $endpoint = array_filter($this->statements, fn (array $s): bool => $s['phase'] === 'endpoint');
     $touched = array_unique(array_merge(...array_map(fn (array $s): array => dashboardTables($s['sql']), array_values($endpoint))));
-    expect($ran)->toBe(36)
+    expect($ran)->toBe(42)
         ->and(dashboardViolations($this->statements))->toBe([])
         ->and($touched)->toContain('daily_sales', 'daily_item_metrics', 'analytics_days', 'items', 'payment_channels', 'stations', 'users');
 });
@@ -165,5 +191,8 @@ it('bites: a planted endpoint that reads orders and the shifts is caught, and so
         ->and(dashboardViolations([['sql' => 'select exists (select 1 from payment_refunds twin where twin.id = 1) as x from `daily_sales`', 'phase' => 'endpoint']]))->toHaveCount(1)
         ->and(dashboardViolations([['sql' => 'select sum(qty) from "stock_movements"', 'phase' => 'endpoint']]))->toHaveCount(1)
         ->and(dashboardViolations([['sql' => 'select * from `audit_log`', 'phase' => 'plumbing']]))->toHaveCount(1)
-        ->and(dashboardViolations([['sql' => 'select * from `daily_item_metrics` left join `items` on `items`.`id` = `daily_item_metrics`.`item_id`', 'phase' => 'endpoint']]))->toBe([]);
+        ->and(dashboardViolations([['sql' => 'select * from `daily_item_metrics` left join `items` on `items`.`id` = `daily_item_metrics`.`item_id`', 'phase' => 'endpoint']]))->toBe([])
+        ->and(dashboardViolations([['sql' => 'insert into `audit_log` (`action`) values (?)', 'phase' => 'endpoint', 'export' => true]]))->toBe([], 'an export writes its audit row')
+        ->and(dashboardViolations([['sql' => 'select * from `audit_log` where `action` = ?', 'phase' => 'endpoint', 'export' => true]]))->toHaveCount(1, 'but never reads the log')
+        ->and(dashboardViolations([['sql' => 'insert into `audit_log` (`action`) values (?)', 'phase' => 'endpoint']]))->toHaveCount(1, 'and a dashboard writes none');
 });
