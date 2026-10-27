@@ -347,6 +347,7 @@ jobs:
           done
       - name: k6 (p95 under 1000 ms per read)
         run: |
+          set -o pipefail # k6 exits 99 when a threshold fails; the tee must not hide it
           mkdir -p /tmp/k6 && chmod 777 /tmp/k6 # the k6 image runs as a user of its own; it writes its summary there
           docker run --rm --network host -v "$PWD/scripts/perf:/scripts:ro" -v /tmp/k6:/out \
             -e BASE_URL=http://localhost:8000 -e TOKEN="$K6_TOKEN" -e FROM="$K6_FROM" -e TO="$K6_TO" -e ITEM="$K6_ITEM" \
