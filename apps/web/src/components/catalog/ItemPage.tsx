@@ -11,6 +11,7 @@ import type { DecimalString, Item, Locale, Recipe, RecipeCost, RecipeSpec } from
 import { compareDecimal, isQuantityText, scaleDecimal, subtractDecimal, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { authed, can, useSession } from "@/lib/session";
+import { useDateFormat } from "@/lib/useDates";
 import { formatWhen } from "../production/RequestCard";
 import { focusRing } from "../styles";
 import { Alert, Badge, Button, Field, PageHeader, Panel, Select, Status, TextInput } from "../ui";
@@ -218,8 +219,8 @@ function CostLines({ cost, names }: { cost: RecipeCost; names: Map<number, strin
 // --- the history and one version in full -------------------------------------------------------------------------
 
 function History({ rows, viewed, onView }: { rows: { version: number; is_active: boolean; line_count: number; published_at: string | null; published_by: { name: string } | null; change_note: string | null }[]; viewed: number | null; onView: (version: number) => void }) {
+  const dates = useDateFormat();
   const t = useTranslations("recipe");
-  const locale = useLocale() as Locale;
   return (
     <Panel title={t("history")}>
       <div className="overflow-x-auto">
@@ -239,7 +240,7 @@ function History({ rows, viewed, onView }: { rows: { version: number; is_active:
             {rows.map((row) => (
               <tr key={row.version} className="border-b border-neutral-100 align-top last:border-0">
                 <td className="py-3 pr-4 font-medium text-neutral-900">{row.version}</td>
-                <td className="py-3 pr-4">{row.published_at ? formatWhen(row.published_at, locale) : "—"}</td>
+                <td className="py-3 pr-4">{row.published_at ? formatWhen(row.published_at, dates) : "—"}</td>
                 <td className="py-3 pr-4">{row.published_by?.name ?? "—"}</td>
                 <td className="py-3 pr-4">{row.change_note ?? "—"}</td>
                 <td className="py-3 pr-4">{row.is_active ? <Badge tone="green">{t("active")}</Badge> : <Badge>{t("older")}</Badge>}</td>

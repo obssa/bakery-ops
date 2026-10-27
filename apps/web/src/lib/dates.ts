@@ -157,6 +157,26 @@ export function stampText(iso: string | null | undefined, like: DateFormatLike):
   return `${date} ${clock}`;
 }
 
+/**
+ * An instant with its day and clock, as the bell, the production board and the till's receipt preview write it: "27 Oct, 14:05" ("27 Oct
+ * 2026, 14:05" with the year; in the device's time zone unless one is named, as before step 4.5f); "Tikimt 17 14:05" in Addis Ababa's day
+ * and clock; or both.
+ */
+export function whenText(iso: string | null | undefined, like: DateFormatLike, options: { withYear?: boolean; timeZone?: string } = {}): string {
+  if (!iso) return "—";
+  const fmt = formatOf(like);
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  const { withYear = false, timeZone } = options;
+  const gregorian = () =>
+    at.toLocaleString(intlOf(fmt.locale), { ...(timeZone ? { timeZone } : {}), day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}), hour: "2-digit", minute: "2-digit" });
+  const ethiopian = () => {
+    const local = new Date(at.getTime() + ADDIS_OFFSET_MS).toISOString();
+    return `${ethiopianLabel(local.slice(0, 10), fmt, withYear)} ${local.slice(11, 16)}`;
+  };
+  return shown(fmt, gregorian, ethiopian);
+}
+
 // --- the person's choice, kept in the browser -----------------------------------------------------------------------------------------------
 
 /**

@@ -11,6 +11,7 @@ import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { canCancel, canSignOff } from "@/lib/live/production";
 import { can, useSession } from "@/lib/session";
+import { useDateFormat } from "@/lib/useDates";
 import { RequestTransferSheet } from "../inventory/RequestTransferSheet";
 import { Alert, Badge, Button, Field, TextInput } from "../ui";
 import { formatWhen } from "./RequestCard";
@@ -105,6 +106,7 @@ function RecipeTable({ lines, locale, onTransfer, canTransfer }: { lines: CardLi
 }
 
 export function RequestDetail({ summary, onClose, onChanged }: { summary: ProductionRequest; onClose: () => void; onChanged: () => void }) {
+  const dates = useDateFormat();
   const t = useTranslations("production");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
@@ -199,7 +201,7 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
         <li>{t("station_is", { name: place(request.station) })}</li>
         {request.requested_by ? <li>{t("asked_by", { name: request.requested_by.name })}</li> : null}
         {request.assigned_to ? <li>{t("baker", { name: request.assigned_to.name })}</li> : null}
-        {request.due_at ? <li>{t("due", { time: formatWhen(request.due_at, locale) })}</li> : null}
+        {request.due_at ? <li>{t("due", { time: formatWhen(request.due_at, dates) })}</li> : null}
         {request.note ? <li>{t("note_is", { note: request.note })}</li> : null}
         {batch?.finished_by ? (
           <li>

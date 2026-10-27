@@ -10,6 +10,8 @@ import { useErrorText } from "@/lib/errors";
 import { visibleLines } from "@/lib/live/pad";
 import { useOrderNo } from "@/lib/orderNo";
 import { keepsKey } from "@/lib/paySheet";
+import { whenText, type DateFormat } from "@/lib/dates";
+import { useDateFormat } from "@/lib/useDates";
 import { Alert, Button, Field, TextInput } from "../ui";
 
 // The receipt of a bill the pay sheet just completed (step 4.5b): a preview on screen, the PDF (GET /orders/{order}/receipt.pdf, the
@@ -20,10 +22,6 @@ import { Alert, Button, Field, TextInput } from "../ui";
 
 const ADDIS = "Africa/Addis_Ababa";
 
-function when(iso: string | undefined, locale: Locale): string {
-  const date = iso ? new Date(iso) : new Date();
-  return date.toLocaleString(locale === "am" ? "am-ET" : "en-GB", { timeZone: ADDIS, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
 
 export function ReceiptPanel({
   order,
@@ -42,6 +40,9 @@ export function ReceiptPanel({
   const no = useOrderNo(order);
   const errorText = useErrorText();
   const settings = useReceiptSettings();
+  // dated as the printed receipt is: the Gregorian date, and the Ethiopian one too when the receipt settings print it (step 4.5f)
+  const dates = useDateFormat();
+  const receiptDates: DateFormat = { ...dates, display: settings.data?.ethiopian_dates ? "both" : "gregorian" };
   const titleId = useId();
   const [busy, setBusy] = useState<"pdf" | "link" | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -107,7 +108,7 @@ export function ReceiptPanel({
         <div className="space-y-0.5 text-center">
           {business ? <p className="text-lg font-semibold">{business}</p> : null}
           <p>{t("order_heading", { no })}</p>
-          <p className="text-sm text-neutral-600">{when(payments[0]?.received_at, locale)}</p>
+          <p className="text-sm text-neutral-600">{whenText(payments[0]?.received_at ?? new Date().toISOString(), receiptDates, { withYear: true, timeZone: ADDIS })}</p>
         </div>
         <ul className="divide-y divide-neutral-200">
           {visibleLines(order).map((line) => (

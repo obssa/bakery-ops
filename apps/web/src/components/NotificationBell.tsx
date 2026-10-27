@@ -12,6 +12,8 @@ import { createInboxFeed, inboxOf, markedAllRead, markedRead } from "@/lib/live/
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { enablePush, type PushOutcome } from "@/lib/push";
 import { useSession } from "@/lib/session";
+import { whenText } from "@/lib/dates";
+import { useDateFormat } from "@/lib/useDates";
 import { Alert, Badge, Button } from "./ui";
 import { focusRing } from "./styles";
 
@@ -20,14 +22,9 @@ import { focusRing } from "./styles";
 // links to the screen it is about when the web has that screen. "Enable notifications" is offered only when the API says
 // push is on.
 
-function when(iso: string, locale: Locale): string {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toLocaleString(locale === "am" ? "am-ET" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
 function Line({ line, locale, onRead, onFollow }: { line: AppNotification; locale: Locale; onRead: (line: AppNotification) => void; onFollow: (line: AppNotification) => void }) {
   const t = useTranslations("bell");
+  const dates = useDateFormat();
   const title = locale === "am" ? line.title_am : line.title_en;
   const body = locale === "am" ? line.body_am : line.body_en;
   const unread = line.read_at === null;
@@ -42,7 +39,7 @@ function Line({ line, locale, onRead, onFollow }: { line: AppNotification; local
       </span>
       {body ? <span className="mt-0.5 block text-base text-neutral-700">{body}</span> : null}
       <time dateTime={line.created_at} className="mt-0.5 block text-sm text-neutral-600">
-        {when(line.created_at, locale)}
+        {whenText(line.created_at, dates)}
       </time>
     </>
   );

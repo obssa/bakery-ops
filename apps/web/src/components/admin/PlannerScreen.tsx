@@ -9,6 +9,7 @@ import { REQUEST_PRIORITIES, type Locale, type NewScheduledRequest, type Product
 import { isQuantityText, compareDecimal, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
+import { useDateFormat } from "@/lib/useDates";
 import { formatWhen } from "../production/RequestCard";
 import { Alert, Badge, Button, Field, PageHeader, Panel, Select, Status, TextInput } from "../ui";
 
@@ -205,6 +206,7 @@ function OpenRequests() {
 }
 
 function RequestRow({ request, locale, people }: { request: ProductionRequest; locale: Locale; people: User[] | null }) {
+  const dates = useDateFormat();
   const t = useTranslations("planner");
   const tp = useTranslations("production");
   const errorText = useErrorText();
@@ -233,7 +235,7 @@ function RequestRow({ request, locale, people }: { request: ProductionRequest; l
         {request.note ? <span className="block text-sm text-neutral-600">{request.note}</span> : null}
       </td>
       <td className="py-3 pr-4">{`${trimDecimal(request.requested_qty)} ${request.product.unit}`}</td>
-      <td className="py-3 pr-4">{request.due_at ? formatWhen(request.due_at, locale) : "—"}</td>
+      <td className="py-3 pr-4">{request.due_at ? formatWhen(request.due_at, dates) : "—"}</td>
       <td className="py-3 pr-4">
         <Badge tone={request.priority === "urgent" ? "red" : request.priority === "high" ? "amber" : "neutral"}>{t(`priority_${request.priority}`)}</Badge>
       </td>

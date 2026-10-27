@@ -188,7 +188,7 @@ test.describe("p4 audit log", () => {
       await expect(sections.getByRole("link", { name: "Audit log" })).toHaveCount(0);
       await expect(page.getByRole("link", { name: /^Audit log/ })).toHaveCount(0);
       await page.goto("en/admin/audit/");
-      await expect(page.getByRole("alert")).toContainText("Your account cannot open this page.", { timeout: 30_000 });
+      await expect(page.getByRole("alert").filter({ hasText: "Your account cannot open this page." })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByRole("table", { name: "Audit log", exact: true })).toHaveCount(0);
     } finally {
       await cashierContext.close();
