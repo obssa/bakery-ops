@@ -4,7 +4,7 @@ import { requireAdmin } from "../support/env";
 import { orderLabel } from "../support/fixture";
 import { openAs } from "../support/pad";
 import { buildPayFixture, paymentsOf, removeChannel, serveAll, takeawayOrder, tidyOrder, WALLET_HINT_EN, type PayFixture } from "../support/payments";
-import { fetchBytes, hasExif, jpegSize, receiptPhoto } from "../support/photo";
+import { fetchBytes, hasExif, jpegSize, receiptPhoto, recordUploads, uploadsOf } from "../support/photo";
 
 // Phase 4 gate project p4-pay-photo-split (docs/phases/phase-4-plan.md sections 7 and 10.3 item 2), step 4.5b: the till's full pay sheet.
 //
@@ -18,6 +18,7 @@ import { fetchBytes, hasExif, jpegSize, receiptPhoto } from "../support/photo";
 // channels, the fixed cashier on the till with its shift running. So the flow carries @live.
 
 async function openSheet(page: Page, fixture: PayFixture, label: string) {
+  await recordUploads(page);
   await openAs(page, fixture.cashier.api, "en/till/");
   await expect(page.getByRole("heading", { level: 1, name: "Cashier till" })).toBeVisible({ timeout: 30_000 });
   const queue = page.getByRole("region", { name: "Orders awaiting payment" });
@@ -91,11 +92,11 @@ test.describe("p4 pay sheet: photo and split", () => {
       const file = (await uploaded.json()) as { id: number; width: number; height: number; attached: boolean };
       expect(file).toMatchObject({ width: 1600, height: 1200, attached: false });
       // what left the browser was already the shrunk JPEG, without the EXIF block
-      const body = uploaded.request().postDataBuffer();
-      if (!body) throw new Error("the upload's body is not readable");
-      const shrunk = body.subarray(body.indexOf(Buffer.from([0xff, 0xd8, 0xff])));
-      expect(jpegSize(shrunk)).toEqual({ width: 1600, height: 1200 });
-      expect(hasExif(shrunk)).toBe(false);
+      const sentFiles = await uploadsOf(page);
+      expect(sentFiles).toHaveLength(1);
+      expect(sentFiles[0].type).toBe("image/jpeg");
+      expect(jpegSize(sentFiles[0].bytes)).toEqual({ width: 1600, height: 1200 });
+      expect(hasExif(sentFiles[0].bytes)).toBe(false);
 
       await expect(second.getByRole("img", { name: "Receipt photo of payment 2" })).toBeVisible();
       await expect(second.getByRole("button", { name: "Replace photo" })).toBeVisible();

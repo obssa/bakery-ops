@@ -113,3 +113,35 @@ export async function fetchBytes(url: string): Promise<{ status: number; type: s
   const response = await fetch(url);
   return { status: response.status, type: response.headers.get("content-type"), bytes: Buffer.from(await response.arrayBuffer()) };
 }
+
+/**
+ * Records what the page uploads as a file (POST /files, multipart): the browser does not expose a multipart body that holds a Blob to the
+ * test (request.postDataBuffer() is null), so a wrapper around the page's fetch keeps a copy of each `file` part, base64, in the page.
+ * It observes only; the request goes out unchanged. Install it before the page loads.
+ */
+export async function recordUploads(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const seen: { type: string; size: number; base64: string }[] = [];
+    (window as unknown as { __e2eUploads: typeof seen }).__e2eUploads = seen;
+    const original = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init?.body;
+      if (body instanceof FormData) {
+        const file = body.get("file");
+        if (file instanceof Blob) {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          let binary = "";
+          for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          seen.push({ type: file.type, size: file.size, base64: btoa(binary) });
+        }
+      }
+      return original(input, init);
+    };
+  });
+}
+
+/** The files the page uploaded so far (recordUploads), oldest first. */
+export async function uploadsOf(page: Page): Promise<{ type: string; bytes: Buffer }[]> {
+  const seen = await page.evaluate(() => (window as unknown as { __e2eUploads?: { type: string; base64: string }[] }).__e2eUploads ?? []);
+  return seen.map((u) => ({ type: u.type, bytes: Buffer.from(u.base64, "base64") }));
+}

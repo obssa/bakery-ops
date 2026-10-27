@@ -22,7 +22,7 @@ import { TillQueue } from "./TillQueue";
 import { VoidDialog } from "./VoidDialog";
 
 // The cashier till (/till): the signed-in cashier (no short code) sees the orders awaiting payment, oldest first, and
-// takes cash or voids; the same ordering surface as the waiter pad takes orders at the counter (the API stamps them
+// takes payment (the pay sheet of step 4.5b: any enabled channel, split, receipt photos) or voids; the same ordering surface as the waiter pad takes orders at the counter (the API stamps them
 // created_via = till). The queue is a LiveFeed over GET /orders (?unpaid=1 first, then the cursor, ETag-gated).
 
 type View = "queue" | "order";
@@ -38,8 +38,9 @@ export function TillScreen() {
   const [paying, setPaying] = useState<Order | null>(null);
   const [voiding, setVoiding] = useState<Order | null>(null);
 
-  // the shift at the till: Pay waits for it once the API has said a cash payment needs one (payments.require_shift_for_cash, step 3.5;
-  // switched on in step 3.7e). With the rule off nothing blocks, the bar only shows the state.
+  // the shift at the till: Pay waits for it once the API has said a payment needs one (payments.require_shift_for_cash, step 3.5; switched
+  // on in step 3.7e; every channel since step 4.3b), or from the first screen with the build flag. With the rule off nothing blocks, the bar
+  // only shows the state. The pay sheet reads the same reason (step 4.5b).
   const shiftStation = useShiftStation({ kinds: TILL_KINDS });
   const cashNeedsShift = useShiftNotice((s) => s.cashNeedsShift) || CASH_NEEDS_SHIFT_BUILD;
   const block = payBlockReason({ shift: shiftStation.shift, tracked: shiftStation.station?.tracks_shifts === true, loaded: shiftStation.loaded, enforced: cashNeedsShift });
@@ -104,7 +105,10 @@ export function TillScreen() {
         <OrderingSurface userId={userId} menu={menu} onSendStarted={() => setNotice(false)} />
       )}
 
-      {paying ? <PaySheet order={paying} onClose={() => setPaying(null)} onChanged={refresh} /> : null}
+      {paying ? (
+        // the order as the queue holds it now (a line added meanwhile changes the balance), else as it was when Pay was pressed
+        <PaySheet order={orders.find((o) => o.id === paying.id) ?? paying} shift={block} onClose={() => setPaying(null)} onChanged={refresh} />
+      ) : null}
       {voiding ? <VoidDialog order={voiding} onClose={() => setVoiding(null)} onVoided={refresh} /> : null}
     </div>
   );

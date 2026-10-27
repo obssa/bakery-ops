@@ -12,7 +12,8 @@ import { Badge, Button } from "../ui";
 
 // The queue of orders awaiting payment: oldest first, each with its table, number, waiter, how long it has waited (the
 // kitchen display's amber and red thresholds, with the words "Slow" and "Late" so colour is not the only signal), its
-// lines and the balance. A paid order that is not served yet stays, marked settled, until it closes.
+// lines and the balance. A paid order that is not served yet stays, marked settled, until it closes; one of its payments can still be voided
+// (step 4.5b, the void of step 4.3c).
 
 const AGE_STYLE: Record<TicketAge, string> = {
   fresh: "border-neutral-200 bg-white",
@@ -67,7 +68,13 @@ function QueueCard({
       <footer className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-lg font-semibold text-neutral-900">{t("balance", { amount: order.totals.balance, currency: order.currency })}</p>
         {settled ? (
-          <Badge tone="green">{t("settled")}</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone="green">{t("settled")}</Badge>
+            {/* paid in full, not served yet: a wrong payment can still be voided (step 4.3c); once the order closes it is a refund */}
+            <Button type="button" variant="secondary" aria-label={t("void_payment_aria", { no })} onClick={() => onVoid(order)}>
+              {t("void_payment")}
+            </Button>
+          </div>
         ) : (
           <div className="flex gap-2">
             <Button type="button" variant="secondary" aria-label={t("void_aria", { no })} onClick={() => onVoid(order)}>

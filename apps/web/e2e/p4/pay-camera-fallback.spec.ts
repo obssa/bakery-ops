@@ -3,7 +3,7 @@ import { requireAdmin } from "../support/env";
 import { orderLabel } from "../support/fixture";
 import { openAs } from "../support/pad";
 import { buildPayFixture, removeChannel, takeawayOrder, tidyOrder } from "../support/payments";
-import { fetchBytes, hasExif, jpegSize, receiptPhoto } from "../support/photo";
+import { fetchBytes, hasExif, jpegSize, receiptPhoto, recordUploads, uploadsOf } from "../support/photo";
 
 // Phase 4 project p4-pay-photo-split (docs/phases/phase-4-plan.md section 7), step 4.5b: the pay sheet's camera button on a device without a
 // camera, and a browser that cannot decode the picture.
@@ -29,6 +29,7 @@ test.describe("p4 pay sheet: camera fallback", () => {
       await page.addInitScript(() => {
         Object.defineProperty(window, "createImageBitmap", { value: () => Promise.reject(new DOMException("cannot decode", "InvalidStateError")), configurable: true });
       });
+      await recordUploads(page);
       await openAs(page, fixture.cashier.api, "en/till/");
       const pay = page.getByRole("region", { name: "Orders awaiting payment" }).getByRole("button", { name: `Take payment for order ${label}`, exact: true });
       await expect(pay).toBeEnabled({ timeout: 30_000 });
@@ -55,11 +56,10 @@ test.describe("p4 pay sheet: camera fallback", () => {
       expect(uploaded.status()).toBe(201);
       const file = (await uploaded.json()) as { id: number; width: number; height: number };
       // the original went up (the browser could not shrink it), and the server shrank it
-      const body = uploaded.request().postDataBuffer();
-      if (!body) throw new Error("the upload's body is not readable");
-      const original = body.subarray(body.indexOf(Buffer.from([0xff, 0xd8, 0xff])));
-      expect(jpegSize(original)).toEqual({ width: 2400, height: 1800 });
-      expect(hasExif(original)).toBe(true);
+      const sentFiles = await uploadsOf(page);
+      expect(sentFiles).toHaveLength(1);
+      expect(sentFiles[0].bytes.equals(photo.buffer)).toBe(true);
+      expect(hasExif(sentFiles[0].bytes)).toBe(true);
       expect(file).toMatchObject({ width: 1600, height: 1200 });
 
       await expect(first.getByRole("img", { name: "Receipt photo of payment 1" })).toBeVisible();
