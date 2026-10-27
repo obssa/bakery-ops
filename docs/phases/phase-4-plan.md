@@ -1533,6 +1533,76 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `docs/openapi.json` and `docs/erd.dbml` final, `docs/runbook/server.md` (Files, Receipts, Analytics sections: cron timing, rebuild by hand, the quota, what to do when `analytics_days` says
      `stale`), `domain-model.md`, `dependency-graph.md`, `invariants.md`, `traps.md`, `testing-strategy.md`, `ci-cd.md`, `workflows-and-screens.md` and the phase reference corrected (10.9),
      the Playwright `fixme`s of 4.1a turned into tests, `phase-4-report.md`, STATUS `claim-done`.
+   - **As built (step 4.6b, `phase-4/gate`).** Order: the `mod-inventory` timeout (its own commit), the tests (red: `AnalyticsBenchCommandTest` on the
+     missing command, the seeded gate tests on the missing seed), `analytics:bench`, the CI jobs, `dashboards.spec.ts`, the ADRs, the runbook, the skill's
+     references, the report and this note. **Phase 4 is not claimed done**: refunds (4.1b, 4.3d, their screens, the seed's refund roll, the refund
+     Playwright flows) wait for R-C. STATUS keeps phase 4 `in_progress` with no `done_commit`; `shared.files` and `analytics` stay `done`, `contracts`,
+     `payments`, `web` and `docs` stay `in_progress` (each still holds a refund part); the report is `docs/phases/phase-4-report.md`, the gate run is its
+     evidence (not `gate_run_url`). Where the code disagreed with the plan or the plan left a choice:
+     - **The seeded tests and the test database.** 4.6a's note said phpunit.xml's `DB_DATABASE=bakery_test` was not forced, so the container's database
+       would win. It is pinned by a `<server>` entry, which PHPUnit writes into `$_SERVER` unconditionally and no environment variable overrides (traps.md).
+       So the seeded tests open the seed themselves: `Tests\Support\SeededGate::open()` reads `GATE_SEED_DATABASE` and `GATE_SEED_DAYS`, points the default
+       connection at that database (`config` and `DB::purge`), finds the demo branch through `Phase0Seeder::existingBranch()` and fails, never skips, when a
+       variable is missing, the branch is missing, a day of the window (the `GATE_SEED_DAYS` local days before today) has no `analytics_days` row, or one sold
+       nothing. No `RefreshDatabase` or `DatabaseTruncation`; they write only what a rebuild writes and the export audit rows. The other tests of the same
+       process (the race tests, `DatabaseTruncation`) keep `bakery_test`, so the whole `gate:p4` group runs in one Pest process and nothing beside the
+       seeded tests can wipe the seed.
+     - **The `gate:p4` group**: `ChannelTotalsEqualPaymentsTest`, `RevenueEqualsOrdersTest`, `RebuildIdempotentGateTest`, `DashboardsReadSummariesOnlyGateTest`,
+       `DashboardBudgetGateTest` (new, `tests/Gate`, on the seed), `SplitPaymentRaceTest` and `PaymentVoidRaceTest` (their groups gained `gate:p4`), and
+       `PaymentStatusTest` (the payment machine's exhaustive table) and `FilesNoPublicAccessTest`, which stand for section 7's `Phase4StateMachinesTest` and
+       `FilesNoPublicAccessGateTest`. Not built: `Phase4ActorGateTest` (the actor stamp of every new write is held by `ActorStampTest` and `AuditCoverageTest`
+       in the `invariants` group, which `gate_check` runs as `arch,invariants`), `Phase4GateTest` (`gate_check` runs the group by name, and the `gate-p4` job
+       fails on an empty group or any skipped test) and `RefundReversalGateTest` (with 4.1b).
+     - **What each asserts.** Channel totals and revenue: every built day of the demo branch (the anchor, the opening day, the window, today), amounts compared
+       with brick/math (`isEqualTo`), counts, the refund columns against `payment_refunds` (by `refunded_at`; `daily_sales.refund_count` is one per order
+       refund, as `SalesBuilder` counts it, `daily_channel_totals.refund_count` one per row), the net figures, and the channels adding up to the day's takings.
+       Rebuild: three days chosen by what they hold (the busiest, the day of the first voided payment, the last Friday of the window, whose Night shift runs
+       into Saturday; the newest days fill in if two coincide), rebuilt twice with trigger `manual`: both write the seed's own rows (`AnalyticsDay::rows`) and
+       fingerprint, `changed` false, the version up by one each time. Summaries only: the routes are read from the router (11 GET routes under
+       `/analytics/`), each read over the window with `compare=previous` as the demo admin (the chef for `/stations`, the cashier for `/staff` too), each then
+       answering 304 to its ETag, each export once (xlsx, CSV and PDF in turn); the rules moved from the module test into `Tests\Support\DashboardQueries`, so
+       the two tests cannot drift. Budget: the reads of `App\Console\Support\DashboardBench` (the bench's own class) as the admin, plus the chef's stations and
+       the cashier's staff, 3 warm-ups and 30 timed requests, each a 200 with a body, at most 8 statements of its own, p95 under 400 ms; then
+       `analytics:bench --requests=3` on the seeded branch, exit 0, not one write statement, no audit row.
+     - **`php artisan analytics:bench {--branch=} {--requests=30}`** (`App\Console\Commands\AnalyticsBenchCommand`) lives outside the modules, as
+       `bakery:seed-demo` does: it signs in as a person of Identity (the branch's first active holder of `analytics.view`, `Recipients::byPermission`) and reads
+       Analytics' routes through the HTTP kernel. The person is set on the sanctum guard for the process (no token: no `personal_access_tokens` row, no
+       `last_used_at`; `Sanctum::actingAs` needs Mockery, which the release does not ship). It reads the 90 local days up to yesterday compared with the 90
+       before and the product page of the product with the most revenue in them (left out when none sold), prints a table and the budget line, exits 1 over
+       the budget or on a non-200, 2 for a bad call (`--branch` missing or not an id, an unknown branch, `--requests` outside 1 to 999, nobody who may read).
+       The exports are not read (each writes its audit row). `AnalyticsBenchCommandTest` (`module:analytics`) proves it writes nothing (no INSERT, UPDATE or
+       DELETE; on the database cache store only the permission cache, which any request fills) and the exit codes. The runbook says how to run it on the live
+       host; nobody runs it there from CI.
+     - **`gate-p4`** (`.github/workflows/ci.yml`): `needs` as the CI design (gate-p3, mod-analytics, e2e-p4, perf-dashboards) plus `files-s3` (4.2b); loads the
+       API image, starts `app` (with the database and Redis), seeds `SEED_PHASE=4` with `DEMO_HISTORY_DAYS=$GATE_SEED_DAYS` (90: the gate's own figure, 10.3,
+       not the 60-day fallback of `e2e-p4`), runs `vendor/bin/pest --group=gate:p4` in the app container with `GATE_SEED_DATABASE=bakery`, fails on an empty
+       group or a skipped test, copies the gate's figure lines to the step summary, then `gate_check.py --mode done --phase 4 --ci`. Timeout 45 minutes.
+     - **`perf-dashboards`**: after `mod-analytics` and `docker-build`, beside `e2e-p4` (the CI design's graph; it had needed `e2e-p4`), timeout 40 minutes:
+       the 90-day seed (`DEMO_HISTORY_DAYS` unset), the demo admin signed in by `curl`, the range (the 90 days to yesterday in Addis Ababa) and the product
+       (the most revenue, from `daily_item_metrics`), every read warmed once, then k6 (`grafana/k6:1.3.0` pinned by the digest of its image index,
+       `scripts/perf/dashboards.k6.js`): two virtual users, 15 iterations each over the eleven reads with a second between pages, thresholds `p(95)<1000` per
+       read and in all, no failed request, every check true; the per-read p50 and p95 go to the step summary and the summary JSON is an artifact.
+     - **`dashboards.spec.ts`** (the last non-refund `fixme` of 4.1a) runs in **`e2e-p4`, on its 60-day seed**: the overview reads the last 30 days by default,
+       which 60 days hold in full, so the 90-day seed would time the same page, and `perf-dashboards` stays a job without a browser. CI only (skipped on the
+       live host, whose figure `dashboards-live.spec.ts` logs against the soft 2500 ms). The demo admin's token is put in the page's storage, the API warmed
+       (`GET /me` and the overview's own read, which must be built and have orders), and the time runs from the page's `GET /me` answering (its resource
+       timing `responseEnd`) to the revenue tile showing a figure (`performance.now()` in a requestAnimationFrame poll): both instants in the browser, so
+       Playwright's round trips are not counted. Budget 1000 ms. `pay-refund.spec.ts` and `dashboards-audit.spec.ts` stay the refund flows' stubs.
+     - **`mod-inventory`** got room, not a split: `module-tests.yml` takes `timeout_minutes` (default 20) and `mod-inventory` passes 30 (it took 18 m 34 s on
+       PR #79 and 19 m 18 s on `main` at `76c25a0`). The skill's CI copy (`assets/ci/`) changed with every job above.
+     - **ADRs.** 0015 and 0016 did not exist (4.2a and 4.1b were to write them): 0015 is written and accepted as built; 0016 is written as **proposed**, its
+       refund part the proposal R-C decides, the void of 4.3c in a dated note. 0014 is accepted with the gate's evidence. Dated notes: 0006 (the Files row,
+       this step); 0009 (4.5c and 4.5e, already there); 0013 (4.3b, already there). The manifest's `phases.4.adrs` lists the three, so `claim-done` records
+       them.
+     - **Docs.** `docs/openapi.json` and `docs/erd.dbml` need nothing (no route, no table). The runbook gained `analytics:bench`, a day that says not built
+       (`stale_days`) and the line that the deploy never runs a seeder; the Files section's delete rule follows `payments.verify` (4.3c). The skill's
+       references and the Phase 4 reference were corrected (10.9: the weekly summary goes to Telegram and the inbox, the audit read API, the three ADRs,
+       the gate's wiring); the manifest names `rules-off-gates` (it still said `enforced-gates`). The plans' TODO wording that was not about refunds was
+       reworded, so the markers left are the refund placeholders only.
+     - **Measured** (CI, this PR's run): <<ASBUILT:figures>>
+     - **Local run notes**: the seeded gate tests and the race tests ran here against a 3-day seed in a scratch database of the dev stack (`gate:p4`: 9 passed
+       in 312 s; the seed of 4 played days took 46 s); `AnalyticsBenchCommandTest` 11 passed. The 90-day figures are CI's.
+     - STATUS: unchanged (see above).
 
 As-built notes are appended under each step as the build runs, as in Phases 1 to 3.
 
