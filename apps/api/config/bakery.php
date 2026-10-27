@@ -46,5 +46,9 @@ return [
         // testing (the seeders refuse to run without it); local and testing fall back to the documented
         // Database\Seeders\Demo\DemoCredentials::LOCAL_PASSWORD, which is refused everywhere else.
         'password' => env('BAKERY_DEMO_PASSWORD'),
+        // How many days of trading history Phase4Seeder plays into a FRESH demo branch (phase-4 plan section 8): the clock is
+        // anchored DEMO_HISTORY_DAYS + 2 days back and the days after the anchor are played to yesterday. A branch that already
+        // holds data never gets history, whatever this says. CI's e2e-p4 uses the default; tests set a small number.
+        'history_days' => (int) env('DEMO_HISTORY_DAYS', 90),
     ],
 ];

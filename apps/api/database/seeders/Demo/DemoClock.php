@@ -12,21 +12,31 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The clock of a fresh demo branch (step 3.8; phase-3 plan section 8). A locked history is only consistent with the ledger if its
- * movements happened before its counts, and the Phase 0 to 2 seeders write the opening stock "now". So when Phase 3 is asked for and the
- * demo branch is fresh (it does not exist yet, or holds no stock movement and no shift), around() sets the clock to 05:30 local, three
- * days ago (both Carbon and CarbonImmutable), runs the seeders, and puts the real clock back in a finally. Phase3Seeder then moves the
- * clock forward day by day and returns to the real time for today's part.
+ * The clock of a fresh demo branch (step 3.8; phase-3 plan section 8; step 4.6a, phase-4 plan section 8). A locked history is only
+ * consistent with the ledger if its movements happened before its counts, and the Phase 0 to 2 seeders write the opening stock "now".
+ * So when a history is asked for and the demo branch is fresh, around() sets the clock (both Carbon and CarbonImmutable) to 05:30 local
+ * on the anchor day, daysBackFor($phase) days ago, runs the seeders, and puts the real clock back in a finally. The history seeder then
+ * moves the clock forward day by day and returns to the real time for today's part:
  *
- * A branch that already holds movements (the live demo, loaded on Phases 0 to 2) is never anchored: the ledger is append-only and
- * nothing may be written under rows it has already shown, so the clock is not touched and Phase3Seeder writes no history.
+ *   SEED_PHASE 3: the anchor is three days back and Phase3Seeder plays the two days after it (exactly as step 3.8 built it);
+ *   SEED_PHASE 4 and above: the anchor is DayPlan::historyDays() + 2 days back (92 with the default 90) and Phase4Seeder plays every day
+ *   after it up to yesterday with the Phase 4 day plan; Phase3Seeder then writes only its templates and reasons.
+ *
+ * A branch that already holds data (the live demo) is never anchored: the ledger is append-only and nothing may be written under rows
+ * it has already shown, so the clock is not touched and no history is written. For Phase 3 "data" is a movement or a shift (step 3.8's
+ * rule, unchanged); from Phase 4 an order counts too.
  */
 final class DemoClock
 {
     /** The timezone Phase0Seeder gives the demo branch. */
     public const string TIMEZONE = 'Africa/Addis_Ababa';
 
+    /** Phase 3's anchor: three days back, two days of history. */
+    public const int PHASE_THREE_DAYS_BACK = 3;
+
     private static ?CarbonImmutable $anchor = null;
+
+    private static ?int $phase = null;
 
     private static ?CarbonImmutable $real = null;
 
@@ -40,10 +50,31 @@ final class DemoClock
         return self::$anchor instanceof CarbonImmutable;
     }
 
-    /** The anchor instant (05:30 local, three days ago) while anchored. */
+    /** The phase around() anchored the clock for (3: Phase 3's two days; 4 or more: the Phase 4 history), null when not anchored. */
+    public static function anchoredPhase(): ?int
+    {
+        return self::anchored() ? self::$phase : null;
+    }
+
+    /** Does the anchored clock belong to the Phase 4 history (Phase4Seeder plays the days, Phase3Seeder only sets up)? */
+    public static function playsPhaseFourHistory(): bool
+    {
+        return (self::anchoredPhase() ?? 0) >= 4;
+    }
+
+    /** The anchor instant (05:30 local on the anchor day) while anchored. */
     public static function anchor(): CarbonImmutable
     {
         return self::$anchor ?? throw new \LogicException('The demo clock is not anchored.');
+    }
+
+    /**
+     * How many days back the anchor is for a run up to $phase: 3 below Phase 4 (so e2e-p0 to e2e-p3 and every earlier seeder test see
+     * exactly what they saw), else the Phase 4 history's days plus two (the anchor day and the opening day before the window).
+     */
+    public static function daysBackFor(int $phase): int
+    {
+        return $phase >= 4 ? DayPlan::historyDays() + 2 : self::PHASE_THREE_DAYS_BACK;
     }
 
     /** The real time of the run (the test clock when a test froze it). */
@@ -84,7 +115,8 @@ final class DemoClock
     }
 
     /**
-     * Is the demo branch fresh enough to write a history under? True when Phase 3 is requested and the branch has no movement and no shift.
+     * Is the demo branch fresh enough to write a history under? From Phase 3, when the branch does not exist yet or has no movement
+     * and no shift; from Phase 4 it must have no order either.
      */
     public static function wantsAnchor(int $phase): bool
     {
@@ -97,7 +129,8 @@ final class DemoClock
         }
 
         return DB::table('stock_movements')->where('branch_id', $branch->id)->doesntExist()
-            && DB::table('shift_instances')->where('branch_id', $branch->id)->doesntExist();
+            && DB::table('shift_instances')->where('branch_id', $branch->id)->doesntExist()
+            && ($phase < 4 || DB::table('orders')->where('branch_id', $branch->id)->doesntExist());
     }
 
     /**
@@ -116,13 +149,15 @@ final class DemoClock
         self::$real = CarbonImmutable::now();
         self::$realWasFrozen = Carbon::hasTestNow();
         $local = self::$real->setTimezone(self::TIMEZONE);
-        self::$anchor = $local->subDays(3)->setTime(5, 30)->utc();
+        self::$anchor = $local->subDays(self::daysBackFor($phase))->setTime(5, 30)->utc();
+        self::$phase = $phase;
         self::set(self::$anchor);
         try {
             $seed();
         } finally {
             self::toReal();
             self::$anchor = null;
+            self::$phase = null;
             self::$real = null;
             self::$realWasFrozen = false;
         }

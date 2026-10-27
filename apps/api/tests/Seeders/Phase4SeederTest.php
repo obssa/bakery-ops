@@ -12,6 +12,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\DayPlan;
 use Database\Seeders\Demo\DemoBakery;
 use Database\Seeders\Demo\DemoClock;
+use Database\Seeders\Demo\DemoSeedRefused;
 use Database\Seeders\Demo\PlannedDay;
 use Database\Seeders\Demo\PlannedOrder;
 use Database\Seeders\DemoSeeder;
@@ -316,7 +317,7 @@ it('refuses a branch that is not a demo branch (the E2E Test Branch), writing no
 });
 
 it('refuses a run with no demo branch behind it', function () {
-    expect(fn () => $this->seed(Phase4Seeder::class))->toThrow(Database\Seeders\Demo\DemoSeedRefused::class);
+    expect(fn () => $this->seed(Phase4Seeder::class))->toThrow(DemoSeedRefused::class);
 });
 
 it('writes no history into a demo branch that holds data: it says so, adds nothing to the ledger, makes sure of the channels and receipt settings and builds the days not built', function () {
