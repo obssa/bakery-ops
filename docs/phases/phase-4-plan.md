@@ -1430,6 +1430,105 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
 6. **4.6 docs and seeds** (STATUS `docs`), two PRs.
    - **4.6a `phase-4/seed-history`**: the real `Phase4Seeder` and `DemoClock` generalisation (section 8). It lands before 4.6b because the gate tests and `perf-dashboards` run on its data;
      it may be started as soon as 4.1 is done if the order needs it (`Phase3Seeder` and `DemoClock` exist since Phase 3 closed).
+   - **As built (step 4.6a, `phase-4/seed-history`).** Order: the tests (red: `DemoClockTest` on the missing `daysBackFor`, `Phase4SeederTest` on the missing plan and
+     message), then the clock and the extracted day loop with Phase 3 unchanged, then the Phase 4 seeder, then the CI wiring, the runbook and this note. Where the code
+     disagreed with the plan or the plan left a choice:
+     - **The clock.** `DemoClock::daysBackFor(int $phase)` is 3 below Phase 4 and `DayPlan::historyDays() + 2` from Phase 4 (`bakery.demo.history_days`, env
+       `DEMO_HISTORY_DAYS`, default `DayPlan::HISTORY_DAYS` = 90, at least 1); `around()` anchors 05:30 local that many days back and remembers the phase
+       (`anchoredPhase()`, `playsPhaseFourHistory()`). `wantsAnchor(4)` also needs no order (Phase 3's rule, movements and shifts, is unchanged). `DemoClockTest` proves
+       Phase 3 still anchors three days back whatever `DEMO_HISTORY_DAYS` says. The loop plays **every day after the anchor to yesterday**, so with the default it plays
+       91 days: the opening day D-91 (the first large purchase, transfers and production) and the 90 days D-90 to D-1 that the gate reads (section 8 said "90 days";
+       corrected).
+     - **The day loop.** `Demo\DemoDay` is Phase3Seeder's per-day play: 05:55 the Night shift of the evening before closes, 06:02 every station's Day shift starts and
+       counts its opening, then the day's steps in time order (a stable sort), 14:05 the closings ("nothing changed" except the planned differences, co-signed and decided
+       by the manager, a closing the plan leaves pending stays pending), 22:05 a planned Night shift starts; `closeAnchor()` locks the anchor day's carried shifts at 21:30;
+       `today()` is Phase 3's today part. `Demo\DayPlan::phaseThree()` holds step 3.8's two days as data (`Demo\PlannedDay`), and Phase 3 writes the same rows as before:
+       `Phase3SeederTest` and `ReplaySeededHistoryTest` are unchanged and green. With `SEED_PHASE` 4 and above on a fresh branch, `Phase3Seeder` writes only its templates
+       and reasons and leaves the clock anchored; `Phase4Seeder` plays the history and then does today's part.
+     - **The plan** (`DayPlan::phaseFour`, `mt_srand(4040)`, drawn once before anything is played; constants a test states): `WEEKDAY_ORDERS` 22 and `WEEKEND_ORDERS` 34
+       (Saturday and Sunday) between 06:45 and 12:50; lines from a weighted menu (a drink 80 %, kitchen food 45 %, the display case 55 %); `CHANNEL_MIX` cash 45, Telebirr 30,
+       CBE Birr 10, bank 15 spread over `BANK_CHANNELS` (CBE bank 7, Dashen 3, Awash 2, Abyssinia 2, Coop 1: the plan's "bank transfers" named); `SPLIT_PCT` 12 (the digital
+       part 30 to 70 % of the bill in tens of birr, the rest in cash, one `payment-batch`); `PAYMENT_VOID_PER_MILLE` 15 (a digital part payment of half the bill, voided two
+       minutes later by the cashier with the manager's approval, the bill then paid in cash); `ORDER_VOID_PCT` 1 (voided two minutes after it is sent, before anything is
+       made); `VERIFIED_PCT` 40 and `DISPUTED_PCT` 3 of the digital payments (verified at 13:50, disputed at 13:52, one dispute in three verified at 06:44 the next morning;
+       the last day's stay disputed); a voided payment's order gets no check. `REFUND_PCT` is 0 with `TODO(p4): 4.3d`; its roll is drawn on every order already, so turning
+       it on changes no other draw, and `DemoTill` has the marked place where the refund becomes one more step after the payment. Every kind happens at least once
+       however short the window (a second-day order is given it when the draw left it out).
+     - **Stock** (`Demo\DemoStock`, from 06:05): what a day needs is its planned orders, a to-order product exploded through `Recipes::scaled` the way the ledger reserves
+       it; what is there is `Stock::of(...)->available()`. A product made in the house below its day's need x 1.2 plus a margin is made up to the day's and the next day's
+       need plus the margin (the manager plans it at 06:12, the baker accepts and starts it, finishes at 06:35, the manager confirms at 06:38); an ingredient or a bought-in
+       drink below the same threshold is brought to (today + tomorrow) x 1.3 plus the margin in whole units of its own unit, asked by the station's worker and confirmed by
+       the manager at the store; the store buys on Mondays and on the opening day for eight days of need x 1.3 (and on any day an item the transfers would empty). The
+       margin is one unit of the item (two for a product) or twice a Phase 2 reorder rule's minimum. Two suppliers are added (Merkato Fresh Market, Abay Beverages; made-up
+       numbers) besides Phase 2's three. Section 8's "daily production batches and weekly purchases" hold in effect; a product is made on the days it is short.
+     - **Stock-outs**: `STOCK_OUTS` croissant, black forest slice and sweet bread at 25 %, 55 % and 82 % of the window. That morning the product is not made, the first order
+       at or after 10:30 takes every unit left (read from the ledger), the reservation opens the stock-out and `CreateAutoRequest` its request (synchronous), and the baker
+       makes it at 11:00 to 11:45; no other line of the product is sold before 11:50. No other place runs out (the test counts the `stock_out` requests).
+     - **Differences**: `DIFFERENCES` at 12, 30, 50, 68 and 88 % of the window: the kitchen's 500 g of tomatoes (spoilage), the till 20.00 short (miscount), the bar's 250 ml of
+       milk (spoilage), the till 10.00 over (miscount), the cake room's 200 ml of cream (spoilage), each approved by the manager. Every other count equals the ledger.
+     - **Shifts**: one Day shift per tracked station per day, all locked; a Night shift at the bakery every Friday, planned at 08:30 with the bread baker, 22:05 to 05:55,
+       dated Friday; **not when Friday is yesterday** (its night would end today). No test turns a shift rule off; every payment carries the till's shift.
+     - **Payments** (`Demo\DemoTill`): each order over its own minutes (taken and sent at the pad, accepted 1 to 3 minutes later, the bar ready 2 to 5 and the kitchen 6 to 14
+       minutes after that, served 1 to 3 minutes after the last ready line, paid 4 to 20 minutes later), so prep times and hours are real on the dashboards. Every digital
+       payment's photo is drawn with GD (`Demo\DemoReceiptPhotos`: five designs cycled, each stamped with the channel, amount, reference and time, so no two have the same
+       sha256 and no duplicate-receipt warning fires), stored through `Files::put` (purpose `receipt`, on the `files` disk) by the cashier at the till the same minute as its
+       payment (the 12 h rule), with the `file.upload` audit row `POST /files` writes. References are `SEED-{yymmdd}-{n}`, n the order's number in the day. Client UUIDs are
+       UUIDv5 of `demo-order:{date}:{n}`, `demo-pay:{date}:{n}[:digital|:cash|:void]`, `demo-batch:{date}:{n}`, `demo-photo:...`, `transfer:...`, `purchase:...`,
+       `production:...` (`Demo\DemoIds`). A refusal anywhere in the history (a send the restock left short) stops the seed: nothing is skipped silently.
+     - **Today**: Phase 3's today part, then, a second after today's opening counts (a count's snapshot has microseconds, a movement's `created_at` whole seconds, so a
+       movement in the same second would read as before the snapshot: `DemoClock::nextSecond()`), a restock for today's samples in real time (`DemoStock` over the samples'
+       plan, so nothing runs out under the live screens), then four sample orders (one on the rails, one being made, one served at the till, one paid split Telebirr plus
+       cash), keyed by today's date; a send the stock cannot cover leaves the cart open, as the pad would.
+     - **The queue.** From Phase 4 the whole anchored run is on the `sync` queue (`DemoClock::around`, put back afterwards), Phases 0 and 1 included: they do not set it
+       themselves, and on a Redis queue (the dev and CI stacks) their `EvaluateBalance` jobs waited for a worker while holding their unique locks for ten minutes, which
+       swallowed the history's own evaluations of the same balances, its stock-outs among them (found running the seed on the dev stack; the tests run `sync` and the
+       `array` cache, whose locks expire in the seeded clock). `Phase4SeederTest` asserts the `jobs` table is empty after the seed.
+     - **Held jobs** (`Demo\DemoAlerts`). Every queued listener runs (`queue.default=sync`), but two jobs are held on the bus while the history is played (`Bus::swap` with
+       a `BusFake` that fakes those two only; every other job runs): the `RebuildDay` jobs the touch and shift-lock listeners ask for (a rebuild per payment over a growing
+       ledger would cost minutes), and the `EvaluateBalance` jobs Inventory asks for on every movement. The held evaluations are run on the real bus, once per balance,
+       after each day's closings, after the morning's batches and right after a planned stock-out order (so its automatic request is there that morning): the stock-outs,
+       low-stock alerts, recoveries and their inbox lines happen as on the screens, at that granularity. Then `Rebuild::day` runs once for every day from the anchor to today,
+       trigger `seed`. Side effect: a held job's unique lock is still taken when it is asked for; an evaluation lets its balance's lock go when it runs, and `RebuildDay`'s
+       lock (120 s) means a payment in the demo branch in the two minutes after the seed asks for no rebuild (the nightly run heals it).
+     - **Receipt settings**: `SaveReceiptSettings` is taken out of `ReceiptSettingsController` (same AuditedAction, same answer) and the seed saves the demo's settings through
+       it when the branch has none (fresh and data paths).
+     - **A branch with data** (the live demo): "history not generated: the demo branch already has data; load a new demo branch", nothing added to the ledger, the eight
+       channels and the receipt settings made sure of, and `Rebuild::day` (trigger `seed`) for **every day from its first movement to today that has no `analytics_days`
+       row yet** (section 8 said every day with data; a built day is left to its triggers and the nightly run, so a second run writes nothing), and a tracked station with no
+       open shift named. The seeder never touches the E2E Test Branch (not a demo branch: refused by Phase 0, tested).
+     - **Timing.** Measured in `e2e-p4` on `49d0130` (run 40571301269): Phases 0 to 2 in 15 s, the 91 days played in 938 s and rebuilt in 12 s, the whole seed step
+       967 s (16 min, **over the 10-minute budget**); the job took 18 m 37 s (2 m 14 s before). That is about 0.4 s an order through the real actions (some 300 statements
+       each, nearly all the modules' own), against the plan's 80 to 150 ms. Two answers: the held evaluations above and the helpers keeping what they read (stations,
+       products, tables, people, unit factors, place types), about 15 % faster on the dev stack (8 days in 83 s instead of 96 to 104 s); and **the fallback**: `e2e-p4` seeds
+       `DEMO_HISTORY_DAYS=60` (the reusable `e2e.yml` takes `history_days` and passes it only when set), the 90-day figure kept for `perf-dashboards` (4.6b). The 60-day
+       seed's measured line is in the PR.
+     - **CI.** `e2e-p4` seeds `SEED_PHASE=4` with `history_days: "60"` (the fallback above); `e2e-p0` to `e2e-p3` are unchanged. `Phase4SeederTest` (group `seeds:p4`,
+       7 days, about 2.5 minutes here) runs in `mod-analytics` (the seed rebuilds through Analytics); `phpunit.xml` sets `DEMO_HISTORY_DAYS=1`, so the tests that seed every
+       phase (`SeedDemoCommandTest`, `DemoSeederTest`'s `db:seed`) play two short days. The deploy pipeline (`release.sh`, `deploy.yml`) calls no seeder.
+     - **For 4.6b.** The 90-day data exists only after `SEED_PHASE=4 php artisan migrate:fresh --force --seed --seeder=DemoSeeder` on the compose stack (e2e.yml's seed
+       step); the "Demo Bakery" branch then holds the anchor day, the 91 played days and today, every one in `analytics_days` with trigger `seed`, version 1, and an empty
+       `jobs` table; the E2E Test Branch is created after it and never touched. `gate-p4`'s seeded tests (`ChannelTotalsEqualPaymentsTest`, `RevenueEqualsOrdersTest`,
+       `RebuildIdempotentGateTest`, `DashboardsReadSummariesOnlyGateTest`, `DashboardBudgetGateTest`) should run in a job that seeds once that way and then runs only their
+       group in the app container, against that database and without `RefreshDatabase` or `DatabaseTruncation` (either would wipe the seed; `phpunit.xml`'s
+       `DB_DATABASE=bakery_test` is not forced, so the container's `DB_DATABASE` wins, which is also why no other group may run in that process); they find the branch through
+       `Phase0Seeder::existingBranch()` and should fail, not skip, when it has fewer than 90 built days. `dashboards.spec.ts` (`p4-dashboards`, in `e2e-p4` after the seed) sees the
+       60-day fallback; `perf-dashboards` keeps the 90-day figure, so it seeds in a job of its own without `history_days` (the e2e job with `history_days` empty; about
+       13 to 16 minutes, so give that job a timeout above e2e.yml's 30 minutes only if the Playwright part is long). Both can sign in as the demo admin
+       (`DEMO_ADMIN_PHONE`/`DEMO_ADMIN_PASSWORD` in e2e.yml) and read the range they seeded; warm the API once before timing
+       (the first request after the seed is cold), and start the timer after `GET /me` (4.5e's note). The seed's own line (`Phase 4: N days of history played ... in X s`) is in
+       the e2e log of the seed step. Counts at 90 days (on `49d0130`): 2 325 orders, 2 612 payments (37 voided), 1 382 receipt photos and 26 971
+       audit rows in the demo branch, under the 50 000 rows the audit export takes; at 60 days about two thirds of that.
+     - **For 4.3d.** `DayPlan::REFUND_PCT` goes to 2 (and its `TODO(p4)` goes); the roll is already drawn on every order (`$refundRoll <= DayPlan::refundPct()`, never a voided
+       order), so no other draw moves. `DemoTill::orderSteps` has the marked place, which throws today: the refund becomes one step after the payment (before 13:50: the latest
+       payment is about 13:35), asked by the cashier and approved by the manager through the refund use case, display-case lines restocked (a `return` at the display case,
+       inside the till's shift), station lines `waste`, a handful by line and a few lines `none`. The closings need nothing: `DemoShiftFlow` declares the drawer's expected
+       cash, which `Totals::cash` will give net of cash refunds; the next morning's restock reads `available`, so restocked units are sold again. `Phase4SeederTest` already
+       asserts `Σ payments − Σ payment_refunds = Σ order totals − Σ refunded_total` (a missing `orders.refunded_total` counts as zero until 4.1b adds it); add the planned refund
+       count, `daily_channel_totals.refund_amount` and `daily_sales.refund_total` against the raw rows, and that every `return` points at its original.
+     - **Also in this PR** (asked for separately, its own commit): the e2e API client (`apps/web/e2e/support/api.ts`) retries a request whose connection the busy live host
+       drops (ECONNRESET and the like, or a body read that fails after the headers), three attempts, about 1 s then 3 s apart, with one Idempotency-Key per logical request;
+       an HTTP answer is never retried. A pure check is in `pay-admin-logic.spec.ts`.
+     - STATUS: phase 4's `docs` step is `in_progress`.
    - **4.6b `phase-4/gate`**: the `gate:p4` tests (section 7), the `gate-p4` and `perf-dashboards` jobs wired, ADR 0014/0015/0016 accepted and the dated notes on ADR 0006/0009/0013,
      `docs/openapi.json` and `docs/erd.dbml` final, `docs/runbook/server.md` (Files, Receipts, Analytics sections: cron timing, rebuild by hand, the quota, what to do when `analytics_days` says
      `stale`), `domain-model.md`, `dependency-graph.md`, `invariants.md`, `traps.md`, `testing-strategy.md`, `ci-cd.md`, `workflows-and-screens.md` and the phase reference corrected (10.9),
@@ -1488,28 +1587,35 @@ ledger, payment, count or file table. It runs the queued listeners synchronously
 `DemoClock::around()` takes the days back from the phase (a `DemoClock::daysBackFor(int $phase)`); `SEED_PHASE` below 4 keeps 3, so `e2e-p0` to `e2e-p3` and every earlier seeder test see exactly what they saw. With `SEED_PHASE>=4` and a demo branch that has **no
 shift, no order and no movement**, the Phase 0 to 2 seeders run with `Carbon::setTestNow` and `CarbonImmutable::setTestNow` at `today - 92 days, 05:30 local`, then one day loop plays 90 days forward to
 yesterday (`Phase3Seeder`'s per-day play is extracted into `Demo\DemoDay` so the Phase 3 history is that loop run for two days with its planned differences; Phase 4 runs it with a richer `DayPlan`),
-and `DemoClock` puts the real clock back in a `finally`. Today is left for the live demo: open shifts, a few sample orders.
+and `DemoClock` puts the real clock back in a `finally`. Today is left for the live demo: open shifts, a few sample orders. *As built (4.6a):* the loop plays every day after the anchor, D-91 to
+D-1 (91 days: an opening day, then the 90-day window D-90..D-1 the gate reads); the whole Phase 4 run is on the `sync` queue from the anchor (`DemoClock::around`), and with `SEED_PHASE>=4` on a
+fresh branch `Phase3Seeder` writes only its templates and reasons while `Phase4Seeder` plays the days and does today's part.
 
 **The day plan** (seeded `mt_srand(4040)`, so the same 90 days every run): weekdays about 22 orders, weekends about 34 (about 2 000 orders in all, 6 000 lines); a channel mix of (cash 45%, Telebirr 30%,
 CBE Birr 10%, bank transfers 15%); 12% of paid orders are **split** (a digital part with a photo and the rest in cash); every digital payment carries a generated receipt photo (five small GD-drawn
 images, EXIF-free, cycled) and a reference `SEED-{yymmdd}-{n}`; about 1.5% of payments are **voided** before the order is paid (and the order re-paid in cash) and 2% of orders are **refunded** (display-case
-lines restocked, station lines `waste`, a few lines `none`), a handful by line; 40% of digital payments are verified, 3% disputed (a few resolved); 1% of sent orders are voided; the
+lines restocked, station lines `waste`, a few lines `none`), a handful by line (*as built in 4.6a:* `DayPlan::REFUND_PCT` is 0 until step 4.3d, `TODO(p4): 4.3d`; the roll is drawn on every
+order already); 40% of digital payments are verified, 3% disputed (a few resolved); 1% of sent orders are voided; the
 display case and the bakery are kept stocked by daily production batches and weekly purchases so stock-outs are rare and planned (three days in the 90 have one, with the production request it
 causes); one Day shift per tracked station per day, closed and locked with the closing count equal to the ledger except on five planned days (a kitchen spoilage, a till cash difference); a Night
-shift at the bakery every Friday. Dates and volumes are constants in `Demo\DayPlan` so a test can state them.
+shift at the bakery every Friday (not when Friday is yesterday: that night would end today). Dates and volumes are constants in `Demo\DayPlan` so a test can state them; the As built note of 4.6a
+lists them and the choices the plan left open.
 
 **What the seed guarantees**, asserted by `Phase4SeederTest`: all Phase 0 to 3 history assertions still hold (every place's chain verifies, `expected_qty` equals `balanceAt`); the ledger oracle holds
 after every refund; for every day `SUM(payments.amount WHERE status <> 'voided')` per channel equals `daily_channel_totals.amount` and counts match; `daily_sales.revenue` equals `SUM(orders.total)`
 of paid/closed orders settled that day; `Σ payments - Σ payment_refunds` equals `Σ order totals - Σ refunded_total`; a second run writes nothing, not even an audit row; a run into a branch that is not a demo
 branch is refused. Estimated cost: about 2 000 orders through the real actions at 80 to 150 ms each is 3 to 5 minutes; the plan's budget is **under 10 minutes in `e2e-p4`/`gate-p4`**; if 4.6a measures
-more, the fallback is `DEMO_HISTORY_DAYS` (60) in CI only, with the 90-day figure kept for `perf-dashboards` (decision recorded in the PR; 10.2 R-I).
+more, the fallback is `DEMO_HISTORY_DAYS` (60) in CI only, with the 90-day figure kept for `perf-dashboards` (decision recorded in the PR; 10.2 R-I). *As built (4.6a):* measured 967 s for the
+90 days (2 325 orders at about 0.4 s each); the fallback is taken, `e2e-p4` seeds 60 days (see the As built note).
 
-**What the earlier seeders must change.** Nothing beyond the clock anchor parameter. `Phase1Seeder` already pays in the till's running shift (3.7e). Channels, `payment_channels` defaults and the
+**What the earlier seeders must change.** Nothing beyond the clock anchor parameter (*as built in 4.6a:* `Phase3Seeder`'s day is played by the extracted `Demo\DemoDay` with the same rows,
+and from Phase 4 the anchored run is on the `sync` queue from the start). `Phase1Seeder` already pays in the till's running shift (3.7e). Channels, `payment_channels` defaults and the
 permission grants reach the database by migrations, not by the seeder.
 
 **The live demo branch.** "Demo Bakery" on https://bakery-ops.orcamind.dev was loaded by hand at an earlier phase and has data of its own. **`bakery:seed-demo --phase=4` never writes history into it**: if the
 branch has any order, shift or movement the seeder prints "history not generated: the demo branch already has data; load a new demo branch" (the Phase 3 rule), adds nothing to the ledger, and only (a) makes sure the
-eight channels and the receipt settings exist, (b) runs `Rebuild::day` for every day that has data (read only on the ledger, so the dashboards show the live demo's real orders), and (c) if the demo branch has no open
+eight channels and the receipt settings exist, (b) runs `Rebuild::day` for every day that has data (read only on the ledger, so the dashboards show the live demo's real orders; *as built in 4.6a:* every day from its first
+movement to today that has no summary yet, so a second run writes nothing), and (c) if the demo branch has no open
 shift at a tracked station, says so (starting them is the owner's call, as in 3.7e). Nothing on the live host is ever backdated. A 90-day showcase on live would need a **second, new demo branch** created for it
 (`--branch="Demo History"`); that is not done unless Ramin asks (10.2 R-I). Never run the seeder against the "E2E Test Branch".
 
