@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { PaymentChannel, PaymentListRow, ReconciliationChannelRow } from "../../src/lib/api/types";
 import { resolveDeepLink } from "../../src/lib/deeplink";
+import { Api, ApiFailure, networkRetry } from "../support/api";
 import {
   canDispute,
   canDrill,
@@ -395,5 +396,83 @@ test.describe("admin payments logic", () => {
     // the Ethiopian date switch (step 4.5f): read from the settings and sent back as it was set
     expect(receiptFormOf({ ...settings, ethiopian_dates: true }).ethiopian_dates).toBe(true);
     expect(receiptBody({ ...form, ethiopian_dates: true }).ethiopian_dates).toBe(true);
+  });
+});
+
+// The e2e API client every @live fixture uses (e2e/support/api.ts): the busy live host sometimes resets a connection, and the client tries
+// the request again with the same Idempotency-Key, so a write that reached the server is replayed, not doubled. Pure: fetch is stubbed.
+test.describe("the e2e API client's retry", () => {
+  const reset = (code: string) => new TypeError("fetch failed", { cause: Object.assign(new Error(`read ${code}`), { code }) });
+  const answer = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+  test("a reset connection is tried again with the same Idempotency-Key; an HTTP answer never is", async () => {
+    const realFetch = globalThis.fetch;
+    const delays = networkRetry.delaysMs;
+    networkRetry.delaysMs = [1, 1];
+    const keys: (string | null)[] = [];
+    let calls = 0;
+    const stub = (respond: (call: number) => Promise<Response> | Response) => {
+      calls = 0;
+      keys.length = 0;
+      globalThis.fetch = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+        calls++;
+        keys.push(new Headers(init?.headers).get("Idempotency-Key"));
+        return respond(calls);
+      }) as typeof fetch;
+    };
+    try {
+      const api = new Api("token", "http://api.test");
+
+      // ECONNRESET once, then the answer: two attempts, one key
+      stub((call) => {
+        if (call === 1) throw reset("ECONNRESET");
+        return answer(201, { id: 7 });
+      });
+      expect(await api.post<{ id: number }>("/things", { name: "x" })).toEqual({ id: 7 });
+      expect(calls).toBe(2);
+      expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/);
+      expect(keys[1]).toBe(keys[0]);
+
+      // the body read fails after the headers arrived: tried again too, same key
+      stub((call) =>
+        call === 1
+          ? ({ status: 200, headers: new Headers(), text: async () => Promise.reject(new TypeError("terminated")) } as unknown as Response)
+          : answer(200, { ok: true }),
+      );
+      expect(await api.patch<{ ok: boolean }>("/things/7", { name: "y" })).toEqual({ ok: true });
+      expect(calls).toBe(2);
+      expect(keys[1]).toBe(keys[0]);
+
+      // a multipart body is sent again as it is
+      const form = new FormData();
+      form.append("purpose", "receipt");
+      stub((call) => {
+        if (call === 1) throw reset("UND_ERR_SOCKET");
+        return answer(201, { id: 9 });
+      });
+      expect(await api.postForm<{ id: number }>("/files", form)).toEqual({ id: 9 });
+      expect(calls).toBe(2);
+
+      // three refused connections: three attempts in all, then the failure itself
+      stub(() => {
+        throw reset("ECONNREFUSED");
+      });
+      await expect(api.get("/things")).rejects.toThrow("fetch failed");
+      expect(calls).toBe(3);
+      expect(keys).toEqual([null, null, null]);
+
+      // an HTTP 500 (or any 4xx) is an answer: thrown at once, never sent again; so is an error that is not the network's
+      stub(() => answer(500, { message_key: "server.error" }));
+      await expect(api.post("/things", {})).rejects.toBeInstanceOf(ApiFailure);
+      expect(calls).toBe(1);
+      stub(() => {
+        throw new TypeError("invalid URL");
+      });
+      await expect(api.post("/things", {})).rejects.toThrow("invalid URL");
+      expect(calls).toBe(1);
+    } finally {
+      globalThis.fetch = realFetch;
+      networkRetry.delaysMs = delays;
+    }
   });
 });

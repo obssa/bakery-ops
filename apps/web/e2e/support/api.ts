@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { apiOrigin } from "./env";
 
 // A tiny typed client for the API, for fixtures and post-conditions: bearer token, JSON, and a fresh Idempotency-Key
-// on every write (rule 7). It does not share code with the app's own client on purpose: the tests must not pass or
+// on every write (rule 7), kept across the retries of that write. It does not share code with the app's own client on purpose: the tests must not pass or
 // fail because of a bug in what they check.
 
 export class ApiFailure extends Error {
@@ -61,6 +61,57 @@ function storeSession(key: string, value: Stored | null): void {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+// The live host is a busy shared server: under load it sometimes resets a connection, and fetch throws ("fetch failed", cause
+// ECONNRESET) before an answer, or the body read fails after the headers arrived. Such a network-level failure is tried again, three
+// attempts in all, about 1 s and then 3 s apart (delaysMs; a pure spec shortens them). The Idempotency-Key is made once per logical
+// request, before the first attempt, so a write that did reach the server is replayed by it, never done twice. An HTTP answer is never
+// retried here: a 4xx or 5xx stays what it is, apart from the 429 and 401 handling in send().
+export const networkRetry = { delaysMs: [1000, 3000] };
+
+const NETWORK_CODES = new Set(["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EPIPE", "UND_ERR_SOCKET"]);
+
+/** The body of an answer could not be read after its headers arrived (the connection went away). */
+class BodyReadFailure extends Error {
+  constructor(readonly original: unknown) {
+    super(`reading the answer failed: ${original instanceof Error ? original.message : String(original)}`, { cause: original });
+    this.name = "BodyReadFailure";
+  }
+}
+
+/** A thrown TypeError whose cause (or the cause's cause) carries one of NETWORK_CODES, or a body read that failed. */
+export function isNetworkFailure(error: unknown): boolean {
+  if (error instanceof BodyReadFailure) return true;
+  if (!(error instanceof TypeError)) return false;
+  let cause: unknown = (error as { cause?: unknown }).cause;
+  for (let depth = 0; cause !== undefined && cause !== null && depth < 4; depth++) {
+    const code = (cause as { code?: unknown }).code;
+    if (typeof code === "string" && NETWORK_CODES.has(code)) return true;
+    cause = (cause as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/** One HTTP exchange, tried again on a network-level failure only; the answer's status, headers and text. */
+async function exchange(url: string, init: RequestInit): Promise<{ status: number; headers: Headers; text: string }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(url, init);
+      let text: string;
+      try {
+        text = await response.text();
+      } catch (error) {
+        throw new BodyReadFailure(error);
+      }
+      return { status: response.status, headers: response.headers, text };
+    } catch (error) {
+      if (attempt >= networkRetry.delaysMs.length || !isNetworkFailure(error)) {
+        throw error instanceof BodyReadFailure ? error.original : error;
+      }
+      await sleep(networkRetry.delaysMs[attempt]);
+    }
+  }
+}
+
 export class Api {
   constructor(
     public token: string | null = null,
@@ -93,27 +144,36 @@ export class Api {
     return pending;
   }
 
-  private async send<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}, retried = false, throttled = false): Promise<T> {
-    // a multipart body (POST /files) goes as it is: fetch writes its Content-Type with the boundary
+  private async send<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    headers: Record<string, string> = {},
+    retried = false,
+    throttled = false,
+    // one key per logical request, made before the first attempt: every retry of a write carries the same one
+    key: string | null = method === "GET" ? null : randomUUID(),
+  ): Promise<T> {
+    // a multipart body (POST /files) goes as it is: fetch writes its Content-Type with the boundary (and a FormData can be sent again)
     const form = body instanceof FormData;
-    const response = await fetch(`${this.origin}/api/v1${path}`, {
+    const response = await exchange(`${this.origin}/api/v1${path}`, {
       method,
       headers: {
         Accept: "application/json",
         ...(body === undefined || form ? {} : { "Content-Type": "application/json" }),
         ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
-        ...(method === "GET" ? {} : { "Idempotency-Key": randomUUID() }),
+        ...(key === null ? {} : { "Idempotency-Key": key }),
         ...headers,
       },
       body: body === undefined ? undefined : form ? body : JSON.stringify(body),
     });
-    const text = await response.text();
+    const text = response.text;
     const json: unknown = text ? JSON.parse(text) : null;
     if (response.status === 429 && !throttled) {
       // throttled (the login allows ten a minute per address): wait as long as the server asks, 60 s when it does not say, and try once more
       const asked = Number(response.headers.get("Retry-After"));
       await sleep((Number.isFinite(asked) && asked > 0 ? Math.min(asked, 65) : 60) * 1000 + 500);
-      return this.send<T>(method, path, body, headers, retried, true);
+      return this.send<T>(method, path, body, headers, retried, true, key);
     }
     if (response.status === 401 && this.account && !retried) {
       // the token was revoked: forget the cached login, log in once more (shared with the other holders of this account) and retry
@@ -124,9 +184,9 @@ export class Api {
         storeSession(key, null);
       }
       this.token = (await Api.session(phone, password, branchId, this.origin)).token;
-      return this.send<T>(method, path, body, headers, true, throttled);
+      return this.send<T>(method, path, body, headers, true, throttled, key);
     }
-    if (!response.ok) throw new ApiFailure(response.status, path, json);
+    if (response.status < 200 || response.status > 299) throw new ApiFailure(response.status, path, json);
     return json as T;
   }
 
