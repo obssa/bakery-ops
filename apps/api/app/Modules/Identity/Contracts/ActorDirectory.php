@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Contracts;
 
+use App\Shared\Contracts\ActorNames;
 use App\Shared\Models\Station;
 
 /**
  * Who and where, by id, for a module that may not import Identity's models (manifest analytics.needs identity "ActorDirectory::names(ids)";
- * step 4.4c brought it for the dashboards, ModuleBoundariesTest has allowed it to Analytics since step 4.4a):
+ * step 4.4c brought it for the dashboards, ModuleBoundariesTest has allowed it to Analytics since step 4.4a). It is also Shared's ActorNames
+ * (step 4.5a), which IdentityServiceProvider binds to it, so Audit, a leaf above Shared, names people without importing Identity:
  *   names: the display names of the people of the ids (People::names: inactive and deleted people too, never another branch's), one query;
  *   stations: the stations of the ids as StationLabel, keyed by id in id order, a removed one too, never another branch's, one query;
  *   workStationIds: the stations a person may work at (People::workStationIds: their live assignments, or every station of the branch
  *     for a person who holds stations.all; nothing for a person who cannot act), which scopes analytics.view_own to the caller's stations.
  * Reads only. A final class resolved per use: it carries nothing of its own (traps.md, Octane).
  */
-final class ActorDirectory
+final class ActorDirectory implements ActorNames
 {
     public function __construct(private readonly People $people) {}
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Shared;
 
 use App\Shared\Actor\ActorContext;
+use App\Shared\Contracts\ActorNames;
+use App\Shared\Contracts\NoActorNames;
 use App\Shared\Events\LineAccepted;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
@@ -48,6 +50,8 @@ final class SharedServiceProvider extends ServiceProvider
         $this->app->scoped(OpenShifts::class, static fn (): OpenShifts => new NoOpenShifts);
         // the signed link to a weekly summary's PDF: Analytics rebinds it (step 4.4d); until then none can be made
         $this->app->scoped(WeeklySummaryLinks::class, static fn (): WeeklySummaryLinks => new NoWeeklySummaryLinks);
+        // the names of people by id, for Audit (a leaf): Identity rebinds it to its ActorDirectory (step 4.5a); until then nobody has a name
+        $this->app->bind(ActorNames::class, NoActorNames::class);
     }
 
     public function boot(): void

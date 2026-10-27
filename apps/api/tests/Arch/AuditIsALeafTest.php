@@ -27,7 +27,8 @@ $auditForbidden = function (): array {
         $forbidden[] = 'App\\'.basename($file, '.php');
     }
 
-    return $forbidden;
+    // and the scaffold's namespaces that have no directory today (App\Models went with the User model to Identity)
+    return array_values(array_unique([...$forbidden, 'App\Models', 'App\Http', 'App\Providers', 'App\Console']));
 };
 
 arch('Audit imports nothing of the application but App\Shared: no other module, nor the scaffold\'s models, HTTP layer or providers')
@@ -36,7 +37,7 @@ arch('Audit imports nothing of the application but App\Shared: no other module, 
     ->group('arch', 'module:audit');
 
 it('reads the forbidden list from disk: every module but Audit, and the scaffold namespaces', function () use ($auditForbidden) {
-    expect($auditForbidden())->toContain('App\Modules\Identity', 'App\Modules\Payments', 'App\Modules\Analytics', 'App\Http', 'App\Models', 'App\Providers')
+    expect($auditForbidden())->toContain('App\Modules\Identity', 'App\Modules\Payments', 'App\Modules\Analytics', 'App\Http', 'App\Models', 'App\Providers', 'App\Console')
         ->not->toContain('App\Modules\Audit', 'App\Shared', 'App\Modules');
 })->group('arch', 'module:audit');
 

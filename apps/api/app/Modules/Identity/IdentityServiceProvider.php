@@ -6,12 +6,14 @@ namespace App\Modules\Identity;
 
 use App\Modules\Identity\Console\CreateAdminCommand;
 use App\Modules\Identity\Contracts\ActingAsSession;
+use App\Modules\Identity\Contracts\ActorDirectory;
 use App\Modules\Identity\Contracts\ShiftAttacher;
 use App\Modules\Identity\Contracts\StationPresenceResolver;
 use App\Modules\Identity\Http\Middleware\ResolveActor;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Resolvers\AssignedUsersResolver;
 use App\Modules\Identity\Resolvers\NullShiftAttacher;
+use App\Shared\Contracts\ActorNames;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -34,6 +36,8 @@ final class IdentityServiceProvider extends ServiceProvider
         $this->app->scoped(ActingAsSession::class, static fn (): ActingAsSession => new ActingAsSession);
         $this->app->bind(StationPresenceResolver::class, AssignedUsersResolver::class);
         $this->app->bind(ShiftAttacher::class, NullShiftAttacher::class);
+        // Shared's names of people by id (step 4.5a: the audit-log read API; Audit may import nothing but Shared), per use like the directory
+        $this->app->bind(ActorNames::class, ActorDirectory::class);
     }
 
     public function boot(): void
