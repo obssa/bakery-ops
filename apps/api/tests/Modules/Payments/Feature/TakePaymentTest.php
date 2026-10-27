@@ -334,6 +334,6 @@ it('stores the normalised reference and keeps it, the reference and the photo ke
         ->and($logged)->not->toContain($key)
         ->and($audit->after['receipt_photo_key'] ?? null)->toBe('[redacted]')
         ->and($audit->after['reference_norm'] ?? null)->toBe('[redacted]')
-        ->and($audit->after['receipt_file_id'] ?? null)->toBe($file);
+        ->and($audit->after['receipt_file_id'] ?? null)->toBe('[redacted]'); // step 4.5a: which stored file a payment holds is not the audit's to show (the payment reads apply their own scope)
     expect(DB::table('audit_log')->where('action', 'payment.record')->count())->toBe(1);
 });

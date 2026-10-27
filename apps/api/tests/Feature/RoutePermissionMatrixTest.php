@@ -32,6 +32,7 @@ use App\Shared\Files\StoredFile;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use Illuminate\Support\Str;
+use Tests\Support\AuditRows;
 
 /*
  * Rule 6, generated: tests/Support/route_permissions.php maps every protected api/v1 route to its permission and the
@@ -54,9 +55,12 @@ function matrixParameters(string $uri, Branch $branch, int $actorId): array
 {
     $params = [];
     if (str_contains($uri, '{id}')) {
-        $params['{id}'] = str_starts_with($uri, '/api/v1/devices')
-            ? (string) Device::factory()->create(['branch_id' => $branch->id])->id
-            : (string) makeUser($branch, 'waiter')->id;
+        $params['{id}'] = match (true) {
+            str_starts_with($uri, '/api/v1/devices') => (string) Device::factory()->create(['branch_id' => $branch->id])->id,
+            // a row of the caller's branch (step 4.5a)
+            str_starts_with($uri, '/api/v1/audit-log') => (string) AuditRows::write($branch->id, $actorId)->id,
+            default => (string) makeUser($branch, 'waiter')->id,
+        };
     }
     if (str_contains($uri, '{item}')) {
         $params['{item}'] = (string) Item::factory()->product(Fulfilment::ToOrder)->create(['branch_id' => $branch->id, 'created_by_user_id' => $actorId])->id;

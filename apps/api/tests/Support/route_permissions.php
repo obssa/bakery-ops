@@ -274,4 +274,9 @@ return [
     // by hand is the admin's (analytics.manage). GET /weekly-summaries/{week} is public by design (signed link, tests/Support/public_routes.php).
     'GET /api/v1/analytics/exports/{report}' => ['permission' => 'analytics.view', 'roles' => ['admin', 'manager'], 'module' => 'analytics'],
     'POST /api/v1/analytics/weekly-summary/send' => ['permission' => 'analytics.manage', 'roles' => ['admin'], 'module' => 'analytics'],
+    // Audit (step 4.5a): the log is read by admin and manager (audit.view, since Phase 0) and exported by the admin (audit.export); the matrix's
+    // {id} on these routes is a row of the caller's branch
+    'GET /api/v1/audit-log' => ['permission' => 'audit.view', 'roles' => ['admin', 'manager'], 'module' => 'audit'],
+    'GET /api/v1/audit-log/export' => ['permission' => 'audit.export', 'roles' => ['admin'], 'module' => 'audit'],
+    'GET /api/v1/audit-log/{id}' => ['permission' => 'audit.view', 'roles' => ['admin', 'manager'], 'module' => 'audit'],
 ];

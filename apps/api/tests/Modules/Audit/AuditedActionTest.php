@@ -89,6 +89,14 @@ it('stores the optional context next to the snapshots', function () {
     expect(AuditLog::query()->firstOrFail()->context)->toEqual(['reason' => 'oven broken', 'note_en' => 'x', 'note_am' => 'y']);
 })->group('module:audit', 'feature');
 
+it('redacts the context too, as it does the snapshots (step 4.5a: before it the context was stored as given)', function () {
+    app(AuditedAction::class)->run(fn () => null, $this->station, 'station.flag', [
+        'reason' => 'oven broken', 'pin' => '1234', 'rows' => [['reference_no' => 'FT1', 'amount' => '5.00']],
+    ]);
+
+    expect(AuditLog::query()->firstOrFail()->context)->toEqual(['reason' => 'oven broken', 'pin' => '[redacted]', 'rows' => [['reference_no' => '[redacted]', 'amount' => '5.00']]]);
+})->group('module:audit', 'feature');
+
 it('returns whatever the action returns, not only models', function () {
     $result = app(AuditedAction::class)->run(fn () => ['ok' => true, 'qty' => '12.5000'], $this->station, 'station.noop');
 
