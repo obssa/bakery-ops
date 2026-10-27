@@ -80,9 +80,24 @@ final class DemoTill
     /** @var array<string, array{0: string|null, 1: bool}> SKU => [route, made at a station] */
     private array $routes = [];
 
+    /** @var array<string, Item> live products by SKU (the seed changes no catalog row) */
+    private array $items = [];
+
+    /** @var array<string, DiningTable> */
+    private array $tables = [];
+
+    /** @var array<string, User> by phone */
+    private array $waiters = [];
+
+    /** @var array<string, string> channel code => English name */
+    private array $channelNames = [];
+
+    private ?User $padAccount = null;
+
     public function __construct(
         private readonly DemoShiftFlow $flow,
         private readonly DemoIds $ids,
+        private readonly ?DemoAlerts $alerts = null,
     ) {}
 
     /**
@@ -176,8 +191,12 @@ final class DemoTill
 
             return;
         }
-        $order = $this->createAndSend($uuid, $order->table, $order->waiter, $lines);
-        $this->taken[$key] = $order->id;
+        $sent = $this->createAndSend($uuid, $order->table, $order->waiter, $lines);
+        $this->taken[$key] = $sent->id;
+        if ($order->stockOut !== null) {
+            // the stock-out is evaluated now, so its automatic production request is there for the baker this morning
+            $this->alerts?->flush();
+        }
     }
 
     /**
@@ -189,11 +208,11 @@ final class DemoTill
     {
         $inputs = [];
         foreach ($lines as $i => [$sku, $qty]) {
-            $item = Item::query()->where('sku', $sku)->where('is_active', true)->firstOrFail();
+            $item = $this->items[$sku] ??= Item::query()->where('sku', $sku)->where('is_active', true)->firstOrFail();
             $inputs[] = new LineInput($i, $this->ids->uuid("demo-order-line:{$uuid}:{$i}"), $item->id, Quantity::of($qty), [], null);
         }
-        $dining = DiningTable::query()->where('code', $table)->where('is_active', true)->firstOrFail();
-        $waiter = User::query()->withTrashed()->where('phone', $waiterPhone)->firstOrFail();
+        $dining = $this->tables[$table] ??= DiningTable::query()->where('code', $table)->where('is_active', true)->firstOrFail();
+        $waiter = $this->waiters[$waiterPhone] ??= User::query()->withTrashed()->where('phone', $waiterPhone)->firstOrFail();
         $this->atPad($waiter);
         [$order] = app(CreateOrder::class)->handle($uuid, OrderType::DineIn, $dining->id, null, $inputs, $waiter, CreatedVia::WaiterPad);
         try {
@@ -381,7 +400,7 @@ final class DemoTill
     private function photo(string $key, string $date, PlannedOrder $order, string $channel, BigDecimal $amount): StoredFile
     {
         $this->flow->as('cashier', 'till');
-        $name = (string) PaymentChannel::query()->where('code', $channel)->value('name_en');
+        $name = $this->channelNames[$channel] ??= (string) PaymentChannel::query()->where('code', $channel)->value('name_en');
         $bytes = DemoReceiptPhotos::jpeg($order->n, $name, (string) $amount->toScale(2), $this->reference($date, $order->n), CarbonImmutable::now(self::TZ)->format('Y-m-d H:i'));
 
         return DB::transaction(function () use ($bytes, $key, $order): StoredFile {
@@ -448,7 +467,7 @@ final class DemoTill
     /** The pad account signed in on the pad's device, the waiter acting by short code (no station, so no shift of the pad's own). */
     private function atPad(User $waiter): void
     {
-        $pad = User::query()->withTrashed()->where('phone', DemoBakery::PAD_PHONE)->firstOrFail();
+        $pad = $this->padAccount ??= User::query()->withTrashed()->where('phone', DemoBakery::PAD_PHONE)->firstOrFail();
         $this->pad ??= Device::query()->withTrashed()->where('name', DemoBakery::PAD_DEVICE)->orderBy('id')->first()
             ?? throw new LogicException('The shared pad is not enrolled: Phase1Seeder comes first.');
         $context = app(ActorContext::class);

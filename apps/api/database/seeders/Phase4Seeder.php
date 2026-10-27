@@ -6,7 +6,6 @@ namespace Database\Seeders;
 
 use App\Modules\Analytics\Contracts\Rebuild;
 use App\Modules\Analytics\Enums\RebuildTrigger;
-use App\Modules\Analytics\Jobs\RebuildDay;
 use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Models\Supplier;
@@ -21,6 +20,7 @@ use App\Shared\Models\Station;
 use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Demo\DayPlan;
+use Database\Seeders\Demo\DemoAlerts;
 use Database\Seeders\Demo\DemoBakery;
 use Database\Seeders\Demo\DemoClock;
 use Database\Seeders\Demo\DemoDay;
@@ -37,7 +37,6 @@ use Illuminate\Contracts\Bus\QueueingDispatcher;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Testing\Fakes\BusFake;
 use LogicException;
 
 /**
@@ -59,8 +58,9 @@ use LogicException;
  * with data that were never summarised are rebuilt (read only on the ledger), and a tracked station with no open shift is named.
  *
  * Queued listeners run synchronously for the run (`queue.default` set to `sync` and put back, as Phase2Seeder and Phase3Seeder do), except
- * the rebuild jobs the touch and shift-lock listeners ask for: those are held (RebuildDay faked on the bus for the run) because the seed
- * rebuilds every day itself, once, at the end. Idempotent: natural keys and UUIDv5 client UUIDs (`demo-pay:{date}:{n}`), so a second run
+ * two jobs held on the bus while the history is played (Demo\DemoAlerts): the rebuilds the touch and shift-lock listeners ask for (the seed
+ * rebuilds every day itself, once, at the end) and the stock-alert evaluations Inventory asks for on every movement (each balance a day
+ * moved is evaluated once after its closings, and around a planned stock-out at once). Idempotent: natural keys and UUIDv5 client UUIDs (`demo-pay:{date}:{n}`), so a second run
  * writes nothing, not even an audit row. The demo branch must exist (Phase0Seeder); any other branch is refused there.
  */
 final class Phase4Seeder extends Seeder
@@ -107,17 +107,17 @@ final class Phase4Seeder extends Seeder
         }
 
         config(['queue.default' => 'sync']);
-        // the touch and shift-lock listeners ask for rebuilds as the history is played; the seed rebuilds every day once, at the end
-        Bus::swap(new BusFake($bus, [RebuildDay::class]));
+        // the rebuilds and the stock-alert evaluations are held while the history is played (Demo\DemoAlerts)
+        $alerts = new DemoAlerts($bus);
         try {
             $current->set($branch);
             if (DemoClock::playsPhaseFourHistory()) {
-                $this->history($branch);
+                $this->history($branch, $alerts);
             } else {
                 $this->withData($branch);
             }
         } finally {
-            Bus::swap($bus);
+            $alerts->release();
             config(['queue.default' => $previousQueue]);
             $this->restore($previousBranch, $previousActor);
         }
@@ -125,7 +125,7 @@ final class Phase4Seeder extends Seeder
 
     // ---------------------------------------------------------------------------------------------------- the history
 
-    private function history(Branch $branch): void
+    private function history(Branch $branch, DemoAlerts $alerts): void
     {
         $started = microtime(true);
         $zone = $branch->timezone;
@@ -138,9 +138,9 @@ final class Phase4Seeder extends Seeder
         foreach (['Day', 'Night'] as $name) {
             $templates[$name] = ShiftTemplate::query()->where('name_en', $name)->orderBy('id')->first() ?? throw new LogicException("Phase3Seeder made no {$name} template.");
         }
-        $till = new DemoTill($flow, $ids);
-        $stock = new DemoStock($flow, $ids, $suppliers);
-        $loop = new DemoDay($flow, new DemoOrders($flow), $templates, $till, $stock);
+        $till = new DemoTill($flow, $ids, $alerts);
+        $stock = new DemoStock($flow, $ids, $suppliers, $alerts);
+        $loop = new DemoDay($flow, new DemoOrders($flow), $templates, $till, $stock, $alerts);
 
         $anchor = DemoClock::anchor()->setTimezone($zone)->toDateString();
         $real = DemoClock::real()->setTimezone($zone);
@@ -166,6 +166,7 @@ final class Phase4Seeder extends Seeder
             $step();
         }
         $till->today($today, $waiter);
+        $alerts->flush();
 
         $rebuilt = microtime(true);
         $this->rebuild($branch, $anchor, $today);

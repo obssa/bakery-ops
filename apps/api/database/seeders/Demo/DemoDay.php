@@ -61,6 +61,7 @@ final class DemoDay
         private readonly array $templates,
         private readonly ?DemoTill $till = null,
         private readonly ?DemoStock $stock = null,
+        private readonly ?DemoAlerts $alerts = null,
     ) {}
 
     public function at(string $date, string $time): CarbonImmutable
@@ -117,6 +118,8 @@ final class DemoDay
                 decide: ! in_array($code, $day->pending, true),
             );
         }
+        // the day's stock alerts, once per balance it moved (Phase 4: the evaluations are held while the day is played)
+        $this->alerts?->flush();
 
         if ($day->night) {
             DemoClock::set($this->at($date, '22:05'));

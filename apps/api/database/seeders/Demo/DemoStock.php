@@ -93,6 +93,12 @@ final class DemoStock
 
     private ?Location $store = null;
 
+    /** @var array<int, BigDecimal> item id => base units in one unit of its own unit (1000 for a kilogram counted in grams) */
+    private array $unitOf = [];
+
+    /** @var array<int, string|null> location id => its type */
+    private array $typeOf = [];
+
     /**
      * @param  array<string, Supplier>  $suppliers  by key (mill, dairy, packaging, market, drinks)
      */
@@ -100,6 +106,7 @@ final class DemoStock
         private readonly DemoShiftFlow $flow,
         private readonly DemoIds $ids,
         private readonly array $suppliers,
+        private readonly ?DemoAlerts $alerts = null,
     ) {}
 
     /**
@@ -298,7 +305,7 @@ final class DemoStock
         foreach ($bySupplier as $key => $lines) {
             $inputs = [];
             foreach ($lines as $i => [$item, $qty]) {
-                $units = $this->units()->fromBase(Quantity::of((string) $qty->toScale(4, RoundingMode::Up)), $item->unit_id)->toBigDecimal()->toScale(0, RoundingMode::Up);
+                $units = $this->ownUnits($item, $qty);
                 $cost = BigDecimal::of(DemoPhaseTwo::OPENING_COSTS[$item->sku] ?? '1.00')
                     ->multipliedBy(BigDecimal::of(100 + ($week + $i) % 5 - 2))->dividedBy(100, 2, RoundingMode::HalfUp);
                 $inputs[] = new LineInput($i, $this->ids->uuid("purchase:{$day->date}:{$key}:{$item->sku}"), $item->id, Quantity::of((string) $units), $item->unit_id, UnitCost::of((string) $cost));
@@ -398,6 +405,8 @@ final class DemoStock
             app(Batches::class)->confirm($this->batchOf($batch['request']), $this->flow->person('manager')->id);
         }
         $this->batches = [];
+        // what the batches brought back (a stock-out recovers when its batch is confirmed)
+        $this->alerts?->flush();
     }
 
     private function batchOf(int $requestId): ProductionBatch
@@ -451,8 +460,10 @@ final class DemoStock
     /** What stays at a place on top of the day's need: one unit of the item (a kilogram, a litre, a piece), or a reorder rule's minimum. */
     private function margin(Item $item, int $locationId): BigDecimal
     {
-        $unit = $this->units()->toBase('1', $item->unit_id)->toBigDecimal();
-        $type = Location::query()->find($locationId)?->type->value;
+        $unit = $this->unit($item);
+        $type = array_key_exists($locationId, $this->typeOf)
+            ? $this->typeOf[$locationId]
+            : ($this->typeOf[$locationId] = Location::query()->find($locationId)?->type->value);
         foreach (DemoPhaseTwo::REORDER_RULES as [$sku, $place, $min]) {
             if ($sku === $item->sku && $place === $type) {
                 $rule = $this->units()->toBase($min, $item->unit_id)->toBigDecimal()->multipliedBy(2);
@@ -467,9 +478,19 @@ final class DemoStock
     /** Rounded up to whole units of the item's own unit (whole kilograms, litres, pieces), in base units. */
     private function wholeUnits(Item $item, BigDecimal $base): BigDecimal
     {
-        $units = $this->units()->fromBase(Quantity::of((string) $base->toScale(4, RoundingMode::Up)), $item->unit_id)->toBigDecimal()->toScale(0, RoundingMode::Up);
+        return $this->ownUnits($item, $base)->multipliedBy($this->unit($item));
+    }
 
-        return $this->units()->toBase((string) $units, $item->unit_id)->toBigDecimal();
+    /** How many whole units of the item's own unit hold $base (rounded up). */
+    private function ownUnits(Item $item, BigDecimal $base): BigDecimal
+    {
+        return $base->dividedBy($this->unit($item), 0, RoundingMode::Up);
+    }
+
+    /** Base units in one unit of the item's own unit, read once. */
+    private function unit(Item $item): BigDecimal
+    {
+        return $this->unitOf[$item->id] ??= $this->units()->toBase('1', $item->unit_id)->toBigDecimal();
     }
 
     private function supplierOf(Item $item): string

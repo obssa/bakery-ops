@@ -51,6 +51,9 @@ final class DemoShiftFlow
     /** @var array<string, User> */
     private array $people = [];
 
+    /** @var array<string, Station> by code (the seed never changes a station) */
+    private array $stations = [];
+
     public function __construct(private readonly Branch $branch) {}
 
     /** Sign in as the demo person with this role, at a station when given, inside the shift that runs there. */
@@ -81,7 +84,7 @@ final class DemoShiftFlow
 
     public function station(string $code): Station
     {
-        return Station::query()->where('code', $code)->firstOrFail();
+        return $this->stations[$code] ??= Station::query()->where('code', $code)->firstOrFail();
     }
 
     public function uuid(string $part): string
