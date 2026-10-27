@@ -59,6 +59,8 @@ final class DemoDay
         private readonly DemoShiftFlow $flow,
         private readonly DemoOrders $orders,
         private readonly array $templates,
+        private readonly ?DemoTill $till = null,
+        private readonly ?DemoStock $stock = null,
     ) {}
 
     public function at(string $date, string $time): CarbonImmutable
@@ -142,6 +144,9 @@ final class DemoDay
         $date = $day->date;
         /** @var list<array{0: string, 1: Closure(): void}> $steps */
         $steps = [];
+        if ($day->restock && $this->stock instanceof DemoStock) {
+            array_push($steps, ...$this->stock->steps($day, $upcoming));
+        }
         if ($day->waste !== []) {
             $steps[] = ['07:30', fn () => $this->waste($day->waste, $date)];
         }
@@ -155,6 +160,9 @@ final class DemoDay
             $steps[] = [$time, function () use ($date, $i, $table, $role, $lines): void {
                 $this->orders->cashOrder("{$date}/{$i}", $table, $role, $lines);
             }];
+        }
+        if ($this->till instanceof DemoTill) {
+            array_push($steps, ...$this->till->steps($day));
         }
         if ($day->note !== null) {
             [$time, $station, $key, $body] = $day->note;

@@ -301,7 +301,7 @@ final class DayPlan
                 $channel = self::digitalChannel(mt_rand(1, 55));
             }
             $check = match (true) {
-                $channel === 'cash' || $voidOrder => PlannedOrder::CHECK_NONE,
+                $channel === 'cash' || $voidOrder || $voidPayment => PlannedOrder::CHECK_NONE,
                 $roll <= self::VERIFIED_PCT => PlannedOrder::CHECK_VERIFY,
                 $roll <= self::VERIFIED_PCT + self::DISPUTED_PCT => $resolved ? PlannedOrder::CHECK_DISPUTE_RESOLVED : PlannedOrder::CHECK_DISPUTE,
                 default => PlannedOrder::CHECK_NONE,

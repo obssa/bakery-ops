@@ -193,8 +193,9 @@ it('plays the planned days through the module code: shifts, orders, payments wit
             ->and(CarbonImmutable::parse($file->created_at, 'UTC')->diffInHours($received, true))->toBeLessThan(12)
             ->and($payment->reference_no)->toMatch('/^SEED-'.$received->setTimezone($zone)->format('ymd').'-\d+$/');
         $hashes[] = $file->sha256;
-        $exif = @exif_read_data('data://image/jpeg;base64,'.base64_encode(Storage::disk($file->disk)->get($file->key)));
-        expect(is_array($exif) ? array_intersect(array_keys($exif), ['GPSLatitude', 'Make', 'Model', 'DateTimeOriginal']) : [])->toBe([]);
+        // no EXIF (APP1), no other APPn block, no comment: Files::put re-encoded it
+        $segments = imgSegments((string) Storage::disk($file->disk)->get($file->key));
+        expect(array_values(array_filter($segments, fn (int $m): bool => ($m >= 0xE1 && $m <= 0xEF) || $m === 0xFE)))->toBe([]);
     }
     expect(array_unique($hashes))->toHaveCount(count($hashes))
         ->and(DB::table('stored_files')->where('branch_id', $b)->whereNull('attached_id')->count())->toBe(0)
@@ -287,11 +288,12 @@ it('plays the planned days through the module code: shifts, orders, payments wit
         expect($sales->revenue)->toBe(p4Sum($settled->pluck('total')), "revenue {$day}")->and((int) $sales->orders_count)->toBe($settled->count());
     }
 
-    // the money adds up: payments less payment refunds equal the paid orders' totals less what was refunded (no refunds yet)
+    // the money adds up: payments less payment refunds equal the paid orders' totals less what was refunded (no refunds yet; the
+    // orders.refunded_total column arrives with step 4.1b, so a missing one counts as zero)
     $payments = p4Sum(DB::table('payments')->where('branch_id', $b)->where('status', '<>', 'voided')->pluck('amount'));
     $refunds = p4Sum(DB::table('payment_refunds')->where('branch_id', $b)->pluck('amount'));
     $orders = DB::table('orders')->where('branch_id', $b)->whereIn('status', ['paid', 'closed'])->get();
-    expect((string) BigDecimal::of($payments)->minus($refunds)->toScale(2))->toBe((string) BigDecimal::of(p4Sum($orders->pluck('total')))->minus(p4Sum($orders->pluck('refunded_total')))->toScale(2))
+    expect((string) BigDecimal::of($payments)->minus($refunds)->toScale(2))->toBe((string) BigDecimal::of(p4Sum($orders->pluck('total')))->minus(p4Sum($orders->map(fn (object $o): string => (string) ($o->refunded_total ?? '0.00'))))->toScale(2))
         ->and(DB::table('payment_refunds')->where('branch_id', $b)->count())->toBe(0);
 
     // receipt settings saved; today's sample orders taken in real time
