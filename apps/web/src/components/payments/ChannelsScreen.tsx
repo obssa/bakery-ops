@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAllChannels, useCreateChannel, useRemoveChannel, useReorderChannels, useUpdateChannel } from "@/lib/api/adminPayments";
 import { ApiError } from "@/lib/api/client";
 import { useIdempotencyKey, uuid } from "@/lib/api/idempotency";
@@ -29,7 +29,8 @@ import { useErrorText } from "@/lib/errors";
 import { keepsKey } from "@/lib/paySheet";
 import { Alert, Badge, Button, Field, PageHeader, Panel, TextInput } from "../ui";
 import { QueryBox } from "../inventory/shared";
-import { TD, TH, useChannelName } from "./shared";
+import { addisStamp, TD, TH, useChannelName } from "./shared";
+import { focusRing } from "../styles";
 
 // Admin > Payments > Payment methods (step 4.5c; channels.manage, the admin): the ways the till takes money, in the till's order, with what
 // each asks for (a receipt photo, a reference, a reference pattern, the hints the till shows). A method is added with a code typed once,
@@ -44,10 +45,17 @@ export function ChannelsScreen() {
   const channels = useAllChannels();
   const [editing, setEditing] = useState<PaymentChannel | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // an Edit below the fold brings the form into view
+  useEffect(() => {
+    if (editing) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [editing]);
+
   return (
     <>
       <PageHeader title={t("channels.title")} intro={t("channels.intro")} />
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_28rem]">
+      <div className="space-y-6">
         <Panel title={t("channels.list")}>
           <QueryBox query={channels}>
             {(rows) => (
@@ -61,16 +69,18 @@ export function ChannelsScreen() {
             )}
           </QueryBox>
         </Panel>
-        <ChannelForm
-          key={editing?.id ?? "new"}
-          editing={editing}
-          saved={saved}
-          onSaved={(name) => {
-            setSaved(name);
-            setEditing(null);
-          }}
-          onCancel={() => setEditing(null)}
-        />
+        <div ref={formRef} className="scroll-mt-4">
+          <ChannelForm
+            key={editing?.id ?? "new"}
+            editing={editing}
+            saved={saved}
+            onSaved={(name) => {
+              setSaved(name);
+              setEditing(null);
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        </div>
       </div>
     </>
   );
@@ -105,6 +115,8 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
   const [failure, setFailure] = useState<unknown>(null);
 
   const listed = listedChannels(rows);
+  const live = listed.filter((row) => row.deleted_at === null);
+  const removed = listed.filter((row) => row.deleted_at !== null);
   const ids = liveIds(rows);
   const busy = reorder.isPending || update.isPending || remove.isPending;
 
@@ -158,7 +170,7 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
             </tr>
           </thead>
           <tbody>
-            {listed.map((row) => {
+            {live.map((row) => {
               const controls = channelControls(row);
               const at = ids.indexOf(row.id);
               const label = name(row);
@@ -175,7 +187,7 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                     <Rules channel={row} />
                   </td>
                   <td className={TD}>
-                    {row.deleted_at ? <Badge>{t("channels.removed")}</Badge> : row.is_enabled ? <Badge tone="green">{t("channels.on")}</Badge> : <Badge tone="amber">{t("channels.off")}</Badge>}
+                    {row.is_enabled ? <Badge tone="green">{t("channels.on")}</Badge> : <Badge tone="amber">{t("channels.off")}</Badge>}
                   </td>
                   <td className="py-3 align-top">
                     {confirming === row.id ? (
@@ -194,26 +206,26 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                       <div className="flex flex-wrap items-center gap-2">
                         {controls.move ? (
                           <>
-                            <Button variant="secondary" disabled={busy || at <= 0} onClick={() => move(row, -1)} aria-label={t("channels.move_up_named", { name: label })}>
+                            <Button variant="secondary" compact disabled={busy || at <= 0} onClick={() => move(row, -1)} aria-label={t("channels.move_up_named", { name: label })}>
                               {t("channels.move_up")}
                             </Button>
-                            <Button variant="secondary" disabled={busy || at < 0 || at >= ids.length - 1} onClick={() => move(row, 1)} aria-label={t("channels.move_down_named", { name: label })}>
+                            <Button variant="secondary" compact disabled={busy || at < 0 || at >= ids.length - 1} onClick={() => move(row, 1)} aria-label={t("channels.move_down_named", { name: label })}>
                               {t("channels.move_down")}
                             </Button>
                           </>
                         ) : null}
                         {controls.edit ? (
-                          <Button variant="secondary" disabled={busy} onClick={() => onEdit(row)} aria-label={t("channels.edit_named", { name: label })}>
+                          <Button variant="secondary" compact disabled={busy} onClick={() => onEdit(row)} aria-label={t("channels.edit_named", { name: label })}>
                             {t("channels.edit")}
                           </Button>
                         ) : null}
                         {controls.toggle ? (
-                          <Button variant="secondary" disabled={busy} onClick={() => toggle(row)} aria-label={t(row.is_enabled ? "channels.switch_off_named" : "channels.switch_on_named", { name: label })}>
+                          <Button variant="secondary" compact disabled={busy} onClick={() => toggle(row)} aria-label={t(row.is_enabled ? "channels.switch_off_named" : "channels.switch_on_named", { name: label })}>
                             {t(row.is_enabled ? "channels.switch_off" : "channels.switch_on")}
                           </Button>
                         ) : null}
                         {controls.remove ? (
-                          <Button variant="secondary" disabled={busy} onClick={() => setConfirming(row.id)} aria-label={t("channels.remove_named", { name: label })}>
+                          <Button variant="secondary" compact disabled={busy} onClick={() => setConfirming(row.id)} aria-label={t("channels.remove_named", { name: label })}>
                             {t("channels.remove")}
                           </Button>
                         ) : null}
@@ -227,6 +239,49 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
           </tbody>
         </table>
       </div>
+      {removed.length > 0 ? (
+        <details className="rounded-md border border-neutral-200">
+          <summary className={`flex min-h-12 cursor-pointer items-center px-4 text-base font-medium text-neutral-800 ${focusRing}`}>
+            {t("channels.removed_title", { count: removed.length })}
+          </summary>
+          <div className="overflow-x-auto px-4 pb-2">
+            <p className="py-2 text-sm text-neutral-600">{t("channels.removed_intro")}</p>
+            <table className="w-full border-collapse text-left text-base">
+              <caption className="sr-only">{t("channels.removed_list")}</caption>
+              <thead>
+                <tr className="border-b border-neutral-200 text-sm text-neutral-600">
+                  <th scope="col" className={TH}>{t("channels.col_name")}</th>
+                  <th scope="col" className={TH}>{t("channels.col_other_name")}</th>
+                  <th scope="col" className={TH}>{t("channels.col_code")}</th>
+                  <th scope="col" className={TH}>{t("channels.col_rules")}</th>
+                  <th scope="col" className={TH}>{t("channels.col_removed")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {removed.map((row) => {
+                  const label = name(row);
+                  return (
+                    <tr key={row.id} className="border-b border-neutral-100 last:border-0">
+                      <th scope="row" className={`${TD} font-medium text-neutral-900`}>
+                        {label}
+                      </th>
+                      <td className={`${TD} text-neutral-700`}>{row.name_am === label ? row.name_en : row.name_am}</td>
+                      <td className={`${TD} font-mono text-sm`}>{row.code}</td>
+                      <td className={TD}>
+                        <Rules channel={row} />
+                      </td>
+                      <td className={`${TD} whitespace-nowrap`}>
+                        <Badge>{t("channels.removed")}</Badge>
+                        <span className="mt-1 block text-sm text-neutral-600">{addisStamp(row.deleted_at)}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -308,59 +363,76 @@ function ChannelForm({ editing, saved, onSaved, onCancel }: { editing: PaymentCh
 
   return (
     <Panel title={title}>
-      <form onSubmit={onSubmit} className="space-y-4" noValidate>
-        <Field label={t("channels.code")} hint={creating ? t("channels.code_hint") : t("channels.code_fixed")} error={issue("code") ?? fieldError("code")}>
-          {(props) => (
-            <TextInput {...props} value={draft.code} maxLength={CODE_MAX} disabled={!creating} autoCapitalize="none" spellCheck={false} onChange={(event) => set("code", event.target.value)} />
-          )}
-        </Field>
-        <Field label={t("channels.name_en")} error={issue("name_en") ?? fieldError("name_en")}>
-          {(props) => <TextInput {...props} value={draft.name_en} maxLength={NAME_MAX} onChange={(event) => set("name_en", event.target.value)} />}
-        </Field>
-        <Field label={t("channels.name_am")} error={issue("name_am") ?? fieldError("name_am")}>
-          {(props) => <TextInput {...props} lang="am" value={draft.name_am} maxLength={NAME_MAX} onChange={(event) => set("name_am", event.target.value)} />}
-        </Field>
-        <label className="flex min-h-12 items-center gap-3 text-base">
-          <input type="checkbox" className="size-5" checked={draft.requires_photo} onChange={(event) => set("requires_photo", event.target.checked)} />
-          {t("channels.requires_photo")}
-        </label>
-        <label className="flex min-h-12 items-center gap-3 text-base">
-          <input type="checkbox" className="size-5" checked={draft.requires_reference} onChange={(event) => set("requires_reference", event.target.checked)} />
-          {t("channels.requires_reference")}
-        </label>
-        <Field label={t("channels.pattern")} optionalLabel={t("optional")} hint={t("channels.pattern_hint")} error={issue("pattern_long") ?? (patternReason ? t(`channels.pattern_reason.${patternReason}`) : fieldError("reference_pattern"))}>
-          {(props) => (
-            <TextInput {...props} className="font-mono" value={draft.reference_pattern} maxLength={PATTERN_MAX + 20} autoCapitalize="none" spellCheck={false} onChange={(event) => set("reference_pattern", event.target.value)} />
-          )}
-        </Field>
-        <p
-          role="status"
-          aria-live="polite"
-          aria-label={t("channels.pattern_check")}
-          className={`rounded-md px-3 py-2 text-sm ${check === "ok" ? "bg-green-50 text-green-900" : check === "none" ? "bg-neutral-50 text-neutral-700" : "bg-amber-50 text-amber-900"}`}
-        >
-          {t(`channels.pattern_${check === "too_long" ? "too_long" : check}`)}
-        </p>
-        <Field label={t("channels.sample")} hint={t("channels.sample_hint")}>
-          {(props) => <TextInput {...props} className="font-mono" value={sample} maxLength={80} autoCapitalize="none" spellCheck={false} onChange={(event) => setSample(event.target.value)} />}
-        </Field>
-        <p role="status" aria-live="polite" aria-label={t("channels.sample_check")} className={tried === null ? "sr-only" : `rounded-md px-3 py-2 text-sm ${tried === "match" ? "bg-green-50 text-green-900" : "bg-amber-50 text-amber-900"}`}>
-          {tried === "match" ? t("channels.sample_match") : tried === "no_match" ? t("channels.sample_no_match") : null}
-        </p>
+      <form onSubmit={onSubmit} className="space-y-5" noValidate>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Field label={t("channels.code")} hint={creating ? t("channels.code_hint") : t("channels.code_fixed")} error={issue("code") ?? fieldError("code")}>
+            {(props) => (
+              <TextInput {...props} className="font-mono" value={draft.code} maxLength={CODE_MAX} disabled={!creating} autoCapitalize="none" spellCheck={false} onChange={(event) => set("code", event.target.value)} />
+            )}
+          </Field>
+          <Field label={t("channels.name_en")} error={issue("name_en") ?? fieldError("name_en")}>
+            {(props) => <TextInput {...props} value={draft.name_en} maxLength={NAME_MAX} onChange={(event) => set("name_en", event.target.value)} />}
+          </Field>
+          <Field label={t("channels.name_am")} error={issue("name_am") ?? fieldError("name_am")}>
+            {(props) => <TextInput {...props} lang="am" value={draft.name_am} maxLength={NAME_MAX} onChange={(event) => set("name_am", event.target.value)} />}
+          </Field>
+        </div>
+        <div className="flex flex-wrap gap-x-8">
+          <label className="flex min-h-12 items-center gap-3 text-base">
+            <input type="checkbox" className="size-5" checked={draft.requires_photo} onChange={(event) => set("requires_photo", event.target.checked)} />
+            {t("channels.requires_photo")}
+          </label>
+          <label className="flex min-h-12 items-center gap-3 text-base">
+            <input type="checkbox" className="size-5" checked={draft.requires_reference} onChange={(event) => set("requires_reference", event.target.checked)} />
+            {t("channels.requires_reference")}
+          </label>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Field label={t("channels.pattern")} optionalLabel={t("optional")} hint={t("channels.pattern_hint")} error={issue("pattern_long") ?? (patternReason ? t(`channels.pattern_reason.${patternReason}`) : fieldError("reference_pattern"))}>
+              {(props) => (
+                <TextInput {...props} className="font-mono" value={draft.reference_pattern} maxLength={PATTERN_MAX + 20} autoCapitalize="none" spellCheck={false} onChange={(event) => set("reference_pattern", event.target.value)} />
+              )}
+            </Field>
+            <p
+              role="status"
+              aria-live="polite"
+              aria-label={t("channels.pattern_check")}
+              className={`rounded-md px-3 py-2 text-sm ${check === "ok" ? "bg-green-50 text-green-900" : check === "none" ? "bg-neutral-50 text-neutral-700" : "bg-amber-50 text-amber-900"}`}
+            >
+              {t(`channels.pattern_${check}`)}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Field label={t("channels.sample")} hint={t("channels.sample_hint")}>
+              {(props) => <TextInput {...props} className="font-mono" value={sample} maxLength={80} autoCapitalize="none" spellCheck={false} onChange={(event) => setSample(event.target.value)} />}
+            </Field>
+            <p
+              role="status"
+              aria-live="polite"
+              aria-label={t("channels.sample_check")}
+              className={tried === null ? "sr-only" : `rounded-md px-3 py-2 text-sm ${tried === "match" ? "bg-green-50 text-green-900" : "bg-amber-50 text-amber-900"}`}
+            >
+              {tried === "match" ? t("channels.sample_match") : tried === "no_match" ? t("channels.sample_no_match") : null}
+            </p>
+          </div>
+        </div>
         <fieldset className="space-y-3">
-          <legend className="text-sm text-neutral-600">{t("channels.hints_hint")}</legend>
-          <Field label={t("channels.reference_hint_en")} optionalLabel={t("optional")} error={issue("reference_hint_pair") ?? fieldError("reference_hint_en")}>
-            {(props) => <TextInput {...props} value={draft.reference_hint_en} maxLength={HINT_MAX} onChange={(event) => set("reference_hint_en", event.target.value)} />}
-          </Field>
-          <Field label={t("channels.reference_hint_am")} optionalLabel={t("optional")} error={fieldError("reference_hint_am")}>
-            {(props) => <TextInput {...props} lang="am" value={draft.reference_hint_am} maxLength={HINT_MAX} onChange={(event) => set("reference_hint_am", event.target.value)} />}
-          </Field>
-          <Field label={t("channels.photo_hint_en")} optionalLabel={t("optional")} error={issue("photo_hint_pair") ?? fieldError("photo_hint_en")}>
-            {(props) => <TextInput {...props} value={draft.photo_hint_en} maxLength={HINT_MAX} onChange={(event) => set("photo_hint_en", event.target.value)} />}
-          </Field>
-          <Field label={t("channels.photo_hint_am")} optionalLabel={t("optional")} error={issue("hint_long") ?? fieldError("photo_hint_am")}>
-            {(props) => <TextInput {...props} lang="am" value={draft.photo_hint_am} maxLength={HINT_MAX} onChange={(event) => set("photo_hint_am", event.target.value)} />}
-          </Field>
+          <legend className="pb-1 text-sm text-neutral-600">{t("channels.hints_hint")}</legend>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label={t("channels.reference_hint_en")} optionalLabel={t("optional")} error={issue("reference_hint_pair") ?? fieldError("reference_hint_en")}>
+              {(props) => <TextInput {...props} value={draft.reference_hint_en} maxLength={HINT_MAX} onChange={(event) => set("reference_hint_en", event.target.value)} />}
+            </Field>
+            <Field label={t("channels.reference_hint_am")} optionalLabel={t("optional")} error={fieldError("reference_hint_am")}>
+              {(props) => <TextInput {...props} lang="am" value={draft.reference_hint_am} maxLength={HINT_MAX} onChange={(event) => set("reference_hint_am", event.target.value)} />}
+            </Field>
+            <Field label={t("channels.photo_hint_en")} optionalLabel={t("optional")} error={issue("photo_hint_pair") ?? fieldError("photo_hint_en")}>
+              {(props) => <TextInput {...props} value={draft.photo_hint_en} maxLength={HINT_MAX} onChange={(event) => set("photo_hint_en", event.target.value)} />}
+            </Field>
+            <Field label={t("channels.photo_hint_am")} optionalLabel={t("optional")} error={issue("hint_long") ?? fieldError("photo_hint_am")}>
+              {(props) => <TextInput {...props} lang="am" value={draft.photo_hint_am} maxLength={HINT_MAX} onChange={(event) => set("photo_hint_am", event.target.value)} />}
+            </Field>
+          </div>
         </fieldset>
         {failure && !(apiError && Object.keys(apiError.fieldErrors).length > 0) ? <Alert>{errorText.message(failure)}</Alert> : null}
         <p role="status" aria-live="polite" className={saved || unchanged ? "rounded-md bg-green-50 px-4 py-3 text-base text-green-800" : "sr-only"}>

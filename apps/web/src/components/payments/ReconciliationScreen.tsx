@@ -6,7 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { useAllChannels } from "@/lib/api/adminPayments";
 import { usePaymentChannels } from "@/lib/api/till";
 import type { ReconciliationCell, ReconciliationChannelRow } from "@/lib/api/types";
-import { dayTotals, listedChannels, missingPhotoDrill, rangeIssue, shiftDate } from "@/lib/adminPayments";
+import { canDrill, dayTotals, listedChannels, missingPhotoDrill, rangeIssue, shiftDate } from "@/lib/adminPayments";
 import { useErrorText } from "@/lib/errors";
 import { createReconciliationFeed } from "@/lib/live/payments";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
@@ -74,15 +74,18 @@ export function ReconciliationScreen() {
           )
         ) : (
           <>
-            {[...report.days].reverse().map((day) =>
-              day.channels.length === 0 ? (
-                <p key={day.day} className="rounded-lg border border-neutral-200 bg-white px-5 py-4 text-base text-neutral-600">
-                  {t("reconciliation.day_empty", { day: day.day })}
-                </p>
-              ) : (
-                <DayTable key={day.day} day={day.day} rows={day.channels} />
-              ),
-            )}
+            {[...report.days].reverse().map((day) => (day.channels.length === 0 ? null : <DayTable key={day.day} day={day.day} rows={day.channels} />))}
+            {report.days.some((day) => day.channels.length === 0) ? (
+              <p className="rounded-lg border border-neutral-200 bg-white px-5 py-3 text-base text-neutral-600">
+                {t("reconciliation.days_empty", {
+                  days: [...report.days]
+                    .reverse()
+                    .filter((day) => day.channels.length === 0)
+                    .map((day) => day.day)
+                    .join(", "),
+                })}
+              </p>
+            ) : null}
             <TotalsTable rows={report.totals.channels} total={report.totals} />
           </>
         )}
@@ -155,7 +158,7 @@ function Cells({ cell, drill }: { cell: ReconciliationCell; drill?: { href: { pa
         const money = MONEY.has(column);
         return (
           <td key={column} className={`py-3 pr-4 text-right tabular-nums ${money ? "whitespace-nowrap" : ""}`}>
-            {column === "without_photo" && drill && cell.without_photo > 0 ? (
+            {column === "without_photo" && drill ? (
               <Link href={drill.href} aria-label={drill.label} className={`inline-flex min-h-12 min-w-12 items-center justify-end rounded-md px-2 font-semibold text-blue-800 underline hover:bg-blue-50 ${focusRing}`}>
                 {String(value)}
               </Link>
@@ -206,7 +209,7 @@ function DayTable({ day, rows }: { day: string; rows: ReconciliationChannelRow[]
                 </th>
                 <Cells
                   cell={row}
-                  drill={{ href: { pathname: "/admin/payments", query: missingPhotoDrill(day, row.channel.id) }, label: t("reconciliation.drill", { channel: name, day }) }}
+                  drill={canDrill(row) ? { href: { pathname: "/admin/payments", query: missingPhotoDrill(day, row.channel.id) }, label: t("reconciliation.drill", { channel: name, day }) } : undefined}
                 />
               </tr>
             );

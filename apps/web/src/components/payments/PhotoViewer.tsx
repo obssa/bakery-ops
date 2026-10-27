@@ -96,7 +96,7 @@ export function PhotoViewer({ paymentId, fileId, onClose }: { paymentId: number;
 }
 
 /** A small picture of the photo that opens the viewer; it starts from the list's signed URL and asks for a fresh one if that fails. */
-export function PhotoThumb({ label, fileId, url, onOpen }: { label: string; fileId: number; url: string | null; onOpen: () => void }) {
+export function PhotoThumb({ label, fileId, url, onOpen, large = false }: { label: string; fileId: number; url: string | null; onOpen: () => void; large?: boolean }) {
   const t = useTranslations("adminPayments");
   const signed = useSignedUrl(fileId, url);
   const { sign } = signed;
@@ -110,7 +110,7 @@ export function PhotoThumb({ label, fileId, url, onOpen }: { label: string; file
       type="button"
       aria-label={label}
       onClick={onOpen}
-      className={`inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-md border border-neutral-300 bg-neutral-50 hover:border-neutral-500 ${focusRing}`}
+      className={`inline-flex ${large ? "h-40 w-40" : "h-14 w-14"} items-center justify-center overflow-hidden rounded-md border border-neutral-300 bg-neutral-50 hover:border-neutral-500 ${focusRing}`}
     >
       {signed.url && !signed.failed ? (
         // eslint-disable-next-line @next/next/no-img-element

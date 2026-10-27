@@ -3,6 +3,7 @@ import type { PaymentChannel, PaymentListRow, ReconciliationChannelRow } from ".
 import { resolveDeepLink } from "../../src/lib/deeplink";
 import {
   canDispute,
+  canDrill,
   canVerify,
   changesOf,
   channelControls,
@@ -128,6 +129,11 @@ test.describe("admin payments logic", () => {
   test("a missing-photo cell of the reconciliation drills into that day, that channel and missing_photo=1", () => {
     expect(missingPhotoDrill("2026-10-27", 6)).toEqual({ from: "2026-10-27", to: "2026-10-27", channel_id: "6", missing_photo: "1" });
     expect(filtersFromParams(params(missingPhotoDrill("2026-10-27", 6)))).toEqual({ ...NO_FILTERS, from: "2026-10-27", to: "2026-10-27", channelId: "6", missingPhoto: true });
+    // only where the list can find them: cash never has a photo, and the list's missing_photo leaves cash out
+    const channel = (code: string) => ({ id: 6, code, name_en: code, name_am: code });
+    expect(canDrill({ channel: channel("telebirr"), without_photo: 2 })).toBe(true);
+    expect(canDrill({ channel: channel("telebirr"), without_photo: 0 })).toBe(false);
+    expect(canDrill({ channel: channel("cash"), without_photo: 6 })).toBe(false);
   });
 
   test("the payment_disputed notification's link (step 4.3c) is a page of the web: the inbox links to it", () => {

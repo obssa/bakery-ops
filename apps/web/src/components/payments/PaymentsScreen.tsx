@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { olderPayments, paymentsExport, useAllChannels } from "@/lib/api/adminPayments";
 import { usePaymentChannels } from "@/lib/api/till";
@@ -200,9 +200,10 @@ function FilterForm({ filters, onApply, onClear }: { filters: PaymentFilters; on
   }
 
   const known = channels.some((channel) => String(channel.id) === draft.channelId);
+  const flaggedHint = useId();
   return (
-    <form role="search" aria-label={t("list.filters")} onSubmit={onSubmit} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-5" noValidate>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <form role="search" aria-label={t("list.filters")} onSubmit={onSubmit} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4" noValidate>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Field label={t("list.from")} error={issue === "dates" ? t("list.issue_dates") : undefined}>
           {(props) => <TextInput {...props} type="date" value={draft.from} onChange={(event) => set("from", event.target.value)} />}
         </Field>
@@ -232,36 +233,36 @@ function FilterForm({ filters, onApply, onClear }: { filters: PaymentFilters; on
             </Select>
           )}
         </Field>
-        <Field label={t("list.order_no")} hint={t("list.order_no_hint")} error={issue === "order_no" ? t("list.issue_order_no") : undefined}>
+        <Field label={t("list.order_no")} error={issue === "order_no" ? t("list.issue_order_no") : undefined}>
           {(props) => <TextInput {...props} inputMode="numeric" value={draft.orderNo} maxLength={10} onChange={(event) => set("orderNo", event.target.value)} />}
         </Field>
-        <div className="space-y-2 sm:col-span-1 lg:col-span-3">
-          <label className="flex min-h-12 items-center gap-3 text-base">
-            <input type="checkbox" className="size-5" checked={draft.missingPhoto} onChange={(event) => set("missingPhoto", event.target.checked)} />
-            {t("list.missing_photo")}
-          </label>
-          <label className="flex min-h-12 items-start gap-3 text-base">
-            <input type="checkbox" className="mt-3.5 size-5" checked={draft.flagged} onChange={(event) => set("flagged", event.target.checked)} />
-            <span className="py-2.5">
-              {t("list.flagged")}
-              <span className="block text-sm text-neutral-600">{t("list.flagged_hint")}</span>
-            </span>
-          </label>
-        </div>
       </div>
-      <div className="flex flex-wrap gap-3">
-        <Button type="submit">{t("list.apply")}</Button>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            setDraft(NO_FILTERS);
-            setIssue(null);
-            onClear();
-          }}
-        >
-          {t("list.clear")}
-        </Button>
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+        <label className="flex min-h-12 items-center gap-3 text-base">
+          <input type="checkbox" className="size-5" checked={draft.missingPhoto} onChange={(event) => set("missingPhoto", event.target.checked)} />
+          {t("list.missing_photo")}
+        </label>
+        <label className="flex min-h-12 items-center gap-3 text-base">
+          <input type="checkbox" className="size-5" checked={draft.flagged} onChange={(event) => set("flagged", event.target.checked)} aria-describedby={flaggedHint} />
+          {t("list.flagged")}
+        </label>
+        <span id={flaggedHint} className="text-sm text-neutral-600">
+          {t("list.flagged_hint")}
+        </span>
+        <div className="ml-auto flex flex-wrap gap-3">
+          <Button type="submit">{t("list.apply")}</Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setDraft(NO_FILTERS);
+              setIssue(null);
+              onClear();
+            }}
+          >
+            {t("list.clear")}
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -363,7 +364,7 @@ function PaymentsTable({ rows, onOpen, onPhoto }: { rows: PaymentListRow[]; onOp
                   {row.receipt ? (
                     <PhotoThumb key={row.receipt.url ?? "none"} label={t("list.photo_open", { id: row.id })} fileId={row.receipt.file_id} url={row.receipt.url} onOpen={() => onPhoto(row)} />
                   ) : (
-                    <span className="text-sm text-neutral-600">{t("list.no_photo")}</span>
+                    <span className="whitespace-nowrap text-sm text-neutral-600">{t("list.no_photo")}</span>
                   )}
                 </td>
                 <td className={TD}>

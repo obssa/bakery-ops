@@ -139,7 +139,7 @@ function Details({ payment, canDecide, onPhoto, onChanged }: { payment: PaymentD
         <div className="space-y-2">
           <p className="text-sm font-medium text-neutral-600">{t("detail.photo")}</p>
           {payment.receipt ? (
-            <PhotoThumb key={payment.receipt.url ?? "none"} label={t("detail.photo_open")} fileId={payment.receipt.file_id} url={payment.receipt.url} onOpen={onPhoto} />
+            <PhotoThumb key={payment.receipt.url ?? "none"} large label={t("detail.photo_open")} fileId={payment.receipt.file_id} url={payment.receipt.url} onOpen={onPhoto} />
           ) : (
             <p className="text-base text-neutral-700">{t("detail.photo_none")}</p>
           )}

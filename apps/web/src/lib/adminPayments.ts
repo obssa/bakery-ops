@@ -93,6 +93,14 @@ export function missingPhotoDrill(day: string, channelId: number): Record<string
   return { from: day, to: day, channel_id: String(channelId), missing_photo: "1" };
 }
 
+/**
+ * Does a "without photo" cell open the list? Only for a method that is not cash and has such payments: the list's missing_photo filter
+ * leaves cash out (a cash payment never has a photo), so a drill from the cash row would open an empty list.
+ */
+export function canDrill(row: Pick<ReconciliationChannelRow, "channel" | "without_photo">): boolean {
+  return row.without_photo > 0 && row.channel.code !== CASH;
+}
+
 export type ExportFormat = "csv" | "xlsx";
 
 /** The export's file name, as GET /payments/export names it in its Content-Disposition. */

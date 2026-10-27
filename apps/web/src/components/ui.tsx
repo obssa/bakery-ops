@@ -16,16 +16,17 @@ import {
 
 export function Button({
   variant = "primary",
+  compact = false,
   className = "",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary"; /** less side padding, for a row of actions in a table (still 48 px tall) */ compact?: boolean }) {
   const look =
     variant === "primary"
       ? "bg-blue-700 text-white hover:bg-blue-800 disabled:bg-blue-700/60"
       : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100 disabled:text-neutral-400";
   return (
     <button
-      className={`inline-flex min-h-12 items-center justify-center rounded-md px-5 text-base font-medium transition-colors disabled:cursor-not-allowed ${look} ${focusRing} ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center rounded-md ${compact ? "px-3" : "px-5"} text-base font-medium transition-colors disabled:cursor-not-allowed ${look} ${focusRing} ${className}`}
       {...props}
     />
   );

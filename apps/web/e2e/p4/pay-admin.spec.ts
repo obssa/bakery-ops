@@ -60,7 +60,7 @@ test.describe("p4 admin payments", () => {
     try {
       await openAs(page, admin, "en/admin/payments/channels/");
       await expect(page.getByRole("heading", { level: 1, name: "Payment methods" })).toBeVisible({ timeout: 30_000 });
-      const list = page.getByRole("table", { name: "Payment methods" });
+      const list = page.getByRole("table", { name: "Payment methods", exact: true });
       await expect(rowOf(list, fixtureChannels.bank.name_en)).toBeVisible({ timeout: 30_000 });
 
       // cash is locked: no edit, switch or remove control
@@ -139,14 +139,15 @@ test.describe("p4 admin payments", () => {
       await expect.poll(async () => (await channelByCode(admin, code)).is_enabled).toBe(false);
       await expect(mine.getByRole("button", { name: `Switch on ${name}` })).toBeVisible();
 
-      // remove it: asked once more, then it moves to the removed ones, with no control left
+      // remove it: asked once more, then it leaves the live list for the removed ones, where it has no control left
       await mine.getByRole("button", { name: `Remove ${name}` }).click();
       await mine.getByRole("button", { name: `Confirm: remove ${name}` }).click();
-      await expect(mine.getByText("Removed", { exact: true })).toBeVisible();
-      await expect(mine.getByRole("button")).toHaveCount(0);
+      await expect(mine).toHaveCount(0);
       expect((await channelByCode(admin, code)).deleted_at).not.toBeNull();
-      const after = await names();
-      expect(after.indexOf(name)).toBeGreaterThan(after.indexOf(fixtureChannels.bank.name_en));
+      await page.getByText(/removed payment methods?$/).click();
+      const removed = rowOf(page.getByRole("table", { name: "Removed payment methods" }), name);
+      await expect(removed).toContainText("Removed");
+      await expect(removed.getByRole("button")).toHaveCount(0);
     } finally {
       if (created) await removeChannel(admin, created);
       await removeChannel(admin, fixtureChannels.wallet);
