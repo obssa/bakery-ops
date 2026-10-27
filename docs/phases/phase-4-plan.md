@@ -1076,6 +1076,68 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      `payment-batches` once with one key; a network failure keeps the sheet and its uploaded photos (the photo ids are already on the server) and the retry is safe; offline says so (the outbox is Phase 5).
      Receipt after completion: preview, download PDF, copy link (`receipt-link`). Pure rules in `lib/paySheet.ts` (`rowsComplete`, `remaining`, `canComplete`, `blockReason`, `changeDue`) tested in
      `e2e/p4/pay-sheet-logic.spec.ts`. The `VoidDialog` gains the refund path for a closed order (lines to refund, disposition per line with the 10.2 R-C defaults, reason, manager PIN).
+   - **As built (step 4.5b, `phase-4/web-pay-sheet`).** Order: the tests red (the pure rules failing on the missing `lib/paySheet.ts` and
+     `lib/images/downscale.ts`, the three browser flows on the missing sheet), then the rules, the downscale and the client's calls, then the sheet,
+     the receipt, the payment void and the strings; this note. Where the code disagreed with the plan or the plan left a choice:
+     - **No `lib/money.ts`.** The arithmetic is `lib/decimal.ts` (scaled BigInt, Phase 1) with the keypad helpers of `lib/payment.ts`; `lib/paySheet.ts`
+       adds `moneyOf` (typed text to a 2 dp string: at most ten whole digits and two decimals, the API's `MONEY` rule). Never a float.
+     - **The rules** (`lib/paySheet.ts`): `sheetChannels` (enabled, by `sort`, cash first), `remaining`, `restOf` (the "Rest of the balance" button),
+       `newRow` (the rest of the balance, on cash when no other row has it), `canUseChannel` (cash on one row only, one drawer count; any other channel on
+       several), `changeDue`, `checkReference`, `rowIssue`, `rowsComplete`, `blockReason` and `canComplete` (in order: the till's shift, offline, nothing due,
+       no rows, more than 6, the first incomplete row by number, then short or over by how much), `batchRows`, `keepsKey`. A cash row is complete once the cash
+       handed over covers it (as the Phase 1 sheet; the API would take a missing tender as exact); "Exact amount" fills it.
+     - **The reference check** compiles the pattern body as `^(?:body)$`, in the strict `u` mode first and the plain one when that fails (an escape such as
+       `\-` that `u` refuses); a body neither compiles is not checked here (the API decides). Trimmed, case-sensitive, at most 64 characters, as
+       `ReferencePattern` matches. Only a channel with `requires_reference` shows the field and sends `reference_no`; only one with `requires_photo` sends
+       `receipt_file_id`.
+     - **The photo** (`lib/images/downscale.ts`): `createImageBitmap(file, {imageOrientation: 'from-image'})`, an `OffscreenCanvas` (else a canvas) filled
+       white, longest side 1600 never enlarged, JPEG 0.82; the original file when decoding or encoding fails. The camera button is a `<button>` that clicks a
+       hidden `<input type="file" accept="image/*" capture="environment">` (named "Receipt photo file"), so a device without a camera opens the file chooser.
+       The upload starts as soon as the photo is taken (`POST /files`, purpose `receipt`, its own `client_uuid` and key, both reused by "Try again"), so
+       Complete never waits for it; the thumbnail is the local object URL of the shrunk picture, not a signed URL. A replaced photo is left unattached for
+       the orphan purge (24 h): the till sends no `DELETE /files`.
+     - **Idempotency after a failure.** The batch's `client_uuid` and each row's stay for the sheet's life. The Idempotency-Key is kept for a retry only when
+       the outcome is unknown (no answer, a 5xx, `idempotency.in_flight`); after a refusal (4xx) the next Complete takes a new key, because the API stores a
+       refusal and would replay it under the same key (a `payments.shift.required` would come back after the shift started). A changed body after a lost
+       answer still carries the batch's `client_uuid`, which `RecordPaymentBatch` answers with the batch it recorded, so nothing is taken twice.
+     - **The sheet is kept per order** while the page lives (`lib/payDrafts.ts`, zustand, memory only): closing it (Escape, a tap beside it) and opening it
+       again shows the rows, the photos already uploaded and the same batch id. A reload starts afresh (the outbox is Phase 5). `payments.batch.row_invalid`
+       marks the row it names with that row's own message, and a `payments.photo.invalid` row asks for a new photo. A network failure says the sheet is kept
+       and a retry is safe; offline (`navigator.onLine`) blocks Complete and says so.
+     - **The till passes the live order** (the queue's copy, so a line added meanwhile moves the balance and Complete waits for the rows to match) and the
+       block of `payBlockReason` (the build flag or the API's first `payments.shift.required`), which covers every channel since 4.3b; the till's strings say
+       "a payment", not "cash".
+     - **The receipt**: a preview from the order the till holds, the payments the API answered and the references as typed, last 4 characters (the write
+       answers do not echo a reference), under the business name of `GET /receipt-settings`; "Download receipt (PDF)" fetches
+       `GET /orders/{order}/receipt.pdf` with the till's token (new `requestBlob` / `authedBlob`) and saves it; "Copy receipt link" posts `receipt-link`
+       (one key per receipt, so a retry replays the same link) and copies it, or shows it to copy by hand when the clipboard is not available.
+     - **The void of a payment is wired in** (4.3c's endpoint). A settled order (paid in full, not served) shows "Void a payment" in the queue; `VoidDialog`
+       lists the order's payments that are not voided or refunded (`GET /orders/{order}/payments`), and for a part-paid order "The whole order" too. A settled
+       order cannot be voided whole (`orders.order.paid`), so that choice is not offered. Reason and manager's PIN as for the order void, a new key after a failure.
+     - **Refunds are not built** (4.1b and 4.3d wait for R-C). The refund path the plan puts in `VoidDialog` is a marked place (`RefundPlaceholder`, a
+       `TODO(p4)` in the file's header): for a paid or closed order the dialog says refunds are not available yet. Nothing in the till reaches it today.
+     - **Tests.** `pay-sheet-logic` (13 pure cases); `pay-photo-split` @live, the gate flow of 10.3 item 2 (cash 70.00 with 100 handed over plus the run's
+       wallet 180.00 with a photo and a reference; Complete disabled with its reason until the photo is uploaded; one `payment-batches` 201; the order closed,
+       two payments of one batch, the file attached to the wallet's and stored without EXIF at 1600 x 1200, and what left the browser already 1600 x 1200
+       without EXIF; the PDF downloaded and the link fetched); `pay-camera-fallback` (CI only: the button opens the file chooser; with `createImageBitmap`
+       failing, the original 2400 x 1800 with its GPS block goes up as it is and the server stores it without EXIF at 1600); `pay-void` @live (cash and the
+       run's bank transfer on an unserved order, the transfer voided with a manager's PIN after a wrong one, the rest taken in cash, served and closed; a void
+       of a closed order's payment is `409 payments.void.order_closed`). `pay-refund` stays a `test.fixme` stub for 4.3d; the four others 4.1a left for 4.6b
+       are real now. A multipart body holding a Blob is not readable by Playwright (`postDataBuffer()` is null), so the flows read the uploaded file through a
+       fetch wrapper the test installs (`recordUploads`, it only observes). The photo fixture is drawn by the page's canvas with an injected EXIF/GPS block
+       (`e2e/support/photo.ts`); no binary is committed. `p1-order-flow`'s cash step presses "Complete payment"; its Phase 1 check that the digital channels
+       were disabled is gone.
+     - **Fixtures** (`e2e/support/payments.ts`): the till staff of 1.6c, a run-unique display-case product (ready when sent, served by the cashier through the
+       API) and, per fixture, two run-unique channels made through `POST /payment-channels`: `e2e_wallet_<run>_<n>` (photo, reference, pattern
+       `[A-Z]{2}[0-9]{6}`, a hint pair) and `e2e_bank_<run>_<n>` (reference only), each `client_uuid` derived from the code so a retried call gets the same
+       channel. The number is there because the API keeps a removed channel's code taken (section 7 said `e2e_wallet_<runId>`). A flow removes its channels
+       (soft) in its `finally` and voids or serves its order; `retireStaleChannels` first removes the `e2e_` channels earlier runs left. The default channels
+       and the demo branch are never touched.
+     - **Strings**: 65 new keys under `till` in `en.json` and `am.json`; `digital_reason` and `confirm` are gone.
+     - **Local run notes**: the local dev API (`php artisan serve`, one worker, 3 to 5 s a request over the Windows bind mount) cannot carry a till screen, so
+       the flows ran against a second `php artisan serve --no-reload` with `PHP_CLI_SERVER_WORKERS=8` and opcache timestamps off (a local container only, not
+       a repo change): `p4-pay-photo-split` 16 passed (the refund stub skipped), `p1-order-flow` 6 passed.
+     - STATUS: phase 4's `web` step stays `in_progress`.
    - **4.5c `phase-4/web-admin-payments`**: `/admin/payments` with tabs Channels (list, add, edit, reorder with up/down buttons not drag-only, switch, rules, hints, the cash row locked), Payments
      (the polled list with filters, photo thumbnail opens a viewer with a fresh signed URL, verify and dispute buttons, flagged chips), Reconciliation (per day and channel, with a "missing photo" drill),
      Receipts (the settings form). Export button. `lib/api/adminPayments.ts`, `lib/live/payments.ts` (poll 10 s visible, 30 s hidden, 304 keeps state).
