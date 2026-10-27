@@ -31,6 +31,7 @@ use Database\Seeders\Demo\DemoSeedRefused;
 use Database\Seeders\Demo\DemoShiftFlow;
 use Database\Seeders\Demo\DemoStock;
 use Database\Seeders\Demo\DemoTill;
+use Database\Seeders\Demo\PlannedDay;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Bus\QueueingDispatcher;
 use Illuminate\Database\Seeder;
@@ -138,7 +139,8 @@ final class Phase4Seeder extends Seeder
             $templates[$name] = ShiftTemplate::query()->where('name_en', $name)->orderBy('id')->first() ?? throw new LogicException("Phase3Seeder made no {$name} template.");
         }
         $till = new DemoTill($flow, $ids);
-        $loop = new DemoDay($flow, new DemoOrders($flow), $templates, $till, new DemoStock($flow, $ids, $suppliers));
+        $stock = new DemoStock($flow, $ids, $suppliers);
+        $loop = new DemoDay($flow, new DemoOrders($flow), $templates, $till, $stock);
 
         $anchor = DemoClock::anchor()->setTimezone($zone)->toDateString();
         $real = DemoClock::real()->setTimezone($zone);
@@ -156,7 +158,14 @@ final class Phase4Seeder extends Seeder
         DemoClock::toReal();
         $today = $real->toDateString();
         $loop->today($branch);
-        $till->today($today, $this->waiters()[0]);
+        // this morning's restock for the sample orders, in real time, then the orders: nothing runs out under the live screens (after the
+        // second of today's opening counts, so their snapshots come before every movement of the morning)
+        DemoClock::nextSecond();
+        $waiter = $this->waiters()[0];
+        foreach ($stock->steps(new PlannedDay(date: $today, orders: $till->samples($waiter), restock: true), []) as [, $step]) {
+            $step();
+        }
+        $till->today($today, $waiter);
 
         $rebuilt = microtime(true);
         $this->rebuild($branch, $anchor, $today);

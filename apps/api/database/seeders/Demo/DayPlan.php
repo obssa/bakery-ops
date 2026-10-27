@@ -109,6 +109,12 @@ final class DayPlan
 
     private const array TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'TR1', 'TR2'];
 
+    /** REFUND_PCT, read as the int it will be when step 4.3d sets it. */
+    public static function refundPct(): int
+    {
+        return self::REFUND_PCT;
+    }
+
     /** Days of history the window holds: bakery.demo.history_days (DEMO_HISTORY_DAYS), at least one. */
     public static function historyDays(): int
     {
@@ -291,6 +297,8 @@ final class DayPlan
             $roll = mt_rand(1, 100);
             $resolved = mt_rand(1, 3) === 1;
             $offsets = [mt_rand(1, 3), mt_rand(2, 5), mt_rand(6, 14), mt_rand(1, 3), mt_rand(4, 20)];
+            // drawn on every order whatever REFUND_PCT says, so turning refunds on (4.3d) changes no other draw of the plan
+            $refundRoll = mt_rand(1, 100);
             if ($voidPayment) {
                 $split = false;
             }
@@ -306,7 +314,8 @@ final class DayPlan
                 $roll <= self::VERIFIED_PCT + self::DISPUTED_PCT => $resolved ? PlannedOrder::CHECK_DISPUTE_RESOLVED : PlannedOrder::CHECK_DISPUTE,
                 default => PlannedOrder::CHECK_NONE,
             };
-            $order = new PlannedOrder($k + 1, $time, $table, $waiter, $lines, $voidOrder, $channel, $split, $splitPct, $voidPayment, $check, false, $offsets);
+            $refund = ! $voidOrder && $refundRoll <= self::refundPct();
+            $order = new PlannedOrder($k + 1, $time, $table, $waiter, $lines, $voidOrder, $channel, $split, $splitPct, $voidPayment, $check, $refund, $offsets);
 
             if ($stockOut !== null) {
                 if (! $stockOutTaken && $time >= self::STOCK_OUT_AT) {

@@ -16,7 +16,7 @@ namespace Database\Seeders\Demo;
  *   $splitPct     the digital part's share of the total, in percent
  *   $voidPayment  a digital part payment taken before the order is paid, voided (the manager approves), then the bill paid in cash
  *   $check        what the manager does with the digital payment at the end of the day: none, verify, dispute, or dispute and verify the
- *                 next morning (dispute_resolved)
+ *                 next morning (dispute_resolved); none for cash, a voided order and an order whose part payment is voided
  *   $refund       refunded after it closed: always false until refunds exist (DayPlan::REFUND_PCT, step 4.3d)
  *   $offsets      minutes after $time: [accept, bar ready, kitchen ready, serve after the last ready, pay after serving]
  *   $stockOut     the stock-out order of the day: it takes every unit of this product left in the display case

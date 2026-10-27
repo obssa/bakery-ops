@@ -171,7 +171,7 @@
         "payments": "in_progress",
         "analytics": "done",
         "web": "in_progress",
-        "docs": "todo"
+        "docs": "in_progress"
       },
       "playwright_projects": [
         "p4-pay-photo-split",

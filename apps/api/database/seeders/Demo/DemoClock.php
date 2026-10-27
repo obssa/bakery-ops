@@ -20,7 +20,8 @@ use Illuminate\Support\Facades\DB;
  *
  *   SEED_PHASE 3: the anchor is three days back and Phase3Seeder plays the two days after it (exactly as step 3.8 built it);
  *   SEED_PHASE 4 and above: the anchor is DayPlan::historyDays() + 2 days back (92 with the default 90) and Phase4Seeder plays every day
- *   after it up to yesterday with the Phase 4 day plan; Phase3Seeder then writes only its templates and reasons.
+ *   after it up to yesterday with the Phase 4 day plan; Phase3Seeder then writes only its templates and reasons. The queue is `sync` for
+ *   the whole run (put back afterwards), so nothing is left for a worker to evaluate in real time.
  *
  * A branch that already holds data (the live demo) is never anchored: the ledger is append-only and nothing may be written under rows
  * it has already shown, so the clock is not touched and no history is written. For Phase 3 "data" is a movement or a shift (step 3.8's
@@ -98,6 +99,26 @@ final class DemoClock
         }
     }
 
+    /**
+     * On to the next second of the clock, so a count's snapshot never shares the second of a movement written after it (a movement's
+     * created_at has whole seconds, a snapshot microseconds): a tick while the history is played; in real time a wait (or a frozen test
+     * clock moved on).
+     */
+    public static function nextSecond(): void
+    {
+        if (self::$moving) {
+            self::tick(1);
+
+            return;
+        }
+        if (Carbon::hasTestNow()) {
+            Carbon::setTestNow(CarbonImmutable::now()->addSecond());
+
+            return;
+        }
+        usleep(1_000_000 - (int) CarbonImmutable::now()->format('u') + 1_000);
+    }
+
     /** Back to the real time, for today's part of the seed. */
     public static function toReal(): void
     {
@@ -152,9 +173,17 @@ final class DemoClock
         self::$anchor = $local->subDays(self::daysBackFor($phase))->setTime(5, 30)->utc();
         self::$phase = $phase;
         self::set(self::$anchor);
+        // the Phase 4 history: every seeder's queued work runs here and now, in the seeded clock (Phases 0 and 1 do not set the queue
+        // themselves; on the queue a worker would evaluate their balances in real time, and the unique locks of those jobs would hold
+        // back the history's own evaluations, its stock-outs among them, for ten minutes)
+        $previousQueue = config('queue.default');
+        if ($phase >= 4) {
+            config(['queue.default' => 'sync']);
+        }
         try {
             $seed();
         } finally {
+            config(['queue.default' => $previousQueue]);
             self::toReal();
             self::$anchor = null;
             self::$phase = null;

@@ -111,7 +111,9 @@ it('plays the planned days through the module code: shifts, orders, payments wit
     $before = [Carbon::getTestNow(), CarbonImmutable::getTestNow()];
     p4Seed();
     expect([Carbon::getTestNow(), CarbonImmutable::getTestNow()])->toBe($before)
-        ->and(config('queue.default'))->toBe('database');
+        ->and(config('queue.default'))->toBe('database')
+        // every seeder's queued work ran in the seeded clock: nothing is left for a worker to run in real time
+        ->and(DB::table('jobs')->count())->toBe(0);
 
     $branch = p4Branch();
     $b = $branch->id;

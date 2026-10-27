@@ -151,6 +151,11 @@ final class DemoTill
         } else {
             $steps[] = [$time($paid), fn () => $this->pay($key, $date, $order)];
         }
+        if ($order->refund) {
+            // TODO(p4): 4.3d plays the refund here, one more step after the payment (Payments::refund, the manager approves; display-case
+            // lines restocked, station lines waste), and DayPlan::REFUND_PCT goes to 2
+            throw new LogicException('Refunds are played from step 4.3d; DayPlan::REFUND_PCT is 0 until then.');
+        }
 
         return $steps;
     }
@@ -403,14 +408,17 @@ final class DemoTill
         return $order->total->toBigDecimal()->minus($order->paid_total->toBigDecimal());
     }
 
-    /** $pct percent of the bill, in tens of birr, leaving at least 10.00 for the other part; null for a bill too small to split. */
+    /**
+     * $pct percent of the bill in tens of birr, at least 10.00 and leaving at least 5.00 for the other part (the cheapest bill on the plan's
+     * menu, a bread roll, is 15.00); null for a bill under 15.00.
+     */
     private function share(BigDecimal $balance, int $pct): ?BigDecimal
     {
-        if ($balance->isLessThan(20)) {
+        if ($balance->isLessThan(15)) {
             return null;
         }
         $part = $balance->multipliedBy($pct)->dividedBy(1000, 0, RoundingMode::HalfUp)->multipliedBy(10);
-        $part = BigDecimal::max(BigDecimal::of(10), BigDecimal::min($part, $balance->minus(10)));
+        $part = BigDecimal::max(BigDecimal::of(10), BigDecimal::min($part, $balance->minus(5)));
 
         return $part->toScale(2);
     }
@@ -451,6 +459,30 @@ final class DemoTill
 
     // ---------------------------------------------------------------------------------------------------- today
 
+    /** @var array<string, array{0: string, 1: list<array{0: string, 1: string}>, 2: string}> name => [table, lines, how far it goes] */
+    private const array SAMPLES = [
+        'sent' => ['T2', [['P-HOT-LATTE', '1'], ['P-SND-CHICKEN', '1']], 'sent'],
+        'making' => ['T5', [['P-SND-TUNA', '1'], ['P-HOT-MACCHIATO', '1']], 'accepted'],
+        'served' => ['T8', [['P-SND-CLUB', '1'], ['P-CLD-WATER', '1']], 'served'],
+        'split' => ['T9', [['P-HOT-CAPPUCCINO', '2'], ['P-BRD-ROLL', '2']], 'paid'],
+    ];
+
+    /**
+     * Today's sample orders as a plan, so the morning restock can be run for them first (nothing runs out under the live screens).
+     *
+     * @return list<PlannedOrder>
+     */
+    public function samples(string $waiter): array
+    {
+        $orders = [];
+        $n = 0;
+        foreach (self::SAMPLES as [$table, $lines]) {
+            $orders[] = new PlannedOrder(++$n, '00:00:00', $table, $waiter, $lines, false, 'telebirr', true, 60, false, PlannedOrder::CHECK_NONE, false, [0, 0, 0, 0, 0]);
+        }
+
+        return $orders;
+    }
+
     /**
      * A few sample orders in real time, for the live screens: one on the kitchen and bar rails, one being made, one served and waiting
      * at the till, one paid split (Telebirr with its photo, the rest in cash). Keyed by today's date, so a second run the same day writes
@@ -458,13 +490,10 @@ final class DemoTill
      */
     public function today(string $today, string $waiter): void
     {
-        $samples = [
-            'sent' => ['T2', [['P-HOT-LATTE', '1'], ['P-SND-CHICKEN', '1']], 'sent'],
-            'making' => ['T5', [['P-SND-TUNA', '1'], ['P-HOT-MACCHIATO', '1']], 'accepted'],
-            'served' => ['T8', [['P-SND-CLUB', '1'], ['P-CLD-WATER', '1']], 'served'],
-            'split' => ['T9', [['P-HOT-CAPPUCCINO', '2'], ['P-BRD-ROLL', '2']], 'paid'],
-        ];
-        foreach ($samples as $name => [$table, $lines, $stage]) {
+        $plans = $this->samples($waiter);
+        $i = 0;
+        foreach (self::SAMPLES as $name => [$table, $lines, $stage]) {
+            $planned = $plans[$i++];
             $key = "today:{$today}:{$name}";
             $uuid = $this->ids->uuid("demo-order:{$key}");
             if (Order::query()->where('client_uuid', $uuid)->exists()) {
@@ -486,7 +515,7 @@ final class DemoTill
             $this->stations($key, LineStatus::Accepted);
             $this->serve($key);
             if ($stage === 'paid') {
-                $this->pay($key, $today, new PlannedOrder(1, '00:00:00', $table, $waiter, $lines, false, 'telebirr', true, 60, false, PlannedOrder::CHECK_NONE, false, [0, 0, 0, 0, 0]));
+                $this->pay($key, $today, $planned);
             }
         }
     }

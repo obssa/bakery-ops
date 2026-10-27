@@ -191,6 +191,21 @@ and nothing in it holds a secret: the same `BAKERY_DEMO_PASSWORD` as before is a
   For the full history load a **new** demo branch: `php artisan bakery:seed-demo --force --branch="Demo Bakery 2"`.
 - A second run writes nothing either way. Running it on the live demo branch is the owner's decision (the report lists it).
 
+**Phase 4 (payments and analytics, step 4.6a).** `bakery:seed-demo` now ends with `Phase4Seeder` (`--phase=4`, or no `--phase`). Again it depends on the branch:
+
+- *A fresh demo branch* (no shift, no order and no movement): the clock is moved to 05:30 local `DEMO_HISTORY_DAYS` + 2 days ago (92 with the default 90), Phases 0 to 2 are
+  seeded there, Phase 3 writes its templates and reasons, and `Phase4Seeder` plays every day after that to yesterday through the code the screens call: each morning the
+  purchases, transfers and production batches that keep the stations and the display case stocked; 22 orders on a weekday and 34 at the weekend, paid in cash, Telebirr,
+  CBE Birr and the banks, every digital payment with a drawn receipt photo stored on the `files` disk and a `SEED-yymmdd-n` reference, splits, a few voided part payments
+  and voided orders, the manager's verifications and disputes; three planned stock-outs made again from their automatic production request; five closings with a
+  difference the manager approves; a Night shift at the bakery on Fridays. Then today's shifts and four sample orders, the receipt settings, and every day rebuilt for the
+  dashboards (trigger `seed`). It prints how long it took and how many orders, payments, photos and audit rows it wrote. This is what CI's `e2e-p4` loads.
+- *A branch that already holds data* (the live demo bakery): **no history is generated** ("history not generated: the demo branch already has data; load a new demo
+  branch"). Nothing is added to the ledger and nothing is backdated; it only makes sure of the eight channels and the receipt settings, builds the summaries of the days
+  that were never built (reading the ledger, writing only the summary tables) and says which tracked station has no open shift. A 90-day showcase on the live site would
+  need a **new** demo branch (`--branch="Demo History"`) and is not done unless the owner asks; it would add about 2 300 receipt photos to the disk quota.
+- A second run writes nothing either way.
+
 Nothing secret is printed or stored: the password is never shown, and the sample orders carry made-up tables and
 products only. Never run it with `--branch` pointing at the "E2E Test Branch" or at shop data (a branch that is not a
 demo branch is refused anyway). `--branch="<name>"` loads a second, separate demo

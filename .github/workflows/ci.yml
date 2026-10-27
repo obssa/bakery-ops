@@ -226,7 +226,8 @@ jobs:
     if: fromJSON(needs.status.outputs.phase) >= 4
     uses: ./.github/workflows/module-tests.yml
     # the Facts contract is green since step 4.1c and runs here with Analytics absent (its ports live in the providers) and in every provider job
-    with: { module: analytics, groups: "module:analytics", contracts: "contract:analytics->facts" }
+    # `seeds:p4`: the Phase 4 demo history (Phase4SeederTest, step 4.6a) rebuilds every day it writes, so it runs after Analytics is green
+    with: { module: analytics, groups: "module:analytics,seeds:p4", contracts: "contract:analytics->facts" }
 
   # ------------------------------------------------------------------ web
   web-lint:

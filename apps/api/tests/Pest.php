@@ -5,7 +5,7 @@ declare(strict_types=1);
 /*
  * Pest bootstrap. Groups are the backbone of the phase gates (see the bakery-ops-builder skill):
  *   arch, invariants, unit, feature, property, concurrency, module:<name>,
- *   contract:<consumer>-><provider>, gate:p<N>, seeds (the demo bakery, tests/Seeders)
+ *   contract:<consumer>-><provider>, gate:p<N>, seeds (the demo bakery, tests/Seeders), seeds:p4 (its Phase 4 history, run after Analytics)
  * Feature, Module, Contract, Invariants and Seeders tests get the Laravel TestCase + RefreshDatabase on the production engine
  * (MariaDB 10.11 locally, in CI and live). Gate tests, and contract tests named *ConcurrencyTest.php, get the TestCase
  * and choose their database trait per file: RefreshDatabase for most, Tests\Support\CommitsForConcurrency
