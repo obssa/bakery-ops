@@ -58,6 +58,18 @@ Note (step 0.7, 2026-10-20): the web shell is export-safe. It is served under `/
 Being same-origin, production needs no CORS origin at all (ADR 0007's allowlist is `http://localhost:3000` locally and
 in CI only). The live `@live` tests sign in as the admin of the isolated "E2E Test Branch".
 
+Note (Phase 4, step 4.6b, 2026-10-28): the Files row of the table is concrete (built in steps 4.2a and 4.2b; ADR 0015). Receipt photos
+live on the `files` disk, `storage/app/private/files` on the account (outside `public/`, protected from the deploy's `rsync --delete` with
+the rest of `storage/`), chosen by `FILES_DISK`; the S3-compatible `files_s3` disk is one variable and a key-for-key copy away, proved in
+CI only by the `files-s3` job against MinIO. Every read is a five-minute signed URL served by PHP (`private, no-store`). The host's PHP
+needs `gd` (JPEG, PNG; WebP optional), `fileinfo`, `mbstring`, `zip`, `dom` and the XML extensions; `exif` is optional (a pure-PHP
+orientation reader stands in); `imagick` is not used. `php artisan files:doctor` (the CLI PHP) and `GET /api/v1/files/doctor` (the web
+PHP, which can differ on cPanel) check them, the limits, the free space and the folder's size, with a round trip of a generated photo.
+The photos count against the account's quota and must be in its nightly backup together with the database (`docs/runbook/server.md`,
+"Files"). Phase 4 also kept every heavy job to one local day of one branch on the cron-drained queue (ADR 0014), so nothing needs a
+process that lives longer than the cron's 50 seconds, and it measures the dashboards in process (`php artisan analytics:bench`) instead
+of loading the shared host from outside (k6 runs only against the CI compose stack).
+
 ## Consequences
 
 - Positive: one URL, automatic deploys, honest tests in the environment the shop will use, no local

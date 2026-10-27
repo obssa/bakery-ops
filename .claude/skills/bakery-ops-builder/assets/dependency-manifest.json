@@ -1351,14 +1351,16 @@
           "perf-dashboards"
         ],
         "criteria": [
-          "ChannelTotalsEqualPaymentsTest on the seeded day: daily_channel_totals.amount == SUM(payments.amount) WHERE status <> voided per channel; counts equal; daily_sales.revenue == SUM(orders.total) for paid/closed",
+          "ChannelTotalsEqualPaymentsTest and RevenueEqualsOrdersTest on every seeded day (gate-p4 seeds 90 days once on the compose stack): daily_channel_totals.amount == SUM(payments.amount) WHERE status <> voided per channel; counts equal; net = amount - refunds; daily_sales.revenue == SUM(orders.total) for paid/closed by settled_at",
           "p4-pay-photo-split: Telebirr with photo + cash remainder; requires_photo blocks completion until a photo is attached",
           "timed budget (R-G): DashboardBudgetGateTest in process on the 90-day seed (p95 < 400 ms, at most 8 queries per /analytics/* endpoint) plus analytics:bench; perf-dashboards (k6) on the CI compose stack where Docker exists; Playwright p4-dashboards asserts first data under 1000 ms. k6 never runs against the live host",
           "dashboards hit no raw tables (query log assertion); Rebuild::day run twice yields identical rows"
         ]
       },
       "adrs": [
-        "0014-summary-rebuild-semantics"
+        "0014-summary-rebuild-semantics",
+        "0015-file-storage-portability",
+        "0016-refunds-voids-and-the-cash-drawer"
       ],
       "intra_phase_contracts": [
         "payments->orders",
@@ -1470,7 +1472,7 @@
         "mod-inventory",
         "mod-payments"
       ],
-      "enforced-gates": [
+      "rules-off-gates": [
         "mod-payments",
         "mod-production",
         "mod-notifications"
@@ -1554,7 +1556,7 @@
       "gate-p3": [
         "gate-p2",
         "mod-shifts",
-        "enforced-gates",
+        "rules-off-gates",
         "e2e-p3"
       ],
       "gate-p4": [

@@ -1,6 +1,6 @@
 # ADR 0014: Summary rebuild semantics
 
-- Status: proposed (step 4.4a, `phase-4/analytics-rebuild`); accepted at the Phase 4 gate
+- Status: accepted (Phase 4 gate step 4.6b, 2026-10-28; proposed in step 4.4a, `phase-4/analytics-rebuild`)
 - Date: 2026-10-26
 - Phase: 4
 
@@ -119,3 +119,28 @@ is made. Step 4.4a builds it (`App\Modules\Analytics\Contracts\Rebuild`); 4.4b a
   wrong way), and a missed or doubled event would drift forever; a rebuild from facts heals itself.
 - **READ COMMITTED for the rebuild,** which takes no gap locks: every port would then read a different moment and the day would not be
   one snapshot.
+
+## As built at the gate (step 4.6b, 2026-10-28)
+
+Accepted on what the gate proves on the seeded history (the `gate-p4` CI job seeds the demo bakery with 90 days on the compose stack, every
+day rebuilt by the seed with trigger `seed`, and runs the `gate:p4` group against it; `Tests\Support\SeededGate`):
+
+- **Decision 4 (each figure's clock).** `ChannelTotalsEqualPaymentsTest`: for every built day and channel, `daily_channel_totals.amount`
+  equals the sum of the day's payments that are not voided by `received_at` (brick/math, never floats), `receipts_count` their number,
+  `refund_amount` and `refund_count` the day's `payment_refunds` by `refunded_at`, `net_amount = amount - refund_amount`, and the channels
+  add up to the day's takings. `RevenueEqualsOrdersTest`: `daily_sales.revenue` equals the totals of the paid or closed orders settled
+  that day, `orders_count` their number, `refund_total` the day's refunds, `refund_count` one per order refund, `net_revenue = revenue -
+  refund_total`.
+- **Decisions 6 and 8 (idempotent, by fingerprint).** `RebuildIdempotentGateTest` rebuilds three seeded days (the busiest, one with a voided
+  payment, a Friday whose Night shift runs into Saturday) twice: both write the seed's own rows and fingerprint, neither is `changed`, only
+  the version moves.
+- **Decision 10 (summaries only).** `DashboardsReadSummariesOnlyGateTest` holds every GET `/analytics/*` route, read over the seeded window
+  by the admin (and the chef and the cashier for the `view_own` reads), each also answering 304, and each export once, to the query-log
+  rules of the module test (`Tests\Support\DashboardQueries`).
+- **The budget (10.2 R-G).** `DashboardBudgetGateTest`: each dashboard read, 3 warm-ups then 30 timed requests in process, a 200 within 8
+  statements of its own and a p95 under 400 ms; the calls are `App\Console\Support\DashboardBench`'s, the class
+  `php artisan analytics:bench --branch=<id>` runs on any host (the live one included), read-only. k6 (`perf-dashboards`) loads the
+  CI compose stack only, p95 under 1000 ms per read on the same 90 days.
+- **Still as in Consequences:** refund figures are the summaries' zeros until the refund steps (4.1b, 4.3d) are built on Ramin's answer to
+  R-C; display-case products made in the house have `cogs_complete = false`; modifier recipe deltas are not costed.
+
