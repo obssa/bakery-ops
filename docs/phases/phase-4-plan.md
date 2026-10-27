@@ -1141,6 +1141,70 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
    - **4.5c `phase-4/web-admin-payments`**: `/admin/payments` with tabs Channels (list, add, edit, reorder with up/down buttons not drag-only, switch, rules, hints, the cash row locked), Payments
      (the polled list with filters, photo thumbnail opens a viewer with a fresh signed URL, verify and dispute buttons, flagged chips), Reconciliation (per day and channel, with a "missing photo" drill),
      Receipts (the settings form). Export button. `lib/api/adminPayments.ts`, `lib/live/payments.ts` (poll 10 s visible, 30 s hidden, 304 keeps state).
+   - **As built (step 4.5c, `phase-4/web-admin-payments`).** Order: the tests red (the pure rules failing on the missing `lib/adminPayments.ts`, the two
+     browser flows on the missing pages), then the rules, the client's calls, the feeds and the deep-link pages, then the screens and the strings; the ADR 0009
+     note and this note. Where the code disagreed with the plan or the plan left a choice:
+     - **Four pages under one tab, not four tabs of one page.** `/admin/payments` (the list, where the `payment_disputed` link of 4.3c,
+       `/admin/payments?payment={id}`, lands), `/admin/payments/reconciliation`, `/admin/payments/channels` and `/admin/payments/receipts`, under pills as
+       Inventory and Shifts do (`PaymentsNav`, each pill shown to the holders of its permission: `payments.view`, `payments.verify`, `channels.manage`,
+       `payments.take`). The admin console's "Payments" tab is its first tab shown only to someone who holds one of the section's permissions
+       (`payments.view` or `channels.manage`); the overview has its card. The list comes first (the daily work and the link's target; the plan listed
+       Channels first). `lib/deeplink.ts` knows the four pages, so the inbox links to them.
+     - **The list's filters live in the address** (`from`, `to`, `channel_id`, `status`, `order_no`, `missing_photo`, `flagged`; `filtersFromParams` and
+       `filterParams`), so a reload, the reconciliation's drill and the notification's link land on the same list; a malformed value is dropped, never
+       sent. The API's `reference` and `shift_id` filters have no field here (the step did not ask for them).
+     - **The polled list** (`lib/live/payments.ts`, `PAYMENTS_POLL` 10 s visible, 30 s hidden, a 304 keeps what is shown, one feed per filter set) polls
+       the first page only. "Older payments" reads the next pages by cursor once (`olderPayments`, not polled); `foldHead` keeps the rows that new payments
+       push out of the first page above the older pages, so nothing goes missing between the two. A verify or dispute answer replaces its row
+       (`patchRows`) and asks the feed to look again.
+     - **The photo**: a list thumbnail starts from the list's signed URL; the viewer always asks `GET /files/{file}/url` when it opens; a picture that
+       fails to load asks for a fresh URL once more (`useSignedUrl`, at most two per picture, then "could not be loaded" with a retry). The dialog shows a
+       larger thumbnail that opens the same viewer; Escape then closes the viewer only.
+     - **Verify and dispute** are in the payment dialog, not inline in the list: verify with an optional note (the audit trail's only), dispute with a
+       reason checked here for 3 to 255 characters. A refused reason (`422 validation.failed` on `reason`) shows the dictionary's twin of
+       `payments.dispute.reason_required` (the API's field text is English only); every other refusal its own `message_en`/`message_am`. The keys follow
+       4.5b: a new key after a 4xx, the same one when the outcome is unknown (`keepsKey`). The same rule holds for every channel write and the receipt
+       settings.
+     - **Chips** (`chipsOf`): disputed, duplicate reference, duplicate receipt photo. A disputed payment shows its chip in place of the status badge, so
+       the word shows once.
+     - **The export**: "Export CSV" and "Export Excel" for `payments.verify`, the list's filters and the page's language, read with the bearer token
+       through `authedBlob` (4.5b's PDF read gained an `accept` option) and saved under the name the API gives the file (`exportFileName`, rebuilt in the
+       browser: a cross-origin answer's `Content-Disposition` is not readable by script unless exposed). `422 payments.export.too_large` shows the API's
+       bilingual message.
+     - **Payment methods**: the live ones in the till's order (sort, then id) with Up and Down (`moveIds`: a swap with the neighbour, then
+       `PUT /payment-channels/order` with every live id once), Edit, Switch off or on, Remove (asked once more); cash shows only Up and Down and "Locked"
+       (`channelControls`). The removed ones are folded under "N removed payment methods" with the day they went (the E2E branch holds dozens). The form,
+       below the list: the code (on a new method only), both names, the two rules, the pattern with a live check (`patternCheck`: none, read well, too
+       long, unreadable in this browser; the server's `ReferencePattern` still judges it on save and its refusal shows its `reason` in words) and a sample
+       reference tried against it (`sampleCheck`: the whole reference, trimmed, case-sensitive, as the API matches it), and the hint pairs. An edit sends
+       only what changed, a hint pair together (`changesOf`); a new method keeps one `client_uuid` until it is made.
+     - **Reconciliation**: the range is the screen's own state (the last 7 local days by default, at most 62 checked before asking), a feed
+       (`RECONCILIATION_POLL` 30 s visible, 60 s hidden); the newest day first, a table per day with a day total (`dayTotals`, decimal strings), the days
+       without a payment on one line, then the range's table from the API's `totals`. The refund columns render (zero until 4.3d). A "without photo" cell
+       links to the list of that day, that method and `missing_photo=1` (`missingPhotoDrill`), except on cash (`canDrill`): the API counts cash payments
+       as without a photo while the list's `missing_photo` leaves cash out, so that drill would open an empty list.
+     - **Receipts**: the form over `GET /receipt-settings` (the till's query and shape), editable with `channels.manage` and read-only otherwise; the PUT
+       replaces the whole form, an empty text is null, the pairs are both or neither; `is_default` says the settings were never saved.
+     - **Query keys**, one per answer shape: `["payment-channels", "all"]` (the admin list with the removed ones; the till's `["payment-channels"]` keeps
+       the live list, and a channel write refreshes both), `["payment", id]` (a payment's detail), `["receipt-settings"]` (the till's own key, the same
+       shape). The list and the reconciliation are feeds, not queries.
+     - **No refund** is issued anywhere: the dialog only shows a refunded amount when there is one, and the reconciliation's refund columns stay.
+     - **UI**: `Button` gained `compact` (less side padding, still 48 px tall) for the row of actions of a method.
+     - **Strings**: 246 keys under `adminPayments` plus `admin.payments` and `admin.payments_desc`, English and Amharic. The literal braces of the pattern
+       hints are quoted for ICU (`'{10}'`).
+     - **Tests**: `pay-admin-logic` (19 pure cases: the filters and the address, the drill, the inbox link, the export name, the order and its moves, the
+       cash lock, the channel form, the pattern and sample checks, chips and decisions, the reason, the first page with the older pages, the row patch, the
+       day totals, the range, the receipt form) and `pay-admin` (two flows, @live): a method added with its pattern checked live, edited (the PATCH holds
+       only the change), moved up past the run's bank transfer and back (the PUT names every live id once), switched off and removed, with cash showing
+       no edit, switch or remove; a 250.00 order paid through the API with the run's wallet (a photo and a reference) and bank transfer, the wallet
+       payment found by its method, its photo opened from a fresh signed URL and loaded, a too-short reason refused before sending, disputed, verified,
+       the reconciliation of today counting both run-unique methods exactly, the bank's missing photo drilled into, the deep link opening the payment and,
+       in CI only (on the live host the queue waits for the cron), the manager's inbox line followed to it. The fixtures gained `Api.postForm`,
+       `uploadReceipt`, `payBatch` and a background colour per run for `canvasJpeg` (`runTint`): two runs' photos drawn alike were the same stored bytes,
+       which the API flags as a duplicate receipt.
+     - **Local run notes**: the flows ran against a second local API container (eight CLI-server workers, opcache on without timestamp checks, a sync
+       queue, port 8001; not a repo change): `pay-admin-logic` and `pay-admin` 21 passed.
+     - STATUS: phase 4's `web` step stays `in_progress`.
    - **4.5d `phase-4/web-order-timeline`**: `/admin/orders/[id]` (record page by `?id=`, export-safe) merges `GET /orders/{order}` (events) with `GET /orders/{order}/payments` (photo thumbnails, signed
      on read, re-signed when a viewer opens after 5 min), shows void/refund/payment events with who approved, and the refund action. The orders board links to it.
    - **4.5e `phase-4/web-analytics`**: `/admin/analytics` (Overview with period compare, Sales by day/week/month and by hour, Channels, Products with the product page `/admin/analytics/product?id=`,
@@ -1176,7 +1240,7 @@ As-built notes are appended under each step as the build runs, as in Phases 1 to
 - **Live-host realities in tests**: queue tests keep `Queue::fake` plus a `sync` twin; the touch debounce is tested with the database cache lock; every poll test asserts `304` on an unchanged second request and
   a changed tag inside the 5-second settling window of `Payments::fingerprint()`.
 - **Playwright** (`apps/web/e2e/p4/`, projects exist in `playwright.config.ts`):
-  - `p4-pay-photo-split` (`testMatch /pay/`): `pay-photo-split.spec.ts` @live (the gate), `pay-sheet-logic.spec.ts` (pure), `pay-refund.spec.ts` @live, `pay-void.spec.ts` @live, `pay-camera-fallback.spec.ts`.
+  - `p4-pay-photo-split` (`testMatch /pay/`): `pay-photo-split.spec.ts` @live (the gate), `pay-sheet-logic.spec.ts` (pure), `pay-refund.spec.ts` @live, `pay-void.spec.ts` @live, `pay-camera-fallback.spec.ts`, and from 4.5c `pay-admin.spec.ts` @live (the admin payments screens) and `pay-admin-logic.spec.ts` (pure).
   - `p4-dashboards` (`testMatch /dashboards/`): `dashboards.spec.ts` (CI, the 90-day seed: first KPI visible under 1000 ms), `dashboards-live.spec.ts` @live (exact figures on a run-unique channel,
     soft budget), `dashboards-audit.spec.ts` @live (the audit screen shows this run's refund with its approver), `dashboards-logic.spec.ts` (range maths).
   - Earlier projects keep running; `p1-order-flow` and `p3-handover` prove the cash path and the shift rules are not broken.

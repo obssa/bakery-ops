@@ -159,3 +159,15 @@ step 3.7b: while the newest movement is younger than the overlap window (5 s) th
 cursor sits below a late commit is never answered 304 for a change it has not seen; tests that expect a 304 after writing stock travel past the window
 first. The chain that makes a screen change (`CountSubmitted`, `VarianceDecided`, `ChainBroken`) is queued work, so on the live host it waits for the
 cron-drained worker (runbook, "Queued work").
+
+## Note, 2026-10-27: Phase 4 stays on polling
+
+Phase 4 adds no channel either (step 4.5c). The admin payments list polls `GET /payments` with its filters every 10 s while the tab is visible and every
+30 s while it is hidden (`lib/live/payments.ts`, built on `LiveFeed` like the other feeds): only the first page (the newest 50) is polled, the older pages
+are read once by cursor on request, and a 304 keeps what is shown. Its ETag is `Payments::fingerprint()` (count, highest id, newest `updated_at`, and a
+`settling` second while the newest payment is younger than the 5 s overlap window, the lesson of `Stock::fingerprint`) with the query, the viewer's scope
+and a bucket of half the signed URLs' lifetime, so a list that keeps answering 304 still gets fresh photo URLs before the old ones expire; the photo viewer
+asks `GET /files/{file}/url` for a fresh one each time it opens anyway. The reconciliation polls `GET /payments/reconciliation` every 30 s visible and 60 s
+hidden, behind the payments' fingerprint and the refunds' own (count, highest id, the same settling second). A verify or a dispute answers the payment, which
+replaces the row at once and asks the list to look again. The analytics freshness feed (`GET /analytics/freshness`, 30 s, 4.4b) is read by the dashboards
+of step 4.5e. A write that tests expect to be answered 304 afterwards travels past the settling window first, as in Phase 3.
