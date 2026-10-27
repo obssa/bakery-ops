@@ -171,7 +171,10 @@ jobs:
   mod-inventory:
     needs: mod-catalog
     uses: ./.github/workflows/module-tests.yml
-    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory,contract:analytics->facts" }
+    # 30 minutes, not the reusable job's 20: the inventory groups (module:inventory, property, concurrency and four consumers'
+    # contracts) took 18 m 34 s on PR #79 (run 40586333985) and 19 m 18 s on main at 76c25a0 (run 40554229133), so the 20-minute
+    # default was a minute from cancelling the gate chain (phase-4 plan, 4.6b)
+    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory,contract:analytics->facts", timeout_minutes: 30 }
 
   mod-orders:
     needs: [status, mod-inventory]

@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: ""
+      timeout_minutes:
+        description: the job's timeout; 20 minutes unless a module's job needs more (mod-inventory, ci.yml says why)
+        required: false
+        type: number
+        default: 20
       env:
         description: Extra environment for the Pest steps, one KEY=VALUE per line (the enforced-gates job turns a rollout flag on)
         required: false
@@ -28,7 +33,7 @@ jobs:
   pest:
     name: ${{ inputs.module }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: ${{ inputs.timeout_minutes }}
     services:
       mysql:
         image: mysql:8.0
