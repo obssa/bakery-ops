@@ -99,10 +99,15 @@ export function apiUrl(path: string, query?: RequestOptions["query"]): string {
   return qs ? `${url}?${qs}` : url;
 }
 
+/** A multipart body (POST /files, step 4.5b): sent as it is, the browser writes its Content-Type with the boundary. */
+function isForm(body: unknown): body is FormData {
+  return typeof FormData !== "undefined" && body instanceof FormData;
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json", ...stationHeaders(), ...options.headers };
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  if (options.body !== undefined && !isForm(options.body)) headers["Content-Type"] = "application/json";
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (WRITE_METHODS.has(method)) {
     if (!options.idempotencyKey) throw new Error(`${method} ${path} needs an Idempotency-Key (rule 7)`);
@@ -116,7 +121,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     response = await fetch(apiUrl(path, options.query), {
       method,
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : isForm(options.body) ? options.body : JSON.stringify(options.body),
       signal: limit.signal,
       cache: "no-store",
     });
@@ -141,6 +146,41 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw failed(new ApiError(response.status, body));
   }
   return json as T;
+}
+
+/**
+ * A GET whose answer is a file (the receipt PDF of step 4.5b), with the same headers, time limit and errors as `request`: a refusal is
+ * still the API's bilingual JSON body.
+ */
+export async function requestBlob(
+  path: string,
+  options: { query?: RequestOptions["query"]; token?: string | null; signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<Blob> {
+  const headers: Record<string, string> = { Accept: "application/pdf, application/json", ...stationHeaders() };
+  if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  const limit = withTimeout(options.signal, options.timeoutMs ?? READ_TIMEOUT_MS);
+  let response: Response;
+  let blob: Blob;
+  try {
+    response = await fetch(apiUrl(path, options.query), { method: "GET", headers, signal: limit.signal, cache: "no-store" });
+    blob = await response.blob();
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === "AbortError" && !limit.timedOut()) throw cause;
+    throw new ApiError(0, { message_key: "network" });
+  } finally {
+    limit.done();
+  }
+  if (!response.ok) {
+    let body: Partial<ApiErrorBody> = {};
+    try {
+      const json: unknown = JSON.parse(await blob.text());
+      if (json && typeof json === "object") body = json as Partial<ApiErrorBody>;
+    } catch {
+      body = {};
+    }
+    throw failed(new ApiError(response.status, body));
+  }
+  return blob;
 }
 
 /** What a conditional GET came back with: the page, or "nothing changed" (304). */

@@ -374,7 +374,7 @@ export interface DiningTable {
   state: TableState;
 }
 
-/** GET /payment-channels */
+/** GET /payment-channels: the Phase 1 keys, then the rules of step 4.3a (Payments\Contracts\ChannelView). */
 export interface PaymentChannel {
   id: number;
   code: string;
@@ -384,7 +384,16 @@ export interface PaymentChannel {
   requires_photo: boolean;
   requires_reference: boolean;
   sort: number;
+  /** since step 4.3b simply is_enabled (a photo channel is taken with its photo) */
   accepted_now: boolean;
+  /** a regex body matched against the whole reference by the API (ReferencePattern); null: any text */
+  reference_pattern: string | null;
+  reference_hint_en: string | null;
+  reference_hint_am: string | null;
+  photo_hint_en: string | null;
+  photo_hint_am: string | null;
+  is_cash: boolean;
+  deleted_at: string | null;
 }
 
 export interface Payment {
@@ -404,6 +413,109 @@ export interface Payment {
 export interface PaymentResult {
   payment: Payment;
   order: { id: number; status: OrderStatus; total: DecimalString; paid: DecimalString; balance: DecimalString };
+  warnings: PaymentWarning[];
+}
+
+/** A payment as the writes answer it (step 4.3b adds the photo's id and the batch). */
+export interface RecordedPaymentRow extends Payment {
+  receipt_file_id: number | null;
+  batch_uuid: string | null;
+}
+
+/** A reference or a receipt photo seen on another payment (step 4.3b): shown to the cashier, never a refusal. */
+export interface PaymentWarning {
+  code: "reference.duplicate" | "receipt.duplicate" | string;
+  message_key: string;
+  message_en: string;
+  message_am: string;
+  payment_id: number;
+  payment_ids: number[];
+}
+
+/** POST /orders/{order}/payment-batches body (step 4.3b): 1 to 6 payments that add up to exactly the balance, all or none. */
+export interface NewPaymentBatch {
+  client_uuid: string;
+  rows: {
+    client_uuid: string;
+    channel_code: string;
+    amount: DecimalString;
+    tendered_amount?: DecimalString;
+    reference_no?: string;
+    receipt_file_id?: number;
+  }[];
+}
+
+/** POST /orders/{order}/payment-batches */
+export interface PaymentBatchResult {
+  payments: RecordedPaymentRow[];
+  order: PaymentResult["order"];
+  warnings: PaymentWarning[];
+}
+
+/** POST /files (step 4.2b): a stored picture; `url` is signed and short-lived. */
+export interface StoredFileView {
+  id: number;
+  purpose: "receipt" | "refund_proof";
+  width: number;
+  height: number;
+  bytes: number;
+  sha256: string;
+  url: string;
+  url_expires_at: string;
+  attached: boolean;
+}
+
+/** A payment as the reads answer it (GET /orders/{order}/payments, step 4.3b). */
+export interface PaymentView {
+  id: number;
+  order_id: number;
+  client_uuid: string;
+  channel: { id: number; code: string | null; name_en: string | null; name_am: string | null };
+  amount: DecimalString;
+  tendered_amount: DecimalString | null;
+  change_amount: DecimalString | null;
+  currency: string;
+  reference_no: string | null;
+  status: "recorded" | "verified" | "disputed" | "voided";
+  received_at: string;
+  received_by: { id: number; name: string | null };
+  shift_id: number | null;
+  batch_uuid: string | null;
+  receipt: { file_id: number; url: string | null; url_expires_at: string | null } | null;
+  verified_at: string | null;
+  disputed_at: string | null;
+  dispute_reason: string | null;
+  refunded_amount: DecimalString;
+  void_reason: string | null;
+  voided_at: string | null;
+  flags: { duplicate_reference: boolean; duplicate_receipt: boolean };
+}
+
+/** GET /orders/{order}/payments */
+export interface OrderPayments {
+  data: PaymentView[];
+  balance: DecimalString;
+}
+
+/** GET /receipt-settings (step 4.3e): what the printed receipt carries at its top. */
+export interface ReceiptSettings {
+  business_name_en: string;
+  business_name_am: string;
+  address_en: string | null;
+  address_am: string | null;
+  phone: string | null;
+  tin: string | null;
+  footer_en: string | null;
+  footer_am: string | null;
+  show_amharic: boolean;
+  ethiopian_dates: boolean;
+  is_default: boolean;
+}
+
+/** POST /orders/{order}/receipt-link (step 4.3e): a signed link to the public receipt. */
+export interface ReceiptLink {
+  url: string;
+  expires_at: string;
 }
 
 /** POST /orders and POST /orders/{order}/lines body: one line of the cart. */

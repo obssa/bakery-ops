@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { ApiError, isActingExpired, request, type RequestOptions } from "./api/client";
+import { ApiError, isActingExpired, request, requestBlob, type RequestOptions } from "./api/client";
 import { uuid } from "./api/idempotency";
 import type { LoginResponse, Me } from "./api/types";
 
@@ -132,6 +132,17 @@ export async function authed<T>(path: string, options: Omit<RequestOptions, "tok
   const { token } = useSession.getState();
   try {
     return await request<T>(path, { ...options, token });
+  } catch (error) {
+    handleUnauthorized(error);
+    throw error;
+  }
+}
+
+/** A file (a receipt PDF) with the current token; a 401 signs this device out, as `authed` does. */
+export async function authedBlob(path: string, options: { query?: RequestOptions["query"]; timeoutMs?: number } = {}): Promise<Blob> {
+  const { token } = useSession.getState();
+  try {
+    return await requestBlob(path, { ...options, token });
   } catch (error) {
     handleUnauthorized(error);
     throw error;
