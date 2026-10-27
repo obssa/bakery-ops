@@ -1,23 +1,26 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useSaveReceiptSettings } from "@/lib/api/adminPayments";
 import { ApiError } from "@/lib/api/client";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { useReceiptSettings } from "@/lib/api/till";
 import type { ReceiptSettings } from "@/lib/api/types";
 import { NAME_MAX, receiptBody, receiptFormOf, receiptIssues, type ReceiptForm, type ReceiptIssue } from "@/lib/adminPayments";
+import { ethiopianLabel } from "@/lib/dates";
 import { useErrorText } from "@/lib/errors";
+import { businessToday } from "@/lib/orderNo";
 import { keepsKey } from "@/lib/paySheet";
 import { can, useSession } from "@/lib/session";
+import { useDateFormat } from "@/lib/useDates";
 import { Alert, Button, Field, PageHeader, Panel, TextInput, Textarea } from "../ui";
 import { QueryBox } from "../inventory/shared";
 
 // Admin > Payments > Receipts (step 4.5c): what the receipt of step 4.3e carries, the M5 columns of GET /receipt-settings (payments.take):
 // the business name in both languages, the address and the footer as bilingual pairs, the phone, the TIN, whether Amharic is printed beside
-// English and whether the Ethiopian date is printed too. PUT /receipt-settings (channels.manage, the admin) replaces the whole form; anyone
-// else who takes payments reads it here as the till's receipt prints it.
+// English and whether the Ethiopian date is printed too (step 4.5f: with today's date as the receipt prints it). PUT /receipt-settings
+// (channels.manage, the admin) replaces the whole form; anyone else who takes payments reads it here as the till's receipt prints it.
 
 export function ReceiptSettingsScreen() {
   const t = useTranslations("adminPayments");
@@ -58,6 +61,8 @@ function SettingsForm({ settings }: { settings: ReceiptSettings }) {
   const [form, setForm] = useState<ReceiptForm>(() => receiptFormOf(settings));
   const [issues, setIssues] = useState<ReceiptIssue[]>([]);
   const [saved, setSaved] = useState(false);
+  const dates = useDateFormat();
+  const ethiopianHint = useId();
   const set = <K extends keyof ReceiptForm>(key: K, value: ReceiptForm[K]) => {
     setSaved(false);
     setForm((current) => ({ ...current, [key]: value }));
@@ -139,10 +144,23 @@ function SettingsForm({ settings }: { settings: ReceiptSettings }) {
           <input type="checkbox" className="size-5" disabled={!editable} checked={form.show_amharic} onChange={(event) => set("show_amharic", event.target.checked)} />
           {t("receipts.show_amharic")}
         </label>
-        <label className="flex min-h-12 items-center gap-3 text-base">
-          <input type="checkbox" className="size-5" disabled={!editable} checked={form.ethiopian_dates} onChange={(event) => set("ethiopian_dates", event.target.checked)} />
-          {t("receipts.ethiopian_dates")}
-        </label>
+        <div>
+          <label className="flex min-h-12 items-center gap-3 text-base">
+            <input
+              type="checkbox"
+              className="size-5"
+              disabled={!editable}
+              checked={form.ethiopian_dates}
+              aria-describedby={ethiopianHint}
+              onChange={(event) => set("ethiopian_dates", event.target.checked)}
+            />
+            {t("receipts.ethiopian_dates")}
+          </label>
+          {/* the receipt's own converter (Shared\Time\EthiopianDate) and the web's (lib/ethiopianDate.ts) are twins */}
+          <p id={ethiopianHint} className="pl-8 text-sm text-neutral-600">
+            {t("receipts.ethiopian_today", { date: ethiopianLabel(businessToday(), dates, true) })}
+          </p>
+        </div>
         {save.isError && !(apiError && Object.keys(apiError.fieldErrors).length > 0) ? <Alert>{errorText.message(save.error)}</Alert> : null}
         <p role="status" aria-live="polite" className={saved ? "rounded-md bg-green-50 px-4 py-3 text-base text-green-800" : "sr-only"}>
           {saved ? t("receipts.saved") : null}

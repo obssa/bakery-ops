@@ -29,6 +29,8 @@ const PAGES = new Set<string>([
   "/admin/analytics/staff",
   "/admin/analytics/shifts",
   "/admin/analytics/me",
+  // step 4.5f: the audit log (?id= opens a row; the filters ride along)
+  "/admin/audit",
 ]);
 
 // The API's notification registry names the stock paths it had before the admin Inventory pages existed (stock alerts:

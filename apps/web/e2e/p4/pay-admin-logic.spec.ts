@@ -359,7 +359,7 @@ test.describe("admin payments logic", () => {
   });
 
   test("the receipt settings form: the business name in both languages, pairs, the phone and TIN shapes, empty text is null", () => {
-    const form = receiptFormOf({
+    const settings = {
       business_name_en: "Demo Bakery",
       business_name_am: "ዴሞ ዳቦ ቤት",
       address_en: null,
@@ -371,7 +371,8 @@ test.describe("admin payments logic", () => {
       show_amharic: true,
       ethiopian_dates: false,
       is_default: true,
-    });
+    };
+    const form = receiptFormOf(settings);
     expect(form.address_en).toBe("");
     expect(receiptIssues(form)).toEqual([]);
     expect(receiptBody({ ...form, phone: "+251 00 000 0000 ", tin: "0012345678" })).toEqual({
@@ -391,5 +392,8 @@ test.describe("admin payments logic", () => {
     expect(receiptIssues({ ...form, footer_am: "እናመሰግናለን" })).toEqual(["footer_pair"]);
     expect(receiptIssues({ ...form, phone: "call us" })).toEqual(["phone"]);
     expect(receiptIssues({ ...form, tin: "TIN 1" })).toEqual(["tin"]);
+    // the Ethiopian date switch (step 4.5f): read from the settings and sent back as it was set
+    expect(receiptFormOf({ ...settings, ethiopian_dates: true }).ethiopian_dates).toBe(true);
+    expect(receiptBody({ ...form, ethiopian_dates: true }).ethiopian_dates).toBe(true);
   });
 });

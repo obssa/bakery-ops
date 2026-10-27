@@ -9,6 +9,7 @@ import { useErrorText } from "@/lib/errors";
 import { shortHash } from "@/lib/counts";
 import { addisClock } from "@/lib/shifts";
 import { addisDate, addisLocalInput, addisToIso } from "@/lib/shiftsAdmin";
+import { useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, Field, Panel, Select, TextInput } from "../../ui";
 import { TD, TH, ShiftStatusBadge, useName } from "./common";
 
@@ -84,6 +85,7 @@ export function ReplayScreen() {
 }
 
 function ReplayView({ replay }: { replay: Replay }) {
+  const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   const name = useName();
   const shift = replay.shift;
@@ -93,7 +95,7 @@ function ReplayView({ replay }: { replay: Replay }) {
         {shift ? (
           <p className="flex flex-wrap items-center gap-3 text-base text-neutral-800">
             <ShiftStatusBadge status={shift.status} />
-            <span>{t("running.line", { name: shift.template ? name(shift.template) : t("running.ad_hoc"), date: shift.date })}</span>
+            <span>{t("running.line", { name: shift.template ? name(shift.template) : t("running.ad_hoc"), date: isoDay(shift.date) })}</span>
           </p>
         ) : (
           <p className="text-base text-neutral-700">{t("replay.no_shift")}</p>

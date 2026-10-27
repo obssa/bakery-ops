@@ -11,6 +11,7 @@ import { useErrorText } from "@/lib/errors";
 import { authed, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
+import { useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, PageHeader, Panel } from "../ui";
 import { useRouter } from "@/i18n/navigation";
 import { CountPanel, StageBadge } from "./CountPanel";
@@ -52,6 +53,7 @@ export function CountScreen() {
 }
 
 function Loaded({ shiftId }: { shiftId: number }) {
+  const isoDay = useIsoDay();
   const t = useTranslations("counts");
   const ts = useTranslations("shifts");
   const locale = useLocale() as Locale;
@@ -142,7 +144,7 @@ function Loaded({ shiftId }: { shiftId: number }) {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-neutral-200 bg-white px-5 py-4">
         <p className="text-lg font-semibold text-neutral-900">{stationName}</p>
-        <p className="text-base text-neutral-700">{t("shift_date", { date: shift.date })}</p>
+        <p className="text-base text-neutral-700">{t("shift_date", { date: isoDay(shift.date) })}</p>
         <Badge tone={SHIFT_TONE[shift.status]}>{t(`shift_${shift.status}`)}</Badge>
         {shift.opened_at ? <p className="text-base text-neutral-600">{ts("open_since", { time: addisClock(shift.opened_at) })}</p> : null}
         <div className="ml-auto">

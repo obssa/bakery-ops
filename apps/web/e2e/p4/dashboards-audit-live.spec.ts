@@ -83,7 +83,7 @@ test.describe("p4 audit log", () => {
       await openAs(page, fixture.admin, `en/admin/payments/?payment=${transfer.id}`);
       const payment = page.getByRole("dialog", { name: `Payment ${transfer.id}` });
       await expect(payment).toBeVisible({ timeout: 30_000 });
-      await payment.getByRole("link", { name: "History", exact: true }).click();
+      await payment.getByRole("link", { name: "Audit history", exact: true }).click();
       await expect(page.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible({ timeout: 30_000 });
       await expect(page).toHaveURL(new RegExp(`subject_id=${transfer.id}`));
       const filters = page.getByRole("search", { name: "Audit log filters" });
@@ -95,7 +95,7 @@ test.describe("p4 audit log", () => {
       await expect(entry).toContainText(reason);
 
       // narrowed by the action prefix, picked from the list: the address keeps it
-      await filters.getByLabel("Action").selectOption("payment.");
+      await filters.getByLabel("Action", { exact: true }).selectOption("payment.");
       await filters.getByRole("button", { name: "Apply" }).click();
       await expect(page).toHaveURL(/action=payment\./);
       await expect(entry).toHaveCount(1, { timeout: 30_000 });

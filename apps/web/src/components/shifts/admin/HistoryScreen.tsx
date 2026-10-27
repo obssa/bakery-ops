@@ -10,6 +10,7 @@ import { shortHash } from "@/lib/counts";
 import { can, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { verifySummary, type VerifySummary } from "@/lib/shiftsAdmin";
+import { useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, Field, Panel, Select } from "../../ui";
 import { focusRing } from "../../styles";
 import { Pager, QueryBox } from "../../inventory/shared";
@@ -85,6 +86,7 @@ function ChainHistory({ enabled }: { enabled: boolean }) {
 }
 
 function ChainTable({ placeId, placeName, links, head }: { placeId: number; placeName: string; links: ChainLink[]; head: string | null }) {
+  const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   const errorText = useErrorText();
   const verify = useVerifyChain();
@@ -139,7 +141,7 @@ function ChainTable({ placeId, placeName, links, head }: { placeId: number; plac
                     {t(link.type === "opening" ? "history.type_opening" : "history.type_closing")}
                     {link.superseded_by_id ? <Badge className="ml-2" tone="amber">{t("history.superseded")}</Badge> : null}
                   </td>
-                  <td className={TD}>{link.shift_date}</td>
+                  <td className={TD}>{isoDay(link.shift_date)}</td>
                   <td className={TD}>{addisClock(link.locked_at)}</td>
                   <td className={`${TD} font-mono text-sm`} title={link.payload_hash}>
                     {shortHash(link.payload_hash)}
@@ -164,6 +166,7 @@ function ChainTable({ placeId, placeName, links, head }: { placeId: number; plac
 }
 
 function ShiftHistory() {
+  const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   const name = useName();
   const stations = useWorkStations();
@@ -222,7 +225,7 @@ function ShiftHistory() {
                     <tbody>
                       {result.data.map((shift) => (
                         <tr key={shift.id} className="border-b border-neutral-100 last:border-0">
-                          <td className={`${TD} font-medium`}>{shift.date}</td>
+                          <td className={`${TD} font-medium`}>{isoDay(shift.date)}</td>
                           <td className={TD}>{name(shift.station)}</td>
                           <td className={TD}>{shift.template ? name(shift.template) : t("running.ad_hoc")}</td>
                           <td className={TD}><ShiftStatusBadge status={shift.status} /></td>

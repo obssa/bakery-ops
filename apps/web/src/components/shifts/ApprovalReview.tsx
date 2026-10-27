@@ -14,6 +14,8 @@ import { useErrorText } from "@/lib/errors";
 import { authed, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
+import { useIsoDay } from "@/lib/useDates";
+import { HistoryLink } from "../audit/HistoryLink";
 import { Alert, Badge, Button, Field, Modal, PageHeader, Panel, Status, Textarea } from "../ui";
 import { focusRing } from "../styles";
 import { CashSummaryView } from "./CashSummaryView";
@@ -58,6 +60,7 @@ type Dialog = "reject" | "unlock" | null;
 
 function Loaded({ countId }: { countId: number }) {
   const t = useTranslations("counts");
+  const isoDay = useIsoDay();
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
   const client = useQueryClient();
@@ -157,11 +160,14 @@ function Loaded({ countId }: { countId: number }) {
   return (
     <div className="space-y-6">
       <BackLink />
-      <PageHeader title={t("count_number", { id: count.id })} intro={[station, place, shift ? t("shift_date", { date: shift.date }) : ""].filter(Boolean).join(" · ")} />
+      <PageHeader title={t("count_number", { id: count.id })} intro={[station, place, shift ? t("shift_date", { date: isoDay(shift.date) }) : ""].filter(Boolean).join(" · ")} />
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-neutral-200 bg-white px-5 py-4">
         <Badge tone={STAGE_TONE[stage]}>{t(`stage_${stage}_badge`)}</Badge>
         <Badge tone="neutral">{t(count.type === "opening" ? "type_opening" : "type_closing")}</Badge>
+        <span className="ml-auto">
+          <HistoryLink kind="stock_count" id={count.id} />
+        </span>
         {count.counted_by ? <p className="text-base text-neutral-700">{t("handed_in_by", { name: count.counted_by.name, time: addisClock(count.submitted_at) })}</p> : null}
         {count.cosigned_by ? <p className="text-base text-neutral-700">{t("cosigned_by", { name: count.cosigned_by.name })}</p> : null}
         {decided && count.decided_by ? (

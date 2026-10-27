@@ -13,6 +13,7 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useSession } from "@/lib/session";
 import { useNow } from "@/lib/useNow";
 import { useTables } from "../pad/TablesPanel";
+import { HistoryLink } from "../audit/HistoryLink";
 import { VoidDialog } from "../till/VoidDialog";
 import { Alert, Badge, Button, Field, PageHeader, Select } from "../ui";
 import { focusRing } from "../styles";
@@ -146,11 +147,14 @@ function Timeline({ order, onClose, onVoid }: { order: Order; onClose: () => voi
           </ol>
         </>
       ) : null}
-      {isPayable(order) ? (
-        <Button type="button" variant="secondary" aria-label={t("void_aria", { no })} onClick={() => onVoid(order)}>
-          {t("void")}
-        </Button>
-      ) : null}
+      <div className="flex flex-wrap gap-3">
+        {isPayable(order) ? (
+          <Button type="button" variant="secondary" aria-label={t("void_aria", { no })} onClick={() => onVoid(order)}>
+            {t("void")}
+          </Button>
+        ) : null}
+        <HistoryLink kind="order" id={order.id} />
+      </div>
     </section>
   );
 }

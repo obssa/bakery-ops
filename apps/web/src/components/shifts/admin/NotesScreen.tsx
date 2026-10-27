@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useShiftList, useShiftNotes, useWorkStations } from "@/lib/api/adminShifts";
 import type { ShiftSummary } from "@/lib/api/types";
 import { addisClock } from "@/lib/shifts";
+import { useIsoDay } from "@/lib/useDates";
 import { Button, Field, Panel, Select } from "../../ui";
 import { Pager, QueryBox } from "../../inventory/shared";
 import { ShiftStatusBadge, useName } from "./common";
@@ -54,10 +55,11 @@ export function NotesScreen() {
 }
 
 function ShiftNotes({ shift }: { shift: ShiftSummary }) {
+  const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   const name = useName();
   const [shown, setShown] = useState(false);
-  const label = `${name(shift.station)} · ${shift.template ? name(shift.template) : t("running.ad_hoc")} · ${shift.date}`;
+  const label = `${name(shift.station)} · ${shift.template ? name(shift.template) : t("running.ad_hoc")} · ${isoDay(shift.date)}`;
   return (
     <li className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">

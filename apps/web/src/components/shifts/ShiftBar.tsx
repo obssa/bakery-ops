@@ -11,6 +11,7 @@ import { useErrorText } from "@/lib/errors";
 import { addisClock, barActions, onDuty, type BarMode } from "@/lib/shifts";
 import { can, useSession } from "@/lib/session";
 import { useShiftNotice } from "@/lib/station";
+import { useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, Field, Modal, Select } from "../ui";
 import { focusRing } from "../styles";
 import { DrawerDialog } from "./DrawerDialog";
@@ -43,6 +44,7 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   const t = useTranslations("shifts");
   const tc = useTranslations("counts");
   const locale = useLocale() as Locale;
+  const isoDay = useIsoDay();
   const errorText = useErrorText();
   const me = useSession((s) => s.me);
   const notice = useShiftNotice((s) => s.notice);
@@ -83,7 +85,7 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   const stationName = locale === "am" ? station.name_am : station.name_en;
   const showNotice = notice !== null && (notice.stationId === null || notice.stationId === station.station_id) && actions.mode !== "open";
   // the shift is named by its template and its local start date: the Night shift started at 22:00 yesterday is still yesterday's (step 3.7c)
-  const shiftLabel = shift ? t("shift_label", { name: shift.template ? (locale === "am" ? shift.template.name_am : shift.template.name_en) : t("ad_hoc"), date: shift.date }) : "";
+  const shiftLabel = shift ? t("shift_label", { name: shift.template ? (locale === "am" ? shift.template.name_am : shift.template.name_en) : t("ad_hoc"), date: isoDay(shift.date) }) : "";
   const noticeText = notice ? (locale === "am" ? notice.message_am || notice.message_en : notice.message_en || notice.message_am) : "";
 
   async function run(name: ActionName, keyName: string, call: (key: string) => Promise<Shift | null>) {

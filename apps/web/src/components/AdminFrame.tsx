@@ -10,7 +10,8 @@ import { focusRing } from "./styles";
 // The admin console's own frame: signed-in only, with its sections as tabs: Catalog and People (Phase 0), the live
 // Orders board (Phase 1), Inventory with its own sub-tabs (Phase 2), Shifts (Phase 3), Payments (Phase 4, step 4.5c: shown
 // to whoever holds one of its permissions), Analytics (step 4.5e: the dashboards for analytics.view; a person who holds only
-// analytics.view_own, every role, is taken to their own figures). The header's "Admin console" link is the overview.
+// analytics.view_own, every role, is taken to their own figures), the Audit log (step 4.5f: audit.view, the admin and the manager). The
+// header's "Admin console" link is the overview.
 const SECTIONS: readonly { href: string; key: string; anyOf?: readonly string[]; own?: { unless: string; href: string } }[] = [
   { href: "/admin/catalog", key: "catalog" },
   { href: "/admin/people", key: "people" },
@@ -20,6 +21,7 @@ const SECTIONS: readonly { href: string; key: string; anyOf?: readonly string[];
   { href: "/admin/shifts", key: "shifts" },
   { href: "/admin/payments", key: "payments", anyOf: ["payments.view", "channels.manage"] },
   { href: "/admin/analytics", key: "analytics", anyOf: ["analytics.view", "analytics.view_own"], own: { unless: "analytics.view", href: "/admin/analytics/me" } },
+  { href: "/admin/audit", key: "audit", anyOf: ["audit.view"] },
 ];
 
 export function AdminFrame({ children }: { children: ReactNode }) {

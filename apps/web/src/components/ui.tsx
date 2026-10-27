@@ -4,6 +4,7 @@ import { focusRing } from "./styles";
 import {
   useEffect,
   useId,
+  useRef,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -156,6 +157,41 @@ export function Modal({ label, onClose, size = "md", children }: { label: string
         aria-modal="true"
         aria-label={label}
         className={`max-h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-lg"} space-y-4 overflow-y-auto rounded-lg bg-white p-5 shadow-xl`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A panel from the side of the screen (step 4.5f: the audit log's entry): a dialog named for screen readers that takes the focus when it
+ * opens, closed by Escape or a tap on the backdrop, the list behind it kept as it was. Wide enough on a 1280 px tablet for a table of
+ * before and after; the whole width on a phone.
+ */
+export function Drawer({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    panel.current?.focus();
+  }, []);
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end bg-neutral-900/50" onClick={onClose}>
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        tabIndex={-1}
+        className="h-full w-full max-w-3xl space-y-5 overflow-y-auto bg-white p-5 shadow-xl outline-none"
         onClick={(event) => event.stopPropagation()}
       >
         {children}

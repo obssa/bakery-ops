@@ -14,6 +14,7 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { can, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { setupCheck } from "@/lib/shiftsAdmin";
+import { useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, Panel } from "../../ui";
 import { focusRing } from "../../styles";
 import { ShiftStatusBadge, useName } from "./common";
@@ -80,6 +81,7 @@ export function SetupCheck() {
 }
 
 function Running({ shift }: { shift: ShiftSummary }) {
+  const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   const name = useName();
   const errorText = useErrorText();
@@ -115,7 +117,7 @@ function Running({ shift }: { shift: ShiftSummary }) {
             <span>{name(shift.station)}</span>
             <ShiftStatusBadge status={shift.status} />
           </p>
-          <p className="text-base text-neutral-700">{t("running.line", { name: label, date: shift.date })}</p>
+          <p className="text-base text-neutral-700">{t("running.line", { name: label, date: isoDay(shift.date) })}</p>
           <p className="text-sm text-neutral-600">
             {shift.started_by ? t("running.started_by", { name: shift.started_by.name, time: addisClock(since) }) : t("running.since", { time: addisClock(since) })}
           </p>

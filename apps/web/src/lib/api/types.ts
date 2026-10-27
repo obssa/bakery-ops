@@ -1269,3 +1269,49 @@ export interface Replay {
     locked_at: string | null;
   }[];
 }
+
+// --- the audit log (step 4.5f over the reads of step 4.5a; phase-4 plan section 4.7) ------------------------------------------------------
+
+/** A person as the audit log names them (Shared ActorNames): null when nobody of the branch has the id. */
+export interface AuditPerson {
+  id: number;
+  name: string | null;
+}
+
+/** What changed, as GET /audit-log sums it up: the changed fields (sorted, at most 10, the bookkeeping fields left out), and the context's reason. */
+export interface AuditSummary {
+  changed: string[];
+  more: number;
+  reason: string | null;
+}
+
+/** A row of GET /audit-log, newest first. `at` is UTC (ISO 8601); subject_type is the morph string the API wrote (a model's class, or a short name). */
+export interface AuditEntry {
+  id: number;
+  at: string;
+  actor: AuditPerson;
+  /** the person acting at a shared pad by short code (the account signed in is the actor) */
+  acting_user: AuditPerson | null;
+  action: string;
+  subject_type: string;
+  subject_id: number | null;
+  station_id: number | null;
+  shift_id: number | null;
+  device_id: number | null;
+  ip: string | null;
+  summary: AuditSummary;
+}
+
+export type AuditJson = null | boolean | number | string | AuditJson[] | { [key: string]: AuditJson };
+
+/** GET /audit-log/{id}: the row with before, after and context, redacted again on every read ("[redacted]" in place of a hidden value). */
+export interface AuditDetail extends AuditEntry {
+  before: Record<string, AuditJson> | null;
+  after: Record<string, AuditJson> | null;
+  context: Record<string, AuditJson> | null;
+}
+
+export interface AuditPage {
+  data: AuditEntry[];
+  next_cursor: string | null;
+}

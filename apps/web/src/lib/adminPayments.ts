@@ -316,16 +316,17 @@ export function reasonIssue(text: string): "short" | "long" | null {
 
 /**
  * The list on screen: the first page, polled (the newest payments under the filters, replaced whole by each changed answer), and the older
- * pages the checker asked for with "Older payments", read once by cursor and not polled.
+ * pages the checker asked for with "Older payments", read once by cursor and not polled. Any keyset-paged list newest first by id uses the
+ * same three rules (step 4.5f: the audit log, whose first page is read again on Refresh).
  */
-export interface ListPages {
-  head: PaymentListRow[];
-  older: PaymentListRow[];
+export interface ListPages<R extends { id: number } = PaymentListRow> {
+  head: R[];
+  older: R[];
 }
 
-function newestFirst(rows: PaymentListRow[]): PaymentListRow[] {
+function newestFirst<R extends { id: number }>(rows: R[]): R[] {
   const seen = new Set<number>();
-  const out: PaymentListRow[] = [];
+  const out: R[] = [];
   for (const row of [...rows].sort((a, b) => b.id - a.id)) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
@@ -338,7 +339,7 @@ function newestFirst(rows: PaymentListRow[]): PaymentListRow[] {
  * A new first page. When older pages are on screen, the rows that new payments pushed out of the first page are kept above them (else they
  * would vanish between the two until the next "Older payments"); a first page that comes back empty means nothing matches any more.
  */
-export function foldHead(pages: ListPages, head: PaymentListRow[]): ListPages {
+export function foldHead<R extends { id: number }>(pages: ListPages<R>, head: R[]): ListPages<R> {
   if (pages.older.length === 0 || head.length === 0) return { head, older: [] };
   const lowest = Math.min(...head.map((row) => row.id));
   const inHead = new Set(head.map((row) => row.id));
@@ -347,12 +348,12 @@ export function foldHead(pages: ListPages, head: PaymentListRow[]): ListPages {
 }
 
 /** Every listed payment once, newest first; the first page's copy wins over an older page's. */
-export function visibleRows(pages: ListPages): PaymentListRow[] {
+export function visibleRows<R extends { id: number }>(pages: ListPages<R>): R[] {
   return newestFirst([...pages.head, ...pages.older]);
 }
 
 /** The cursor of the next older page: below the oldest row on screen (the first page's own cursor while no older page is loaded). */
-export function olderCursor(pages: ListPages, headCursor: string | null): string | null {
+export function olderCursor<R extends { id: number }>(pages: ListPages<R>, headCursor: string | null): string | null {
   if (pages.older.length === 0) return headCursor;
   return String(Math.min(...pages.older.map((row) => row.id)));
 }

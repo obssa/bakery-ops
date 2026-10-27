@@ -9,6 +9,7 @@ import { trimDecimal } from "@/lib/decimal";
 import { createQueueFeed } from "@/lib/live/counts";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { addisClock } from "@/lib/shifts";
+import { useIsoDay } from "@/lib/useDates";
 import { Badge, Panel } from "../ui";
 import { focusRing } from "../styles";
 import { itemName } from "./CountLines";
@@ -21,6 +22,7 @@ import { itemName } from "./CountLines";
 const SHOWN_LINES = 4;
 
 function Row({ row }: { row: QueueRow }) {
+  const isoDay = useIsoDay();
   const t = useTranslations("counts");
   const locale = useLocale() as Locale;
   const place = row.location ? (locale === "am" ? row.location.name_am || row.location.name_en : row.location.name_en) : "";
@@ -36,7 +38,7 @@ function Row({ row }: { row: QueueRow }) {
             <Badge tone="neutral">{t(row.type === "opening" ? "type_opening" : "type_closing")}</Badge>
           </p>
           <p className="text-base text-neutral-700">
-            {station} · {place} · {t("shift_date", { date: row.shift.date })}
+            {station} · {place} · {t("shift_date", { date: isoDay(row.shift.date) })}
           </p>
           <p className="text-sm text-neutral-600">
             {row.counted_by ? t("handed_in_by", { name: row.counted_by.name, time: addisClock(row.submitted_at) }) : null}
