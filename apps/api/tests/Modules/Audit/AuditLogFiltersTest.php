@@ -38,7 +38,7 @@ it('reads from and to as local dates of the branch, both ends inclusive, split a
     $on19th = ($this->row)(['at' => CarbonImmutable::parse('2026-10-19 09:00:00', 'UTC')]);
 
     expect(($this->ids)('from=2026-10-21'))->toBe([$on22nd, $firstSecondOf21st])
-        ->and(($this->ids)('to=2026-10-20'))->toBe([$lastSecondOf20th, $on19th])
+        ->and(($this->ids)('to=2026-10-20'))->toBe([$on19th, $lastSecondOf20th]) // newest first by id, not by at
         ->and(($this->ids)('from=2026-10-20&to=2026-10-21'))->toBe([$firstSecondOf21st, $lastSecondOf20th])
         ->and(($this->ids)('from=2026-10-21&to=2026-10-21'))->toBe([$firstSecondOf21st]);
 });
