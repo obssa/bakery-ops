@@ -95,7 +95,7 @@ it('takes one of two payments of the whole last balance; the other is told the o
     expect($failures)->toBe([])->and(splitPaymentRaceDeadlocks())->toBe($deadlocksBefore, 'the engine detected no deadlock at all');
     $oracle = ledgerOracle($f->branch->id);
     expect($oracle['movements'])->toBe($oracle['balances'])->and($oracle['balances'])->toBe($oracle['view']);
-})->group('concurrency', 'module:payments', 'feature');
+})->group('concurrency', 'module:payments', 'feature', 'gate:p4');
 
 it('takes one of two part payments that together are more than the balance; the other sees the balance left (30 rounds)', function () {
     $f = $this->f;
@@ -121,4 +121,4 @@ it('takes one of two part payments that together are more than the balance; the 
     }
 
     expect($failures)->toBe([])->and(splitPaymentRaceDeadlocks())->toBe($deadlocksBefore, 'the engine detected no deadlock at all');
-})->group('concurrency', 'module:payments', 'feature');
+})->group('concurrency', 'module:payments', 'feature', 'gate:p4');

@@ -8,12 +8,14 @@ use Illuminate\Routing\Route as RouteDefinition;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Tests\Support\DashboardQueries;
 use Tests\Support\Dashboards;
 
 pest()->group('module:analytics', 'feature');
 
 /*
- * The dashboards read the summaries only (phase-4 plan section 6, 4.4c; 10.9 item 19; ADR 0014): the query-log assertion. Every statement
+ * The dashboards read the summaries only (phase-4 plan section 6, 4.4c; 10.9 item 19; ADR 0014): the query-log assertion (its rules are
+ * Tests\Support\DashboardQueries, which DashboardsReadSummariesOnlyGateTest runs on the full seed of gate:p4). Every statement
  * of every GET /api/v1/analytics/* request (the routes are read from the router, so a new read route is covered without touching this
  * file) is recorded with the tables it names (FROM, JOIN, INTO, UPDATE, subqueries included) and the phase it ran in:
  *   - the request's plumbing, before the endpoint resolves its RangeRequest: auth:sanctum, the actor middleware (the branch, the device,
@@ -29,48 +31,6 @@ pest()->group('module:analytics', 'feature');
  * are read once. POST /analytics/weekly-summary/send (step 4.4d) is the other write of the module; WeeklySummaryTest holds its builder to
  * the summaries. A planted endpoint that reads orders and shift_instances proves the assertion bites.
  */
-
-const DASHBOARD_SUMMARIES = ['analytics_days', 'daily_sales', 'daily_hour_sales', 'daily_channel_totals', 'daily_item_metrics', 'daily_station_metrics', 'daily_user_metrics'];
-const DASHBOARD_NAMES = ['items', 'units', 'categories', 'payment_channels', 'users', 'stations', 'user_station_assignments'];
-const DASHBOARD_FRAMEWORK = ['personal_access_tokens', 'roles', 'permissions', 'model_has_roles', 'model_has_permissions', 'role_has_permissions', 'idempotency_keys', 'cache', 'cache_locks'];
-const DASHBOARD_PLUMBING = ['personal_access_tokens', 'users', 'branches', 'roles', 'permissions', 'model_has_roles', 'model_has_permissions', 'role_has_permissions',
-    'cache', 'cache_locks', 'devices', 'acting_sessions', 'user_station_assignments', 'stations', 'shift_instances'];
-const DASHBOARD_FORBIDDEN = '/^(orders|order_lines|payments|payment_refunds|stock_movements|stock_balances|production_.*|shift_.*|stock_counts.*|audit_log)$/';
-/** The one statement on audit_log an export may make: its own audit row. */
-const DASHBOARD_EXPORT_AUDIT = '/^\s*insert\s+into\s+[`"]?audit_log[`"]?\s/i';
-
-/** The tables a statement names. @return list<string> */
-function dashboardTables(string $sql): array
-{
-    preg_match_all('/\b(?:from|join|into|update)\s+[`"]?([a-z_][a-z0-9_]*)[`"]?/i', $sql, $m);
-
-    return array_values(array_unique(array_map('strtolower', $m[1])));
-}
-
-/**
- * What the recorded statements touched that they may not.
- *
- * @param  list<array{sql: string, phase: string}>  $statements
- * @return list<string>
- */
-function dashboardViolations(array $statements): array
-{
-    $violations = [];
-    foreach ($statements as $statement) {
-        $allowed = $statement['phase'] === 'endpoint' ? array_merge(DASHBOARD_SUMMARIES, DASHBOARD_NAMES, DASHBOARD_FRAMEWORK) : DASHBOARD_PLUMBING;
-        if (($statement['export'] ?? false) && $statement['phase'] === 'endpoint' && preg_match(DASHBOARD_EXPORT_AUDIT, $statement['sql']) === 1) {
-            continue;
-        }
-        foreach (dashboardTables($statement['sql']) as $table) {
-            $forbidden = $statement['phase'] === 'endpoint' && preg_match(DASHBOARD_FORBIDDEN, $table) === 1;
-            if ($forbidden || ! in_array($table, $allowed, true)) {
-                $violations[] = "{$statement['phase']}: {$table} in ".$statement['sql'];
-            }
-        }
-    }
-
-    return $violations;
-}
 
 beforeEach(function () {
     $this->d = Dashboards::open($this);
@@ -152,9 +112,9 @@ it('reads only the summaries, the names behind the contracts and the framework\'
     }
 
     $endpoint = array_filter($this->statements, fn (array $s): bool => $s['phase'] === 'endpoint');
-    $touched = array_unique(array_merge(...array_map(fn (array $s): array => dashboardTables($s['sql']), array_values($endpoint))));
+    $touched = array_unique(array_merge(...array_map(fn (array $s): array => DashboardQueries::tables($s['sql']), array_values($endpoint))));
     expect($ran)->toBe(42)
-        ->and(dashboardViolations($this->statements))->toBe([])
+        ->and(DashboardQueries::violations($this->statements))->toBe([])
         ->and($touched)->toContain('daily_sales', 'daily_item_metrics', 'analytics_days', 'items', 'payment_channels', 'stations', 'users');
 });
 
@@ -165,8 +125,8 @@ it('reads nothing else with a real bearer token either (the token, its owner and
 
     $this->withHeader('Authorization', 'Bearer '.$token)->getJson('/api/v1/analytics/overview?compare=previous')->assertOk();
 
-    $tables = array_unique(array_merge(...array_map(fn (array $s): array => dashboardTables($s['sql']), $this->statements)));
-    expect(dashboardViolations($this->statements))->toBe([])
+    $tables = array_unique(array_merge(...array_map(fn (array $s): array => DashboardQueries::tables($s['sql']), $this->statements)));
+    expect(DashboardQueries::violations($this->statements))->toBe([])
         ->and($tables)->toContain('personal_access_tokens', 'daily_sales');
 });
 
@@ -182,17 +142,17 @@ it('bites: a planted endpoint that reads orders and the shifts is caught, and so
 
     $this->d->get('planted', [], 'admin')->assertOk();
 
-    $caught = dashboardViolations($this->statements);
+    $caught = DashboardQueries::violations($this->statements);
     expect($caught)->toHaveCount(2)
         ->and($caught[0])->toStartWith('endpoint: orders in ')
         ->and($caught[1])->toStartWith('endpoint: shift_instances in ', 'the stamp of the plumbing is not allowed to an endpoint');
 
-    expect(dashboardViolations([['sql' => 'select * from `daily_sales` inner join `payments` on `payments`.`id` = `daily_sales`.`day`', 'phase' => 'endpoint']]))->toHaveCount(1)
-        ->and(dashboardViolations([['sql' => 'select exists (select 1 from payment_refunds twin where twin.id = 1) as x from `daily_sales`', 'phase' => 'endpoint']]))->toHaveCount(1)
-        ->and(dashboardViolations([['sql' => 'select sum(qty) from "stock_movements"', 'phase' => 'endpoint']]))->toHaveCount(1)
-        ->and(dashboardViolations([['sql' => 'select * from `audit_log`', 'phase' => 'plumbing']]))->toHaveCount(1)
-        ->and(dashboardViolations([['sql' => 'select * from `daily_item_metrics` left join `items` on `items`.`id` = `daily_item_metrics`.`item_id`', 'phase' => 'endpoint']]))->toBe([])
-        ->and(dashboardViolations([['sql' => 'insert into `audit_log` (`action`) values (?)', 'phase' => 'endpoint', 'export' => true]]))->toBe([], 'an export writes its audit row')
-        ->and(dashboardViolations([['sql' => 'select * from `audit_log` where `action` = ?', 'phase' => 'endpoint', 'export' => true]]))->toHaveCount(1, 'but never reads the log')
-        ->and(dashboardViolations([['sql' => 'insert into `audit_log` (`action`) values (?)', 'phase' => 'endpoint']]))->toHaveCount(1, 'and a dashboard writes none');
+    expect(DashboardQueries::violations([['sql' => 'select * from `daily_sales` inner join `payments` on `payments`.`id` = `daily_sales`.`day`', 'phase' => 'endpoint']]))->toHaveCount(1)
+        ->and(DashboardQueries::violations([['sql' => 'select exists (select 1 from payment_refunds twin where twin.id = 1) as x from `daily_sales`', 'phase' => 'endpoint']]))->toHaveCount(1)
+        ->and(DashboardQueries::violations([['sql' => 'select sum(qty) from "stock_movements"', 'phase' => 'endpoint']]))->toHaveCount(1)
+        ->and(DashboardQueries::violations([['sql' => 'select * from `audit_log`', 'phase' => 'plumbing']]))->toHaveCount(1)
+        ->and(DashboardQueries::violations([['sql' => 'select * from `daily_item_metrics` left join `items` on `items`.`id` = `daily_item_metrics`.`item_id`', 'phase' => 'endpoint']]))->toBe([])
+        ->and(DashboardQueries::violations([['sql' => 'insert into `audit_log` (`action`) values (?)', 'phase' => 'endpoint', 'export' => true]]))->toBe([], 'an export writes its audit row')
+        ->and(DashboardQueries::violations([['sql' => 'select * from `audit_log` where `action` = ?', 'phase' => 'endpoint', 'export' => true]]))->toHaveCount(1, 'but never reads the log')
+        ->and(DashboardQueries::violations([['sql' => 'insert into `audit_log` (`action`) values (?)', 'phase' => 'endpoint']]))->toHaveCount(1, 'and a dashboard writes none');
 });

@@ -104,4 +104,4 @@ it('serialises a void and the last payment of one bill on the order lock: one of
         ->and(array_keys($seen))->toEqualCanonicalizing(['void first', 'pay first'], 'both orders of the race happened');
     $oracle = ledgerOracle($f->branch->id);
     expect($oracle['movements'])->toBe($oracle['balances'])->and($oracle['balances'])->toBe($oracle['view']);
-})->group('concurrency', 'module:payments', 'feature');
+})->group('concurrency', 'module:payments', 'feature', 'gate:p4');
