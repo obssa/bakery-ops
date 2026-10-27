@@ -9,6 +9,7 @@ use App\Shared\StateMachine\IllegalTransition;
  * The payment machine after step 4.3c (phase-4 plan section 7, "Unit": the exhaustive from x to table with the new disputed exits; M4 note):
  * recorded -> verified | disputed | voided, verified -> voided, disputed -> verified | voided (a dispute is resolved), voided is terminal.
  * A disputed payment is still money received (10.8 R-Q), so it can be verified after all or voided; a verified one is never disputed again.
+ * In gate:p4 too (step 4.6b: the plan's Phase4StateMachinesTest is this table).
  */
 
 it('allows exactly the moves of the table and throws IllegalTransition for every other pair', function () {
@@ -30,4 +31,4 @@ it('allows exactly the moves of the table and throws IllegalTransition for every
     }
     expect(PaymentStatus::Voided->isTerminal())->toBeTrue()
         ->and(PaymentStatus::Disputed->isTerminal())->toBeFalse();
-})->group('unit', 'module:payments');
+})->group('unit', 'module:payments', 'gate:p4');

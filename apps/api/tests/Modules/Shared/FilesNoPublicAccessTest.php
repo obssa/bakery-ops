@@ -9,10 +9,11 @@ use Illuminate\Support\Str;
 
 /*
  * Step 4.2b: there is no plain-URL way to a stored image. The object is never under public/, public/storage carries no files, and a GET of
- * /files/{id} with no signature (or a wrong one) is 403 files.invalid_signature, whatever the id.
+ * /files/{id} with no signature (or a wrong one) is 403 files.invalid_signature, whatever the id. In gate:p4 too (step 4.6b: the plan's
+ * FilesNoPublicAccessGateTest is this file).
  */
 
-uses()->group('module:shared', 'feature');
+uses()->group('module:shared', 'feature', 'gate:p4');
 
 beforeEach(function () {
     Storage::fake(config('files.disk'));
