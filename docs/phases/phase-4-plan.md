@@ -1278,6 +1278,82 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
      - STATUS: phase 4's `web` step stays `in_progress`.
    - **4.5f `phase-4/web-audit-ethiopian`**: `/admin/audit` (filters, the detail drawer with the before/after diff, export for admin), and the optional Ethiopian date display (`lib/ethiopianDate.ts`, a pure
      converter with a unit table for the new year, Pagume 5 and 6 and the leap rule, a per-user display preference; the receipt prints it when `ethiopian_dates` is on). Ethiopian dates are labels only: nothing stored changes.
+   - **As built (step 4.5f, `phase-4/web-audit-ethiopian`).** Order: the tests red (the pure rules failing on the missing `lib/ethiopianDate.ts`,
+     `lib/dates.ts` and `lib/audit.ts`, the browser flows on the missing page), then the calendar (the converter, the formatter, the preference and its
+     switch, the labels routed through them), then the audit screen, the "Audit history" links and the strings; this note. Where the code disagreed with the
+     plan or the plan left a choice:
+     - **The page.** `/admin/audit` for `audit.view` (admin, manager): a tab after Analytics and a card on the overview, both shown only to holders of
+       `audit.view` (the card is a small client piece, `PermittedCard`; the other cards are unchanged). Anyone else reads "Your account cannot open this
+       page" (`RequireAuth`) and the API answers 403. `lib/deeplink.ts` knows the page, so a link with `?id=` and the filters opens there.
+     - **The filters live in the address** (`lib/audit.ts` `auditFiltersFromParams` and `auditFilterParams`, 4.5c's pattern): `from`, `to`, `actor_id`,
+       `action`, `subject_type`, `subject_id`, `station_id`, `shift_id`; a malformed value is dropped, never sent (the API's limits: an action of at most 100
+       characters, a subject type of at most 191). The person list is the admin console's (`GET /users`, people.manage, the People screen's key and shape
+       `["users"]`) together with every actor and acting person the rows on screen name, so a manager, who has no people list, still picks from the page;
+       the chosen id stays offered. The action is a list of the 35 prefixes the API writes (read from the actions in the code: the counts are `count.`, not
+       the `stock_count.` the step named), each named in both languages, or typed (a prefix or a whole action). The subject is a list of the known
+       subjects by name, or typed; the station comes from `GET /me`'s work stations (every station for an admin); the shift is a number.
+     - **The morph strings.** No morph map is registered, so the subject of an `AuditedAction` over a model is its class
+       (`App\Modules\Payments\Models\Payment`, `App\Modules\Orders\Models\Order`, `App\Modules\Shifts\Models\StockCount`) and an event's is a short name
+       (`stock_movement`, `stored_file`, `order` for `receipt.link`, `none`). `SUBJECT_TYPES` lists them; `historyQuery(kind, id)` builds the filtered
+       address that the order timeline of 4.5d will use too.
+     - **Not polled.** An audit trail needs no live refresh: the first page is read when the filters change and again on Refresh (a line under the button
+       says when it was read and that the log does not update by itself), older pages by cursor ("Older entries"). 4.5c's `foldHead`, `olderCursor` and
+       `visibleRows` are now generic over any row with an id (the payments list reads them as before), so rows a Refresh pushes out of the first page stay
+       above the older pages. Query keys, one per answer shape: `["audit-log", "page", query]` (a first page) and `["audit-log", "entry", id]` (one row with
+       before, after and context). These routes answer without an ETag, so the reads are plain `authed` reads.
+     - **The drawer** (`?id=`; a `Drawer` primitive in `ui.tsx`, a side panel dialog that takes the focus, closed by Escape or the backdrop): the time, the
+       action, who (and the person acting at a shared pad), the subject (a link to its history), station, shift, device and IP; then "Before and after"
+       (`diffOf`): every field of either side, the changed, added and removed ones first with a badge and a tint, the unchanged after them, the bookkeeping
+       fields (`id`, `branch_id`, `created_at`, `updated_at`) last and never highlighted; a field missing on one side counts as null there, as the API's
+       summary counts it; two objects are diffed inside a fold that opens when something inside changed; a list is compared and shown whole on one line.
+       `"[redacted]"` shows as a "Redacted" marker wherever it stands (a whole value, a piece of a text, an item of a list), never as data. A row with nothing
+       before (an event, a create) reads as "Recorded values". The context reads as one column in the order it was written. A field that names a person
+       (`*_user_id`, `user_id`, `actor_id`) is named from the people list or the row's own names: the void's approver reads as the manager. "Show the raw
+       JSON" shows before, after and context as the API sent them (redacted too).
+     - **The export** (`audit.export`, the admin only; the manager reads the log without it): Export CSV and Export Excel of the filters in the page's
+       language, through `authedBlob` with `accept` (120 s) and `saveBlob`, named in the browser `audit-log-{from|all}-{to|today}.{format}` as the API names
+       it. `422 audit.export.too_large` shows the API's message and, from `{max_rows, rows}`, how many entries the filters find and how many one file holds,
+       in both languages.
+     - **"Audit history" links** (for `audit.view`) on the payment dialog, the orders board's timeline and the count review page. They are named "Audit
+       history", not "History": the Shifts pills already have a "History" that the p3 flow clicks by name.
+     - **The Ethiopian converter** (`lib/ethiopianDate.ts`): the twin of `Shared\Time\EthiopianDate`, the same Julian day number arithmetic in integers,
+       both ways (`fromEthiopian` refuses a day the calendar does not have, such as Pagume 6 of a common year). Its tests are the PHP unit table ported case
+       for case, the days around 1 January, the leap year 2019 (Pagume 6 on 11 September 2027, the new year on the 12th), the month names checked against
+       the PHP lists, and every day from 1900 to 2100 there and back.
+     - **One formatter** (`lib/dates.ts`) for every date on screen: `dayText`, `monthText`, `rangeText`, `spanText`, `isoDayText` (the shift pages'
+       dates, ISO as before in Gregorian), `stampText` (what `addisStamp` returns) and `whenText` (the bell, the production board and planner, the recipe
+       history, the till's receipt preview). The Ethiopian labels read as the API's `EthiopianDate::format` ("Tikimt 17, 2019", "ጥቅምት 17 ቀን 2019 ዓ.ም.")
+       with the month names of `messages/*.json` (`dates.ethiopian_months`); "both" writes "Gregorian (Ethiopian)"; the 24-hour clock of Addis Ababa stays
+       in every calendar (the Ethiopian hours counted from dawn are not used). A series month is a Gregorian month (the API buckets by `YYYY-MM`), so in the
+       Ethiopian calendar it reads as the days it covers ("Meskerem 21 – Tikimt 21, 2019"). 4.5e's `dayLabel`, `seriesLabel`, `rangeLabel` and
+       `spanLabel`, `addisStamp` and `otherDayLabel` take the person's format (`useDateFormat()`); a bare locale still reads Gregorian, so 4.5e's
+       assertions stand unchanged.
+     - **The preference.** `GET /me` has no preference field, so the choice (Gregorian by default, Ethiopian, or both) is kept in the browser per signed-in
+       user id (`bakery-ops.date-display.{id}`), every read and write in try/catch: blocked storage reads Gregorian, and a choice that cannot be kept lasts
+       for the page. The switch is a select beside the language switch, shown when signed in. No migration and no API change; a server-side preference
+       (a column on `users` set through the API) would follow the person to another device, and is left for a later step to decide.
+     - **Where it reaches**: the dashboards, the payments list, dialog and methods, the freshness badge, the audit log, the shift pages (running shifts,
+       the review queue and page, the count, notes, history, replay and the shift bar), the order labels, the bell, the production board and planner and
+       the recipe history. The date pickers, the range controls and every address stay Gregorian ISO dates underneath. The roster's week grid stays
+       Gregorian (it plans by Gregorian weeks). The till's receipt preview follows the receipt settings (the Gregorian date, and the Ethiopian one too when
+       `ethiopian_dates` is on), as the printed receipt does, not the person's choice.
+     - **The receipt.** 4.5c's Receipts form already showed and saved `ethiopian_dates`; it now says what today prints beside it ("Today it prints Tikimt
+       17, 2019.", the page's language). The PDF is unchanged.
+     - **Strings**: 168 keys under `audit` and 18 under `dates`, plus `admin.audit`, `admin.audit_desc` and `adminPayments.receipts.ethiopian_today`,
+       English and Amharic.
+     - **Tests**: `dashboards-logic` (five new cases: the converter as the twin, the leap rule with the round trip, the dashboards' labels, the timestamps
+       and shift dates, the preference with blocked storage; the 4.5e `fixme` is gone), `dashboards-audit-logic` (nine pure cases: the filters and the
+       address, the action prefixes, the morph strings, the diff with the redacted marker and the folding, the people offered, the export's name and
+       refusal, the older pages), `dashboards-audit-live` (two flows @live: a payment voided with the manager's PIN found from the payment's "Audit history"
+       link, narrowed by the action prefix, its before and after with the reference redacted (nowhere on the page or in the raw JSON) and the approver
+       named, the address reopening it, the CSV export of the filter holding the void and not the reference, the Ethiopian labels in English and Amharic
+       and both; the manager reading without the export and the cashier with no tab, refused on the page and 403 from the API; and one CI-only flow: the
+       receipt switch saved), `pay-admin-logic` (the switch through the form). `dashboards-audit.spec.ts` stays the stub of 4.3d and 4.6b. No test turns a
+       shift rule off.
+     - **Local run notes**: against a second local API container (eight CLI-server workers, opcache without timestamp checks, a sync
+       queue, port 8001; not a repo change) the three flows of `dashboards-audit-live` passed (the voided payment's flow in 40 s), and the pure specs of
+       `p4-dashboards` and `pay-admin-logic` 60 passed; the whole projects ran in CI.
+     - STATUS: phase 4's `web` step stays `in_progress` (4.5d, the order timeline, remains).
 6. **4.6 docs and seeds** (STATUS `docs`), two PRs.
    - **4.6a `phase-4/seed-history`**: the real `Phase4Seeder` and `DemoClock` generalisation (section 8). It lands before 4.6b because the gate tests and `perf-dashboards` run on its data;
      it may be started as soon as 4.1 is done if the order needs it (`Phase3Seeder` and `DemoClock` exist since Phase 3 closed).
@@ -1292,7 +1368,7 @@ As-built notes are appended under each step as the build runs, as in Phases 1 to
 
 - **Unit** (no database): `PaymentStatusTest` (the exhaustive `from x to` table with the new `disputed` exits), `ImageProcessorTest`, `ExifOrientationFallbackTest`, `ChannelPatternTest`,
   `RefundAllocationTest` (LIFO over splits, remainder cents, never more than a payment's open amount), `RefundDispositionDefaultsTest`, `LocalDayTest` (23:59/00:01 Addis, `utcBounds`, week start Monday),
-  one test per builder (`SalesBuilderTest` ... `UserBuilderTest`) with array facts, `FingerprintTest` (order-independent, scale-sensitive), `EthiopianDateTest` (web), `paySheet` logic (web).
+  one test per builder (`SalesBuilderTest` ... `UserBuilderTest`) with array facts, `FingerprintTest` (order-independent, scale-sensitive), `EthiopianDateTest` (the API's, 4.3e; the web's twin runs its table in `dashboards-logic.spec.ts`, 4.5f), `paySheet` logic (web).
 - **Feature** (one per endpoint, 403 per role from the matrix, idempotent replay, validation): every route of section 4; `RoutePermissionMatrixTest` and `IdempotencyCoverageTest` pick the new routes
   up from the registries; the multipart idempotency cases; `OpenApiTest` for the multipart route.
 - **Property**: `RefundMoneyPropertyTest`, `RefundLedgerPropertyTest` (50 random order/pay/refund sequences, seeded, the seed printed on failure: `item_stock_view` equals movements, no negative on_hand
@@ -1311,6 +1387,10 @@ As-built notes are appended under each step as the build runs, as in Phases 1 to
     soft budget), `dashboards-audit.spec.ts` @live (the audit screen shows this run's refund with its approver), `dashboards-logic.spec.ts` (range maths). From 4.5e
     `dashboards-logic.spec.ts` holds the range maths and the charts' scaling (pure; the Ethiopian labels wait for 4.5f) and `dashboards-live.spec.ts` the
     run's channel and product after an inline rebuild of today with the soft budget logged, the person's own page, and a CI-only flow of the Rebuild button.
+    From 4.5f `dashboards-logic.spec.ts` also holds the Ethiopian converter (the PHP unit table of `EthiopianDateTest`, ported, so the web's converter is
+    its twin), the labels and the display preference; `dashboards-audit-logic.spec.ts` (pure) the audit screen's rules; and `dashboards-audit-live.spec.ts`
+    @live the audit screen over a voided payment (its diff, the redacted reference, the approver, the export, the Ethiopian labels) and the 403 matrix of
+    the screen, with a CI-only flow of the receipt's Ethiopian switch. `dashboards-audit.spec.ts` (the refund's entry) stays for 4.3d and 4.6b.
   - Earlier projects keep running; `p1-order-flow` and `p3-handover` prove the cash path and the shift rules are not broken.
   - **How the live and shared-branch specs stay deterministic** (the lessons of 3.7a to 3.7e): they sign in as the E2E branch's admin through `Api.login` (per-run token file, a `429` waits for `Retry-After`);
     they start by `settleStation` for the till, kitchen and bar (a leftover opening or counting shift from an earlier failed run is closed and its count resolved) and end with `ensureOpenShift`; every
