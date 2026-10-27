@@ -300,13 +300,67 @@ jobs:
     # budget); the 90-day figure stays for perf-dashboards (4.6b)
     with: { phase: 4, projects: "p4-pay-photo-split p4-dashboards", profiles: "full", history_days: "60" }
 
+  # k6 against the dashboards (phase-4 plan 10.2 R-G, ci-cd.md): on the CI compose stack only, never the live host, with the full 90-day
+  # demo history (DEMO_HISTORY_DAYS unset: the seeder's 90; about 12 minutes of seeding, so the timeout has room). Two admins read every
+  # dashboard of those 90 days compared with the 90 before (scripts/perf/dashboards.k6.js): every answer a 200, p95 under 1000 ms per
+  # read and in all. It runs beside e2e-p4 (both after mod-analytics, as the CI design's graph has it); the browser's first-data budget
+  # is dashboards.spec.ts in e2e-p4 (its 60 days hold the 30 days the overview reads by default in full).
   perf-dashboards:
-    needs: [status, e2e-p4]
+    needs: [status, mod-analytics, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 4
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # the demo bakery's admin (Phase0Seeder): APP_ENV=testing in compose.ci.yml, so the documented local/CI password (e2e.yml)
+      DEMO_ADMIN_PHONE: "+251900000101"
+      DEMO_ADMIN_PASSWORD: demo-bakery-local
+      # grafana/k6 1.3.0, pinned by the digest of its image index
+      K6_IMAGE: grafana/k6:1.3.0@sha256:3ddc8b1a33a2c3d8edc6e99b6a762ae36cba08788463458f5e6a7703e14eb77d
     steps:
       - uses: actions/checkout@v4
-      - run: echo "TODO(p4) k6 perf-dashboards job is defined in Phase 4"
+      - uses: actions/download-artifact@v4
+        with: { name: api-image, path: /tmp }
+      - run: docker load -i /tmp/api.tar
+      - name: Start the stack (the API, the database, Redis)
+        run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180 app
+      - name: Migrate and seed the 90-day demo history
+        run: |
+          set -o pipefail
+          docker compose -f compose.yml -f compose.ci.yml exec -T -e SEED_PHASE=4 app php artisan migrate:fresh --force --seed --seeder=DemoSeeder 2>&1 | grep -v ' DEBUG: ' | tee /tmp/seed.txt | tail -30
+          grep -E '^Phase 4: ' /tmp/seed.txt | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Sign in as the demo admin, pick the range and the product, warm every read once
+        run: |
+          token=$(curl -fsS -X POST http://localhost:8000/api/v1/login -H 'Accept: application/json' -H 'Content-Type: application/json' \
+            -d "{\"phone\":\"$DEMO_ADMIN_PHONE\",\"password\":\"$DEMO_ADMIN_PASSWORD\"}" | jq -r .token)
+          test -n "$token" && test "$token" != null || { echo "::error::the demo admin could not sign in"; exit 1; }
+          to=$(TZ=Africa/Addis_Ababa date -d yesterday +%F)
+          from=$(TZ=Africa/Addis_Ababa date -d '90 days ago' +%F)
+          item=$(docker compose -f compose.yml -f compose.ci.yml exec -T db mariadb -ubakery -psecret bakery -N -e \
+            "SELECT item_id FROM daily_item_metrics WHERE kind = 'product' AND day BETWEEN '$from' AND '$to' GROUP BY item_id ORDER BY SUM(revenue) DESC, item_id LIMIT 1" | tr -d '[:space:]')
+          test -n "$item" || { echo "::error::no product sold in $from..$to: the seed did not play the history"; exit 1; }
+          echo "::add-mask::$token"
+          { echo "K6_TOKEN=$token"; echo "K6_FROM=$from"; echo "K6_TO=$to"; echo "K6_ITEM=$item"; } >> "$GITHUB_ENV"
+          echo "range $from..$to, product $item"
+          for path in freshness overview sales sales/hourly channels items "items/$item" stations staff shifts; do
+            curl -fsS -o /dev/null -w "warm-up $path: %{http_code} in %{time_total} s\n" -H "Authorization: Bearer $token" -H 'Accept: application/json' \
+              "http://localhost:8000/api/v1/analytics/$path?from=$from&to=$to&compare=previous"
+          done
+      - name: k6 (p95 under 1000 ms per read)
+        run: |
+          mkdir -p /tmp/k6 && chmod 777 /tmp/k6 # the k6 image runs as a user of its own; it writes its summary there
+          docker run --rm --network host -v "$PWD/scripts/perf:/scripts:ro" -v /tmp/k6:/out \
+            -e BASE_URL=http://localhost:8000 -e TOKEN="$K6_TOKEN" -e FROM="$K6_FROM" -e TO="$K6_TO" -e ITEM="$K6_ITEM" \
+            "$K6_IMAGE" run --quiet /scripts/dashboards.k6.js | tee /tmp/k6/stdout.txt
+          sed -n '/^perf-dashboards (k6)/,$p' /tmp/k6/stdout.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=120 app
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: perf-dashboards, path: /tmp/k6, retention-days: 7, if-no-files-found: ignore }
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f compose.yml -f compose.ci.yml down -v
 
   e2e-p5:
     needs: [status, e2e-p4]
@@ -366,16 +420,51 @@ jobs:
         with: { fetch-depth: 0 }
       - run: python3 scripts/gate_check.py --mode done --phase 3 --ci
 
+  # The Phase 4 gate (phase-4 plan 10.3): the needs of the CI design (gate-p3, mod-analytics, e2e-p4, perf-dashboards), then the
+  # gate:p4 group on the seeded history. The demo bakery is seeded once on the compose stack with 90 days of history
+  # (GATE_SEED_DAYS, the gate's own figure), and the gate:p4 group runs in the app container in one Pest process: the seeded tests
+  # (Tests\Support\SeededGate) point their connection at the seeded database (GATE_SEED_DATABASE) without RefreshDatabase or
+  # DatabaseTruncation, and fail, never skip, when fewer days are built; the race tests of the group (DatabaseTruncation) keep
+  # phpunit.xml's bakery_test, so nothing beside the seeded tests can wipe the seed. A skipped test fails the step. Then gate_check.
   gate-p4:
     needs: [status, gate-p3, mod-analytics, e2e-p4, perf-dashboards]
     if: fromJSON(needs.status.outputs.phase) >= 4
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GATE_SEED_DAYS: "90"
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer
         with: { fetch-depth: 0 }
-      - run: python3 scripts/gate_check.py --mode done --phase 4 --ci
+      - uses: actions/download-artifact@v4
+        with: { name: api-image, path: /tmp }
+      - run: docker load -i /tmp/api.tar
+      - name: Start the stack (the API, the database, Redis)
+        run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180 app
+      - name: Migrate and seed ${{ env.GATE_SEED_DAYS }} days of demo history
+        run: |
+          set -o pipefail
+          docker compose -f compose.yml -f compose.ci.yml exec -T -e SEED_PHASE=4 -e DEMO_HISTORY_DAYS="$GATE_SEED_DAYS" app \
+            php artisan migrate:fresh --force --seed --seeder=DemoSeeder 2>&1 | grep -v ' DEBUG: ' | tee /tmp/seed.txt | tail -30
+          grep -E '^Phase 4: ' /tmp/seed.txt | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Pest group gate:p4 on the seeded history
+        run: |
+          set -o pipefail
+          docker compose -f compose.yml -f compose.ci.yml exec -T -e GATE_SEED_DATABASE=bakery -e GATE_SEED_DAYS="$GATE_SEED_DAYS" app \
+            vendor/bin/pest --group=gate:p4 --colors=never 2>&1 | grep -v ' DEBUG: ' | tee /tmp/gate-p4.txt
+          if grep -Eq "No tests (found|executed)" /tmp/gate-p4.txt; then echo "::error::the gate:p4 group ran nothing"; exit 1; fi
+          if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky)" /tmp/gate-p4.txt; then echo "::error::a gate:p4 test was skipped: the gate fails, it never skips"; exit 1; fi
+          grep -E '^\[(gate:p4|dashboard budget)' /tmp/gate-p4.txt >> "$GITHUB_STEP_SUMMARY" || true
+      - name: gate_check
+        run: python3 scripts/gate_check.py --mode done --phase 4 --ci
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=120 app
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f compose.yml -f compose.ci.yml down -v
 
   gate-p5:
     needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill]
