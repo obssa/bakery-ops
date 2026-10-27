@@ -101,13 +101,11 @@ async function runFlow(f: FlowFixture, pages: { pad: Page; kitchen: Page; bar: P
   await till.getByRole("button", { name: `Take payment for order ${order.order_no}`, exact: true }).click({ timeout: 15_000 });
   const sheet = till.getByRole("dialog", { name: `Payment for order ${order.order_no}` });
   await expect(sheet).toContainText("330.00 ETB");
-  // digital channels are listed but cannot be used until Phase 4
-  await expect(sheet.getByRole("button", { name: /Telebirr/ })).toBeDisabled();
-  await expect(sheet).toContainText("Photo required, available in Phase 4");
+  // step 4.5b: the full pay sheet starts with one payment, cash for the whole balance (splits and photos are p4-pay-photo-split's)
   await sheet.getByRole("button", { name: "Cash", exact: true }).click();
   for (const digit of "400") await sheet.getByRole("button", { name: digit, exact: true }).click();
   await expect(sheet).toContainText("Change due: 70.00 ETB");
-  await sheet.getByRole("button", { name: "Confirm payment" }).click();
+  await sheet.getByRole("button", { name: "Complete payment" }).click();
   await expect(sheet).toContainText("Payment recorded", { timeout: 30_000 });
   await expect(sheet).toContainText("Give change: 70.00 ETB");
   await sheet.getByRole("button", { name: "Done" }).click();
