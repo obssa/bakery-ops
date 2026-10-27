@@ -66,7 +66,9 @@ export function VoidDialog({
   const no = useOrderNo(order);
   const errorText = useErrorText();
   const queries = useQueryClient();
-  const closed = !UNPAID_STATUSES.includes(order.status);
+  // paid or closed: refunded, never voided. A voided order is not closed: a part payment it kept can still be voided (step 4.3c), which the
+  // order record offers; the till and the board never open the dialog on one
+  const closed = !UNPAID_STATUSES.includes(order.status) && order.status !== "voided";
   const hasPayments = compareDecimal(order.totals.paid, "0", 2) > 0;
   const wholeAllowed = !closed && !isSettled(order);
   const payments = useOrderPayments(hasPayments && !closed ? order.id : null);

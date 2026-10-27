@@ -306,10 +306,12 @@ export function canVoidOrder(order: Order): boolean {
 
 /**
  * One payment is voided while its order is sent and not paid or closed (a paid or closed order is refunded instead: 409
- * payments.void.order_closed), and while it is not voided and nothing of it was paid back (4.5b's VoidDialog offers the same ones).
+ * payments.void.order_closed), and while it is not voided and nothing of it was paid back (4.5b's VoidDialog offers the same ones). A
+ * part-paid order voided as a whole keeps its payment, and that payment can still be voided (step 4.3c): its money goes back.
  */
 export function canVoidPayment(order: Pick<Order, "status">, payment: Pick<PaymentView, "status" | "refunded_amount">): boolean {
-  return UNPAID_STATUSES.includes(order.status) && payment.status !== "voided" && compareDecimal(payment.refunded_amount, "0", 2) === 0;
+  const open = UNPAID_STATUSES.includes(order.status) || order.status === "voided";
+  return open && payment.status !== "voided" && compareDecimal(payment.refunded_amount, "0", 2) === 0;
 }
 
 /** The receipt exists once the order is paid in full (settled, paid or closed), never for a cancelled or voided one (as the API's ReceiptBuilder). */

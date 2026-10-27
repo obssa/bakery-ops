@@ -18,7 +18,8 @@ import { canvasJpeg, runTint } from "../support/photo";
 // 2. @live: on a second order (cash 50.00 and the run's bank transfer 70.00), the admin voids the transfer from the record page: a wrong PIN
 //    is refused with the API's message and the next try carries a new Idempotency-Key, the manager's PIN approves it, and the timeline's
 //    void names the manager as its approver; the order is owed 70.00 again. A cashier has no "Open the full record" on the board and
-//    reads that the record page is not theirs.
+//    reads that the record page is not theirs. The admin then voids the whole order there (the board's PIN dialog): it keeps the 50.00
+//    in cash, which the header says, and the page voids that payment too (step 4.3c allows it): nothing is owed or held.
 //
 // Fixtures through the admin API of the isolated "E2E Test Branch" (e2e/support/payments.ts), run-unique names; nothing is counted.
 
@@ -68,7 +69,7 @@ test.describe("p4 order record", () => {
       // the header's money, as the API wrote it
       const facts = page.getByRole("region", { name: "Order details" });
       await expect(facts).toContainText("250.00 ETB");
-      await expect(facts.getByRole("status", { name: "Balance" })).toContainText("0.00 ETB");
+      await expect(facts.getByRole("status", { name: "Balance" })).toHaveText("0.00 ETB");
       await expect(facts).toContainText("Paid in full");
       await expect(facts).toContainText("Takeaway");
 
@@ -137,8 +138,8 @@ test.describe("p4 order record", () => {
     }
   });
 
-  test("a payment voided from the record page with the manager's PIN names its approver; a cashier cannot open the record @live", async ({ page, browser }) => {
-    test.setTimeout(240_000);
+  test("a payment voided from the record page with the manager's PIN names its approver; a cashier cannot open the record; the order voided whole, then the payment it kept @live", async ({ page, browser }) => {
+    test.setTimeout(300_000);
     const credentials = requireAdmin(test.skip);
     const fixture = await buildPayFixture(credentials, "60.00");
     const { bank } = fixture.channels;
@@ -148,7 +149,7 @@ test.describe("p4 order record", () => {
       orderId = sent.id;
       expect(sent.totals.total).toBe("120.00");
       const label = orderLabel(sent);
-      const [, transfer] = await payBatch(fixture, sent.id, [
+      const [cash, transfer] = await payBatch(fixture, sent.id, [
         { channel_code: "cash", amount: "50.00", tendered_amount: "50.00" },
         { channel_code: bank.code, amount: "70.00", reference_no: `REC-${run}`.toUpperCase() },
       ]);
@@ -193,7 +194,9 @@ test.describe("p4 order record", () => {
       await expect(voided).toContainText(bank.name_en);
       await expect(card).toContainText("Voided");
       await expect(card.getByRole("button", { name: `Void payment ${transfer.id}`, exact: true })).toHaveCount(0);
-      await expect(page.getByRole("region", { name: "Order details" }).getByRole("status", { name: "Balance" })).toContainText("70.00 ETB");
+      const details = page.getByRole("region", { name: "Order details" });
+      const balance = details.getByRole("status", { name: "Balance" });
+      await expect(balance).toHaveText("70.00 ETB");
       const after = await fixture.admin.get<{ data: { id: number; status: string }[]; balance: string }>(`/orders/${sent.id}/payments`);
       expect(after.balance).toBe("70.00");
       expect(after.data.find((p) => p.id === transfer.id)?.status).toBe("voided");
@@ -215,6 +218,31 @@ test.describe("p4 order record", () => {
       } finally {
         await cashierContext.close();
       }
+
+      // the whole order voided on the page (the board's PIN dialog): it keeps the 50.00 taken in cash, which the page says and offers to void
+      await details.getByRole("button", { name: `Void order ${label}`, exact: true }).click();
+      const whole = page.getByRole("dialog", { name: `Void order ${label}` });
+      await whole.getByRole("radio", { name: /The whole order/ }).check();
+      await whole.getByLabel("Reason").fill(`E2E record ${run}: the customer left`);
+      await whole.getByLabel("Manager PIN").fill(fixture.manager.pin);
+      await whole.getByRole("button", { name: "Void this order" }).click();
+      await expect(whole).toHaveCount(0, { timeout: 30_000 });
+      await expect(balance).toHaveText("-50.00 ETB", { timeout: 30_000 });
+      await expect(details).toContainText("The order holds 50.00 ETB more than it costs");
+      await expect(timeline.getByRole("listitem").filter({ hasText: "Order voided" })).toContainText(`Approved by ${fixture.manager.name}`);
+      const cashCard = payments.getByRole("article", { name: `Payment ${cash.id}`, exact: true });
+      await cashCard.getByRole("button", { name: `Void payment ${cash.id}`, exact: true }).click();
+      const last = page.getByRole("dialog", { name: `Void a payment of order ${label}` });
+      await expect(last.getByRole("radio", { name: /Cash 50\.00 ETB/ })).toBeChecked({ timeout: 15_000 });
+      await last.getByLabel("Reason").fill(`E2E record ${run}: the cash went back to the customer`);
+      await last.getByLabel("Manager PIN").fill(fixture.manager.pin);
+      await last.getByRole("button", { name: "Void this payment" }).click();
+      await expect(last).toHaveCount(0, { timeout: 30_000 });
+      await expect(balance).toHaveText("0.00 ETB", { timeout: 30_000 });
+      await expect(details).toContainText("Nothing to pay");
+      await expect(timeline.getByRole("listitem").filter({ hasText: "Payment voided" })).toHaveCount(2);
+      const final = await fixture.admin.get<{ data: { status: string }[]; balance: string }>(`/orders/${sent.id}/payments`);
+      expect(final.data.map((p) => p.status)).toEqual(["voided", "voided"]);
     } catch (error) {
       if (error instanceof ApiFailure) console.error(error.message);
       throw error;

@@ -305,6 +305,11 @@ test.describe("p4 order record: the rules", () => {
     expect(canVoidOrder(closed)).toBe(false);
     expect(canVoidPayment(closed, payment(1))).toBe(false);
     expect(canVoidPayment(order({ status: "paid" }), payment(1))).toBe(false);
+    // a part-paid order voided as a whole still holds its payment, which can be voided (its money goes back); the order itself cannot again
+    const voidedOrder = order({ status: "voided", totals: { subtotal: "0.00", discount: "0.00", tax: "0.00", total: "0.00", paid: "20.00", balance: "-20.00" } });
+    expect(canVoidOrder(voidedOrder)).toBe(false);
+    expect(canVoidPayment(voidedOrder, payment(1, { amount: "20.00" }))).toBe(true);
+    expect(canVoidPayment(order({ status: "cancelled" }), payment(1))).toBe(false);
 
     expect(receiptAvailable(unpaid)).toBe(false);
     expect(receiptAvailable(settled)).toBe(true);

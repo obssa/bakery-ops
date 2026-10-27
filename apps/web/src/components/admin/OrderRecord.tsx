@@ -268,7 +268,7 @@ function Details({
           <Fact term={t("business_day")}>{order.business_date ? dayText(order.business_date, dates, { withYear: true }) : "—"}</Fact>
           <Fact term={t("where")}>{where}</Fact>
           <Fact term={t("owner")}>{order.owner.name || person(order.owner.id)}</Fact>
-          <Fact term={t("taken_at")}>{o(`via_${order.created_via}`)}</Fact>
+          <Fact term={t("taken_at")}>{t(`via_${order.created_via}`)}</Fact>
           <Fact term={t("created")}>{addisStamp(order.created_at, dates)}</Fact>
           <Fact term={t("total")}>
             <Money amount={order.totals.total} currency={order.currency} />
@@ -542,7 +542,7 @@ function PaymentCard({
       <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1">
         <dt className="text-sm font-medium text-neutral-600">{t("reference")}</dt>
         <dd className="text-base text-neutral-900">{tail ? <span className="font-mono">{tail}</span> : t("no_reference")}</dd>
-        <dt className="text-sm font-medium text-neutral-600">{t("taken_by")}</dt>
+        <dt className="text-sm font-medium text-neutral-600">{t("received_by")}</dt>
         <dd className="text-base text-neutral-900">{payment.received_by.name || person(payment.received_by.id)}</dd>
         <dt className="text-sm font-medium text-neutral-600">{t("received")}</dt>
         <dd className="text-base text-neutral-900">{addisStamp(payment.received_at, dates)}</dd>
