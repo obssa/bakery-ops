@@ -19,6 +19,16 @@ const PAGES = new Set<string>([
   "/admin/payments/reconciliation",
   "/admin/payments/channels",
   "/admin/payments/receipts",
+  // step 4.5e: the weekly_summary line (step 4.4d) links to /admin/analytics?from={week_start}&to={week_end}, the week's range
+  "/admin/analytics",
+  "/admin/analytics/sales",
+  "/admin/analytics/channels",
+  "/admin/analytics/products",
+  "/admin/analytics/product",
+  "/admin/analytics/stations",
+  "/admin/analytics/staff",
+  "/admin/analytics/shifts",
+  "/admin/analytics/me",
 ]);
 
 // The API's notification registry names the stock paths it had before the admin Inventory pages existed (stock alerts:

@@ -55,6 +55,35 @@ export function multiplyDecimal(amount: string, quantity: string, dp = 2): strin
   return unscaled(negative ? -rounded : rounded, dp);
 }
 
+/**
+ * `a / b`, times `times` (100 for a percent), rounded half up (away from zero) to `dp` places: exact on scaled integers (both read at 4
+ * decimals). `b` must not be zero. Never a float.
+ */
+export function divideDecimal(a: string, b: string, dp = 2, times = 1): string {
+  const numerator = scaled(a, 4) * BigInt(times) * BigInt(10) ** BigInt(dp);
+  const denominator = scaled(b, 4);
+  if (denominator === BigInt(0)) throw new Error("cannot divide by zero");
+  const negative = numerator < BigInt(0) !== denominator < BigInt(0);
+  const n = numerator < BigInt(0) ? -numerator : numerator;
+  const d = denominator < BigInt(0) ? -denominator : denominator;
+  const rounded = (BigInt(2) * n + d) / (BigInt(2) * d);
+  return unscaled(negative && rounded !== BigInt(0) ? -rounded : rounded, dp);
+}
+
+/**
+ * How many of `steps` parts `part` is of `whole` (rounded half up): what a chart needs to place a figure in pixels, worked on scaled
+ * integers. The answer is a position, never a figure to show; `whole` must be above zero.
+ */
+export function decimalRatio(part: string, whole: string, steps: number): number {
+  const total = scaled(whole, 4);
+  if (total <= BigInt(0)) throw new Error("the whole must be above zero");
+  const value = scaled(part, 4) * BigInt(steps);
+  const negative = value < BigInt(0);
+  const magnitude = negative ? -value : value;
+  const rounded = (BigInt(2) * magnitude + total) / (BigInt(2) * total);
+  return Number(negative ? -rounded : rounded);
+}
+
 /** Adds one to a whole-number quantity ("2" -> "3"); subtracts with a floor of zero when `by` is negative. */
 export function stepQuantity(quantity: string, by: 1 | -1): string {
   const next = scaled(quantity, 0) + BigInt(by);
