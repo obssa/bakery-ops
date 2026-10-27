@@ -5,23 +5,27 @@ import type { Page } from "@playwright/test";
 // imgExifApp1 in apps/api/tests/Support/images.php) is spliced in right after SOI, so the flows can prove that what the server stored has
 // no EXIF and a longest side of 1600 px. The readers below parse the JPEG's own segments; they share no code with the app.
 
-/** A JPEG of width x height drawn by the page's canvas: blue, with a red square in the top-left corner. */
-export async function canvasJpeg(page: Page, width: number, height: number, quality = 0.9): Promise<Buffer> {
+/**
+ * A JPEG of width x height drawn by the page's canvas: blue (or the given background), with a red square in the top-left corner. Every
+ * stored photo of the same drawing has the same bytes, which the API flags as a duplicate receipt; a flow that must not meet an earlier
+ * run's photo passes a background of its own (runTint).
+ */
+export async function canvasJpeg(page: Page, width: number, height: number, quality = 0.9, background = "rgb(20, 20, 220)"): Promise<Buffer> {
   const dataUrl = await page.evaluate(
-    ([w, h, q]) => {
+    ([w, h, q, fill]) => {
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
       const context = canvas.getContext("2d");
       if (!context) throw new Error("no 2d canvas");
-      context.fillStyle = "rgb(20, 20, 220)";
+      context.fillStyle = fill;
       context.fillRect(0, 0, w, h);
       context.fillStyle = "rgb(230, 20, 20)";
       const square = Math.max(2, Math.floor(Math.min(w, h) / 3));
       context.fillRect(0, 0, square, square);
       return canvas.toDataURL("image/jpeg", q);
     },
-    [width, height, quality] as const,
+    [width, height, quality, background] as const,
   );
   return Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
 }
@@ -99,6 +103,13 @@ export function jpegSize(bytes: Buffer): { width: number; height: number } {
   const frame = segmentsOf(bytes).find((s) => s.marker >= 0xc0 && s.marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(s.marker));
   if (!frame) throw new Error("no SOF segment");
   return { height: frame.payload.readUInt16BE(1), width: frame.payload.readUInt16BE(3) };
+}
+
+/** A background colour of this text's own (the run id): two runs' photos are not the same picture. */
+export function runTint(text: string): string {
+  let hash = 2166136261;
+  for (const char of text) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  return `rgb(${hash & 0xff}, ${(hash >>> 8) & 0xff}, ${(hash >>> 16) & 0xff})`;
 }
 
 /** The photo of a receipt as a phone would take it: 2400 x 1800 with a GPS position in its EXIF. */

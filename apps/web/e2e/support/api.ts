@@ -94,16 +94,18 @@ export class Api {
   }
 
   private async send<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}, retried = false, throttled = false): Promise<T> {
+    // a multipart body (POST /files) goes as it is: fetch writes its Content-Type with the boundary
+    const form = body instanceof FormData;
     const response = await fetch(`${this.origin}/api/v1${path}`, {
       method,
       headers: {
         Accept: "application/json",
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(body === undefined || form ? {} : { "Content-Type": "application/json" }),
         ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
         ...(method === "GET" ? {} : { "Idempotency-Key": randomUUID() }),
         ...headers,
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
     });
     const text = await response.text();
     const json: unknown = text ? JSON.parse(text) : null;
@@ -135,6 +137,11 @@ export class Api {
 
   post<T>(path: string, body: unknown = {}): Promise<T> {
     return this.send<T>("POST", path, body);
+  }
+
+  /** A multipart POST (the receipt photo upload of step 4.5c's fixture). */
+  postForm<T>(path: string, form: FormData): Promise<T> {
+    return this.send<T>("POST", path, form);
   }
 
   put<T>(path: string, body: unknown): Promise<T> {

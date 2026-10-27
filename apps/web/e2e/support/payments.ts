@@ -222,3 +222,42 @@ export interface PaymentRead {
 export async function paymentsOf(api: Api, orderId: number): Promise<{ data: PaymentRead[]; balance: string }> {
   return api.get<{ data: PaymentRead[]; balance: string }>(`/orders/${orderId}/payments`);
 }
+
+export interface StoredFile {
+  id: number;
+  width: number;
+  height: number;
+  sha256: string;
+  attached: boolean;
+}
+
+/** POST /files as `api` (multipart, purpose receipt): what the till's camera button sends, here straight from the test. */
+export function uploadReceipt(api: Api, jpeg: Buffer): Promise<StoredFile> {
+  const form = new FormData();
+  form.append("purpose", "receipt");
+  form.append("client_uuid", uuid());
+  form.append("file", new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" }), "receipt.jpg");
+  return api.postForm<StoredFile>("/files", form);
+}
+
+export interface BatchRow {
+  channel_code: string;
+  amount: string;
+  tendered_amount?: string;
+  reference_no?: string;
+  receipt_file_id?: number;
+}
+
+/** POST /orders/{order}/payment-batches as the cashier: the rows must add up to the balance; the payments in row order. */
+export async function payBatch(fixture: PayFixture, orderId: number, rows: BatchRow[]): Promise<PaymentRead[]> {
+  const result = await fixture.cashier.api.post<{ payments: { id: number }[] }>(`/orders/${orderId}/payment-batches`, {
+    client_uuid: uuid(),
+    rows: rows.map((row) => ({ client_uuid: uuid(), ...row })),
+  });
+  const { data } = await paymentsOf(fixture.cashier.api, orderId);
+  return result.payments.map((p) => {
+    const read = data.find((d) => d.id === p.id);
+    if (!read) throw new Error(`payment ${p.id} is not among the order's payments`);
+    return read;
+  });
+}
