@@ -133,8 +133,9 @@ path of `VoidDialog.tsx` and the refund event kinds of `lib/orderRecord.ts` (4.1
 - **Modifier recipe deltas are not costed** (the line's Facts row does not carry them).
 - **Domain refusals are logged at ERROR** app-wide (`PaymentError`, `OrderError`, `IllegalTransition`: nothing marks them not reportable), so
   the log and any alerting on it are noisy (4.3c).
-- **The PIN under the Idempotency hash**: `idempotency_keys.request_hash` of a void is a sha256 over a body that includes the 4 to 6 digit
-  PIN, guessable offline by whoever reads the table (4.3c; the PIN itself is never stored, logged or audited).
+- **The PIN under the Idempotency hash** (found in 4.3c) is **fixed**, not open: since 4.3e `Idempotency::SECRET_FIELDS` (`password`, `pin`,
+  `short_code`) leaves secrets out of `request_hash` at any depth, and the migration `clear_secret_fingerprints_of_idempotency_keys` voided the
+  fingerprints stored before it (no row deleted). Listed here only so the history of the phase stays complete.
 - **The old `failed_jobs` rows on the live host** (3 529 on 2026-10-26, from the hourly sweep of retired E2E ingredients, fixed in 4.4c)
   could be pruned with `queue:prune-failed` (operational).
 - **The Ethiopian date preference is kept per device** (browser storage per signed-in user), not on the server, so it does not follow a
