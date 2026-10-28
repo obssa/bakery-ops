@@ -118,6 +118,9 @@ test.describe("p4 analytics dashboards", () => {
       if (error instanceof ApiFailure) console.error(error.message);
       throw error;
     } finally {
+      // the product stops being new, so it does not give later runs' pads a "New" menu tab (they open on their first tab);
+      // a failed clean-up must not hide the test's own result
+      await fixture.admin.patch(`/items/${fixture.product.id}`, { is_new_until: null }).catch(() => undefined);
       if (orderId !== null) await tidyOrder(fixture, orderId);
       await removeChannel(fixture.admin, wallet);
       await removeChannel(fixture.admin, bank);

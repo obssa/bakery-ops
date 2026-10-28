@@ -97,6 +97,9 @@ async function runFlow(f: ProductionFixture, pages: { pad: Page; baker: Page; ov
   // the pad shows the cake with 6 available (the menu is polled every 5 s)
   await expect.poll(() => menuAvailable(f.waiter.api, f.cake.id), { timeout: 30_000 }).toBe("6.0000");
   await ensureUnlocked(pad, f.waiter); // the flow waited longer than the pad's 60 s idle lock
+  // unlocking puts the pad back on its first menu tab, which is "New" whenever the shared E2E branch holds a product still
+  // marked new (other runs leave some), and the cake is not new: open its own tab again, as the start of the flow does
+  await pad.getByRole("tab", { name: "Other" }).click();
   await expect(pad.getByRole("button", { name: new RegExp(`^Add ${cake}.*6 available`) })).toBeVisible({ timeout: 30_000 });
 
   // post-conditions through the API
