@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Orders\Contracts;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Contracts\Movement;
+use App\Modules\Inventory\Contracts\Reversals;
 use App\Modules\Orders\Actions\RefundOrder;
 use App\Modules\Orders\Enums\LineStatus;
 use App\Modules\Orders\Enums\OrderEventType;
@@ -25,7 +27,10 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  */
 final class Orders
 {
-    public function __construct(private readonly RefundOrder $refunds) {}
+    public function __construct(
+        private readonly RefundOrder $refunds,
+        private readonly Reversals $reversals,
+    ) {}
 
     /**
      * Refund lines of a closed order (step 4.1b; phase-4 plan sections 4.4 and 10.4; Ramin's answer to R-C, 2026-10-28; contract
@@ -63,6 +68,21 @@ final class Orders
     public function assertRefundable(int $orderId, array $lineIds, ?string $clientUuid = null): void
     {
         $this->refunds->assertRefundable($orderId, $lineIds, $clientUuid);
+    }
+
+    /**
+     * The reversing `return` movements of a refund (step 4.3d: POST /orders/{order}/refund answers them; Payments may not read the ledger),
+     * read again from the ledger by the ids its lines kept, ascending: each with its item, place, quantity and the original it reverses.
+     * The same for a replay. Reads only.
+     *
+     * @return list<RefundMovementView>
+     */
+    public function refundMovements(OrderRefundView $refund): array
+    {
+        return array_map(
+            static fn (Movement $m): RefundMovementView => new RefundMovementView($m->id, $m->itemId, $m->locationId, $m->qty->toString(), (int) $m->refId),
+            $this->reversals->returns($refund->movementIds()),
+        );
     }
 
     /**

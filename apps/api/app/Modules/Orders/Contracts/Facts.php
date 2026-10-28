@@ -8,6 +8,7 @@ use App\Modules\Orders\Enums\LineStatus;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
+use App\Modules\Orders\Models\OrderRefundLine;
 use App\Shared\Time\DayRows;
 use App\Shared\Time\LocalDay;
 use App\Shared\Values\Money;
@@ -31,6 +32,7 @@ use stdClass;
  *                        readied, served or rejected, whatever its order became (work done is work done; a voided order's
  *                        ready lines were still made). The row carries all four instants, so the reader buckets each figure
  *                        by its own: prep time by `ready_at`, served by `served_at`, rejected by `rejected_at`.
+ * And one more (step 4.3d): refundLines(range), the refunded lines on the local day of their refund (order_refund_lines.created_at).
  */
 final class Facts
 {
@@ -158,6 +160,36 @@ final class Facts
                 DayRows::iso($row->served_at),
                 DayRows::iso($row->rejected_at),
                 $row->prepared_by_user_id === null ? null : (int) $row->prepared_by_user_id,
+            ),
+        );
+    }
+
+    /**
+     * The refunded lines on the local day of their refund (step 4.3d; the refund's own clock, order_refund_lines.created_at), ordered (day,
+     * id): what Analytics counts as daily_item_metrics.refunded_qty. A line is refunded once, whatever its disposition.
+     *
+     * @return Generator<int, RefundLineFact>
+     */
+    public function refundLines(LocalDay $range): Generator
+    {
+        return DayRows::generate(
+            $range,
+            'order_refund_lines.id',
+            fn (CarbonImmutable $start, CarbonImmutable $end) => OrderRefundLine::query()->toBase()
+                ->join('order_lines', 'order_lines.id', '=', 'order_refund_lines.order_line_id')
+                ->select('order_refund_lines.*', 'order_lines.order_id', 'order_lines.item_id')
+                ->where('order_refund_lines.created_at', '>=', DayRows::sql($start))
+                ->where('order_refund_lines.created_at', '<', DayRows::sql($end)),
+            fn (stdClass $row, string $day): RefundLineFact => new RefundLineFact(
+                (int) $row->order_refund_id,
+                (int) $row->order_id,
+                (int) $row->order_line_id,
+                $day,
+                (int) $row->item_id,
+                Quantity::of((string) $row->qty)->toString(),
+                Money::of((string) $row->line_amount)->amount(),
+                (string) $row->disposition,
+                (string) DayRows::iso($row->created_at),
             ),
         );
     }

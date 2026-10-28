@@ -58,6 +58,28 @@ final class LedgerReader
     }
 
     /**
+     * The `return` movements among $ids (step 4.3d: the returns a refund wrote, read again for its answer), ascending by id; an id that is
+     * not a return, or another branch's (BranchScoped), is left out. Each return's refId is the original it reverses.
+     *
+     * @param  list<int>  $ids
+     * @return list<Movement>
+     */
+    public function returnsOf(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        return array_values(StockMovement::query()
+            ->whereIn('id', array_values(array_unique($ids)))
+            ->where('reason', MovementReason::Returned->value)
+            ->orderBy('id')
+            ->get()
+            ->map(static fn (StockMovement $m): Movement => $m->toMovement())
+            ->all());
+    }
+
+    /**
      * The movements among $ids that a reversal names (step 4.1b), original id => its return's id, ascending by original; another
      * branch's are left out.
      *

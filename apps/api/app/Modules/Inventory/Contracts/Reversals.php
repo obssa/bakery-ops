@@ -20,7 +20,9 @@ use App\Modules\Inventory\Ledger\LedgerReader;
  *     reversal committed first: two unique keys decide), no open shift at a tracked station (inventory.shift.required, 409);
  *   consumptionsOf(ref, item): the sale and production_consume rows of an item that carry a reservation ref, oldest first: what an order
  *     line took out of stock of its own product (a display-case sale, or the product itself used at a station);
- *   reversed(ids): which of the ids a reversal names already, original id => its return's id.
+ *   reversed(ids): which of the ids a reversal names already, original id => its return's id;
+ *   returns(ids): the `return` movements among the ids, ascending (step 4.3d: a refund's answer reads the returns it wrote; each refId is
+ *     the original it reverses).
  * Resolved per use: the Ledger carries the request-scoped ActorContext and CurrentBranch (traps.md, Octane).
  */
 final class Reversals
@@ -48,6 +50,15 @@ final class Reversals
     public function consumptionsOf(string $reservationRef, int $itemId): array
     {
         return $this->reader->consumptionsOf($reservationRef, $itemId);
+    }
+
+    /**
+     * @param  list<int>  $movementIds
+     * @return list<Movement> the returns among the ids, ascending by id; another branch's or a movement that is not a return is left out
+     */
+    public function returns(array $movementIds): array
+    {
+        return $this->reader->returnsOf($movementIds);
     }
 
     /**
