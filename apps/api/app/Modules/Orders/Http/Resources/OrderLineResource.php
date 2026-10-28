@@ -71,6 +71,8 @@ final class OrderLineResource extends JsonResource
                 'at' => $line->rejected_at?->toIso8601String(),
             ],
             'notes' => $line->notes,
+            // step 4.1b: a line is refunded once
+            'refunded_at' => $line->refunded_at?->toIso8601String(),
             'version' => $line->version,
         ];
     }

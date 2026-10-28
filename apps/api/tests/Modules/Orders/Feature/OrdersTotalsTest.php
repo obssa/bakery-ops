@@ -40,6 +40,8 @@ it('answers decimal strings for a sent order, modifiers included', function () {
         ->and($view->currency)->toBe('ETB')
         ->and($view->toArray())->toBe([
             'subtotal' => '820.00', 'discount' => '0.00', 'tax' => '0.00', 'total' => '820.00', 'paid' => '0.00', 'balance' => '820.00', 'currency' => 'ETB',
+            // step 4.1b, additive (contract payments->orders case 13): what came back, and paid less that
+            'refunded' => '0.00', 'net_paid' => '0.00',
         ])
         ->and($view->toArray())->toMatchArray(['total' => $order['totals']['total'], 'balance' => $order['totals']['balance']]);
 })->group('module:orders', 'feature');

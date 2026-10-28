@@ -392,7 +392,7 @@ it('writes no movement for a line whose product does not go back into stock (was
         ->and(DB::table('stock_movement_reversals')->count())->toBe(0)
         ->and(($this->movementRows)($sandwichRef, 'production_consume'))->toBe($consumed)
         ->and(($this->movementRows)($croissantRef, 'sale'))->toBe($sold)
-        ->and(($this->dispositions)($refund->id))->toBe([$croissant['id'] => 'waste', $sandwich['id'] => 'waste'])
+        ->and(($this->dispositions)($refund->id))->toBe([$sandwich['id'] => 'waste', $croissant['id'] => 'waste'])
         ->and($refund->movementIds())->toBe([]);
 })->group(REFUND_GROUP, 'contract:payments->orders');
 

@@ -10,6 +10,7 @@ use App\Modules\Analytics\Listeners\RebuildAfterShiftLocked;
 use App\Modules\Analytics\Listeners\TouchToday;
 use App\Modules\Analytics\Support\SignedWeeklySummaryLinks;
 use App\Shared\Events\OrderPaid;
+use App\Shared\Events\OrderRefunded;
 use App\Shared\Events\OrderVoided;
 use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\PaymentRecorded;
@@ -32,7 +33,7 @@ use Illuminate\Support\ServiceProvider;
  */
 final class AnalyticsServiceProvider extends ServiceProvider
 {
-    /** The events that move today's figures (phase-4 plan section 5). Refunds join with steps 4.1b and 4.3d. */
+    /** The events that move today's figures (phase-4 plan section 5). OrderRefunded since step 4.1b; RefundPaid joins with step 4.3d. */
     public const array TOUCHES_TODAY = [
         PaymentRecorded::class,
         PaymentVerified::class,
@@ -40,6 +41,7 @@ final class AnalyticsServiceProvider extends ServiceProvider
         PaymentVoided::class,
         OrderPaid::class,
         OrderVoided::class,
+        OrderRefunded::class,
     ];
 
     public function register(): void

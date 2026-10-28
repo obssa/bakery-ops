@@ -132,6 +132,71 @@ final class OrderError extends RuntimeException
         return new self('orders.table.code_taken', 422, ['field' => 'code']);
     }
 
+    // Step 4.1b: the refusals of Orders::refund (phase-4 plan sections 4.4 and 10.2, Ramin's answer to R-C of 2026-10-28)
+
+    public static function refundReasonRequired(): self
+    {
+        return new self('orders.refund.reason_required', 422, ['field' => 'reason']);
+    }
+
+    /** Only a closed order is refunded (an open, sent..served, settled-but-not-served, cancelled or voided one is not), and only its refundable lines. */
+    public static function refundNotRefundable(OrderStatus $status): self
+    {
+        return new self('orders.refund.not_refundable', 409, ['status' => $status->value]);
+    }
+
+    /** Not a charged line of this order: another order's, an unknown id, or a rejected or voided line (it was never paid for). */
+    public static function refundLineInvalid(int $lineId): self
+    {
+        return new self('orders.refund.line_invalid', 422, ['line_id' => $lineId]);
+    }
+
+    /** The admin marked the line's product not refundable (Catalog refundable = false). */
+    public static function refundLineNotRefundable(int $lineId): self
+    {
+        return new self('orders.refund.line_not_refundable', 422, ['line_id' => $lineId]);
+    }
+
+    /**
+     * A line is refunded once.
+     *
+     * @param  list<int>  $lineIds
+     */
+    public static function refundLineRefunded(array $lineIds): self
+    {
+        return new self('orders.refund.line_refunded', 409, ['line_ids' => $lineIds]);
+    }
+
+    /** A refund is given within payments.refund_window_hours of the order's close (R-O). */
+    public static function refundWindowClosed(int $hours): self
+    {
+        return new self('orders.refund.window_closed', 409, ['hours' => $hours]);
+    }
+
+    /** An order with a discount or tax is refunded whole, never in part, until those are defined (R-D). */
+    public static function refundPartialNotAllowed(): self
+    {
+        return new self('orders.refund.partial_not_allowed', 422);
+    }
+
+    /** The money back may never exceed what the order took in (refunded_total <= paid_total). */
+    public static function refundExceedsPaid(string $paidTotal, string $refundedTotal, string $amount): self
+    {
+        return new self('orders.refund.exceeds_paid', 409, ['paid_total' => $paidTotal, 'refunded_total' => $refundedTotal, 'amount' => $amount]);
+    }
+
+    /** The client_uuid names a refund of another order. */
+    public static function refundClientUuidReused(): self
+    {
+        return new self('orders.refund.client_uuid_reused', 409, ['field' => 'client_uuid']);
+    }
+
+    /** The PIN that approves a refund belongs to a holder of payments.void (a manager, the admin). */
+    public static function refundApproverForbidden(): self
+    {
+        return new self('orders.refund.approver_forbidden', 403);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

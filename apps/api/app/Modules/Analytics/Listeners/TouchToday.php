@@ -21,7 +21,8 @@ use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
  * give one rebuild that reads all of them and a payment taken while it runs asks for the next. With the cron-drained queue of the live host
  * today is at most about three minutes behind the till. The day is the event's own (a payment at 23:59:30 handled at 00:00:40 rebuilds the
  * day it was taken on), never a day after today; a branch that no longer exists is skipped. A day that is not today is rebuilt by its
- * shift's lock, the nightly run or by hand. Refunds (OrderRefunded, RefundPaid) join with step 4.1b and 4.3d.
+ * shift's lock, the nightly run or by hand. OrderRefunded (step 4.1b) touches the day of the refund: refunds count on the cash basis and
+ * its return movements on their created_at, while the day the order was settled keeps its sale (ADR 0014); RefundPaid joins with 4.3d.
  */
 final class TouchToday implements ShouldQueueAfterCommit
 {

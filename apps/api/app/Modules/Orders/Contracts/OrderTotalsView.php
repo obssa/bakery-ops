@@ -6,7 +6,8 @@ namespace App\Modules\Orders\Contracts;
 
 /**
  * An order's money as Orders::totals answers it: decimal strings with two decimals (ADR 0004), in the order's currency.
- * balance = total - paid.
+ * balance = total - paid. Step 4.1b (additive): refunded is what came back of it (orders.refunded_total), net_paid = paid - refunded;
+ * paid stays what came in.
  */
 final readonly class OrderTotalsView
 {
@@ -18,10 +19,12 @@ final readonly class OrderTotalsView
         public string $paid,
         public string $balance,
         public string $currency,
+        public string $refunded = '0.00',
+        public string $netPaid = '0.00',
     ) {}
 
     /**
-     * @return array{subtotal: string, discount: string, tax: string, total: string, paid: string, balance: string, currency: string}
+     * @return array{subtotal: string, discount: string, tax: string, total: string, paid: string, balance: string, currency: string, refunded: string, net_paid: string}
      */
     public function toArray(): array
     {
@@ -33,6 +36,8 @@ final readonly class OrderTotalsView
             'paid' => $this->paid,
             'balance' => $this->balance,
             'currency' => $this->currency,
+            'refunded' => $this->refunded,
+            'net_paid' => $this->netPaid,
         ];
     }
 }

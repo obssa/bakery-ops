@@ -26,6 +26,18 @@ return [
         'reason_required' => 'Say why the order is voided.',
         'pin_required' => 'A manager must type their PIN (4 to 6 digits) to approve the void.',
     ],
+    'refund' => [
+        'reason_required' => 'Say why the money is given back.',
+        'not_refundable' => 'Only a closed order can be refunded, and only its lines that may be refunded.',
+        'line_invalid' => 'This is not a paid line of this order.',
+        'line_not_refundable' => 'This product cannot be refunded. The admin decides which products can.',
+        'line_refunded' => 'This line was already refunded. A line is refunded once.',
+        'window_closed' => 'The time allowed for a refund after the sale has passed.',
+        'partial_not_allowed' => 'This order has a discount or tax, so it can only be refunded whole.',
+        'exceeds_paid' => 'This refund would give back more than the order took in.',
+        'client_uuid_reused' => 'This refund was already saved for another order.',
+        'approver_forbidden' => 'Only a manager or the admin can approve a refund with their PIN.',
+    ],
     'station' => [
         'forbidden' => 'This line belongs to another station. Only the staff of its station or a manager can work on it.',
     ],

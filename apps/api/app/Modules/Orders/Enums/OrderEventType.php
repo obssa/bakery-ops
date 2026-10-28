@@ -8,7 +8,8 @@ namespace App\Modules\Orders\Enums;
  * The names of the rows of the append-only order timeline (order_events; docs/phases/phase-1-plan.md section 3,
  * migration 6). Line events carry the line and its station (the KDS cursor), every event the order's owner (the pad
  * and till cursors). The order_events table enforces the same list with the CHECK constraint order_events_event_check (extended for the two
- * payment events by 2026_11_02_100200_extend_order_events_check_for_payments).
+ * payment events by 2026_11_02_100200_extend_order_events_check_for_payments, for the two refund events by
+ * 2026_11_09_100500_extend_order_events_check_for_refunds).
  */
 enum OrderEventType: string
 {
@@ -33,6 +34,9 @@ enum OrderEventType: string
     // step 4.3c (phase-4 plan M9, the payment half): every payment and every void of one, on the order's timeline
     case PaymentRecorded = 'payment.recorded';
     case PaymentVoided = 'payment.voided';
+    // step 4.1b (the refund half of M9): a refund, one row per refunded line and one for the refund
+    case LineRefunded = 'line.refunded';
+    case OrderRefunded = 'order.refunded';
 
     /**
      * @return list<string>

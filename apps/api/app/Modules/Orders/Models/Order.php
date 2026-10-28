@@ -23,7 +23,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * along OrderStatus, through the actions of steps 1.3b-1.3d (state changes are actions, never a PATCH of status).
  * Never deleted: it ends closed, cancelled or voided (no SoftDeletes, tests/Arch/SoftDeletesTest.php allowlist).
  * order_no and business_date are given together at send (null while the order is an open cart). Money reads back as
- * Money in the row's currency (ADR 0004); owner_user_id is whose order it is (the acting waiter, else the creator).
+ * Money in the row's currency (ADR 0004); owner_user_id is whose order it is (the acting waiter, else the creator). Step 4.1b: a refund
+ * leaves the status `closed` and adds to refunded_total (never above paid_total) and refunded_at; its rows are `refunds`.
  *
  * @property int $id
  * @property int $branch_id
@@ -46,12 +47,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property Money $tax
  * @property Money $total
  * @property Money $paid_total
+ * @property Money $refunded_total
  * @property string $currency
  * @property string|null $notes
  * @property CarbonImmutable|null $sent_at
  * @property CarbonImmutable|null $settled_at
  * @property CarbonImmutable|null $paid_at
  * @property CarbonImmutable|null $closed_at
+ * @property CarbonImmutable|null $refunded_at
  * @property CarbonImmutable|null $cancelled_at
  * @property string|null $cancel_reason
  * @property CarbonImmutable|null $voided_at
@@ -66,6 +69,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read User|null $owner
  * @property-read Collection<int, OrderLine> $lines
  * @property-read Collection<int, OrderEvent> $events
+ * @property-read Collection<int, OrderRefund> $refunds
  */
 final class Order extends Model
 {
@@ -87,6 +91,7 @@ final class Order extends Model
         'tax' => '0.00',
         'total' => '0.00',
         'paid_total' => '0.00',
+        'refunded_total' => '0.00',
         'currency' => Money::DEFAULT_CURRENCY,
         'version' => 1,
     ];
@@ -115,10 +120,12 @@ final class Order extends Model
             'tax' => Money::class,
             'total' => Money::class,
             'paid_total' => Money::class,
+            'refunded_total' => Money::class,
             'sent_at' => 'immutable_datetime',
             'settled_at' => 'immutable_datetime',
             'paid_at' => 'immutable_datetime',
             'closed_at' => 'immutable_datetime',
+            'refunded_at' => 'immutable_datetime',
             'cancelled_at' => 'immutable_datetime',
             'voided_at' => 'immutable_datetime',
             'voided_by_user_id' => 'integer',
@@ -162,6 +169,16 @@ final class Order extends Model
     public function events(): HasMany
     {
         return $this->hasMany(OrderEvent::class, 'order_id')->orderBy('id');
+    }
+
+    /**
+     * Step 4.1b: the refunds of the order, oldest first, each with its lines.
+     *
+     * @return HasMany<OrderRefund, $this>
+     */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(OrderRefund::class, 'order_id')->orderBy('id');
     }
 
     protected static function newFactory(): OrderFactory

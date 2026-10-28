@@ -27,6 +27,9 @@ declare(strict_types=1);
  * export_max_rows: the most rows GET /payments/export writes (422 payments.export.too_large beyond), so a file stays within the shared
  * host's memory and time.
  *
+ * refund_window_hours (step 4.1b, R-O): an order is refunded within this many hours of its close (Orders::refund, 409
+ * orders.refund.window_closed beyond); an admin raises the number in the server .env (PAYMENTS_REFUND_WINDOW_HOURS, then config:cache).
+ *
  * Plain values only: no closures, so `config:cache` keeps working on the shared host (DeployableCachesTest).
  */
 return [
@@ -40,4 +43,5 @@ return [
     ],
     'reconciliation_max_days' => 62,
     'export_max_rows' => 20000,
+    'refund_window_hours' => (int) env('PAYMENTS_REFUND_WINDOW_HOURS', 72),
 ];

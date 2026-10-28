@@ -224,8 +224,9 @@ it('refuses a partial refund of an order with a discount or tax, and refunds its
     $m = $f->menu;
     foreach (['discount' => ['discount' => '10.00', 'total' => '80.00'], 'tax' => ['tax' => '13.50', 'total' => '103.50']] as $what => $money) {
         $order = $f->send([$m->line($m->croissant), $m->line($m->water)]);
-        DB::table('orders')->where('id', $order['id'])->update($money); // the pad has no discount or tax yet: the row carries one
         ($this->serve)($order);
+        // the pad has no discount or tax yet (every line action totals the order again): the served order's row carries one, then it is paid
+        DB::table('orders')->where('id', $order['id'])->update($money);
         ($this->pay)($order['id']);
         $croissant = $f->lineOf($order, $m->croissant)['id'];
         $written = ($this->written)();
@@ -364,6 +365,7 @@ it('is asked by someone holding orders.void_request and approved by a holder of 
     $m = $f->menu;
     $order = ($this->closed)([$m->line($m->croissant), $m->line($m->water)]);
     $croissant = $f->lineOf($order, $m->croissant)['id'];
+    $open = $f->send([$m->line($m->water)]);
     $written = ($this->written)();
 
     // the cashier asks; a cashier's PIN does not approve a refund (payments.void: admin, manager)
@@ -383,7 +385,6 @@ it('is asked by someone holding orders.void_request and approved by a holder of 
     // the state checks an endpoint makes before it asks Identity for the PIN: the same refusals, nothing written
     expect(($this->refusal)(fn () => $this->orders->assertRefundable($order['id'], [987654]))?->messageKey)->toBe('orders.refund.line_invalid')
         ->and(fn () => $this->orders->assertRefundable($order['id'], [$croissant]))->not->toThrow(OrderError::class);
-    $open = $f->send([$m->line($m->water)]);
     expect(($this->refusal)(fn () => $this->orders->assertRefundable($open['id'], []))?->messageKey)->toBe('orders.refund.not_refundable')
         ->and(($this->written)())->toBe($written);
 

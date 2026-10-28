@@ -22,16 +22,17 @@ final class OrderTimeline
 
     /**
      * @param  array<string, mixed>  $payload  ids, decimal strings and reason codes only
-     * @param  int|null  $approvedByUserId  the owner of the manager PIN that approved it (a void), else null
+     * @param  int|null  $approvedByUserId  the owner of the manager PIN that approved it (a void, a refund), else null
+     * @param  bool  $atStation  false keeps a line event off its station's feed (step 4.1b: a refunded line is no news to the kitchen screen)
      */
-    public function record(Order $order, OrderEventType $event, array $payload = [], ?OrderLine $line = null, ?int $approvedByUserId = null): OrderEvent
+    public function record(Order $order, OrderEventType $event, array $payload = [], ?OrderLine $line = null, ?int $approvedByUserId = null, bool $atStation = true): OrderEvent
     {
         $row = new OrderEvent;
         $row->forceFill([
             'branch_id' => $order->branch_id,
             'order_id' => $order->id,
             'order_line_id' => $line?->id,
-            'station_id' => $line?->station_id,
+            'station_id' => $atStation ? $line?->station_id : null,
             'owner_user_id' => $order->owner_user_id,
             'event' => $event,
             'user_id' => $this->actor->requireUserId(),

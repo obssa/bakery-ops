@@ -52,6 +52,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $rejected_at
  * @property RejectReason|null $reject_reason
  * @property string|null $reject_note
+ * @property CarbonImmutable|null $refunded_at
  * @property int $created_by_user_id
  * @property int|null $acting_user_id
  * @property int|null $shift_instance_id
@@ -109,6 +110,7 @@ final class OrderLine extends Model
             'rejected_by_user_id' => 'integer',
             'rejected_at' => 'immutable_datetime',
             'reject_reason' => RejectReason::class,
+            'refunded_at' => 'immutable_datetime',
             'created_by_user_id' => 'integer',
             'acting_user_id' => 'integer',
             'shift_instance_id' => 'integer',

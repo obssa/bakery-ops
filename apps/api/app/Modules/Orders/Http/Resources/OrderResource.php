@@ -8,6 +8,8 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
+use App\Modules\Orders\Models\OrderRefund;
+use App\Modules\Orders\Models\OrderRefundLine;
 use App\Modules\Orders\Support\OrderTotals;
 use Closure;
 use Illuminate\Http\Request;
@@ -19,7 +21,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * (totals: subtotal, discount, tax, total, paid, balance; ADR 0004), the timestamps of its life, why it was cancelled
  * or voided, its version (the live feeds merge by it) and its lines (OrderLineResource), removed ones included with
  * their status (rule 4: nothing is deleted). With the events relation loaded (GET /orders/{order}) it also carries the
- * `events` timeline.
+ * `events` timeline. Step 4.1b: refunded_total and refunded_at (what came back of the money; the order stays closed) and `refunds`,
+ * oldest first, each with its lines and what each line did to stock (the disposition and its reversing movements).
  *
  * @mixin Order
  */
@@ -39,6 +42,7 @@ final class OrderResource extends JsonResource
             'lines.station' => fn ($q) => $q->withTrashed(),
             'diningTable' => fn ($q) => $q->withTrashed(),
             'owner' => fn ($q) => $q->withTrashed(),
+            'refunds.lines',
         ];
     }
 
@@ -81,11 +85,13 @@ final class OrderResource extends JsonResource
             'acting_user_id' => $order->acting_user_id,
             'notes' => $order->notes,
             'totals' => $totals->toArray($order->paid_total),
+            'refunded_total' => $order->refunded_total->amount(),
             'currency' => $order->currency,
             'sent_at' => $order->sent_at?->toIso8601String(),
             'settled_at' => $order->settled_at?->toIso8601String(),
             'paid_at' => $order->paid_at?->toIso8601String(),
             'closed_at' => $order->closed_at?->toIso8601String(),
+            'refunded_at' => $order->refunded_at?->toIso8601String(),
             'cancelled' => $order->cancelled_at === null ? null : [
                 'reason' => $order->cancel_reason,
                 'at' => $order->cancelled_at->toIso8601String(),
@@ -99,7 +105,34 @@ final class OrderResource extends JsonResource
             'version' => $order->version,
             'created_at' => $order->created_at?->toIso8601String(),
             'lines' => OrderLineResource::collection($order->lines)->resolve($request),
+            'refunds' => self::refunds($order),
         ] + ($order->relationLoaded('events') ? ['events' => $this->events($order)] : []);
+    }
+
+    /**
+     * The order's refunds (step 4.1b), oldest first: the money, whether every line has come back, why, who asked and whose PIN approved,
+     * and per line its quantity, money, disposition and reversing movements.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function refunds(Order $order): array
+    {
+        return array_values(array_map(static fn (OrderRefund $r): array => [
+            'id' => $r->id,
+            'amount' => $r->amount->amount(),
+            'is_full' => $r->is_full,
+            'reason' => $r->reason,
+            'requested_by' => $r->requested_by_user_id,
+            'approved_by' => $r->approved_by_user_id,
+            'at' => $r->created_at->toIso8601String(),
+            'lines' => array_values(array_map(static fn (OrderRefundLine $l): array => [
+                'order_line_id' => $l->order_line_id,
+                'qty' => $l->qty->toString(),
+                'amount' => $l->line_amount->amount(),
+                'disposition' => $l->disposition->value,
+                'movement_ids' => array_map('intval', $l->movement_ids),
+            ], $r->lines->all())),
+        ], $order->refunds->all()));
     }
 
     /**
