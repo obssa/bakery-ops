@@ -1575,8 +1575,8 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
        host; nobody runs it there from CI.
      - **`gate-p4`** (`.github/workflows/ci.yml`): `needs` as the CI design (gate-p3, mod-analytics, e2e-p4, perf-dashboards) plus `files-s3` (4.2b); loads the
        API image, starts `app` (with the database and Redis), seeds `SEED_PHASE=4` with `DEMO_HISTORY_DAYS=$GATE_SEED_DAYS` (90: the gate's own figure, 10.3,
-       not the 60-day fallback of `e2e-p4`), runs `vendor/bin/pest --group=gate:p4` in the app container with `GATE_SEED_DATABASE=bakery`, fails on an empty
-       group or a skipped test, copies the gate's figure lines to the step summary, then `gate_check.py --mode done --phase 4 --ci`. Timeout 45 minutes.
+       not the 60-day fallback of `e2e-p4`), puts an empty `.env` in the container (see Measured), runs `vendor/bin/pest --group=gate:p4` there with
+       `GATE_SEED_DATABASE=bakery`, fails on an empty group or a skipped or warning test, copies the gate's figure lines to the step summary, then `gate_check.py --mode done --phase 4 --ci`. Timeout 45 minutes.
      - **`perf-dashboards`**: after `mod-analytics` and `docker-build`, beside `e2e-p4` (the CI design's graph; it had needed `e2e-p4`), timeout 40 minutes:
        the 90-day seed (`DEMO_HISTORY_DAYS` unset), the demo admin signed in by `curl`, the range (the 90 days to yesterday in Addis Ababa) and the product
        (the most revenue, from `daily_item_metrics`), every read warmed once, then k6 (`grafana/k6:1.3.0` pinned by the digest of its image index,
@@ -1599,7 +1599,16 @@ Build order of the migrations: 4.1b M6 M7 M8 M9; 4.1c M10 M11; 4.2a M1; 4.2b M2;
        references and the Phase 4 reference were corrected (10.9: the weekly summary goes to Telegram and the inbox, the audit read API, the three ADRs,
        the gate's wiring); the manifest names `rules-off-gates` (it still said `enforced-gates`). The plans' TODO wording that was not about refunds was
        reworded, so the markers left are the refund placeholders only.
-     - **Measured** (CI, this PR's run): <<ASBUILT:figures>>
+     - **Measured** (CI run 40604303076 at `3e7114c`, every job green, 88 minutes). The 90-day seed: 672 s in `gate-p4` and 683 s in
+       `perf-dashboards` (91 days played, 93 rebuilt in 12 s; 2 325 orders, 2 612 payments of which 37 voided, 1 383 receipt photos, 26 940 audit
+       rows), the seed step 11 m 46 s; the 60-day seed of `e2e-p4`: 441 s. `gate:p4`: 15 tests in 46 s (channel totals: 93 days and 490
+       day-channel rows; revenue: 2 298 settled orders; rebuilt twice: 2026-08-02, 2026-07-30 and 2026-10-23; the summaries-only test: 30
+       requests, 140 statements, none outside the rules). In-process p95 on the seed: 4.4 ms (freshness) to 27.7 ms (items), 1 to 7 statements
+       of a read's own. k6: 330 requests, p95 per read 30.7 to 68.7 ms, 56.5 ms over all. The browser: first data 278 ms after `GET /me`
+       (`dashboards.spec.ts`); the live twin's figure in the same CI job 557 ms from navigation. `mod-inventory` 14 m 15 s in that run.
+       **Found there:** Pest reported the `gate:p4` tests that boot Laravel as *warnings*, not passes: the API image has no `.env` (compose gives
+       the variables) and PHPUnit reports phpdotenv's suppressed read of the missing file on every such test (the `files-s3` job has shown the
+       same since 4.2b). `gate-p4` now gives the container an empty `.env` before the group and fails on any warning, as on a skip.
      - **Local run notes**: the seeded gate tests and the race tests ran here against a 3-day seed in a scratch database of the dev stack (`gate:p4`: 9 passed
        in 312 s; the seed of 4 played days took 46 s); `AnalyticsBenchCommandTest` 11 passed. The 90-day figures are CI's.
      - STATUS: unchanged (see above).

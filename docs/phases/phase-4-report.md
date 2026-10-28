@@ -1,6 +1,8 @@
 # Phase 4 report — Payments and analytics (the phase so far)
 
-Commit: `<<CI:sha>>` (pull request #80, `phase-4/gate`, step 4.6b) · CI run: <<CI:run>> · Date: 2026-10-28
+Commit: `3e7114c` (pull request #80, `phase-4/gate`, step 4.6b), the last commit before this report was filled in · CI run:
+[40604303076](https://github.com/obssa/bakery-ops/actions/runs/40604303076), every job green · Date: 2026-10-28. The PR's later runs (this
+report, a CI fix) are in the PR
 
 **This is a report of the phase so far, not a claim that it is done.** Every step of Phase 4 is built, merged and deployed except the
 refunds: steps 4.1b (Orders' refund and Inventory's reversals) and 4.3d (the payments refund), their screens, the seed's refund roll and
@@ -39,23 +41,41 @@ deploy run 40564591095, `@live` 35 passed and 1 flaky on a dropped connection; s
 
 | # | Criterion | Evidence (test name, CI job, numbers) | Result |
 |---|---|---|---|
-| 1 | channel totals equal the payments not voided, per channel and day, counts equal; revenue equals the paid or closed orders | `ChannelTotalsEqualPaymentsTest` and `RevenueEqualsOrdersTest` (`tests/Gate`, `gate:p4`) in the `gate-p4` job, on the demo bakery seeded once with 90 days: <<CI:channels>>. Decimals compared with brick/math. `net_amount = amount - refund_amount` and `net_revenue = revenue - refund_total` hold with zero refunds | PASS |
-| 2 | `p4-pay-photo-split`: Telebirr with photo plus cash remainder; Pay disabled until the photo is attached | `apps/web/e2e/p4/pay-photo-split.spec.ts` (`@live`), CI job `e2e-p4`: <<CI:e2e>>; on the live host after each deploy (`@live`) | PASS |
-| 3 | timed budget: k6 on the CI stack, `DashboardBudgetGateTest` in process and `analytics:bench`, first data in the browser under 1000 ms | `perf-dashboards` (k6 on the 90-day seed): <<CI:k6>>. `DashboardBudgetGateTest` (`gate:p4`, the 90-day seed, 30 timed requests after 3 warm-ups): <<CI:budget>>; `analytics:bench --requests=3` ran on the seed within the budget and wrote nothing. `dashboards.spec.ts` (`e2e-p4`, the 60-day seed): first data <<CI:firstdata>> after `GET /me` answered (budget 1000 ms). Live (soft, logged): the overview's first figure in 1231 ms on 2026-10-27 (`dashboards-live.spec.ts`, soft budget 2500 ms) | PASS |
-| 4 | dashboards hit no raw tables; `Rebuild::day` run twice yields identical rows | `DashboardsReadSummariesOnlyGateTest` (`gate:p4`): every GET `/analytics/*` route over the seeded window, each with its 304, and each export once: <<CI:queries>>, no violation. `RebuildIdempotentGateTest` (`gate:p4`): three seeded days rebuilt twice into the seed's rows and fingerprint, `changed` false: <<CI:rebuild>> | PASS |
-| 5 | Phases 0 to 3 gates still green | `gate-p0` to `gate-p3` in the same run, `rules-off-gates` with the three shift rules off: <<CI:earlier>> | PASS |
+| 1 | channel totals equal the payments not voided, per channel and day, counts equal; revenue equals the paid or closed orders | `ChannelTotalsEqualPaymentsTest` and `RevenueEqualsOrdersTest` (`tests/Gate`, `gate:p4`) in the `gate-p4` job, on the demo bakery seeded once with 90 days: 93 built days (the anchor, the opening day, the 90-day window and today), 490 day-channel rows equal the payments not voided, and 2 298 settled orders equal `daily_sales` (revenue and count) day by day. Decimals compared with brick/math. `net_amount = amount - refund_amount` and `net_revenue = revenue - refund_total` hold with zero refunds | PASS |
+| 2 | `p4-pay-photo-split`: Telebirr with photo plus cash remainder; Pay disabled until the photo is attached | `apps/web/e2e/p4/pay-photo-split.spec.ts` (`@live`), CI job `e2e-p4`: 84 passed and 2 skipped (the refund stubs `pay-refund` and `dashboards-audit`) in 45.3 s over `p4-pay-photo-split` (51 tests) and `p4-dashboards` (35), the history 60 days; on the live host after each deploy (`@live`) | PASS |
+| 3 | timed budget: k6 on the CI stack, `DashboardBudgetGateTest` in process and `analytics:bench`, first data in the browser under 1000 ms | `perf-dashboards` (k6 on the 90-day seed): two admins, 15 rounds of the eleven reads, 330 requests, p95 per read 30.7 ms (hourly sales) to 68.7 ms (items), 56.5 ms over all, no failed request, every check true (threshold 1000 ms). `DashboardBudgetGateTest` (`gate:p4`, the 90-day seed, 30 timed requests after 3 warm-ups): every read a 200 within 1 to 7 statements of its own, p95 4.4 ms (freshness) to 27.7 ms (items); `analytics:bench --requests=3` ran on the seed within the budget and wrote nothing. `dashboards.spec.ts` (`e2e-p4`, the 60-day seed): first data 278 ms after `GET /me` answered (budget 1000 ms). Live (soft, logged): the overview's first figure in 1231 ms on 2026-10-27 (`dashboards-live.spec.ts`, soft budget 2500 ms) | PASS |
+| 4 | dashboards hit no raw tables; `Rebuild::day` run twice yields identical rows | `DashboardsReadSummariesOnlyGateTest` (`gate:p4`): every GET `/analytics/*` route over the seeded window, each with its 304, and each export once: 30 requests, 140 statements, 91 of them the endpoints', no violation. `RebuildIdempotentGateTest` (`gate:p4`): three seeded days rebuilt twice into the seed's rows and fingerprint, `changed` false: 2026-08-02 (the busiest day, 92 rows), 2026-07-30 (the first voided payment, 89 rows) and 2026-10-23 (the last Friday, 92 rows), each fingerprint unchanged twice | PASS |
+| 5 | Phases 0 to 3 gates still green | `gate-p0` to `gate-p3` in the same run, `rules-off-gates` with the three shift rules off: `gate-p0`, `gate-p1`, `gate-p2`, `gate-p3` passed; `api-arch`, the nine `mod-*` jobs, `rules-off-gates`, `files-s3`, `e2e-p0` to `e2e-p3`, `openapi-check`, `erd-check`, `invariants` green (`mod-inventory` 14 m 15 s against its new 30-minute timeout) | PASS |
 
-`gate_check.py --mode done --phase 4 --ci` (job `gate-p4`), at the commit above:
+`gate_check.py --mode done --phase 4 --ci` (job `gate-p4`), at the commit above (informational while the phase is `in_progress`: a refusal
+is printed as `WARN`; the gate report was this file, which did not exist yet):
 
 ```
-<<CI:gatecheck>>
+== gate_check: done phase 4
+  [SKIP] gate:p4 green                               pest --group=gate:p4 not run (--no-tests/--ci)
+  [SKIP] gate:p0 still green                         pest --group=gate:p0 not run (--no-tests/--ci)
+  [SKIP] gate:p1 still green                         pest --group=gate:p1 not run (--no-tests/--ci)
+  [SKIP] gate:p2 still green                         pest --group=gate:p2 not run (--no-tests/--ci)
+  [SKIP] gate:p3 still green                         pest --group=gate:p3 not run (--no-tests/--ci)
+  [SKIP] arch,invariants green                       pest --group=arch,invariants not run (--no-tests/--ci)
+  [SKIP] playwright projects                         p4-pay-photo-split, p4-dashboards (trusted to CI / skipped)
+  [PASS] ADR 0014-summary-rebuild-semantics          present
+  [PASS] ADR 0015-file-storage-portability           present
+  [PASS] ADR 0016-refunds-voids-and-the-cash-drawer  present
+  [WARN] gate report                                 docs/phases/phase-4-report.md
+  [PASS] openapi.json present                        docs/openapi.json
+  [PASS] ERD covers tables                           all listed
+  [WARN] no TODO(p 4) markers                        12 found: apps/api/database/seeders/Demo/DayPlan.php:50, apps/api/database/seeders/Demo/DemoTill.php:170, apps/web/e2e/p4/pay-refund.spec.ts:9
+  [PASS] no ->skip( in phase module tests            0 found
+  [SKIP] phase claimed done                          status=in_progress (informational run)
+== result: PASS (0 failed, 2 warnings, 16 checks)
 ```
 
 Every remaining refusal is refund work (the marker is written `TODO(p 4)` in the output above so that this file does not count
-itself): the marker lines are `DayPlan::REFUND_PCT` and `DemoTill`'s refund step (the seed's refund
+itself). The 12 marker lines are `DayPlan::REFUND_PCT` and `DemoTill`'s refund step (the seed's refund
 roll, 4.3d), `pay-refund.spec.ts` and `dashboards-audit.spec.ts` (the refund flows), `RefundPlaceholder` in `OrderRecord.tsx`, the refund
-path of `VoidDialog.tsx` and the refund event kinds of `lib/orderRecord.ts` (4.1b, 4.3d), and the plan's own descriptions of those
-placeholders. The `gate:p4` Pest group itself ran in the job before `gate_check`: <<CI:gatep4>>.
+path of `VoidDialog.tsx` and the refund event kinds of `lib/orderRecord.ts` (4.1b, 4.3d): seven in the code; and five in
+`docs/phases/phase-4-plan.md`, its own descriptions of those placeholders (4.5b, 4.5d, 4.6a, section 8). The `gate:p4` Pest group itself ran in the job before `gate_check`: 15 tests, all green: the five seeded tests, the two race tests (30 rounds each; `PaymentVoidRaceTest` saw both orders, 1 "pay first" and 29 "void first"), `PaymentStatusTest` and `FilesNoPublicAccessTest`'s five cases, 3 983 assertions in 45.6 s. At `3e7114c` Pest reported 14 of them as warnings, not passes: the API image has no `.env` (its variables come from compose) and PHPUnit reports phpdotenv's suppressed read of the missing file on every Laravel test (the `files-s3` job has shown the same since 4.2b). The next commit gives the container an empty `.env` before the group runs and fails the step on any warning, as on a skip; the PR's last run shows the group as 15 passed.
 
 ## Dependencies proven
 
@@ -79,16 +99,16 @@ placeholders. The `gate:p4` Pest group itself ran in the job before `gate_check`
 
 | What | Figure | Where |
 |---|---|---|
-| The 90-day seed | <<CI:seed90>> | `gate-p4` and `perf-dashboards` seed steps |
-| The 60-day seed | <<CI:seed60>> | `e2e-p4` seed step (486 s on PR #79) |
+| The 90-day seed | 672 s in `gate-p4` and 683 s in `perf-dashboards` for the 91 days played (2026-07-29 to 2026-10-27), the 93 days rebuilt in 12 s: 2 325 orders, 2 612 payments (37 voided), 1 383 receipt photos, 26 940 audit rows | `gate-p4` and `perf-dashboards` seed steps |
+| The 60-day seed | 441 s for 61 days (2026-08-28 to 2026-10-27), the 63 days rebuilt in 7 s: 1 569 orders, 1 771 payments (26 voided), 944 photos, 18 111 audit rows | `e2e-p4` seed step (486 s on PR #79) |
 | The 90-day seed before 4.6a's speed-up | 967 s: 2 325 orders, 2 612 payments (37 voided), 1 382 receipt photos, 26 971 audit rows | `e2e-p4` on `49d0130` |
-| In-process p95 per dashboard read, the 90-day seed | <<CI:budgettable>> | `DashboardBudgetGateTest` in `gate-p4` |
-| k6 p95 per read, the 90-day seed, two admins | <<CI:k6table>> | `perf-dashboards` step summary |
-| First data in the browser | <<CI:firstdata>> (CI, the 60-day seed); 1231 ms on the live host (2026-10-27, soft) | `dashboards.spec.ts`, `dashboards-live.spec.ts` |
+| In-process p95 per dashboard read, the 90-day seed | freshness 4.4, overview 23.0, sales by day 10.5, by week 8.7, hourly 5.1, channels 14.8, items 27.7, item page 15.0, stations 6.9, staff 6.7, shifts 9.2, the chef's stations 10.5, the cashier's staff 8.1 ms; statements of its own 1 to 7 (budget: 400 ms, 8) | `DashboardBudgetGateTest` in `gate-p4` |
+| k6 p95 per read, the 90-day seed, two admins | freshness 34.3, overview 55.8, sales by day 33.4, by week 34.1, hourly 30.7, channels 45.8, items 68.7, item page 40.8, stations 33.2, staff 33.2, shifts 33.1 ms; all reads p50 30.0, p95 56.5 ms over 330 requests (budget 1000 ms) | `perf-dashboards` step summary |
+| First data in the browser | 278 ms (CI, the 60-day seed); 1231 ms on the live host (2026-10-27, soft) | `dashboards.spec.ts`, `dashboards-live.spec.ts` |
 | A receipt PDF | about 40 MB of PHP memory, under a second (Helvetica for Latin, Noto Sans Ethiopic subset for Amharic) | 4.3e, the Docker image |
 | A receipt photo | about 180 KB at 1600 px (about 1 GB a month at 200 digital payments a day) | 4.2a, the runbook |
 | `mod-inventory` | 18 m 34 s (PR #79) and 19 m 18 s (main, `76c25a0`) against a 20-minute timeout: now 30 | CI |
-| The whole CI run | <<CI:runtime>> | this PR |
+| The whole CI run | 88 minutes (23:45 to 01:14 UTC): `e2e-p4` 10 m 0 s and `perf-dashboards` 15 m 56 s side by side after `mod-analytics`, then `gate-p4` 13 m 26 s (the seed step 11 m 46 s, `gate:p4` 46 s) | this PR |
 
 ## Artifacts produced
 
