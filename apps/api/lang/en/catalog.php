@@ -10,6 +10,7 @@ return [
     'item' => [
         'not_a_product' => 'Only products have recipes, stations and modifiers.',
         'in_use' => 'An active recipe still uses this item; change the recipe first.',
+        'restock_not_stocked' => 'Only a product sold from stock or bought in can go back into stock when it is refunded. A product made to order uses up its ingredients, and an ingredient is never sold.',
     ],
     'category' => [
         'in_use' => 'This category still holds items or sub-categories; move them first.',

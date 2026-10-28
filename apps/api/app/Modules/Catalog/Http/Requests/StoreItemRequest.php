@@ -15,7 +15,8 @@ use Illuminate\Validation\Rule;
  * POST /items: an ingredient or a product of the admin's branch, named in both languages (rule 9). A product says how
  * it is fulfilled; an ingredient is always bought in (the default). The category holds items of the same kind; sku is
  * unique per branch; the batch size and the producing station belong to products only. Quantities are decimal
- * strings (ADR 0004).
+ * strings (ADR 0004). Step 4.1b: the two refund settings, booleans, optional (left out, Item takes their natural value); the
+ * controller refuses refund_restock = true where nothing can go back into stock (catalog.item.restock_not_stocked).
  */
 final class StoreItemRequest extends FormRequest
 {
@@ -49,6 +50,8 @@ final class StoreItemRequest extends FormRequest
             'default_batch_qty' => ['sometimes', 'nullable', 'prohibited_if:kind,ingredient', DecimalString::quantity()],
             'production_station_id' => ['sometimes', 'nullable', 'prohibited_if:kind,ingredient', 'integer', Rule::exists('stations', 'id')
                 ->where('branch_id', $branchId)->whereNull('deleted_at')],
+            'refundable' => ['sometimes', 'boolean'],
+            'refund_restock' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -72,6 +75,24 @@ final class StoreItemRequest extends FormRequest
             'is_new_until' => isset($data['is_new_until']) ? (string) $data['is_new_until'] : null,
             'default_batch_qty' => isset($data['default_batch_qty']) ? (string) $data['default_batch_qty'] : null,
             'production_station_id' => isset($data['production_station_id']) ? (int) $data['production_station_id'] : null,
-        ];
+        ] + self::refundSettings($data);
+    }
+
+    /**
+     * The refund settings the request names, as booleans; one left out is not in the array (Item gives it its natural value).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{refundable?: bool, refund_restock?: bool}
+     */
+    public static function refundSettings(array $data): array
+    {
+        $out = [];
+        foreach (['refundable', 'refund_restock'] as $key) {
+            if (array_key_exists($key, $data)) {
+                $out[$key] = filter_var($data[$key], FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        return $out;
     }
 }

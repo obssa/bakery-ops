@@ -32,6 +32,15 @@ final class CatalogError extends RuntimeException
         return new self('catalog.item.not_a_product', 422);
     }
 
+    /**
+     * Step 4.1b: a refunded unit goes back into stock only where its sale took the product itself out of stock (sold from stock or bought
+     * in); a product made to order uses its recipe's ingredients and an ingredient is never sold.
+     */
+    public static function restockNotStocked(): self
+    {
+        return new self('catalog.item.restock_not_stocked', 422, ['field' => 'refund_restock']);
+    }
+
     /** An ingredient an active recipe still uses cannot be deleted. */
     public static function itemInUse(): self
     {

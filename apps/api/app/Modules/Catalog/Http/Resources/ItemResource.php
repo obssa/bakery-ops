@@ -13,7 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * An item of either inventory as the admin catalog and the pads read it: kind, fulfilment, both names, its unit and
  * base unit, the New badge (is_new in the branch calendar), the batch size as a decimal string (ADR 0004), the
- * producing station, the stations its lines route to (in station order) and who created it.
+ * producing station, the stations its lines route to (in station order), its two refund settings (step 4.1b: refundable, and
+ * refund_restock: whether a refunded unit goes back into stock) and who created it.
  *
  * @mixin Item
  */
@@ -46,6 +47,8 @@ final class ItemResource extends JsonResource
             'is_new' => app(Items::class)->isNew($item),
             'default_batch_qty' => $item->default_batch_qty?->toString(),
             'production_station_id' => $item->production_station_id,
+            'refundable' => (bool) $item->refundable,
+            'refund_restock' => (bool) $item->refund_restock,
             'station_ids' => $item->stationAssignments
                 ->filter(fn (ItemStationAssignment $a): bool => $a->station !== null)
                 ->sortBy(fn (ItemStationAssignment $a): string => sprintf('%05d-%012d', $a->station->sort ?? 0, $a->station_id))

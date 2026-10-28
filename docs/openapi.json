@@ -15858,6 +15858,12 @@
                             "null"
                         ]
                     },
+                    "refundable": {
+                        "type": "boolean"
+                    },
+                    "refund_restock": {
+                        "type": "boolean"
+                    },
                     "station_ids": {
                         "type": "array",
                         "items": {
@@ -15903,6 +15909,8 @@
                     "is_new",
                     "default_batch_qty",
                     "production_station_id",
+                    "refundable",
+                    "refund_restock",
                     "station_ids",
                     "created_by_user_id",
                     "created_at",
@@ -17353,7 +17361,7 @@
             },
             "StoreItemRequest": {
                 "type": "object",
-                "description": "POST /items: an ingredient or a product of the admin's branch, named in both languages (rule 9). A product says how\nit is fulfilled; an ingredient is always bought in (the default). The category holds items of the same kind; sku is\nunique per branch; the batch size and the producing station belong to products only. Quantities are decimal\nstrings (ADR 0004).",
+                "description": "POST /items: an ingredient or a product of the admin's branch, named in both languages (rule 9). A product says how\nit is fulfilled; an ingredient is always bought in (the default). The category holds items of the same kind; sku is\nunique per branch; the batch size and the producing station belong to products only. Quantities are decimal\nstrings (ADR 0004). Step 4.1b: the two refund settings, booleans, optional (left out, Item takes their natural value); the\ncontroller refuses refund_restock = true where nothing can go back into stock (catalog.item.restock_not_stocked).",
                 "properties": {
                     "kind": {
                         "type": "string",
@@ -17415,6 +17423,12 @@
                             "integer",
                             "null"
                         ]
+                    },
+                    "refundable": {
+                        "type": "boolean"
+                    },
+                    "refund_restock": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -18488,7 +18502,7 @@
             },
             "UpdateItemRequest": {
                 "type": "object",
-                "description": "PATCH /items/{item}: any subset of the editable attributes. The kind is fixed (it decides which inventory the\nitem's stock belongs to); an ingredient stays bought in; the unit may change only within the same base unit (the\ncontroller checks, since every stock movement of the item is written in that base).",
+                "description": "PATCH /items/{item}: any subset of the editable attributes. The kind is fixed (it decides which inventory the\nitem's stock belongs to); an ingredient stays bought in; the unit may change only within the same base unit (the\ncontroller checks, since every stock movement of the item is written in that base). Step 4.1b: the two refund settings, booleans;\nrefund_restock = true where nothing can go back into stock is the controller's refusal (catalog.item.restock_not_stocked).",
                 "properties": {
                     "kind": {
                         "type": "string"
@@ -18547,6 +18561,12 @@
                             "integer",
                             "null"
                         ]
+                    },
+                    "refundable": {
+                        "type": "boolean"
+                    },
+                    "refund_restock": {
+                        "type": "boolean"
                     }
                 },
                 "title": "UpdateItemRequest"

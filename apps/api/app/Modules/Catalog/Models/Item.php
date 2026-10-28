@@ -25,6 +25,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * fulfilled to order, to stock or bought in. Quantities about the item (default_batch_qty, its stock) are in the base
  * unit of `unit`. The actor stamp columns are written once, at creation, from ActorContext (rule 4).
  *
+ * Step 4.1b (Ramin's answer to R-C, 2026-10-28): the admin's two refund settings. `refundable`: may the product be refunded at all.
+ * `refund_restock`: does a refunded unit go back into stock; only a product whose sale takes the product itself out of stock can
+ * (canRestock(): sold from stock or bought in), never a product made to order (its sale uses the recipe's ingredients) or an ingredient.
+ * Left unset on create they take their natural value (refundable for a product, restock for a product sold from stock), so an item made
+ * by the API, a seeder or a factory starts the same way the live rows were backfilled; and a save that leaves an item unable to restock
+ * (made to order now) turns refund_restock off with it. Catalog\Contracts\RefundPolicy is how Orders reads them.
+ *
  * @property int $id
  * @property int $branch_id
  * @property ItemKind $kind
@@ -39,6 +46,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property CarbonImmutable|null $is_new_until
  * @property Quantity|null $default_batch_qty
  * @property int|null $production_station_id
+ * @property bool $refundable
+ * @property bool $refund_restock
  * @property int $created_by_user_id
  * @property int|null $acting_user_id
  * @property int|null $shift_instance_id
@@ -67,7 +76,7 @@ final class Item extends Model
     /** @var list<string> the editable attributes; branch_id and the actor stamp are set explicitly on create */
     protected $fillable = [
         'kind', 'fulfilment', 'name_en', 'name_am', 'category_id', 'unit_id', 'sku', 'is_active', 'is_new_until',
-        'default_batch_qty', 'production_station_id',
+        'default_batch_qty', 'production_station_id', 'refundable', 'refund_restock',
     ];
 
     /** @var array<string, mixed> */
@@ -91,6 +100,8 @@ final class Item extends Model
             'is_new_until' => 'immutable_date',
             'default_batch_qty' => Quantity::class,
             'production_station_id' => 'integer',
+            'refundable' => 'boolean',
+            'refund_restock' => 'boolean',
             'created_by_user_id' => 'integer',
             'acting_user_id' => 'integer',
             'shift_instance_id' => 'integer',
@@ -100,6 +111,34 @@ final class Item extends Model
             'updated_at' => 'immutable_datetime',
             'deleted_at' => 'immutable_datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        self::creating(function (Item $item): void {
+            $item->refundable ??= $item->kind === ItemKind::Product;
+            $item->refund_restock ??= $item->canRestock();
+        });
+        self::saving(function (Item $item): void {
+            if ($item->refund_restock === true && ! $item->canRestock()) {
+                $item->refund_restock = false;
+            }
+        });
+    }
+
+    /**
+     * Whether a refunded unit can go back into stock at all: only for a product whose sale takes the product itself out of stock (sold
+     * from stock, or bought in), never for a product made to order (its sale consumes the recipe's ingredients) or an ingredient.
+     */
+    public function canRestock(): bool
+    {
+        return self::restocks($this->kind, $this->fulfilment);
+    }
+
+    /** canRestock() for an item of this kind and fulfilment, before it is saved. */
+    public static function restocks(?ItemKind $kind, ?Fulfilment $fulfilment): bool
+    {
+        return $kind === ItemKind::Product && $fulfilment !== null && $fulfilment !== Fulfilment::ToOrder;
     }
 
     public function isProduct(): bool

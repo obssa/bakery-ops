@@ -14,7 +14,8 @@ use Illuminate\Validation\Rule;
 /**
  * PATCH /items/{item}: any subset of the editable attributes. The kind is fixed (it decides which inventory the
  * item's stock belongs to); an ingredient stays bought in; the unit may change only within the same base unit (the
- * controller checks, since every stock movement of the item is written in that base).
+ * controller checks, since every stock movement of the item is written in that base). Step 4.1b: the two refund settings, booleans;
+ * refund_restock = true where nothing can go back into stock is the controller's refusal (catalog.item.restock_not_stocked).
  */
 final class UpdateItemRequest extends FormRequest
 {
@@ -52,6 +53,8 @@ final class UpdateItemRequest extends FormRequest
             // a batch size and a producing station belong to products only
             'default_batch_qty' => $isIngredient ? ['prohibited'] : ['sometimes', 'nullable', DecimalString::quantity()],
             'production_station_id' => $isIngredient ? ['prohibited'] : ['sometimes', 'nullable', 'integer', $stationExists],
+            'refundable' => ['sometimes', 'boolean'],
+            'refund_restock' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -86,6 +89,6 @@ final class UpdateItemRequest extends FormRequest
             $out['is_active'] = (bool) $data['is_active'];
         }
 
-        return $out;
+        return $out + StoreItemRequest::refundSettings($data);
     }
 }

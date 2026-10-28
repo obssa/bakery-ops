@@ -6,6 +6,8 @@ namespace App\Modules\Catalog\Http\Controllers;
 
 use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Catalog\Contracts\Units;
+use App\Modules\Catalog\Enums\Fulfilment;
+use App\Modules\Catalog\Enums\ItemKind;
 use App\Modules\Catalog\Exceptions\CatalogError;
 use App\Modules\Catalog\Http\Requests\ListItemsRequest;
 use App\Modules\Catalog\Http\Requests\StoreItemRequest;
@@ -23,7 +25,9 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 /**
  * Items of both inventories in the admin's branch (catalog.view to read, catalog.manage to write). Every write is one
  * AuditedAction; a create carries the actor stamp (rule 4); another branch's item is 404 through the BranchScoped
- * route binding (rule 8). Delete is soft and refused while an active recipe still uses the item.
+ * route binding (rule 8). Delete is soft and refused while an active recipe still uses the item. Step 4.1b: refund_restock = true
+ * is refused for an item that cannot go back into stock (an ingredient, a product made to order: catalog.item.restock_not_stocked, 422),
+ * on create and on update, judged on the item as it would be after the change; the audit row records the settings with the rest.
  */
 final class ItemsController
 {
@@ -54,9 +58,12 @@ final class ItemsController
 
     public function store(StoreItemRequest $request): JsonResponse
     {
-        $item = $this->audit->run(function () use ($request): Item {
+        $attributes = $request->itemAttributes();
+        self::assertRestockable($attributes['refund_restock'] ?? null, $attributes['kind'], $attributes['fulfilment']);
+
+        $item = $this->audit->run(function () use ($attributes): Item {
             $item = new Item;
-            $item->fill($request->itemAttributes());
+            $item->fill($attributes);
             $item->forceFill(['branch_id' => $this->branch->id()] + $this->actor->stamp());
             $item->save();
 
@@ -78,6 +85,7 @@ final class ItemsController
             throw CatalogError::unitIncompatible('unit_id');
         }
         $changes = $request->changes();
+        self::assertRestockable($changes['refund_restock'] ?? null, $item->kind, $changes['fulfilment'] ?? $item->fulfilment);
 
         $this->audit->run(function (Item $i) use ($changes): Item {
             $i->fill($changes)->save();
@@ -86,6 +94,16 @@ final class ItemsController
         }, $item, 'item.update');
 
         return response()->json((new ItemResource($item->fresh() ?? $item))->resolve($request));
+    }
+
+    /**
+     * @throws CatalogError catalog.item.restock_not_stocked (422) when restock is asked of an item that cannot go back into stock
+     */
+    private static function assertRestockable(?bool $restock, ItemKind $kind, Fulfilment $fulfilment): void
+    {
+        if ($restock === true && ! Item::restocks($kind, $fulfilment)) {
+            throw CatalogError::restockNotStocked();
+        }
     }
 
     public function destroy(Request $request, Item $item): JsonResponse
