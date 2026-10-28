@@ -766,6 +766,10 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        `module:payments`, `gate:p4`) and `RefundReversalGateTest` (`gate:p4`, on the seeded history) join the gate. Changed: the type lists
        of `NotificationsSchemaTest` and `NotificationTextTest`, `PaymentsLangTest` (33 keys), `TouchTodayDebounceTest` (`RefundPaid`),
        `SoftDeletesTest` (`PaymentRefund`), `ItemBuilderTest` (one case). No test turns a shift rule off.
+     - **Left for the refund UI step**: `pay-refund.spec.ts`, `dashboards-audit.spec.ts`, the `VoidDialog` and `OrderRecord` placeholders,
+       the event kinds of `lib/orderRecord.ts` (their `TODO(p4)` stay) and the admin's two product toggles.
+     - STATUS: `phase_status.py module-stable payments` after `mod-payments` passed on this PR's CI (PR #84), and phase 4's `payments` step
+       `done` (the script marks the module's own phase, 1, so the phase 4 step was set beside it).
    - **4.3e `phase-4/receipts-reconciliation`**: M5; `composer require barryvdh/laravel-dompdf` (pinned, needs `dom`, `mbstring`, `gd`), the bundled `NotoSansEthiopic-Regular.ttf` (SIL OFL,
      registered into `storage/fonts` lazily and under a lock, `receipts:fonts` to warm it), `ReceiptRenderer`, the receipt routes, `receipt-settings` PUT, `GET /payments/reconciliation`,
      `GET /payments/export` (OpenSpout for xlsx, plain CSV; see 10.8 R-E), runbook "Receipts" (fonts folder, memory). Tests: `ReceiptRendererTest` (text extracted from the PDF contains the

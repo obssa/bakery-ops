@@ -168,7 +168,7 @@
       "modules": {
         "contracts": "done",
         "shared.files": "done",
-        "payments": "in_progress",
+        "payments": "done",
         "analytics": "done",
         "web": "in_progress",
         "docs": "in_progress"
@@ -239,7 +239,7 @@
     "payments": {
       "phase": 1,
       "status": "stable",
-      "stable_since": "2026-10-20T17:15:53Z"
+      "stable_since": "2026-10-28T21:14:22Z"
     },
     "notifications": {
       "phase": 2,
