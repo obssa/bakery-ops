@@ -122,8 +122,9 @@ final class RefundPayments
             $proof = $proofFileId === null ? null : $this->proof($proofFileId, true);
 
             $rows = $this->write($refund, $clientUuid, $shares, $requester, $approver, $reference, $digital === [] ? null : $proof);
-            if ($proof instanceof StoredFile && $digital !== []) {
-                $claimer = collect($rows)->first(fn (PaymentRefund $r): bool => $r->proof_file_id === $proof->id);
+            $claimer = $proof instanceof StoredFile ? collect($rows)->first(fn (PaymentRefund $r): bool => $r->proof_file_id === $proof->id) : null;
+            if ($proof instanceof StoredFile && $claimer instanceof PaymentRefund) {
+                // the first digital row claims the photo of the transfer; a refund with no digital share leaves it unclaimed
                 $this->files->attach($proof, 'payment_refund', $claimer->id);
             }
 
