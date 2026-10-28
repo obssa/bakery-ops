@@ -1,9 +1,9 @@
 # ADR 0016: Refunds, voids and the cash drawer
 
-- Status: **proposed** (phase-4 plan section 9; written at the Phase 4 gate step 4.6b, 2026-10-28). Ramin answered R-C (what a refund
-  does to stock, phase-4 plan 10.2) on 2026-10-28; the refund part below is his rule. The void part is built (step 4.3c), the stock and
-  order side of the refund is built (step 4.1b); both are recorded in the dated notes below. The ADR is accepted when the money side
-  (step 4.3d) or the refund screens complete the refund work.
+- Status: **accepted** (step 4.3d, 2026-10-28; proposed in phase-4 plan section 9, written at the Phase 4 gate step 4.6b). Ramin answered
+  R-C (what a refund does to stock, phase-4 plan 10.2) on 2026-10-28; the refund part below is his rule. The void is built (step 4.3c),
+  the stock and order side of the refund (step 4.1b) and its money side with the endpoint (step 4.3d); each is recorded in the dated
+  notes below. The refund screens (the till's sheet, the admin's two toggles) come with the refund UI step and change nothing here.
 - Date: 2026-10-28
 - Phase: 4
 
@@ -44,11 +44,11 @@ cash was paid out of it.
    out by `(received_at, id)` over the order's payments, each taking at most its open amount (`amount - refunded_amount`), unless the
    sheet gives an explicit allocation on a split bill; an outgoing transfer carries its reference and may carry a proof photo
    (`refund_proof`, ADR 0015).
-5. **Proposed: the drawer.** A cash share is paid out of the drawer inside the till's shift (the shift rule of ADR 0013 applies to it as
+5. **The drawer.** A cash share is paid out of the drawer inside the till's shift (the shift rule of ADR 0013 applies to it as
    to a payment), so `Totals::cash(shift)` is the cash taken **less the cash refunded** in that shift and `Totals::byChannel(shift)` adds
    the refunds per channel. Shifts' code and its declaration arithmetic do not change: the expected cash simply falls by the refund, so
    a refund never reads as a shortage.
-6. **Proposed: limits.** A refund within `payments.refund_window_hours` (72) of the payment (`409 orders.refund.window_closed` beyond it;
+6. **Limits.** A refund within `payments.refund_window_hours` (72) of the payment (`409 orders.refund.window_closed` beyond it;
    the number is plain config, R-O); a partial refund of an order that carries a discount or tax is refused until those are defined
    (`422 orders.refund.partial_not_allowed`, R-D); a whole-order refund returns the full total. The window runs from the order's close.
 7. **Analytics counts refunds on the cash basis** (ADR 0014): on the day they were paid back (`refunded_at`), so a day's net revenue can
@@ -56,9 +56,10 @@ cash was paid out of it.
 
 ## Consequences
 
-- Until 4.3d is built no refund reaches the till: `Orders::refund` exists (4.1b) but no endpoint calls it, the order record shows
-  "refunds are not available yet", the demo seed plays no refund (`DayPlan::REFUND_PCT` is 0), and the refund figures of the summaries are
-  zero. The void of a payment before the order is paid works today.
+- Since 4.3d a refund is one call, `POST /orders/{order}/refund`, and the demo seed plays about one closed order in fifty refunded
+  (`DayPlan::REFUND_PCT` 2), so the refund figures of the summaries, the reconciliation and the receipts are real. Until the refund UI
+  step the till and the order record have no button for it ("refunds are not available yet"). The void of a payment before the order is
+  paid works as before.
 - The admin owns the stock meaning of a refund: a wrong setting (a made-to-order product the admin wants restocked) is refused at the
   catalog, not at the till; the existing products were backfilled (sold from stock: restock; made to order: waste; ingredients: not
   refundable).
@@ -74,8 +75,11 @@ Built (the void): `PaymentVoidTest`, `PaymentVoidRaceTest` (`tests/Gate`, `gate:
 `ApplyPaymentTest`. Built (the refund's stock and order side, 4.1b): contract cases 5 to 9, 11, 13 and three cases of Ramin's rule
 (`contract:payments->orders`), `contract:orders->inventory` cases 13 to 15 (with a seeded property test), the `contract:orders->catalog`
 case of `RefundPolicy`, `RefundOrderTest`, `ItemRefundSettingsTest`, `OrderRefundsSchemaTest`, `StockMovementReversalsSchemaTest`,
-`AppendOnlyTest`. To come with 4.3d: `contract:shifts->payments` (cash net of refunds), `RefundTest`, `RefundRaceTest`,
-`RefundMoneyPropertyTest`, `RefundAuditTest`, `RefundReversalGateTest`.
+`AppendOnlyTest`. Built (the money side, 4.3d): the `contract:shifts->payments` case of cash net of refunds, the
+`contract:payments->orders` case of `Orders::refundMovements`, the `contract:orders->inventory` case of `Reversals::returns`, the
+`contract:analytics->facts` case of `Orders\Facts::refundLines`, `RefundTest`, `RefundAuditTest`, `CashFiguresTest`,
+`RefundMoneyPropertyTest`, `RefundNotificationTest`, `RefundRaceTest` and `RefundReversalGateTest` (`tests/Gate`, `gate:p4`, the second
+on the seeded history), and `Phase4SeederTest`'s refunds.
 
 ## Alternatives considered
 
@@ -110,3 +114,19 @@ or the product used at a station), and anything that cannot be put back (a produ
 approver; `OrderRefunded` follows the commit. The asker holds `orders.void_request`, the approver `payments.void`; the PIN is the caller's
 (4.3d's endpoint checks it before the transaction, after `Orders::assertRefundable`). The phase-4 plan's As built note of 4.1b has the
 refusals and the rest.
+
+## Note (step 4.3d, 2026-10-28): the money side as built
+
+`POST /orders/{order}/refund` (Payments' `RefundsController`, `Actions\RefundPayments`): `orders.void_request` asks, the PIN of a
+`payments.void` holder approves. Orders' checks (`Orders::assertRefundable`) and the shares of an `allocation` and the proof photo as
+they are come first, so a refused refund spends no PIN attempt; then the PIN outside any transaction; then one transaction: the order's
+row lock, `Orders::refund`, the order's payments `FOR UPDATE`, the shares (last in, first out by `(received_at, id)`, or the
+`allocation`, which must add up to the refund: `422 payments.refund.allocation_invalid`), the shift rule per share (`409
+payments.shift.required` for a cash share without the till's open shift, every channel when `payments.require_shift` says so), a digital
+share's reference (`422 payments.refund.reference_required`) and its optional `refund_proof` photo (`422 payments.refund.proof_invalid`,
+the same checks as a receipt photo, claimed by the first digital row), one `payment_refunds` row per share and each payment's
+`refunded_amount`, `RefundPaid` after the commit, and one `order.refund` audit row written last with ids and amounts only. Any refusal
+inside rolls the stock and order side back too. `Totals::cash` is net of the cash refunds keyed on the refund's own shift, and
+`Totals::byChannel` lists each channel's refunds; Shifts' code is unchanged. `NotifyRefund` listens to `RefundPaid`, not
+`OrderRefunded`, because the text needs the order number and the approver's name and Notifications reads neither Orders nor Payments.
+The phase-4 plan's As built note of 4.3d has the details.

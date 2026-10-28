@@ -266,8 +266,8 @@ so Notifications and Analytics never import a producer.
 | `PaymentVerified` (new) | payment_id, order_id, channel_code, amount, by_user_id | Analytics `TouchToday` | queued |
 | `PaymentDisputed` (new) | payment_id, order_id, channel_code, amount, reason, by_user_id, order_no, channel names en/am | Notifications `NotifyPaymentDisputed` (admins and managers: in-app, push, Telegram, deduped per payment), Analytics `TouchToday` | queued |
 | `PaymentVoided` (new, in the manifest's event list but never built) | payment_id, order_id, channel_code, amount, reason, by_user_id, approved_by_user_id | Orders `ReversePayment` (**sync, in the voiding transaction**), Analytics `TouchToday` | sync + queued |
-| `OrderRefunded` (new, Orders, after commit) | order_id, refund_id, amount, is_full, line_ids, movement_ids, by_user_id, approved_by_user_id, reason | Analytics `TouchToday` (and the refund's own day), Notifications `NotifyRefund` (admins: "a refund of 120.00 on order 17 approved by ...") | queued |
-| `RefundPaid` (new, Payments, after commit) | refund_id, order_id, payment_refunds [{channel_code, amount}] | Analytics `TouchToday`; Shifts: nothing (it reads `Totals::cash`) | queued |
+| `OrderRefunded` (new, Orders, after commit) | order_id, refund_id, amount, is_full, line_ids, movement_ids, by_user_id, approved_by_user_id, reason | Analytics `TouchToday` (and the refund's own day); *as built in 4.3d:* `NotifyRefund` listens to `RefundPaid` instead (this payload has no order number or name, and Notifications may read neither Orders nor Payments) | queued |
+| `RefundPaid` (new, Payments, after commit) | refund_id, order_id, payment_refunds [{channel_code, amount}]; *as built in 4.3d:* also order_no, amount, is_full, reason, by_user_id, approved_by_user_id, approved_by_name, and each share's payment_id | Analytics `TouchToday`; Notifications `NotifyRefund` (the holders of `payments.verify` without the asker and the approver, in the inbox: "120.00 ETB was given back on order #17, approved by ..."); Shifts: nothing (it reads `Totals::cash`) | queued |
 | `OrderPaid`, `OrderVoided` (exist) | | Analytics `TouchToday` | queued |
 | `ShiftLocked` (exists, "no listener in Phase 3") | shift_id, station_id, date, locked_at, ... | Analytics `RebuildAfterShiftLocked`: the local dates from the shift's opening to its lock (one or two: a Night shift touches `date` and `date+1`), one unique job each | **yes** |
 | `AnalyticsDayRebuilt` (new, Analytics) | day, trigger, version, changed | none (the freshness feed reads `analytics_days`); useful to tests | n/a |
@@ -702,6 +702,70 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
      Tests: `RefundTest` (full, line, the dispositions the product settings give, allocation across a split, cash share needs the shift), `RefundRaceTest` (two managers refund the same order: one wins, one `409
      orders.refund.line_refunded`), `RefundMoneyPropertyTest` (random split/void/refund sequences: `Σ payments - Σ voids - Σ refunds = Σ order totals - Σ refunded_total` and the
      ledger oracle holds), `RefundAuditTest` (every refund and void has its audit row, no PIN/reference/URL in the snapshot).
+   - **As built (step 4.3d, `phase-4/payments-refund`), on Ramin's rule (R-C, 2026-10-28).** Order: the tests red (the cases below failing
+     on a missing route, class, method, migration or lang key); the provider reads (Inventory `Reversals::returns`, `Orders::refundMovements`,
+     `Orders\Facts::refundLines`); `Totals` net of refunds with the `PaymentRefund` model; `refunded_qty`; the endpoint with `RefundPaid`,
+     `NotifyRefund` and its migration; the seed; OpenAPI, ERD, manifest, ADR 0016, STATUS and this note. Where the code disagreed with the
+     plan or the plan left a choice:
+     - **The endpoint** is Payments' (`Http\Controllers\RefundsController`, route `payments.refund`, `permission:orders.void_request` and
+       `idempotency`; the shared middleware leaves `pin` out of the fingerprint) on `Actions\RefundPayments`, which the seed calls too (there
+       is no `Payments::refund` contract method: nothing outside Payments asks for one). Body `{client_uuid, reason, pin, lines?,
+       allocation?, refund_reference?, refund_proof_file_id?}`; anything else (a disposition) is ignored.
+     - **Before the PIN**: the asker (`PaymentAccess::person('orders.void_request')`, `403 auth.forbidden`), `Orders::assertRefundable`, and
+       the parts of Payments' checks that need no amount: each `allocation` share (a payment of the order that is not voided, named once,
+       more than zero, within `amount - refunded_amount`) and the proof photo. A refund already made under the `client_uuid` skips them
+       (its money rows are found by their own UUIDs). Then `verifyPinFor('payments.void')` (`403 identity.pin.rejected`, `423
+       identity.short_code.locked`).
+     - **Under the locks** (one transaction: the order row through `Orders::forPayment(lock)`, then `Orders::refund` with its lines and the
+       ledger, then the order's payments `FOR UPDATE` in id order): the shares, last in, first out by `(received_at, id)` descending, or the
+       `allocation`, which must now add up to the refund (`422 payments.refund.allocation_invalid {reason: sum | payment | exceeds | repeated
+       | amount, payment_id}`); the shift rule per share (`ShiftRule::needsShift`: `409 payments.shift.required`); a digital share needs
+       `refund_reference` (`422 payments.refund.reference_required {channel_code}`); the proof again under its row lock (`422
+       payments.refund.proof_invalid {reason: not_found | wrong_purpose | attached | expired}`, the receipt photo's checks with purpose
+       `refund_proof` and `payments.photo_max_age_hours`). These come after the PIN because the shares depend on the amount Orders computes;
+       any of them rolls the stock and order side back as well.
+     - **Rows.** One `payment_refunds` row per share (`client_uuid` = UUIDv5 of `payment-refund:{branch}:{refund client_uuid}:{payment}`;
+       the payment's channel; `refunded_by` = the asker, `approved_by` = the approver, the acting person, the shift the money left in, the
+       station and device; `reference_no` and `proof_file_id` on a digital share only); each payment's `refunded_amount` grows by its share.
+       The proof is claimed (`Files::attach`, type `payment_refund`) by the first digital row; a proof sent with a refund that has no
+       digital share is left unclaimed (the orphan purge takes it). A replay (same `client_uuid`, another key) answers `200` with the rows
+       as written; the same key answers the stored `201`.
+     - **Audit.** One `order.refund` row, written last inside the refund's transaction (`AuditedAction::run` around the finished outcome, so
+       its context can carry the refund's id), subject `none`, actor the asker, context `{order_id, refund_id, amount, is_full, reason,
+       line_ids, movement_ids, approved_by_user_id, payments: [{payment_refund_id, payment_id, channel_code, amount}]}`; never the PIN, the
+       reference or the photo (`RefundAuditTest`).
+     - **Answer.** `201 {refund: OrderRefundView::toArray (id, order_id, amount, is_full, reason, requested_by_user_id, approved_by_user_id,
+       lines with their dispositions and movement_ids), payments: [{id, payment_id, channel_code, channel_name_en, channel_name_am, amount,
+       reference_no, proof_file_id, shift_instance_id, refunded_at}] (in the order paid), movements: [{id, item_id, location_id, qty,
+       reverses}], order: {id, status, total, paid, balance, refunded, net_paid}}`. The movements come from `Orders::refundMovements(refund)`
+       (new; `RefundMovementView`), which reads them through Inventory's new `Reversals::returns(ids)` (`LedgerReader::returnsOf`): Payments
+       may not read the ledger.
+     - **`RefundPaid`** (Shared, after commit) carries `refund_id, order_id, order_no, amount, is_full, reason, by_user_id,
+       approved_by_user_id, approved_by_name, payment_refunds [{payment_id, channel_code, amount}]`; Analytics' `TOUCHES_TODAY` lists it.
+       **`NotifyRefund` listens to it, not to `OrderRefunded`** (section 5 corrected): the line needs the order number and the approver's
+       name, and Notifications may read neither Orders nor Payments. Type `order_refunded`: severity info, the inbox only, key
+       `order_refunded:{refund_id}`, deep link `/admin/orders/record?id={order_id}`, told to the holders of `payments.verify` without the
+       asker and the approver, queued after commit. Migration `2026_11_10_100100_extend_notification_types_for_refunds` (the inbox CHECK
+       gains the type; DDL only).
+     - **Totals.** `Totals::cash(shift)` = the shift's non-voided cash payments less the cash `payment_refunds` whose `shift_instance_id` is
+       the shift (a refund keyed on its own shift, as a payment is); a shift that only gave money back answers a negative amount.
+       `Totals::byChannel` lists a channel that took or gave back money in the shift, with `refunds` and `refund_total` beside `receipts`
+       and `sum` (`ChannelTotal::refunds`/`refundTotal`, defaults 0, so `GET /shifts/{shift}` shows them; `CashDeclarations` maps its own
+       keys and does not change). `CashFiguresTest` proves the till's `cash_sales_total` and `expected_total` fall by a cash refund.
+     - **Facts and reports.** `Payments\Facts::refunds` already read `payment_refunds` (4.1c); `Orders\Facts::refundLines(range)`
+       (`RefundLineFact`, the day of `order_refund_lines.created_at`) fills `daily_item_metrics.refunded_qty` (restocked and waste alike;
+       an item only refunded that day gets its row). The reconciliation (4.3e), the receipts (4.3e) and the dashboards (4.4c) read
+       `payment_refunds` and the summaries, so they show the real refunds without a change.
+     - **Seed.** `DayPlan::REFUND_PCT` = 2 (its `TODO(p4)` gone). `DemoTill` plays the refund 6 minutes after the payment (10 after a
+       voided part payment, whose bill is paid again in cash at +4), through `RefundPayments` (its pre-PIN checks, then `handle`): the
+       cashier asks, the manager approves, every fourth refunded order of more than one line gives back its first line only, a digital
+       share's reference is `SEED-R-{yymmdd}-{n}`. `Phase4SeederTest` checks the refund count against the plan, the day figures against the
+       raw rows, every return against its original, and the money identity with real refunds.
+     - **Tests.** The split example of the plan (Telebirr 70 + cash 50, refund 40) uses the menu's prices: a 30.00 water comes back in cash,
+       then a 60.00 croissant takes the 20.00 cash left and 40.00 of Telebirr. `RefundRaceTest` (`tests/Gate`, `concurrency`,
+       `module:payments`, `gate:p4`) and `RefundReversalGateTest` (`gate:p4`, on the seeded history) join the gate. Changed: the type lists
+       of `NotificationsSchemaTest` and `NotificationTextTest`, `PaymentsLangTest` (33 keys), `TouchTodayDebounceTest` (`RefundPaid`),
+       `SoftDeletesTest` (`PaymentRefund`), `ItemBuilderTest` (one case). No test turns a shift rule off.
    - **4.3e `phase-4/receipts-reconciliation`**: M5; `composer require barryvdh/laravel-dompdf` (pinned, needs `dom`, `mbstring`, `gd`), the bundled `NotoSansEthiopic-Regular.ttf` (SIL OFL,
      registered into `storage/fonts` lazily and under a lock, `receipts:fonts` to warm it), `ReceiptRenderer`, the receipt routes, `receipt-settings` PUT, `GET /payments/reconciliation`,
      `GET /payments/export` (OpenSpout for xlsx, plain CSV; see 10.8 R-E), runbook "Receipts" (fonts folder, memory). Tests: `ReceiptRendererTest` (text extracted from the PDF contains the
@@ -1739,8 +1803,8 @@ fresh branch `Phase3Seeder` writes only its templates and reasons while `Phase4S
 **The day plan** (seeded `mt_srand(4040)`, so the same 90 days every run): weekdays about 22 orders, weekends about 34 (about 2 000 orders in all, 6 000 lines); a channel mix of (cash 45%, Telebirr 30%,
 CBE Birr 10%, bank transfers 15%); 12% of paid orders are **split** (a digital part with a photo and the rest in cash); every digital payment carries a generated receipt photo (five small GD-drawn
 images, EXIF-free, cycled) and a reference `SEED-{yymmdd}-{n}`; about 1.5% of payments are **voided** before the order is paid (and the order re-paid in cash) and 2% of orders are **refunded** (each line as its
-product's settings say: the display case's back into stock, the station's made-to-order lines `waste`), a handful by line (*as built in 4.6a:* `DayPlan::REFUND_PCT` is 0 until step 4.3d, `TODO(p4): 4.3d`; the roll is drawn on every
-order already); 40% of digital payments are verified, 3% disputed (a few resolved); 1% of sent orders are voided; the
+product's settings say: the display case's back into stock, the station's made-to-order lines `waste`), a handful by line (*as built in 4.6a:* the roll is drawn on every order; *as built in 4.3d:* `DayPlan::REFUND_PCT` is 2, played by
+`DemoTill` after the payment, every fourth refunded order of more than one line by its first line); 40% of digital payments are verified, 3% disputed (a few resolved); 1% of sent orders are voided; the
 display case and the bakery are kept stocked by daily production batches and weekly purchases so stock-outs are rare and planned (three days in the 90 have one, with the production request it
 causes); one Day shift per tracked station per day, closed and locked with the closing count equal to the ledger except on five planned days (a kitchen spoilage, a till cash difference); a Night
 shift at the bakery every Friday (not when Friday is yesterday: that night would end today). Dates and volumes are constants in `Demo\DayPlan` so a test can state them; the As built note of 4.6a

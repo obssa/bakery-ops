@@ -216,7 +216,7 @@
         "Availability::ofProduct(product, location) / bulk(products[], location) (branches on items.fulfilment: to_order = floor(min(available ingredient / qty)), to_stock and bought_in = on_hand of the product at its location)",
         "Locations::forProduct(item) (its order station's location, the display case for counter products), forStation(station), displayCase()",
         "Phase 2: Purchases::confirm, Transfers::request/confirm, Costs::movingAverage, RecipeCost::rollUp, ReorderRules::evaluate",
-        "Phase 4: Reversals::of(movementIds) writes one `return` per original sale / production_consume and a stock_movement_reversals row, in the Ledger's lock order (as built in 4.1b: Ledger::reverse; also consumptionsOf(ref, item) and reversed(ids)); Facts::movements/closingBalances/stockOuts/unitCosts"
+        "Phase 4: Reversals::of(movementIds) writes one `return` per original sale / production_consume and a stock_movement_reversals row, in the Ledger's lock order (as built in 4.1b: Ledger::reverse; also consumptionsOf(ref, item) and reversed(ids); 4.3d: returns(ids), the return movements among the ids, for a refund's answer); Facts::movements/closingBalances/stockOuts/unitCosts"
       ],
       "events": [
         "StockChanged",
@@ -258,7 +258,7 @@
           "Availability::bulk",
           "Locations::forProduct",
           "consumeMany(refs, sale) for display-case lines at payment",
-          "Reversals::of / consumptionsOf for a refund that sends units back into stock (Phase 4)"
+          "Reversals::of / consumptionsOf for a refund that sends units back into stock (Phase 4); Reversals::returns for the refund's answer (4.3d)"
         ],
         "catalog": [
           "Prices::at(now) snapshot",
@@ -292,7 +292,8 @@
         "Tickets::since(station, cursor)",
         "Orders::totals(order)",
         "Orders::openAt(station, time)",
-        "Orders::refund(order, reason, approver User, lines, client_uuid) (step 4.1b, Ramin's answer to R-C): each line follows its product's Catalog settings (restock writes ONE reversing `return` per movement of the product itself via Inventory Reversals, waste writes none); the money back is the lines' line_total; Orders::assertRefundable for the checks before the PIN; the approver's PIN is checked by the caller (plan 10.9 item 8)"
+        "Orders::refund(order, reason, approver User, lines, client_uuid) (step 4.1b, Ramin's answer to R-C): each line follows its product's Catalog settings (restock writes ONE reversing `return` per movement of the product itself via Inventory Reversals, waste writes none); the money back is the lines' line_total; Orders::assertRefundable for the checks before the PIN; the approver's PIN is checked by the caller (plan 10.9 item 8)",
+        "Orders::refundMovements(refund) (step 4.3d): the return movements of a refund as RefundMovementView {id, item_id, location_id, qty, reverses}, read through Inventory Reversals::returns, for POST /orders/{order}/refund"
       ],
       "events": [
         "OrderSent",
@@ -345,9 +346,9 @@
         "Payments::record(order, channel, amount, reference?, photo?) enforcing requires_photo / requires_reference",
         "Payments::balanceDue(order)",
         "verify / dispute",
-        "void / refund (Phase 4)",
+        "void / refund (Phase 4; as built: POST /payments/{payment}/void in 4.3c, POST /orders/{order}/refund in 4.3d on Orders::refund, Actions\\RefundPayments)",
         "Totals::byChannel(date | shift_instance)",
-        "Totals::cash(shift_instance)"
+        "Totals::cash(shift_instance) (net of the cash refunds paid out in that shift, 4.3d)"
       ],
       "events": [
         "PaymentRecorded",
@@ -552,7 +553,8 @@
           "Orders\\Facts::sales(range)",
           "Orders\\Facts::lines(range)",
           "Orders\\Facts::voids(range)",
-          "Orders\\Facts::stationLines(range)"
+          "Orders\\Facts::stationLines(range)",
+          "Orders\\Facts::refundLines(range)"
         ],
         "payments": [
           "Payments\\Facts::payments(range)",
@@ -731,7 +733,8 @@
         "every movement carries the pad account as user_id and the waiter as acting_user_id, with station and device",
         "Phase 4 (4.1b): Reversals::of writes one return per original (opposite quantity, at its place, pointing at it) with its stock_movement_reversals row, in the Ledger's ascending lock order",
         "Reversals::of refuses what is not a sale or production_consume, another branch's movement, or one reversed already, and writes nothing for the batch",
-        "the ledger oracle holds after reversals, and 50 seeded sale and reversal sequences never take on_hand or reserved below zero"
+        "the ledger oracle holds after reversals, and 50 seeded sale and reversal sequences never take on_hand or reserved below zero",
+        "Phase 4 (4.3d): Reversals::returns(ids) reads the return movements among the ids, ascending, each pointing at its original; a sale or an unknown id is left out"
       ]
     },
     "orders->catalog": {
@@ -776,7 +779,8 @@
         "Orders::totals also reports refunded and net_paid",
         "a line of a product the admin marked not refundable is 422 orders.refund.line_not_refundable {line_id}, nothing written",
         "no lines named refunds every refundable line and skips the others; none refundable is 409 orders.refund.not_refundable",
-        "the disposition follows the product's refund_restock at the moment of the refund, and a later change of the settings never rewrites a past refund"
+        "the disposition follows the product's refund_restock at the moment of the refund, and a later change of the settings never rewrites a past refund",
+        "Phase 4 (4.3d): Orders::refundMovements(refund) answers each return of the refund with its item, place, quantity and the original it reverses, the same on a replay"
       ]
     },
     "production->inventory": {
@@ -850,7 +854,8 @@
         "Totals::cash(shift) sums only non-voided cash payments whose own shift_instance_id is that shift (a payment is keyed on the shift it was taken in, not on its order's)",
         "Totals::byChannel(shift) counts and sums per channel",
         "other channels, shifts, voided payments and branches are left out; amount is summed, not tendered or change",
-        "Payments::record stamps the actor's shift"
+        "Payments::record stamps the actor's shift",
+        "Phase 4 (4.3d): Totals::cash(shift) is net of the cash payment_refunds keyed on that shift (a refund keyed on its own shift, like a payment); Totals::byChannel lists each channel's refunds and refund_total, a channel that only gave money back included"
       ]
     },
     "analytics->facts": {
@@ -865,7 +870,8 @@
         "closingBalances(day) equals Stock::balanceAt(end of local day); unitCosts(day) equals the item_cost_history row in force",
         "Shifts\\Facts::instances returns a shift once for any range holding a local day of its life (a Night shift)",
         "step 4.4a additions: Orders voids (voided_at / cancelled_at) and stationLines (once per local day a line was readied, served or rejected); PaymentFact duplicate_reference; RefundFact order_refund_id; StockOutFact station_id; ShiftFact variance_line_count and cash_variance of its final counts; Catalog ItemSummary categoryId",
-        "step 4.4c additions: Payments Facts::channels(ids) names removed and switched-off channels, never another branch's, in one query; Catalog Items::labels(ids) (kind, base unit, category names, is_new at local midnight, deleted items named) in one query; Identity ActorDirectory names people (left ones too) and stations, and lists a person's work stations (assignments, or every station with stations.all)"
+        "step 4.4c additions: Payments Facts::channels(ids) names removed and switched-off channels, never another branch's, in one query; Catalog Items::labels(ids) (kind, base unit, category names, is_new at local midnight, deleted items named) in one query; Identity ActorDirectory names people (left ones too) and stations, and lists a person's work stations (assignments, or every station with stations.all)",
+        "Phase 4 (4.3d): Orders\\Facts::refundLines(range) answers the refunded lines on the day of the refund with item, qty (scale 4), amount (scale 2) and the disposition kept"
       ],
       "note": "committed red by 4.1a; the mod-analytics job adds the group to its contracts input in step 4.1c, when the ports exist"
     },
