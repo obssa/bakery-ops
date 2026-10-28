@@ -14,6 +14,7 @@ import { authed, can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { formatWhen } from "../production/RequestCard";
 import { focusRing } from "../styles";
+import { RefundSettingsPanel } from "./RefundSettings";
 import { Alert, Badge, Button, Field, PageHeader, Panel, Select, Status, TextInput } from "../ui";
 
 // Admin > Catalog > one product (Phase 2, step 2.8d): the price with the cost and margin of the version being looked at
@@ -41,6 +42,7 @@ export function ItemPage({ id }: { id: number }) {
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
   const item = useItem(id);
+  const canManage = useSession((s) => can(s.me, "catalog.manage"));
 
   const back = (
     <Link href="/admin/catalog" className={`mb-4 inline-flex min-h-12 items-center rounded-md text-base text-blue-800 underline ${focusRing}`}>
@@ -75,6 +77,8 @@ export function ItemPage({ id }: { id: number }) {
     <>
       {back}
       <PageHeader title={pick(locale, product)} intro={t("intro")} />
+      {/* step 4.5g: the product's two refund settings (Ramin's rule R-C) */}
+      {product.kind === "product" ? <RefundSettingsPanel key={product.id} product={product} canManage={canManage} /> : null}
       {product.kind !== "product" ? (
         <p className="text-base text-neutral-700">{t("not_a_product")}</p>
       ) : product.fulfilment === "bought_in" ? (

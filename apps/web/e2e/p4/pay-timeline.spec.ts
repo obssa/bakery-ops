@@ -119,8 +119,8 @@ test.describe("p4 order record", () => {
       const [download] = await Promise.all([page.waitForEvent("download"), receipt.getByRole("button", { name: "Download receipt (PDF)" }).click()]);
       expect(download.suggestedFilename()).toMatch(/^receipt-.*\.pdf$/);
       await expect(receipt.getByRole("button", { name: "Copy receipt link" })).toBeVisible();
-      // no refund yet (step 4.3d): its place says so
-      await expect(page.getByRole("region", { name: "Refund" })).toContainText("Refunds are not available yet");
+      // settled, not closed yet: a wrong payment is voided, not refunded (the refund of a closed order is step 4.5g's pay-refund)
+      await expect(page.getByRole("region", { name: "Refund" })).toContainText("Until the order is closed, a wrong payment is voided instead");
 
       // the order's audit history: the audit log filtered to this order
       await page.getByRole("link", { name: "Audit history", exact: true }).click();

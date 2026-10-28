@@ -152,6 +152,10 @@ export interface Item {
   default_batch_qty: DecimalString | null;
   production_station_id: number | null;
   station_ids: number[];
+  /** step 4.1b (Ramin's rule R-C): whether the product may be refunded at all */
+  refundable: boolean;
+  /** step 4.1b: whether a refunded unit goes back into stock (only a product sold from stock or bought in may) */
+  refund_restock: boolean;
   created_by_user_id: number;
   created_at: string | null;
   updated_at: string | null;
@@ -172,6 +176,15 @@ export interface NewItem {
   category_id?: number | null;
   unit_id: number;
   sku?: string | null;
+  /** step 4.5g: the two refund settings; left out, the API gives the natural values (refundable; back into stock when sold from stock) */
+  refundable?: boolean;
+  refund_restock?: boolean;
+}
+
+/** PATCH /items/{item}: the refund settings the product page changes (step 4.5g). */
+export interface ItemRefundSettings {
+  refundable: boolean;
+  refund_restock: boolean;
 }
 
 /** POST /categories (StoreCategoryRequest) */
@@ -261,6 +274,8 @@ export interface Line {
   served_at: string | null;
   rejected: { reason: RejectReason; note: string | null; message_en: string; message_am: string; by: number | null; at: string | null } | null;
   notes: string | null;
+  /** step 4.1b: when the line was refunded (a line is refunded once); absent in answers older than the refund */
+  refunded_at?: string | null;
   version: number;
 }
 
@@ -271,6 +286,21 @@ export interface OrderTotals {
   total: DecimalString;
   paid: DecimalString;
   balance: DecimalString;
+  /** step 4.1b: what came back of the money (paid and balance do not change with a refund) and what the order keeps */
+  refunded?: DecimalString;
+  net_paid?: DecimalString;
+}
+
+/** One refund of an order as GET /orders/{order} lists it (step 4.1b), oldest first. */
+export interface OrderRefund {
+  id: number;
+  amount: DecimalString;
+  is_full: boolean;
+  reason: string;
+  requested_by: number;
+  approved_by: number;
+  at: string;
+  lines: { order_line_id: number; qty: DecimalString; amount: DecimalString; disposition: "restock" | "waste"; movement_ids: number[] }[];
 }
 
 export interface Order {
@@ -298,6 +328,10 @@ export interface Order {
   version: number;
   created_at: string | null;
   lines: Line[];
+  /** step 4.1b: the money that came back, when the last refund was made and every refund; absent in answers older than the refund */
+  refunded_total?: DecimalString;
+  refunded_at?: string | null;
+  refunds?: OrderRefund[];
 }
 
 /** GET /orders?since= and ?mine= */
@@ -524,6 +558,45 @@ export interface PaymentRefundView {
 /** GET /payments/{payment}, and the answer of verify, dispute and void (step 4.3c). */
 export interface PaymentDetail extends PaymentListRow {
   refunds: PaymentRefundView[];
+}
+
+/** POST /orders/{order}/refund (step 4.3d): no `lines` refunds every refundable line; no `allocation` gives back last in, first out. */
+export interface RefundBody {
+  client_uuid: string;
+  reason: string;
+  pin: string;
+  lines?: number[];
+  allocation?: { payment_id: number; amount: DecimalString }[];
+  refund_reference?: string;
+  refund_proof_file_id?: number;
+}
+
+/** The 201 (and the 200 of a replay) of POST /orders/{order}/refund. */
+export interface RefundResult {
+  refund: {
+    id: number;
+    order_id: number;
+    amount: DecimalString;
+    is_full: boolean;
+    reason: string;
+    requested_by_user_id: number;
+    approved_by_user_id: number;
+    lines: { line_id: number; item_id: number; qty: DecimalString; amount: DecimalString; disposition: "restock" | "waste"; movement_ids: number[] }[];
+  };
+  payments: {
+    id: number;
+    payment_id: number;
+    channel_code: string;
+    channel_name_en: string;
+    channel_name_am: string;
+    amount: DecimalString;
+    reference_no: string | null;
+    proof_file_id: number | null;
+    shift_instance_id: number | null;
+    refunded_at: string;
+  }[];
+  movements: { id: number; item_id: number; location_id: number; qty: DecimalString; reverses: number }[];
+  order: { id: number; status: OrderStatus; total: DecimalString; paid: DecimalString; balance: DecimalString; refunded: DecimalString; net_paid: DecimalString };
 }
 
 /** GET /files/{file}/url (step 4.2b): a fresh signed URL of a stored photo. */

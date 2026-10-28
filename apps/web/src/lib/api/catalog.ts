@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authed, can, useSession } from "../session";
-import type { Collection, Item, ItemPrice, NewScheduledRequest, ProductionBoardPage, ProductionRequest, Recipe, RecipeCost, RecipeSpec, RecipeVersionRow, Station, User } from "./types";
+import type { Collection, Item, ItemPrice, ItemRefundSettings, NewScheduledRequest, ProductionBoardPage, ProductionRequest, Recipe, RecipeCost, RecipeSpec, RecipeVersionRow, Station, User } from "./types";
 
 // The calls of the admin Catalog item page, the planner and the station switch (Phase 2, step 2.8d). Reads run only while
 // signed in; every write carries the Idempotency-Key its form chose and refreshes what it changes.
@@ -14,6 +14,18 @@ function useSignedIn(): boolean {
 export function useItem(id: number | null) {
   const enabled = useSignedIn() && id !== null;
   return useQuery({ queryKey: ["item", id], queryFn: () => authed<Item>(`/items/${id}`), enabled });
+}
+
+/** PATCH /items/{item} with the two refund settings (step 4.5g); the item and every list of items are read again. */
+export function useSaveRefundSettings(id: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ body, idempotencyKey }: { body: ItemRefundSettings; idempotencyKey: string }) => authed<Item>(`/items/${id}`, { method: "PATCH", body, idempotencyKey }),
+    onSuccess: (item) => {
+      client.setQueryData(["item", id], item);
+      void client.invalidateQueries({ queryKey: ["items"] });
+    },
+  });
 }
 
 export function useItemPrices(id: number | null) {

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
+import { usePayment } from "@/lib/api/adminPayments";
 import { useRosterPeople } from "@/lib/api/adminShifts";
 import { ApiError } from "@/lib/api/client";
 import { useOrderDetail, useOrderPayments } from "@/lib/api/till";
@@ -37,6 +38,7 @@ import { HistoryLink } from "../audit/HistoryLink";
 import { PhotoThumb, PhotoViewer } from "../payments/PhotoViewer";
 import { addisStamp, Money, PaymentStatusCell, useChannelName } from "../payments/shared";
 import { ReceiptActions } from "../till/ReceiptPanel";
+import { RefundDialog } from "../refunds/RefundDialog";
 import { VoidDialog } from "../till/VoidDialog";
 import { Alert, Badge, Button, PageHeader } from "../ui";
 import { focusRing } from "../styles";
@@ -51,8 +53,9 @@ import { focusRing } from "../styles";
 //
 // The only writes are the existing ones: the void of the whole order (the board's PIN dialog, POST /orders/{order}/void) and the void of
 // one payment (4.5b's VoidDialog, POST /payments/{payment}/void), each with a new Idempotency-Key after a refusal and the same one when the
-// outcome is unknown. The receipt's two actions are 4.5b's (ReceiptActions). REFUND: not built (steps 4.1b and 4.3d wait for Ramin's answer
-// on R-C); `RefundPlaceholder` below marks its place.
+// outcome is unknown. The receipt's two actions are 4.5b's (ReceiptActions). The refund (step 4.5g) is the refund dialog of the till
+// (components/refunds/RefundDialog.tsx), opened from the Refund section once the order is closed; the section lists the order's refunds,
+// each payment card what was paid back of it (GET /payments/{payment} refunds, 4.5c's ["payment", id]), the header what came back.
 
 const STATUS_TONE: Record<OrderStatus, Tone> = {
   open: "amber",
@@ -150,6 +153,7 @@ function RecordBody({ order, detail }: { order: OrderDetail; detail: DetailQuery
   const me = useSession((s) => s.me);
   const mayVoid = can(me, "orders.void_request");
   const [voiding, setVoiding] = useState<{ payment?: number } | null>(null);
+  const [refunding, setRefunding] = useState(false);
   const [viewing, setViewing] = useState<{ paymentId: number; fileId: number } | null>(null);
 
   const list = payments.data?.data;
@@ -197,11 +201,12 @@ function RecordBody({ order, detail }: { order: OrderDetail; detail: DetailQuery
           <div className="space-y-6">
             <Payments order={order} payments={payments} people={people} mayVoid={mayVoid} onVoid={(payment) => setVoiding({ payment })} onPhoto={openPhoto} />
             <Receipt order={order} />
-            {receiptAvailable(order) ? <RefundPlaceholder order={order} /> : null}
+            {receiptAvailable(order) ? <RefundSection order={order} people={people} mayRefund={mayVoid} onRefund={() => setRefunding(true)} /> : null}
           </div>
         </div>
       </div>
       {voiding ? <VoidDialog order={order} payment={voiding.payment} onClose={() => setVoiding(null)} onVoided={afterVoid} /> : null}
+      {refunding ? <RefundDialog order={order} onClose={() => setRefunding(false)} onRefunded={afterVoid} /> : null}
       {viewing ? <PhotoViewer paymentId={viewing.paymentId} fileId={viewing.fileId} onClose={() => setViewing(null)} /> : null}
     </>
   );
@@ -276,6 +281,16 @@ function Details({
           <Fact term={t("paid")}>
             <Money amount={order.totals.paid} currency={order.currency} />
           </Fact>
+          {money.refunded !== "0.00" ? (
+            <>
+              <Fact term={t("refunded")}>
+                <Money amount={money.refunded} currency={order.currency} />
+              </Fact>
+              <Fact term={t("net_paid")}>
+                <Money amount={money.netPaid} currency={order.currency} />
+              </Fact>
+            </>
+          ) : null}
         </dl>
         <div className="space-y-2 rounded-lg bg-neutral-50 p-4 lg:min-w-64">
           <p className="text-sm font-medium text-neutral-600">{t("balance")}</p>
@@ -581,6 +596,7 @@ function PaymentCard({
             <dt className="text-sm font-medium text-neutral-600">{t("refunded")}</dt>
             <dd className="text-base text-neutral-900">
               <Money amount={payment.refunded_amount} currency={payment.currency} />
+              <PaymentRefunds payment={payment} />
             </dd>
           </>
         ) : null}
@@ -626,24 +642,69 @@ function Receipt({ order }: { order: OrderDetail }) {
   );
 }
 
-/**
- * The place of the refund action. The plan (section 6, item 5, 4.5d) puts "the refund action" on this page; refunds are steps 4.1b and
- * 4.3d, on hold for Ramin's answer on R-C (the disposition of each line), so this only says they are not available yet, for an order paid
- * in full. The same marked place is in 4.5b's VoidDialog (its own `RefundPlaceholder`).
- *
- * TODO(p4): 4.3d: the refund of a closed order here: the lines to refund with their dispositions (10.2 R-C), the reason, the manager's PIN,
- * POST /orders/{order}/refund with its own Idempotency-Key and client_uuid; then the timeline's refund kinds (lib/orderRecord.ts ENTRY_KINDS).
- */
-function RefundPlaceholder({ order }: { order: OrderDetail }) {
+/** What was paid back of one payment, row by row (GET /payments/{payment} refunds, 4.5c's ["payment", id]; payments.view). */
+function PaymentRefunds({ payment }: { payment: PaymentView }) {
   const t = useTranslations("orderRecord");
+  const dates = useDateFormat();
+  const detail = usePayment(payment.id);
+  const rows = detail.data?.refunds ?? [];
+  if (rows.length === 0) return null;
+  return (
+    <ul aria-label={t("payment_refunds", { id: payment.id })} className="mt-1 space-y-0.5 text-sm text-neutral-700">
+      {rows.map((row) => (
+        <li key={row.id} className="tabular-nums">
+          {t("payment_refund_row", { amount: row.amount, currency: payment.currency, when: addisStamp(row.refunded_at, dates) })}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The refund (step 4.5g): once the order is closed, its refunds so far (when, how much, who asked and whose PIN approved) and the refund
+ * dialog for the lines left; before it closes, a wrong payment is voided instead. A cash refund is asked at the till, by someone working
+ * its open shift (payments.shift.required otherwise), which the section says.
+ */
+function RefundSection({ order, people, mayRefund, onRefund }: { order: OrderDetail; people: People; mayRefund: boolean; onRefund: () => void }) {
+  const t = useTranslations("orderRecord");
+  const dates = useDateFormat();
+  const person = usePersonName(people);
   const headingId = useId();
+  const refunds = order.refunds ?? [];
+  const left = order.lines.some((line) => line.status !== "rejected" && line.status !== "voided" && !line.refunded_at);
+  const closed = order.status === "closed";
   return (
     <section aria-labelledby={headingId} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
       <h2 id={headingId} className="text-lg font-semibold text-neutral-900">
         {t("refund")}
       </h2>
-      <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">{t("refund_not_yet")}</p>
-      {order.status !== "closed" && order.status !== "paid" ? <p className="text-base text-neutral-600">{t("refund_void_instead")}</p> : null}
+      {refunds.length > 0 ? (
+        <ul aria-label={t("refunds")} className="space-y-2">
+          {refunds.map((refund) => (
+            <li key={refund.id} className="space-y-0.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+              <p className="text-base font-medium text-neutral-900 tabular-nums">{t("refund_row", { amount: refund.amount, currency: order.currency, when: addisStamp(refund.at, dates) })}</p>
+              <p className="text-sm text-neutral-700">
+                {refund.is_full ? t("refund_whole") : t("refund_lines", { count: refund.lines.length })} · {t("reason", { reason: refund.reason })}
+              </p>
+              <p className="text-sm text-neutral-700">{t("refund_people", { asker: person(refund.requested_by), approver: person(refund.approved_by) })}</p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {!closed ? (
+        <p className="text-base text-neutral-600">{t("refund_void_instead")}</p>
+      ) : !left ? (
+        <p className="text-base text-neutral-600">{t("refund_none_left")}</p>
+      ) : (
+        <>
+          <p className="text-base text-neutral-600">{t("refund_intro")}</p>
+          {mayRefund ? (
+            <Button type="button" variant="secondary" onClick={onRefund}>
+              {t("refund_open")}
+            </Button>
+          ) : null}
+        </>
+      )}
     </section>
   );
 }

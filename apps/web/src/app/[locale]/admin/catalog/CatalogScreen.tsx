@@ -6,11 +6,13 @@ import { useState, type FormEvent } from "react";
 import { focusRing } from "@/components/styles";
 import { Alert, Button, Field, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
 import { ItemPage } from "@/components/catalog/ItemPage";
+import { RefundToggles, useRefundSettingsText } from "@/components/catalog/RefundSettings";
 import { Link } from "@/i18n/navigation";
 import { useCategories, useCreateCategory, useCreateItem, useItems, useUnits } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { FULFILMENTS, type Category, type Fulfilment, type ItemKind, type Locale, type NewCategory, type NewItem } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
+import { refundSettingsBody } from "@/lib/refund";
 import { can, useSession } from "@/lib/session";
 
 // Admin > Catalog (Phase 0 step 0.7): both inventories in one list (rule 2), filtered by kind through the API's
@@ -87,6 +89,7 @@ function ItemsPanel({ kind }: { kind: ItemKind | null }) {
   const errorText = useErrorText();
   const items = useItems(kind);
   const categories = useCategories();
+  const refundText = useRefundSettingsText();
   const categoryName = (id: number | null): string => {
     const category = id === null ? undefined : categories.data?.find((c) => c.id === id);
     return category ? named(locale, category).primary : "—";
@@ -113,6 +116,7 @@ function ItemsPanel({ kind }: { kind: ItemKind | null }) {
                 <th scope="col" className="py-2 pr-4 font-medium">{t("col_name")}</th>
                 <th scope="col" className="py-2 pr-4 font-medium">{t("col_kind")}</th>
                 <th scope="col" className="py-2 pr-4 font-medium">{t("col_fulfilment")}</th>
+                <th scope="col" className="py-2 pr-4 font-medium">{t("col_refunds")}</th>
                 <th scope="col" className="py-2 pr-4 font-medium">{t("col_category")}</th>
                 <th scope="col" className="py-2 pr-4 font-medium">{t("col_unit")}</th>
                 <th scope="col" className="py-2 font-medium">{t("col_sku")}</th>
@@ -121,7 +125,7 @@ function ItemsPanel({ kind }: { kind: ItemKind | null }) {
             <tbody>
               {items.data.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-6 text-neutral-600">
+                  <td colSpan={7} className="py-6 text-neutral-600">
                     {t("no_items")}
                   </td>
                 </tr>
@@ -147,6 +151,7 @@ function ItemsPanel({ kind }: { kind: ItemKind | null }) {
                       </td>
                       <td className="py-3 pr-4">{t(`kind_${item.kind}`)}</td>
                       <td className="py-3 pr-4">{t(`fulfilment_${item.fulfilment}`)}</td>
+                      <td className="py-3 pr-4 text-sm">{refundText(item)}</td>
                       <td className="py-3 pr-4">{categoryName(item.category_id)}</td>
                       <td className="py-3 pr-4">{item.unit_code}</td>
                       <td className="py-3 font-mono text-sm">{item.sku ?? ""}</td>
@@ -179,7 +184,11 @@ function NewItemPanel() {
   const [categoryId, setCategoryId] = useState("");
   const [unitId, setUnitId] = useState("");
   const [sku, setSku] = useState("");
+  // the refund settings (step 4.5g): untouched, the API gives the natural values (a product refundable, back into stock when it can)
+  const [refundable, setRefundable] = useState<boolean | null>(null);
+  const [restock, setRestock] = useState<boolean | null>(null);
   const [created, setCreated] = useState<string | null>(null);
+  const settingsFulfilment: Fulfilment = kind === "product" ? fulfilment : "bought_in";
 
   const ofKind: Category[] = (categories.data ?? []).filter((c) => c.kind === kind);
 
@@ -193,6 +202,7 @@ function NewItemPanel() {
       category_id: categoryId ? Number(categoryId) : null,
       unit_id: Number(unitId),
       sku: sku.trim() || null,
+      ...(refundable !== null || restock !== null ? refundSettingsBody(kind, settingsFulfilment, refundable ?? kind === "product", restock ?? true) : {}),
     };
     setCreated(null);
     create.mutate(
@@ -213,7 +223,7 @@ function NewItemPanel() {
 
   return (
     <Panel title={t("new_item")}>
-      <form onSubmit={onSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} aria-label={t("new_item")} className="space-y-4">
         <Field label={t("field_kind")}>
           {(props) => (
             <Select
@@ -280,6 +290,14 @@ function NewItemPanel() {
         <Field label={t("field_sku")} optionalLabel={t("optional")} error={fieldError("sku")}>
           {(props) => <TextInput {...props} maxLength={64} autoComplete="off" value={sku} onChange={(e) => setSku(e.target.value)} />}
         </Field>
+        <RefundToggles
+          kind={kind}
+          fulfilment={settingsFulfilment}
+          refundable={refundable ?? kind === "product"}
+          restock={restock ?? true}
+          onRefundable={setRefundable}
+          onRestock={setRestock}
+        />
         {create.isError ? <Alert>{errorText.message(create.error)}</Alert> : null}
         <Status>{created ? t("item_created", { name: created }) : null}</Status>
         <Button type="submit" disabled={create.isPending}>

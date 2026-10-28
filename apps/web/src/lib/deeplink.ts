@@ -7,7 +7,7 @@ const PAGES = new Set<string>([
   ...SCREENS.map((screen) => screen.href),
   "/admin/catalog",
   "/admin/orders",
-  // step 4.5d: the order record (?id=)
+  // step 4.5d: the order record (?id=); step 4.5g: the order_refunded line (NotifyRefund, step 4.3d) links here too
   "/admin/orders/record",
   "/admin/people",
   "/admin/inventory",

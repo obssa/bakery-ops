@@ -11,6 +11,7 @@ import { useErrorText } from "@/lib/errors";
 import { isSettled, UNPAID_STATUSES } from "@/lib/live/orders";
 import { useOrderNo } from "@/lib/orderNo";
 import { keepsKey } from "@/lib/paySheet";
+import { RefundDialog } from "../refunds/RefundDialog";
 import { Alert, Button, Field, Modal, TextInput } from "../ui";
 
 // Voiding at the till: a reason, and the PIN of a manager or admin (their short code) typed on this screen. The API checks the PIN and
@@ -21,10 +22,9 @@ import { Alert, Button, Field, Modal, TextInput } from "../ui";
 // - An order with payments that is not closed (step 4.5b, the void of step 4.3c): one payment is voided (POST /payments/{payment}/void),
 //   its money comes off the order and the order is owed it again. A part-paid order can still be voided as a whole; a settled one (paid
 //   in full, not served yet) cannot (409 orders.order.paid), so only its payments are offered.
-// - REFUND (steps 4.1b and 4.3d, ON HOLD for Ramin's answer on R-C): a paid or closed order is refunded, never voided. The plan puts the
-//   refund path here (the lines to refund, a disposition per line with the 10.2 R-C defaults, the reason, the manager's PIN, POST
-//   /orders/{order}/refund). It is not built: the dialog says refunds are not available yet. See `RefundPlaceholder` below.
-//   TODO(p4): the refund path of 4.1b/4.3d, once R-C is answered.
+// - A paid or closed order is refunded, never voided (step 4.5g, Ramin's rule R-C): the dialog is the refund dialog then
+//   (components/refunds/RefundDialog.tsx: the lines to refund, each following its product's two settings, the money back from the
+//   payments, the reason, the manager's PIN, POST /orders/{order}/refund). The till's closed orders open it this way.
 
 const PIN = /^\d{4,6}$/;
 
@@ -34,19 +34,6 @@ function paymentLabel(payment: PaymentView, locale: Locale): string {
   const name = (locale === "am" ? payment.channel.name_am : payment.channel.name_en) ?? payment.channel.code ?? "";
   const time = new Date(payment.received_at).toLocaleTimeString(locale === "am" ? "am-ET" : "en-GB", { timeZone: "Africa/Addis_Ababa", hour: "2-digit", minute: "2-digit" });
   return `${name} ${payment.amount} ${payment.currency} · ${time}`;
-}
-
-/** The place of the refund path (on hold, see the header): a paid or closed order is refunded, and that is not available yet. */
-function RefundPlaceholder({ onClose }: { onClose: () => void }) {
-  const t = useTranslations("till");
-  return (
-    <div className="space-y-4">
-      <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">{t("refund_not_yet")}</p>
-      <Button type="button" variant="secondary" onClick={onClose}>
-        {t("void_back")}
-      </Button>
-    </div>
-  );
 }
 
 export function VoidDialog({
@@ -83,6 +70,7 @@ export function VoidDialog({
   const [attempt, setAttempt] = useState(() => uuid());
 
   const title = hasPayments && !wholeAllowed ? t("void_payment_title", { no }) : t("void_title", { no });
+  if (closed) return <RefundDialog order={order} onClose={onClose} onRefunded={onVoided} />;
   const valid = target !== null && reason.trim() !== "" && PIN.test(pin);
 
   async function submit(event: FormEvent) {
@@ -110,62 +98,58 @@ export function VoidDialog({
     <Modal label={title} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
         <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>
-        {closed ? (
-          <RefundPlaceholder onClose={onClose} />
-        ) : (
-          <>
-            <p className="text-base text-neutral-700">{hasPayments ? t("void_payment_intro") : t("void_intro")}</p>
-            {error ? <Alert>{errorText.message(error)}</Alert> : null}
-            {hasPayments ? (
-              <fieldset className="space-y-2">
-                <legend className="mb-1 text-sm font-medium text-neutral-800">{t("void_what")}</legend>
-                {payments.isLoading ? (
-                  <p role="status" className="text-base text-neutral-600">
-                    {t("void_payments_loading")}
-                  </p>
-                ) : payments.error ? (
-                  <Alert>{errorText.message(payments.error)}</Alert>
-                ) : null}
-                {wholeAllowed ? (
-                  <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-neutral-300 px-4">
-                    <input type="radio" name="void-target" className="h-5 w-5" checked={target === "order"} onChange={() => setTarget("order")} />
-                    <span className="text-base">{t("void_whole_order")}</span>
-                  </label>
-                ) : null}
-                {voidable.map((payment) => (
-                  <label key={payment.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-neutral-300 px-4">
-                    <input type="radio" name="void-target" className="h-5 w-5" checked={target === payment.id} onChange={() => setTarget(payment.id)} />
-                    <span className="text-base">{paymentLabel(payment, locale)}</span>
-                  </label>
-                ))}
-              </fieldset>
-            ) : null}
-            <Field label={t("void_reason")}>
-              {(props) => <TextInput {...props} value={reason} maxLength={255} autoFocus={!hasPayments} onChange={(event) => setReason(event.target.value)} />}
-            </Field>
-            <Field label={t("void_pin")} hint={t("void_pin_hint")}>
-              {(props) => (
-                <TextInput
-                  {...props}
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  maxLength={6}
-                  value={pin}
-                  onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
-                />
-              )}
-            </Field>
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={!valid || pending}>
-                {pending ? t("voiding") : target === "order" || (target === null && wholeAllowed && !hasPayments) ? t("void_submit") : t("void_payment_submit")}
-              </Button>
-              <Button type="button" variant="secondary" onClick={onClose}>
-                {t("void_back")}
-              </Button>
-            </div>
-          </>
-        )}
+        <>
+          <p className="text-base text-neutral-700">{hasPayments ? t("void_payment_intro") : t("void_intro")}</p>
+          {error ? <Alert>{errorText.message(error)}</Alert> : null}
+          {hasPayments ? (
+            <fieldset className="space-y-2">
+              <legend className="mb-1 text-sm font-medium text-neutral-800">{t("void_what")}</legend>
+              {payments.isLoading ? (
+                <p role="status" className="text-base text-neutral-600">
+                  {t("void_payments_loading")}
+                </p>
+              ) : payments.error ? (
+                <Alert>{errorText.message(payments.error)}</Alert>
+              ) : null}
+              {wholeAllowed ? (
+                <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-neutral-300 px-4">
+                  <input type="radio" name="void-target" className="h-5 w-5" checked={target === "order"} onChange={() => setTarget("order")} />
+                  <span className="text-base">{t("void_whole_order")}</span>
+                </label>
+              ) : null}
+              {voidable.map((payment) => (
+                <label key={payment.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-neutral-300 px-4">
+                  <input type="radio" name="void-target" className="h-5 w-5" checked={target === payment.id} onChange={() => setTarget(payment.id)} />
+                  <span className="text-base">{paymentLabel(payment, locale)}</span>
+                </label>
+              ))}
+            </fieldset>
+          ) : null}
+          <Field label={t("void_reason")}>
+            {(props) => <TextInput {...props} value={reason} maxLength={255} autoFocus={!hasPayments} onChange={(event) => setReason(event.target.value)} />}
+          </Field>
+          <Field label={t("void_pin")} hint={t("void_pin_hint")}>
+            {(props) => (
+              <TextInput
+                {...props}
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={6}
+                value={pin}
+                onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))}
+              />
+            )}
+          </Field>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={!valid || pending}>
+              {pending ? t("voiding") : target === "order" || (target === null && wholeAllowed && !hasPayments) ? t("void_submit") : t("void_payment_submit")}
+            </Button>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              {t("void_back")}
+            </Button>
+          </div>
+        </>
       </form>
     </Modal>
   );

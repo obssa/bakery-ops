@@ -15,6 +15,8 @@ import type {
   PaymentView,
   ReceiptLink,
   ReceiptSettings,
+  RefundBody,
+  RefundResult,
   StoredFileView,
   VoidBody,
 } from "./types";
@@ -60,12 +62,20 @@ const UPLOAD_TIMEOUT_MS = 90_000;
  * POST /files (step 4.2b): the photo as `file`, its purpose and its own client_uuid in one multipart body. A retry of the same photo sends
  * the same client_uuid and Idempotency-Key, so the API answers the stored file (200) instead of keeping a second one.
  */
-export function uploadReceiptPhoto(photo: Blob, clientUuid: string, idempotencyKey: string): Promise<StoredFileView> {
+export function uploadReceiptPhoto(photo: Blob, clientUuid: string, idempotencyKey: string, purpose: StoredFileView["purpose"] = "receipt"): Promise<StoredFileView> {
   const form = new FormData();
-  form.append("purpose", "receipt");
+  form.append("purpose", purpose);
   form.append("client_uuid", clientUuid);
-  form.append("file", photo, photo.type === "image/jpeg" || photo.type === "" ? "receipt.jpg" : "receipt");
+  form.append("file", photo, photo.type === "image/jpeg" || photo.type === "" ? `${purpose}.jpg` : purpose);
   return authed<StoredFileView>("/files", { method: "POST", body: form, idempotencyKey, timeoutMs: UPLOAD_TIMEOUT_MS });
+}
+
+/**
+ * POST /orders/{order}/refund (step 4.3d): the asker's account (or the person acting by short code) asks, the manager's PIN approves. One
+ * client_uuid per refund for the dialog's life; the key is kept for a retry only when the outcome is unknown (lib/paySheet keepsKey).
+ */
+export function refundOrder(orderId: number, body: RefundBody, idempotencyKey: string): Promise<RefundResult> {
+  return authed<RefundResult>(`/orders/${orderId}/refund`, { method: "POST", body, idempotencyKey });
 }
 
 /** POST /orders/{order}/payment-batches (step 4.3b): every payment of the sheet in one write, all or none. */
@@ -94,6 +104,23 @@ export function useOrderPayments(orderId: number | null) {
   return useQuery({
     queryKey: ["order-payments", orderId],
     queryFn: () => authed<OrderPayments>(`/orders/${orderId}/payments`),
+    enabled,
+    staleTime: 0,
+  });
+}
+
+/** How many closed orders the till lists for a refund (newest first; the API's ?status=closed&limit=). */
+export const CLOSED_ORDERS_LIMIT = 30;
+
+/**
+ * GET /orders?status=closed (step 4.5g): the till's closed orders, newest first, for a refund. A plain read, refreshed when the tab opens
+ * and after a refund; the queue's feed lists unpaid orders only.
+ */
+export function useClosedOrders(active: boolean) {
+  const enabled = useSession((s) => s.status === "signed-in") && active;
+  return useQuery({
+    queryKey: ["closed-orders"],
+    queryFn: async () => (await authed<{ data: Order[] }>("/orders", { query: { status: "closed", limit: CLOSED_ORDERS_LIMIT } })).data,
     enabled,
     staleTime: 0,
   });

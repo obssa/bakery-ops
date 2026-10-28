@@ -101,6 +101,11 @@ function EntryBody({ entry }: { entry: AuditDetail }) {
             <span className="block">
               <RecordLink orderId={entry.subject_id} label={t("entry.open_record")} inline />
             </span>
+          ) : refundOrderOf(entry) !== null ? (
+            // step 4.5g: a refund's row (order.refund, step 4.3d) has no subject; its context names the order
+            <span className="block">
+              <RecordLink orderId={refundOrderOf(entry) as number} label={t("entry.open_record")} inline />
+            </span>
           ) : null}
         </Fact>
         <Fact term={t("entry.station")}>{entry.station_id !== null ? names.station(entry.station_id) : "—"}</Fact>
@@ -293,4 +298,11 @@ function Value({ shown, field, people }: { shown: Shown; field: string; people: 
         </details>
       );
   }
+}
+
+/** The order a refund's audit row names in its context (order.refund has no subject), or null. */
+function refundOrderOf(entry: { action: string; context: Record<string, unknown> | null }): number | null {
+  if (entry.action !== "order.refund") return null;
+  const id = entry.context?.order_id;
+  return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : null;
 }

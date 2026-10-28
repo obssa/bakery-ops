@@ -1,5 +1,5 @@
 import type { Order, OrderEvent, OrderTotals, PaymentView } from "./api/types";
-import { addDecimal, compareDecimal } from "./decimal";
+import { addDecimal, compareDecimal, subtractDecimal } from "./decimal";
 import { isPayable, UNPAID_STATUSES } from "./live/orders";
 
 // The order record page (step 4.5d, /admin/orders/record?id=): the rules, as plain logic tested without a browser
@@ -47,11 +47,9 @@ export interface KindSpec {
 }
 
 /**
- * Every kind of entry the page has words for (adminOrders.ev_* in messages/*.json): the timeline's 20 events (order_events_event_check)
- * and the payment's own two decisions. A kind not listed is still shown, as the API wrote it.
- *
- * TODO(p4): 4.3d: the refund adds its kinds here, one line each (`"line.refunded"` and `"order.refunded"`, the events 4.1b adds to the
- * timeline, `approved: true`), with their two strings; nothing else in the merge changes.
+ * Every kind of entry the page has words for (adminOrders.ev_* in messages/*.json): the timeline's 22 events (order_events_event_check,
+ * with the refund's two of step 4.1b, each approved by a manager's PIN) and the payment's own two decisions. A kind not listed is still
+ * shown, as the API wrote it.
  */
 export const ENTRY_KINDS: Readonly<Record<string, KindSpec>> = {
   "order.created": { tone: "neutral" },
@@ -72,6 +70,9 @@ export const ENTRY_KINDS: Readonly<Record<string, KindSpec>> = {
   "order.closed": { tone: "neutral" },
   "order.cancelled": { tone: "amber" },
   "order.voided": { tone: "red", approved: true },
+  // step 4.1b: a refund writes one line.refunded per line and one order.refunded; both carry the approver (approved_by_user_id)
+  "line.refunded": { tone: "amber", approved: true },
+  "order.refunded": { tone: "amber", approved: true },
   "payment.recorded": { tone: "blue", payment: true },
   "payment.disputed": { tone: "red", payment: true },
   "payment.verified": { tone: "green", payment: true },
@@ -249,6 +250,9 @@ export interface BalanceView {
   total: string;
   paid: string;
   balance: string;
+  /** what came back of the money (step 4.1b; paid and the balance do not change with a refund) and what the order keeps */
+  refunded: string;
+  netPaid: string;
   state: BalanceState;
   /** the payments that are not voided, added up; null before they are read */
   paidByPayments: string | null;
@@ -257,17 +261,24 @@ export interface BalanceView {
 }
 
 export function balanceView(
-  totals: Pick<OrderTotals, "total" | "paid" | "balance">,
-  payments: readonly Pick<PaymentView, "amount" | "status">[] | null,
+  totals: Pick<OrderTotals, "total" | "paid" | "balance" | "refunded" | "net_paid">,
+  payments: readonly (Pick<PaymentView, "amount" | "status"> & { refunded_amount?: string })[] | null,
   paymentsBalance: string | null,
 ): BalanceView {
   const due = compareDecimal(totals.balance, "0", 2);
   const state: BalanceState = due > 0 ? "due" : due < 0 ? "over" : compareDecimal(totals.total, "0", 2) > 0 ? "settled" : "none";
-  const paidByPayments = payments === null ? null : payments.filter((p) => p.status !== "voided").reduce((sum, p) => addDecimal(sum, p.amount, 2), "0.00");
+  const refunded = totals.refunded ?? "0.00";
+  const netPaid = totals.net_paid ?? subtractDecimal(totals.paid, refunded, 2);
+  const kept = payments === null ? null : payments.filter((p) => p.status !== "voided");
+  const paidByPayments = kept === null ? null : kept.reduce((sum, p) => addDecimal(sum, p.amount, 2), "0.00");
+  // what the payments say they paid back must be what the order says came back (step 4.5g)
+  const refundedByPayments = kept === null ? null : kept.reduce((sum, p) => addDecimal(sum, p.refunded_amount ?? "0.00", 2), "0.00");
   const inStep =
     paidByPayments === null ||
-    (compareDecimal(paidByPayments, totals.paid, 2) === 0 && (paymentsBalance === null || compareDecimal(paymentsBalance, totals.balance, 2) === 0));
-  return { total: totals.total, paid: totals.paid, balance: totals.balance, state, paidByPayments, inStep };
+    (compareDecimal(paidByPayments, totals.paid, 2) === 0 &&
+      (refundedByPayments === null || compareDecimal(refundedByPayments, refunded, 2) === 0) &&
+      (paymentsBalance === null || compareDecimal(paymentsBalance, totals.balance, 2) === 0));
+  return { total: totals.total, paid: totals.paid, balance: totals.balance, refunded, netPaid, state, paidByPayments, inStep };
 }
 
 // --- the photo ------------------------------------------------------------------------------------------------------------------------------

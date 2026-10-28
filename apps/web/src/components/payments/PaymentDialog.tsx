@@ -139,6 +139,18 @@ function Details({ payment, canDecide, onPhoto, onChanged }: { payment: PaymentD
               <Money amount={payment.refunded_amount} currency={payment.currency} />
             </Row>
           ) : null}
+          {payment.refunds.length > 0 ? (
+            // step 4.5g: the rows of payment_refunds (written by the refund since step 4.3d), oldest first
+            <Row term={t("detail.refund_list")}>
+              <ul className="space-y-0.5">
+                {payment.refunds.map((refund) => (
+                  <li key={refund.id} className="tabular-nums">
+                    {t("detail.refund_row", { amount: t("money", { amount: refund.amount, currency: payment.currency }), when: addisStamp(refund.refunded_at, dates) })}
+                  </li>
+                ))}
+              </ul>
+            </Row>
+          ) : null}
         </dl>
         <div className="space-y-2">
           <p className="text-sm font-medium text-neutral-600">{t("detail.photo")}</p>

@@ -16,16 +16,18 @@ import { useShiftStation } from "../shifts/useShiftStation";
 import { CASH_NEEDS_SHIFT_BUILD, payBlockReason } from "@/lib/shifts";
 import { useShiftNotice } from "@/lib/station";
 import { focusRing } from "../styles";
+import { ClosedOrders } from "./ClosedOrders";
 import { DisplayCasePanel } from "./DisplayCasePanel";
 import { PaySheet } from "./PaySheet";
 import { TillQueue } from "./TillQueue";
 import { VoidDialog } from "./VoidDialog";
 
 // The cashier till (/till): the signed-in cashier (no short code) sees the orders awaiting payment, oldest first, and
-// takes payment (the pay sheet of step 4.5b: any enabled channel, split, receipt photos) or voids; the same ordering surface as the waiter pad takes orders at the counter (the API stamps them
+// takes payment (the pay sheet of step 4.5b: any enabled channel, split, receipt photos) or voids, and refunds a closed order (step 4.5g,
+// the "Closed orders" tab); the same ordering surface as the waiter pad takes orders at the counter (the API stamps them
 // created_via = till). The queue is a LiveFeed over GET /orders (?unpaid=1 first, then the cursor, ETag-gated).
 
-type View = "queue" | "order";
+type View = "queue" | "order" | "closed";
 const TILL_KINDS = ["till"] as const;
 const NOTICE_MS = 8000;
 
@@ -77,7 +79,7 @@ export function TillScreen() {
       <CashWidget shift={shiftStation.shift} />
 
       <div role="tablist" aria-label={t("views")} className="flex gap-2">
-        {(["queue", "order"] as const).map((value) => (
+        {(["queue", "order", "closed"] as const).map((value) => (
           <button
             key={value}
             type="button"
@@ -86,7 +88,7 @@ export function TillScreen() {
             onClick={() => setView(value)}
             className={`inline-flex min-h-12 items-center gap-2 rounded-md px-5 text-base font-medium ${view === value ? "bg-blue-700 text-white" : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"} ${focusRing}`}
           >
-            {value === "queue" ? t("tab_queue") : t("tab_new_order")}
+            {value === "queue" ? t("tab_queue") : value === "order" ? t("tab_new_order") : t("tab_closed")}
             {value === "queue" && orders.length > 0 ? <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-sm text-white">{orders.length}</span> : null}
           </button>
         ))}
@@ -101,8 +103,11 @@ export function TillScreen() {
           <TillQueue orders={orders} loaded={!!queue?.loaded} stale={queue?.error ? t("stale") : null} payBlocked={payBlocked} onPay={setPaying} onVoid={setVoiding} />
           <DisplayCasePanel />
         </div>
-      ) : (
+      ) : view === "order" ? (
         <OrderingSurface userId={userId} menu={menu} onSendStarted={() => setNotice(false)} />
+      ) : (
+        // step 4.5g: the orders closed lately, where a refund starts (the void dialog's path for a closed order)
+        <ClosedOrders active={view === "closed"} onRefund={setVoiding} />
       )}
 
       {paying ? (
