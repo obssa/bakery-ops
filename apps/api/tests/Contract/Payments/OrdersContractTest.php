@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Orders\Contracts\OrderRefundView;
 use App\Modules\Orders\Contracts\Orders;
+use App\Modules\Orders\Contracts\RefundMovementView;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
 use App\Shared\Events\OrderPaid;
@@ -625,4 +626,30 @@ it('takes the disposition from the product settings at the moment of the refund,
         ->and(($this->dispositions)($second->id))->toBe([$sandwich['id'] => 'waste'])
         ->and(($this->dispositions)($third->id))->toBe([$otherCroissant['id'] => 'waste'], 'the croissant of a later refund follows the new setting')
         ->and($second->isFull)->toBeTrue('after the second refund every line of the order came back');
+})->group(REFUND_GROUP, 'contract:payments->orders');
+
+it('answers the reversing movements of a refund for its answer: each return with its item, place, quantity and the sale it reverses', function () {
+    // step 4.3d: POST /orders/{order}/refund answers movements [{id, item_id, qty, reverses}]; Payments may not read the ledger, so Orders
+    // reads them for it (Orders::refundMovements, through Inventory's Reversals::returns), the same on a replay of the refund
+    $f = $this->floor;
+    $m = $f->menu;
+    [$order, , , $croissantRef] = ($this->closedOrder)();
+    $sale = ($this->movementRows)($croissantRef, 'sale')[0];
+
+    $uuid = (string) Str::uuid();
+    $refund = ($this->refund)($order['id'], [], 'customer returned it', $uuid);
+    $movements = app(Orders::class)->refundMovements($refund);
+
+    expect($movements)->toHaveCount(1)
+        ->and($movements[0])->toBeInstanceOf(RefundMovementView::class)
+        ->and($movements[0]->id)->toBe($refund->movementIds()[0])
+        ->and($movements[0]->itemId)->toBe($m->croissant->id)
+        ->and($movements[0]->locationId)->toBe($m->display->id)
+        ->and($movements[0]->qty)->toBe('2.0000')
+        ->and($movements[0]->reverses)->toBe((int) $sale['id'])
+        ->and($movements[0]->toArray())->toBe(['id' => $refund->movementIds()[0], 'item_id' => $m->croissant->id, 'location_id' => $m->display->id, 'qty' => '2.0000', 'reverses' => (int) $sale['id']]);
+    // a replay of the same client_uuid answers the refund as it was written, and the same movements
+    $replayed = ($this->refund)($order['id'], [], 'customer returned it', $uuid);
+    expect($replayed->id)->toBe($refund->id)
+        ->and(app(Orders::class)->refundMovements($replayed))->toEqual($movements);
 })->group(REFUND_GROUP, 'contract:payments->orders');

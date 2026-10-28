@@ -183,6 +183,37 @@ it('Payments\Facts::refunds: bucketed by refunded_at; empty is []; a refund read
         ->and($rows[0]['amount'])->toBe($order['totals']['total']);
 });
 
+it('Orders\Facts::refundLines: the refunded lines bucketed by the day of the refund, with item, qty at scale 4, amount at scale 2 and the disposition kept', function () {
+    // step 4.3d: daily_item_metrics.refunded_qty reads the refund lines (Orders::refund wrote them in 4.1b; the port is this step's)
+    expect(factRows((new OrderFacts)->refundLines($this->both)))->toBe([]);
+    $this->travelTo($this->firstSecond->addHours(2));
+    $f = OrderFloor::open($this);
+    $m = $f->menu;
+    $order = $f->send([$m->line($m->croissant, '2'), $m->line($m->sandwich)]);
+    $f->act('ready', $f->lineOf($order, $m->sandwich)['id'], $f->chef)->assertOk();
+    foreach ($order['lines'] as $line) {
+        $f->act('served', $line['id'], $f->waiter)->assertOk();
+    }
+    withActor($f->cashier->id);
+    DB::transaction(fn () => event(new PaymentRecorded($f->branch->id, 1, $order['id'], 'cash', $order['totals']['total'], '0.00')));
+    $refund = app(Orders::class)->refund($order['id'], 'customer returned it', $f->manager, [], (string) Str::uuid());
+
+    $rows = factRows((new OrderFacts)->refundLines($this->both));
+
+    $croissant = $f->lineOf($order, $m->croissant);
+    $sandwich = $f->lineOf($order, $m->sandwich);
+    expect($rows)->toHaveCount(2)
+        ->and(array_column($rows, 'line_id'))->toBe([$croissant['id'], $sandwich['id']])
+        ->and(array_column($rows, 'refund_id'))->toBe([$refund->id, $refund->id])
+        ->and(array_column($rows, 'order_id'))->toBe([$order['id'], $order['id']])
+        ->and(array_column($rows, 'day'))->toBe(['2026-11-21', '2026-11-21'])
+        ->and(array_column($rows, 'item_id'))->toBe([$m->croissant->id, $m->sandwich->id])
+        ->and(array_column($rows, 'qty'))->toBe(['2.0000', '1.0000'])
+        ->and(array_column($rows, 'amount'))->toBe([$croissant['line_total'], $sandwich['line_total']])
+        ->and(array_column($rows, 'disposition'))->toBe(['restock', 'waste'])
+        ->and(factRows((new OrderFacts)->refundLines(LocalDay::between('2026-11-22', '2026-11-22'))))->toBe([]);
+});
+
 it('Production\Facts::batches: bucketed by finished_at, only finished or confirmed batches, quantities at scale 4', function () {
     expect(factRows((new ProductionFacts)->batches($this->both)))->toBe([]);
     // one cake room for the three requests (the factory would make a second station with the same code per branch)

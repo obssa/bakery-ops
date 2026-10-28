@@ -119,7 +119,7 @@ it('plays the planned days through the module code: shifts, orders, payments wit
     $b = $branch->id;
     $zone = $branch->timezone;
     $plan = p4Plan();
-    expect($plan)->toHaveCount(P4_DAYS + 1)->and(DayPlan::REFUND_PCT)->toBe(0);
+    expect($plan)->toHaveCount(P4_DAYS + 1)->and(DayPlan::REFUND_PCT)->toBe(2);
     $anchor = CarbonImmutable::now($zone)->subDays(P4_DAYS + 2)->toDateString();
     $today = CarbonImmutable::now($zone)->toDateString();
 
@@ -290,13 +290,47 @@ it('plays the planned days through the module code: shifts, orders, payments wit
         expect($sales->revenue)->toBe(p4Sum($settled->pluck('total')), "revenue {$day}")->and((int) $sales->orders_count)->toBe($settled->count());
     }
 
-    // the money adds up: payments less payment refunds equal the paid orders' totals less what was refunded (no refunds yet; the
-    // orders.refunded_total column arrives with step 4.1b, so a missing one counts as zero)
+    // the refunds (step 4.3d): one per planned refund, asked by the cashier and approved by the manager through the refund use case, the
+    // money back over the order's payments (cash out of the till's drawer), each line as its product's settings say
+    $planned = 0;
+    foreach ($plan as $day) {
+        $planned += count(array_filter($day->orders, fn (PlannedOrder $o): bool => $o->refund));
+    }
+    $refundRows = DB::table('order_refunds')->where('branch_id', $b)->get();
+    expect($refundRows)->toHaveCount($planned)
+        ->and($refundRows->every(fn (object $r): bool => (int) $r->requested_by_user_id !== (int) $r->approved_by_user_id))->toBeTrue('the cashier asks, the manager approves')
+        ->and(DB::table('payment_refunds')->where('branch_id', $b)->distinct()->count('order_refund_id'))->toBe($planned);
+    foreach ($days as $built) {
+        $day = substr((string) $built->day, 0, 10);
+        [$from, $to] = p4Bounds($day);
+        $back = DB::table('payment_refunds')->where('branch_id', $b)->where('refunded_at', '>=', $from)->where('refunded_at', '<', $to)->get();
+        $totals = DB::table('daily_channel_totals')->where('branch_id', $b)->where('day', $day)->get()->keyBy('channel_id');
+        foreach ($back->groupBy('channel_id') as $channel => $rows) {
+            expect($totals[$channel]->refund_amount)->toBe(p4Sum($rows->pluck('amount')), "refund_amount {$day} {$channel}")
+                ->and((int) $totals[$channel]->refund_count)->toBe($rows->count());
+        }
+        $sales = DB::table('daily_sales')->where('branch_id', $b)->where('day', $day)->first();
+        expect($sales?->refund_total ?? '0.00')->toBe(p4Sum($back->pluck('amount')), "refund_total {$day}")
+            ->and((int) ($sales?->refund_count ?? 0))->toBe($back->pluck('order_refund_id')->unique()->count(), "refund_count {$day}");
+    }
+    // every return points at its original, a sale of the opposite quantity at the same place, reversed once
+    $returns = DB::table('stock_movements')->where('branch_id', $b)->where('reason', 'return')->get();
+    foreach ($returns as $return) {
+        $reversal = DB::table('stock_movement_reversals')->where('movement_id', $return->id)->sole();
+        $original = DB::table('stock_movements')->where('id', $reversal->reverses_movement_id)->sole();
+        expect($original->reason)->toBe('sale')
+            ->and((int) $return->ref_id)->toBe((int) $original->id)
+            ->and((int) $return->item_id)->toBe((int) $original->item_id)
+            ->and(BigDecimal::of((string) $return->qty)->plus((string) $original->qty)->isZero())->toBeTrue("return {$return->id}");
+    }
+    expect($returns->count())->toBe(DB::table('order_refund_lines')->where('branch_id', $b)->where('disposition', 'restock')->count());
+
+    // the money adds up: payments less payment refunds equal the paid orders' totals less what was refunded, now with real refunds
     $payments = p4Sum(DB::table('payments')->where('branch_id', $b)->where('status', '<>', 'voided')->pluck('amount'));
     $refunds = p4Sum(DB::table('payment_refunds')->where('branch_id', $b)->pluck('amount'));
     $orders = DB::table('orders')->where('branch_id', $b)->whereIn('status', ['paid', 'closed'])->get();
-    expect((string) BigDecimal::of($payments)->minus($refunds)->toScale(2))->toBe((string) BigDecimal::of(p4Sum($orders->pluck('total')))->minus(p4Sum($orders->map(fn (object $o): string => (string) ($o->refunded_total ?? '0.00'))))->toScale(2))
-        ->and(DB::table('payment_refunds')->where('branch_id', $b)->count())->toBe(0);
+    expect((string) BigDecimal::of($payments)->minus($refunds)->toScale(2))->toBe((string) BigDecimal::of(p4Sum($orders->pluck('total')))->minus(p4Sum($orders->pluck('refunded_total')))->toScale(2))
+        ->and($refunds)->toBe(p4Sum($orders->pluck('refunded_total')));
 
     // receipt settings saved; today's sample orders taken in real time
     expect(DB::table('receipt_settings')->where('branch_id', $b)->count())->toBe(1)

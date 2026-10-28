@@ -34,6 +34,7 @@ function samplePayloads(): array
         'chain_broken' => NotificationEvents::chainBroken(1)->payload(),
         'payment_disputed' => NotificationEvents::paymentDisputed(1, 5)->payload(),
         'weekly_summary' => NotificationEvents::weeklySummaryReady(1)->payload(),
+        'order_refunded' => NotificationEvents::refundPaid(1, 5, 6)->payload(),
     ];
 }
 
@@ -163,7 +164,7 @@ it('refuses a type it does not know and a payload that lacks what the text needs
 })->group('module:notifications', 'unit');
 
 it('knows every type of the registry with a severity, channels and keys, and only the types the inbox table accepts', function () {
-    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary'];
+    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary', 'order_refunded'];
 
     foreach (NotificationTypes::all() as $type) {
         expect($accepted)->toContain($type)

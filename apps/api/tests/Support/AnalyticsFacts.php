@@ -12,6 +12,7 @@ use App\Modules\Inventory\Contracts\MovementFact;
 use App\Modules\Inventory\Contracts\StockOutFact;
 use App\Modules\Inventory\Contracts\UnitCostFact;
 use App\Modules\Orders\Contracts\LineFact;
+use App\Modules\Orders\Contracts\RefundLineFact;
 use App\Modules\Orders\Contracts\SaleFact;
 use App\Modules\Orders\Contracts\StationLineFact;
 use App\Modules\Orders\Contracts\VoidFact;
@@ -131,6 +132,26 @@ final class AnalyticsFacts
             $a['shift_instance_id'] ?? null,
             (string) ($a['received_at'] ?? self::DAY.'T06:00:00Z'),
             (bool) ($a['duplicate_reference'] ?? false),
+        );
+    }
+
+    /**
+     * A refunded order line (Orders\Contracts\Facts::refundLines, step 4.3d).
+     *
+     * @param  array<string, mixed>  $a
+     */
+    public static function refundLine(array $a = []): RefundLineFact
+    {
+        return new RefundLineFact(
+            (int) ($a['refund_id'] ?? 1),
+            (int) ($a['order_id'] ?? 1),
+            (int) ($a['line_id'] ?? 1),
+            (string) ($a['day'] ?? self::DAY),
+            (int) ($a['item_id'] ?? 1),
+            Quantity::of((string) ($a['qty'] ?? '1'))->toString(),
+            (string) ($a['amount'] ?? '100.00'),
+            (string) ($a['disposition'] ?? 'restock'),
+            (string) ($a['refunded_at'] ?? self::DAY.'T10:00:00Z'),
         );
     }
 

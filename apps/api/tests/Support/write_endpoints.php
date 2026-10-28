@@ -720,6 +720,36 @@ return [
         },
         'payload' => fn (): array => ['reason' => 'Keyed on the wrong bill', 'pin' => '864209'],
     ],
+    // Refunds (step 4.3d): a closed order (two cakes taken away, served, paid in cash at the admin's till) refunded whole with the admin's own
+    // PIN writes one payment_refunds row (the cash share, out of the till's shift)
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders/{order}/refund',
+        'module' => 'payments',
+        'table' => 'payment_refunds',
+        'setup' => function (TestCase $t) use ($admin, $orderableCake): array {
+            $me = $admin();
+            app(ShortCodes::class)->set($me, '864209');
+            $cake = $orderableCake($me);
+            $till = Station::factory()->forCode(StationCode::Till)->create(['branch_id' => $me->branch_id]);
+            Shifts::ensureOpen($till);
+            $t->withHeader('X-Station-Id', (string) $till->id);
+            $order = $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson('/api/v1/orders', [
+                'client_uuid' => (string) Str::uuid(),
+                'type' => 'takeaway',
+                'lines' => [['client_uuid' => (string) Str::uuid(), 'item_id' => $cake->id, 'qty' => '2']],
+            ]);
+            foreach ((array) $order->json('lines') as $line) {
+                $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson("/api/v1/order-lines/{$line['id']}/served")->assertOk();
+            }
+            $t->withHeaders(['Idempotency-Key' => (string) Str::uuid()])->postJson("/api/v1/orders/{$order->json('id')}/payments", [
+                'client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => (string) $order->json('totals.total'),
+            ])->assertCreated();
+
+            return ['{order}' => (string) $order->json('id')];
+        },
+        'payload' => fn (): array => ['client_uuid' => '3c9d6f1e-2a4b-4c8d-9e7f-5a1b2c3d4e5f', 'reason' => 'The cakes were the wrong ones', 'pin' => '864209'],
+    ],
     // Receipts (step 4.3e): the first save of the receipt settings writes the branch's receipt_settings row; a receipt link writes one audit_log
     // row (receipt.link, without the URL) for an order paid in full
     [

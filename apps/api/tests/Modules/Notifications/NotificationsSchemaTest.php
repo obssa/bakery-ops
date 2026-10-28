@@ -76,8 +76,8 @@ it('creates notifications with branch_id NOT NULL, both languages, a JSON payloa
         ->and(Schema::hasColumn('notifications', 'deleted_at'))->toBeFalse('history: the inbox is never deleted');
 })->group('module:notifications', 'feature');
 
-it('accepts the fifteen types and three severities of the plan (migration 11 added the three of Phase 3, step 4.3c payment_disputed, step 4.4d weekly_summary) and refuses any other', function () {
-    $types = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary'];
+it('accepts the sixteen types and three severities of the plan (migration 11 added the three of Phase 3, step 4.3c payment_disputed, step 4.4d weekly_summary, step 4.3d order_refunded) and refuses any other', function () {
+    $types = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary', 'order_refunded'];
     foreach ($types as $type) {
         DB::table('notifications')->insert(inboxRow(['_reuse' => true, 'type' => $type]));
     }

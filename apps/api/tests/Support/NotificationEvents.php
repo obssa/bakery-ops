@@ -12,6 +12,7 @@ use App\Shared\Events\LineRejected;
 use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\ProductionAssigned;
 use App\Shared\Events\ProductionRequested;
+use App\Shared\Events\RefundPaid;
 use App\Shared\Events\StockLow;
 use App\Shared\Events\StockOut;
 use App\Shared\Events\StockRecovered;
@@ -223,6 +224,23 @@ final class NotificationEvents
         ];
 
         return new PaymentDisputed($branchId, $paymentId, $a['orderId'], $a['orderNo'], $a['channelCode'], $a['channelEn'], $a['channelAm'], $a['amount'], $a['reason'], $byUserId);
+    }
+
+    /**
+     * Step 4.3d: refund 4 of order #17 (id 21) paid back, 120.00 in all: 50.00 in cash and 70.00 by Telebirr, asked by $byUserId and approved by
+     * $approverId (Meron) unless $over says otherwise (refundId, orderId, orderNo, amount, isFull, reason, approverName, payments).
+     *
+     * @param  array<string, mixed>  $over
+     */
+    public static function refundPaid(int $branchId, int $byUserId, int $approverId, array $over = []): RefundPaid
+    {
+        $a = $over + [
+            'refundId' => 4, 'orderId' => 21, 'orderNo' => 17, 'amount' => '120.00', 'isFull' => true, 'reason' => 'The cake was the wrong one',
+            'approverName' => 'Meron',
+            'payments' => [['payment_id' => 31, 'channel_code' => 'cash', 'amount' => '50.00'], ['payment_id' => 30, 'channel_code' => 'telebirr', 'amount' => '70.00']],
+        ];
+
+        return new RefundPaid($branchId, $a['refundId'], $a['orderId'], $a['orderNo'], $a['amount'], $a['isFull'], $a['reason'], $byUserId, $approverId, $a['approverName'], $a['payments']);
     }
 
     /**

@@ -14,7 +14,8 @@ use Tests\Support\AnalyticsFacts as F;
  *   - COGS: units x the cost of the recipe version the line snapshotted, each required ingredient at unitCosts(day), the sum rounded
  *     half-up ONCE per item-day; a line with no version is costed at the product's own cost (a bought-in product); a missing recipe
  *     version or a missing cost makes cogs_complete false and counts 0, never an estimate.
- * refunded_qty stays 0 until order refunds exist (step 4.1b). An item with nothing to say that day has no row.
+ * refunded_qty is the quantity of the item's order lines refunded that day (the refund's own day, Orders\Facts::refundLines, step 4.3d),
+ * whatever their disposition. An item with nothing to say that day has no row.
  */
 
 beforeEach(function () {
@@ -143,4 +144,22 @@ it('rounds half-up at the cent', function () {
 
 it('has no row for a day where nothing happened and nothing is held', function () {
     expect((new ItemBuilder)->build(F::DAY, [], [], [F::closing(13, 1, '0')], [], $this->costs, $this->items, []))->toBe([]);
+})->group('unit', 'module:analytics');
+
+it('counts the units refunded that day per item, restocked or wasted, and gives an item only refunded that day its row', function () {
+    $rows = (new ItemBuilder)->build(
+        F::DAY,
+        [F::line(['line_id' => 3, 'item_id' => 2, 'qty' => '3', 'line_total' => '180.00'])],
+        [], [], [], $this->costs, $this->items, $this->recipes,
+        [
+            F::refundLine(['line_id' => 3, 'item_id' => 2, 'qty' => '1', 'disposition' => 'restock']),
+            F::refundLine(['line_id' => 7, 'item_id' => 2, 'qty' => '2', 'disposition' => 'restock']),
+            F::refundLine(['line_id' => 8, 'item_id' => 1, 'qty' => '1', 'disposition' => 'waste']), // a sandwich sold another day
+        ],
+    );
+
+    expect(array_column($rows, 'refunded_qty', 'item_id'))->toBe([1 => '1.0000', 2 => '3.0000'])
+        ->and($rows[0])->toBe(($this->row)(1, 7, 'product', ['refunded_qty' => '1.0000']))
+        ->and($rows[1]['units_sold_qty'])->toBe('3.0000', 'a refund does not unsell: revenue stays on the day of the sale')
+        ->and($rows[1]['revenue'])->toBe('180.00');
 })->group('unit', 'module:analytics');

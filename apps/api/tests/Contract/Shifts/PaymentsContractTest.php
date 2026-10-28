@@ -14,9 +14,11 @@ use App\Shared\Models\Branch;
 use App\Shared\Shifts\OpenShifts;
 use App\Shared\Values\Money;
 use Brick\Math\BigDecimal;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\FakeOpenShifts;
 use Tests\Support\OrderFloor;
+use Tests\Support\OrderRefundRows;
 
 /*
  * Contract: shifts -> payments (manifest contracts["shifts->payments"]; phase-3 plan sections 2 and 10.5).
@@ -267,4 +269,48 @@ it('never asks Shifts anything when the flag is off, whatever the actor carries'
 
     expect(array_filter($double->asked, fn (string $q): bool => str_starts_with($q, 'isOpen')))->toBe([])
         ->and(Payment::query()->count())->toBe(1);
+})->group('contract:shifts->payments', 'contract');
+
+it('takes the cash refunds given in a shift out of its cash, keyed on the refund\'s own shift, and lists each channel\'s refunds beside its takings', function () {
+    // step 4.3d (phase-4 plan section 2, 10.4 and 10.9 item 13): a cash refund is handed out of the drawer of the shift it is given in, so the
+    // closing declaration expects less; a digital refund leaves the drawer alone; a refund of a payment taken in another shift counts for the
+    // shift that gave it, as a payment counts for the shift that took it
+    $cash = ($this->take)('cash', '300.00', 61);
+    $wallet = ($this->take)('telebirr', '120.00', 61, ['reference_no' => 'TB-61']);
+    $older = ($this->take)('cash', '80.00', 62);
+    ($this->take)('cash', '40.00', 61, ['status' => 'voided']);
+    $refund = function (Payment $payment, string $amount, int $shift, ?Branch $in = null): void {
+        $branch = $in ?? $this->branch;
+        DB::table('payment_refunds')->insert([
+            'branch_id' => $branch->id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $payment->order_id,
+            'order_refund_id' => OrderRefundRows::make($branch->id, $payment->order_id, $this->admin->id, $amount),
+            'payment_id' => $payment->id, 'channel_id' => $payment->channel_id, 'amount' => $amount,
+            'refunded_by_user_id' => $this->admin->id, 'approved_by_user_id' => $this->admin->id,
+            'shift_instance_id' => shiftRow($shift, $branch->id), 'refunded_at' => now(), 'created_at' => now(),
+        ]);
+    };
+    $refund($cash, '60.00', 61);
+    $refund($older, '30.00', 61);
+    $refund($wallet, '20.00', 61);
+    $refund($cash, '15.00', 63);
+
+    $totals = app(Totals::class);
+
+    expect($totals->cash(61)->amount())->toBe('210.00', '300.00 taken, 60.00 and 30.00 handed back in the shift')
+        ->and($totals->cash(62)->amount())->toBe('80.00', 'the payment\'s own shift keeps what it took')
+        ->and($totals->cash(63)->amount())->toBe('-15.00', 'a shift that only gave money back expects less than its float');
+    $byChannel = $totals->byChannel(61);
+    $cashRow = collect($byChannel)->firstWhere('code', 'cash');
+    $walletRow = collect($byChannel)->firstWhere('code', 'telebirr');
+    expect($cashRow->receipts)->toBe(1)->and($cashRow->sum)->toBe('300.00')
+        ->and($cashRow->refunds)->toBe(2)->and($cashRow->refundTotal)->toBe('90.00')
+        ->and($walletRow->refunds)->toBe(1)->and($walletRow->refundTotal)->toBe('20.00')
+        ->and($cashRow->toArray())->toHaveKeys(['refunds', 'refund_total']);
+    $only = $totals->byChannel(63);
+    expect($only)->toHaveCount(1)
+        ->and($only[0]->code)->toBe('cash')
+        ->and($only[0]->receipts)->toBe(0)
+        ->and($only[0]->sum)->toBe('0.00')
+        ->and($only[0]->refunds)->toBe(1)
+        ->and($only[0]->refundTotal)->toBe('15.00', 'a channel that only gave money back in the shift is listed');
 })->group('contract:shifts->payments', 'contract');

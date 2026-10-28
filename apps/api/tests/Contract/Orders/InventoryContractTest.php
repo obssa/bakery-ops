@@ -630,3 +630,31 @@ it('keeps the ledger oracle after reversals, and 50 random sale and reversal seq
     expect($reversedCount)->toBeGreaterThan(0, "seed {$seed}: the sequence reversed something")
         ->and(DB::table('stock_movement_reversals')->where('branch_id', $this->branch->id)->count())->toBe($reversedCount);
 })->group('contract:orders->inventory', 'contract', 'property');
+
+it('reads the returns a refund wrote by their ids: each with its item, place, quantity and the original it points at, nothing else', function () {
+    // step 4.3d: Orders answers a refund's movements (POST /orders/{order}/refund) from the return ids it kept on its refund lines, through
+    // Reversals::returns: the returns among the ids, ascending; an id that is not a return (a sale) or another branch's is left out
+    $croissant = (string) Str::uuid();
+    $water = (string) Str::uuid();
+    $this->reservations->reserveMany([
+        $croissant => [($this->line)($this->croissant, '2', $this->display)],
+        $water => [($this->line)($this->water, '1', $this->display)],
+    ]);
+    $sales = $this->reservations->consumeMany([$croissant, $water], MovementReason::Sale);
+    $reversals = app(Reversals::class);
+    $croissantSale = collect($reversals->consumptionsOf($croissant, $this->croissant->id))->sole();
+    $waterSale = collect($reversals->consumptionsOf($water, $this->water->id))->sole();
+    [$waterReturn, $croissantReturn] = $reversals->of([$waterSale->id, $croissantSale->id]);
+
+    $read = $reversals->returns([$croissantReturn->id, $waterReturn->id, $croissantSale->id, 999999]);
+
+    $expected = collect([$waterReturn, $croissantReturn])->sortBy(fn (Movement $m): int => $m->id)->values()->all();
+    expect(array_map(fn (Movement $m): int => $m->id, $read))->toBe(array_map(fn (Movement $m): int => $m->id, $expected), 'the returns among the ids, ascending')
+        ->and(array_map(fn (Movement $m): ?int => $m->refId, $read))->toBe(array_map(fn (Movement $m): ?int => $m->refId, $expected))
+        ->and(collect($read)->mapWithKeys(fn (Movement $m): array => [$m->refId => [$m->itemId, $m->locationId, $m->qty->toString()]])->all())->toEqual([
+            $waterSale->id => [$this->water->id, $this->display->id, '1.0000'],
+            $croissantSale->id => [$this->croissant->id, $this->display->id, '2.0000'],
+        ])
+        ->and($reversals->returns([]))->toBe([])
+        ->and($sales)->not->toBeEmpty();
+})->group('contract:orders->inventory', 'contract');

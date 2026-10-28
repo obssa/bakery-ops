@@ -189,6 +189,7 @@ return [
     'POST /api/v1/payments/{payment}/verify' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
     'POST /api/v1/payments/{payment}/dispute' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
     'POST /api/v1/payments/{payment}/void' => ['permission' => 'orders.void_request', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'POST /api/v1/orders/{order}/refund' => ['permission' => 'orders.void_request', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
     // Receipts, reconciliation and the export (step 4.3e): the admin saves the receipt settings (channels.manage); a receipt is read by the payment
     // readers (payments.view) and its signed link made by the till's roles (payments.take; the matrix's {order} is an open cart, which has no
     // receipt: 409 payments.receipt.unpaid, no 403); the reconciliation and the export are the payment checkers' (payments.verify: admin, manager).
