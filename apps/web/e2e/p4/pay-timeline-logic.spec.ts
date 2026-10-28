@@ -343,8 +343,8 @@ test.describe("p4 order record: the rules", () => {
       expect(am[key as string], kind).toBeTruthy();
       expect(am[key as string], kind).not.toBe(en[key as string]);
     }
-    // the four payment kinds and the two voids that name an approver
-    expect(Object.entries(ENTRY_KINDS).filter(([, spec]) => spec.approved).map(([kind]) => kind).sort()).toEqual(["line.voided", "order.voided", "payment.voided"]);
+    // the four payment kinds, and the voids and the refund's two kinds (step 4.5g) that name an approver
+    expect(Object.entries(ENTRY_KINDS).filter(([, spec]) => spec.approved).map(([kind]) => kind).sort()).toEqual(["line.refunded", "line.voided", "order.refunded", "order.voided", "payment.voided"]);
     expect(Object.entries(ENTRY_KINDS).filter(([, spec]) => spec.payment).map(([kind]) => kind).sort()).toEqual(["payment.disputed", "payment.recorded", "payment.verified", "payment.voided"]);
     expect(kindLabelKey("order.refunded_later")).toBeNull();
     const unknown = recordEntries([event("order.refunded_later", "2026-10-27T08:00:00+00:00")], []);
