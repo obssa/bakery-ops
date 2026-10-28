@@ -96,6 +96,11 @@ return [
             'title' => 'Payment disputed: order #:order_no',
             'body' => ':amount ETB paid by :channel on order #:order_no was disputed: :reason. Check it against the bank statement, then verify or void it.',
         ],
+        // Phase 4, step 4.3d: money of a closed order given back
+        'order_refunded' => [
+            'title' => 'Refund: order #:order_no',
+            'body' => ':amount ETB was given back on order #:order_no, approved by :approver: :reason.',
+        ],
         // Phase 4, step 4.4d: how the week went (Monday morning, or sent by hand)
         'weekly_summary' => [
             'title' => 'Weekly summary: :from to :to',

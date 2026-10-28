@@ -9,6 +9,7 @@ use App\Modules\Payments\Http\Controllers\PaymentReportsController;
 use App\Modules\Payments\Http\Controllers\PaymentsController;
 use App\Modules\Payments\Http\Controllers\ReceiptsController;
 use App\Modules\Payments\Http\Controllers\ReceiptSettingsController;
+use App\Modules\Payments\Http\Controllers\RefundsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -24,6 +25,8 @@ use Illuminate\Support\Facades\Route;
  * link: payments.take), the receipt settings PUT (channels.manage), the reconciliation and the export (payments.verify), and the one public
  * route of Payments: GET /receipts/{order}, a customer's receipt behind a signed link (no bearer token; the `signed` middleware is the
  * protection, tests/Support/public_routes.php). /payments/reconciliation and /payments/export are not a {payment}: it takes digits only.
+ * Step 4.3d adds the refund of a closed order (POST /orders/{order}/refund: asked with orders.void_request, approved inside by the PIN of a
+ * payments.void holder, as the void).
  * Every route is listed in tests/Support/route_permissions.php and every write in tests/Support/write_endpoints.php.
  */
 Route::prefix('api/v1')->middleware(['api', 'signed'])->group(function (): void {
@@ -59,6 +62,8 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     });
     Route::middleware(['permission:orders.void_request', 'idempotency'])->group(function (): void {
         Route::post('/payments/{payment}/void', [PaymentDecisionsController::class, 'void'])->whereNumber('payment')->name('payments.void');
+        // step 4.3d: the refund of a closed order, asked with orders.void_request and approved inside by the PIN of a payments.void holder
+        Route::post('/orders/{order}/refund', [RefundsController::class, 'store'])->whereNumber('order')->name('payments.refund');
     });
 
     Route::middleware(['permission:channels.manage', 'idempotency'])->group(function (): void {

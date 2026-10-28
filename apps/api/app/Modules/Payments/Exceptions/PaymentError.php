@@ -204,6 +204,31 @@ final class PaymentError extends RuntimeException
         return new self('payments.export.too_large', 422, ['max_rows' => $maxRows, 'rows' => $rows]);
     }
 
+    /**
+     * Step 4.3d: an `allocation` of a refund that cannot be followed. $reason: `sum` (the shares do not add up to the refund), `payment`
+     * (a payment that is not one of the order's, or voided), `exceeds` (more than the payment still holds: amount - refunded_amount),
+     * `repeated` (one payment named twice); $paymentId names the share at fault, when one is.
+     */
+    public static function refundAllocationInvalid(string $reason, ?int $paymentId = null): self
+    {
+        return new self('payments.refund.allocation_invalid', 422, ['field' => 'allocation', 'reason' => $reason, 'payment_id' => $paymentId]);
+    }
+
+    /** Step 4.3d: a refund pays a share back through a digital channel, a transfer made outside the app: its reference is asked for. */
+    public static function refundReferenceRequired(string $channelCode): self
+    {
+        return new self('payments.refund.reference_required', 422, ['field' => 'refund_reference', 'channel_code' => $channelCode]);
+    }
+
+    /**
+     * Step 4.3d: the refund_proof_file_id cannot be this refund's photo: `not_found` (unknown, another branch's, removed), `wrong_purpose`
+     * (not a refund_proof upload), `attached` (claimed already), `expired` (older than payments.photo_max_age_hours).
+     */
+    public static function refundProofInvalid(string $reason): self
+    {
+        return new self('payments.refund.proof_invalid', 422, ['field' => 'refund_proof_file_id', 'reason' => $reason]);
+    }
+
     public function render(): JsonResponse
     {
         return ApiError::json($this->messageKey, $this->status, $this->extra);

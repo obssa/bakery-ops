@@ -16,6 +16,7 @@ use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\PaymentRecorded;
 use App\Shared\Events\PaymentVerified;
 use App\Shared\Events\PaymentVoided;
+use App\Shared\Events\RefundPaid;
 use App\Shared\Events\ShiftLocked;
 use App\Shared\Reports\WeeklySummaryLinks;
 use Illuminate\Support\Facades\Event;
@@ -42,6 +43,7 @@ final class AnalyticsServiceProvider extends ServiceProvider
         OrderPaid::class,
         OrderVoided::class,
         OrderRefunded::class,
+        RefundPaid::class,
     ];
 
     public function register(): void

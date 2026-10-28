@@ -57,6 +57,13 @@ return [
         'reason_required' => 'Say why the payment is voided, in at most 255 characters.',
         'pin_required' => 'A manager must type their PIN (4 to 6 digits) to approve the void.',
     ],
+    // step 4.3d: the money side of a refund (Orders' refusals are in orders.php)
+    'refund' => [
+        'pin_required' => 'A manager must type their PIN (4 to 6 digits) to approve the refund.',
+        'allocation_invalid' => 'Share the refund over the payments of this order, each within what it still holds, adding up to the refund.',
+        'reference_required' => 'Write the reference of the transfer that sends the money back.',
+        'proof_invalid' => 'This photo cannot be the proof of this refund. Take a new photo of the transfer and try again.',
+    ],
     // step 4.3e: receipts, the reconciliation and the export
     'receipt' => [
         'unpaid' => 'This order has no receipt: it is not paid in full. Ask for a pro-forma instead, or take the rest of the payment first.',

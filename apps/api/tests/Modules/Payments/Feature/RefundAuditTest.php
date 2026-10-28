@@ -61,7 +61,7 @@ it('writes one audit row per refund and per void, with the asker as the actor an
     $proof = ReceiptFiles::upload($this, $f->cashier, null, 'refund_proof');
     $proofKey = (string) DB::table('stored_files')->where('id', $proof)->value('key');
     ($this->post)("/api/v1/orders/{$split['id']}/refund", [
-        'client_uuid' => (string) Str::uuid(), 'reason' => 'The croissant was stale', 'pin' => $pin,
+        'client_uuid' => (string) Str::uuid(), 'reason' => 'The croissant was stale', 'pin' => $pin, 'lines' => [$f->lineOf($split, $m->croissant)['id']],
         'refund_reference' => $reference, 'refund_proof_file_id' => $proof,
     ])->assertCreated();
 

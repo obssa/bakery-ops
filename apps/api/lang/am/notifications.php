@@ -94,6 +94,11 @@ return [
             'title' => 'ክፍያ ላይ ጥያቄ ቀርቧል፦ ትዕዛዝ #:order_no',
             'body' => 'በ:channel የተከፈለው :amount ብር (ትዕዛዝ #:order_no) ጥያቄ ቀርቦበታል፦ :reason። ከባንክ መግለጫው ጋር ያመሳክሩት፤ ከዚያ ያረጋግጡት ወይም ይሰርዙት።',
         ],
+        // ደረጃ 4.3d፡ የተዘጋ ትዕዛዝ ገንዘብ ተመልሷል
+        'order_refunded' => [
+            'title' => 'ተመላሽ፦ ትዕዛዝ #:order_no',
+            'body' => 'ለትዕዛዝ #:order_no :amount ብር ተመልሷል፤ ያጸደቁት :approver ናቸው፦ :reason።',
+        ],
         // ደረጃ 4.4d፡ ሳምንቱ እንዴት እንደሄደ (ሰኞ ጠዋት፣ ወይም በእጅ ሲላክ)
         'weekly_summary' => [
             'title' => 'የሳምንቱ ማጠቃለያ፦ ከ:from እስከ :to',

@@ -18,6 +18,7 @@ use App\Modules\Notifications\Listeners\NotifyLineRejected;
 use App\Modules\Notifications\Listeners\NotifyPaymentDisputed;
 use App\Modules\Notifications\Listeners\NotifyProductionAssigned;
 use App\Modules\Notifications\Listeners\NotifyProductionRequested;
+use App\Modules\Notifications\Listeners\NotifyRefund;
 use App\Modules\Notifications\Listeners\NotifyStockLow;
 use App\Modules\Notifications\Listeners\NotifyStockOut;
 use App\Modules\Notifications\Listeners\NotifyTransferDecided;
@@ -32,6 +33,7 @@ use App\Shared\Events\LineRejected;
 use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\ProductionAssigned;
 use App\Shared\Events\ProductionRequested;
+use App\Shared\Events\RefundPaid;
 use App\Shared\Events\StockLow;
 use App\Shared\Events\StockOut;
 use App\Shared\Events\StockRecovered;
@@ -75,6 +77,7 @@ final class NotificationsServiceProvider extends ServiceProvider
         Event::listen(VarianceDecided::class, [NotifyVarianceDecided::class, 'handle']);
         Event::listen(ChainBroken::class, [NotifyChainBroken::class, 'handle']);
         Event::listen(PaymentDisputed::class, [NotifyPaymentDisputed::class, 'handle']);
+        Event::listen(RefundPaid::class, [NotifyRefund::class, 'handle']);
         Event::listen(WeeklySummaryReady::class, [NotifyWeeklySummary::class, 'handle']);
 
         $this->loadRoutesFrom(base_path('routes/modules/notifications.php'));

@@ -11,6 +11,7 @@ use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\PaymentRecorded;
 use App\Shared\Events\PaymentVerified;
 use App\Shared\Events\PaymentVoided;
+use App\Shared\Events\RefundPaid;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
@@ -94,8 +95,9 @@ it('rebuilds today from everything paid when the queue runs the jobs (the sync t
 it('listens to every event that changes the figures of today: a payment taken, verified, disputed or voided, an order paid, voided or refunded', function () {
     $raw = app('events')->getRawListeners();
 
-    // step 4.1b: a refund moves the day it happens (refunds count on the cash basis, its return movements on their created_at)
-    foreach ([PaymentRecorded::class, PaymentVerified::class, PaymentDisputed::class, PaymentVoided::class, OrderPaid::class, OrderVoided::class, OrderRefunded::class] as $event) {
+    // step 4.1b: a refund moves the day it happens (refunds count on the cash basis, its return movements on their created_at); step 4.3d:
+    // so does the money paid back (RefundPaid, after the payment_refunds rows are written)
+    foreach ([PaymentRecorded::class, PaymentVerified::class, PaymentDisputed::class, PaymentVoided::class, OrderPaid::class, OrderVoided::class, OrderRefunded::class, RefundPaid::class] as $event) {
         expect($raw[$event] ?? [])->toContain([TouchToday::class, 'handle']);
     }
 });

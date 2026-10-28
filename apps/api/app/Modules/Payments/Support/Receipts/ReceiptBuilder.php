@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Gathers what one receipt prints (phase-4 plan section 4.5, step 4.3e): the order through Orders::forReceipt (number, date, type, table,
  * the charged lines with their modifiers, the money), and Payments' own rows: the payments that are not voided (oldest first), the money
- * paid back (payment_refunds, empty until step 4.3d), the channels' names in both languages (removed channels included) and the receipt
+ * paid back (payment_refunds, written by the refund since step 4.3d), the channels' names in both languages (removed channels included) and the receipt
  * settings (or their defaults). It reads no person's name: the receipt has none.
  *
  * An order paid in full (settled, paid or closed) has a receipt, dated when it was settled. One that is not has a pro-forma when asked

@@ -85,7 +85,7 @@ it('accepts the sixteen types and three severities of the plan (migration 11 add
         DB::table('notifications')->insert(inboxRow(['_reuse' => true, 'severity' => $severity]));
     }
 
-    expect(DB::table('notifications')->count())->toBe(18)
+    expect(DB::table('notifications')->count())->toBe(19)
         ->and(fn () => DB::table('notifications')->insert(inboxRow(['_reuse' => true, 'type' => 'shift_opened'])))->toThrow(QueryException::class)
         ->and(fn () => DB::table('notifications')->insert(inboxRow(['_reuse' => true, 'severity' => 'fatal'])))->toThrow(QueryException::class);
 })->group('module:notifications', 'feature');

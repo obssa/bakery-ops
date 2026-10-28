@@ -166,6 +166,15 @@ return [
             'gate' => null,
             'deep_link' => '/admin/payments?payment={payment_id}',
         ],
+        // Phase 4 (step 4.3d): money of a closed order was given back (RefundPaid). The people who check the money (payments.verify) hear of
+        // it in the inbox once per refund, without the person who asked or the manager who approved it; the line opens the order's record.
+        'order_refunded' => [
+            'severity' => 'info',
+            'channels' => ['in_app'],
+            'inbox_key' => 'order_refunded:{refund_id}',
+            'gate' => null,
+            'deep_link' => '/admin/orders/record?id={order_id}',
+        ],
         // Phase 4 (step 4.4d): the summary of a week (plan 10.2 R-L: Telegram and the inbox, not email). The people who run the analytics
         // (analytics.manage) hear of it on every channel they have switched on; one line per week and run (the Monday job is "scheduled",
         // each manual send its own run). The line opens the dashboards on that week; its body carries the signed link to the week's PDF.

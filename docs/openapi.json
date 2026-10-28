@@ -9506,6 +9506,55 @@
                 }
             }
         },
+        "/v1/orders/{order}/refund": {
+            "post": {
+                "operationId": "payments.refund",
+                "tags": [
+                    "Refunds"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RefundOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/reorder-rules": {
             "get": {
                 "operationId": "inventory.reorder-rules.index",
@@ -16512,6 +16561,77 @@
                     "amount"
                 ],
                 "title": "RecordPaymentRequest"
+            },
+            "RefundOrderRequest": {
+                "type": "object",
+                "description": "POST /orders/{order}/refund (step 4.3d): the refund's own id (client_uuid, ADR 0003), why (free text, required, up to 255 characters;\nblanks are no reason), the PIN of the manager or admin who approves it (their short code: 4 to 6 digits, read once for Identity's check\nand never kept), and optionally:\n  - lines: the order-line ids to refund (none: every refundable line); nobody chooses a disposition, each line follows its product;\n  - allocation: [{payment_id, amount}] the shares over the order's payments, instead of last in, first out (a split bill);\n  - refund_reference: the reference of the outgoing transfer of a digital share (up to 64 characters, the column's size);\n  - refund_proof_file_id: the photo of that transfer, a refund_proof upload (POST /files).\nAnything else in the body is ignored.",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "pin": {
+                        "type": "string",
+                        "pattern": "^[0-9]{4,6}$"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "maxItems": 200,
+                        "uniqueItems": true
+                    },
+                    "allocation": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "payment_id": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "amount": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,10}(\\.[0-9]{1,2})?$"
+                                }
+                            },
+                            "required": [
+                                "payment_id",
+                                "amount"
+                            ]
+                        },
+                        "maxItems": 50
+                    },
+                    "refund_reference": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 64
+                    },
+                    "refund_proof_file_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1
+                    }
+                },
+                "required": [
+                    "client_uuid",
+                    "reason",
+                    "pin"
+                ],
+                "title": "RefundOrderRequest"
             },
             "RejectCountRequest": {
                 "type": "object",

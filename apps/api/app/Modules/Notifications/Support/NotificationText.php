@@ -144,6 +144,12 @@ final class NotificationText
                 'channel' => $this->str($type, $p, $in('channel_name')),
                 'reason' => $this->str($type, $p, 'reason'),
             ],
+            'order_refunded' => [
+                'order_no' => (string) $this->int($type, $p, 'order_no'),
+                'amount' => $this->str($type, $p, 'amount'),
+                'approver' => $this->str($type, $p, 'approved_by_name'),
+                'reason' => $this->str($type, $p, 'reason'),
+            ],
             'weekly_summary' => [
                 'from' => $this->str($type, $p, 'week_start'),
                 'to' => $this->str($type, $p, 'week_end'),
