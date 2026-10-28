@@ -78,7 +78,17 @@ it('carries the item columns Inventory, Orders and Production rely on, and the a
     expect(Schema::hasColumns('items', [
         'id', 'branch_id', 'kind', 'fulfilment', 'name_en', 'name_am', 'category_id', 'unit_id', 'sku', 'is_active',
         'is_new_until', 'default_batch_qty', 'production_station_id', 'created_at', 'updated_at', 'deleted_at',
+        // step 4.1b: the admin's two refund settings (Ramin's answer to R-C, 2026-10-28)
+        'refundable', 'refund_restock',
     ]))->toBeTrue();
+    foreach (['refundable' => '1', 'refund_restock' => '0'] as $column => $default) {
+        $info = DB::selectOne(
+            'select is_nullable as nullable, column_default as def from information_schema.columns where table_schema = ? and table_name = ? and column_name = ?',
+            [dbSchema(), 'items', $column],
+        );
+        expect(strtoupper((string) $info?->nullable))->toBe('NO', "items.{$column} is NOT NULL")
+            ->and(trim((string) $info?->def, "'"))->toBeIn([$default, $default === '1' ? 'true' : 'false'], "items.{$column} default");
+    }
 
     foreach (['items', 'item_prices'] as $table) {
         expect(Schema::hasColumns($table, ['created_by_user_id', 'acting_user_id', 'shift_instance_id', 'station_id', 'device_id']))

@@ -47,6 +47,11 @@ arch('Orders reads Inventory through its Contracts: Locations names where a line
     ->not->toUse(['App\Modules\Inventory\Models', 'App\Modules\Inventory\Ledger\Ledger', 'App\Modules\Inventory\Ledger\StockBalance', 'App\Modules\Payments'])
     ->group('arch', 'module:orders');
 
+arch('Orders reads the refund settings of a product through the Catalog RefundPolicy, never the item model or its tables (step 4.1b)')
+    ->expect('App\Modules\Orders\Actions\RefundOrder')
+    ->not->toUse(['App\Modules\Catalog\Models', 'Illuminate\Support\Facades\DB'])
+    ->group('arch', 'module:orders');
+
 arch('every other module reaches Orders through App\Modules\Orders\Contracts only (Orders::totals, Orders::openAt, Tickets::since)')
     ->expect(['App\Modules\Payments', 'App\Modules\Production', 'App\Modules\Shifts', 'App\Modules\Notifications', 'App\Modules\Analytics'])
     ->not->toUse(array_map(

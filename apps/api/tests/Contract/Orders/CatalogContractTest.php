@@ -8,6 +8,7 @@ use App\Modules\Catalog\Contracts\ModifierView;
 use App\Modules\Catalog\Contracts\Prices;
 use App\Modules\Catalog\Contracts\RecipeDeltaLine;
 use App\Modules\Catalog\Contracts\Recipes;
+use App\Modules\Catalog\Contracts\RefundPolicy;
 use App\Modules\Catalog\Contracts\Routing;
 use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Item;
@@ -28,7 +29,8 @@ use Carbon\CarbonImmutable;
  * Written BEFORE any code exists in App\Modules\Orders (step 1.1): only Catalog classes and factories. Phrased from
  * Orders' side: "when I, Orders, put a product on an order line, I rely on Catalog for the price in force when the
  * order was sent, the station the line goes to (none for the display case), the modifiers with their price and recipe
- * deltas, the recipe version I snapshot, and whether the product is new". It runs in Catalog's CI job (mod-catalog).
+ * deltas, the recipe version I snapshot, and whether the product is new"; since step 4.1b also "whether a product may be refunded and
+ * whether a refunded unit goes back into stock" (RefundPolicy). It runs in Catalog's CI job (mod-catalog).
  */
 
 beforeEach(function () {
@@ -161,4 +163,38 @@ it('tells me with Items::isNew which products go in the New row (local date), an
     expect($items->fulfilment($this->sandwich))->toBe(Fulfilment::ToOrder)
         ->and($items->fulfilment($this->cake))->toBe(Fulfilment::ToStock)
         ->and($items->fulfilment($this->water->id))->toBe(Fulfilment::BoughtIn);
+})->group('contract:orders->catalog', 'contract');
+
+// Step 4.1b (Ramin's answer to R-C, 2026-10-28): what a refund does is the admin's decision per product, two Catalog settings. Orders reads
+// them through RefundPolicy::for at the moment of the refund and never reads Catalog's tables itself.
+
+it('answers RefundPolicy::for(ids) with each product\'s two refund settings as they stand now: refundable, and whether a refunded unit goes back into stock', function () {
+    $policy = app(RefundPolicy::class);
+    $theirs = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => Branch::factory()->create()->id]);
+    $ids = [$this->water->id, $this->cake->id, $this->sandwich->id, $this->chicken->id, $theirs->id, 987654];
+    $rule = fn (array $rules, Item $item): array => $rules[$item->id]->toArray();
+
+    $rules = $policy->for($ids);
+
+    // the natural defaults: sold from stock goes back into stock, made to order does not (its ingredients are used), an ingredient is not sold
+    $ours = [$this->sandwich->id, $this->cake->id, $this->water->id, $this->chicken->id];
+    sort($ours);
+    expect(array_keys($rules))->toBe($ours, 'in id order; another branch\'s ids and unknown ids are left out')
+        ->and($rule($rules, $this->cake))->toBe(['item_id' => $this->cake->id, 'refundable' => true, 'restock' => true])
+        ->and($rule($rules, $this->water))->toBe(['item_id' => $this->water->id, 'refundable' => true, 'restock' => true])
+        ->and($rule($rules, $this->sandwich))->toBe(['item_id' => $this->sandwich->id, 'refundable' => true, 'restock' => false])
+        ->and($rule($rules, $this->chicken))->toBe(['item_id' => $this->chicken->id, 'refundable' => false, 'restock' => false]);
+
+    // the admin changes them; the next read sees the change, and a product deleted since its sale is still answered
+    $this->cake->forceFill(['refund_restock' => false])->save();
+    $this->water->forceFill(['refundable' => false])->save();
+    $this->latte->delete();
+    $after = $policy->for([$this->cake->id, $this->water->id, $this->latte->id]);
+
+    expect($rule($after, $this->cake))->toBe(['item_id' => $this->cake->id, 'refundable' => true, 'restock' => false])
+        ->and($rule($after, $this->water))->toBe(['item_id' => $this->water->id, 'refundable' => false, 'restock' => true])
+        ->and($rule($after, $this->latte))->toBe(['item_id' => $this->latte->id, 'refundable' => true, 'restock' => false])
+        ->and($after[$this->cake->id]->refundable)->toBeTrue()
+        ->and($after[$this->cake->id]->restock)->toBeFalse()
+        ->and($policy->for([]))->toBe([]);
 })->group('contract:orders->catalog', 'contract');

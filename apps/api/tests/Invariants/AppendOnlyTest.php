@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Enums\Fulfilment;
 use App\Modules\Catalog\Models\Item;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Models\Location;
+use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Payments\Models\Payment;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
@@ -93,14 +95,54 @@ function seedAppendOnlyRow(string $table): int
             $payment = Payment::factory()->create();
 
             return DB::table('payment_refunds')->insertGetId([
-                'branch_id' => $payment->branch_id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $payment->order_id, 'order_refund_id' => 1,
+                'branch_id' => $payment->branch_id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $payment->order_id,
+                'order_refund_id' => appendOnlyOrderRefund($payment->branch_id, $payment->order_id, $payment->received_by_user_id),
                 'payment_id' => $payment->id, 'channel_id' => $payment->channel_id, 'amount' => '10.00',
                 'refunded_by_user_id' => $payment->received_by_user_id, 'approved_by_user_id' => $payment->received_by_user_id,
                 'refunded_at' => now(), 'created_at' => now(),
             ]);
         })(),
+        // step 4.1b: the Orders side of a refund and the Ledger's reversal rows
+        'order_refunds' => (function (): int {
+            $payment = Payment::factory()->create();
+
+            return appendOnlyOrderRefund($payment->branch_id, $payment->order_id, $payment->received_by_user_id);
+        })(),
+        'order_refund_lines' => (function (): int {
+            $line = OrderLine::factory()->create();
+            $order = DB::table('orders')->where('id', $line->order_id)->first();
+
+            return DB::table('order_refund_lines')->insertGetId([
+                'branch_id' => $line->branch_id, 'order_refund_id' => appendOnlyOrderRefund($line->branch_id, $line->order_id, (int) $order->created_by_user_id),
+                'order_line_id' => $line->id, 'qty' => '1.0000', 'line_amount' => '10.00', 'disposition' => 'waste', 'movement_ids' => '[]', 'created_at' => now(),
+            ]);
+        })(),
+        'stock_movement_reversals' => (function (): int {
+            $branch = Branch::factory()->create();
+            $user = User::factory()->create(['branch_id' => $branch->id]);
+            $item = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $branch->id, 'created_by_user_id' => $user->id]);
+            $location = Location::factory()->create(['branch_id' => $branch->id]);
+            $row = fn (string $qty, string $reason, string $end): int => DB::table('stock_movements')->insertGetId([
+                'branch_id' => $branch->id, 'item_id' => $item->id, $end => $location->id, 'qty' => $qty, 'reason' => $reason,
+                'ref_type' => 'probe', 'user_id' => $user->id, 'created_at' => now(),
+            ]);
+
+            return DB::table('stock_movement_reversals')->insertGetId([
+                'branch_id' => $branch->id, 'movement_id' => $row('1.0000', 'return', 'to_location_id'),
+                'reverses_movement_id' => $row('-1.0000', 'sale', 'from_location_id'), 'created_at' => now(),
+            ]);
+        })(),
         default => throw new LogicException("seedAppendOnlyRow(): add a seed row for append-only table {$table}"),
     };
+}
+
+/** An order_refunds row (step 4.1b) of an order, so the refund tables that point at one have it. */
+function appendOnlyOrderRefund(int $branchId, int $orderId, int $userId): int
+{
+    return DB::table('order_refunds')->insertGetId([
+        'branch_id' => $branchId, 'client_uuid' => (string) Str::uuid(), 'order_id' => $orderId, 'reason' => 'probe', 'amount' => '10.00',
+        'is_full' => false, 'requested_by_user_id' => $userId, 'approved_by_user_id' => $userId, 'created_at' => now(),
+    ]);
 }
 
 /** A change to a column the table really has, so the trigger (not an unknown column) is what refuses it. */
@@ -112,6 +154,9 @@ function appendOnlyTamper(string $table): array
         'item_cost_history' => ['cost_after' => '9.0000'],
         'handover_notes' => ['body' => 'tampered'],
         'payment_refunds' => ['amount' => '99.00'],
+        'order_refunds' => ['reason' => 'tampered'],
+        'order_refund_lines' => ['disposition' => 'restock'],
+        'stock_movement_reversals' => ['created_at' => now()->addDay()],
         default => ['action' => 'tampered'],
     };
 }

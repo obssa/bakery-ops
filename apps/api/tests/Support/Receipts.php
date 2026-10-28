@@ -23,7 +23,7 @@ use Tests\TestCase;
  * dependency): its text and its page count. tea() adds a 12.50 product to the OrdersMenu of a floor (the total the receipt test looks for);
  * pay() takes a payment through POST /orders/{order}/payments as the cashier, the way the till does (a digital channel with a photo
  * uploaded through POST /files and a reference); refund() writes a payment_refunds row the way step 4.3d will (nothing writes the table
- * before it: a factory row stands in, with a plain order_refund_id because order_refunds is 4.1b's).
+ * before it: a raw row stands in, pointing at a raw order_refunds row of its own since step 4.1b made order_refund_id a foreign key).
  */
 final class Receipts
 {
@@ -71,7 +71,7 @@ final class Receipts
             'branch_id' => $payment->branch_id,
             'client_uuid' => (string) Str::uuid(),
             'order_id' => $payment->order_id,
-            'order_refund_id' => 1,
+            'order_refund_id' => OrderRefundRows::make($payment->branch_id, $payment->order_id, $byUserId, $amount, $at),
             'payment_id' => $payment->id,
             'channel_id' => $payment->channel_id,
             'amount' => $amount,

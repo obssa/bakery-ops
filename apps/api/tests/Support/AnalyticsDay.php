@@ -112,10 +112,17 @@ final class AnalyticsDay
         ]);
     }
 
-    /** A payment_refunds row, as step 4.3d will write it (nothing writes the table before then). */
-    public function refund(Payment $payment, string $amount, string $refundedAt, int $orderRefundId = 1, ?User $by = null): int
+    /** @var array<int, int> the order_refunds row standing for each refund number a test names */
+    private array $refunds = [];
+
+    /**
+     * A payment_refunds row, as step 4.3d will write it (nothing writes the table before then). $refund numbers the refund it belongs to
+     * (two money rows of one refund share it); since step 4.1b each number stands for a real order_refunds row (the foreign key).
+     */
+    public function refund(Payment $payment, string $amount, string $refundedAt, int $refund = 1, ?User $by = null): int
     {
         $at = CarbonImmutable::parse($refundedAt, 'UTC')->format('Y-m-d H:i:s');
+        $orderRefundId = $this->refunds[$refund] ??= OrderRefundRows::make($payment->branch_id, $payment->order_id, $this->manager->id, $amount, CarbonImmutable::parse($refundedAt, 'UTC'));
 
         return (int) DB::table('payment_refunds')->insertGetId([
             'branch_id' => $payment->branch_id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $payment->order_id, 'order_refund_id' => $orderRefundId,

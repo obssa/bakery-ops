@@ -26,6 +26,9 @@ it('has an English and an Amharic text for every Orders message, with the same k
         'order.not_sent', 'station.forbidden',
         'order.paid', 'order.not_voidable', 'void.reason_required', 'void.pin_required',
         'table.code_taken',
+        // step 4.1b: the refusals of Orders::refund
+        'refund.reason_required', 'refund.not_refundable', 'refund.line_invalid', 'refund.line_not_refundable', 'refund.line_refunded',
+        'refund.window_closed', 'refund.partial_not_allowed', 'refund.exceeds_paid', 'refund.client_uuid_reused', 'refund.approver_forbidden',
     ] as $key) {
         expect($en[$key] ?? null)->toBeString()->not->toBeEmpty("en {$key}")
             ->and($am[$key] ?? null)->toBeString()->not->toBeEmpty("am {$key}")

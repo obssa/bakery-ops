@@ -33,7 +33,7 @@ BRANCH_ALLOWLIST = {
     "model_has_roles", "role_has_permissions", "branches", "units", "idempotency_keys", "telescope_entries",
     "pulse_values", "pulse_entries", "pulse_aggregates", "activity_log", "notifications_dedupe",
 }
-APPEND_ONLY_TABLES = ["stock_movements", "audit_log", "order_events", "item_cost_history", "handover_notes", "payment_refunds"]
+APPEND_ONLY_TABLES = ["stock_movements", "audit_log", "order_events", "item_cost_history", "handover_notes", "payment_refunds", "stock_movement_reversals", "order_refunds", "order_refund_lines"]
 PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify", "api/v1/telegram/webhook/{secret}", "GET api/v1/files/{file}", "GET api/v1/receipts/{order}", "GET api/v1/weekly-summaries/{week}"}
 # write-method routes that write nothing (mirrors apps/api/tests/Support/read_like_writes.php)
 READ_LIKE_WRITES = {"POST api/v1/broadcasting/auth"}

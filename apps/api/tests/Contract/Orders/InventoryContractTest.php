@@ -17,9 +17,11 @@ use App\Modules\Inventory\Contracts\Movement;
 use App\Modules\Inventory\Contracts\Reservations;
 use App\Modules\Inventory\Contracts\Reserved;
 use App\Modules\Inventory\Contracts\ReserveLine;
+use App\Modules\Inventory\Contracts\Reversals;
 use App\Modules\Inventory\Contracts\Shortfall;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Enums\LocationType;
+use App\Modules\Inventory\Exceptions\InventoryError;
 use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\Location;
 use App\Shared\Enums\StationCode;
@@ -31,6 +33,8 @@ use Brick\Math\RoundingMode;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Random\Engine\Mt19937;
+use Random\Randomizer;
 
 /*
  * Contract: orders -> inventory (manifest contracts["orders->inventory"]; ADR 0008).
@@ -43,6 +47,7 @@ use Illuminate\Support\Str;
  *     balance rows are locked in one ascending pass and two orders can never deadlock (the companion file
  *     InventoryLockOrderConcurrencyTest.php proves it with real parallel processes);
  *   - a station line draws on its station's location, a display-case line on the display case (Locations).
+ * Step 4.1b adds the refund's Reversals (Reversals::of, consumptionsOf, reversed: the plan's cases 13 to 15, at the end of the file).
  * It runs in Inventory's CI job (mod-inventory) for the life of the project.
  */
 
@@ -475,3 +480,153 @@ it('stamps every movement with the pad account, the acting waiter, the station a
         ->and($consumed->pluck('station_id')->unique()->all())->toBe([$this->kitchenStation->id])
         ->and($consumed->pluck('device_id')->unique()->all())->toBe([$kds->id]);
 })->group('contract:orders->inventory', 'contract');
+
+/*
+ * Phase 4 (step 4.1b, plan section 2; Ramin's answer to R-C, 2026-10-28): a refunded line whose product goes back into stock is put back
+ * with Reversals::of(movementIds): one `return` per original sale / production_consume, pointing at it, so the originals are never
+ * touched. Phrased from Orders' side: "when I refund a line, I ask Inventory for the movements its reservation consumed of the product,
+ * and rely on it to reverse each of them once, in the Ledger's lock order, or to refuse and write nothing".
+ */
+
+it('reverses each original with one return of the opposite quantity at its place, pointing at it, with its reversal row, in the Ledger lock order', function () {
+    $croissant = (string) Str::uuid();
+    $water = (string) Str::uuid();
+    $sandwich = (string) Str::uuid();
+    $this->reservations->reserveMany([
+        $croissant => [($this->line)($this->croissant, '2', $this->display)],
+        $water => [($this->line)($this->water, '3', $this->display)],
+        $sandwich => [($this->line)($this->sandwich, '1')],
+    ]);
+    $this->reservations->consume($sandwich); // the kitchen made it: production_consume of its ingredients
+    $this->reservations->consumeMany([$croissant, $water], MovementReason::Sale); // paid: one sale per display-case line
+    $reversals = app(Reversals::class);
+    $consumedOf = fn (string $ref, Item $item): Movement => collect($reversals->consumptionsOf($ref, $item->id))->sole();
+    $croissantSale = $consumedOf($croissant, $this->croissant);
+    $waterSale = $consumedOf($water, $this->water);
+    $chickenUsed = $consumedOf($sandwich, $this->chicken);
+    expect($croissantSale->reason)->toBe(MovementReason::Sale)
+        ->and($chickenUsed->reason)->toBe(MovementReason::ProductionConsume)
+        ->and($reversals->consumptionsOf($croissant, $this->water->id))->toBe([], 'only the consumption of the item asked for');
+    $ids = [$croissantSale->id, $waterSale->id, $chickenUsed->id];
+    $originals = DB::table('stock_movements')->whereIn('id', $ids)->orderBy('id')->get()->map(fn (object $r): array => (array) $r)->all();
+    $locked = [];
+    DB::listen(function (QueryExecuted $q) use (&$locked): void {
+        if (str_contains($q->sql, 'stock_balances') && str_contains(strtolower($q->sql), 'for update')) {
+            $locked[] = [(int) $q->bindings[0], (int) $q->bindings[1]];
+        }
+    });
+
+    $returns = $reversals->of([$waterSale->id, $chickenUsed->id, $croissantSale->id]);
+
+    expect($returns)->toHaveCount(3)
+        ->and(array_map(fn (Movement $m): ?int => $m->refId, $returns))->toBe([$waterSale->id, $chickenUsed->id, $croissantSale->id], 'in the order asked')
+        ->and(collect($returns)->every(fn (Movement $m): bool => $m->reason === MovementReason::Returned && $m->refType === 'stock_movement' && $m->reservationRef === null))->toBeTrue()
+        ->and(array_map(fn (Movement $m): string => $m->qty->toString(), $returns))->toBe(['3.0000', '126.0000', '2.0000'])
+        ->and(array_map(fn (Movement $m): int => $m->locationId, $returns))->toBe([$this->display->id, $this->kitchen->id, $this->display->id])
+        ->and(array_map(fn (Movement $m): ?int => $m->toLocationId, $returns))->toBe([$this->display->id, $this->kitchen->id, $this->display->id])
+        ->and(stockRow($this->croissant, $this->display))->on_hand->toBe('5.0000')->reserved->toBe('0.0000')
+        ->and(stockRow($this->water, $this->display))->on_hand->toBe('24.0000')
+        ->and(stockRow($this->chicken, $this->kitchen))->on_hand->toBe('1000.0000');
+    foreach ($returns as $return) {
+        expect(DB::table('stock_movement_reversals')->where('movement_id', $return->id)->where('reverses_movement_id', $return->refId)->where('branch_id', $this->branch->id)->count())
+            ->toBe(1, "reversal row of {$return->id}");
+    }
+    // the originals are byte-identical; the balance rows were first locked in ascending (item_id, location_id) order
+    expect(DB::table('stock_movements')->whereIn('id', $ids)->orderBy('id')->get()->map(fn (object $r): array => (array) $r)->all())->toBe($originals);
+    $first = [];
+    foreach ($locked as $pair) {
+        $first[$pair[0].':'.$pair[1]] ??= $pair;
+    }
+    $sorted = array_values($first);
+    sort($sorted);
+    expect(array_values($first))->toBe($sorted)->and($first)->toHaveCount(3)
+        ->and($reversals->reversed([...$ids, $returns[0]->id]))
+        ->toBe([$croissantSale->id => $returns[2]->id, $waterSale->id => $returns[0]->id, $chickenUsed->id => $returns[1]->id]);
+})->group('contract:orders->inventory', 'contract');
+
+it('refuses to reverse what is not a sale or a consumption, a movement of another branch or one reversed already, and writes nothing for the batch', function () {
+    $croissant = (string) Str::uuid();
+    $this->reservations->reserve([($this->line)($this->croissant, '1', $this->display)], $croissant);
+    $sale = $this->reservations->consume($croissant, null, MovementReason::Sale)[0];
+    $purchase = stockIn($this->milk, $this->bar, '100');
+    $reversals = app(Reversals::class);
+    $refusal = function (array $ids) use ($reversals): ?string {
+        try {
+            $reversals->of($ids);
+        } catch (InventoryError $e) {
+            return $e->messageKey;
+        }
+
+        return null;
+    };
+    $movements = DB::table('stock_movements')->count();
+
+    // a purchase is not undone by a refund; nothing is written for the good id beside it either
+    expect($refusal([$sale->id, $purchase->id]))->toBe('inventory.reversal.not_reversible')
+        ->and(DB::table('stock_movements')->count())->toBe($movements)
+        ->and(DB::table('stock_movement_reversals')->count())->toBe(0);
+
+    // a sale of another branch is not found from here, nor an id that does not exist
+    $other = Branch::factory()->create();
+    $theirs = DB::table('stock_movements')->insertGetId([
+        'branch_id' => $other->id, 'item_id' => Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $other->id])->id,
+        'from_location_id' => Location::factory()->create(['branch_id' => $other->id])->id, 'qty' => '-1.0000', 'reason' => 'sale',
+        'ref_type' => 'probe', 'user_id' => $this->admin->id, 'created_at' => now(),
+    ]);
+    expect($refusal([$theirs]))->toBe('inventory.reversal.not_found')
+        ->and($refusal([987654321]))->toBe('inventory.reversal.not_found');
+
+    // reversed once: a duplicate id in one call reverses it once, and the second call is refused
+    expect($reversals->of([$sale->id, $sale->id]))->toHaveCount(1);
+    $after = DB::table('stock_movements')->count();
+    expect($refusal([$sale->id]))->toBe('inventory.reversal.reversed')
+        ->and(DB::table('stock_movements')->count())->toBe($after)
+        ->and(DB::table('stock_movement_reversals')->where('reverses_movement_id', $sale->id)->count())->toBe(1)
+        ->and(stockRow($this->croissant, $this->display))->on_hand->toBe('5.0000')
+        ->and($reversals->of([]))->toBe([]);
+})->group('contract:orders->inventory', 'contract');
+
+it('keeps the ledger oracle after reversals, and 50 random sale and reversal sequences never take on_hand or reserved below zero', function () {
+    $given = getenv('REVERSALS_PROPERTY_SEED');
+    $seed = is_string($given) && ctype_digit($given) ? (int) $given : 20261109;
+    fwrite(STDERR, "Reversals property seed {$seed} (REVERSALS_PROPERTY_SEED=<n> replays one)\n");
+    $random = new Randomizer(new Mt19937($seed));
+    $reversals = app(Reversals::class);
+    $products = [[$this->croissant, $this->display], [$this->water, $this->display]];
+    $sold = [];
+    $check = function (string $step) use ($seed): void {
+        $o = ledgerOracle($this->branch->id);
+        expect($o['movements'])->toBe($o['balances'], "seed {$seed}, {$step}: movements vs balances")
+            ->and($o['balances'])->toBe($o['view'], "seed {$seed}, {$step}: balances vs view");
+        foreach (DB::table('stock_balances')->where('branch_id', $this->branch->id)->get() as $row) {
+            expect(BigDecimal::of((string) $row->on_hand)->isNegative())->toBeFalse("seed {$seed}, {$step}: on_hand of {$row->item_id}:{$row->location_id}")
+                ->and(BigDecimal::of((string) $row->reserved)->isNegative())->toBeFalse("seed {$seed}, {$step}: reserved of {$row->item_id}:{$row->location_id}");
+        }
+    };
+
+    foreach (range(1, 50) as $step) {
+        $open = array_values(array_filter($sold, fn (array $s): bool => ! $s['reversed']));
+        if ($open !== [] && $random->getInt(0, 2) === 0) {
+            $pick = $open[$random->getInt(0, count($open) - 1)];
+            $reversals->of([$pick['id']]);
+            $sold[$pick['id']]['reversed'] = true;
+            $check("step {$step}: reverse {$pick['id']}");
+
+            continue;
+        }
+        [$item, $at] = $products[$random->getInt(0, 1)];
+        $qty = (string) $random->getInt(1, 3);
+        if (BigDecimal::of($qty)->isGreaterThan((string) (stockRow($item, $at)->on_hand ?? '0'))) {
+            stockIn($item, $at, '6'); // a delivery keeps the display case stocked
+        }
+        $ref = (string) Str::uuid();
+        $this->reservations->reserve([($this->line)($item, $qty, $at)], $ref);
+        $sale = $this->reservations->consume($ref, null, MovementReason::Sale)[0];
+        $sold[$sale->id] = ['id' => $sale->id, 'reversed' => false];
+        $check("step {$step}: sell {$qty} of {$item->id}");
+    }
+
+    $reversedCount = count(array_filter($sold, fn (array $s): bool => $s['reversed']));
+    expect($reversedCount)->toBeGreaterThan(0, "seed {$seed}: the sequence reversed something")
+        ->and(DB::table('stock_movement_reversals')->where('branch_id', $this->branch->id)->count())->toBe($reversedCount);
+})->group('contract:orders->inventory', 'contract', 'property');

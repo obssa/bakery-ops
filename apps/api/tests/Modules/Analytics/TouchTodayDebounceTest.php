@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Analytics\Jobs\RebuildDay;
 use App\Modules\Analytics\Listeners\TouchToday;
 use App\Shared\Events\OrderPaid;
+use App\Shared\Events\OrderRefunded;
 use App\Shared\Events\OrderVoided;
 use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\PaymentRecorded;
@@ -90,10 +91,11 @@ it('rebuilds today from everything paid when the queue runs the jobs (the sync t
         ]);
 });
 
-it('listens to every event that changes the figures of today: a payment taken, verified, disputed or voided, an order paid or voided', function () {
+it('listens to every event that changes the figures of today: a payment taken, verified, disputed or voided, an order paid, voided or refunded', function () {
     $raw = app('events')->getRawListeners();
 
-    foreach ([PaymentRecorded::class, PaymentVerified::class, PaymentDisputed::class, PaymentVoided::class, OrderPaid::class, OrderVoided::class] as $event) {
+    // step 4.1b: a refund moves the day it happens (refunds count on the cash basis, its return movements on their created_at)
+    foreach ([PaymentRecorded::class, PaymentVerified::class, PaymentDisputed::class, PaymentVoided::class, OrderPaid::class, OrderVoided::class, OrderRefunded::class] as $event) {
         expect($raw[$event] ?? [])->toContain([TouchToday::class, 'handle']);
     }
 });

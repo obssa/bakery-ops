@@ -33,6 +33,7 @@ use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Models\StockCountLine;
 use App\Shared\Enums\StationCode;
+use App\Shared\Events\PaymentRecorded;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use App\Shared\Time\LocalDay;
@@ -40,6 +41,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\OrderFloor;
+use Tests\Support\OrderRefundRows;
 
 /*
  * Contract: analytics -> facts (phase-4 plan sections 2 and 6, step 4.1a; manifest contracts["analytics->facts"]).
@@ -158,15 +160,15 @@ it('Payments\Facts::payments: bucketed by received_at, voided payments excluded,
 it('Payments\Facts::refunds: bucketed by refunded_at; empty is []; a refund read through the port carries channel, amount and its payment', function () {
     expect(factRows((new PaymentFacts)->refunds($this->both)))->toBe([]);
 
-    // a real refund needs the Phase 4 refund path (Orders::refund, step 4.1b); the money side row is written the way Payments will (4.3d)
+    // a real refund through the Phase 4 refund path (Orders::refund, step 4.1b); the money side row is written the way Payments will (4.3d)
     $f = OrderFloor::open($this);
     $m = $f->menu;
     $order = $f->send([$m->line($m->croissant)]);
     $f->act('served', $f->lineOf($order, $m->croissant)['id'], $f->waiter)->assertOk();
     $payment = Payment::factory()->create(['branch_id' => $f->branch->id, 'order_id' => $order['id'], 'amount' => $order['totals']['total'], 'received_at' => $this->lastSecond]);
-    // Orders::refund and `order_refunds` arrive with step 4.1b (on hold); this port reads only the money side, and `order_refund_id` has
-    // no foreign key until 4.1b adds it, so a plain id stands in. 4.1b swaps this for the real refund (the expectations do not change).
-    $orderRefundId = 1;
+    withActor($f->cashier->id);
+    DB::transaction(fn () => event(new PaymentRecorded($f->branch->id, $payment->id, $order['id'], 'cash', $order['totals']['total'], '0.00')));
+    $orderRefundId = app(Orders::class)->refund($order['id'], 'customer returned it', $f->manager, [], (string) Str::uuid())->id;
     DB::table('payment_refunds')->insert([
         'branch_id' => $f->branch->id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $order['id'], 'order_refund_id' => $orderRefundId,
         'payment_id' => $payment->id, 'channel_id' => $payment->channel_id, 'amount' => $order['totals']['total'], 'refunded_by_user_id' => $f->manager->id,
@@ -392,15 +394,16 @@ it('Payments\Facts::payments flags a duplicate reference: another live payment o
 it('Payments\Facts::refunds: each money row names the refund it belongs to', function () {
     $order = ($this->order)('100.00', $this->lastSecond);
     $payment = Payment::factory()->create(['branch_id' => $this->branch->id, 'order_id' => $order->id, 'amount' => '100.00', 'received_at' => $this->lastSecond]);
+    $orderRefundId = OrderRefundRows::make($this->branch->id, $order->id, $this->admin->id, '40.00');
     DB::table('payment_refunds')->insert([
-        'branch_id' => $this->branch->id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $order->id, 'order_refund_id' => 7,
+        'branch_id' => $this->branch->id, 'client_uuid' => (string) Str::uuid(), 'order_id' => $order->id, 'order_refund_id' => $orderRefundId,
         'payment_id' => $payment->id, 'channel_id' => $payment->channel_id, 'amount' => '40.00', 'refunded_by_user_id' => $this->admin->id,
         'approved_by_user_id' => $this->admin->id, 'refunded_at' => $this->lastSecond, 'created_at' => $this->lastSecond,
     ]);
 
     $rows = factRows((new PaymentFacts)->refunds($this->both));
 
-    expect($rows)->toHaveCount(1)->and($rows[0]['order_refund_id'])->toBe(7)->and($rows[0]['amount'])->toBe('40.00');
+    expect($rows)->toHaveCount(1)->and($rows[0]['order_refund_id'])->toBe($orderRefundId)->and($rows[0]['amount'])->toBe('40.00');
 });
 
 it('Inventory\Facts::stockOuts: an episode names the station of its location (null for a place no station owns)', function () {
