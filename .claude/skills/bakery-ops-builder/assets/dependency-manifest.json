@@ -163,7 +163,8 @@
         "Routing::stationFor(item) -> ?Station",
         "Modifiers::for(item) with price and recipe deltas",
         "Items::isNew(item)",
-        "Items::activeAtLocationType(type)"
+        "Items::activeAtLocationType(type)",
+        "Phase 4 (step 4.1b, Ramin's answer to R-C): items.refundable and items.refund_restock, the admin's refund settings per product (refund_restock refused for a product made to order or an ingredient), and RefundPolicy::for(ids) -> {item_id, refundable, restock}, which Orders reads at the moment of a refund"
       ],
       "tables": [
         "categories",
@@ -215,7 +216,7 @@
         "Availability::ofProduct(product, location) / bulk(products[], location) (branches on items.fulfilment: to_order = floor(min(available ingredient / qty)), to_stock and bought_in = on_hand of the product at its location)",
         "Locations::forProduct(item) (its order station's location, the display case for counter products), forStation(station), displayCase()",
         "Phase 2: Purchases::confirm, Transfers::request/confirm, Costs::movingAverage, RecipeCost::rollUp, ReorderRules::evaluate",
-        "Phase 4: Reversals::of(movementIds, ref) writes one `return` per original and a stock_movement_reversals row, in the Ledger's lock order; Facts::movements/closingBalances/stockOuts/unitCosts"
+        "Phase 4: Reversals::of(movementIds) writes one `return` per original sale / production_consume and a stock_movement_reversals row, in the Ledger's lock order (as built in 4.1b: Ledger::reverse; also consumptionsOf(ref, item) and reversed(ids)); Facts::movements/closingBalances/stockOuts/unitCosts"
       ],
       "events": [
         "StockChanged",
@@ -233,9 +234,7 @@
         "item_costs",
         "transfers",
         "reorder_rules",
-        "stock_alert_states"
-      ],
-      "tables_phase_4": [
+        "stock_alert_states",
         "stock_movement_reversals"
       ]
     },
@@ -258,13 +257,16 @@
           "Reservations::reserveMany / releaseMany / consumeMany (one lock pass per order); consume(ref) at ready, release(ref) at reject",
           "Availability::bulk",
           "Locations::forProduct",
-          "consumeMany(refs, sale) for display-case lines at payment"
+          "consumeMany(refs, sale) for display-case lines at payment",
+          "Reversals::of / consumptionsOf for a refund that sends units back into stock (Phase 4)"
         ],
         "catalog": [
           "Prices::at(now) snapshot",
           "Recipes::activeFor (snapshot recipe_version on line)",
           "Routing::stationFor",
-          "Modifiers::for"
+          "Modifiers::for",
+          "RefundPolicy::for(item ids) at the moment of a refund (Phase 4)",
+          "Items::deleted(ids) (a deleted product is not put back into stock)"
         ],
         "identity": [
           "verifyShortCode",
@@ -290,7 +292,7 @@
         "Tickets::since(station, cursor)",
         "Orders::totals(order)",
         "Orders::openAt(station, time)",
-        "Orders::refund(order, reason, approver User, lines, dispositions, client_uuid): restock lines write ONE reversing `return` movement per original (via Inventory Reversals), waste/none write none; the approver's PIN is checked by the controller (plan 10.9 item 8)"
+        "Orders::refund(order, reason, approver User, lines, client_uuid) (step 4.1b, Ramin's answer to R-C): each line follows its product's Catalog settings (restock writes ONE reversing `return` per movement of the product itself via Inventory Reversals, waste writes none); the money back is the lines' line_total; Orders::assertRefundable for the checks before the PIN; the approver's PIN is checked by the caller (plan 10.9 item 8)"
       ],
       "events": [
         "OrderSent",
@@ -307,7 +309,9 @@
         "orders",
         "order_lines",
         "order_line_modifiers",
-        "order_events"
+        "order_events",
+        "order_refunds",
+        "order_refund_lines"
       ]
     },
     "payments": {
@@ -724,7 +728,10 @@
         "display-case lines are sold at payment with consumeMany(refs, sale): one sale per product carrying its ref",
         "a void releases every open line of the order with one releaseMany; consumed lines stay consumed",
         "Locations::forProduct names a line's stock location: its order station's location, the display case for counter products",
-        "every movement carries the pad account as user_id and the waiter as acting_user_id, with station and device"
+        "every movement carries the pad account as user_id and the waiter as acting_user_id, with station and device",
+        "Phase 4 (4.1b): Reversals::of writes one return per original (opposite quantity, at its place, pointing at it) with its stock_movement_reversals row, in the Ledger's ascending lock order",
+        "Reversals::of refuses what is not a sale or production_consume, another branch's movement, or one reversed already, and writes nothing for the batch",
+        "the ledger oracle holds after reversals, and 50 seeded sale and reversal sequences never take on_hand or reserved below zero"
       ]
     },
     "orders->catalog": {
@@ -735,7 +742,8 @@
         "Routing::stationFor is null for display-case products",
         "Modifiers::for returns price and recipe deltas in base units",
         "Recipes::activeFor gives the version a line snapshots; Recipes::version(product, n) still answers an older version after a newer one is active",
-        "Items::isNew through is_new_until in the branch's local date; Items::fulfilment tells a station line from a counter line"
+        "Items::isNew through is_new_until in the branch's local date; Items::fulfilment tells a station line from a counter line",
+        "Phase 4 (4.1b): RefundPolicy::for(ids) answers each product's refundable and restock as they stand now (deleted products too, another branch's left out)"
       ]
     },
     "orders->identity": {
@@ -757,15 +765,18 @@
         "Orders::totals returns total, paid, balance as decimal strings",
         "PaymentRecorded with balance zero moves the order to paid and writes sale movements for display-case lines",
         "a payment recorded before the last line is served settles the order, which becomes paid and closed when that line is served",
-        "Phase 4 (red until 4.1b, group contract:payments->orders:refund): Orders::refund(order, reason, approver, lines, dispositions, client_uuid) on a closed order writes ONE reversing `return` per restocked line (ref_type stock_movement, ref_id the original, one stock_movement_reversals row), originals byte-identical",
-        "a line refunded as waste or none writes no movement",
+        "Phase 4 (4.1a red, built by 4.1b on Ramin's answer to R-C; group contract:payments->orders and :refund): Orders::refund(order, reason, approver, lines, client_uuid) on a closed order writes ONE reversing `return` per line whose product goes back into stock (ref_type stock_movement, ref_id the original, one stock_movement_reversals row), originals byte-identical",
+        "a line whose product does not go back into stock (waste) writes no movement",
         "a movement is reversed once (409 orders.refund.line_refunded; unique reverses_movement_id)",
         "refund needs a closed order and a reason; the order stays closed with refunded_total and timeline events; OrderRefunded after commit, never on rollback",
-        "restocking a station line without an open shift is 409 inventory.shift.required and writes nothing",
+        "restocking a display-case line while the till has no open shift is 409 inventory.shift.required and writes nothing",
         "PaymentVoided on a sent..served order takes the amount out of paid_total and unsettles it; on paid/closed it is refused (payments.void.order_closed)",
         "part payments leave the order unsettled, the last settles it, display-case lines are sold once",
         "two payments racing for the last balance: one recorded, one payments.amount.mismatch (fork test, OrdersConcurrencyTest.php)",
-        "Orders::totals also reports refunded and net_paid"
+        "Orders::totals also reports refunded and net_paid",
+        "a line of a product the admin marked not refundable is 422 orders.refund.line_not_refundable {line_id}, nothing written",
+        "no lines named refunds every refundable line and skips the others; none refundable is 409 orders.refund.not_refundable",
+        "the disposition follows the product's refund_restock at the moment of the refund, and a later change of the settings never rewrites a past refund"
       ]
     },
     "production->inventory": {

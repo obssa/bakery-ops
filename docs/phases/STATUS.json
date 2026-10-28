@@ -166,7 +166,7 @@
         "analytics->facts"
       ],
       "modules": {
-        "contracts": "in_progress",
+        "contracts": "done",
         "shared.files": "done",
         "payments": "in_progress",
         "analytics": "done",
