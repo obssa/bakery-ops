@@ -516,7 +516,7 @@ jobs:
   # (GATE_SEED_DAYS, the gate's own figure), and the gate:p4 group runs in the app container in one Pest process: the seeded tests
   # (Tests\Support\SeededGate) point their connection at the seeded database (GATE_SEED_DATABASE) without RefreshDatabase or
   # DatabaseTruncation, and fail, never skip, when fewer days are built; the race tests of the group (DatabaseTruncation) keep
-  # phpunit.xml's bakery_test, so nothing beside the seeded tests can wipe the seed. A skipped test fails the step. Then gate_check.
+  # phpunit.xml's bakery_test, so nothing beside the seeded tests can wipe the seed. A skipped or warning test fails the step. Then gate_check.
   gate-p4:
     needs: [status, gate-p3, mod-analytics, e2e-p4, perf-dashboards, files-s3]
     if: fromJSON(needs.status.outputs.phase) >= 4
@@ -543,10 +543,13 @@ jobs:
       - name: Pest group gate:p4 on the seeded history
         run: |
           set -o pipefail
+          # the image has no .env (the variables come from compose): phpdotenv's suppressed read of a missing file is reported by PHPUnit
+          # as a warning on every test, so an empty one is put there and a warning then fails the gate like a skip
+          docker compose -f compose.yml -f compose.ci.yml exec -T app touch .env
           docker compose -f compose.yml -f compose.ci.yml exec -T -e GATE_SEED_DATABASE=bakery -e GATE_SEED_DAYS="$GATE_SEED_DAYS" app \
             vendor/bin/pest --group=gate:p4 --colors=never 2>&1 | grep -v ' DEBUG: ' | tee /tmp/gate-p4.txt
           if grep -Eq "No tests (found|executed)" /tmp/gate-p4.txt; then echo "::error::the gate:p4 group ran nothing"; exit 1; fi
-          if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky)" /tmp/gate-p4.txt; then echo "::error::a gate:p4 test was skipped: the gate fails, it never skips"; exit 1; fi
+          if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky|warning|deprecat|notice)" /tmp/gate-p4.txt; then echo "::error::a gate:p4 test was skipped or warned: the gate fails, it never skips"; exit 1; fi
           grep -E '^\[(gate:p4|dashboard budget)' /tmp/gate-p4.txt >> "$GITHUB_STEP_SUMMARY" || true
       - name: gate_check
         run: python3 scripts/gate_check.py --mode done --phase 4 --ci
