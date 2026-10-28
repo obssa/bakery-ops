@@ -18,7 +18,7 @@ use Carbon\CarbonImmutable;
  * BANK_CHANNELS), SPLIT_PCT of the paid orders split (a digital part with its photo, the rest in cash), PAYMENT_VOID_PER_MILLE of them with
  * a digital part payment voided before the order is paid and the bill paid again in cash, ORDER_VOID_PCT of the sent orders voided,
  * VERIFIED_PCT of the digital payments verified and DISPUTED_PCT disputed by the manager (a third of those verified the next morning), and
- * REFUND_PCT refunded (zero until refunds exist). Every morning the stock is topped up (DemoStock: the weekly purchase on Mondays and on
+ * REFUND_PCT of the closed orders refunded (step 4.3d: the cashier asks, the manager approves, a few minutes after the payment). Every morning the stock is topped up (DemoStock: the weekly purchase on Mondays and on
  * the opening day, transfers out of the store, production batches); three planned days (STOCK_OUTS) let a display-case product run out,
  * and its automatic production request is made the same morning; five planned closings (DIFFERENCES) are counted with a difference the
  * manager approves; the bakery runs a Night shift every Friday (not when Friday is yesterday: that night would end today). The opening day
@@ -47,8 +47,8 @@ final class DayPlan
     /** Per mille of the paid orders whose first (digital, part) payment is voided before the order is paid, then paid again in cash. */
     public const int PAYMENT_VOID_PER_MILLE = 15;
 
-    /** Percent of the closed orders refunded. TODO(p4): 4.3d sets it to 2 and plays the refund (Payments::refund) as one more action. */
-    public const int REFUND_PCT = 0;
+    /** Percent of the closed orders refunded (step 4.3d), played by DemoTill through the refund use case (RefundPayments). */
+    public const int REFUND_PCT = 2;
 
     /** Percent of the digital payments the manager verifies at the end of the day. */
     public const int VERIFIED_PCT = 40;
@@ -109,7 +109,7 @@ final class DayPlan
 
     private const array TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'TR1', 'TR2'];
 
-    /** REFUND_PCT, read as the int it will be when step 4.3d sets it. */
+    /** REFUND_PCT as an int, so the plan's roll compares with what a test may read. */
     public static function refundPct(): int
     {
         return self::REFUND_PCT;

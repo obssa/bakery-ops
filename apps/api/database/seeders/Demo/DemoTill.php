@@ -27,6 +27,7 @@ use App\Modules\Orders\Support\LineInput;
 use App\Modules\Payments\Actions\DisputePayment;
 use App\Modules\Payments\Actions\RecordPayment;
 use App\Modules\Payments\Actions\RecordPaymentBatch;
+use App\Modules\Payments\Actions\RefundPayments;
 use App\Modules\Payments\Actions\VerifyPayment;
 use App\Modules\Payments\Actions\VoidPayment;
 use App\Modules\Payments\Contracts\PaymentInput;
@@ -57,6 +58,8 @@ use LogicException;
  *                cash (tendered to the next 50, change given), a digital channel (its receipt photo uploaded through Files::put just
  *                before, its reference SEED-{yymmdd}-{n}), a split (RecordPaymentBatch: the digital part with its photo, the rest in
  *                cash), or a digital part payment voided (the cashier asks, the manager approves: VoidPayment) and the bill paid in cash;
+ *   paid+6       a refunded order (DayPlan::REFUND_PCT, step 4.3d): the cashier asks, the manager approves (RefundPayments); each line as
+ *                its product's settings say, the money back last in, first out (cash out of the till's drawer);
  *   13:50/13:52  the manager verifies and disputes the day's planned digital payments (VerifyPayment, DisputePayment);
  *   06:44        the next morning, the disputes the plan resolves are verified.
  * The stock-out order (DayPlan::STOCK_OUTS) takes every unit of its product left in the display case, read from the ledger when it is
@@ -167,9 +170,8 @@ final class DemoTill
             $steps[] = [$time($paid), fn () => $this->pay($key, $date, $order)];
         }
         if ($order->refund) {
-            // TODO(p4): 4.3d plays the refund here, one more step after the payment (Payments::refund, the manager approves; display-case
-            // lines restocked, station lines waste), and DayPlan::REFUND_PCT goes to 2
-            throw new LogicException('Refunds are played from step 4.3d; DayPlan::REFUND_PCT is 0 until then.');
+            // step 4.3d: the customer comes back a few minutes after paying (the latest payment is about 13:35, so before 13:50)
+            $steps[] = [$time($paid + ($order->voidPayment ? 10 : 6)), fn () => $this->refund($key, $date, $order)];
         }
 
         return $steps;
@@ -345,6 +347,26 @@ final class DemoTill
         $payment = Payment::query()->findOrFail($this->digital[$key.':void'] ?? throw new LogicException("Order {$key} has no part payment to void."));
         $this->flow->as('cashier', 'till');
         app(VoidPayment::class)->handle($payment, $this->flow->person('cashier'), $this->flow->person('manager'), 'The transfer did not arrive on the account.');
+    }
+
+    /**
+     * Step 4.3d: the customer brings the order back. The cashier asks, the manager approves with the PIN (RefundPayments, the endpoint's use
+     * case, after the checks it makes before the PIN); each line goes back as its product's settings say (a display-case product into stock
+     * with a `return` inside the till's shift, a made-to-order one as waste); the money goes back last in, first out over the payments, the
+     * cash out of the till's drawer, a digital share as a transfer with its reference SEED-R-{yymmdd}-{n}. Every fourth refunded order of
+     * more than one line gives back its first line only.
+     */
+    private function refund(string $key, string $date, PlannedOrder $planned): void
+    {
+        $orderId = $this->taken[$key] ?? throw new LogicException("Order {$key} was not taken.");
+        $lines = $this->lines($key);
+        $named = $planned->n % 4 === 0 && count($lines) > 1 ? [$lines[0]->id] : [];
+        $uuid = $this->ids->uuid("demo-refund:{$key}");
+        $reference = 'SEED-R-'.CarbonImmutable::parse($date)->format('ymd').'-'.$planned->n;
+        $this->flow->as('cashier', 'till');
+        $refunds = app(RefundPayments::class);
+        $refunds->assertRefundable($orderId, $named, $uuid, null, null);
+        $refunds->handle($orderId, $this->flow->person('cashier'), $this->flow->person('manager'), 'The customer brought it back.', $named, $uuid, null, $reference);
     }
 
     private function payCash(string $key, string $uuid): void
