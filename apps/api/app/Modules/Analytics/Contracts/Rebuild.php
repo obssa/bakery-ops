@@ -117,7 +117,7 @@ final class Rebuild
             'daily_sales' => $this->sales->build($f->day, $f->sales, $f->lines, $f->voids, $f->refunds),
             'daily_hour_sales' => $this->hours->build($f->day, $f->sales, $f->lines),
             'daily_channel_totals' => $this->channels->build($f->day, $f->payments, $f->refunds),
-            'daily_item_metrics' => $this->items->build($f->day, $f->lines, $f->movements, $f->closings, $f->stockOuts, $f->unitCosts, $f->items, $f->recipes),
+            'daily_item_metrics' => $this->items->build($f->day, $f->lines, $f->movements, $f->closings, $f->stockOuts, $f->unitCosts, $f->items, $f->recipes, $f->refundLines),
             'daily_station_metrics' => $this->stations->build($f->day, $f->timezone, $f->stationLines, $f->batches, $f->shifts, $f->stockOuts),
             'daily_user_metrics' => $this->users->build($f->day, $f->timezone, $f->sales, $f->lines, $f->voids, $f->payments, $f->refunds, $f->stationLines),
         ];

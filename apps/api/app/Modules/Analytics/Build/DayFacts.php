@@ -11,6 +11,7 @@ use App\Modules\Inventory\Contracts\MovementFact;
 use App\Modules\Inventory\Contracts\StockOutFact;
 use App\Modules\Inventory\Contracts\UnitCostFact;
 use App\Modules\Orders\Contracts\LineFact;
+use App\Modules\Orders\Contracts\RefundLineFact;
 use App\Modules\Orders\Contracts\SaleFact;
 use App\Modules\Orders\Contracts\StationLineFact;
 use App\Modules\Orders\Contracts\VoidFact;
@@ -40,6 +41,7 @@ final readonly class DayFacts
      * @param  list<ShiftFact>  $shifts
      * @param  array<int, ItemSummary>  $items
      * @param  array<string, RecipeView|null>  $recipes  "product id:version"
+     * @param  list<RefundLineFact>  $refundLines  the lines refunded that day (step 4.3d)
      */
     public function __construct(
         public string $day,
@@ -58,5 +60,6 @@ final readonly class DayFacts
         public array $shifts,
         public array $items,
         public array $recipes,
+        public array $refundLines = [],
     ) {}
 }

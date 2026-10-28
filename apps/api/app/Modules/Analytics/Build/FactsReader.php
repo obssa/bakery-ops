@@ -39,9 +39,10 @@ final class FactsReader
         $movements = self::all($this->inventory->movements($range));
         $closings = self::all($this->inventory->closingBalances($day));
         $stockOuts = self::all($this->inventory->stockOuts($range));
+        $refundLines = self::all($this->orders->refundLines($range));
 
         $itemIds = [];
-        foreach ([$lines, $movements, $closings, $stockOuts] as $rows) {
+        foreach ([$lines, $movements, $closings, $stockOuts, $refundLines] as $rows) {
             foreach ($rows as $row) {
                 $itemIds[$row->itemId] = true;
             }
@@ -71,6 +72,7 @@ final class FactsReader
             self::all($this->shifts->instances($range)),
             $this->items->summaries(array_keys($itemIds)),
             $recipes,
+            $refundLines,
         );
     }
 

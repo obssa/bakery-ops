@@ -11,6 +11,7 @@ use App\Modules\Inventory\Contracts\MovementFact;
 use App\Modules\Inventory\Contracts\StockOutFact;
 use App\Modules\Inventory\Contracts\UnitCostFact;
 use App\Modules\Orders\Contracts\LineFact;
+use App\Modules\Orders\Contracts\RefundLineFact;
 use Brick\Math\BigDecimal;
 
 /**
@@ -19,7 +20,9 @@ use Brick\Math\BigDecimal;
  * (purchase_in) and adjusted (count_adjustment, signed) from the day's movements (created_at); transfers, reservations, sales and
  * returns of the ledger are not item figures; stock-outs begun that day; the closing on-hand over every place at the end of the day,
  * valued at the day's cost (0 for an item with no cost). COGS through CostOfSales, rounded half-up once per item-day. refunded_qty is
- * 0 until order refunds exist (step 4.1b). An item with nothing to say that day has no row; rows ascend by item id. Pure.
+ * the quantity of the item's order lines refunded that day, on the refund's own clock (Orders\Facts::refundLines, step 4.3d), restocked
+ * or wasted alike; revenue and units sold stay on the day of the sale. An item with nothing to say that day has no row; rows ascend by
+ * item id. Pure.
  */
 final class ItemBuilder
 {
@@ -44,9 +47,10 @@ final class ItemBuilder
      * @param  list<UnitCostFact>  $unitCosts
      * @param  array<int, ItemSummary>  $items  item id => what Catalog says of it
      * @param  array<string, RecipeView|null>  $recipes  "product id:version" => the version the lines snapshotted
+     * @param  list<RefundLineFact>  $refundLines  the lines refunded that day (step 4.3d)
      * @return list<array<string, mixed>>
      */
-    public function build(string $day, array $lines, array $movements, array $closings, array $stockOuts, array $unitCosts, array $items, array $recipes): array
+    public function build(string $day, array $lines, array $movements, array $closings, array $stockOuts, array $unitCosts, array $items, array $recipes, array $refundLines = []): array
     {
         $costs = [];
         foreach ($unitCosts as $cost) {
@@ -67,12 +71,16 @@ final class ItemBuilder
         foreach ($stockOuts as $out) {
             $outs[$out->itemId] = ($outs[$out->itemId] ?? 0) + 1;
         }
+        $refunded = [];
+        foreach ($refundLines as $refund) {
+            $refunded[$refund->itemId] = ($refunded[$refund->itemId] ?? BigDecimal::zero())->plus($refund->qty);
+        }
         $closing = [];
         foreach ($closings as $balance) {
             $closing[$balance->itemId] = ($closing[$balance->itemId] ?? BigDecimal::zero())->plus($balance->onHand);
         }
 
-        $ids = array_values(array_unique(array_merge(array_keys($sold), array_keys($moved), array_keys($outs), array_keys($closing))));
+        $ids = array_values(array_unique(array_merge(array_keys($sold), array_keys($moved), array_keys($outs), array_keys($closing), array_keys($refunded))));
         sort($ids);
 
         $rows = [];
@@ -90,8 +98,9 @@ final class ItemBuilder
             $onHand = $closing[$itemId] ?? BigDecimal::zero();
             $value = isset($costs[$itemId]) ? $onHand->multipliedBy($costs[$itemId]) : BigDecimal::zero();
             $stockouts = $outs[$itemId] ?? 0;
+            $back = $refunded[$itemId] ?? BigDecimal::zero();
 
-            $nothing = $units->isZero() && $revenue->isZero() && $onHand->isZero() && $stockouts === 0
+            $nothing = $units->isZero() && $revenue->isZero() && $onHand->isZero() && $stockouts === 0 && $back->isZero()
                 && array_filter($figures, static fn (BigDecimal $f): bool => ! $f->isZero()) === [];
             if ($nothing) {
                 continue;
@@ -104,7 +113,7 @@ final class ItemBuilder
                 'category_id' => $summary?->categoryId,
                 'kind' => $summary !== null ? $summary->kind : ($itemLines === [] ? 'ingredient' : 'product'),
                 'units_sold_qty' => Figures::qty($units),
-                'refunded_qty' => Figures::qty(BigDecimal::zero()),
+                'refunded_qty' => Figures::qty($back),
                 'produced_qty' => Figures::qty($figures['produced']),
                 'consumed_qty' => Figures::qty($figures['consumed']),
                 'waste_qty' => Figures::qty($figures['waste']),
