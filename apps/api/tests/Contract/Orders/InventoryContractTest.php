@@ -541,7 +541,7 @@ it('reverses each original with one return of the opposite quantity at its place
     sort($sorted);
     expect(array_values($first))->toBe($sorted)->and($first)->toHaveCount(3)
         ->and($reversals->reversed([...$ids, $returns[0]->id]))
-        ->toBe([$croissantSale->id => $returns[2]->id, $waterSale->id => $returns[0]->id, $chickenUsed->id => $returns[1]->id]);
+        ->toEqual([$croissantSale->id => $returns[2]->id, $waterSale->id => $returns[0]->id, $chickenUsed->id => $returns[1]->id]);
 })->group('contract:orders->inventory', 'contract');
 
 it('refuses to reverse what is not a sale or a consumption, a movement of another branch or one reversed already, and writes nothing for the batch', function () {

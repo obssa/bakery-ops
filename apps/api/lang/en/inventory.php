@@ -11,6 +11,11 @@ return [
         'insufficient' => 'There is not enough of this item at this location.',
         'reserved_below_zero' => 'This would release more than is reserved for the item here.',
     ],
+    'reversal' => [
+        'not_found' => 'This stock movement is not in this branch.',
+        'not_reversible' => 'Only a sale or a use of stock can be put back. Correct other movements with a new movement of their own.',
+        'reversed' => 'This stock was already put back once.',
+    ],
     'shift' => [
         'required' => 'No shift is open at this station. Start a shift here, or ask someone who has one open, before moving its stock.',
     ],

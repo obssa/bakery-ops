@@ -8,11 +8,13 @@ use App\Modules\Inventory\Contracts\Movement;
 use App\Modules\Inventory\Contracts\ShiftMovementTotal;
 use App\Modules\Inventory\Contracts\StockLevel;
 use App\Shared\Tenancy\BranchScope;
+use App\Shared\Tenancy\CurrentBranch;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
@@ -36,6 +38,48 @@ final class LedgerReader
     /** The reserved change of a row: qty for the reservation reasons, and for a consumption carrying its reservation. */
     public const string RESERVED_SQL = "CASE WHEN reason IN ('reservation', 'reservation_release') THEN qty "
         ."WHEN reason IN ('production_consume', 'sale') AND reservation_ref IS NOT NULL THEN qty ELSE 0 END";
+
+    /**
+     * The consumptions of an item under a reservation (step 4.1b: what a refunded order line took out of stock of its product): the sale
+     * and production_consume rows that carry the ref, oldest first. An excess used beyond the reservation carries no ref and is not here.
+     *
+     * @return list<Movement>
+     */
+    public function consumptionsOf(string $reservationRef, int $itemId): array
+    {
+        return array_values(StockMovement::query()
+            ->where('reservation_ref', $reservationRef)
+            ->where('item_id', $itemId)
+            ->whereIn('reason', [MovementReason::Sale->value, MovementReason::ProductionConsume->value])
+            ->orderBy('id')
+            ->get()
+            ->map(static fn (StockMovement $m): Movement => $m->toMovement())
+            ->all());
+    }
+
+    /**
+     * The movements among $ids that a reversal names (step 4.1b), original id => its return's id, ascending by original; another
+     * branch's are left out.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, int>
+     */
+    public function reversalsOf(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $branch = app(CurrentBranch::class)->idOrNull();
+        $found = [];
+        $rows = DB::table('stock_movement_reversals')->whereIn('reverses_movement_id', array_values(array_unique($ids)))
+            ->when($branch !== null, fn ($q) => $q->where('branch_id', $branch))
+            ->orderBy('reverses_movement_id')->get(['reverses_movement_id', 'movement_id']);
+        foreach ($rows as $row) {
+            $found[(int) $row->reverses_movement_id] = (int) $row->movement_id;
+        }
+
+        return $found;
+    }
 
     public function level(int $itemId, int $locationId): StockLevel
     {

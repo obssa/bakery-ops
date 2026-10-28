@@ -43,6 +43,28 @@ final class InventoryError extends RuntimeException
     }
 
     /** A movement changes on_hand at a station that tracks shifts while neither the actor's shift nor the station's is open. */
+    /** Step 4.1b: the movement to reverse is not one of this branch (or does not exist). */
+    public static function reversalNotFound(int $movementId): self
+    {
+        return new self('inventory.reversal.not_found', 404, ['movement_id' => $movementId]);
+    }
+
+    /** Step 4.1b: only a sale or a production_consume is reversed (a purchase, a count, a transfer are corrected their own way). */
+    public static function reversalNotReversible(int $movementId, string $reason): self
+    {
+        return new self('inventory.reversal.not_reversible', 422, ['movement_id' => $movementId, 'reason' => $reason]);
+    }
+
+    /**
+     * Step 4.1b: a movement is reversed once.
+     *
+     * @param  list<int>  $movementIds
+     */
+    public static function reversalReversed(array $movementIds): self
+    {
+        return new self('inventory.reversal.reversed', 409, ['movement_ids' => $movementIds]);
+    }
+
     public static function shiftRequired(int $stationId, int $locationId): self
     {
         return new self('inventory.shift.required', 409, ['station_id' => $stationId, 'location_id' => $locationId]);

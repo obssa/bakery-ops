@@ -16,11 +16,13 @@ use App\Shared\Tenancy\BranchScope;
 use App\Shared\Tenancy\CurrentBranch;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use LogicException;
+use Ramsey\Uuid\Uuid;
 
 /**
  * The only writer of stock_movements and stock_balances (rule 1, ADR 0002; tests/Arch/LedgerIsSoleWriterTest.php).
@@ -34,12 +36,22 @@ use LogicException;
  * batch becomes a savepoint of it.
  *
  * lock() exposes the same row locks to callers that must decide under them (Reservations: is enough available?).
+ *
+ * reverse() (step 4.1b, a refund that sends units back into stock; Contracts\Reversals) writes one `return` per original sale or
+ * production_consume through the same batch path (shift cover, ascending balance locks, all or nothing), with the row of
+ * stock_movement_reversals that names the original, in the same transaction. The originals are never touched.
  * Resolved per use: it carries the request-scoped ActorContext and CurrentBranch (traps.md, Octane).
  */
 final class Ledger
 {
     /** Deadlock / lock-wait retries of an outermost batch (Laravel retries only when the transaction is not nested). */
     private const int ATTEMPTS = 3;
+
+    /** ref_type of a reversing `return`: its ref_id is the movement it reverses (step 4.1b). */
+    public const string REVERSAL_REF = 'stock_movement';
+
+    /** The reasons a reversal undoes: a unit sold, or used where it was made (step 4.1b). */
+    private const array REVERSIBLE = [MovementReason::Sale, MovementReason::ProductionConsume];
 
     public function __construct(
         private readonly ConnectionResolverInterface $db,
@@ -71,6 +83,110 @@ final class Ledger
      */
     public function appendMany(array $intents): array
     {
+        return $this->write($intents);
+    }
+
+    /**
+     * Reverse each movement once (step 4.1b, phase-4 plan section 2, contract orders->inventory cases 13 to 15): for every original sale or
+     * production_consume, one `return` of the opposite quantity at the place the original changed, with ref_type `stock_movement` and ref_id
+     * the original, and one stock_movement_reversals row (movement_id the return, reverses_movement_id the original), all in one batch of
+     * appendMany's path: the shift rule of the place (ADR 0013), the balance rows locked in ascending (item_id, location_id) order, every row
+     * or none. A repeated id is reversed once. The return's client_uuid is derived from the original (UUIDv5 of
+     * "stock-reversal:{branch}:{id}"), so a second reversal is refused by two unique keys whatever a read saw.
+     *
+     * @param  list<int>  $movementIds
+     * @return list<Movement> the returns written, in the order of $movementIds
+     *
+     * @throws InventoryError inventory.reversal.not_found (404: unknown, or another branch's), inventory.reversal.not_reversible (422: not
+     *                        a sale or a production_consume), inventory.reversal.reversed (409), inventory.shift.required (409); nothing written
+     * @throws InvalidMovement an original of an item that is no longer live (the ledger takes live items only)
+     */
+    public function reverse(array $movementIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $movementIds)));
+        if ($ids === []) {
+            return [];
+        }
+        $this->actor->requireUserId();
+
+        try {
+            /** @var list<Movement> $returns */
+            $returns = $this->connection()->transaction(function () use ($ids): array {
+                $originals = StockMovement::query()->whereKey($ids)->get()->keyBy('id');
+                $intents = [];
+                foreach ($ids as $id) {
+                    $original = $originals->get($id);
+                    if (! $original instanceof StockMovement) {
+                        throw InventoryError::reversalNotFound($id);
+                    }
+                    if (! in_array($original->reason, self::REVERSIBLE, true)) {
+                        throw InventoryError::reversalNotReversible($id, $original->reason->value);
+                    }
+                    $intents[] = MovementIntent::of(
+                        $original->item_id,
+                        $original->locationId(),
+                        $original->qty->negated(),
+                        MovementReason::Returned,
+                        self::REVERSAL_REF,
+                        $original->id,
+                        null,
+                        self::reversalUuid($original->branch_id, $original->id),
+                    );
+                }
+                $reversed = $this->reversedAmong($ids);
+                if ($reversed !== []) {
+                    throw InventoryError::reversalReversed(array_keys($reversed));
+                }
+
+                return $this->write($intents, function (array $rows) use ($ids): void {
+                    $links = [];
+                    foreach ($rows as $index => $row) {
+                        $links[] = ['branch_id' => $row->branch_id, 'movement_id' => $row->id, 'reverses_movement_id' => $ids[$index], 'created_at' => $row->created_at];
+                    }
+                    $this->connection()->table('stock_movement_reversals')->insert($links);
+                });
+            }, self::ATTEMPTS);
+        } catch (UniqueConstraintViolationException) {
+            // a concurrent reversal of one of them committed first (the return's client_uuid or reverses_movement_id): nothing was written here
+            $reversed = array_keys($this->reversedAmong($ids));
+            throw InventoryError::reversalReversed($reversed === [] ? $ids : $reversed);
+        }
+
+        return $returns;
+    }
+
+    /**
+     * The originals among $ids that a reversal already names, original id => the return's id.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, int>
+     */
+    private function reversedAmong(array $ids): array
+    {
+        $found = [];
+        foreach ($this->connection()->table('stock_movement_reversals')->whereIn('reverses_movement_id', $ids)->orderBy('reverses_movement_id')->get(['reverses_movement_id', 'movement_id']) as $row) {
+            $found[(int) $row->reverses_movement_id] = (int) $row->movement_id;
+        }
+
+        return $found;
+    }
+
+    /** The client_uuid of the return that reverses movement $id: the same original always gives the same UUID. */
+    public static function reversalUuid(int $branchId, int $id): string
+    {
+        return Uuid::uuid5(Uuid::NAMESPACE_URL, 'stock-reversal:'.$branchId.':'.$id)->toString();
+    }
+
+    /**
+     * The batch every write goes through: appendMany's intents, and for reverse() the rows written beside them in the same transaction
+     * ($alongside gets the movement rows in the order of $intents, after they are saved and before the balances are).
+     *
+     * @param  list<MovementIntent>  $intents
+     * @param  (Closure(list<StockMovement>): void)|null  $alongside
+     * @return list<Movement>
+     */
+    private function write(array $intents, ?Closure $alongside = null): array
+    {
         if ($intents === []) {
             return [];
         }
@@ -87,7 +203,7 @@ final class Ledger
         $branches = $this->branchesOf($pairs);
 
         /** @var array{0: list<StockMovement>, 1: array<string, StockBalance>, 2: array<string, list<int>>} $written */
-        $written = $this->connection()->transaction(function () use ($intents, $pairs, $branches, $userId): array {
+        $written = $this->connection()->transaction(function () use ($intents, $pairs, $branches, $userId, $alongside): array {
             // with the flag on: every on_hand change at a station that tracks shifts must be covered (and the shifts relied on are
             // locked) before any balance lock is taken; nothing is consulted with the flag off
             $stamps = $this->shiftCover($intents);
@@ -138,6 +254,9 @@ final class Ledger
                 $row->save();
                 $movements[] = $row;
                 $byPair[self::key($intent->itemId, $intent->locationId)][] = $row->id;
+            }
+            if ($alongside !== null) {
+                $alongside($movements);
             }
 
             foreach ($next as $key => [$onHand, $reserved]) {
