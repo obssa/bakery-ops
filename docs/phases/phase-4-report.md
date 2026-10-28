@@ -4,17 +4,17 @@ Commit: `3e7114c` (pull request #80, `phase-4/gate`, step 4.6b), the last commit
 [40604303076](https://github.com/obssa/bakery-ops/actions/runs/40604303076), every job green · Date: 2026-10-28. The PR's later runs (this
 report, a CI fix) are in the PR
 
-**This is a report of the phase so far, not a claim that it is done.** Every step of Phase 4 is built, merged and deployed except the
-refunds: steps 4.1b (Orders' refund and Inventory's reversals) and 4.3d (the payments refund), their screens, the seed's refund roll and
-the refund Playwright flows wait for Ramin's answer to R-C (what a refund does to stock, plan 10.2). STATUS keeps phase 4
-`in_progress`, no `done_commit` is set and no tag is made; `gate_check.py --mode done --phase 4` refuses on the refund markers only
-(below). The section "Remaining before claim-done" is the whole list.
+**This is a report of the phase so far, not a claim that it is done.** Every step of Phase 4 is built: the refunds, held for Ramin's answer
+to R-C until 2026-10-28, followed on his rule (the admin decides per product whether it can be refunded and whether a refunded unit goes back
+into stock): step 4.1b (Orders' refund and Inventory's reversals, PR #83), step 4.3d (the payments refund, the seed's refund roll, PR #84)
+and step 4.5g (the refund screens and the refund Playwright flows, PR #85). STATUS keeps phase 4 `in_progress`, no `done_commit` is set and
+no tag is made: the claim itself is the coordinator's, after step 4.5g's deploy. The section "Remaining before claim-done" is the whole list.
 
 ## Verdict
 
-PASS for everything but refunds: the gate's arithmetic holds on every day of a 90-day seeded history, the dashboards read the summaries
-only and keep their budget in process, under k6 and in the browser, the pay-photo-split flow passes, Phases 0 to 3 stay green, and
-`gate_check` refuses nothing but the refund placeholders. Not closable until 4.1b and 4.3d are built on R-C.
+PASS: the gate's arithmetic holds on every day of a 90-day seeded history (refunds included since 4.3d), the dashboards read the summaries
+only and keep their budget in process, under k6 and in the browser, the pay-photo-split and refund flows pass, Phases 0 to 3 stay green, and
+`gate_check` refuses nothing since step 4.5g removed the last phase-4 to-do markers (the refund placeholders). Closable by the claim alone.
 
 ## What is built and live
 
@@ -28,11 +28,14 @@ deploy run 40564591095, `@live` 35 passed and 1 flaky on a dropped connection; s
 | 4.2a, 4.2b | #62, #63 | `Shared\Files` (re-encode, EXIF and metadata gone, 1600 px, signed five-minute URLs, `files:doctor`), the files API, the orphan purge, the log scrub, the multipart idempotency, the `files-s3` portability job (ADR 0015) |
 | 4.3a | #64 | the channel admin (add, rename, reorder, switch off, the reference pattern and the bilingual hints; cash locked) |
 | 4.3b | #65 | payments on every channel with photo and reference, split bills recorded together (`payment-batches`), duplicate warnings, the payment reads with the cashier's scope, the shift rule for every channel (ADR 0013 note) |
+| 4.1b | #83 | the refund on Ramin's rule (R-C): the products' `refundable` and `refund_restock` settings, `Orders::refund` with the reversing `return` movements (`Inventory\Contracts\Reversals`), `order_refunds` and `order_refund_lines`, the refund events |
 | 4.3c | #66 | verify, dispute (and its resolution), the void of a payment with the manager's PIN before the order is paid (ADR 0016's void part), `payment_disputed` notifications |
 | 4.3e | #67 | the receipt PDF and its signed link (dompdf, Noto Sans Ethiopic), the receipt settings, the reconciliation, the payments export (CSV, xlsx) |
+| 4.3d | #84 | the payments refund (`POST /orders/{order}/refund`: the manager's PIN, last in first out or a share-out, `payment_refunds`, the cash drawer net of refunds, `NotifyRefund`), the seed's 2 % refunds, `RefundReversalGateTest` |
 | 4.4a to 4.4d | #68, #69, #70, #72 | the summary tables and `Rebuild::day` (ADR 0014), its triggers (shift lock, touch of today, nightly, on demand) and freshness feed, the nine dashboard reads, the exports (xlsx, CSV, PDF) and the Monday summary |
 | 4.5a | #73 | the audit read API and its export |
 | 4.5b to 4.5f | #74, #75, #78, #76, #77 | the till's pay sheet (camera, split rows, reference, change due), the admin's Payments screens, the order record with its photos, the analytics dashboards and product pages, the audit screen and the Ethiopian date labels |
+| 4.5g | #85 | the refund screens: one refund dialog from the till's closed orders and the order record, the timeline's refund kinds, the payments' refund rows, the admin's two toggles; the refund Playwright flows |
 | fix | #71 | the admin Shifts crash after the admin overview (one query key, one shape) |
 | 4.6a | #79 | the real `Phase4Seeder`: 90 days of history through the module code (22 or 34 orders a day, a channel mix over eight channels, splits, voided payments re-paid in cash, voided orders, checks and disputes, three planned stock-outs, five planned closing differences, a Night shift every Friday), every day rebuilt |
 | 4.6b | #80 | this step: the `gate:p4` tests on the seed, `php artisan analytics:bench`, the `gate-p4` and `perf-dashboards` jobs, `dashboards.spec.ts`, ADRs 0014 and 0015 accepted, ADR 0016 proposed, the runbook, the skill's references, this report |
@@ -147,38 +150,23 @@ path of `VoidDialog.tsx` and the refund event kinds of `lib/orderRecord.ts` (4.1
 
 ## Remaining before claim-done
 
-Exactly the refund work, all waiting for Ramin's answer to R-C (asked 2026-10-24; default proposed: display-case lines restock with a
-reversing `return`, station lines waste with no movement):
+Only the close itself, once step 4.5g (PR #85) is merged and deployed:
 
-1. **Step 4.1b** (Orders and Inventory): `Orders::refund(order, reason, approver, lines, dispositions)`, `Inventory\Contracts\Reversals::of`
-   with `stock_movement_reversals` (M6), `order_refunds` and `order_refund_lines` (M7), `orders.refunded_total` and `refunded_at` (M8), the
-   refund half of the order events (M9: `line.refunded`, `order.refunded`), `RefundDispositionDefaults`; the red refund cases of
-   `contract:payments->orders:refund` (5 to 9, 11 to 13) and `contract:orders->inventory` (13 to 15) green and given the plain group name.
-2. **Step 4.3d** (Payments): `Payments::refund` (the PIN, the LIFO allocation over the order's payments, `payment_refunds` rows, the shift
-   rule for the cash share), `Totals::cash` net of cash refunds and `Totals::byChannel` with refunds (`contract:shifts->payments`),
-   `Payments\Facts::refunds` filled, `RefundTest`, `RefundRaceTest`, `RefundMoneyPropertyTest`, `RefundLedgerPropertyTest`,
-   `RefundAuditTest`, `RefundReversalGateTest` (`gate:p4`).
-3. **The refund UI**: the refund path of `components/till/VoidDialog.tsx` and `RefundPlaceholder` in `components/admin/OrderRecord.tsx`
-   (with the refund event kinds of `lib/orderRecord.ts`).
-4. **The seed's refund roll**: `DayPlan::REFUND_PCT` to 2 and the refund step in `DemoTill::orderSteps`; `Phase4SeederTest` checks the refunds
-   against the raw rows (the money identity is already asserted).
-5. **The refund Playwright flows**: `pay-refund.spec.ts` (a manager refunds a paid order with a PIN, display-case lines restocked, the drawer
-   total drops, `@live`) and `dashboards-audit.spec.ts` (the audit screen shows the run's refund with its approver, `@live`).
-6. **ADR 0016** accepted with the as-built facts.
-
-Then: `phase_status.py claim-done 4`, `gate-p4` green on `main` with the run URL recorded, the tag `phase-4-complete`, and `gate-p5` added to
-the required checks.
+1. `gate_check.py --mode done --phase 4` refuses nothing (step 4.5g's run: every artifact check passes; the test groups are trusted to the
+   `gate-p4` job and its `needs`).
+2. `phase_status.py claim-done 4` (records `done_commit`), `gate-p4` green on `main` with the run URL recorded (`set-run-url`), the tag
+   `phase-4-complete`, and `gate-p5` added to the required checks.
 
 ## Deviations from the plan and assumptions taken
 
 The As built notes under section 6 of `docs/phases/phase-4-plan.md` list them step by step; the ones of the gate step are in its note
-(4.6b). The largest: refunds on hold (R-C); the Audit read API added as a step (4.5a); `FilesNoPublicAccessTest` and `PaymentStatusTest`
+(4.6b). The largest: refunds held for R-C until 2026-10-28, then built on Ramin's rule (4.1b, 4.3d, 4.5g); the Audit read API added as a step (4.5a); `FilesNoPublicAccessTest` and `PaymentStatusTest`
 carry `gate:p4` instead of the plan's separate gate files; `dashboards.spec.ts` runs in `e2e-p4` on its 60-day seed (the overview reads 30
 days); k6 runs only on the CI stack and `analytics:bench` measures the live host in process (R-G).
 
 ## What Ramin needs to do
 
-- [ ] Answer **R-C** (what a refund does to stock): it unblocks 4.1b, 4.3d and the phase close.
+- [x] Answer **R-C** (what a refund does to stock): answered 2026-10-28 (the admin's two settings per product); 4.1b, 4.3d and 4.5g are built on it.
 - [ ] Decide the display-case COGS gap (snapshot the recipe version on such lines, or value the batch output).
 - [ ] Optionally run `php artisan analytics:bench --branch=<demo branch id>` on the live host outside the busy hours (runbook, "Dashboards
       and the cron") and keep the figures.

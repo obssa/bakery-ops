@@ -756,7 +756,7 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        (`RefundLineFact`, the day of `order_refund_lines.created_at`) fills `daily_item_metrics.refunded_qty` (restocked and waste alike;
        an item only refunded that day gets its row). The reconciliation (4.3e), the receipts (4.3e) and the dashboards (4.4c) read
        `payment_refunds` and the summaries, so they show the real refunds without a change.
-     - **Seed.** `DayPlan::REFUND_PCT` = 2 (its `TODO(p4)` gone). `DemoTill` plays the refund 6 minutes after the payment (10 after a
+     - **Seed.** `DayPlan::REFUND_PCT` = 2 (its phase-4 to-do marker gone). `DemoTill` plays the refund 6 minutes after the payment (10 after a
        voided part payment, whose bill is paid again in cash at +4), through `RefundPayments` (its pre-PIN checks, then `handle`): the
        cashier asks, the manager approves, every fourth refunded order of more than one line gives back its first line only, a digital
        share's reference is `SEED-R-{yymmdd}-{n}`. `Phase4SeederTest` checks the refund count against the plan, the day figures against the
@@ -767,7 +767,7 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        of `NotificationsSchemaTest` and `NotificationTextTest`, `PaymentsLangTest` (33 keys), `TouchTodayDebounceTest` (`RefundPaid`),
        `SoftDeletesTest` (`PaymentRefund`), `ItemBuilderTest` (one case). No test turns a shift rule off.
      - **Left for the refund UI step**: `pay-refund.spec.ts`, `dashboards-audit.spec.ts`, the `VoidDialog` and `OrderRecord` placeholders,
-       the event kinds of `lib/orderRecord.ts` (their `TODO(p4)` stay) and the admin's two product toggles.
+       the event kinds of `lib/orderRecord.ts` (their phase-4 to-do markers stayed; step 4.5g removed them) and the admin's two product toggles.
      - STATUS: `phase_status.py module-stable payments` after `mod-payments` passed on this PR's CI (PR #84), and phase 4's `payments` step
        `done` (the script marks the module's own phase, 1, so the phase 4 step was set beside it).
    - **4.3e `phase-4/receipts-reconciliation`**: M5; `composer require barryvdh/laravel-dompdf` (pinned, needs `dom`, `mbstring`, `gd`), the bundled `NotoSansEthiopic-Regular.ttf` (SIL OFL,
@@ -1144,7 +1144,7 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        - No test turns a shift rule off.
      - STATUS: phase 4's `analytics` step is `done` and the module `stable` (`phase_status.py module-stable analytics`, after CI's
        `mod-analytics` passed).
-5. **4.5 web** (STATUS `web`), six PRs, Next 15 static export under `/app`, en and am, 48 px targets, tablets first; pure rules in `lib/*.ts` tested without a browser (the Phase 3
+5. **4.5 web** (STATUS `web`), seven PRs (the seventh, 4.5g, the refund screens once R-C was answered), Next 15 static export under `/app`, en and am, 48 px targets, tablets first; pure rules in `lib/*.ts` tested without a browser (the Phase 3
    `*-logic.spec.ts` pattern). No chart library is added (10.8 R-H): `components/charts/{Sparkline,Bars,Line}.tsx` are small inline SVG with `role="img"` and a table fallback.
    - **4.5a `phase-4/audit-read-api`**: API only: M17, Shared `ActorDirectory` (+ Identity binding), the three audit routes, `audit.export`, `Snapshot` redaction additions (`receipt_file_id`, signed URL
      shapes). Tests: `AuditLogListTest`, `AuditLogFiltersTest`, `AuditExportTest`, `AuditIsALeafTest` (arch: Audit imports only Shared), 403 matrix (manager reads, cashier 403).
@@ -1249,7 +1249,7 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        lists the order's payments that are not voided or refunded (`GET /orders/{order}/payments`), and for a part-paid order "The whole order" too. A settled
        order cannot be voided whole (`orders.order.paid`), so that choice is not offered. Reason and manager's PIN as for the order void, a new key after a failure.
      - **Refunds are not built** (4.1b and 4.3d wait for R-C). The refund path the plan puts in `VoidDialog` is a marked place (`RefundPlaceholder`, a
-       `TODO(p4)` in the file's header): for a paid or closed order the dialog says refunds are not available yet. Nothing in the till reaches it today.
+       phase-4 to-do marker in the file's header, gone since step 4.5g): for a paid or closed order the dialog says refunds are not available yet. Nothing in the till reaches it today.
      - **Tests.** `pay-sheet-logic` (13 pure cases); `pay-photo-split` @live, the gate flow of 10.3 item 2 (cash 70.00 with 100 handed over plus the run's
        wallet 180.00 with a photo and a reference; Complete disabled with its reason until the photo is uploaded; one `payment-batches` 201; the order closed,
        two payments of one batch, the file attached to the wallet's and stored without EXIF at 1600 x 1200, and what left the browser already 1600 x 1200
@@ -1392,7 +1392,7 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        two actions moved out of `ReceiptPanel` into `ReceiptActions`, each shown to the holders of its permission (the PDF: `payments.view`; the link:
        `payments.take`); the till shows both, as before.
      - **The refund is deferred to 4.3d.** The plan puts "the refund action" on this page; refunds (4.1b, 4.3d) wait for Ramin's answer on R-C. Its place
-       is `RefundPlaceholder` in `components/admin/OrderRecord.tsx` (a `TODO(p4): 4.3d`), shown for an order paid in full: refunds are not available yet,
+       is `RefundPlaceholder` in `components/admin/OrderRecord.tsx` (a phase-4 to-do marker naming 4.3d; the refund section of step 4.5g replaced it), shown for an order paid in full: refunds are not available yet,
        and before the order closes a wrong payment is voided instead. The refund's timeline kinds (`line.refunded`, `order.refunded`) are one line each in
        `ENTRY_KINDS` (its own TODO) with their two strings; nothing else in the merge changes.
      - **Links in**: the orders board's timeline panel ("Open the full record"), the payment dialog ("Open the order's record") and an audit entry whose
@@ -1561,6 +1561,67 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        queue, port 8001; not a repo change) the three flows of `dashboards-audit-live` passed (the voided payment's flow in 40 s), and the pure specs of
        `p4-dashboards` and `pay-admin-logic` 60 passed; the whole projects ran in CI.
      - STATUS: phase 4's `web` step stays `in_progress` (4.5d, the order timeline, remains).
+   - **As built (step 4.5g, `phase-4/web-refunds`), on Ramin's rule (R-C, 2026-10-28).** Order: the tests red (the pure rules failing on
+     the missing `lib/refund.ts` and the timeline's two refund kinds, the browser flows on the missing screens), then the rules, the screens
+     and the strings; this note, STATUS and the report. Where the code disagreed with the plan or the plan left a choice:
+     - **No API change.** The order read does not carry the products' two settings, so the dialog reads them from the catalog
+       (`GET /items?kind=product`, `catalog.view`: every role; the catalog's own key `["items", "product"]`). A product the catalog no
+       longer lists (deleted) can still be chosen and its stock is left to the API ("decided when it is refunded"). `refundable` and
+       `refund_restock` on each line's `item` in `OrderLineResource` would spare that read; nothing needs it today.
+     - **Where a refund starts.** The till's queue lists unpaid orders only, and a cash share needs the asker to carry the till's open shift
+       (4.3d, `payments.shift.required`), so the till gained a third tab, **Closed orders** (`GET /orders?status=closed&limit=30`, newest
+       first; a plain read, refreshed when the tab opens and after a refund), whose cards open 4.5b's `VoidDialog`: its path for a paid or
+       closed order is now the refund dialog (`components/refunds/RefundDialog.tsx`). The order record opens the same dialog from its Refund
+       section once the order is closed; a manager there carries no till shift, so a cash share is refused unless they work the till, which
+       the section and the dialog's shift refusal say.
+     - **The dialog.** The lines with checkboxes (named by the product; described by what happens to the stock, or why the line cannot be
+       chosen: not refundable by the admin's setting, refunded already, never made), every open line chosen to start; with a discount or a tax
+       one tap chooses or clears them all (R-D). The amount is the chosen lines' `line_total`, the order's `total` when every charged line
+       comes back (decimal strings). `lines` is left out (the whole order) when nothing came back before and every open line is chosen, else
+       the chosen ids (the API refuses a whole-order refund after a line refund). The money: the default split last in, first out by
+       `(received_at, id)` as the API makes it, under "Paid back from"; "Share it out by hand" (offered with two or more payments that still
+       hold money) starts from that split and checks each share as the API does (`payment`, `repeated`, `amount`, `exceeds`, then `sum`); a
+       split equal to the default is not sent. A share on a channel other than cash asks for the reference of the transfer back and offers
+       its photo (`POST /files` purpose `refund_proof`, 4.5b's downscale, its own `client_uuid` and key, reused by a retry; a `proof_invalid`
+       refusal clears it). The reason takes 3 to 255 characters (the API asks for 1 to 255; the brief said 3), the PIN 4 to 6 digits;
+       `refundBlock` names the first thing missing, in that order.
+     - **Keys and refusals.** One `client_uuid` for the dialog's life; a new Idempotency-Key after a 4xx, the same one after no answer, a 5xx
+       or `idempotency.in_flight` (`keepsKey`). A refusal shows in the API's own words in both languages and marks its part (`refundField`:
+       lines, allocation, reference, proof, reason, pin, shift, order); `allocation_invalid` reads in the dialog's words for its `reason`;
+       a lost answer says the retry sends the same refund.
+     - **After it**: the amount, each payment's share, the lines back in stock and those not, what the order keeps, and 4.5b's receipt
+       actions (the PDF and the link print the refund since 4.3e). The order, its payments, the closed list and each payment's detail are
+       read again.
+     - **The record.** `ENTRY_KINDS` gained `line.refunded` and `order.refunded` (amber, approved: the approver is named). `balanceView`
+       gained `refunded` and `netPaid` (an answer older than 4.1b reads as nothing back), and its in-step check now also compares the
+       payments' `refunded_amount` with the order's `refunded`; the header shows "Paid back" and "Kept after refunds" once something came
+       back. The Refund section lists the order's refunds (amount, when, whole or how many lines, the reason, who asked and whose PIN
+       approved); a payment card with money paid back lists its `payment_refunds` rows (`GET /payments/{payment}`, 4.5c's `["payment", id]`).
+     - **The admin's toggles** (`components/catalog/RefundSettings.tsx`): "Refundable" and "Goes back to stock when refunded" on the new
+       item form (untouched, nothing is sent and the API gives the natural values), a "Refunds" column in the item list, and a "Refund
+       settings" form on the product page (`PATCH /items/{item}` with both; `catalog.manage`, read-only otherwise). The second toggle is
+       greyed out and unticked for a product made to order and for an ingredient, with the reason under it (`restockAllowed`, the API's
+       `Item::restocks`); a refusal of the server still shows in its words.
+     - **Also**: 4.5c's payment dialog lists the payment's refund rows; an `order.refund` audit entry (subject none) links to the order's
+       record through its context's `order_id`; `lib/deeplink.ts` already took the `order_refunded` line's `/admin/orders/record?id=` (a
+       comment and a pure case). The reconciliation's refund columns needed no change.
+     - **Types**: `Item` gained the two settings; `Order` gained `refunded_total`, `refunded_at` and `refunds`, its totals `refunded` and
+       `net_paid`, `Line` `refunded_at` (optional, so the earlier fixtures still type); `RefundBody` and `RefundResult`.
+     - **Tests**: `pay-refund-logic` (9 pure cases), `pay-timeline-logic` (the approved kinds). `pay-refund` (two flows, @live): the run
+       makes a display-case cake (back into stock), a burger made to order at the kitchen (the admin accepts and readies it) and a
+       display-case water that cannot be refunded, sells one of each and takes 180.00 in cash at the till; at the till's closed orders the
+       cashier opens the refund: the water's line disabled with its reason, the others saying what happens to their stock, 150.00 from the
+       cash payment; a wrong PIN refused and the next try under a new key with the same `client_uuid`; the manager's PIN approves it (no
+       `lines`: the whole order). Through the API: one `return` movement, for the cake, pointing at its `sale`, none for the burger's
+       ingredient; `refunded_total` 150.00, the water's line not refunded; the till shift's expected cash 150.00 lower. The second flow: a
+       product saved with both toggles (the restock toggle greyed out while "Made to order" is chosen), the list's column, "Refundable"
+       switched off on its page, and a made-to-order product's page with the toggle greyed out. `dashboards-audit` (@live): the run's
+       refund asked by the cashier with the manager's PIN through the API, its one `order.refund` row found by its reason and opened on the
+       audit screen (the context's reason, amount, order and the approver by name, the link to the record). `pay-timeline` now reads the
+       refund place of a settled order ("voided instead"). The flows switch the run's products off at the end. No test turns a shift rule off.
+     - **Local run notes**: the local API image predates 4.1b (no refund route, no product settings, and its vendor lacks 4.3e's packages),
+       so the browser flows ran in CI only; the pure specs of the project (52) passed locally.
+     - STATUS: phase 4's `web` step `done`. The phase-4 to-do markers are gone (the plan's own mentions of them reworded).
 6. **4.6 docs and seeds** (STATUS `docs`), two PRs.
    - **4.6a `phase-4/seed-history`**: the real `Phase4Seeder` and `DemoClock` generalisation (section 8). It lands before 4.6b because the gate tests and `perf-dashboards` run on its data;
      it may be started as soon as 4.1 is done if the order needs it (`Phase3Seeder` and `DemoClock` exist since Phase 3 closed).
@@ -1585,7 +1646,7 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        part 30 to 70 % of the bill in tens of birr, the rest in cash, one `payment-batch`); `PAYMENT_VOID_PER_MILLE` 15 (a digital part payment of half the bill, voided two
        minutes later by the cashier with the manager's approval, the bill then paid in cash); `ORDER_VOID_PCT` 1 (voided two minutes after it is sent, before anything is
        made); `VERIFIED_PCT` 40 and `DISPUTED_PCT` 3 of the digital payments (verified at 13:50, disputed at 13:52, one dispute in three verified at 06:44 the next morning;
-       the last day's stay disputed); a voided payment's order gets no check. `REFUND_PCT` is 0 with `TODO(p4): 4.3d`; its roll is drawn on every order already, so turning
+       the last day's stay disputed); a voided payment's order gets no check. `REFUND_PCT` is 0 with a phase-4 to-do marker naming 4.3d; its roll is drawn on every order already, so turning
        it on changes no other draw, and `DemoTill` has the marked place where the refund becomes one more step after the payment. Every kind happens at least once
        however short the window (a second-day order is given it when the draw left it out).
      - **Stock** (`Demo\DemoStock`, from 06:05): what a day needs is its planned orders, a to-order product exploded through `Recipes::scaled` the way the ledger reserves
@@ -1652,7 +1713,7 @@ Build order of the migrations: 4.1b M18 M6 M7 M8 M9 (M9's refund half); 4.1c M10
        (the first request after the seed is cold), and start the timer after `GET /me` (4.5e's note). The seed's own line (`Phase 4: N days of history played ... in X s`) is in
        the e2e log of the seed step. Counts at 90 days (on `49d0130`): 2 325 orders, 2 612 payments (37 voided), 1 382 receipt photos and 26 971
        audit rows in the demo branch, under the 50 000 rows the audit export takes; at 60 days about two thirds of that.
-     - **For 4.3d.** `DayPlan::REFUND_PCT` goes to 2 (and its `TODO(p4)` goes); the roll is already drawn on every order (`$refundRoll <= DayPlan::refundPct()`, never a voided
+     - **For 4.3d.** `DayPlan::REFUND_PCT` goes to 2 (and its phase-4 to-do marker goes); the roll is already drawn on every order (`$refundRoll <= DayPlan::refundPct()`, never a voided
        order), so no other draw moves. `DemoTill::orderSteps` has the marked place, which throws today: the refund becomes one step after the payment (before 13:50: the latest
        payment is about 13:35), asked by the cashier and approved by the manager through the refund use case, display-case lines restocked (a `return` at the display case,
        inside the till's shift), station lines `waste`, a handful by line and a few lines `none`. The closings need nothing: `DemoShiftFlow` declares the drawer's expected
@@ -1767,7 +1828,7 @@ As-built notes are appended under each step as the build runs, as in Phases 1 to
 - **Live-host realities in tests**: queue tests keep `Queue::fake` plus a `sync` twin; the touch debounce is tested with the database cache lock; every poll test asserts `304` on an unchanged second request and
   a changed tag inside the 5-second settling window of `Payments::fingerprint()`.
 - **Playwright** (`apps/web/e2e/p4/`, projects exist in `playwright.config.ts`):
-  - `p4-pay-photo-split` (`testMatch /pay/`): `pay-photo-split.spec.ts` @live (the gate), `pay-sheet-logic.spec.ts` (pure), `pay-refund.spec.ts` @live, `pay-void.spec.ts` @live, `pay-camera-fallback.spec.ts`, and from 4.5c `pay-admin.spec.ts` @live (the admin payments screens) and `pay-admin-logic.spec.ts` (pure), and from 4.5d `pay-timeline.spec.ts` @live (the order record page) and `pay-timeline-logic.spec.ts` (pure).
+  - `p4-pay-photo-split` (`testMatch /pay/`): `pay-photo-split.spec.ts` @live (the gate), `pay-sheet-logic.spec.ts` (pure), `pay-refund.spec.ts` @live, `pay-void.spec.ts` @live, `pay-camera-fallback.spec.ts`, and from 4.5c `pay-admin.spec.ts` @live (the admin payments screens) and `pay-admin-logic.spec.ts` (pure), and from 4.5d `pay-timeline.spec.ts` @live (the order record page) and `pay-timeline-logic.spec.ts` (pure), and from 4.5g `pay-refund-logic.spec.ts` (pure; `pay-refund.spec.ts` gained the admin's refund toggles).
   - `p4-dashboards` (`testMatch /dashboards/`): `dashboards.spec.ts` (CI, the 90-day seed: first KPI visible under 1000 ms), `dashboards-live.spec.ts` @live (exact figures on a run-unique channel,
     soft budget), `dashboards-audit.spec.ts` @live (the audit screen shows this run's refund with its approver), `dashboards-logic.spec.ts` (range maths). From 4.5e
     `dashboards-logic.spec.ts` holds the range maths and the charts' scaling (pure; the Ethiopian labels wait for 4.5f) and `dashboards-live.spec.ts` the
@@ -1775,7 +1836,7 @@ As-built notes are appended under each step as the build runs, as in Phases 1 to
     From 4.5f `dashboards-logic.spec.ts` also holds the Ethiopian converter (the PHP unit table of `EthiopianDateTest`, ported, so the web's converter is
     its twin), the labels and the display preference; `dashboards-audit-logic.spec.ts` (pure) the audit screen's rules; and `dashboards-audit-live.spec.ts`
     @live the audit screen over a voided payment (its diff, the redacted reference, the approver, the export, the Ethiopian labels) and the 403 matrix of
-    the screen, with a CI-only flow of the receipt's Ethiopian switch. `dashboards-audit.spec.ts` (the refund's entry) stays for 4.3d and 4.6b.
+    the screen, with a CI-only flow of the receipt's Ethiopian switch. `dashboards-audit.spec.ts` (the refund's entry) is built in 4.5g.
   - Earlier projects keep running; `p1-order-flow` and `p3-handover` prove the cash path and the shift rules are not broken.
   - **How the live and shared-branch specs stay deterministic** (the lessons of 3.7a to 3.7e): they sign in as the E2E branch's admin through `Api.login` (per-run token file, a `429` waits for `Retry-After`);
     they start by `settleStation` for the till, kitchen and bar (a leftover opening or counting shift from an earlier failed run is closed and its count resolved) and end with `ensureOpenShift`; every
