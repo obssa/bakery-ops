@@ -256,6 +256,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/check_invariants.py --i18n ${{ fromJSON(needs.status.outputs.phase) >= 5 && '--strict-i18n' || '' }}
+      # Step 5.4a: the review sheet's export and import on a tiny fixture, then the dictionary report (a report, never a failure).
+      - run: python3 -m unittest discover -s scripts/tests -p "test_*.py"
+      - run: python3 scripts/i18n_report.py
 
   web-build:
     needs: web-lint
