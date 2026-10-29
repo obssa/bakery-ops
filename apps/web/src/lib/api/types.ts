@@ -1388,3 +1388,42 @@ export interface AuditPage {
   data: AuditEntry[];
   next_cursor: string | null;
 }
+
+// --- devices (Phase 5 step 5.1b; the API of step 5.1a, phase-5 plan 4.1) -----------------------------------------------------------------
+
+export const DEVICE_KINDS = ["tablet", "till", "kds", "bridge"] as const;
+export type DeviceKind = (typeof DEVICE_KINDS)[number];
+
+/** A row of GET /devices: an enrolled device of the branch, revoked or not. `fingerprint` is the id it sends in X-Device-Id. */
+export interface Device {
+  id: number;
+  branch_id: number;
+  name: string;
+  kind: DeviceKind;
+  station_id: number | null;
+  fingerprint: string;
+  enrolled_by: number | null;
+  enrolled_at: string;
+  last_seen_at: string | null;
+  revoked_at: string | null;
+  revoked_by: number | null;
+}
+
+/** POST /devices: 201 with `token` once for a bridge (stored hashed; never shown again), 200 and no token when the client_uuid was used. */
+export type EnrolledDevice = Device & { token?: string };
+
+export interface NewDevice {
+  name: string;
+  fingerprint: string;
+  kind: DeviceKind;
+  client_uuid: string;
+}
+
+/** GET /devices/this: whether the device this page runs on is enrolled in the signed-in person's branch. Never a 403. */
+export interface ThisDevice {
+  enrolled: boolean;
+  revoked: boolean;
+  device: { id: number; name: string; kind: DeviceKind } | null;
+  /** IDENTITY_REQUIRE_DEVICE: whether the station routes refuse a device that is not enrolled */
+  enforcement: boolean;
+}

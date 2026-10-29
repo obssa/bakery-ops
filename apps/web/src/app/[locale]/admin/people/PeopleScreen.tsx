@@ -9,9 +9,13 @@ import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { ROLES, type Locale, type NewUser, type Role, type Station } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
 import { RequireAuth } from "@/components/RequireAuth";
+import { focusRing } from "@/components/styles";
+import { Link } from "@/i18n/navigation";
+import { can, useSession } from "@/lib/session";
 
 // Admin > People (Phase 0 step 0.7, "People minimal"): the branch's users and a form to add one with a role and the
-// language their screens open in. Roles, stations, short codes and devices get their own screens later.
+// language their screens open in. Roles, stations, short codes and devices get their own screens later; the devices screen (step 5.1b)
+// is linked from here.
 
 const LOCALES: readonly Locale[] = ["en", "am"];
 
@@ -20,6 +24,7 @@ export function PeopleScreen() {
   return (
     <RequireAuth permission="people.manage">
       <PageHeader title={t("title")} intro={t("intro")} />
+      <DevicesLink />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="space-y-6">
           <PeoplePanel />
@@ -28,6 +33,24 @@ export function PeopleScreen() {
         <NewPersonPanel />
       </div>
     </RequireAuth>
+  );
+}
+
+/** The way to Admin > People > Devices, for whoever may manage devices (devices.manage, the admin). */
+function DevicesLink() {
+  const t = useTranslations("people");
+  const me = useSession((s) => s.me);
+  if (!can(me, "devices.manage")) return null;
+  return (
+    <p className="mb-6 flex flex-wrap items-center gap-3 text-base text-neutral-700">
+      <Link
+        href="/admin/people/devices"
+        className={`inline-flex min-h-12 items-center rounded-md border border-neutral-300 bg-white px-5 font-medium text-neutral-900 hover:bg-neutral-100 ${focusRing}`}
+      >
+        {t("devices_link")}
+      </Link>
+      <span>{t("devices_desc")}</span>
+    </p>
   );
 }
 

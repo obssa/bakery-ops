@@ -6,6 +6,7 @@ import { uuid } from "../api/idempotency";
 import type { NewOrder, NewOrderLine, RejectBody } from "../api/types";
 import { actingHooks, useSession } from "../session";
 import { actingHeaders } from "../acting";
+import { isDeviceRefusal } from "../device";
 
 // A minimal outbox (step 1.6a): the writes a screen must not lose to a bad connection, i.e. send an order, accept a
 // line, mark a line ready. Each is queued with its Idempotency-Key (and the order its client UUID) fixed at enqueue,
@@ -155,6 +156,11 @@ export const useOutbox = create<OutboxState>()((set, get) => ({
         } catch (error) {
           if (error instanceof ApiError && error.status === 401 && !isActingExpired(error)) {
             useSession.getState().expire();
+            return;
+          }
+          if (isDeviceRefusal(error)) {
+            // this tablet is not enrolled (or was revoked): the "not enrolled" screen says so; the write waits, with its key, until an
+            // admin enrols the device and the page starts again (step 5.1b)
             return;
           }
           if (error instanceof ApiError && error.status >= 400 && error.status < 500) {

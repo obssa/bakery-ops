@@ -174,3 +174,11 @@ replaces the row at once and asks the list to look again. The analytics dashboar
 `running`, so it needs no settling window. The dashboards themselves are not polled: when a day's version or rebuilt_at moves, the page invalidates the
 queries that read that day, and each read sends its last ETag, so one whose days did not move answers 304. A write that tests expect to be answered 304
 afterwards travels past the settling window first, as in Phase 3.
+
+## Note, 2026-10-29: Phase 5 stays on polling
+
+`e2e-p5` drops `ws` (step 5.1b): it runs the `full` profile (the worker, no Reverb), `BROADCAST_CONNECTION=null` and
+`NEXT_PUBLIC_LIVE_TRANSPORT=poll`, as the live host does and as `e2e-p1` to `e2e-p4` already do, and it runs beside `e2e-p4` instead of
+after it (phase-5 plan 7.1, 10.2 D17). Step 5.1b adds no feed: the Devices screen reads its list once and again after each write, and the
+"not enrolled" screen reacts to the answers of the page's own feeds. The print bridge's job poll (step 5.3) and the System page (step 5.5c)
+add their cadences to this note when they are built.
