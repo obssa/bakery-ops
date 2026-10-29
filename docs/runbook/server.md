@@ -565,6 +565,22 @@ database queue, run by the `queue:work` cron line:
   removed once sent; a before/after longer than a spreadsheet cell is a note there (the CSV keeps it whole). Each export is itself an audit
   row `audit.export`.
 
+## Errors (Phase 5, step 5.5a; ADR 0021)
+
+- **What the log holds.** Failures at `error`, with their stack trace. A domain refusal (a 4xx with a message_key: a payment over the
+  balance, a locked count, a wrong password) is not an error: it leaves one `info` line, `refused: <message_key>`, and no trace. With
+  `LOG_LEVEL=warning` in the server `.env` those lines are not written at all. Logs: `~/bakery-ops.orcamind.dev/storage/logs/`.
+- **Sentry is off** until Ramin creates the project (his account; no agent creates one) and sets its DSN. Off means nothing of the SDK
+  loads and nothing is sent. To turn it on for the API: add `SENTRY_LARAVEL_DSN=<the project's DSN>` to the server `.env`, then
+  `php artisan config:cache`; `php artisan sentry:test` (only present once a DSN is set) sends a test event, which is the `error-tracking`
+  checklist item. For the web shell: set the repository variable `NEXT_PUBLIC_SENTRY_DSN` (GitHub, Settings, Secrets and variables, Actions,
+  Variables; a browser DSN is public by design) and run the deploy: the next static export carries the SDK.
+- **What is sent:** errors only, never a refusal, never a PIN, password, token, Authorization or Cookie header, phone number, signed-link
+  parameter or the body of an identity route (scrubbed on the host before sending); no traces, replays or sessions.
+- **Turning it off:** remove the `.env` line and `php artisan config:cache`; delete the variable and redeploy for the web shell.
+- **Failed jobs** older than 30 days are pruned by the scheduler daily at 04:10 Addis Ababa time (`queue:prune-failed --hours=720`, on the
+  existing `schedule:run` cron line). Nobody deletes rows by hand; `php artisan queue:failed` lists what is left.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.
