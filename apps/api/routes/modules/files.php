@@ -23,7 +23,7 @@ Route::prefix('api/v1')->middleware(['api', 'signed'])->group(function (): void 
 
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::get('/files/doctor', [FilesController::class, 'doctor'])->middleware('permission:channels.manage')->name('files.doctor');
-    Route::post('/files', [FilesController::class, 'store'])->middleware(['permission:files.upload', 'idempotency'])->name('files.store');
+    Route::post('/files', [FilesController::class, 'store'])->middleware(['permission:files.upload', 'idempotency'])->middleware('device')->name('files.store');
     Route::get('/files/{file}/url', [FilesController::class, 'url'])->whereNumber('file')->middleware('permission:payments.view|files.upload')->name('files.url');
-    Route::delete('/files/{file}', [FilesController::class, 'destroy'])->whereNumber('file')->middleware(['permission:files.upload', 'idempotency'])->name('files.destroy');
+    Route::delete('/files/{file}', [FilesController::class, 'destroy'])->whereNumber('file')->middleware(['permission:files.upload', 'idempotency'])->middleware('device')->name('files.destroy');
 });

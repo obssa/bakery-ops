@@ -19,8 +19,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Fills the request-scoped CurrentBranch and ActorContext from the authenticated user (rule 4, rule 8), the
- * X-Device-Id header (an enrolled, unrevoked device of the user's branch; unknown fingerprints are ignored until
- * Phase 5 enforces enrolment) and the X-Acting-Session header (an active session of the same branch and device,
+ * X-Device-Id header (an enrolled, unrevoked device of the user's branch; an unknown fingerprint is ignored here, and refused on the
+ * station routes by EnsureEnrolledDevice once Phase 5's flag is on; GET /devices/this reads the header itself) and the X-Acting-Session header (an active session of the same branch and device,
  * else 401 so the pad locks again), and (Phase 3) the station the request works at (Stations::workStationFor: the
  * X-Station-Id header when the user may work there, else their only assignment) and the shift running there (Shared's
  * OpenShifts::stampFor; null under the default binding, so nothing changes until Shifts exists). Runs after auth:sanctum and before route model binding and the idempotency
@@ -33,6 +33,12 @@ final class ResolveActor
     public const string ACTING_SESSION_HEADER = 'X-Acting-Session';
 
     public const string STATION_HEADER = 'X-Station-Id';
+
+    /**
+     * GET /devices/this (step 5.1a): the one route where a revoked device is an answer, not a refusal ({revoked: true}), so the
+     * "not enrolled" screen can say so. Its request carries no device: nothing it does is stamped.
+     */
+    public const string DEVICE_PROBE_ROUTE = 'identity.devices.this';
 
     public function __construct(
         private readonly CurrentBranch $branch,
@@ -58,7 +64,7 @@ final class ResolveActor
         $this->branch->set($user->branch);
         $this->actor->authenticate($user->id);
 
-        $device = self::deviceFor($request, $user->branch_id);
+        $device = $request->routeIs(self::DEVICE_PROBE_ROUTE) ? null : self::deviceFor($request, $user->branch_id);
         $this->actor->onDevice($device?->id);
 
         $sessionId = trim((string) $request->header(self::ACTING_SESSION_HEADER, ''));

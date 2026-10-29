@@ -44,8 +44,8 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/reorder-rules', [ReorderRulesController::class, 'index'])->name('inventory.reorder-rules.index');
         Route::get('/reorder-list', [StockViewsController::class, 'reorderList'])->name('inventory.reorder-list');
         Route::get('/stock-alerts', [StockViewsController::class, 'alerts'])->name('inventory.stock-alerts');
-        Route::get('/stations/{station}/stock-strip', [StockViewsController::class, 'strip'])->whereNumber('station')->name('inventory.stations.stock-strip');
-        Route::get('/display-case', [StockViewsController::class, 'displayCase'])->name('inventory.display-case');
+        Route::get('/stations/{station}/stock-strip', [StockViewsController::class, 'strip'])->whereNumber('station')->middleware('device')->name('inventory.stations.stock-strip');
+        Route::get('/display-case', [StockViewsController::class, 'displayCase'])->middleware('device')->name('inventory.display-case');
     });
 
     Route::middleware(['permission:inventory.manage', 'idempotency'])->group(function (): void {
@@ -77,7 +77,7 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     });
 
     Route::middleware(['permission:transfers.request', 'idempotency'])->group(function (): void {
-        Route::post('/transfers', [TransfersController::class, 'store'])->name('inventory.transfers.store');
+        Route::post('/transfers', [TransfersController::class, 'store'])->middleware('device')->name('inventory.transfers.store');
     });
 
     Route::middleware(['permission:transfers.confirm', 'idempotency'])->group(function (): void {

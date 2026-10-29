@@ -22,12 +22,12 @@ use Illuminate\Support\Facades\Route;
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:production.view')->group(function (): void {
-        Route::get('/production/requests', [RequestsController::class, 'index'])->name('production.requests.index');
-        Route::get('/production/requests/{request}', [RequestsController::class, 'show'])->whereNumber('request')->name('production.requests.show');
+        Route::get('/production/requests', [RequestsController::class, 'index'])->middleware('device')->name('production.requests.index');
+        Route::get('/production/requests/{request}', [RequestsController::class, 'show'])->whereNumber('request')->middleware('device')->name('production.requests.show');
     });
 
     Route::middleware(['permission:production.request', 'idempotency'])->group(function (): void {
-        Route::post('/production/requests', [RequestsController::class, 'store'])->name('production.requests.store');
+        Route::post('/production/requests', [RequestsController::class, 'store'])->middleware('device')->name('production.requests.store');
     });
 
     Route::middleware(['permission:production.plan', 'idempotency'])->group(function (): void {
@@ -35,14 +35,14 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     });
 
     Route::middleware(['permission:production.fulfil', 'idempotency'])->group(function (): void {
-        Route::post('/production/requests/{request}/accept', [RequestsController::class, 'accept'])->whereNumber('request')->name('production.requests.accept');
-        Route::post('/production/requests/{request}/start', [BatchesController::class, 'start'])->whereNumber('request')->name('production.requests.start');
-        Route::post('/production/batches/{batch}/done', [BatchesController::class, 'done'])->whereNumber('batch')->name('production.batches.done');
+        Route::post('/production/requests/{request}/accept', [RequestsController::class, 'accept'])->whereNumber('request')->middleware('device')->name('production.requests.accept');
+        Route::post('/production/requests/{request}/start', [BatchesController::class, 'start'])->whereNumber('request')->middleware('device')->name('production.requests.start');
+        Route::post('/production/batches/{batch}/done', [BatchesController::class, 'done'])->whereNumber('batch')->middleware('device')->name('production.batches.done');
     });
 
     Route::middleware(['permission:production.view', 'idempotency'])->group(function (): void {
-        Route::post('/production/requests/{request}/cancel', [RequestsController::class, 'cancel'])->whereNumber('request')->name('production.requests.cancel');
-        Route::post('/production/batches/{batch}/confirm', [BatchesController::class, 'confirm'])->whereNumber('batch')->name('production.batches.confirm');
-        Route::post('/production/batches/{batch}/send-back', [BatchesController::class, 'sendBack'])->whereNumber('batch')->name('production.batches.send_back');
+        Route::post('/production/requests/{request}/cancel', [RequestsController::class, 'cancel'])->whereNumber('request')->middleware('device')->name('production.requests.cancel');
+        Route::post('/production/batches/{batch}/confirm', [BatchesController::class, 'confirm'])->whereNumber('batch')->middleware('device')->name('production.batches.confirm');
+        Route::post('/production/batches/{batch}/send-back', [BatchesController::class, 'sendBack'])->whereNumber('batch')->middleware('device')->name('production.batches.send_back');
     });
 });

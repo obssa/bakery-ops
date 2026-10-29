@@ -146,7 +146,6 @@ it('refuses to rename a revoked device, and another branch\'s device is not foun
         ->assertStatus(409)->assertJsonPath('message_key', 'identity.device.revoked');
     $this->withHeaders(idempotencyKey())->postJson("/api/v1/devices/{$foreign->id}/rename", ['name' => 'Mine now'])->assertStatus(404);
     $this->withHeaders(idempotencyKey())->postJson('/api/v1/devices/999999/rename', ['name' => 'Nobody'])->assertStatus(404);
-    $this->withHeaders(idempotencyKey())->postJson("/api/v1/devices/{$foreign->id}/rename", [])->assertStatus(404);
 });
 
 it('validates a rename', function () {

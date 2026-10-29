@@ -13,12 +13,14 @@ use Illuminate\Support\Facades\Route;
 /*
  * Identity routes under /api/v1 (owned by App\Modules\Identity, loaded by IdentityServiceProvider; kept out of app/
  * so PSR-4 class discovery never executes it). Public: login and the pad's short-code gate, both throttled. Everything else: auth:sanctum, the actor middleware (branch + actor + device + acting session),
- * a permission (rule 6) and, on writes, idempotency (rule 7). Every route is listed in
+ * a permission (rule 6) and, on writes, idempotency (rule 7). The short-code gate is a station route (tests/Support/station_routes.php): it
+ * carries the `device` middleware, which refuses an unenrolled pad once identity.require_enrolled_device is on (step 5.1a). Every route is listed in
  * tests/Support/route_permissions.php and every write in tests/Support/write_endpoints.php.
  */
 Route::prefix('api/v1')->middleware('api')->group(function (): void {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login')->name('identity.login');
-    Route::post('/short-code/verify', [ShortCodeController::class, 'verify'])->middleware('throttle:short-code')->name('identity.short-code.verify');
+    // a station route (step 5.1a): the pad's lock screen answers only an enrolled pad once identity.require_enrolled_device is on
+    Route::post('/short-code/verify', [ShortCodeController::class, 'verify'])->middleware(['throttle:short-code', 'device'])->name('identity.short-code.verify');
 
     Route::middleware(['auth:sanctum', 'actor'])->group(function (): void {
         Route::get('/me', [AuthController::class, 'me'])->middleware('can:identity.authenticated')->name('identity.me');
@@ -38,10 +40,16 @@ Route::prefix('api/v1')->middleware('api')->group(function (): void {
             Route::get('/stations', [StationsController::class, 'index'])->name('identity.stations.index');
             Route::post('/stations', [StationsController::class, 'store'])->middleware('idempotency')->name('identity.stations.store');
             Route::patch('/stations/{station}', [StationsController::class, 'update'])->middleware('idempotency')->whereNumber('station')->name('identity.stations.update');
+        });
 
+        // Devices (step 5.1a, phase-5 plan 4.1): devices.manage (the admin; people.manage until Phase 5), and GET /devices/this for every
+        // signed-in role (devices.self), which is not a station route and never answers 403 for the device that asks.
+        Route::middleware('permission:devices.manage')->group(function (): void {
             Route::get('/devices', [DevicesController::class, 'index'])->name('identity.devices.index');
             Route::post('/devices', [DevicesController::class, 'store'])->middleware('idempotency')->name('identity.devices.store');
+            Route::post('/devices/{id}/rename', [DevicesController::class, 'rename'])->middleware('idempotency')->whereNumber('id')->name('identity.devices.rename');
             Route::post('/devices/{id}/revoke', [DevicesController::class, 'revoke'])->middleware('idempotency')->whereNumber('id')->name('identity.devices.revoke');
         });
+        Route::get('/devices/this', [DevicesController::class, 'current'])->middleware('permission:devices.self')->name('identity.devices.this');
     });
 });

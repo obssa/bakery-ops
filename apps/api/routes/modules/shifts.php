@@ -29,16 +29,16 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     Route::middleware('permission:shifts.view')->group(function (): void {
         Route::get('/shift-templates', [TemplatesController::class, 'index'])->name('shifts.templates.index');
         Route::get('/shifts', [ShiftsController::class, 'index'])->name('shifts.index');
-        Route::get('/shifts/{shift}', [ShiftsController::class, 'show'])->whereNumber('shift')->name('shifts.show');
-        Route::get('/stations/{station}/shifts/current', [StationShiftsController::class, 'current'])->whereNumber('station')->name('shifts.current');
+        Route::get('/shifts/{shift}', [ShiftsController::class, 'show'])->whereNumber('shift')->middleware('device')->name('shifts.show');
+        Route::get('/stations/{station}/shifts/current', [StationShiftsController::class, 'current'])->whereNumber('station')->middleware('device')->name('shifts.current');
         Route::get('/shifts/{shift}/summary', [ShiftsController::class, 'summary'])->whereNumber('shift')->name('shifts.summary');
-        Route::get('/shifts/{shift}/cash', [ShiftsController::class, 'cash'])->whereNumber('shift')->name('shifts.cash');
-        Route::get('/shifts/{shift}/counts', [CountsController::class, 'forShift'])->whereNumber('shift')->name('shifts.counts.index');
+        Route::get('/shifts/{shift}/cash', [ShiftsController::class, 'cash'])->whereNumber('shift')->middleware('device')->name('shifts.cash');
+        Route::get('/shifts/{shift}/counts', [CountsController::class, 'forShift'])->whereNumber('shift')->middleware('device')->name('shifts.counts.index');
         Route::get('/stock-counts', [CountsController::class, 'index'])->name('shifts.counts.queue');
-        Route::get('/stock-counts/{count}', [CountsController::class, 'show'])->whereNumber('count')->name('shifts.counts.show');
-        Route::get('/variance-reasons', [VarianceReasonsController::class, 'index'])->name('shifts.reasons.index');
-        Route::get('/shifts/{shift}/notes', [NotesController::class, 'index'])->whereNumber('shift')->name('shifts.notes.index');
-        Route::get('/stations/{station}/handover', [HandoverController::class, 'show'])->whereNumber('station')->name('shifts.handover');
+        Route::get('/stock-counts/{count}', [CountsController::class, 'show'])->whereNumber('count')->middleware('device')->name('shifts.counts.show');
+        Route::get('/variance-reasons', [VarianceReasonsController::class, 'index'])->middleware('device')->name('shifts.reasons.index');
+        Route::get('/shifts/{shift}/notes', [NotesController::class, 'index'])->whereNumber('shift')->middleware('device')->name('shifts.notes.index');
+        Route::get('/stations/{station}/handover', [HandoverController::class, 'show'])->whereNumber('station')->middleware('device')->name('shifts.handover');
     });
 
     Route::middleware(['permission:shifts.manage', 'idempotency'])->group(function (): void {
@@ -52,19 +52,19 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     });
 
     Route::middleware(['permission:shifts.view', 'idempotency'])->group(function (): void {
-        Route::post('/shifts/{shift}/cancel', [ShiftsController::class, 'cancel'])->whereNumber('shift')->name('shifts.cancel');
+        Route::post('/shifts/{shift}/cancel', [ShiftsController::class, 'cancel'])->whereNumber('shift')->middleware('device')->name('shifts.cancel');
     });
 
     Route::middleware(['permission:shifts.count', 'idempotency'])->group(function (): void {
-        Route::post('/stations/{station}/shifts/start', [StationShiftsController::class, 'start'])->whereNumber('station')->name('shifts.start');
-        Route::post('/stations/{station}/shifts/open-ad-hoc', [StationShiftsController::class, 'openAdHoc'])->whereNumber('station')->name('shifts.open_ad_hoc');
-        Route::post('/shifts/{shift}/join', [ShiftsController::class, 'join'])->whereNumber('shift')->name('shifts.join');
-        Route::post('/shifts/{shift}/leave', [ShiftsController::class, 'leave'])->whereNumber('shift')->name('shifts.leave');
-        Route::post('/shifts/{shift}/close', [ShiftsController::class, 'close'])->whereNumber('shift')->name('shifts.close');
-        Route::put('/stock-counts/{count}/lines', [CountsController::class, 'lines'])->whereNumber('count')->name('shifts.counts.lines');
-        Route::put('/stock-counts/{count}/cash', [CountsController::class, 'cash'])->whereNumber('count')->name('shifts.counts.cash');
-        Route::post('/shifts/{shift}/notes', [NotesController::class, 'store'])->whereNumber('shift')->name('shifts.notes.store');
-        Route::post('/stock-counts/{count}/submit', [CountsController::class, 'submit'])->whereNumber('count')->name('shifts.counts.submit');
+        Route::post('/stations/{station}/shifts/start', [StationShiftsController::class, 'start'])->whereNumber('station')->middleware('device')->name('shifts.start');
+        Route::post('/stations/{station}/shifts/open-ad-hoc', [StationShiftsController::class, 'openAdHoc'])->whereNumber('station')->middleware('device')->name('shifts.open_ad_hoc');
+        Route::post('/shifts/{shift}/join', [ShiftsController::class, 'join'])->whereNumber('shift')->middleware('device')->name('shifts.join');
+        Route::post('/shifts/{shift}/leave', [ShiftsController::class, 'leave'])->whereNumber('shift')->middleware('device')->name('shifts.leave');
+        Route::post('/shifts/{shift}/close', [ShiftsController::class, 'close'])->whereNumber('shift')->middleware('device')->name('shifts.close');
+        Route::put('/stock-counts/{count}/lines', [CountsController::class, 'lines'])->whereNumber('count')->middleware('device')->name('shifts.counts.lines');
+        Route::put('/stock-counts/{count}/cash', [CountsController::class, 'cash'])->whereNumber('count')->middleware('device')->name('shifts.counts.cash');
+        Route::post('/shifts/{shift}/notes', [NotesController::class, 'store'])->whereNumber('shift')->middleware('device')->name('shifts.notes.store');
+        Route::post('/stock-counts/{count}/submit', [CountsController::class, 'submit'])->whereNumber('count')->middleware('device')->name('shifts.counts.submit');
     });
 
     // Step 3.3b: shifts.approve (admin, manager) approves a count; that the person who counted cannot approve it is the action's rule
@@ -76,8 +76,8 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     // count waits for a co-signature and to shifts.approve while it waits for a decision, so both ask only for shifts.view here and the
     // action decides (403 shifts.count.cosign_forbidden / auth.forbidden)
     Route::middleware(['permission:shifts.view', 'idempotency'])->group(function (): void {
-        Route::post('/stock-counts/{count}/cosign', [CountsController::class, 'cosign'])->whereNumber('count')->name('shifts.counts.cosign');
-        Route::post('/stock-counts/{count}/reject', [CountsController::class, 'reject'])->whereNumber('count')->name('shifts.counts.reject');
+        Route::post('/stock-counts/{count}/cosign', [CountsController::class, 'cosign'])->whereNumber('count')->middleware('device')->name('shifts.counts.cosign');
+        Route::post('/stock-counts/{count}/reject', [CountsController::class, 'reject'])->whereNumber('count')->middleware('device')->name('shifts.counts.reject');
     });
 
     // Step 3.4: the unlock is the admin's, and the chain of a place is read and verified by the people who may replay (admin, manager)

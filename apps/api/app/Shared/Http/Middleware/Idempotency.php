@@ -47,10 +47,11 @@ final class Idempotency
 
     /**
      * The request fields that hold a secret, matched by name at any depth: the approver's PIN of a void, a person's short code and their
-     * password (People). None of them is part of a fingerprint, and an answer carrying one is stored encrypted. The migration
+     * password (People), and since step 5.1a a print bridge's token, which POST /devices hands back once. None of them is part of a
+     * fingerprint, and an answer carrying one is stored encrypted. The migration
      * 2026_11_03_100100_clear_secret_fingerprints_of_idempotency_keys keeps its own copy of the list for the rows written before.
      */
-    public const array SECRET_FIELDS = ['password', 'pin', 'short_code'];
+    public const array SECRET_FIELDS = ['password', 'pin', 'short_code', 'token'];
 
     public function __construct(
         private readonly CurrentBranch $branch,

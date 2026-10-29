@@ -24,30 +24,30 @@ use Illuminate\Support\Facades\Route;
  */
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware(['permission:orders.create', 'idempotency'])->group(function (): void {
-        Route::post('/orders', [OrdersController::class, 'store'])->name('orders.store');
-        Route::put('/orders/{order}/lines', [OrdersController::class, 'replaceLines'])->whereNumber('order')->name('orders.lines.replace');
-        Route::post('/orders/{order}/send', [OrdersController::class, 'send'])->whereNumber('order')->name('orders.send');
-        Route::post('/orders/{order}/cancel', [OrdersController::class, 'cancel'])->whereNumber('order')->name('orders.cancel');
-        Route::post('/order-lines/{line}/served', [OrderLinesController::class, 'served'])->whereNumber('line')->name('order-lines.served');
+        Route::post('/orders', [OrdersController::class, 'store'])->middleware('device')->name('orders.store');
+        Route::put('/orders/{order}/lines', [OrdersController::class, 'replaceLines'])->whereNumber('order')->middleware('device')->name('orders.lines.replace');
+        Route::post('/orders/{order}/send', [OrdersController::class, 'send'])->whereNumber('order')->middleware('device')->name('orders.send');
+        Route::post('/orders/{order}/cancel', [OrdersController::class, 'cancel'])->whereNumber('order')->middleware('device')->name('orders.cancel');
+        Route::post('/order-lines/{line}/served', [OrderLinesController::class, 'served'])->whereNumber('line')->middleware('device')->name('order-lines.served');
     });
     // read models (step 1.5): conditional polls (ETag / 304, ADR 0009), no Idempotency-Key
     Route::middleware('permission:orders.create')->group(function (): void {
-        Route::get('/menu', MenuController::class)->name('orders.menu');
-        Route::get('/orders', [OrdersController::class, 'index'])->name('orders.index');
-        Route::get('/orders/{order}', [OrdersController::class, 'show'])->whereNumber('order')->name('orders.show');
+        Route::get('/menu', MenuController::class)->middleware('device')->name('orders.menu');
+        Route::get('/orders', [OrdersController::class, 'index'])->middleware('device')->name('orders.index');
+        Route::get('/orders/{order}', [OrdersController::class, 'show'])->whereNumber('order')->middleware('device')->name('orders.show');
     });
-    Route::get('/stations/{station}/tickets', StationTicketsController::class)->middleware('permission:orders.accept')->whereNumber('station')->name('orders.station.tickets');
-    Route::get('/dining-tables', [DiningTablesController::class, 'index'])->middleware('permission:orders.create')->name('orders.tables.index');
+    Route::get('/stations/{station}/tickets', StationTicketsController::class)->middleware('permission:orders.accept')->whereNumber('station')->middleware('device')->name('orders.station.tickets');
+    Route::get('/dining-tables', [DiningTablesController::class, 'index'])->middleware('permission:orders.create')->middleware('device')->name('orders.tables.index');
     Route::middleware(['permission:tables.manage', 'idempotency'])->group(function (): void {
         Route::post('/dining-tables', [DiningTablesController::class, 'store'])->name('orders.tables.store');
         Route::patch('/dining-tables/{table}', [DiningTablesController::class, 'update'])->whereNumber('table')->name('orders.tables.update');
     });
     Route::middleware(['permission:orders.void_request', 'idempotency'])->group(function (): void {
-        Route::post('/orders/{order}/void', [OrdersController::class, 'void'])->whereNumber('order')->name('orders.void');
+        Route::post('/orders/{order}/void', [OrdersController::class, 'void'])->whereNumber('order')->middleware('device')->name('orders.void');
     });
     Route::middleware(['permission:orders.accept', 'idempotency'])->group(function (): void {
-        Route::post('/order-lines/{line}/accept', [OrderLinesController::class, 'accept'])->whereNumber('line')->name('order-lines.accept');
-        Route::post('/order-lines/{line}/ready', [OrderLinesController::class, 'ready'])->whereNumber('line')->name('order-lines.ready');
-        Route::post('/order-lines/{line}/reject', [OrderLinesController::class, 'reject'])->whereNumber('line')->name('order-lines.reject');
+        Route::post('/order-lines/{line}/accept', [OrderLinesController::class, 'accept'])->whereNumber('line')->middleware('device')->name('order-lines.accept');
+        Route::post('/order-lines/{line}/ready', [OrderLinesController::class, 'ready'])->whereNumber('line')->middleware('device')->name('order-lines.ready');
+        Route::post('/order-lines/{line}/reject', [OrderLinesController::class, 'reject'])->whereNumber('line')->middleware('device')->name('order-lines.reject');
     });
 });

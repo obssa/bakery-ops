@@ -18,7 +18,11 @@ return [
     ],
     'device' => [
         'required' => 'This device must send its X-Device-Id header.',
-        'revoked' => 'This device was revoked; ask the admin to enrol it again.',
+        'revoked' => 'This device was revoked; ask the admin to enrol this tablet as a new device.',
+        'unknown' => 'This tablet is not enrolled; ask the admin to enrol it on this screen.',
+        'other_branch' => 'This tablet is enrolled in another branch; ask the admin.',
+        'fingerprint_taken' => 'This device is already enrolled.',
+        'kind_invalid' => 'A device is a tablet, a till, a kitchen screen or a print bridge.',
     ],
     'acting_session' => [
         'expired' => 'Your short-code session has ended; enter your code again.',

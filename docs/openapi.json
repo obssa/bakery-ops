@@ -2785,6 +2785,28 @@
                 "tags": [
                     "Devices"
                 ],
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "tablet",
+                                "till",
+                                "kds",
+                                "bridge"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "revoked",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Array of `DeviceResource`",
@@ -2809,11 +2831,15 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             },
             "post": {
                 "operationId": "identity.devices.store",
+                "summary": "201 the device it enrolled (with `token`, shown this once, for a bridge); 200 the device a client_uuid already made",
                 "tags": [
                     "Devices"
                 ],
@@ -2828,7 +2854,53 @@
                     }
                 },
                 "responses": {
-                    "201": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/devices/{id}/rename": {
+            "post": {
+                "operationId": "identity.devices.rename",
+                "tags": [
+                    "Devices"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RenameDeviceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
                         "description": "",
                         "content": {
                             "application/json": {
@@ -2838,6 +2910,9 @@
                                 }
                             }
                         }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -2878,6 +2953,69 @@
                     },
                     "404": {
                         "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/devices/this": {
+            "get": {
+                "operationId": "identity.devices.this",
+                "summary": "GET /devices/this: {enrolled, revoked, device: {id, name, kind}|null, enforcement}. A device of another branch is not this branch's:\nit reads as unknown",
+                "tags": [
+                    "Devices"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "enrolled": {
+                                            "type": "string"
+                                        },
+                                        "revoked": {
+                                            "type": "string"
+                                        },
+                                        "device": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "kind": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name",
+                                                "kind"
+                                            ]
+                                        },
+                                        "enforcement": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "enrolled",
+                                        "revoked",
+                                        "device",
+                                        "enforcement"
+                                    ]
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -15673,6 +15811,15 @@
                     "name": {
                         "type": "string"
                     },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
                     "fingerprint": {
                         "type": "string"
                     },
@@ -15685,9 +15832,21 @@
                     "enrolled_at": {
                         "type": "string"
                     },
+                    "last_seen_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "revoked_at": {
                         "type": [
                             "string",
+                            "null"
+                        ]
+                    },
+                    "revoked_by": {
+                        "type": [
+                            "integer",
                             "null"
                         ]
                     }
@@ -15696,10 +15855,14 @@
                     "id",
                     "branch_id",
                     "name",
+                    "kind",
+                    "station_id",
                     "fingerprint",
                     "enrolled_by",
                     "enrolled_at",
-                    "revoked_at"
+                    "last_seen_at",
+                    "revoked_at",
+                    "revoked_by"
                 ],
                 "title": "DeviceResource"
             },
@@ -16698,6 +16861,26 @@
                 ],
                 "title": "RejectTransferRequest"
             },
+            "RenameDeviceRequest": {
+                "type": "object",
+                "description": "POST /devices/{id}/rename (step 5.1a, phase-5 plan 4.1): a new name and, when the key is sent, a new home station of the branch (null\nclears it; left out, it stays). No row is created, so the Idempotency-Key alone makes a retry safe.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 120
+                    },
+                    "station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "RenameDeviceRequest"
+            },
             "ReorderChannelsRequest": {
                 "type": "object",
                 "description": "PUT /payment-channels/order: {ids}, the channel ids in their new order (at most 200). That the list names every live channel of the\nbranch exactly once is Payments' rule (ReorderChannels: 422 payments.channel.order_incomplete).",
@@ -17378,7 +17561,7 @@
             },
             "StoreDeviceRequest": {
                 "type": "object",
-                "description": "POST /devices: enrol a pad or till by the fingerprint it will send as X-Device-Id (globally unique, including\nsoft-deleted rows: a fingerprint is a physical device).",
+                "description": "POST /devices: enrol a device by the fingerprint it will send as X-Device-Id. Since step 5.1a (phase-5 plan 4.1): `kind` (tablet when\nleft out; anything outside DeviceKind is 422 identity.device.kind_invalid), an optional home station of the branch, and a client_uuid\n(ADR 0003: the same one again answers the device it made). A fingerprint enrolled before, in any branch and even deleted, is\n422 identity.device.fingerprint_taken (a fingerprint is a physical device); both checks are the action's, after these rules.",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -17387,11 +17570,29 @@
                     "fingerprint": {
                         "type": "string",
                         "maxLength": 191
+                    },
+                    "kind": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 32
+                    },
+                    "station_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
                     }
                 },
                 "required": [
                     "name",
-                    "fingerprint"
+                    "fingerprint",
+                    "client_uuid"
                 ],
                 "title": "StoreDeviceRequest"
             },
@@ -18265,7 +18466,9 @@
                                 "payments.view",
                                 "payments.verify",
                                 "analytics.manage",
-                                "audit.export"
+                                "audit.export",
+                                "devices.manage",
+                                "devices.self"
                             ]
                         }
                     },
@@ -19009,7 +19212,9 @@
                                 "payments.view",
                                 "payments.verify",
                                 "analytics.manage",
-                                "audit.export"
+                                "audit.export",
+                                "devices.manage",
+                                "devices.self"
                             ]
                         }
                     },

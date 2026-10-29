@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Identity\Http\Middleware\EnsureEnrolledDevice;
 use App\Modules\Identity\Http\Middleware\ResolveActor;
 use App\Shared\Http\ApiError;
 use App\Shared\Http\Middleware\Idempotency;
@@ -35,6 +36,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'idempotency' => Idempotency::class,
             // Identity (step 0.4): the actor middleware fills CurrentBranch/ActorContext; spatie's aliases enforce rule 6.
             'actor' => ResolveActor::class,
+            // Identity (step 5.1a, ADR 0017): on every station route (tests/Support/station_routes.php), off unless identity.require_enrolled_device.
+            'device' => EnsureEnrolledDevice::class,
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
@@ -43,8 +46,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Route model binding comes last (Catalog, step 0.5): the permission check answers 403 before a lookup can say
         // 404, and an idempotent replay must return the stored response even when the bound row has changed since
         // (a retried DELETE of an item finds it soft-deleted; binding first would answer 404 instead of the replay).
-        // Applied in this order, each lands right before SubstituteBindings: actor, permission, idempotency, bindings.
+        // Applied in this order, each lands right before SubstituteBindings: actor, device, permission, idempotency, bindings.
+        // The device check (step 5.1a) needs the actor's branch and answers before the permission check, so an unenrolled tablet is
+        // told so whoever signed in on it, and a refused request never reaches the idempotency store.
         $middleware->prependToPriorityList(SubstituteBindings::class, ResolveActor::class);
+        $middleware->prependToPriorityList(SubstituteBindings::class, EnsureEnrolledDevice::class);
         $middleware->prependToPriorityList(SubstituteBindings::class, PermissionMiddleware::class);
         $middleware->prependToPriorityList(SubstituteBindings::class, Idempotency::class);
     })

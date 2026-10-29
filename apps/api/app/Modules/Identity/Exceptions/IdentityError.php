@@ -51,6 +51,36 @@ final class IdentityError extends RuntimeException
         return new self('identity.device.revoked', 403);
     }
 
+    /** Step 5.1a: a station route with device enforcement on, and no X-Device-Id or one nobody enrolled (or a deleted device). */
+    public static function deviceUnknown(): self
+    {
+        return new self('identity.device.unknown', 403);
+    }
+
+    /** Step 5.1a: a station route with device enforcement on, and a device enrolled in another branch than the caller's. */
+    public static function deviceOtherBranch(): self
+    {
+        return new self('identity.device.other_branch', 403);
+    }
+
+    /** Step 5.1a: a change to a revoked device (rename): a revoked id is never enrolled again, the tablet makes a new one. */
+    public static function deviceRevokedConflict(): self
+    {
+        return new self('identity.device.revoked', 409);
+    }
+
+    /** Step 5.1a: POST /devices with a fingerprint already enrolled, in any branch, deleted or not (a fingerprint is a physical device). */
+    public static function deviceFingerprintTaken(): self
+    {
+        return new self('identity.device.fingerprint_taken', 422);
+    }
+
+    /** Step 5.1a: POST /devices with a kind outside DeviceKind (tablet, till, kds, bridge). */
+    public static function deviceKindInvalid(): self
+    {
+        return new self('identity.device.kind_invalid', 422);
+    }
+
     public static function actingSessionExpired(): self
     {
         return new self('identity.acting_session.expired', 401);

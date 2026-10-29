@@ -35,18 +35,18 @@ Route::prefix('api/v1')->middleware(['api', 'signed'])->group(function (): void 
 
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:payments.take')->group(function (): void {
-        Route::get('/payment-channels', [ChannelsController::class, 'index'])->name('payments.channels');
-        Route::post('/orders/{order}/payments', [PaymentsController::class, 'store'])->whereNumber('order')->middleware('idempotency')->name('payments.store');
-        Route::post('/orders/{order}/payment-batches', [PaymentsController::class, 'batch'])->whereNumber('order')->middleware('idempotency')->name('payments.batches.store');
-        Route::get('/receipt-settings', [ReceiptSettingsController::class, 'show'])->name('payments.receipt-settings.show');
-        Route::post('/orders/{order}/receipt-link', [ReceiptsController::class, 'link'])->whereNumber('order')->middleware('idempotency')->name('payments.receipt.link');
+        Route::get('/payment-channels', [ChannelsController::class, 'index'])->middleware('device')->name('payments.channels');
+        Route::post('/orders/{order}/payments', [PaymentsController::class, 'store'])->whereNumber('order')->middleware('idempotency')->middleware('device')->name('payments.store');
+        Route::post('/orders/{order}/payment-batches', [PaymentsController::class, 'batch'])->whereNumber('order')->middleware('idempotency')->middleware('device')->name('payments.batches.store');
+        Route::get('/receipt-settings', [ReceiptSettingsController::class, 'show'])->middleware('device')->name('payments.receipt-settings.show');
+        Route::post('/orders/{order}/receipt-link', [ReceiptsController::class, 'link'])->whereNumber('order')->middleware('idempotency')->middleware('device')->name('payments.receipt.link');
     });
 
     Route::middleware('permission:payments.view')->group(function (): void {
-        Route::get('/orders/{order}/payments', [PaymentReadsController::class, 'forOrder'])->whereNumber('order')->name('payments.order');
+        Route::get('/orders/{order}/payments', [PaymentReadsController::class, 'forOrder'])->whereNumber('order')->middleware('device')->name('payments.order');
         Route::get('/payments', [PaymentReadsController::class, 'index'])->name('payments.index');
         Route::get('/payments/{payment}', [PaymentReadsController::class, 'show'])->whereNumber('payment')->name('payments.show');
-        Route::get('/orders/{order}/receipt.pdf', [ReceiptsController::class, 'pdf'])->whereNumber('order')->name('payments.receipt.pdf');
+        Route::get('/orders/{order}/receipt.pdf', [ReceiptsController::class, 'pdf'])->whereNumber('order')->middleware('device')->name('payments.receipt.pdf');
     });
 
     // step 4.3e: the payment checkers' reports (payments.verify)
@@ -61,9 +61,9 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::post('/payments/{payment}/dispute', [PaymentDecisionsController::class, 'dispute'])->whereNumber('payment')->name('payments.dispute');
     });
     Route::middleware(['permission:orders.void_request', 'idempotency'])->group(function (): void {
-        Route::post('/payments/{payment}/void', [PaymentDecisionsController::class, 'void'])->whereNumber('payment')->name('payments.void');
+        Route::post('/payments/{payment}/void', [PaymentDecisionsController::class, 'void'])->whereNumber('payment')->middleware('device')->name('payments.void');
         // step 4.3d: the refund of a closed order, asked with orders.void_request and approved inside by the PIN of a payments.void holder
-        Route::post('/orders/{order}/refund', [RefundsController::class, 'store'])->whereNumber('order')->name('payments.refund');
+        Route::post('/orders/{order}/refund', [RefundsController::class, 'store'])->whereNumber('order')->middleware('device')->name('payments.refund');
     });
 
     Route::middleware(['permission:channels.manage', 'idempotency'])->group(function (): void {

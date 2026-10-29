@@ -80,6 +80,11 @@ final class PermissionRegistry
         // Step 4.5a (plan section 10.6): its own grant-only migration 2026_11_08_100200_grant_audit_export_permission (M2 has run on the live
         // database without it). audit.export: GET /audit-log/export, the whole log as a file; audit.view (above) reads it on the screen.
         'audit.export' => ['admin'],
+        // Phase 5 (step 5.1a; plan sections 3 M2a and 10.6). They reach a live database through the grant-only migration
+        // 2026_11_11_100200_grant_phase_5_device_permissions. devices.manage: GET and POST /devices, rename and revoke (until Phase 5 under
+        // people.manage, which the admin keeps); devices.self: GET /devices/this, every role's "is this tablet enrolled?".
+        'devices.manage' => ['admin'],
+        'devices.self' => self::EVERYONE,
     ];
 
     /**
