@@ -2,14 +2,15 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api/client";
-import { putLines, submitCount, type LineEdit } from "@/lib/api/counts";
+import { countGroup, submitCount, submitLines, type LineEdit } from "@/lib/api/counts";
 import { useItems } from "@/lib/api/hooks";
 import type { Count, Locale, VarianceReason } from "@/lib/api/types";
 import { isQuantityText } from "@/lib/decimal";
-import { stageOf } from "@/lib/counts";
+import { stageOf, withDraftEdits } from "@/lib/counts";
 import { useErrorText } from "@/lib/errors";
+import { onOutboxApplied, useOutbox } from "@/lib/outbox/store";
 import { Alert, Badge, Button, Field, Panel, Select, TextInput } from "../ui";
 import { CashDeclaration } from "./CashDeclaration";
 import { CashReviewDialog } from "./CashReviewDialog";
@@ -54,11 +55,22 @@ export function CountPanel({
   onChange: (count: Count) => void;
 }) {
   const t = useTranslations("counts");
+  const o = useTranslations("outbox");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
   const client = useQueryClient();
   const keys = useKeys();
   const items = useItems(null);
+  // drafts saved offline wait in the outbox (step 5.2a): the count is read again once they were sent
+  const group = countGroup(count.id);
+  const waiting = useOutbox((s) => s.items.some((item) => item.group === group));
+  useEffect(
+    () =>
+      onOutboxApplied((item) => {
+        if (item.group === group) void client.invalidateQueries({ queryKey: ["shift-counts", shiftId] });
+      }),
+    [group, client, shiftId],
+  );
 
   const [saving, setSaving] = useState(0);
   const [failure, setFailure] = useState<unknown>(null);
@@ -87,9 +99,10 @@ export function CountPanel({
     setSaving((n) => n + 1);
     setFailure(null);
     try {
-      const next = await putLines(count.id, body, keys.keyFor(name));
+      const outcome = await submitLines(count.id, body, keys.keyFor(name));
       keys.done(name);
-      onChange(next);
+      // queued offline (step 5.2a): the figures stay on their lines until the outbox has sent them and the count is read again
+      onChange(outcome.sent ? outcome.answer : withDraftEdits(count, body.lines ?? []));
       return true;
     } catch (error) {
       setFailure(error);
@@ -236,9 +249,15 @@ export function CountPanel({
           </>
         )}
 
+        {waiting ? (
+          <p role="status" className="rounded-md bg-blue-50 px-4 py-3 text-base font-medium text-blue-900">
+            {o("queued")}
+          </p>
+        ) : null}
         {editable ? (
           <div className="flex justify-end">
-            <Button type="button" disabled={saving > 0} onClick={() => setReview(true)}>
+            {/* handing in needs the connection and every draft on the server first */}
+            <Button type="button" disabled={saving > 0 || waiting} onClick={() => setReview(true)}>
               {t("review_button")}
             </Button>
           </div>

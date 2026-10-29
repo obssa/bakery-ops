@@ -1,3 +1,4 @@
+import { submit, type Submitted } from "../outbox/store";
 import { authed } from "../session";
 import type { CashParts } from "../cash";
 import type { Collection, Count, HandoverNote, HandoverPanelData, VarianceReason } from "./types";
@@ -23,15 +24,6 @@ export function getCount(countId: number): Promise<Count> {
 
 export function getVarianceReasons(): Promise<VarianceReason[]> {
   return authed<Collection<VarianceReason>>("/variance-reasons", { query: { active: 1 } }).then((page) => page.data);
-}
-
-export function putLines(countId: number, body: { lines?: LineEdit[]; confirm_all?: boolean }, key: string): Promise<Count> {
-  return authed<Count>(`/stock-counts/${countId}/lines`, { method: "PUT", body, idempotencyKey: key });
-}
-
-/** The cash declaration of a drawer count (step 3.7d): always the whole tally by denomination, plus the parts that changed. */
-export function putCash(countId: number, body: { denominations: Record<string, number> } & CashParts, key: string): Promise<Count> {
-  return authed<Count>(`/stock-counts/${countId}/cash`, { method: "PUT", body, idempotencyKey: key });
 }
 
 /** The submit's answer: the count, and the items whose lines it dropped because they were deleted from the catalog while the draft listed them. */
@@ -76,4 +68,22 @@ export function addNote(shiftId: number, body: string, toUserId: number | null, 
     body: { client_uuid: key, body, ...(toUserId === null ? {} : { to_user_id: toUserId }) },
     idempotencyKey: key,
   });
+}
+
+/** The outbox group of a count's drafts: its lines and its cash declaration, strictly in the order they were saved. */
+export function countGroup(countId: number): string {
+  return `count:${countId}`;
+}
+
+/** PUT /stock-counts/{id}/lines, a draft, through the outbox (step 5.2a): the count when online, queued when offline. */
+export function submitLines(countId: number, body: { lines?: LineEdit[]; confirm_all?: boolean }, key: string): Promise<Submitted<Count>> {
+  return submit<Count>({ kind: "count_lines", method: "PUT", path: `/stock-counts/${countId}/lines`, body, subjectId: countId, group: countGroup(countId), idempotencyKey: key });
+}
+
+/**
+ * The cash declaration of a drawer count (step 3.7d): always the whole tally by denomination, plus the parts that changed. A draft, so
+ * through the outbox (step 5.2a): the count when online, queued when offline.
+ */
+export function submitCash(countId: number, body: { denominations: Record<string, number> } & CashParts, key: string): Promise<Submitted<Count>> {
+  return submit<Count>({ kind: "count_cash", method: "PUT", path: `/stock-counts/${countId}/cash`, body, subjectId: countId, group: countGroup(countId), idempotencyKey: key });
 }
