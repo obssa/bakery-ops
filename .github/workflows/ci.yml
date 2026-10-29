@@ -245,6 +245,8 @@ jobs:
         working-directory: apps/web
       - run: pnpm lint
         working-directory: apps/web
+      - run: node --test eslint-rules/no-literal-text.test.mjs
+        working-directory: apps/web
       - run: pnpm exec tsc --noEmit
         working-directory: apps/web
 
