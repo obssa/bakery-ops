@@ -472,7 +472,7 @@ The reference was written for a VPS with Docker, PostgreSQL, Redis and WebSocket
 Cloudflare: MariaDB 10.11 (not PostgreSQL), CloudLinux `alt-php83`, **no Docker, no Redis, no WebSocket server, no long-running process**;
 live updates are polling with ETags (ADR 0009); `database` cache, session and queue, the queue drained by cron once a minute
 (`queue:work --stop-when-empty --max-time=50`) and the scheduler by `schedule:run` every minute; the web app is a static export under `/app`;
-the app lives in `$HOME/bakery-ops.orcamind.dev`; files sit on the account's private disk (`FILES_DISK=files`); the host is CPU-limited (load
+the app lives in its own folder in the account's home (`DEPLOY_PATH`); files sit on the account's private disk (`FILES_DISK=files`); the host is CPU-limited (load
 average around 10 at busy times; live tests see ECONNRESET and the e2e client retries with the same key). Rules that follow and are used
 above: every ops job is a console command run by the scheduler, bounded so it finishes well inside its slot (the dump at 02:30, when the
 shop is closed); nothing listens on a port on the host (the print bridge pulls); every new poll is conditional and debounced (devices'
@@ -679,4 +679,4 @@ alert fires at 26 h; ESC/POS Latin text mode is the fallback when the host's GD 
 - **The sign-off guard has a limit**: everything on this PC acts as Ramin, so the web-editor check and the rule are what keep an agent
   from signing; the gate report states this plainly.
 - **Phase scope creep**: COGS, a server-side date preference, refund overrides and email stay out (10.4); anything else found during the
-  phase becomes a `TODO(p6)`-style line in the report, never a silent addition.
+  phase becomes a line in the report's "after go-live" list, never a silent addition.
