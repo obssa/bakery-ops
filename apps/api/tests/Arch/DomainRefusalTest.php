@@ -57,6 +57,11 @@ it('finds no refusal class in app/ without the marker, and no refusal outside th
         if (! $file instanceof SplFileInfo || $file->getExtension() !== 'php') {
             continue;
         }
+        // only a file that could hold one is loaded (loading all of app/ would keep some 800 classes in the memory of the whole test run)
+        $source = (string) file_get_contents($file->getPathname());
+        if (! str_contains($source, 'function render(') && ! str_contains($source, 'messageKey')) {
+            continue;
+        }
         $class = 'App\\'.str_replace('/', '\\', substr($file->getPathname(), strlen($root) + 1, -4));
         if (! class_exists($class)) {
             continue;

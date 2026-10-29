@@ -6,6 +6,7 @@ use App\Modules\Orders\Exceptions\OrderError;
 use App\Modules\Payments\Exceptions\PaymentError;
 use App\Shared\Observability\ErrorTracking;
 use App\Shared\Observability\SentryScrubber;
+use Illuminate\Console\Scheduling\Event as ScheduledEvent;
 use Illuminate\Foundation\PackageManifest;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +57,8 @@ function expectNothingPersonalIn(FakeSentryIngest $ingest, string ...$alsoAbsent
 afterEach(function () {
     // the SDK keeps its current hub in a static: never let one test's client reach the next
     SentrySdk::setCurrentHub(new Hub);
+    // and its scheduling feature adds a macro (a static) whose closure holds this test's application: let it go
+    ScheduledEvent::flushMacros();
 });
 
 /** Turns error tracking on for this test as the server .env would (the DSN in config), with the fake ingest as the SDK's HTTP client. */
