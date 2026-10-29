@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "current_phase": 4,
+  "current_phase": 5,
   "invariants_version": 2,
   "phases": {
     "0": {
@@ -150,16 +150,20 @@
       ]
     },
     "4": {
-      "status": "in_progress",
+      "status": "done",
       "plan": "docs/phases/phase-4-plan.md",
       "plan_approved": true,
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
-      "report": null,
+      "report": "docs/phases/phase-4-report.md",
       "gate_job": "gate-p4",
-      "gate_run_url": null,
-      "done_commit": null,
-      "done_at": null,
-      "adrs": [],
+      "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/40821698063",
+      "done_commit": "b7b58e9710f14d9db5c4ca365231f666ae263d34",
+      "done_at": "2026-10-29T06:48:39Z",
+      "adrs": [
+        "0014-summary-rebuild-semantics",
+        "0015-file-storage-portability",
+        "0016-refunds-voids-and-the-cash-drawer"
+      ],
       "adr_waiver": null,
       "contracts_required": [
         "payments->orders",
@@ -171,7 +175,7 @@
         "payments": "done",
         "analytics": "done",
         "web": "done",
-        "docs": "in_progress"
+        "docs": "done"
       },
       "playwright_projects": [
         "p4-pay-photo-split",
@@ -179,7 +183,7 @@
       ]
     },
     "5": {
-      "status": "todo",
+      "status": "planning",
       "plan": "docs/phases/phase-5-plan.md",
       "plan_approved": false,
       "plan_approved_by": null,
