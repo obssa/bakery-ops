@@ -25,8 +25,10 @@
     </source>
     <php>
         <!-- one process runs the whole suite and keeps every test case (and the arch plugin's parsed sources) until the
-             end; the 128M php.ini default ran out once Catalog landed (step 0.5), locally and in any CI job group. -->
-        <ini name="memory_limit" value="1G"/>
+             end; the 128M php.ini default ran out once Catalog landed (step 0.5), locally and in any CI job group. 1G ran
+             out in step 5.5a: api-arch's single process (arch, invariants, unit, module:shared, module:audit: some 3 400
+             tests) died in the route matrix, the last file it runs, once 5.5a's ~70 tests joined it. A runner has 16 GB. -->
+        <ini name="memory_limit" value="2G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="DB_CONNECTION" value="mariadb"/>
         <env name="DB_DATABASE" value="bakery_test"/>
