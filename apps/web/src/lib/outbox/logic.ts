@@ -249,7 +249,7 @@ export function pendingCounts(items: OutboxItem[], screen: ScreenKey): { here: n
   return { here, elsewhere, conflicts };
 }
 
-const ORDER_KINDS: readonly OutboxKind[] = ["send_order", "replace_lines", "send_existing", "cancel_order"];
+const ORDER_KINDS: readonly OutboxKind[] = ["send_order", "replace_lines", "send_existing", "cancel_order", "pay_batch"];
 const PAD_KINDS: readonly OutboxKind[] = ["send_order", "replace_lines", "send_existing", "serve_line", "cancel_order"];
 
 /** The group of a write when its caller names none: an order's writes by the order (its client_uuid, else its id), a line's by the line. */

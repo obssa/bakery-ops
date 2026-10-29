@@ -191,14 +191,15 @@ test.describe("p4 pay sheet: logic", () => {
     expect(rowsComplete([], CHANNELS)).toBe(false);
   });
 
-  test("Complete waits for the shift, the connection, every row and amounts that add up to exactly the balance", () => {
+  test("Complete waits for the shift, every row and amounts that add up to exactly the balance (not for the connection: the outbox)", () => {
     expect(blockReason(state())).toBeNull();
     expect(canComplete(state())).toBe(true);
 
     // the till's shift comes first: nothing can be taken without it (every channel since step 4.3b)
     expect(blockReason(state({ shift: "no_shift" }))).toEqual({ kind: "shift", reason: "no_shift" });
     expect(blockReason(state({ shift: "not_open" }))).toEqual({ kind: "shift", reason: "not_open" });
-    expect(blockReason(state({ online: false }))).toEqual({ kind: "offline" });
+    // offline is no block since step 5.2a: the completed batch joins the outbox (Phase 5 plan 10.2 D10)
+    expect(blockReason(state({ online: false }))).toBeNull();
     expect(blockReason(state({ balance: "0.00" }))).toEqual({ kind: "nothing_due" });
     expect(blockReason(state({ rows: [] }))).toEqual({ kind: "no_rows" });
     const seven = Array.from({ length: MAX_ROWS + 1 }, (_, i) => row({ id: `r${i}`, channel: "bank", amount: "1", reference: "x" }));
