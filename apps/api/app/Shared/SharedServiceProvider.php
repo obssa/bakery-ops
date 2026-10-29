@@ -21,6 +21,7 @@ use App\Shared\Live\Broadcasts\OrderPaidBroadcast;
 use App\Shared\Live\Broadcasts\OrderSentBroadcast;
 use App\Shared\Live\Broadcasts\OrderVoidedBroadcast;
 use App\Shared\Live\Broadcasts\StockChangedBroadcast;
+use App\Shared\Observability\ErrorTracking;
 use App\Shared\Reports\NoWeeklySummaryLinks;
 use App\Shared\Reports\WeeklySummaryLinks;
 use App\Shared\Shifts\NoOpenShifts;
@@ -52,6 +53,8 @@ final class SharedServiceProvider extends ServiceProvider
         $this->app->scoped(WeeklySummaryLinks::class, static fn (): WeeklySummaryLinks => new NoWeeklySummaryLinks);
         // the names of people by id, for Audit (a leaf): Identity rebinds it to its ActorDirectory (step 4.5a); until then nobody has a name
         $this->app->bind(ActorNames::class, NoActorNames::class);
+        // error tracking (step 5.5a, ADR 0021): the Sentry provider only when SENTRY_LARAVEL_DSN is set; otherwise nothing of Sentry loads
+        ErrorTracking::register($this->app);
     }
 
     public function boot(): void

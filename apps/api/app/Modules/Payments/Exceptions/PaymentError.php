@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Payments\Exceptions;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * HTTP status it maps to and what it is about (the channel, the amounts, the order's status). Thrown inside an
  * AuditedAction it rolls the whole write back; Laravel renders it through render().
  */
-final class PaymentError extends RuntimeException
+final class PaymentError extends RuntimeException implements DomainRefusal
 {
     /** @var list<string> why a receipt_file_id is refused (photoInvalid) */
     public const array PHOTO_REASONS = ['not_found', 'wrong_purpose', 'attached', 'expired'];
@@ -227,6 +228,18 @@ final class PaymentError extends RuntimeException
     public static function refundProofInvalid(string $reason): self
     {
         return new self('payments.refund.proof_invalid', 422, ['field' => 'refund_proof_file_id', 'reason' => $reason]);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse

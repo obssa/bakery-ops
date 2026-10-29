@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Notifications\Exceptions;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -12,7 +13,7 @@ use RuntimeException;
  * The client-facing refusals of the endpoint routes, as a stable message_key (lang/<locale>/notifications.php, rule 9) plus the
  * HTTP status it maps to; Laravel renders it through render().
  */
-final class NotificationsError extends RuntimeException
+final class NotificationsError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -35,6 +36,18 @@ final class NotificationsError extends RuntimeException
     public function report(): bool
     {
         return false;
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse

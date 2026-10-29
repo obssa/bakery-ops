@@ -4,6 +4,8 @@ use App\Modules\Identity\Http\Middleware\EnsureEnrolledDevice;
 use App\Modules\Identity\Http\Middleware\ResolveActor;
 use App\Shared\Http\ApiError;
 use App\Shared\Http\Middleware\Idempotency;
+use App\Shared\Observability\ErrorTracking;
+use App\Shared\Observability\RefusalLog;
 use App\Shared\StateMachine\IllegalTransition;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -55,6 +57,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(SubstituteBindings::class, Idempotency::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Step 5.5a (ADR 0021): a domain refusal (App\Shared\DomainRefusal answered with a 4xx) is the system keeping a rule, not failing:
+        // it is not reported (no ERROR line, nothing to Sentry) and RefusalLog writes one info line with its message_key instead. Anything
+        // else, the 5xx a refusal class can carry included, is reported as before.
+        $exceptions->dontReportWhen(fn (Throwable $e): bool => RefusalLog::insteadOfReport($e));
+        // What is reported also goes to Sentry when SENTRY_LARAVEL_DSN is set; without it there is no Sentry provider and this returns at once.
+        $exceptions->reportable(function (Throwable $e): void {
+            ErrorTracking::capture($e);
+        });
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

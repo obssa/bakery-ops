@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Exceptions;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * HTTP status it maps to. Thrown inside a ledger transaction it rolls every movement of the batch back; Laravel renders
  * it through render().
  */
-final class InventoryError extends RuntimeException
+final class InventoryError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -115,6 +116,18 @@ final class InventoryError extends RuntimeException
     public static function stationForbidden(): self
     {
         return new self('inventory.station.forbidden', 403);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse

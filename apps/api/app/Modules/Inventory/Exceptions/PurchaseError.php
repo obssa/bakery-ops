@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Exceptions;
 
 use App\Modules\Inventory\Enums\PurchaseStatus;
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -14,7 +15,7 @@ use RuntimeException;
  * the HTTP status it maps to and what it is about (the line index, the field, the purchase's status). Thrown inside an
  * AuditedAction it rolls the whole write back; Laravel renders it through render().
  */
-final class PurchaseError extends RuntimeException
+final class PurchaseError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -91,6 +92,18 @@ final class PurchaseError extends RuntimeException
     public static function currencyMismatch(): self
     {
         return new self('purchases.cost.currency_mismatch', 409);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse

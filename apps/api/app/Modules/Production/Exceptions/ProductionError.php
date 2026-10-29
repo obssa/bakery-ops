@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Production\Exceptions;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * rule 9) plus the HTTP status it maps to and what it is about (the request, the status, the product). Thrown inside an
  * AuditedAction it rolls the whole write back; Laravel renders it through render().
  */
-final class ProductionError extends RuntimeException
+final class ProductionError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -134,6 +135,18 @@ final class ProductionError extends RuntimeException
             'place' => ['en' => $place['name_en'] ?? '', 'am' => $place['name_am'] ?? ''],
             'more' => $more,
         ]);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse
