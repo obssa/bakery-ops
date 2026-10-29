@@ -149,7 +149,9 @@ writes `last_seen_at` at most once a minute per device (a database cache lock, t
 shared tablet calls: the pad (menu, orders, send, replace lines, serve, cancel, tables), the KDS (tickets, accept, ready, reject), the till
 (order list, payments, receipts, receipt links, print), production (batch actions at a station), the shift bar (start, counts drafting,
 cash declaration, handover) and the acting-session routes. **Not station routes**: login and logout, `GET /me`, `GET /devices/this`, the
-whole admin surface (catalog, people, devices, analytics, audit, settings, channels), the public signed routes. `StationRoutesTest` fails
+purely admin surface (catalog, people, devices, analytics, audit, settings), the public signed routes. (As built in 5.1a: a route the admin
+console shares with a floor screen, such as the order list, a shift, a count, the channels or the receipt settings, is a station route, so an
+admin computer is enrolled like a tablet; ADR 0017 decision 4 and its 2026-10-29 note.) `StationRoutesTest` fails
 when a route is in neither `station_routes.php` nor the explicit `non_station_routes` list beside it, so a new route must be classified.
 
 ### 4.2 Offline (web, steps 5.2a to 5.2c)
@@ -290,9 +292,47 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      unaffected). CI: `e2e-p5` moves to `profiles: "full"` (polling, as on the live host; ADR 0009), `history_days: "2"` (its projects need
      no history; the default would replay 90 days) and `needs: [status, mod-analytics, web-build, docker-build]` so it runs beside
      `e2e-p4` (10.2 D17). Playwright `p5-device` (`e2e/p5/device.spec.ts`, replaces the placeholder): an unknown tablet sees the
-     not-enrolled screen on the pad, the KDS and the till while the same tablet's admin pages work; the admin enrols it in place and the
+     not-enrolled screen on the pad, the KDS and the till while the same tablet's purely admin pages (catalog, people, devices) work (an
+     admin page that reads a station route shows the same screen: ADR 0017's 2026-10-29 note); the admin enrols it in place and the
      pad works after a reload; after a revoke the next request shows the screen again; a device of another branch is refused. Live: the
      flag stays **off** (the live `.env` sets nothing) until Ramin's "every tablet enrolled" sign-off (10.2 D9); `@live` keeps passing.
+   - **As built (step 5.1b, `phase-5/web-devices`).** Tests red first (the `p5-device` flow and `device-logic.spec.ts`), then the web with
+     its fixtures, then CI, then the docs. No API change: no route, permission, registry, OpenAPI or ERD change. Where the code chose what
+     the plan left open:
+     - **The conflict with 5.1a's station routes** is settled in ADR 0017's 2026-10-29 note: the classification stands, no one is exempt,
+       and an unenrolled computer is treated the same everywhere (the screen also appears on an admin page that reads a station route).
+       Section 4.1's "not station routes" sentence and this step's `p5-device` text above are corrected to match.
+     - **The device id** (`src/lib/device.ts`): `dev-<uuid>`, made once and kept under the pad's old localStorage key, so tablets keep the
+       `pad-…` ids they had; `request`, `requestBlob` and `conditionalGet` send it last, after any caller's headers (an outbox item stored
+       with an old id sends the current one; `actingHeaders` now carries only the acting session). Its short form, the last eight
+       characters in capitals, is what the screen and the admin's list show.
+     - **The screen** (`components/DeviceGate.tsx`, around every page in `AppShell`): a device refusal is reported with the page it was made
+       for and replaces that page only; going to another page clears it. One title for the three keys; the API's own message says which
+       (unknown, revoked, another branch). Whoever holds `devices.manage` gets "Enrol this device" (name and kind: tablet, till or kitchen
+       screen) and the page reloads once it is enrolled; for another branch's device the enrol makes a new id first (fingerprints are
+       unique across branches). The outbox keeps a write refused for the device (it waits with its key until the page starts again) instead
+       of dropping it as a refusal; 5.2a carries that into IndexedDB.
+     - **A revoked id** is renewed once (the other calls that went out with the same old id leave the new one alone). The actor middleware
+       refuses a revoked device on every signed-in route whatever the flag, so `GET /me` is asked once more with the new id instead of
+       signing the person out. With the flag off (the live host) a revoked tablet shows the screen once and works again after a reload.
+     - **The Devices screen** is `/admin/people/devices` (the People tab stays current; People links to it for `devices.manage`): this
+       device (the probe, its code, enforcement on or off, enrol in place), every device of the branch with kind, code, enrolled, last seen
+       and status, rename and revoke (with its confirmation) on the active ones, and "Add a print bridge" (the page makes the fingerprint
+       `bridge-<uuid>`; the token is shown once in a read-only field with Copy and Done; a replay answers no token). Rename sends the name
+       only (`station_id` waits for a screen that needs it).
+     - **Fixtures**: the roles are the admin, the seven fixed staff, `other` (any other account) and `demo_admin` (the demo bakery's admin,
+       CI only: its device in the demo branch is also the flow's "another branch" device). The run is fixed in global setup for every worker
+       (`E2E_DEVICE_RUN`) and the enrolled ids reach the workers in `E2E_DEVICES`. On the live host the stable `e2e-live-<role>` ids are
+       probed with `GET /devices/this` and enrolled only when unknown; a revoked or taken one moves to `e2e-live-<role>-2` (up to five).
+       The fixtures' `Api` sends its account's device on every request (`onDevice()` for another); `openAs` places the device in the
+       page's storage (option `device` for a tablet a flow enrols), and so do the two specs that sign in through the form. A failed
+       enrolment stops a CI run; on the live host (flag off) and on a developer's machine it is only reported.
+     - **CI**: `compose.ci.yml` sets the flag on `app` and `worker`. The Pest runs inside that stack (`gate-p4`, `files-s3`) pass
+       `IDENTITY_REQUIRE_DEVICE=false`: the tests keep the code default and turn the flag on where they test it (`files-s3` posts to
+       `POST /files`, a station route). `e2e-p5`'s 30 minutes is `e2e.yml`'s job timeout (a job that calls a reusable workflow cannot set
+       its own). The manifest's `ci.e2e_jobs` and the skill's `assets/ci` carry the same changes (the mirror has no `files-s3` job).
+     - **Live**: the flag stays off. The deploy's `@live` run enrols the stable ids in the E2E Test Branch on its first run after this
+       merge (nine devices, a probe and an enrolment each), then only probes them; nothing touches the demo branch.
 2. **5.2 web.offline** (STATUS `web.offline`), three PRs, web only unless 5.2c needs the lookup read.
    - **5.2a `phase-5/outbox-idb`** (`web.offline` `in_progress`). The outbox store moves from `localStorage` to IndexedDB (a small
      in-house wrapper, or `idb` pinned if the wrapper grows past a page), migrating any items left in `localStorage` on first start; items

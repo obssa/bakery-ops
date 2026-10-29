@@ -79,3 +79,26 @@ cycle 8: `EnsureEnrolledDevice` behind a flag). The live host is shared cPanel: 
 - **Write `last_seen_at` on every request**, or a conditional UPDATE each time. Rejected: a write per request per tablet on a shared
   MariaDB, where the polling screens already make the most requests.
 - **Re-enrol a revoked id.** Rejected: the stamps written under the old id would then mean two different periods of trust.
+
+## Note, 2026-10-29: one model for every computer (step 5.1b)
+
+The plan's `p5-device` flow (phase-5 plan section 6, 5.1b) said an unenrolled tablet's admin pages still work. Step 5.1a classified 58
+routes as station routes, and some of them are read by the admin console too: the order list, one order, a shift, a count, the variance
+reasons, the channels, the receipt settings and the production requests (decision 4). With the flag on, an unenrolled computer still opens
+the purely admin pages (catalog, people, devices, analytics, audit, settings); an admin page that reads one of those shared routes is
+refused. Step 5.1b keeps that, and decides how it looks:
+
+- **5.1a's classification stands.** The check is not weakened and no role or user is exempt from it (the alternative rejected below).
+- **An unenrolled computer is treated the same everywhere.** The web client sends `X-Device-Id` on every request; any page whose call comes
+  back `403 identity.device.unknown`, `revoked` or `other_branch` is replaced by the same "This tablet is not enrolled" screen, the pad's
+  and an admin page's alike (`apps/web/src/components/DeviceGate.tsx`). It says that every computer and tablet that uses the system is
+  enrolled once, shows the device's short code, and offers "Enrol this device" right there to whoever holds `devices.manage`; anyone else
+  is asked to fetch an admin. Going to another page clears it; that page shows it again only if its own calls are refused.
+- **A revoked id is replaced at once.** The first `identity.device.revoked` the client sees makes the device a new id (once, however many
+  calls come back revoked), so the admin enrols it as a new device (decision 6). Because the actor middleware refuses a revoked device on
+  every signed-in route whatever the flag, the client asks `GET /me` once more with the new id instead of signing the person out.
+- **Another branch's device** is enrolled here as a new device: the in-place enrol gives it a new id first (a fingerprint is unique across
+  branches, so the old one cannot be enrolled twice).
+- **The flow that proves it** (`apps/web/e2e/p5/device.spec.ts`): an unknown tablet sees the screen on the pad, the KDS and the till; the
+  same tablet opens catalog, people and devices; the admin enrols it in place and after a reload the pad works; after a revoke the next
+  request shows the screen again, with a new code; a device of another branch is refused.

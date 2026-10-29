@@ -196,7 +196,7 @@
       "adr_waiver": null,
       "contracts_required": [],
       "modules": {
-        "identity.devices": "in_progress",
+        "identity.devices": "done",
         "web.offline": "todo",
         "print-bridge": "todo",
         "i18n": "todo",
