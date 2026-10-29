@@ -126,7 +126,10 @@ foreach ($deviceCases as $module => $cases) {
         if ($isStation) {
             $response->assertStatus(403)->assertJsonPath('message_key', 'identity.device.unknown');
         } else {
-            expect((string) $response->json('message_key'))->not->toStartWith('identity.device.', "{$key} answered the device check: ".$response->getContent());
+            // a route may answer with no JSON at all (the Telegram webhook's bare 404): then it did not answer the device check either
+            $body = json_decode((string) $response->getContent(), true);
+            $messageKey = is_array($body) ? (string) ($body['message_key'] ?? '') : '';
+            expect($messageKey)->not->toStartWith('identity.device.', "{$key} answered the device check: ".$response->getContent());
         }
     })->with($cases)->group('feature', "module:{$module}");
 }
