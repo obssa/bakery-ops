@@ -380,3 +380,303 @@ They are replaced by real specs in 5.1b and 5.2a; the 5.6b gate test fails on an
      phase taught. Then `gate_check --mode done --phase 5` passes every automated row and lists the sign-offs still waiting: **claim-done
      waits for Ramin** (10.3). When his "every tablet enrolled" sign-off lands, a one-line PR flips the device-enforcement default to on
      (the pattern of 3.7e), with the kill switch in the runbook.
+
+## 7. Test list and CI
+
+- **Unit** (no database): `EscPosEncoderTest` (byte layout of init, raster bands, feed, cut), `ReceiptRasterTest` (golden PNGs, 58 and
+  80 mm, Amharic on and off, the TIN line, a 40-line order wraps to a second band), `DeviceKindTest`, `BackupRetentionTest` (30 dumps, the
+  cap, never the newest good one), `ScrubberTest` (Sentry `before_send`: PIN, password, token, phone, `signature=` and `expires=` gone),
+  `PollBudgetTest`; web logic specs: `offline-logic.spec.ts` (ordering, `depends_on`, back-off, the `localStorage` migration),
+  `print-logic.spec.ts` (job states, when the link fallback shows), the bridge's `node --test` suite.
+- **Feature** (one per endpoint, 403 per role from the matrix, idempotent replay, validation): every route of section 4;
+  `RoutePermissionMatrixTest`, `IdempotencyCoverageTest` and the new `StationRoutesTest` pick routes up from the registries;
+  `EnsureEnrolledDeviceTest`; `BridgeAuthTest` (unknown, revoked, another branch's job); `SystemStatusTest` (no path, key or host name in
+  the body; conditional 304); `BackupRunTest` and `BackupDrillTest` (against the test server: a real `mysqldump`, the
+  `--defaults-extra-file` deleted afterwards, the password never in the process arguments, a corrupted dump makes the drill fail with a key).
+- **Property / concurrency**: `PrintClaimRaceTest` (two bridges, one job: one claim; `DatabaseTruncation`, forks), `FileUploadRaceTest` (the
+  Phase 4 gap, now likelier with the photo queue: the same `client_uuid` from two processes gives one row and one object), the replay of
+  50 random outbox sequences against the API (`OutboxReplayPropertyTest`: each sequence sent twice with the same keys, in random
+  interleavings, leaves exactly the rows of one pass; seeded, the seed printed on failure).
+- **Contract**: section 2.
+- **Invariants/arch**: `LangParityTest`; `BranchIdTest` (allowlist + `ops_runs`, with its reason); `NumericColumnsTest`;
+  `AuditCoverageTest` (device enrol, rename and revoke, print requests and the bridge's acknowledgements are audited; backup runs are
+  `ops_runs` rows, not audit entries, ADR 0020); `ModuleBoundariesTest` (`App\Ops` uses `Contracts\*` only); `OctaneSafetyTest`;
+  `DeployableCachesTest` (the new configs: `identity.require_enrolled_device`, `print.*`, `backup.*`, `sentry`).
+- **Playwright** (`apps/web/e2e/p5/`): `p5-device` (`device.spec.ts`, `print.spec.ts`), `p5-offline` (`offline.spec.ts`,
+  `offline-photo.spec.ts`, `offline-conflicts.spec.ts`; the only project with `serviceWorkers: "allow"`), `p5-amharic` (`amharic.spec.ts`,
+  new); every earlier project runs with device enforcement on from 5.1b; `@live`: `ops-live.spec.ts`, and the existing live suites with
+  stable device ids.
+- **Gate test files**: `apps/api/tests/Gate/Phase5GateTest.php` (`gate:p5`), `RestoredLedgerGateTest` (`gate:p5:restored`, run by
+  `backup-drill` on the restored database).
+
+### 7.1 CI for Phase 5
+
+| Job | Needs | Timeout | What it runs |
+|---|---|---|---|
+| `e2e-p5` (changed in 5.1b) | `status`, `mod-analytics`, `web-build`, `docker-build` (beside `e2e-p4`) | 30 (`e2e.yml`) | profiles `full` (polling, no Reverb), `history_days: "2"`, `IDENTITY_REQUIRE_DEVICE=true`; projects `p5-device p5-offline`, plus `p5-amharic` from 5.4a |
+| `backup-drill` (replaces the placeholder in 5.5b) | `status`, `docker-build`, `mod-inventory` | 25 | compose stack, `SEED_PHASE=4` with 14 days, `backup:run`, `backup:drill` into `bakery_drill`, `pest --group=gate:p0` and `--group=gate:p5:restored` on the restored database |
+| `perf-load` (new, 5.5d) | `status`, `docker-build`, `mod-analytics` | 30 | compose stack, `SEED_PHASE=5`, 7 days, `LOAD_DEVICES=60`, k6 `load.k6.js` in the pinned image, thresholds and the after-checks of 5.5d, the figures in the step summary |
+| `print-bridge` (new, 5.3b) | `status` | 20 | Node 22, `node --test` in `tools/print-bridge` |
+| `gate-p5` (changed in 5.6b) | `status`, `gate-p4`, `e2e-p5`, `i18n-check`, `backup-drill`, `perf-load`, `print-bridge` | 25 | loads the image, `pest --group=gate:p5` on the compose stack (fails on a skip or a warning, as `gate-p4` does), then `gate_check.py --mode done --phase 5 --ci` with `GH_TOKEN` and `permissions: actions: read` for the checklist's workflow items |
+| `uptime` (new workflow `uptime.yml`, 5.5c) | schedule `*/15 * * * *` | 5 | one `GET /health` against the live URL variable, a second after 60 s if the first fails; never anything else |
+
+- **Timeouts.** Every new job states 20 to 30 minutes (the uptime job 5). Jobs that have none today (`status`, `api-lint`, `web-lint`,
+  `i18n-check`, `web-build`, `docker-build`, `openapi-check`, `erd-check`, `invariants`, `gate-p0` to `gate-p3`) get an explicit
+  `timeout-minutes` in 5.5d, 20 unless a measured run needs more, so a hung step cannot hold a runner for six hours. `mod-inventory` keeps
+  30 (18 m 34 s and 19 m 18 s measured in Phase 4); if any run passes 25 minutes, its `property,concurrency` groups move to their own job
+  `mod-inventory-props` (same needs) in the PR that sees it, rather than raising the timeout again.
+- **The `e2e-p4` 60-day seed stays under 10 minutes.** It measured 441 s (seed step) in Phase 4. Phase 5 adds nothing to the history
+  loop: device enrolment happens in Playwright's global setup (a few API calls) and `Phase5Seeder` runs after the history, outside the
+  timed loop. Any PR that touches `database/seeders/**` or `e2e/support/**` reads the `Phase 4:` line of the step summary; above 540 s it
+  stops and says so in the PR before merging.
+- **Manifest** (`ci` section, 5.1b and 5.6b): `e2e_jobs.e2e-p5` gets the new needs, `gate_jobs.gate-p5` adds `perf-load` and
+  `print-bridge`, `phases.5.gate.extra_ci_jobs` lists `i18n-check`, `backup-drill`, `perf-load`, `print-bridge`.
+- The whole run grows by `perf-load` (beside `e2e-p4` and `perf-dashboards`) and `gate-p5` (about 5 minutes after `gate-p4`); `e2e-p5`
+  no longer waits for `e2e-p4`, so the critical path stays `mod-analytics` then `perf-dashboards` then `gate-p4` then `gate-p5`.
+
+## 8. Seeds
+
+`Phase5Seeder` (skeleton in 5.1a, real in 5.6b; composed by `DemoSeeder` after `Phase4Seeder` when `SEED_PHASE >= 5`): in the demo
+branch only, enrols a pad, a KDS, a till and a bridge device with fixed fingerprints (`demo-pad-1`, `demo-kds-1`, `demo-till-1`,
+`demo-bridge-1`; the bridge's token is made at random and never printed), sets the receipt settings' sample TIN (a made-up value of the
+right length) and paper width 80, and with `LOAD_DEVICES=N` enrols `load-01` to `load-N` for `perf-load`. It writes no stock movement,
+order or payment, so no earlier gate's figures move. Earlier seeders do not change: they write in process, where the device flag does not
+apply, and the e2e fixtures enrol their own devices through the API. The live host is never seeded by a deploy; the live "Demo Bakery"
+gets nothing (10.2 D5).
+
+## 9. ADRs this phase writes
+
+| ADR | Decision | Written in |
+|---|---|---|
+| **0017 device enrolment and enforcement** | the flag and its kill switch; which routes are station routes and the registry test that keeps them classified; enrol in place by an admin signed in on the tablet; a revoked id is never re-enrolled; `last_seen_at` debounced; the bridge as a device with a hashed token; why the live flag waits for the "every tablet enrolled" sign-off | 5.1a (proposed) |
+| **0018 the offline outbox and its conflicts** | which writes are queued (station writes without a PIN) and which are online-only; IndexedDB; ordering and `depends_on`; the same key on every retry; why a refusal on sync is shown, never dropped; reconnect reconcile; what is lost if the browser's storage is cleared | 5.2c (proposed) |
+| **0019 printing through a pull bridge** | a shop computer pulls jobs over HTTPS (the host cannot reach the shop; a page cannot reach a LAN printer); Amharic as a raster; the receipt wording and TIN; the link fallback; the local mode for a till PC | 5.3b (proposed) |
+| **0020 backups and restore drills on a shared host** | `mysqldump` from the scheduler to the account's disk, the files folder as hard-link snapshots, retention and the cap, the weekly drill and what it proves (ledger oracle, chain, triggers), off-site later, what a restore loses | 5.5b (proposed) |
+| **0021 observability on a shared host** | domain refusals are not errors; Sentry off until a DSN with scrubbing; no Pulse; the System page and the scheduler heartbeat; the uptime workflow | 5.5a (proposed) |
+| note on ADR 0009 | Phase 5 stays on polling: `e2e-p5` drops `ws`; the bridge's and the System page's cadences | 5.1b |
+| note on ADR 0011 | the bridge writes with the system actor plus its `device_id` | 5.3a |
+| note on ADR 0006 | backups, the drill database and the host tools they need | 5.5b |
+
+All five are **accepted** in 5.6b. Phase 5 adds them to `phases.5.adrs`, so `gate_check --mode done --phase 5` requires the files.
+
+## 10. Assumptions and open questions
+
+Nothing in Phase 5 changes the meaning of the ledger, so no question blocks the build (standing approval). Every question below has a
+safe default the build takes. The ones in **part A** need Ramin's **account, money, hardware or a named person**: they wait for him, no
+agent creates an account, buys anything, or signs in his name, and every step is built so it goes ahead without them. **Part B** is
+decided by the default unless he objects.
+
+### 10.1 Live-host facts that shape this plan
+
+The reference was written for a VPS with Docker, PostgreSQL, Redis and WebSockets. The live host is a **shared cPanel account** behind
+Cloudflare: MariaDB 10.11 (not PostgreSQL), CloudLinux `alt-php83`, **no Docker, no Redis, no WebSocket server, no long-running process**;
+live updates are polling with ETags (ADR 0009); `database` cache, session and queue, the queue drained by cron once a minute
+(`queue:work --stop-when-empty --max-time=50`) and the scheduler by `schedule:run` every minute; the web app is a static export under `/app`;
+the app lives in `$HOME/bakery-ops.orcamind.dev`; files sit on the account's private disk (`FILES_DISK=files`); the host is CPU-limited (load
+average around 10 at busy times; live tests see ECONNRESET and the e2e client retries with the same key). Rules that follow and are used
+above: every ops job is a console command run by the scheduler, bounded so it finishes well inside its slot (the dump at 02:30, when the
+shop is closed); nothing listens on a port on the host (the print bridge pulls); every new poll is conditional and debounced (devices'
+`last_seen_at`, the bridge's 204, the System page at 30 s); k6 runs only on the CI stack; backups go to the account's disk first; no test
+or agent touches the live host except the deploy workflow's own `@live` stage and the uptime workflow's health read.
+
+### 10.2 Open questions, each with the default the build takes
+
+**A. Needs Ramin's account, money, hardware or a person (waits for him; never created by an agent).**
+
+| # | Question | Default taken (the build goes ahead) | Checklist item |
+|---|---|---|---|
+| Q1 | **Error tracking: a Sentry account and its DSN** (or another service). | Sentry support is built and tested against a fake ingest, **off** while `SENTRY_LARAVEL_DSN` and `NEXT_PUBLIC_SENTRY_DSN` are unset; refusals stop being logged at ERROR either way (5.5a). | `error-tracking`: the DSN set and a test event seen, or Ramin's written choice to go live without it |
+| Q2 | **Off-site backup storage** (an R2 or S3 bucket, Backblaze, or a drive he owns) and who pays for it. | Nightly dumps and file snapshots on the account's own disk (`~/backups/bakery-ops`, 30 days, 2 GB cap); the `BACKUP_REMOTE` hook is built and off. A copy on the same host does not survive the loss of the host: the sign-off makes that explicit. | `offsite-backup`: configured and one copy verified, or the host-only risk accepted in writing |
+| Q3 | **The shop's receipt printer (model, 58 or 80 mm, network or USB) and the machine that runs the bridge** (a Windows PC at the till, a small Linux box). | Built against an ESC/POS emulator: 80 mm (576 dots) by default, 58 mm as an option; TCP port 9100, a Windows shared printer, or a device path; Node 22 on Windows 10/11 or Linux. | `print-bridge-shop`: the bridge installed on the shop machine and a bilingual receipt with the right TIN printed on the shop printer |
+| Q4 | **Web push (VAPID) and Telegram bot keys** (open since Phase 2). | Both stay off; the in-app inbox carries every notification, including the new print and backup alerts. | `push-telegram`: **optional**, not a go-live blocker |
+| Q5 | **Who reviews the Amharic dictionary** (a fluent member of staff, by role in the repo). | The review sheet (`docs/i18n/am-review.csv`) and the glossary are generated in 5.4a; 5.4b applies the corrections whenever they come back; nothing else waits. | `am-reviewed` |
+| Q6 | **The tablets**: how many, which station each serves, and enrolling each one (an admin signs in on it once). | Device enforcement is built and on in CI, **off** on the live host until Ramin signs that every tablet is enrolled; then the code default flips (10.5). | `devices-enrolled` |
+| Q7 | **Training sessions and the on-call people** (names and phone numbers stay outside the public repository). | The training plan and the on-call plan are written by role in 5.6a. | `training-done`, `on-call-agreed` |
+| Q8 | **A scratch database for the live restore drill** (cPanel, his account; free). | The drill records `skipped` and the System page says "drill database not configured" until `BACKUP_DRILL_DATABASE` is set in the server `.env` (runbook step); the CI drill proves the mechanism on every run. | covered by `live-ops` (the drill must have run and passed within 8 days) |
+| Q9 | **Does the shop need a fiscal receipt** (a registered sales register) for what it sells, and is a customer receipt from this system allowed beside it? (his business, a legal question) | The receipt carries the TIN and says in both languages that it is a customer receipt, **not a fiscal receipt**; the shop's own sales register, if it has one, stays the fiscal record. Nothing in the system claims to be fiscal. | `receipt-wording` |
+| Q10 | **Cloudflare** (his account): if the bridge's requests are ever challenged by bot protection, a rule that lets `/api/v1/bridge/*` through. | No change; the bridge sends a plain `User-Agent` and the 5.3b runbook says what a challenge looks like. Only needed if the shop test shows one. | part of `print-bridge-shop` |
+
+**B. Decided by default unless Ramin objects.** The Phase 4 open items first.
+
+| # | Question | Default taken |
+|---|---|---|
+| D1 | May a manager override a product's refund setting on one refund? (Phase 4) | **No.** Refunds follow the product's two settings, as Ramin's rule says; not built. |
+| D2 | Ethiopian date preference per device or on the server? (Phase 4) | **Per device** (browser storage per signed-in user), unchanged. |
+| D3 | Negative stock? (since Phase 0) | **Refused**, unchanged. |
+| D4 | May a solo admin approve their own batch or count? (Phase 2 and 3) | **Refused**, unchanged; the handbook says a shop needs a second manager or admin for approvals. |
+| D5 | Load demo data on the live host? (Phases 1 to 4) | **Not run.** No seeder runs on the live host. |
+| D6 | Display-case COGS and modifier recipe deltas (Phase 4 known gaps). | **After go-live**: dashboards keep "cost incomplete" for those lines. If Ramin picks a fix (Orders snapshots the recipe version on display-case lines, or Production values its batch output) before 5.6b, it becomes a step 5.6x; neither changes the ledger. |
+| D7 | The old `failed_jobs` rows on the live host (3 529 on 2026-10-26). | The scheduler prunes failed jobs older than 30 days (`queue:prune-failed --hours=720`, 5.5a), so those rows go on their own after 2026-11-25; nobody deletes anything by hand. |
+| D8 | How is a tablet enrolled, and can a revoked one come back? | An admin signs in on the tablet and taps "Enrol this tablet"; a revoked id is never enrolled again (the tablet makes a new id and is enrolled anew). |
+| D9 | When does device enforcement go on for the live host? | After the `devices-enrolled` sign-off, by a one-line PR that flips the code default (the pattern of 3.7e); kill switch `IDENTITY_REQUIRE_DEVICE=false` in the server `.env`, then `config:cache`. |
+| D10 | Which writes work offline? | Every station write without a PIN (orders, station actions, payments on every channel with their photos, production batch steps, count and cash drafts). PIN actions (void, refund, approval, handover signature) and admin screens are online-only and say so. |
+| D11 | How does a receipt reach the printer? | A pull bridge on a shop computer, a raster receipt made by the server, the signed receipt link as the fallback; a till PC may print locally from `receipt.escpos` when the internet is down. |
+| D12 | Laravel Pulse? | **Not installed** (its server recorder needs a long-running process, and it writes on every request on a CPU-limited host); the System page shows what Pulse would have. |
+| D13 | Backup timing and retention. | Dump 02:30 daily, drill Sundays 03:30 (Addis time), 30 dumps, 2 GB cap, the files folder as hard-link snapshots. |
+| D14 | Uptime monitoring without a new account? | A GitHub scheduled workflow reads `/health` every 15 minutes; a failure emails the repository owner. A paid or external monitor can replace it later. |
+| D15 | How many devices to plan for? | `perf-load` measures the manifest's 60 devices on CI; the shop is assumed to run **12 tablets or fewer** on day one, and `PollBudgetTest` states the live request rate for both. |
+| D16 | How does Ramin sign a checklist item? | He adds `docs/go-live/signoffs/<item>.md` in **GitHub's web editor** (10.3); agents never write in that folder. If he prefers to commit from his PC, the check falls back to the file's fields only. |
+| D17 | Where does `e2e-p5` run? | Beside `e2e-p4` after `mod-analytics`, polling (`full`, no `ws`), two days of history. |
+| D18 | Receipt paper width. | 80 mm (576 dots); 58 mm (384) selectable in receipt settings. |
+| D19 | What may stay in Latin script on an `am` screen? | Numbers, `ETB`, the order number format, and names the admin typed (products, channels, people); everything else is Amharic. |
+| D20 | How does the bridge sign in? | As a device of kind `bridge` with a random token shown once and stored hashed; no user account and no new role. |
+| D21 | What may reach Sentry? | No PII: PINs, passwords, tokens, phone numbers, signed-URL parameters and identity request bodies are scrubbed; traces and replays off. |
+
+### 10.3 The go-live checklist and how `gate_check.py --mode done --phase 5` reads it
+
+`docs/go-live-checklist.json` (5.6a), one object per item:
+
+```json
+{
+  "schema": 1,
+  "phase": 5,
+  "items": [
+    { "id": "backup-drill-ci", "title": "A dump restores into a scratch database and passes the ledger tests",
+      "required": true, "verifier": { "type": "ci_job", "jobs": ["backup-drill"] } },
+    { "id": "live-ops", "title": "Live: a good backup in the last 26 h, a passing drill in the last 8 days",
+      "required": true, "verifier": { "type": "ci_job", "workflow": "deploy.yml", "job": "live", "branch": "main", "max_age_days": 7 } },
+    { "id": "branch-protection", "title": "main requires gate-p0 to gate-p5",
+      "required": true, "verifier": { "type": "script", "run": ["python3", "scripts/ops/check_branch_protection.py", "--require", "gate-p0..gate-p5"] } },
+    { "id": "handbook", "title": "Admin handbook",
+      "required": true, "verifier": { "type": "file_exists", "paths": ["docs/handbook/README.md", "docs/handbook/training.md"] } },
+    { "id": "training-done", "title": "Training sessions held for every role",
+      "required": true, "verifier": { "type": "file_exists", "paths": ["docs/go-live/signoffs/training-done.md"], "signoff": true } }
+  ]
+}
+```
+
+The items (titles shortened):
+
+| Item | Verifier | Who completes it |
+|---|---|---|
+| `gates-green`: gate-p0 to gate-p4 still green | `ci_job` `gate-p4` (which needs the earlier gates) | CI |
+| `branch-protection` | `script` `check_branch_protection.py` | CI |
+| `device-enforcement`: unknown device 403, admin unaffected | `ci_job` `e2e-p5` and `self` (the gate job's own `gate:p5` step) | CI |
+| `offline-replay`: exactly one order after an offline send | `ci_job` `e2e-p5` | CI |
+| `print-emulator`: receipt bytes decode to the golden images; the bridge's tests | `ci_job` `print-bridge`, `self` | CI |
+| `i18n-strict`: parity strict, API parity, every `am` screen swept | `ci_job` `i18n-check`, `e2e-p5`; `script` `check_invariants.py --i18n --strict-i18n` | CI |
+| `backup-drill-ci` | `ci_job` `backup-drill` | CI |
+| `load-test`: k6 within thresholds | `ci_job` `perf-load` | CI |
+| `live-ops`: backup and drill fresh on the live host | `ci_job` workflow `deploy.yml`, job `live`, within 7 days of the claim | CI (the deploy's `@live` stage) |
+| `uptime-monitor` | `file_exists` `.github/workflows/uptime.yml` and `ci_job` workflow `uptime.yml` green within 1 day of the claim | CI |
+| `handbook`, `on-call-plan`, `restore-runbook`, `print-runbook`, `adrs` | `file_exists` (the handbook pages, `docs/runbook/on-call.md`, `backup-restore.md`, `print-bridge.md`, ADRs 0017 to 0021) | CI |
+| `devices-enrolled` (every tablet enrolled, enforcement on) | `file_exists` + `signoff` | **Ramin** |
+| `print-bridge-shop` | `file_exists` + `signoff` | **Ramin** (hardware) |
+| `am-reviewed` | `file_exists` + `signoff` | **Ramin** (with the reviewer) |
+| `training-done`, `on-call-agreed` | `file_exists` + `signoff` | **Ramin** |
+| `offsite-backup`, `error-tracking`, `receipt-wording` | `file_exists` + `signoff` (configured, or the risk accepted in writing) | **Ramin** (account, money, or a legal answer) |
+| `push-telegram` | `file_exists` + `signoff`, `required: false` | Ramin, optional |
+
+**How `gate_check` reads it** (5.6a; the manifest's `phases.5.gate` gains `"checklist": "docs/go-live-checklist.json"`, and the code runs for
+any phase whose gate names a checklist). `mode_done` loads the file, validates it against the schema (unknown verifier types and duplicate
+ids fail), and adds one row per item, `checklist <id>`:
+
+- `ci_job` with `jobs`: in CI (`--ci`), each job must be in `ci.gate_jobs["gate-p5"]` of the manifest (the gate job only runs after all of
+  them succeeded, so being needed is the proof; `self` means the gate job's own Pest step, which runs before `gate_check`); a job that is
+  not needed is a FAIL ("not a need of gate-p5"). Locally the row is SKIP ("trusted to CI").
+- `ci_job` with `workflow`: the newest successful run of that workflow (and job, if named) on `branch`, read from the Actions API with
+  `GH_TOKEN` (CI) or `gh` (locally); it must have finished within `max_age_days` **before the reference time**: now while the phase is open,
+  `done_at` once it is claimed, so `gate-p5` on `main` does not turn red a week after go-live.
+- `script`: runs `run` (an argument list, no shell) from the repository root with a 120 s timeout; exit 0 is PASS, the last lines of its
+  output are the detail.
+- `file_exists`: every path exists and is not empty. With `"signoff": true` the file must also have the fields `item` (equal to its file
+  name), `date` (ISO, not in the future), `signed_by` and `statement` (his words), and **every commit that touched it** must have been made in
+  GitHub's web editor (committer `GitHub <noreply@github.com>`, read with `git log --format=%cn%x09%ce -- <path>`). Agents commit under
+  Ramin's git identity from this PC, so the author cannot tell them apart; the web editor is a path no agent uses, the skill and
+  `CLAUDE.md` forbid agents from writing in `docs/go-live/signoffs/`, and `check_invariants.py --signoffs` (in `invariants`) fails a PR that
+  carries a local commit touching that folder. A sign-off item without its file is reported as `WAIT (Ramin)`, not as a plain failure.
+
+Rows are PASS, FAIL, SKIP or WAIT. While phase 5 is not claimed, `gate-p5` runs with `--ci` informationally (as today: failures become
+warnings), so the phase can be built while sign-offs are missing. Run locally, `gate_check --mode done --phase 5` exits non-zero while any
+`required` item is not PASS, and `phase_status.py claim-done 5` (changed in 5.6a) runs it first and refuses with the list of waiting items.
+After the claim, `gate-p5` on `main` is strict: every required item must pass. **The phase cannot be claimed done until Ramin has signed
+the human items.** `docs/go-live/README.md` and `docs/go-live/signoff-template.md` (outside the `signoffs/` folder) say how to sign: open
+the template on GitHub, copy it to `docs/go-live/signoffs/<item>.md`, fill the four fields, commit in the browser.
+
+### 10.4 Phase 4 carry-overs: where each lands
+
+| Item | From | Phase 5 |
+|---|---|---|
+| Manager overrides a product's refund setting on one refund | Phase 4 question | D1: no, not built |
+| Ethiopian date preference per device or on the server | 4.5f | D2: per device |
+| Push and Telegram keys | Phase 2 | Q4: off; optional checklist item |
+| Negative stock | Phase 0 | D3: refused |
+| A solo admin approving their own batch or count | Phases 2 and 3 | D4: refused; handbook note (5.6a) |
+| Loading demo data on the live host | Phases 1 to 4 | D5: not run |
+| Display-case products have no COGS; modifier deltas not costed | 4.4a | D6: after go-live unless Ramin picks a fix |
+| Domain refusals logged at ERROR | 4.3c | **fixed in 5.5a** |
+| Old `failed_jobs` rows on the live host | 4.4c | D7: the daily prune of rows older than 30 days (5.5a) |
+| `FileUploadRaceTest` not built | 4.2a | **built in 5.2b** (the offline photo queue makes the race likelier) |
+| Summaries of a payment changed on an earlier day follow at night | ADR 0014 | unchanged; after go-live |
+| `analytics:bench` on the live host (optional) | 4.6b | unchanged; Ramin's optional run, listed in the handbook |
+
+### 10.5 Device enforcement on the live host
+
+Three states, each reversible by one line: (1) 5.1a to 5.6b: code default off, live `.env` silent, CI e2e on; the live tablets start
+sending `X-Device-Id` on every request from 5.1b and the admin can enrol them as soon as 5.1b is deployed. (2) Ramin enrols every tablet
+(the System page shows how many are enrolled and seen) and signs `devices-enrolled`. (3) A one-line PR turns the code default on; the
+deploy's `@live` suites already send enrolled ids. Kill switch: `IDENTITY_REQUIRE_DEVICE=false` in the server `.env`, then
+`php artisan config:cache` (the runbook's kill-switch section gets this fourth line).
+
+### 10.6 New permissions and how they reach the live database
+
+`devices.manage` (admin), `devices.self` (every role), `print.create` and `print.view` (admin, manager, cashier), `system.view` (admin),
+each added to the registry and granted by a thin `grant_phase_5_*` migration (M2a, M2b, M2c) at the deploy of its step, before any screen
+uses it; never revoked. The three device routes move from `people.manage` to `devices.manage`, which admin holds, so nobody loses access.
+
+### 10.7 The live demo and E2E branches
+
+The live E2E branch gets one device per role (`e2e-live-<role>`), enrolled by the live suites through the API and reused on every run;
+no bridge, no print job reaches a real printer (the live suites never ask for one). The live "Demo Bakery" is untouched.
+
+### 10.8 Other assumptions (safer defaults)
+
+The bridge's job expires after 15 minutes and is reclaimed after 60 s without an answer; a print request on an unpaid order is refused;
+the outbox photo queue caps at 50 MB; the System page polls at 30 s; `last_seen_at` is written at most once a minute; the stale-backup
+alert fires at 26 h; ESC/POS Latin text mode is the fallback when the host's GD has no FreeType.
+
+### 10.9 Where the phase reference and manifest conflict with the live host or with Phase 4 as built
+
+1. **"Nightly `pg_dump` container to object storage"**: MariaDB and no Docker on the host, so `mysqldump` from the scheduler to the
+   account's disk; object storage is Q2. The CI drill restores on the compose MariaDB.
+2. **"Restore drill into a scratch DB"** on the host needs a second database (Q8); until then the CI drill is the proof and the live
+   drill reports `skipped`.
+3. **k6** runs only in CI (`perf-load`); the live host is described by `PollBudgetTest` and Phase 4's `analytics:bench`.
+4. **Sentry** is built and off (Q1). **Laravel Pulse** is not installed (D12).
+5. **"WS devices"** on the status page becomes devices seen in the last 15 minutes (polling, ADR 0009); `e2e-p5`'s `full,ws` becomes `full`.
+6. **"Small local ESC/POS bridge"** becomes a bridge that pulls over HTTPS: a page served over HTTPS cannot call a printer on the shop's
+   network (mixed content, Chrome's private network rules), and the host cannot reach into the shop. The local mode remains for a till PC.
+7. **"Admin enrolment UI"**: the `devices` table and its three routes exist since Phase 0; Phase 5 adds enforcement, kinds, last seen,
+   the screens.
+8. **`i18n-check.mjs --strict`**: the repository's check is `check_invariants.py --i18n --strict-i18n`, already strict since phase 5
+   became current; the skill's `ci-cd.md` row is corrected in 5.4a.
+9. **`phases.5.adrs` is empty**: 5.1a lists 0017 to 0021. **`gate_check` does not read a checklist**: 5.6a. **`e2e-p5` after `e2e-p4`**:
+   beside it (D17). **`extra_ci_jobs`**: `perf-load` and `print-bridge` added. **A third Playwright project** `p5-amharic` (5.4a).
+10. The reference's Idempotency trap ("Redis `SET NX`") is the database cache lock on the live host, as built since Phase 0.
+
+## 11. Risks from `references/traps.md` that apply
+
+- **Playwright and service workers**: only `p5-offline` allows the worker; a precache from an earlier run must not leak into another
+  project (one context per test, the worker unregistered in teardown).
+- **Browser storage is not forever**: Safari evicts script-written storage of a site not added to the home screen after 7 days without
+  use, and any browser may evict under storage pressure; a lost device id makes the tablet "not enrolled", a lost outbox loses unsent
+  writes. Mitigations: `navigator.storage.persist()` on start, the app installed to the home screen (handbook), the pending count always
+  visible, the not-enrolled screen telling the admin what to do.
+- **The live host under load**: new polls (the bridge, the System page) and per-request writes (`last_seen_at`) on a CPU-limited host;
+  every one is conditional or debounced, and `PollBudgetTest` keeps the sum visible.
+- **Settling ETag**: the System page and the print-job list are conditional reads; tests that expect a 304 travel past the 5 s window.
+- **One query key, one shape**: the Devices screen, `GET /devices/this` and the System page each get their own key.
+- **Static export record pages**: Devices and System are fixed routes; no dynamic segment.
+- **Login rate limit**: the fixtures enrol devices with the admin token already cached for the run (`E2E_TOKEN_FILE`), not a new login.
+- **Backups on a shared host**: `mysqldump` must carry the triggers (the append-only rules live there), restore as the same account user
+  (trigger `DEFINER`), and `log_bin_trust_function_creators` may matter when binary logging is on (provisioning step 5 of the runbook);
+  the drill checks the triggers fire after a restore. A copy on the same disk is not a backup against losing the host (Q2). The disk quota
+  is not reported by the host: the cap and the System page's disk figures are the guard.
+- **GD without FreeType** on the host would break the Amharic raster: the doctor line and the Latin fallback.
+- **Driver checks**: the dump tool may be `mysqldump` or `mariadb-dump`; the command looks for both, and every SQL branch uses
+  `in_array($driver, ['mysql','mariadb'], true)`.
+- **Seeds**: `Phase5Seeder` writes no ledger rows; the `e2e-p4` 60-day seed is watched against its 10-minute budget (7.1).
+- **The sign-off guard has a limit**: everything on this PC acts as Ramin, so the web-editor check and the rule are what keep an agent
+  from signing; the gate report states this plainly.
+- **Phase scope creep**: COGS, a server-side date preference, refund overrides and email stay out (10.4); anything else found during the
+  phase becomes a `TODO(p6)`-style line in the report, never a silent addition.
