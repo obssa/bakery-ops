@@ -34,8 +34,8 @@ export async function openAs(page: Page, account: { token: string | null; device
 }
 
 /** Opens the pad page (English) on a device signed in as the pad account. */
-export async function openPad(page: Page, account: { api: { token: string | null } }, path = "en/pad/") {
-  await openAs(page, account.api, path);
+export async function openPad(page: Page, account: { api: { token: string | null } }, path = "en/pad/", options: { device?: string } = {}) {
+  await openAs(page, account.api, path, options);
 }
 
 /** Types a short code on the pad keypad and presses the unlock button (named in the page language). */

@@ -98,3 +98,18 @@ export async function ensureDeviceEnrolled(api: Api, role: DeviceRole): Promise<
   }
   throw new Error(`no device id left for the e2e role ${role} after five generations (each was revoked or taken)`);
 }
+
+/**
+ * A device of a flow's own, new for each attempt, for a flow whose effect is bound to the device: the pad's short-code lockout counts the
+ * wrong codes of one branch and device fingerprint (Identity ShortCodes), so a flow that locks a pad out must not lock the shared waiter
+ * device of the run (a retry, or the next flow, would find it locked for 15 minutes). It is enrolled through `api` (an admin of the
+ * branch) only where the API enforces devices (CI); where enforcement is off (the live host until its sign-off) it stays unknown, so the
+ * live E2E branch does not grow a device per run.
+ */
+export async function freshDevice(api: Api, label: string): Promise<string> {
+  const fingerprint = `e2e-${deviceRun()}-${label}-${randomUUID().slice(0, 8)}`;
+  const probe = api.onDevice(fingerprint);
+  const { enforcement } = await probe.get<{ enforcement: boolean }>("/devices/this");
+  if (enforcement) await probe.post("/devices", { name: `E2E ${label} ${deviceRun()}`, fingerprint, kind: "tablet", client_uuid: randomUUID() });
+  return fingerprint;
+}

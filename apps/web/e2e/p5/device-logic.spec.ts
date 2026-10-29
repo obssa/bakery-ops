@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { request } from "../../src/lib/api/client";
 import { DEVICE_HEADER, deviceId, isDeviceRefusal, renewDeviceId, shortDeviceId, useDeviceGate } from "../../src/lib/device";
 import { Api } from "../support/api";
-import { DEVICE_ROLES, deviceFingerprint, roleOfPhone } from "../support/devices";
+import { DEVICE_ROLES, deviceFingerprint, freshDevice, roleOfPhone } from "../support/devices";
 
 // Phase 5 step 5.1b, the logic under the p5-device flow (no browser, no stack): the device id every request of the shell carries, what a
 // device refusal does to it, and the fixed ids the e2e fixtures enrol per role.
@@ -168,5 +168,23 @@ test.describe("fixture devices (e2e/support/devices.ts)", () => {
       },
     );
     expect(seen).toEqual(["e2e-r1-admin", "e2e-r1-admin", "e2e-r1-tablet"]);
+  });
+
+  test("a flow's own device is new each time, and enrolled only where the API enforces devices", async () => {
+    for (const enforcement of [true, false]) {
+      const calls: string[] = [];
+      let id = "";
+      await withFetch(
+        (headers, call) => {
+          calls.push(`${call}:${headers.get(DEVICE_HEADER)}:${headers.get("Idempotency-Key") ? "write" : "read"}`);
+          return answer(call === 1 ? 200 : 201, call === 1 ? { enrolled: false, revoked: false, device: null, enforcement } : { id: 1 });
+        },
+        async () => {
+          id = await freshDevice(new Api("token", "http://api.test", null, "e2e-r1-admin"), "lockout");
+        },
+      );
+      expect(id).toMatch(/^e2e-.+-lockout-[0-9a-f]{8}$/);
+      expect(calls).toEqual(enforcement ? [`1:${id}:read`, `2:${id}:write`] : [`1:${id}:read`]);
+    }
   });
 });

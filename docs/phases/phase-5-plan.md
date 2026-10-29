@@ -326,7 +326,10 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        probed with `GET /devices/this` and enrolled only when unknown; a revoked or taken one moves to `e2e-live-<role>-2` (up to five).
        The fixtures' `Api` sends its account's device on every request (`onDevice()` for another); `openAs` places the device in the
        page's storage (option `device` for a tablet a flow enrols), and so do the two specs that sign in through the form. A failed
-       enrolment stops a CI run; on the live host (flag off) and on a developer's machine it is only reported.
+       enrolment stops a CI run; on the live host (flag off) and on a developer's machine it is only reported. The pad's short-code lockout
+       counts per branch and device, and every waiter context now shares the run's waiter device, so the lockout flow
+       (`p1/pad-order-flow.spec.ts`) runs on a device of its own, new for each attempt (`freshDevice`: enrolled only where the API enforces
+       devices, so the live branch does not grow one per run); before this step each context had a random id of its own.
      - **CI**: `compose.ci.yml` sets the flag on `app` and `worker`. The Pest runs inside that stack (`gate-p4`, `files-s3`) pass
        `IDENTITY_REQUIRE_DEVICE=false`: the tests keep the code default and turn the flag on where they test it (`files-s3` posts to
        `POST /files`, a station route). `e2e-p5`'s 30 minutes is `e2e.yml`'s job timeout (a job that calls a reusable workflow cannot set
