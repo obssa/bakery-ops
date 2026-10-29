@@ -21,6 +21,7 @@
         "league/flysystem-aws-s3-v3": "3.35.3",
         "minishlink/web-push": "11.0.0",
         "openspout/openspout": "4.32.0",
+        "sentry/sentry-laravel": "4.29.0",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-permission": "^8.3"
     },
