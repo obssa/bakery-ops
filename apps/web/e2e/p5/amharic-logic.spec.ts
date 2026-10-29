@@ -7,7 +7,7 @@ import { collectTyped, sweep } from "../support/amharic";
 const page = (body: string) => `<!doctype html><html lang="am"><body><main>${body}</main></body></html>`;
 
 test.describe("amharic sweep", () => {
-  test("passes Amharic, numbers, ETB, the order number, typed names and text marked as another language", async ({ page: tab }) => {
+  test("passes Amharic, numbers, ETB, the order number, typed names, text marked as another language and identifiers marked translate=no", async ({ page: tab }) => {
     await tab.setContent(
       page(`
         <h1>የአስተናጋጅ ፓድ</h1>
@@ -15,6 +15,8 @@ test.describe("amharic sweep", () => {
         <p>ደረሰኙን አውርድ (PDF) · CSV ላክ</p>
         <p>Club sandwich ከ Meron T. ለጠረጴዛ T4</p>
         <nav><a lang="en" href="#">English</a><a lang="am" href="#">አማርኛ</a></nav>
+        <table><tbody><tr><td translate="no">payment.void</td></tr></tbody></table>
+        <span translate="no" class="font-mono">3F9A2C1B</span>
         <p hidden>Hidden English</p>
         <p style="display:none">Not shown</p>
         <button aria-label="ዝጋ">×</button>

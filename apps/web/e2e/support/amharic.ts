@@ -9,7 +9,9 @@ import type { Api } from "./api";
 //     form an Amharic screen shows: `name_am` and the other `*_am` fields, never `*_en`, so a screen that shows the English name of a
 //     bilingual row is a gap;
 //   - text inside an element marked with another language (`lang="en"`): the language switch names English in its own script, and
-//     the catalog shows an item's other-language name beside it on purpose.
+//     the catalog shows an item's other-language name beside it on purpose;
+//   - an identifier marked `translate="no"` (HTML's own "not to be translated"): the audit log's action codes and changed fields, a
+//     device's short id. Only machine identifiers get the mark, never words a person reads as language.
 // A word joins ALLOWED_WORDS only with its reason, in the glossary too. Never add one to hide a missing translation.
 
 /** Words that stay as they are on an Amharic screen, each with its reason (docs/i18n/glossary.md, "Words that stay in Latin script"). */
@@ -36,6 +38,7 @@ function sweepInPage({ names, words }: { names: string[]; words: string[] }): La
   const allowed = new RegExp(`(^|[^A-Za-z])(${pieces.join("|")})(?=$|[^A-Za-z])`, "g");
   const left = (text: string): string => text.replace(allowed, "$1 ");
   const otherLanguage = (el: Element): boolean => {
+    if (el.closest('[translate="no"]')) return true;
     const marked = el.closest("[lang]");
     return marked !== null && marked.getAttribute("lang") !== "am";
   };

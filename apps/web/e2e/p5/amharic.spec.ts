@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
+import { shortDeviceId } from "../../src/lib/device";
 import { Api } from "../support/api";
 import { settle, sweep, typedNames, type LatinGap } from "../support/amharic";
 import { freshDevice } from "../support/devices";
@@ -94,7 +95,10 @@ function demoBranch(): Promise<DemoBranch> {
     const { api: admin } = await loginOnce(demoPhone, demoPassword);
     const device = await freshDevice(admin, "amharic");
     const users = (await admin.get<{ data: { id: number; phone: string; roles: string[] }[] }>("/users")).data;
-    return { admin, device, names: await typedNames(admin), users };
+    // A device is shown by its short id (the last eight characters of its fingerprint, which hold letters): data, like a typed code.
+    const devices = (await admin.get<{ data: { fingerprint: string }[] }>("/devices")).data;
+    const ids = [device, ...devices.map((d) => d.fingerprint)].map(shortDeviceId);
+    return { admin, device, names: [...(await typedNames(admin)), ...ids], users };
   })();
   branch.catch(() => (branch = null));
   return branch;
