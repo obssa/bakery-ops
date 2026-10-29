@@ -57,5 +57,6 @@ export default defineConfig({
     { name: "p4-dashboards", testDir: "./e2e/p4", testMatch: /dashboards/, use: tablet },
     { name: "p5-device", testDir: "./e2e/p5", testMatch: /device/, use: tablet },
     { name: "p5-offline", testDir: "./e2e/p5", testMatch: /offline/, use: { ...tablet, serviceWorkers: "allow" } },
+    { name: "p5-amharic", testDir: "./e2e/p5", testMatch: /amharic/, use: tablet },
   ],
 });
