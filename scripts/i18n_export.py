@@ -50,6 +50,8 @@ SCREENS = {
     "catalog": "/admin/catalog",
     "recipe": "/admin/catalog (item page)",
     "people": "/admin/people",
+    "devices": "/admin/people/devices",
+    "deviceGate": "/pad, /till, /kds, /production (a computer not enrolled)",
     "planner": "/admin/planner",
     "inventory": "/admin/inventory",
     "shifts": "/shifts",
