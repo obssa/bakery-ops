@@ -33,15 +33,17 @@ test.describe("amharic sweep", () => {
         <p>25.00 Birr</p>
         <p class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Skip to content</p>
         <p>Kitchen</p>
+        <p>ብዛት 3 g · gold</p>
       `),
     );
-    const gaps = await sweep(tab, ["ኩሽና"]);
+    const gaps = await sweep(tab, ["ኩሽና", "g"]);
     expect(gaps.map((g) => g.text)).toEqual([
       "Waiter pad",
       "ትዕዛዝ 12 Ready",
       "25.00 Birr",
       "Skip to content",
       "Kitchen",
+      "ብዛት 3 g · gold",
       'aria-label="Close"',
       'placeholder="Search"',
     ]);

@@ -30,12 +30,11 @@ export interface LatinGap {
 /** What `sweep` runs inside the page; self-contained, because Playwright sends it to the browser as source. */
 function sweepInPage({ names, words }: { names: string[]; words: string[] }): LatinGap[] {
   const latin = /[A-Za-z]/;
-  const allowed = new RegExp(`(^|[^A-Za-z])(${words.join("|")})(?=$|[^A-Za-z])`, "g");
-  const left = (text: string): string => {
-    let out = text;
-    for (const name of names) if (name && out.includes(name)) out = out.split(name).join(" ");
-    return out.replace(allowed, "$1 ");
-  };
+  // One pattern for every allowed piece, longest first, each a whole word: a unit typed as "g" never eats the g of an English word.
+  const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pieces = [...names, ...words].filter((s) => s.length > 0).sort((a, b) => b.length - a.length).map(escape);
+  const allowed = new RegExp(`(^|[^A-Za-z])(${pieces.join("|")})(?=$|[^A-Za-z])`, "g");
+  const left = (text: string): string => text.replace(allowed, "$1 ");
   const otherLanguage = (el: Element): boolean => {
     const marked = el.closest("[lang]");
     return marked !== null && marked.getAttribute("lang") !== "am";

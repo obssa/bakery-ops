@@ -199,13 +199,14 @@
         "identity.devices": "done",
         "web.offline": "todo",
         "print-bridge": "todo",
-        "i18n": "todo",
+        "i18n": "in_progress",
         "ops": "todo",
         "docs": "todo"
       },
       "playwright_projects": [
         "p5-device",
-        "p5-offline"
+        "p5-offline",
+        "p5-amharic"
       ]
     }
   },

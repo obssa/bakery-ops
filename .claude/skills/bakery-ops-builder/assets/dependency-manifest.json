@@ -1451,7 +1451,10 @@
         {
           "id": "5.4",
           "module": "i18n",
-          "builds": "full am dictionary; i18n parity script strict"
+          "builds": "full am dictionary; i18n parity script strict",
+          "playwright": [
+            "p5-amharic"
+          ]
         },
         {
           "id": "5.5",
@@ -1469,7 +1472,8 @@
         "ci_job": "gate-p5",
         "playwright_projects": [
           "p5-device",
-          "p5-offline"
+          "p5-offline",
+          "p5-amharic"
         ],
         "extra_ci_jobs": [
           "i18n-check",
@@ -1500,7 +1504,8 @@
         },
         "projects": [
           "p5-device",
-          "p5-offline"
+          "p5-offline",
+          "p5-amharic"
         ],
         "note": "phase-5 plan 7.1 and 10.9 item 5: polling, no Reverb (the reference's full,ws becomes full, ADR 0009); beside e2e-p4 rather than after it (D17); ci.yml and ci.e2e_jobs changed in step 5.1b (needs status, mod-analytics, web-build, docker-build; e2e.yml's 30-minute job timeout; IDENTITY_REQUIRE_DEVICE=true is set in compose.ci.yml for every e2e job), p5-amharic joins in 5.4a"
       },
