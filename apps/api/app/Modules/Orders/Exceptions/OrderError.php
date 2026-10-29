@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Exceptions;
 
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Support\LineContext;
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -15,7 +16,7 @@ use RuntimeException;
  * status it maps to and what it is about (the line, the field, the order's status). Thrown inside an AuditedAction it
  * rolls the whole write back; Laravel renders it through render().
  */
-final class OrderError extends RuntimeException
+final class OrderError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -195,6 +196,18 @@ final class OrderError extends RuntimeException
     public static function refundApproverForbidden(): self
     {
         return new self('orders.refund.approver_forbidden', 403);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse

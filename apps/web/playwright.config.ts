@@ -57,5 +57,9 @@ export default defineConfig({
     { name: "p4-dashboards", testDir: "./e2e/p4", testMatch: /dashboards/, use: tablet },
     { name: "p5-device", testDir: "./e2e/p5", testMatch: /device/, use: tablet },
     { name: "p5-offline", testDir: "./e2e/p5", testMatch: /offline/, use: { ...tablet, serviceWorkers: "allow" } },
+    // Step 5.5a (ADR 0021), run by CI's web-errors job: -off on a build without NEXT_PUBLIC_SENTRY_DSN (no SDK, nothing sent), -on on a build
+    // made with the made-up DSN in E2E_SENTRY_DSN (an error reaches a page.route sink, scrubbed). Neither needs the API (its answers are stubbed).
+    { name: "p5-errors-off", testDir: "./e2e/p5", testMatch: /errors-(off|logic)\.spec/, use: tablet },
+    { name: "p5-errors-on", testDir: "./e2e/p5", testMatch: /errors-on\.spec/, use: tablet },
   ],
 });

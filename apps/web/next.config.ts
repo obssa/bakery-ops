@@ -27,6 +27,9 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_BASE_PATH: basePath,
     // the shell cache (public/sw.js) exists only in the static export, so only that build registers it
     NEXT_PUBLIC_SHELL_CACHE: exporting ? "1" : "",
+    // Step 5.5a (ADR 0021): error tracking is a build-time switch (the GitHub variable NEXT_PUBLIC_SENTRY_DSN, read by deploy.yml). Always
+    // defined, "" when unset, so the compiler sees a constant and leaves the Sentry SDK out of the bundle (components/ErrorTracking.tsx).
+    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN ?? "",
   },
 };
 

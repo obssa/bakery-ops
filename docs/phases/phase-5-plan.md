@@ -416,6 +416,39 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      Tests: a test event reaches a fake ingest (an HTTP fake for the API, a `page.route` sink for the web) with nothing that should be
      scrubbed left in it; with no DSN nothing is sent. The scheduler gets `queue:prune-failed --hours=720` daily (10.2 D7). ADR 0021
      proposed.
+   - **As built (step 5.5a, `phase-5/ops-errors`).** Tests red first, then the code, then the docs. Where the code chose what the plan left
+     open:
+     - **The refusal classes are 15**, found by a scan rather than by name: the five the plan names (`PaymentError`, `OrderError`,
+       `IdentityError`, Inventory's `InventoryError`, `PurchaseError`, `TransferError`, `ReorderError`, Shifts' `ShiftError`,
+       `IllegalTransition`) and the others that answer a message_key the same way (`CatalogError`, `ProductionError`,
+       `NotificationsError`, `AnalyticsError`, `AuditError`, `FilesError`). `DomainRefusalTest` pins the list and fails on any Throwable in
+       `app/` that renders itself or carries a message key without the marker. The marker carries two methods, `messageKey()` and
+       `httpStatus()`: `FilesError` can also carry a 500 (`processing_failed`) and a 503 (`unavailable`), which stay reported at error.
+       Internal control-flow exceptions (`SendRefused`, `SentMeanwhile`, the `Already*` ones) are caught where they are thrown
+       (`SendRefused` becomes the controller's 409 shortfall answer), and the append-only guards are real failures: neither is marked.
+     - **The info line** is written where Laravel decides not to report (`dontReportWhen`, `App\Shared\Observability\RefusalLog`), so it
+       covers HTTP, queue and console alike: `refused: <key>` with `message_key`, `status`, `class`, no trace.
+     - **Sentry 4.29.0** (`sentry/sentry` 4.34.0) is kept out of package discovery and registered by `SharedServiceProvider` only with a
+       DSN (`App\Shared\Observability\ErrorTracking`): without one there is not even a client. Only the error provider, never the tracing
+       one. `bootstrap/app.php` hands what is reported to `ErrorTracking::capture`, which returns at once without a provider. Only
+       `App\Shared\Observability` may use the SDK (`ModuleBoundariesTest`). The identity routes whose bodies are dropped are matched by
+       path (`login`, `logout`, `me`, `short-code`, `users`, `stations`, `devices`, `broadcasting/auth`).
+     - **The fake ingest** is the SDK's own `http_client` option (`Tests\Support\FakeSentryIngest`), so the event goes through the real
+       client, `before_send` and serialisation, and nothing leaves the process. The secrets in `ErrorTrackingTest` are written in halves:
+       Sentry sends the source lines around in-app frames (the repository's code), which would otherwise carry them.
+     - **The web SDK is `@sentry/browser` 11.7.0** (the newest release at least two weeks old). SDK 11 replaced `sendDefaultPii` with
+       `dataCollection`, set to collect nothing but the browser's name; the session and client-report envelopes are off, and an API
+       refusal (4xx) or a lost connection is never sent. The proof is a CI job of its own, **`web-errors`** (needs `web-build`, 20 min, beside
+       the e2e jobs): `p5-errors-off` on web-build's artifact (no SDK in `.next/static`, no request but the page's and the API's when a page
+       fails, and the scrubber's logic spec), then a build with a made-up DSN (the SDK must be found by the same grep, so the negative
+       check proves something) and `p5-errors-on` (a `page.route` sink gets the error, scrubbed). `web-build` also greps the static export.
+       `deploy.yml` passes the repository variable `NEXT_PUBLIC_SENTRY_DSN` to the export build (unset today).
+     - **The prune** runs daily at 04:10 Addis Ababa time (after the 03:00 chain check), and `.env.example` names both DSNs, empty.
+     - **The test process may now use 2 GB** (`phpunit.xml`, was 1 GB). `api-arch` runs some 3 400 tests in one PHP process that keeps
+       every test case and the arch plugin's parsed sources; with this step's ~70 tests it ran out three times in the route matrix, near
+       the end of its run, even after the new tests were made leaner. Measured locally, the step's runtime wiring costs the same memory
+       per test as main (the matrix grows about 64 KB a test either way), so this is the suite's size, not a leak of 5.5a. For 5.5d, which
+       sets the jobs' limits: split `api-arch`'s groups over two jobs if it nears 2 GB.
    - **5.5b `phase-5/ops-backups`**. The two contract files red first (section 2), then `Inventory\Contracts\LedgerOracle` and
      `HashChain::verifyAll`. M5. `App\Ops` (not a module: a thin layer that may use modules' `Contracts\*` only; an arch test says so).
      `backup:run`: `mysqldump --single-transaction --quick --routines --triggers --hex-blob --no-tablespaces`, the password in a

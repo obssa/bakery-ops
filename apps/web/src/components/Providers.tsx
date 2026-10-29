@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { startOutbox } from "@/lib/outbox/store";
 import { useSession } from "@/lib/session";
+import { ErrorTracking } from "./ErrorTracking";
 import { ServiceWorker } from "./ServiceWorker";
 
 /** Client-side state for every page: the query cache and the device's sign-in (read from storage once). */
@@ -35,6 +36,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <ServiceWorker />
+      <ErrorTracking />
       {children}
     </QueryClientProvider>
   );

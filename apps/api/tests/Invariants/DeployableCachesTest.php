@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Shared\Observability\SentryScrubber;
 use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Process\Process;
 
@@ -114,3 +115,30 @@ it('caches the identity config with IDENTITY_REQUIRE_DEVICE unset, false and tru
         @unlink($cache);
     }
 })->with([[null, false], ['false', false], ['true', true]])->group('invariants');
+
+/*
+ * Step 5.5a (ADR 0021, plan 10.2 Q1): error tracking is off until Ramin puts SENTRY_LARAVEL_DSN in the server .env (then `config:cache`). The
+ * sentry config must cache with the variable unset (the live host today: no DSN, so no Sentry provider and no client), empty and set, and the
+ * cache must keep the scrubber, the PII switch and the traces switch it ships with; a closure there would fail the deploy's `php artisan optimize`.
+ */
+it('caches the sentry config with and without SENTRY_LARAVEL_DSN, the scrubber kept and traces off', function (?string $value, ?string $expected) {
+    $cache = app()->getCachedConfigPath();
+    $env = ['APP_CONFIG_CACHE' => $cache, 'SENTRY_LARAVEL_DSN' => $value ?? false];
+    try {
+        $process = new Process([PHP_BINARY, 'artisan', 'config:cache'], base_path(), $env);
+        $process->run();
+        expect($process->getExitCode())->toBe(0, $process->getErrorOutput().$process->getOutput());
+
+        $cached = require $cache;
+        expect(data_get($cached, 'sentry.dsn'))->toBe($expected)
+            ->and(data_get($cached, 'sentry.before_send'))->toBe([SentryScrubber::class, 'beforeSend'])
+            ->and(data_get($cached, 'sentry.send_default_pii'))->toBeFalse()
+            ->and(data_get($cached, 'sentry.traces_sample_rate'))->toBeNull();
+    } finally {
+        @unlink($cache);
+    }
+})->with([
+    'unset' => [null, null],
+    'empty' => ['', null],
+    'set' => ['https://0123456789abcdef0123456789abcdef@ingest.sentry.example.test/42', 'https://0123456789abcdef0123456789abcdef@ingest.sentry.example.test/42'],
+])->group('invariants');
