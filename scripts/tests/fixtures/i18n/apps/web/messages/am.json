@@ -1,0 +1,15 @@
+{
+  "pad": {
+    "title": "የአስተናጋጅ ፓድ",
+    "send": "{count, plural, one {# መስመር} other {# መስመሮች}} ላክ",
+    "unit": "{qty} {unit}",
+    "brand": "Excel",
+    "same": "Close",
+    "greet": "ሰላም {nam}",
+    "status_open": "ክፍት",
+    "status_closed": "ዝግ"
+  },
+  "orphan": {
+    "old": "የድሮ ጽሑፍ"
+  }
+}
