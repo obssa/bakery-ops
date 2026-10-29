@@ -244,7 +244,21 @@ return [
 
             return [];
         },
-        'payload' => fn (): array => ['name' => 'Pad 1', 'fingerprint' => 'idempotent-pad-fingerprint-1'],
+        // step 5.1a: a kind and a client_uuid (phase-5 plan 4.1); a bridge's token answer is stored encrypted (IdempotencySecretsTest)
+        'payload' => fn (): array => ['name' => 'Pad 1', 'fingerprint' => 'idempotent-pad-fingerprint-1', 'kind' => 'till', 'client_uuid' => '5a1e0000-0000-4000-8000-000000000001'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/devices/{id}/rename',
+        'module' => 'identity',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            $device = Device::factory()->create(['branch_id' => $me->branch_id, 'enrolled_by' => $me->id]);
+
+            return ['{id}' => (string) $device->id];
+        },
+        'payload' => fn (): array => ['name' => 'Renamed pad'],
     ],
     [
         'method' => 'POST',

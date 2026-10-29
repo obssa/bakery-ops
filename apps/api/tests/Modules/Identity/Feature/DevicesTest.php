@@ -6,10 +6,12 @@ use App\Modules\Audit\Models\AuditLog;
 use App\Modules\Identity\Models\Device;
 use App\Shared\Models\Branch;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
 
 /*
- * Devices: the shared pads and tills, identified by the X-Device-Id fingerprint. Optional until Phase 5
- * (EnsureEnrolledDevice behind a flag); enrolled and revoked from People now so Phase 1 pads can be stamped.
+ * Devices: the shared pads and tills, identified by the X-Device-Id fingerprint. Enrolled and revoked by the admin since Phase 0 so
+ * Phase 1 pads can be stamped; required on the station routes once identity.require_enrolled_device is on (step 5.1a,
+ * EnsureEnrolledDeviceTest; the Phase 5 endpoints are in DeviceEnrolmentTest).
  */
 
 beforeEach(function () {
@@ -33,7 +35,7 @@ it('lists the branch devices only', function () {
 it('enrols a device stamped with the admin and the time, audited', function () {
     $before = CarbonImmutable::now()->startOfSecond();
 
-    $response = $this->withHeaders(idempotencyKey())->postJson('/api/v1/devices', ['name' => 'Till tablet', 'fingerprint' => 'till-abc']);
+    $response = $this->withHeaders(idempotencyKey())->postJson('/api/v1/devices', ['name' => 'Till tablet', 'fingerprint' => 'till-abc', 'client_uuid' => (string) Str::uuid()]);
 
     $response->assertCreated()
         ->assertJsonPath('name', 'Till tablet')
@@ -53,10 +55,14 @@ it('enrols a device stamped with the admin and the time, audited', function () {
 it('validates name and a globally unique fingerprint', function () {
     Device::factory()->create(['branch_id' => $this->other->id, 'fingerprint' => 'taken']);
 
-    $response = $this->withHeaders(idempotencyKey())->postJson('/api/v1/devices', ['fingerprint' => 'taken']);
+    $response = $this->withHeaders(idempotencyKey())->postJson('/api/v1/devices', ['fingerprint' => '']);
 
     $response->assertStatus(422)->assertJsonPath('message_key', 'validation.failed');
-    expect(array_keys($response->json('errors')))->toContain('name', 'fingerprint');
+    expect(array_keys($response->json('errors')))->toContain('name', 'fingerprint', 'client_uuid');
+
+    // step 5.1a: a fingerprint enrolled anywhere has its own key (phase-5 plan 4.1)
+    $this->withHeaders(idempotencyKey())->postJson('/api/v1/devices', ['name' => 'Pad', 'fingerprint' => 'taken', 'client_uuid' => (string) Str::uuid()])
+        ->assertStatus(422)->assertJsonPath('message_key', 'identity.device.fingerprint_taken');
 })->group('module:identity', 'feature');
 
 it('revokes a device, after which its header is refused; revoking twice is harmless', function () {
@@ -95,5 +101,5 @@ it('is forbidden for every role but admin', function () {
 })->group('module:identity', 'feature');
 
 it('replays a device enrolment idempotently', function () {
-    assertIdempotent($this, 'POST', '/api/v1/devices', ['name' => 'Pad 9', 'fingerprint' => 'pad-9'], 'devices');
+    assertIdempotent($this, 'POST', '/api/v1/devices', ['name' => 'Pad 9', 'fingerprint' => 'pad-9', 'client_uuid' => (string) Str::uuid()], 'devices');
 })->group('module:identity', 'feature');

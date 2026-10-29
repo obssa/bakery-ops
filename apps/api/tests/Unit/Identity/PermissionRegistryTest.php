@@ -75,6 +75,8 @@ it('follows the matrix row by row', function (string $permission, array $roles) 
     'verify and dispute payments against the bank statement (Phase 4)' => ['payments.verify', ['admin', 'manager']],
     'rebuild the summaries (Phase 4)' => ['analytics.manage', ['admin']],
     'export the audit log (Phase 4)' => ['audit.export', ['admin']],
+    'enrol, rename and revoke the devices (Phase 5)' => ['devices.manage', ['admin']],
+    'ask whether this tablet is enrolled (Phase 5)' => ['devices.self', ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker']],
 ])->group('unit', 'module:identity');
 
 it('knows no role outside the eight and no permission outside the matrix', function () {

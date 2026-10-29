@@ -89,3 +89,28 @@ it('caches the files config with and without FILES_DISK', function (?string $val
         @unlink($cache);
     }
 })->with([[null, 'files'], ['files_s3', 'files_s3']])->group('invariants');
+
+/*
+ * Step 5.1a (phase-5 plan 4.1 and 10.5): device enforcement is read from IDENTITY_REQUIRE_DEVICE and is off when the variable is unset
+ * (the live .env sets nothing until Ramin signs devices-enrolled; CI's e2e stacks set it from step 5.1b). The config must cache with the
+ * variable unset, false and true, and the cache must carry what the environment says; .env.example names it, switched off.
+ */
+it('ships device enforcement off in the config file and .env.example', function () {
+    expect((string) file_get_contents(config_path('identity.php')))->toContain("env('IDENTITY_REQUIRE_DEVICE', false)")
+        ->and((string) file_get_contents(base_path('.env.example')))->toContain('IDENTITY_REQUIRE_DEVICE=false');
+})->group('invariants');
+
+it('caches the identity config with IDENTITY_REQUIRE_DEVICE unset, false and true', function (?string $value, bool $expected) {
+    $cache = app()->getCachedConfigPath();
+    $env = ['APP_CONFIG_CACHE' => $cache, 'IDENTITY_REQUIRE_DEVICE' => $value ?? false];
+    try {
+        $process = new Process([PHP_BINARY, 'artisan', 'config:cache'], base_path(), $env);
+        $process->run();
+        expect($process->getExitCode())->toBe(0, $process->getErrorOutput().$process->getOutput());
+
+        $cached = require $cache;
+        expect(data_get($cached, 'identity.require_enrolled_device'))->toBe($expected);
+    } finally {
+        @unlink($cache);
+    }
+})->with([[null, false], ['false', false], ['true', true]])->group('invariants');

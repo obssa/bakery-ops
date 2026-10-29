@@ -33,9 +33,13 @@ return [
     'GET /api/v1/stations' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/stations' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'PATCH /api/v1/stations/{station}' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
-    'GET /api/v1/devices' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
-    'POST /api/v1/devices' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
-    'POST /api/v1/devices/{id}/revoke' => ['permission' => 'people.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    // step 5.1a (phase-5 plan 4.1 and 10.6): the device routes move from people.manage to devices.manage (the admin holds both);
+    // GET /devices/this is every role's question "is this tablet enrolled?"
+    'GET /api/v1/devices' => ['permission' => 'devices.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'POST /api/v1/devices' => ['permission' => 'devices.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'POST /api/v1/devices/{id}/rename' => ['permission' => 'devices.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'POST /api/v1/devices/{id}/revoke' => ['permission' => 'devices.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'GET /api/v1/devices/this' => ['permission' => 'devices.self', 'roles' => $all, 'module' => 'identity'],
     // live updates (step 1.2, ADR 0009): every active user may ask; the channel rules decide which channel (403 otherwise)
     'POST /api/v1/broadcasting/auth' => ['permission' => 'identity.authenticated', 'roles' => $all, 'module' => 'identity'],
 

@@ -66,7 +66,8 @@ beforeEach(function () {
 });
 
 it('names the secret fields in one place', function () {
-    expect(Idempotency::SECRET_FIELDS)->toBe(['password', 'pin', 'short_code']);
+    // step 5.1a: `token`, the bridge token POST /devices hands back once (its answer is stored encrypted, phase-5 plan 4.1)
+    expect(Idempotency::SECRET_FIELDS)->toBe(['password', 'pin', 'short_code', 'token']);
 });
 
 it('leaves the PIN out of the stored hash: it is the hash of the body without it, and the body with it does not reproduce it', function () {
