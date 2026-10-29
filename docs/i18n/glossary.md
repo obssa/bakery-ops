@@ -23,6 +23,7 @@ other form (`docs/i18n/am-review.csv`, the `correction` column). `python3 script
 
 Plan 10.2 D19: numbers, `ETB`, the order number format (`#123`), and names the admin typed (products, channels, stations, people).
 Besides those, the dictionaries keep a few file formats and codes as they are, each in brackets after an Amharic word where it is a
-label: PDF, CSV, Excel, SKU, TIN. The language switch names English in its own script (`locale.en`, marked `lang="en"`). The report's
-allowlist (`ALLOWED` and `SAME_ON_PURPOSE` in `scripts/i18n_report.py`) and the screen sweep's (`e2e/p5/amharic.spec.ts`) hold the
-same list; a word joins them only with its reason.
+label: PDF, CSV, Excel, SKU, TIN. The language switch names English in its own script (`locale.en`, marked `lang="en"`). The screen
+sweep's allowlist (`ALLOWED_WORDS` in `apps/web/e2e/support/amharic.ts`) and the report's (`ALLOWED` and `SAME_ON_PURPOSE` in
+`scripts/i18n_report.py`, which adds unit symbols) hold this list; a word joins them only with its reason, never to hide a missing
+translation.

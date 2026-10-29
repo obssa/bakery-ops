@@ -24,15 +24,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from i18n_common import ROOT, Entry, load_entries, placeholders  # noqa: E402
 
-# Words that may stay in Latin script in an Amharic text (plan 10.2 D19 and the report's brief): brand and file names, units, the
-# currency, codes. A word goes here with its kind; a word that has an Amharic name does not.
+# Words that may stay in Latin script in an Amharic text (plan 10.2 D19, docs/i18n/glossary.md): the currency, the file formats and
+# codes the dictionary keeps, the same list as the screen sweep's ALLOWED_WORDS (apps/web/e2e/support/amharic.ts), and unit symbols.
+# A word goes here with its kind; a word that has an Amharic name does not.
 ALLOWED = {
-    # file formats and brands
-    "CSV", "Excel", "PDF", "XLSX", "Telegram", "SMS", "QR", "ESC", "POS",
-    # the currency and codes
-    "ETB", "TIN", "SKU", "PIN", "ID", "FT",
-    # units
-    "kg", "g", "l", "ml", "pcs", "h", "min", "s",
+    # the currency, file formats and codes (the sweep's list)
+    "ETB", "PDF", "CSV", "Excel", "SKU", "TIN",
+    # unit symbols, should a message carry one
+    "kg", "g", "l", "ml", "pcs",
 }
 
 # Keys whose Amharic is the English text on purpose, each with its reason.
