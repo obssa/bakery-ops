@@ -189,9 +189,10 @@ test.describe("pay-refund", () => {
       createdId = created?.id ?? null;
       expect(created?.refundable).toBe(true);
       expect(created?.refund_restock).toBe(true);
-      // the list shows the two settings beside the other flags
+      // the list shows the two settings beside the other flags. On the live E2E branch the list holds every item earlier runs
+      // left (over two thousand), and the busy host can take more than the default 10 s to send it again after the create
       const list = page.getByRole("table", { name: "Items" });
-      await expect(list.getByRole("row").filter({ hasText: nameEn })).toContainText("Back to stock");
+      await expect(list.getByRole("row").filter({ hasText: nameEn })).toContainText("Back to stock", { timeout: 60_000 });
 
       // the product's page: refundable switched off and saved
       await openAs(page, admin, `en/admin/catalog/?item=${createdId}`);
