@@ -65,9 +65,9 @@ survive, only parallelism is lost.
 | `invariants` | `python scripts/check_invariants.py --all` (uses `artisan route:list --json` for routes) |
 | `openapi-check` | `artisan scramble:export` → diff against `docs/openapi.json` |
 | `erd-check` | `php scripts/erd-check.php` (tables in `information_schema` vs `docs/erd.dbml`) |
-| `web-lint` | pnpm install (cached), eslint, `tsc --noEmit` |
+| `web-lint` | pnpm install (cached), eslint (with the local `no-literal-text` rule of step 5.4a and its `node --test` cases), `tsc --noEmit` |
 | `web-build` | `next build` (standalone) → artifact |
-| `i18n-check` | `node scripts/i18n-check.mjs` (`--strict` when phase ≥ 5) |
+| `i18n-check` | `python3 scripts/check_invariants.py --i18n` (`--strict-i18n` when phase ≥ 5: no `__TODO__` left); from step 5.4a also the review sheet tests (`python3 -m unittest discover -s scripts/tests`) and `scripts/i18n_report.py` (a report, never a failure) |
 | `docker-build` | `docker/build-push-action` with `cache-from/to: type=gha`, `outputs: type=docker,dest=api.tar` → artifact |
 | `e2e-p<N>` | download artifacts; `docker load`; `docker compose -f compose.yml -f compose.ci.yml up -d --wait`; `artisan migrate:fresh --seed --seeder=DemoSeeder -- --phase=N`; setup-node 24 + Playwright browser cache; `npx playwright test --project=p<N>-*`, with `--pass-with-no-tests` only while phase N is `todo`/`planning`/`plan_approved` (once it is `in_progress` or later, each of its projects must list at least one test); upload `test-results` on failure |
 | `perf-dashboards` | after `mod-analytics`, beside `e2e-p4`: the compose stack with the 90-day seed (`DEMO_HISTORY_DAYS` unset, about 12 minutes; timeout 40), the demo admin signed in by `curl`, every read warmed once, then k6 in its pinned image (`grafana/k6:1.3.0@sha256:...`, `scripts/perf/dashboards.k6.js`): two admins read every `/analytics/*` dashboard of the 90 days compared with the 90 before, every answer 200, `p(95)<1000` per read and in all; the per-read figures go to the step summary. Never against the live host; the timed in-process substitute is `DashboardBudgetGateTest` (in `gate:p4`) and `php artisan analytics:bench` (any host) |

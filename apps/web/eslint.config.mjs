@@ -1,6 +1,7 @@
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { FlatCompat } from "@eslint/eslintrc";
+import literalText from "./eslint-rules/no-literal-text.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -28,6 +29,15 @@ const eslintConfig = [
         { selector: `CallExpression[callee.name='Number'][arguments.0.property.name=${MONEY_OR_QTY}]`, message: DECIMAL_RULE },
         { selector: `CallExpression[callee.name='Number'][arguments.0.name=${MONEY_OR_QTY}]`, message: DECIMAL_RULE },
       ],
+    },
+  },
+  // Rule 9 on the screens (step 5.4a): no word written straight into JSX; it comes from messages/{en,am}.json. The rule and its reasons
+  // are in eslint-rules/no-literal-text.mjs, its cases in no-literal-text.test.mjs (`node --test`, run by web-lint).
+  {
+    files: ["src/**/*.tsx"],
+    plugins: { local: literalText },
+    rules: {
+      "local/no-literal-text": "error",
     },
   },
   {

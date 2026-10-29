@@ -245,6 +245,8 @@ jobs:
         working-directory: apps/web
       - run: pnpm lint
         working-directory: apps/web
+      - run: node --test eslint-rules/no-literal-text.test.mjs
+        working-directory: apps/web
       - run: pnpm exec tsc --noEmit
         working-directory: apps/web
 
@@ -254,6 +256,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/check_invariants.py --i18n ${{ fromJSON(needs.status.outputs.phase) >= 5 && '--strict-i18n' || '' }}
+      # Step 5.4a: the review sheet's export and import on a tiny fixture, then the dictionary report (a report, never a failure).
+      - run: python3 -m unittest discover -s scripts/tests -p "test_*.py"
+      - run: python3 scripts/i18n_report.py
 
   web-build:
     needs: web-lint
@@ -459,7 +464,7 @@ jobs:
     needs: [status, mod-analytics, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 5
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 5, projects: "p5-device p5-offline", profiles: "full", history_days: "2" }
+    with: { phase: 5, projects: "p5-device p5-offline p5-amharic", profiles: "full", history_days: "2" }
 
   backup-drill:
     needs: [status, e2e-p5]

@@ -404,6 +404,36 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      `phases.5.gate.playwright_projects`, STATUS and e2e-p5's list in the same PR): signed in as each role, visit every screen of that role
      under `/app/am/` and assert no visible text node holds Latin letters outside the allowlist (numbers, `ETB`, names the admin typed,
      the order number format).
+   - **As built (step 5.4a, `phase-5/i18n-checks`).** Tests red first (`LangParityTest` with its planted fixture, the scripts' fixture
+     tests, the lint rule's cases), then each piece, then the sweep. No API change: no route, permission, registry, OpenAPI or ERD change.
+     Where the code chose what the plan left open:
+     - **`LangParityTest`** compares through `tests/Support/LangParity.php` (files, keys at every depth, shape, empty or `__TODO__`
+       values, `:placeholders`); `tests/Fixtures/LangParity` plants one gap of each kind. The 490 API messages already agreed.
+     - **The lint rule** is a short local one, not `react/jsx-no-literals`: `local/no-literal-text` (`apps/web/eslint-rules/`) reports a
+       letter of any script (an Amharic literal is as wrong on the English screen) in JSX text, in a string or template placed as a child
+       (also through `?:`, `&&`, `||`, `??`) and in the attributes a person reads or hears (aria-label, title, placeholder, alt);
+       punctuation, digits and templates whose letters all come from expressions pass. `jsx-no-literals` flagged only punctuation (`·`,
+       `—`, `×`) and missed `{"text"}` unless it flagged every template too. Nothing in the 220 source files broke it; its `node --test`
+       cases run in `web-lint`.
+     - **The scripts** share `scripts/i18n_common.py`, which reads the PHP files with a small tokenizer (no PHP on the host) and rewrites
+       only the corrected string literal. Keys are `web:<path>` and `api:<file>.<path>`. The sheet is UTF-8 with a byte-order mark (a
+       spreadsheet opens the Ethiopic script as it is); exported again it keeps each row's correction and comment. The import checks the
+       whole sheet first (the key exists, the correction names the English placeholders, no `__TODO__`) and writes nothing when a row is
+       wrong. The report's "unused" list is a heuristic (a key's path or last part as a string in the code, or a template or a dotted
+       string joined to a variable that starts it), so it lists, never deletes; 5 keys today for 5.4b to check by hand. Fixture tests
+       and the report run in `i18n-check`.
+     - **The glossary** flags refund (ተመላሽ on lists, ገንዘብ መመለስ on the buttons and the refund screen), void (ውድቅ on the screens,
+       ስረዛ in the API messages; ውድቅ also names a rejected count or transfer, ሰርዝ a cancellation) and batch (ዙር, ምርት, በጅምላ).
+     - **`p5-amharic`** runs in the seeded demo bakery of the CI stack (orders at every stage, shifts and history, names typed in
+       Amharic), not the E2E branch, on a tablet enrolled there with `freshDevice` and opened with `openAs`; CI only. Each role's screen
+       list is in the spec (a screen a role may not use still shows its Amharic refusal); on each screen it follows one link with a query
+       to a screen of the same list (an order's record, an item, a product's dashboard, a shift's replay), and the waiter's pad is
+       unlocked with a short code the demo admin resets. The sweep (`e2e/support/amharic.ts`) reads text nodes and the read labels; the
+       allowlist is D19 plus the file formats and codes the dictionary keeps (`ETB`, PDF, CSV, Excel, SKU, TIN), the typed names in the
+       form an Amharic screen shows (`*_am` and the single-language fields, never `*_en`), matched as whole words, and text inside an
+       element marked `lang="en"` (the language switch, the catalog's other-language name). `amharic-logic.spec.ts` proves it on planted
+       pages.
+     - **Gaps fixed**: the cash tally's Latin `x` (`shifts.cash_piece`, `counts.cash_tally`) is now `×` in both languages.
    - **5.4b `phase-5/i18n-review`** (`i18n` `done`). The reviewer's corrections imported from the sheet, the glossary settled, the report
      clean. Opened when the sheet comes back (10.2 Q5); 5.5 and 5.6 do not wait for it. The checklist item `am-reviewed` is a sign-off.
 5. **5.5 ops** (STATUS `ops`), four PRs.
