@@ -13,6 +13,7 @@ import { useOrderNo } from "@/lib/orderNo";
 import { keepsKey } from "@/lib/paySheet";
 import { RefundDialog } from "../refunds/RefundDialog";
 import { Alert, Button, Field, Modal, TextInput } from "../ui";
+import { OnlineOnlyButton } from "../OnlineOnly";
 
 // Voiding at the till: a reason, and the PIN of a manager or admin (their short code) typed on this screen. The API checks the PIN and
 // answers with its own bilingual message when it is refused (403) or locked (423); the dialog shows that message and keeps the reason.
@@ -142,9 +143,9 @@ export function VoidDialog({
             )}
           </Field>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={!valid || pending}>
+            <OnlineOnlyButton type="submit" disabled={!valid || pending}>
               {pending ? t("voiding") : target === "order" || (target === null && wholeAllowed && !hasPayments) ? t("void_submit") : t("void_payment_submit")}
-            </Button>
+            </OnlineOnlyButton>
             <Button type="button" variant="secondary" onClick={onClose}>
               {t("void_back")}
             </Button>

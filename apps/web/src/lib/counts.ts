@@ -149,3 +149,25 @@ export function shortHash(hash: string | null): string {
   if (hash === null) return "";
   return hash.length <= 20 ? hash : `${hash.slice(0, 8)}…${hash.slice(-8)}`;
 }
+
+/**
+ * The count as this tablet sees it after draft edits the outbox holds (step 5.2a): offline, a typed figure stays on its line (counted and
+ * confirmed, the note as typed) until the API's own answer replaces the count. Lines not on the count yet (an added item) show up then.
+ */
+export function withDraftEdits(count: Count, edits: { item_id: number; counted_qty?: string | null; confirm?: boolean; reason_note?: string | null }[]): Count {
+  if (edits.length === 0) return count;
+  const byItem = new Map(edits.map((edit) => [edit.item_id, edit]));
+  return {
+    ...count,
+    lines: count.lines.map((line): CountLine => {
+      const edit = byItem.get(line.item.id);
+      if (!edit) return line;
+      return {
+        ...line,
+        ...(edit.counted_qty !== undefined ? { counted_qty: edit.counted_qty } : {}),
+        ...(edit.reason_note !== undefined ? { note: edit.reason_note } : {}),
+        confirmed: edit.confirm ?? line.confirmed,
+      };
+    }),
+  };
+}

@@ -17,6 +17,7 @@ import { useActiveStation } from "@/lib/station";
 import { useIsoDay } from "@/lib/useDates";
 import { HistoryLink } from "../audit/HistoryLink";
 import { Alert, Badge, Button, Field, Modal, PageHeader, Panel, Status, Textarea } from "../ui";
+import { OnlineOnlyButton } from "../OnlineOnly";
 import { focusRing } from "../styles";
 import { CashSummaryView } from "./CashSummaryView";
 import { ChainCard } from "./ChainCard";
@@ -265,14 +266,14 @@ function Loaded({ countId }: { countId: number }) {
             ) : null}
             <div className="flex flex-wrap gap-3">
               {actions.approve ? (
-                <Button type="button" disabled={busy !== null} onClick={() => void act("approve", (key) => approveCount(countId, note, key), t("done_approved"))}>
+                <OnlineOnlyButton type="button" disabled={busy !== null} onClick={() => void act("approve", (key) => approveCount(countId, note, key), t("done_approved"))}>
                   {busy === "approve" ? t("working") : t("approve")}
-                </Button>
+                </OnlineOnlyButton>
               ) : null}
               {actions.cosign ? (
-                <Button type="button" disabled={busy !== null} onClick={() => void act("cosign", (key) => cosignCount(countId, note, key), t("done_cosigned"))}>
+                <OnlineOnlyButton type="button" disabled={busy !== null} onClick={() => void act("cosign", (key) => cosignCount(countId, note, key), t("done_cosigned"))}>
                   {busy === "cosign" ? t("working") : t("cosign")}
-                </Button>
+                </OnlineOnlyButton>
               ) : null}
               {actions.reject ? (
                 <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => setDialog("reject")}>
@@ -369,9 +370,9 @@ function RejectDialog({
         <Button type="button" variant="secondary" onClick={onClose}>
           {t("cancel")}
         </Button>
-        <Button type="button" disabled={busy || note.trim() === ""} onClick={() => onReject(note.trim(), picked.size === 0 ? null : [...picked])}>
+        <OnlineOnlyButton type="button" disabled={busy || note.trim() === ""} onClick={() => onReject(note.trim(), picked.size === 0 ? null : [...picked])}>
           {busy ? t("working") : t("reject_send")}
-        </Button>
+        </OnlineOnlyButton>
       </div>
     </Modal>
   );
@@ -390,9 +391,9 @@ function UnlockDialog({ busy, failure, onClose, onUnlock }: { busy: boolean; fai
         <Button type="button" variant="secondary" onClick={onClose}>
           {t("cancel")}
         </Button>
-        <Button type="button" disabled={busy || reason.trim() === ""} onClick={() => onUnlock(reason.trim())}>
+        <OnlineOnlyButton type="button" disabled={busy || reason.trim() === ""} onClick={() => onUnlock(reason.trim())}>
           {busy ? t("working") : t("unlock_send")}
-        </Button>
+        </OnlineOnlyButton>
       </div>
     </Modal>
   );

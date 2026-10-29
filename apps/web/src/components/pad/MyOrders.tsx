@@ -85,7 +85,7 @@ function OrderCard({ order }: { order: Order }) {
       <footer className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-base font-semibold text-neutral-900">{t("order_total", { total: order.totals.total, currency: order.currency })}</p>
         {order.status === "open" ? (
-          <Button type="button" variant="secondary" aria-label={t("cancel_order_aria", { no: String(order.order_no) })} disabled={pending} onClick={() => queueCancelOrder(order.id)}>
+          <Button type="button" variant="secondary" aria-label={t("cancel_order_aria", { no: String(order.order_no) })} disabled={pending} onClick={() => queueCancelOrder(order.id, order.client_uuid)}>
             {t("cancel_order")}
           </Button>
         ) : null}

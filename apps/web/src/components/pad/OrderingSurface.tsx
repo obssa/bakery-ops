@@ -52,7 +52,7 @@ export function OrderingSurface({
   function clear() {
     if (cart.serverOrderId !== null) {
       // the API holds it open: cancel it there too (an unsent order, nothing reserved)
-      queueCancelOrder(cart.serverOrderId);
+      queueCancelOrder(cart.serverOrderId, cart.orderUuid);
       return;
     }
     useCarts.getState().reset(userId);

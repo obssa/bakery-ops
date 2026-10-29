@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/lib/api/client";
-import { putCash } from "@/lib/api/counts";
+import { submitCash } from "@/lib/api/counts";
 import type { CashBlock, Count, Locale, VarianceReason } from "@/lib/api/types";
 import { cashBody, cashReview, channelsBody, parseTally, signedMoney, tallyKeys, tallyOf, tallyTotal, toBank, type CashParts, type ChannelFields } from "@/lib/cash";
 import { compareDecimal, isQuantityText, multiplyDecimal, subtractDecimal } from "@/lib/decimal";
@@ -112,9 +112,10 @@ export function CashDeclaration({
     setSaving((n) => n + 1);
     setFailure(null);
     try {
-      const next = await putCash(count.id, body, keys.keyFor(name));
+      const outcome = await submitCash(count.id, body, keys.keyFor(name));
       keys.done(name);
-      onChange(next);
+      // queued offline (step 5.2a): the tally stays as typed until the outbox has sent it and the count is read again
+      if (outcome.sent) onChange(outcome.answer);
     } catch (error) {
       setFailure(error);
       if (!(error instanceof ApiError) || error.status !== 0) keys.done(name);

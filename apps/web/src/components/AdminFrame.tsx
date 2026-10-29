@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { can, useSession } from "@/lib/session";
+import { useOnline } from "@/lib/useOnline";
 import { RequireAuth } from "./RequireAuth";
 import { focusRing } from "./styles";
 
@@ -11,7 +12,8 @@ import { focusRing } from "./styles";
 // Orders board (Phase 1), Inventory with its own sub-tabs (Phase 2), Shifts (Phase 3), Payments (Phase 4, step 4.5c: shown
 // to whoever holds one of its permissions), Analytics (step 4.5e: the dashboards for analytics.view; a person who holds only
 // analytics.view_own, every role, is taken to their own figures), the Audit log (step 4.5f: audit.view, the admin and the manager). The
-// header's "Admin console" link is the overview.
+// header's "Admin console" link is the overview. The admin screens are online-only (step 5.2a, plan 10.2 D10: nothing here joins the outbox):
+// offline, a notice says so and every control of the screen is disabled (a disabled fieldset; the tabs, links, stay usable).
 const SECTIONS: readonly { href: string; key: string; anyOf?: readonly string[]; own?: { unless: string; href: string } }[] = [
   { href: "/admin/catalog", key: "catalog" },
   { href: "/admin/people", key: "people" },
@@ -28,6 +30,8 @@ export function AdminFrame({ children }: { children: ReactNode }) {
   const t = useTranslations("admin");
   const pathname = usePathname().replace(/\/+$/, "");
   const me = useSession((s) => s.me);
+  const o = useTranslations("outbox");
+  const online = useOnline();
 
   return (
     <RequireAuth>
@@ -48,7 +52,14 @@ export function AdminFrame({ children }: { children: ReactNode }) {
           );
         })}
       </nav>
-      {children}
+      {online ? null : (
+        <p role="status" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+          {o("admin_offline")}
+        </p>
+      )}
+      <fieldset role="presentation" disabled={!online} className="contents">
+        {children}
+      </fieldset>
     </RequireAuth>
   );
 }
