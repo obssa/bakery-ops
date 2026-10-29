@@ -59,7 +59,7 @@ test.describe("p5 offline: the outbox", () => {
     await context.setOffline(false);
     await expect.poll(async () => (await ordersWithUuid(fixture.waiter.api, clientUuid)).length, { timeout: 60_000 }).toBe(1);
     await expect(waiting).toHaveCount(0, { timeout: 30_000 });
-    expect(await queuedWrites(page)).toEqual([]);
+    await expect.poll(async () => (await queuedWrites(page)).length).toBe(0);
     const [order] = await ordersWithUuid(fixture.waiter.api, clientUuid);
     expect(order.status).toBe("sent");
     expect(order.lines).toHaveLength(1);
@@ -95,6 +95,6 @@ test.describe("p5 offline: the outbox", () => {
     const orders = await ordersWithUuid(fixture.waiter.api, sends[0].clientUuid);
     expect(orders).toHaveLength(1);
     expect(orders[0].lines).toHaveLength(1);
-    expect(await queuedWrites(page)).toEqual([]);
+    await expect.poll(async () => (await queuedWrites(page)).length).toBe(0);
   });
 });
