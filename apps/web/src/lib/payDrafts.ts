@@ -7,7 +7,8 @@ import type { PayRow, RowPhoto } from "./paySheet";
 // (a tap beside it, Escape, a network failure) keeps the rows as they were typed, the photos already on the server and the batch's
 // client_uuid and Idempotency-Key, so the cashier picks up where they left off and a retry is the same write: the API replays a batch it
 // recorded instead of taking the money twice. A completed sheet is dropped. Nothing is written to storage: a reload starts afresh, and a
-// photo uploaded but never attached is removed by the server's orphan purge (files:purge-orphans, 24 h). The outbox is Phase 5.
+// photo uploaded but never attached is removed by the server's orphan purge (files:purge-orphans, 24 h). A completed batch that cannot be sent
+// joins the outbox (step 5.2a, lib/outbox/store.ts); the photo queue is step 5.2b.
 
 export interface PayDraft {
   /** the batch's client_uuid (stored by the API as every payment's batch_uuid) */
