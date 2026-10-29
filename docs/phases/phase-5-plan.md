@@ -444,6 +444,11 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        check proves something) and `p5-errors-on` (a `page.route` sink gets the error, scrubbed). `web-build` also greps the static export.
        `deploy.yml` passes the repository variable `NEXT_PUBLIC_SENTRY_DSN` to the export build (unset today).
      - **The prune** runs daily at 04:10 Addis Ababa time (after the 03:00 chain check), and `.env.example` names both DSNs, empty.
+     - **The test process may now use 2 GB** (`phpunit.xml`, was 1 GB). `api-arch` runs some 3 400 tests in one PHP process that keeps
+       every test case and the arch plugin's parsed sources; with this step's ~70 tests it ran out three times in the route matrix, near
+       the end of its run, even after the new tests were made leaner. Measured locally, the step's runtime wiring costs the same memory
+       per test as main (the matrix grows about 64 KB a test either way), so this is the suite's size, not a leak of 5.5a. For 5.5d, which
+       sets the jobs' limits: split `api-arch`'s groups over two jobs if it nears 2 GB.
    - **5.5b `phase-5/ops-backups`**. The two contract files red first (section 2), then `Inventory\Contracts\LedgerOracle` and
      `HashChain::verifyAll`. M5. `App\Ops` (not a module: a thin layer that may use modules' `Contracts\*` only; an arch test says so).
      `backup:run`: `mysqldump --single-transaction --quick --routines --triggers --hex-blob --no-tablespaces`, the password in a
