@@ -1,7 +1,7 @@
 import { uuid, type Api } from "./api";
 import { run } from "./env";
 import { buildStationFixture, buildTillStaff, findOrCreateDisplayCase, findOrCreateStation, unitLookup, type Location, type TillStaff } from "./fixture";
-import { ensureOpenShiftAt, currentShift } from "./shifts";
+import { currentShift, ensureDrawer, ensureOpenShiftAt } from "./shifts";
 
 // Fixtures of the refund flows (step 4.5g, Ramin's rule R-C of 2026-10-28: the admin decides per product whether it can be refunded and
 // whether a refunded unit goes back into stock). Every product is made by this run through the catalog API with its two settings, in the
@@ -98,9 +98,14 @@ export async function closedCashOrder(fixture: RefundFixture): Promise<ClosedOrd
   return cashier.get<ClosedOrder>(`/orders/${sent.id}`);
 }
 
-/** The till's running shift and what its drawer is expected to hold now (GET /shifts/{shift}/cash, the till widget's figure). */
+/**
+ * The till's running shift and what its drawer is expected to hold now (GET /shifts/{shift}/cash, the till widget's figure). The till's
+ * cash drawer is found or made first (the E2E branch has had one since the handover flow of step 3.7; a fresh CI database may not), as
+ * the handover flow does: without one the read answers 422 shifts.cash.no_drawer.
+ */
 export async function tillExpectedCash(admin: Api): Promise<{ shiftId: number; expected: string }> {
   const till = await findOrCreateStation(admin, "till");
+  await ensureDrawer(admin, till);
   const shift = await currentShift(admin, till);
   if (!shift) throw new Error("the till has no running shift");
   const body = await admin.get<{ expected_total?: string; data?: { expected_total: string } }>(`/shifts/${shift.id}/cash`);
