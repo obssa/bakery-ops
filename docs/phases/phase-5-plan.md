@@ -47,8 +47,21 @@ plan commit:
 == result: FAIL (2 failed, 0 warnings, 7 checks)
 ```
 
-The two red lines are the ones this commit answers (the plan, and `plan_approved` under the standing approval). The run after the
-commits is pasted at the end of this section by the same PR.
+The two red lines are the ones this PR answers (the plan, and `plan_approved` under the standing approval). The same command after
+the plan, approval and placeholder commits (`54d65b1`):
+
+```
+== gate_check: entry phase 5 (Hardening and Amharic)
+  [PASS] phase 4 done               status=done done_commit=b7b58e9710f14d9db5c4ca365231f666ae263d34
+  [PASS] phase 4 commit in history  b7b58e9710f1 is an ancestor of HEAD
+  [SKIP] gate:p4 green              pest --group=gate:p4 not run (--no-tests/--ci)
+  [PASS] clean working tree         clean
+  [PASS] phase plan exists          docs/phases/phase-5-plan.md
+  [PASS] plan approved by Ramin     plan_approved=True by standing approval: Ramin, 2026-10-19
+  [PASS] approval author            obssa77@gmail.com
+  [SKIP] Phase5Seeder               not yet (created during the phase)
+== result: PASS (0 failed, 0 warnings, 8 checks)
+```
 
 **`gate:p4 green` is proved by CI, not here.** Most of `gate:p4` reads the 90-day seed that only the `gate-p4` job builds
 (`Tests\Support\SeededGate`, `GATE_SEED_DATABASE`), so a local run of the group on an unseeded stack proves nothing. The proof is `gate-p4`
@@ -284,7 +297,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      the branch's `ethiopian_dates` is on), the footer and the non-fiscal wording of 10.2 Q9. The `EscPos` encoder (`ESC @`, `GS v 0`
      raster in bands, feed, `GS V` cut). `tests/Support/EscPosEmulator.php` parses a byte stream back into commands and a bitmap; the tests
      decode the encoder's output and compare the bitmap with golden PNGs (a pixel tolerance) for 58 and 80 mm, Amharic on and off. The
-     print endpoints of 4.3, the claim lock, the 60-second reclaim and the 15-minute expiry (scheduler), `PrintJobFailed`. A line in
+     print endpoints of section 4.3, the claim lock, the 60-second reclaim and the 15-minute expiry (scheduler), `PrintJobFailed`. A line in
      `receipts:doctor` reports `FreeType Support` from `gd_info()`; when it is missing the raster falls back to the printer's own Latin text
      without Amharic and the till offers the link (the deploy smoke prints the doctor line, non-fatal). Feature tests for every route
      (403 per role, the bridge token cases, replay, two bridges racing to claim one job).
@@ -376,7 +389,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
    - **5.6b `phase-5/gate`** (`docs` `done`). `Phase5Seeder` (the demo branch: a pad, a KDS, a till and a bridge device enrolled, receipt
      settings with a sample TIN, `LOAD_DEVICES` for `perf-load`); `Phase5GateTest` (`gate:p5`): unknown device 403 on every station route
      with the flag on and no 403 on admin routes, an order replayed with the same key and `client_uuid` is one row, the checklist parses and
-     every verifier type resolves; the `gate-p5` job of section 7 runs the group; ADRs 0017 to 0021
+     every verifier type resolves; the `gate-p5` job of 7.1 runs the group; ADRs 0017 to 0021
      **accepted**; `docs/phases/phase-5-report.md`; the skill copies (`ci-cd.md`, `testing-strategy.md`, `traps.md`) updated with what the
      phase taught. Then `gate_check --mode done --phase 5` passes every automated row and lists the sign-offs still waiting: **claim-done
      waits for Ramin** (10.3). When his "every tablet enrolled" sign-off lands, a one-line PR flips the device-enforcement default to on
