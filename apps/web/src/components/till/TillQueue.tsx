@@ -8,7 +8,7 @@ import { isSettled } from "@/lib/live/orders";
 import { visibleLines } from "@/lib/live/pad";
 import { useOrderNo } from "@/lib/orderNo";
 import { useNow } from "@/lib/useNow";
-import { useOutbox } from "@/lib/outbox/store";
+import { useWaiting } from "@/lib/outbox/store";
 import { Badge, Button } from "../ui";
 
 // The queue of orders awaiting payment: oldest first, each with its table, number, waiter, how long it has waited (the
@@ -43,7 +43,7 @@ function QueueCard({
   const age = ageOf(seconds);
   const no = useOrderNo(order);
   // a payment completed offline waits in the outbox (step 5.2a): no second sheet for this order until it was sent
-  const waiting = useOutbox((s) => s.items.some((item) => item.kind === "pay_batch" && item.subjectId === order.id));
+  const waiting = useWaiting((item) => item.kind === "pay_batch" && item.subjectId === order.id);
   const payBlocked = waiting ? t("payment_waiting") : blockedBy;
   const where = order.type === "takeaway" ? k("takeaway") : order.dining_table ? k("table", { code: order.dining_table.code }) : "";
 

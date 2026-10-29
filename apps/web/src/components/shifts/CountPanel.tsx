@@ -10,7 +10,7 @@ import type { Count, Locale, VarianceReason } from "@/lib/api/types";
 import { isQuantityText } from "@/lib/decimal";
 import { stageOf, withDraftEdits } from "@/lib/counts";
 import { useErrorText } from "@/lib/errors";
-import { onOutboxApplied, useOutbox } from "@/lib/outbox/store";
+import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
 import { Alert, Badge, Button, Field, Panel, Select, TextInput } from "../ui";
 import { CashDeclaration } from "./CashDeclaration";
 import { CashReviewDialog } from "./CashReviewDialog";
@@ -63,7 +63,7 @@ export function CountPanel({
   const items = useItems(null);
   // drafts saved offline wait in the outbox (step 5.2a): the count is read again once they were sent
   const group = countGroup(count.id);
-  const waiting = useOutbox((s) => s.items.some((item) => item.group === group));
+  const waiting = useWaiting((item) => item.group === group);
   useEffect(
     () =>
       onOutboxApplied((item) => {

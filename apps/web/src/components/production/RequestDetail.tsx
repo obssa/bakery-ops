@@ -10,7 +10,7 @@ import type { CardLine, IngredientShort, Locale, ProductionRequest, RequestStatu
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { canCancel, canSignOff } from "@/lib/live/production";
-import { onOutboxApplied, useOutbox } from "@/lib/outbox/store";
+import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
 import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { RequestTransferSheet } from "../inventory/RequestTransferSheet";
@@ -140,7 +140,7 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
   // a batch step saved offline waits in the outbox (step 5.2a): the request's other steps wait for it, and the card is read again once
   // the outbox has sent it
   const group = batchGroup(request.id);
-  const waiting = useOutbox((s) => s.items.some((item) => item.group === group));
+  const waiting = useWaiting((item) => item.group === group);
   const blocked = busy !== null || waiting;
   useEffect(
     () =>

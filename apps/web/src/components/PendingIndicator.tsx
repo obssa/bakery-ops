@@ -17,7 +17,12 @@ export function PendingIndicator() {
   const errorText = useErrorText();
   const pathname = usePathname();
   const queue = useOutbox((s) => s.queue);
-  const { here, elsewhere } = useMemo(() => pendingCounts(queue, screenOf(pathname)), [queue, pathname]);
+  // a write on the wire for the first time is not waiting yet (its screen shows it busy); after a failure it is
+  const sendingId = useOutbox((s) => s.sendingId);
+  const { here, elsewhere } = useMemo(
+    () => pendingCounts(queue.filter((item) => item.id !== sendingId || item.attempts > 0), screenOf(pathname)),
+    [queue, sendingId, pathname],
+  );
   // a refusal the pad shows on its own line (the shortfall) stays out of the strip
   const allFailures = useOutbox((s) => s.failures);
   const failures = useMemo(() => allFailures.filter((f) => !f.inline), [allFailures]);

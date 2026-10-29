@@ -73,6 +73,8 @@ interface OutboxState {
   durable: boolean;
   /** true while a send is on the wire */
   sending: boolean;
+  /** the write on the wire */
+  sendingId: string | null;
   enqueue: (input: EnqueueInput) => OutboxItem | null;
   dismissFailure: (id: string) => void;
   flush: () => Promise<void>;
@@ -175,6 +177,7 @@ export const useOutbox = create<OutboxState>()((set, get) => {
     loaded: false,
     durable: false,
     sending: false,
+    sendingId: null,
 
     enqueue: (input) => {
       const me = useSession.getState().me;
@@ -232,6 +235,7 @@ export const useOutbox = create<OutboxState>()((set, get) => {
           if (!item) return;
           let answer: unknown;
           try {
+            set({ sendingId: item.id });
             answer = await request(item.path, { method: item.method, body: item.body, idempotencyKey: item.idempotencyKey, token, headers: item.headers });
           } catch (thrown) {
             const error = thrown instanceof ApiError ? thrown : new ApiError(0, {});
@@ -282,7 +286,7 @@ export const useOutbox = create<OutboxState>()((set, get) => {
           appliedListeners.forEach((l) => l(item, "accepted"));
         }
       } finally {
-        set({ sending: false });
+        set({ sending: false, sendingId: null });
         releaseWaiters();
         scheduleWake();
       }
@@ -452,4 +456,12 @@ export function queueCancelOrder(orderId: number, orderUuid: string | null = nul
     subjectUuid: orderUuid,
     headers: actingHeaders(),
   });
+}
+
+/**
+ * Whether a write that matches `which` waits in the outbox: saved on this tablet, not on the wire for the first time (a write a screen is
+ * sending right now, online, is that screen's own "busy"; after a failure it waits).
+ */
+export function useWaiting(which: (item: OutboxItem) => boolean): boolean {
+  return useOutbox((s) => s.items.some((item) => (item.id !== s.sendingId || item.attempts > 0) && which(item)));
 }
