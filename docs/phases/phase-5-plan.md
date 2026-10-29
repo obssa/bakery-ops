@@ -215,7 +215,8 @@ against the stack as it will run in the shop. The 16 steps:
 
 This PR (`phase-5/plan`) carries the plan, the STATUS change and two `test.fixme` placeholders, `apps/web/e2e/p5/device.spec.ts` and
 `offline.spec.ts`, because `e2e.yml` refuses an empty Playwright project once its phase is `in_progress` (Phase 4's 4.1a did the same).
-They are replaced by real specs in 5.1b and 5.2a; the 5.6b gate test fails on any `fixme` left under `e2e/p5`.
+They are replaced by real specs in 5.1b and 5.2a. Each carries the phase's to-do marker (the one `gate_check --mode done` forbids for
+the phase being closed), so the phase cannot close while a placeholder is left.
 
 1. **5.1 identity.devices** (STATUS `identity.devices`), two PRs.
    - **5.1a `phase-5/device-enforcement`** (API only; STATUS `identity.devices` `in_progress`). M1 and M2a (`devices`, the permission
@@ -375,7 +376,7 @@ They are replaced by real specs in 5.1b and 5.2a; the 5.6b gate test fails on an
    - **5.6b `phase-5/gate`** (`docs` `done`). `Phase5Seeder` (the demo branch: a pad, a KDS, a till and a bridge device enrolled, receipt
      settings with a sample TIN, `LOAD_DEVICES` for `perf-load`); `Phase5GateTest` (`gate:p5`): unknown device 403 on every station route
      with the flag on and no 403 on admin routes, an order replayed with the same key and `client_uuid` is one row, the checklist parses and
-     every verifier type resolves, no `fixme` under `e2e/p5`; the `gate-p5` job of section 7 runs the group; ADRs 0017 to 0021
+     every verifier type resolves; the `gate-p5` job of section 7 runs the group; ADRs 0017 to 0021
      **accepted**; `docs/phases/phase-5-report.md`; the skill copies (`ci-cd.md`, `testing-strategy.md`, `traps.md`) updated with what the
      phase taught. Then `gate_check --mode done --phase 5` passes every automated row and lists the sign-offs still waiting: **claim-done
      waits for Ramin** (10.3). When his "every tablet enrolled" sign-off lands, a one-line PR flips the device-enforcement default to on
