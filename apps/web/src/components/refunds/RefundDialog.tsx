@@ -38,6 +38,7 @@ import {
 import { useChannelName } from "../payments/shared";
 import { ReceiptActions } from "../till/ReceiptPanel";
 import { Alert, Button, Field, Modal, TextInput } from "../ui";
+import { OnlineOnlyButton } from "../OnlineOnly";
 
 // The refund (step 4.5g, Ramin's rule R-C of 2026-10-28), one dialog for the till's closed orders (through 4.5b's VoidDialog, whose
 // refund path this is) and for the order record page. The admin's two settings decide each line: a product that cannot be refunded is
@@ -331,9 +332,9 @@ export function RefundDialog({ order, onClose, onRefunded }: { order: Order; onC
         {block !== null && !loading ? <p className="text-sm text-neutral-600">{t(`block_${block}`)}</p> : null}
 
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={block !== null || pending || loading || !closed}>
+          <OnlineOnlyButton type="submit" disabled={block !== null || pending || loading || !closed}>
             {pending ? t("submitting") : t("submit")}
-          </Button>
+          </OnlineOnlyButton>
           <Button type="button" variant="secondary" disabled={pending} onClick={onClose}>
             {t("back")}
           </Button>
