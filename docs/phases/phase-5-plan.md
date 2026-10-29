@@ -82,7 +82,7 @@ Upstream capabilities this phase consumes, and how each is proven before use:
 |---|---|---|---|
 | `EnsureEnrolledDevice` (Identity) | Identity | `ResolveActor::deviceFor` (enrolled, unrevoked, same branch) | Identity's own module tests, extended in 5.1a |
 | Every station route (all modules) | Identity | the `device` middleware alias (a string in route files, no import) | `StationRoutesTest` and the 403 matrix (5.1a) |
-| Print jobs (Payments) | Payments | the receipt view of 4.3e (`Receipts::forOrder`), `receipt_settings` | Payments' module tests (same module, no contract) |
+| Print jobs (Payments) | Payments | the receipt of 4.3e (`ReceiptBuilder` and its `Receipt` view in `Payments/Support/Receipts`), `receipt_settings` | Payments' module tests (same module, no contract) |
 | `App\Ops` backup drill | Inventory | **new** `Inventory\Contracts\LedgerOracle::check(connection)` | `contract:ops->inventory` (new, 5.5b) |
 | `App\Ops` backup drill | Shifts | `Shifts\Contracts\HashChain` verification on a named connection | `contract:ops->shifts` (new, 5.5b) |
 | System status (Ops) | Notifications | **event only**: `BackupFailed`, `BackupStale`, `DrillFailed`, `PrintJobFailed` | listener tests in `mod-notifications` |
@@ -96,7 +96,7 @@ exists, and turned green by the provider work in the same PR (as 4.1b/4.1c did i
 | Contract | File | Cases |
 |---|---|---|
 | `ops->inventory` (new) | `apps/api/tests/Contract/Ops/InventoryContractTest.php` | `LedgerOracle::check($connection)` returns `{ok, items, locations, mismatches[]}`; on a seeded ledger it is `ok`; a row deleted from `stock_movements` behind the triggers' back (a raw statement on a scratch copy) makes it report the `(item, location)` and the two sums; `stock_balances` that disagree with the movements are reported separately; it reads only the named connection (the default connection's rows are never touched); it writes nothing (the query log holds only SELECTs); decimal strings at scale 4 |
-| `ops->shifts` (new) | `apps/api/tests/Contract/Ops/ShiftsContractTest.php` | `HashChain::verifyAll($connection)` (a new method beside the existing per-branch verification) answers `ok` on a seeded chain, names the first broken link when a locked count's stored hash is changed on the scratch copy, and reads only the named connection |
+| `ops->shifts` (new) | `apps/api/tests/Contract/Ops/ShiftsContractTest.php` | `HashChain::verifyAll($connection)` (a new method beside the existing per-location `verify`) answers `ok` on a seeded chain, names the first broken link when a locked count's stored hash is changed on the scratch copy, and reads only the named connection |
 
 Group names `contract:ops->inventory`, `contract:ops->shifts`; both run in `mod-inventory` and `mod-shifts` respectively from 5.5b on, so a
 provider change fails there first. The manifest gets `ops` under `contracts` (and `phases.5.intra_phase_contracts`), not under
@@ -280,7 +280,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      whose payment was abandoned is dropped locally (the server already purges orphans after 24 h). `p5-offline` spec: offline, pay by a
      channel that needs a photo, attach it, go online: one file, one payment, the photo readable through its signed URL.
    - **5.2c `phase-5/offline-conflicts`** (`web.offline` `done`). The **conflict tray**: every item refused on sync (a stock shortfall
-     `orders.stock.*`, `inventory.shift.required`, `payments.shift.required`, a closed order, a revoked device) stays visible with the
+     `orders.send.shortfall` or `inventory.stock.insufficient`, `inventory.shift.required`, `payments.shift.required`, a closed order, a revoked device) stays visible with the
      server's message in both languages, what was attempted, and the actions the refusal allows (edit and resend as a new write with a new
      key, or discard); nothing refused is dropped silently. **Reconnect reconcile**: on `online`, and on visibility after a gap, the KDS
      replays `tickets?since=<cursor>`, the pad and till refetch their lists, and an item whose answer was lost is looked up (`GET
@@ -297,8 +297,8 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      the branch's `ethiopian_dates` is on), the footer and the non-fiscal wording of 10.2 Q9. The `EscPos` encoder (`ESC @`, `GS v 0`
      raster in bands, feed, `GS V` cut). `tests/Support/EscPosEmulator.php` parses a byte stream back into commands and a bitmap; the tests
      decode the encoder's output and compare the bitmap with golden PNGs (a pixel tolerance) for 58 and 80 mm, Amharic on and off. The
-     print endpoints of section 4.3, the claim lock, the 60-second reclaim and the 15-minute expiry (scheduler), `PrintJobFailed`. A line in
-     `receipts:doctor` reports `FreeType Support` from `gd_info()`; when it is missing the raster falls back to the printer's own Latin text
+     print endpoints of section 4.3, the claim lock, the 60-second reclaim and the 15-minute expiry (scheduler), `PrintJobFailed`.
+     A new `print:doctor` reports `FreeType Support` from `gd_info()`; when it is missing the raster falls back to the printer's own Latin text
      without Amharic and the till offers the link (the deploy smoke prints the doctor line, non-fatal). Feature tests for every route
      (403 per role, the bridge token cases, replay, two bridges racing to claim one job).
    - **5.3b `phase-5/print-bridge`**. `tools/print-bridge/`: Node 22, plain JavaScript (ESM), no native modules, one dependency at most;
@@ -313,7 +313,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
    - **5.3c `phase-5/web-print`** (`print-bridge` `done`). The till: Print after payment and on the order record; the job's state (queued,
      printing, printed, failed) by polling `GET /print-jobs?order_id=`; a failed or expired job, or `409 no_bridge`, shows the receipt link
      and its QR code (4.3e's signed link) for the customer to scan; receipt settings get the paper width. Playwright `e2e/p5/print.spec.ts`
-     runs under `p5-device` (its `testMatch` widens to `/device|print/`: a till is a device), with a fake bridge in the test process against
+     runs under `p5-device` (its `testMatch` widens to `/device|print|ops/`: a till is a device; `ops-live.spec.ts` of 5.5c joins it), with a fake bridge in the test process against
      the CI stack, checking the printed bytes with the JS emulator. The shop test is a human item of the checklist.
 4. **5.4 i18n** (STATUS `i18n`), two PRs.
    - **5.4a `phase-5/i18n-checks`** (`i18n` `in_progress`). The web dictionary already has 2 289 keys in both languages and no `__TODO__`
@@ -363,7 +363,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      backups, devices enrolled and seen in 15 minutes, the rollout flags, whether error tracking is on. The hourly `BackupStale` check.
      `.github/workflows/uptime.yml`: every 15 minutes GitHub's scheduler sends one `GET /health` to the live URL (the existing repository
      variable, not written in the file) and fails when it is not `ok` twice in a row, which emails the repository owner (10.2 D14): the
-     same read of the public health route the deploy smoke makes. `e2e/live/ops-live.spec.ts` (`@live`, run by the deploy as the E2E
+     same read of the public health route the deploy smoke makes. `e2e/p5/ops-live.spec.ts` (`@live`, project `p5-device`, run by the deploy as the E2E
      admin): the System page renders and the scheduler ticked in the last 3 minutes; once backups have run, the last good backup is
      younger than 26 h and the last drill younger than 8 days and `ok` (until the first drill has run the spec reports "not configured
      yet" without failing, then it enforces).
@@ -548,7 +548,7 @@ or agent touches the live host except the deploy workflow's own `@live` stage an
     { "id": "backup-drill-ci", "title": "A dump restores into a scratch database and passes the ledger tests",
       "required": true, "verifier": { "type": "ci_job", "jobs": ["backup-drill"] } },
     { "id": "live-ops", "title": "Live: a good backup in the last 26 h, a passing drill in the last 8 days",
-      "required": true, "verifier": { "type": "ci_job", "workflow": "deploy.yml", "job": "live", "branch": "main", "max_age_days": 7 } },
+      "required": true, "verifier": { "type": "ci_job", "workflow": "deploy.yml", "job": "live-e2e", "branch": "main", "max_age_days": 7 } },
     { "id": "branch-protection", "title": "main requires gate-p0 to gate-p5",
       "required": true, "verifier": { "type": "script", "run": ["python3", "scripts/ops/check_branch_protection.py", "--require", "gate-p0..gate-p5"] } },
     { "id": "handbook", "title": "Admin handbook",
@@ -571,7 +571,7 @@ The items (titles shortened):
 | `i18n-strict`: parity strict, API parity, every `am` screen swept | `ci_job` `i18n-check`, `e2e-p5`; `script` `check_invariants.py --i18n --strict-i18n` | CI |
 | `backup-drill-ci` | `ci_job` `backup-drill` | CI |
 | `load-test`: k6 within thresholds | `ci_job` `perf-load` | CI |
-| `live-ops`: backup and drill fresh on the live host | `ci_job` workflow `deploy.yml`, job `live`, within 7 days of the claim | CI (the deploy's `@live` stage) |
+| `live-ops`: backup and drill fresh on the live host | `ci_job` workflow `deploy.yml`, job `live-e2e` (matched by id or display name), within 7 days of the claim | CI (the deploy's `@live` stage) |
 | `uptime-monitor` | `file_exists` `.github/workflows/uptime.yml` and `ci_job` workflow `uptime.yml` green within 1 day of the claim | CI |
 | `handbook`, `on-call-plan`, `restore-runbook`, `print-runbook`, `adrs` | `file_exists` (the handbook pages, `docs/runbook/on-call.md`, `backup-restore.md`, `print-bridge.md`, ADRs 0017 to 0021) | CI |
 | `devices-enrolled` (every tablet enrolled, enforcement on) | `file_exists` + `signoff` | **Ramin** |
