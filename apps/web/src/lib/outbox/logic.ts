@@ -181,7 +181,16 @@ export function settle(items: OutboxItem[], id: string, answer: unknown): Outbox
           ...i,
           dependsOn: null,
           state: "conflict" as const,
-          conflict: { status: 0, body: { message_key: "outbox.dependency_answer_missing" }, at: Date.now(), blockedBy: id },
+          conflict: {
+            status: 0,
+            body: {
+              message_key: "outbox.dependency_answer_missing",
+              message_en: "The change it waited for was saved without what this one needs.",
+              message_am: "የጠበቀው ለውጥ ይህ የሚያስፈልገውን ሳይይዝ ተቀምጧል።",
+            },
+            at: Date.now(),
+            blockedBy: id,
+          },
         };
       }
       const { token } = i.needs;

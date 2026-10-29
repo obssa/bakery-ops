@@ -37,6 +37,8 @@ test.describe("p5 offline: the outbox", () => {
     await page.getByRole("button", { name: "Send order" }).click();
     const waiting = page.getByRole("status").filter({ hasText: "1 change waiting to send" });
     await expect(waiting).toBeVisible();
+    // the record is written to IndexedDB right after the strip shows it
+    await expect.poll(async () => (await queuedWrites(page)).length).toBe(1);
     const queued = await queuedWrites(page);
     expect(queued).toHaveLength(1);
     expect(queued[0]).toMatchObject({ kind: "send_order", path: "/orders", state: "pending" });

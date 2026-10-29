@@ -2,29 +2,36 @@
 
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
+import { usePathname } from "@/i18n/navigation";
 import { useErrorText } from "@/lib/errors";
+import { pendingCounts, screenOf } from "@/lib/outbox/logic";
 import { useOutbox } from "@/lib/outbox/store";
 import { focusRing } from "./styles";
 
-// The outbox in the shell: how many writes are waiting to reach the server, and the ones the server refused (kept
-// until dismissed, so a dropped write is never silent). Renders nothing when there is nothing to say.
+// The outbox in the shell: how many writes are waiting to reach the server from this screen (and from the others of this tablet,
+// step 5.2a), and the ones the server refused (kept until dismissed, so a dropped write is never silent; the conflict tray with its
+// actions is step 5.2c). Renders nothing when there is nothing to say.
 
 export function PendingIndicator() {
   const t = useTranslations("outbox");
   const errorText = useErrorText();
-  const items = useOutbox((s) => s.items);
+  const pathname = usePathname();
+  const queue = useOutbox((s) => s.queue);
+  const { here, elsewhere } = useMemo(() => pendingCounts(queue, screenOf(pathname)), [queue, pathname]);
   // a refusal the pad shows on its own line (the shortfall) stays out of the strip
   const allFailures = useOutbox((s) => s.failures);
   const failures = useMemo(() => allFailures.filter((f) => !f.inline), [allFailures]);
   const dismiss = useOutbox((s) => s.dismissFailure);
 
-  if (items.length === 0 && failures.length === 0) return null;
+  if (here === 0 && elsewhere === 0 && failures.length === 0) return null;
   return (
     <div role="region" aria-label={t("region")} className="border-b border-neutral-200 bg-neutral-50">
       <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-2">
-        {items.length > 0 ? (
+        {here > 0 || elsewhere > 0 ? (
           <p role="status" className="text-base font-medium text-blue-900">
-            {t("pending", { count: items.length })}
+            {here > 0 ? t("pending", { count: here }) : null}
+            {here > 0 && elsewhere > 0 ? " · " : null}
+            {elsewhere > 0 ? t("pending_elsewhere", { count: elsewhere }) : null}
           </p>
         ) : null}
         {failures.map((failure) => (
