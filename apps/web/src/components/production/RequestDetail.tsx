@@ -2,14 +2,15 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api/client";
 import { uuid, useIdempotencyKey } from "@/lib/api/idempotency";
-import { acceptRequest, cancelRequest, confirmBatch, finishBatch, sendBackBatch, startBatch, useProductionCard } from "@/lib/api/production";
+import { acceptRequest, batchGroup, cancelRequest, confirmBatch, sendBackBatch, submitFinishBatch, submitStartBatch, useProductionCard } from "@/lib/api/production";
 import type { CardLine, IngredientShort, Locale, ProductionRequest, RequestStatus } from "@/lib/api/types";
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { canCancel, canSignOff } from "@/lib/live/production";
+import { onOutboxApplied, useOutbox } from "@/lib/outbox/store";
 import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { RequestTransferSheet } from "../inventory/RequestTransferSheet";
@@ -108,6 +109,7 @@ function RecipeTable({ lines, locale, onTransfer, canTransfer }: { lines: CardLi
 export function RequestDetail({ summary, onClose, onChanged }: { summary: ProductionRequest; onClose: () => void; onChanged: () => void }) {
   const dates = useDateFormat();
   const t = useTranslations("production");
+  const o = useTranslations("outbox");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
   const queryClient = useQueryClient();
@@ -135,13 +137,30 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
   const [transfer, setTransfer] = useState<CardLine | null>(null);
   const [transferred, setTransferred] = useState(false);
 
+  // a batch step saved offline waits in the outbox (step 5.2a): the request's other steps wait for it, and the card is read again once
+  // the outbox has sent it
+  const group = batchGroup(request.id);
+  const waiting = useOutbox((s) => s.items.some((item) => item.group === group));
+  const blocked = busy !== null || waiting;
+  useEffect(
+    () =>
+      onOutboxApplied((item) => {
+        if (item.group !== group) return;
+        void queryClient.invalidateQueries({ queryKey: ["production-card", request.id] });
+        onChanged();
+      }),
+    [group, queryClient, request.id, onChanged],
+  );
+
   async function run(kind: string, payload: unknown, call: (key: string) => Promise<unknown>) {
     setBusy(kind);
     setError(null);
     try {
-      await call(keys.keyFor({ kind, id: request.id, payload }));
+      const outcome = await call(keys.keyFor({ kind, id: request.id, payload }));
       keys.done();
       setForm(null);
+      // queued by the outbox (offline): nothing changed on the server yet
+      if (outcome !== null && typeof outcome === "object" && (outcome as { sent?: unknown }).sent === false) return;
       await queryClient.invalidateQueries({ queryKey: ["production-card", request.id] });
       onChanged();
     } catch (failure) {
@@ -159,7 +178,7 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
     if (!isQuantityText(w)) return setInvalid("waste");
     if (compareDecimal(p, "0") === 0 && compareDecimal(w, "0") === 0) return setInvalid("empty");
     setInvalid(null);
-    void run("done", { p, w }, (key) => finishBatch(batch.id, { produced_qty: p, waste_qty: w }, key));
+    void run("done", { p, w }, (key) => submitFinishBatch(request.id, batch.id, { produced_qty: p, waste_qty: w }, key));
   }
 
   function sendBack() {
@@ -251,6 +270,11 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
         )
       ) : null}
 
+      {waiting ? (
+        <p role="status" className="rounded-md bg-blue-50 px-4 py-3 text-base font-medium text-blue-900">
+          {o("queued")}
+        </p>
+      ) : null}
       {error ? (
         <Alert>
           <p>{errorText.message(error)}</p>
@@ -286,7 +310,7 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
             </Field>
           </div>
           {invalid === "empty" ? <p className="text-sm font-medium text-red-700">{t("need_something")}</p> : null}
-          <Button type="submit" disabled={busy !== null}>
+          <Button type="submit" disabled={blocked}>
             {busy === "done" ? t("working") : t("done")}
           </Button>
         </form>
@@ -301,7 +325,7 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
             {(props) => <TextInput {...props} value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
           </Field>
           <div className="flex flex-wrap gap-3">
-            <Button type="button" disabled={busy !== null} onClick={sendBack}>
+            <Button type="button" disabled={blocked} onClick={sendBack}>
               {busy === "send_back" ? t("working") : t("send_back_submit")}
             </Button>
             <Button type="button" variant="secondary" onClick={() => setForm(null)}>
@@ -317,7 +341,7 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
             {(props) => <TextInput {...props} value={reason} maxLength={255} onChange={(event) => setReason(event.target.value)} />}
           </Field>
           <div className="flex flex-wrap gap-3">
-            <Button type="button" disabled={busy !== null} onClick={() => void run("cancel", reason.trim(), (key) => cancelRequest(request.id, reason.trim(), key))}>
+            <Button type="button" disabled={blocked} onClick={() => void run("cancel", reason.trim(), (key) => cancelRequest(request.id, reason.trim(), key))}>
               {busy === "cancel" ? t("working") : t("cancel_submit")}
             </Button>
             <Button type="button" variant="secondary" onClick={() => setForm(null)}>
@@ -329,27 +353,27 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
 
       <div className="flex flex-wrap gap-3">
         {canAccept ? (
-          <Button type="button" disabled={busy !== null} onClick={() => void run("accept", null, (key) => acceptRequest(request.id, key))}>
+          <Button type="button" disabled={blocked} onClick={() => void run("accept", null, (key) => acceptRequest(request.id, key))}>
             {busy === "accept" ? t("working") : t("accept")}
           </Button>
         ) : null}
         {canStart ? (
-          <Button type="button" disabled={busy !== null} onClick={() => void run("start", batchUuid.current, (key) => startBatch(request.id, batchUuid.current, key))}>
+          <Button type="button" disabled={blocked} onClick={() => void run("start", batchUuid.current, (key) => submitStartBatch(request.id, batchUuid.current, key))}>
             {busy === "start" ? t("working") : t("start")}
           </Button>
         ) : null}
         {signOff && batch ? (
           <>
-            <Button type="button" disabled={busy !== null} onClick={() => void run("confirm", null, (key) => confirmBatch(batch.id, key))}>
+            <Button type="button" disabled={blocked} onClick={() => void run("confirm", null, (key) => confirmBatch(batch.id, key))}>
               {busy === "confirm" ? t("working") : t("confirm")}
             </Button>
-            <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => setForm(form === "send_back" ? null : "send_back")}>
+            <Button type="button" variant="secondary" disabled={blocked} onClick={() => setForm(form === "send_back" ? null : "send_back")}>
               {t("send_back")}
             </Button>
           </>
         ) : null}
         {cancellable ? (
-          <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => setForm(form === "cancel" ? null : "cancel")}>
+          <Button type="button" variant="secondary" disabled={blocked} onClick={() => setForm(form === "cancel" ? null : "cancel")}>
             {t("cancel")}
           </Button>
         ) : null}
