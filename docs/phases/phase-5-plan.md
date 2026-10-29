@@ -246,6 +246,39 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      feature tests (403 per role, replay, validation); `RoutePermissionMatrixTest` picks up `devices.manage` and `devices.self`. No
      Playwright change: the flag stays off everywhere in this PR, so no fixture breaks. Live: M1 adds columns with defaults to `devices`;
      the flag is off.
+   - **As built (step 5.1a, `phase-5/device-enforcement`).** Tests red first, then the code with the registries, then the docs. Where the
+     code chose what the plan left open:
+     - **The station routes** are 58 (`tests/Support/station_routes.php`, each with the screen that calls it), the other 126 in
+       `tests/Support/non_station_routes.php`. Besides the plan's list they include the till's receipt photo (`POST /files`, `DELETE
+       /files/{file}`), the display case, the KDS strip's transfer request (`POST /transfers`), the production board's reads, the count
+       screen's reads and `GET /variance-reasons`, the till's channels and receipt settings. A route the back office also reads (the order
+       list, one order, a shift, a count) stays a station route when a floor screen needs it, so once the flag is on an admin computer that
+       opens those pages is enrolled like a tablet (ADR 0017 decision 4; 5.1b's screen should say so). Approve, unlock, assign, rosters,
+       templates, the approval queue, `GET /shifts`, `GET /payments`, verify and dispute stay back office. The acting-session route is the
+       public `POST /short-code/verify`: it carries `device`, and with no user there only "unknown" and "revoked" apply.
+     - **Order of the checks**: `device` runs after `actor` and before the permission and the idempotency key (the middleware priority list
+       in `bootstrap/app.php`), so an unenrolled tablet gets `identity.device.unknown` whoever signed in, and a refusal is never stored.
+       Inside: unknown (no header, an unknown or a deleted fingerprint), then other branch, then revoked.
+     - **`GET /devices/this`** answers `{enrolled, revoked, device: {id, name, kind}|null, enforcement}`. `ResolveActor` skips the device
+       on that one route (`DEVICE_PROBE_ROUTE`), so a revoked device reads `revoked: true` instead of the actor middleware's 403; a device of
+       another branch reads as unknown.
+     - **`POST /devices`**: `client_uuid` required (no web caller existed), `kind` optional (tablet), `station_id` optional (a station of the
+       branch). The fingerprint check left the validator for its own key (`422 identity.device.fingerprint_taken`, any branch, deleted or
+       not); a `client_uuid` already used answers that device with 200 and no token. A bridge's token is 32 random bytes as 64 hex
+       characters; `token` joined `Idempotency::SECRET_FIELDS`, so the answer that carries it is stored encrypted, as a short code's is.
+       Rename and revoke create no row, so they take no `client_uuid` (the Idempotency-Key makes a retry safe); rename's `station_id` is
+       changed only when the key is sent (null clears it). The list answers `station_id`, not a nested station.
+     - **`last_seen_at`**: skipped when the loaded row was seen less than a minute ago, else a lock of the default cache store (the
+       `database` store on the live host; `DeviceLastSeenTest` runs it on `database` too) that lives a minute and is never released; the
+       write sets `last_seen_at` alone (no `updated_at`, no audit row).
+     - **Messages**: `identity.device.revoked` now says to enrol the tablet as a new device (a revoked id is never enrolled again).
+     - **Manifest** (10.9): `phases.5.adrs` names the five ADR files (`0018-offline-outbox-and-conflicts`, `0019-printing-through-a-pull-bridge`,
+       `0020-backups-and-restore-drills-on-a-shared-host`, `0021-observability-on-a-shared-host`: later steps write them under exactly
+       these names); `ops` is a top-level entry, not under `modules`, because `SkeletonInvariantsTest` asks every module for an
+       `app/Modules/<Name>` directory and Ops is `App\Ops`; `phases.5.e2e_profile` records the e2e-p5 stack; the 5.1 and 5.5 step texts
+       follow 10.9. `ci.e2e_jobs` and `ci.yml` are left for 5.1b, `extra_ci_jobs` for 5.6b (7.1).
+     - **Live**: M1 adds columns with defaults to `devices` (every row becomes a tablet; no row is updated) and M2a inserts two
+       `permissions` rows and their default grants in `role_has_permissions`. The flag is off; no Playwright change.
    - **5.1b `phase-5/web-devices`** (STATUS `identity.devices` `done`). Web: `src/lib/api/client.ts` sends `X-Device-Id` on every request
      (today only the acting calls of `lib/acting.ts` do); a "this tablet is not enrolled" screen on 403 `identity.device.unknown` or
      `revoked` (bilingual, shows the short form of the id and "ask an admin to sign in here and enrol it"); a revoked id is dropped and a

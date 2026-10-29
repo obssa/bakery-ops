@@ -901,6 +901,37 @@
       "note": "provider is Shared, built in this phase (step 4.2a); written red in 4.1a, run by mod-payments from 4.2a. Not in phases.4.contracts_required: the entry gate requires a contract whose provider is from an earlier phase (Shared, phase 0) to be green at entry; see phases.4.intra_phase_contracts."
     }
   },
+  "ops": {
+    "not_a_module": "App\\Ops (step 5.5b): backups, the restore drill and the System status; no module job and no app/Modules directory, so it is not under modules (SkeletonInvariantsTest would ask for one); listed so gate_check and the ERD check can see its tables and contracts",
+    "namespace": "App\\Ops",
+    "phase": 5,
+    "depends_on": [
+      "inventory",
+      "shifts",
+      "notifications",
+      "shared"
+    ],
+    "needs": {
+      "inventory": [
+        "LedgerOracle::check(connection) (new, contract ops->inventory)"
+      ],
+      "shifts": [
+        "HashChain::verifyAll(connection) (new, contract ops->shifts)"
+      ],
+      "notifications": [
+        "events only: BackupFailed, BackupStale, DrillFailed, PrintJobFailed"
+      ]
+    },
+    "tables": [],
+    "tables_phase_5": [
+      "ops_runs (step 5.5b, no branch_id: one host, one database; in the branch_id allowlist with that reason)"
+    ],
+    "contracts": [
+      "ops->inventory",
+      "ops->shifts"
+    ],
+    "note": "the two contracts are written red in the first commit of step 5.5b (apps/api/tests/Contract/Ops/InventoryContractTest.php, ShiftsContractTest.php) and enter contracts and phases.5.intra_phase_contracts there"
+  },
   "phases": {
     "0": {
       "name": "Foundations and ledger",
@@ -1396,7 +1427,7 @@
         {
           "id": "5.1",
           "module": "identity.devices",
-          "builds": "EnsureEnrolledDevice on station routes behind a flag, admin enrolment UI; first because it changes every e2e fixture",
+          "builds": "EnsureEnrolledDevice (alias device) on the station routes of tests/Support/station_routes.php behind identity.require_enrolled_device (IDENTITY_REQUIRE_DEVICE, off until devices-enrolled is signed), device kinds and the bridge token, GET /devices/this, the admin Devices screen and the not-enrolled screen; first because it changes every e2e fixture",
           "pest_groups": [
             "feature"
           ],
@@ -1425,7 +1456,7 @@
         {
           "id": "5.5",
           "module": "ops",
-          "builds": "nightly pg_dump container, restore drill script, k6 load test (60 devices), Sentry, Pulse, health endpoints"
+          "builds": "nightly mysqldump plus the files folder from the scheduler to the account's disk (no Docker or object storage on the live host; off-site later), restore drill in CI on the compose MariaDB, k6 load test (60 devices) in CI only, Sentry off until a DSN, no Pulse (D12), the System page with devices seen in the last 15 minutes, health endpoints"
         },
         {
           "id": "5.6",
@@ -1453,7 +1484,27 @@
           "every item in docs/go-live-checklist.json reports pass through its verifier"
         ]
       },
-      "adrs": []
+      "adrs": [
+        "0017-device-enrolment-and-enforcement",
+        "0018-offline-outbox-and-conflicts",
+        "0019-printing-through-a-pull-bridge",
+        "0020-backups-and-restore-drills-on-a-shared-host",
+        "0021-observability-on-a-shared-host"
+      ],
+      "e2e_profile": {
+        "job": "e2e-p5",
+        "profiles": "full",
+        "history_days": "2",
+        "env": {
+          "IDENTITY_REQUIRE_DEVICE": "true"
+        },
+        "projects": [
+          "p5-device",
+          "p5-offline"
+        ],
+        "note": "phase-5 plan 7.1 and 10.9 item 5: polling, no Reverb (the reference's full,ws becomes full, ADR 0009); beside e2e-p4 rather than after it (D17); ci.yml and ci.e2e_jobs change in step 5.1b, p5-amharic joins in 5.4a"
+      },
+      "corrections": "phase-5 plan 10.9 (step 5.1a): adrs lists 0017 to 0021; ops is a top-level entry, not a module; e2e_profile records the e2e-p5 stack; gate.extra_ci_jobs gains perf-load and print-bridge and ci.gate_jobs.gate-p5 the same in step 5.6b; ci.e2e_jobs.e2e-p5 gets its new needs in 5.1b"
     }
   },
   "ci": {

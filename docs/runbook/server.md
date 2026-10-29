@@ -286,6 +286,7 @@ Three rules are on by default in the code (`config/ledger.php`, `config/shifts.p
 | `LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS` | The stock ledger refuses a movement that changes on-hand stock at a location of a station that tracks shifts unless a shift is open there (`409 inventory.shift.required`). Locations of no station (the E2E branch's display case, the store) and a count's own correction are exempt. | Stock moves at any station with no shift, as before Phase 3; rows carry the shift only when one runs. |
 | `SHIFTS_OPEN_AD_HOC_ON_ACCEPT` | A baker who accepts a production request at a station with no running shift opens a call-in shift (`origin = call_in`, carried); the accept, the batch and its movements carry it. | Nothing is opened; the accept carries a shift only if one already runs (the baker joins it). |
 | `PAYMENTS_REQUIRE_SHIFT_FOR_CASH` | A cash payment at the till needs the cashier to carry an open shift (`409 payments.shift.required`); the web till's Pay button waits for a running shift. Since step 4.3b the same holds for **every** channel (Telebirr, the banks): `Totals::byChannel(shift)` and the cashier's per-channel reconciliation are keyed on the payment's own shift. | Every channel is taken with or without a shift, as before; the till's cash count still works on whatever payments carry the shift. |
+| `IDENTITY_REQUIRE_DEVICE` (Phase 5, step 5.1a; ADR 0017) | **Off by default until Ramin signs `devices-enrolled`** (the code default is `false` and the live `.env` sets nothing). When on, every station route (the pad, the KDS, the till, the production board, the shift bar, the pad's lock screen: `apps/api/tests/Support/station_routes.php`) answers only a tablet the admin enrolled: no `X-Device-Id` or an unknown one is `403 identity.device.unknown`, a revoked one `403 identity.device.revoked`, another branch's `403 identity.device.other_branch`. Admin pages that read the same routes need their computer enrolled too. | Any device works on every route, as before Phase 5; known devices are still stamped on writes and a revoked one of the user's branch is still refused. |
 
 **Kill switch** (nothing is deployed and no data is lost; shifts already opened stay and are closed or cancelled from the screens). On the server,
 as the account user, in the release's `.env` (`~/bakery-ops.orcamind.dev/.env`; copy it to `.env.bak` first):
@@ -297,11 +298,15 @@ printf '
 LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS=false
 SHIFTS_OPEN_AD_HOC_ON_ACCEPT=false
 PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false
+IDENTITY_REQUIRE_DEVICE=false
 ' >> .env
 /opt/alt/php83/usr/bin/php artisan config:cache
 ```
 
-(or edit the three lines in place if they are already there; the last value wins only when there is one line per variable, so remove duplicates).
+(or edit the lines in place if they are already there; the last value wins only when there is one line per variable, so remove duplicates).
+The fourth line (step 5.1a) is the device kill switch: until the code default turns device enforcement on it changes nothing, and afterwards it
+lets every tablet in again, enrolled or not, while a lost or broken one is replaced. It can be written alone, without the three shift lines;
+verify it with `php artisan tinker --execute="var_dump(config('identity.require_enrolled_device'));"` (`false`).
 
 **Every channel, one line (step 4.3b, phase-4 plan 10.1 R-A).** `config/payments.php` also reads `PAYMENTS_REQUIRE_SHIFT`, the rule for the digital channels.
 The live `.env` does not set it, so it follows `PAYMENTS_REQUIRE_SHIFT_FOR_CASH`: the kill switch above switches the shift rule off for cash and for every
