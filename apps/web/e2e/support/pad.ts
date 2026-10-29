@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { placeDevice } from "./devices";
 
 // Page helpers for the waiter pad, shared by the step 1.6 specs (p1-shortfall, the pad lock test, and the full
 // p1-order-flow of step 1.6c). They select by role and accessible name only.
@@ -11,9 +12,10 @@ const TOKEN_KEY = "bakery-ops.token";
 
 /**
  * Opens a page (English by default) on a device that is already signed in as `account`: the token of its API session is
- * placed where the app keeps it (ADR 0007). Used by every role of the full order flow (kitchen, bar, till, admin).
+ * placed where the app keeps it (ADR 0007). Used by every role of the full order flow (kitchen, bar, till, admin). The page
+ * runs on the device enrolled for the account's role (step 5.1b, devices.ts), or on `options.device` (a tablet a flow enrols).
  */
-export async function openAs(page: Page, account: { token: string | null }, path: string) {
+export async function openAs(page: Page, account: { token: string | null; device?: string }, path: string, options: { device?: string } = {}) {
   const token = account.token;
   if (!token) throw new Error("the account has no API session");
   await page.addInitScript(
@@ -26,6 +28,8 @@ export async function openAs(page: Page, account: { token: string | null }, path
     },
     [TOKEN_KEY, token],
   );
+  const device = options.device ?? account.device;
+  if (device) await placeDevice(page, device);
   await page.goto(path);
 }
 

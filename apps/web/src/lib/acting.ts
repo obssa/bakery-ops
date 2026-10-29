@@ -8,35 +8,14 @@ import { actingHooks, useSession } from "./session";
 
 // The shared pad (docs/architecture.md section 6): the device is signed in as the pad account, and a waiter wakes it
 // with their short code. POST /short-code/verify starts a 10-minute acting session; every pad call then carries its id
-// in X-Acting-Session (and the device's id in X-Device-Id) so the API stamps the waiter, not the pad account. The
-// session lives in memory only: a reload, a lock or the end of the session leaves the pad locked, never open.
+// in X-Acting-Session so the API stamps the waiter, not the pad account (and, like every call of the shell since step 5.1b, the
+// device's id in X-Device-Id: lib/device.ts). The session lives in memory only: a reload, a lock or the end of the session
+// leaves the pad locked, never open.
 
 /** Locks the pad after this long without a touch. */
 export const IDLE_LOCK_MS = 60_000;
 
-export const DEVICE_HEADER = "X-Device-Id";
 export const ACTING_HEADER = "X-Acting-Session";
-
-const DEVICE_KEY = "bakery-ops.device-id";
-let memoryDeviceId: string | null = null;
-
-/** This device's id for X-Device-Id: made once, kept in localStorage (memory when storage is blocked). */
-export function deviceId(): string {
-  if (memoryDeviceId) return memoryDeviceId;
-  try {
-    const stored = window.localStorage.getItem(DEVICE_KEY);
-    if (stored) return (memoryDeviceId = stored);
-  } catch {
-    // storage blocked: the id lasts for this tab
-  }
-  const made = `pad-${uuid()}`;
-  try {
-    window.localStorage.setItem(DEVICE_KEY, made);
-  } catch {
-    // see above
-  }
-  return (memoryDeviceId = made);
-}
 
 export type LockReason = "idle" | "expired" | "manual";
 
@@ -75,7 +54,6 @@ export const useActing = create<ActingState>()((set, get) => ({
       body: { code, branch_id: me.user.branch_id },
       token,
       idempotencyKey: uuid(),
-      headers: { [DEVICE_HEADER]: deviceId() },
     });
     const length = Date.parse(verified.acting_session.expires_at) - Date.parse(verified.acting_session.started_at);
     const now = Date.now();
@@ -109,12 +87,10 @@ export function lockDue(state: Pick<ActingState, "user" | "expiresAt" | "touched
   return null;
 }
 
-/** The headers of a pad call: the device, and the acting session when a waiter has the pad. */
+/** The headers of a pad call: the acting session when a waiter has the pad (the client adds the device, lib/device.ts). */
 export function actingHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { [DEVICE_HEADER]: deviceId() };
   const sessionId = useActing.getState().sessionId;
-  if (sessionId !== null) headers[ACTING_HEADER] = String(sessionId);
-  return headers;
+  return sessionId === null ? {} : { [ACTING_HEADER]: String(sessionId) };
 }
 
 // signing the pad account out leaves the pad locked for whoever signs in next

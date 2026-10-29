@@ -1,4 +1,5 @@
 import { Api, uuid } from "./api";
+import { STAFF } from "./staff";
 import { run } from "./env";
 import { ensureOpenShift, ensureOpenShiftAt } from "./shifts";
 
@@ -50,17 +51,6 @@ export interface StationFixture {
   ingredient: { id: number; name_en: string; name_am: string; unitId: number; stocked: string };
   product: { id: number; name_en: string; name_am: string; price: string; ingredientPerUnit: string };
 }
-
-const STAFF = {
-  chef: { phone: "+251911000201", name: "E2E Chef" },
-  barista: { phone: "+251911000202", name: "E2E Barista" },
-  waiter: { phone: "+251911000203", name: "E2E Waiter" },
-  cashier: { phone: "+251911000204", name: "E2E Cashier" },
-  manager: { phone: "+251911000205", name: "E2E Manager" },
-  // Phase 2 (step 2.8a): the bakers of the production board
-  cake_baker: { phone: "+251911000206", name: "E2E Cake Baker" },
-  bread_baker: { phone: "+251911000207", name: "E2E Bread Baker" },
-} as const;
 
 /** The password of a fixed e2e account: derived from the admin's, so no credential is written in the repository. */
 function passwordFor(adminPassword: string, role: keyof typeof STAFF): string {

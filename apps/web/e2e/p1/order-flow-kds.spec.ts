@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Request, type Response } from "@playwright/test";
+import { deviceOf, placeDevice } from "../support/devices";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture, clearStaleOrders, ledgerReasons, sendOrder, type StationFixture } from "../support/fixture";
 
@@ -15,6 +16,8 @@ import { buildStationFixture, clearStaleOrders, ledgerReasons, sendOrder, type S
 // flow carries @live (admin-smoke.spec.ts explains how each environment provides the admin).
 
 async function signInAs(page: Page, phone: string, password: string, next: string) {
+  // the device enrolled for this account's role in global setup (step 5.1b: CI enforces enrolled devices on the station routes)
+  await placeDevice(page, deviceOf(phone));
   await page.goto(`en/login/?next=${encodeURIComponent(next)}`);
   await page.getByLabel("Phone number").fill(phone);
   await page.getByLabel("Password").fill(password);
