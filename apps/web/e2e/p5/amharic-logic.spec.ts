@@ -61,7 +61,7 @@ test.describe("amharic sweep", () => {
       {
         data: [
           { id: 1, name_en: "Club sandwich", name_am: "ክለብ ሳንድዊች", sku: "P-SND-CLUB", status: "open", unit: { code: "pcs", name_en: "Piece" } },
-          { id: 2, name: "Meron Tadesse", roles: ["manager"], phone: "+251900000000", note: "E2E note" },
+          { id: 2, name: "Meron Tadesse", roles: ["manager"], note: "E2E note" },
         ],
       },
       names,
