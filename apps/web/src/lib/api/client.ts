@@ -1,8 +1,10 @@
+import { currentPath, DEVICE_HEADER, deviceId, isDeviceRefusal, useDeviceGate } from "../device";
 import { stationHeaders, useShiftNotice } from "../station";
 import type { ApiErrorBody, Locale } from "./types";
 
 // The one way the shell talks to /api/v1 (ADR 0007): bearer token, JSON, and an Idempotency-Key on every write
-// (rule 7, ADR 0003). The API origin is baked in at build time: http://localhost:8000 locally and in CI, empty on the
+// (rule 7, ADR 0003). Every call carries this device's id in X-Device-Id (step 5.1b, lib/device.ts): a device refusal (403
+// identity.device.*) is handed to the "not enrolled" screen, and a revoked id is replaced. The API origin is baked in at build time: http://localhost:8000 locally and in CI, empty on the
 // live site where the shell and the API share https://bakery-ops.orcamind.dev.
 const API_ORIGIN = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "");
 export const API_BASE = `${API_ORIGIN}/api/v1`;
@@ -48,7 +50,7 @@ export interface RequestOptions {
   /** Required for writes; reuse the same key when retrying the same request (see idempotency.ts). */
   idempotencyKey?: string;
   signal?: AbortSignal;
-  /** Extra request headers: the pad sends X-Acting-Session and X-Device-Id (lib/acting.ts). */
+  /** Extra request headers: the pad sends X-Acting-Session (lib/acting.ts). X-Device-Id is always this device's own (lib/device.ts). */
   headers?: Record<string, string>;
   /** Give up after this long (default WRITE_TIMEOUT_MS for writes, READ_TIMEOUT_MS for reads): a network failure. */
   timeoutMs?: number;
@@ -83,9 +85,18 @@ function withTimeout(caller: AbortSignal | undefined, ms: number): { signal: Abo
   };
 }
 
-/** Records the refusals that mean "start a shift first" so the shift bar can say so (step 3.7a), and returns the error. */
-function failed(error: ApiError): ApiError {
+/** What every call sends besides its own headers: the station picked (if any), and this device's id last, so no caller's copy wins. */
+function baseHeaders(accept: string, extra: Record<string, string> | undefined, device: string): Record<string, string> {
+  return { Accept: accept, ...stationHeaders(), ...extra, [DEVICE_HEADER]: device };
+}
+
+/**
+ * Records the refusals that mean "start a shift first" so the shift bar can say so (step 3.7a), and the device refusals for the "not
+ * enrolled" screen (step 5.1b, with the id the call went out with and the page it was for), and returns the error.
+ */
+function failed(error: ApiError, device: string, path: string): ApiError {
   if (error.status === 409) useShiftNotice.getState().report(error);
+  if (isDeviceRefusal(error)) useDeviceGate.getState().report(error, device, path);
   return error;
 }
 
@@ -106,7 +117,9 @@ function isForm(body: unknown): body is FormData {
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
-  const headers: Record<string, string> = { Accept: "application/json", ...stationHeaders(), ...options.headers };
+  const device = deviceId();
+  const page = currentPath();
+  const headers = baseHeaders("application/json", options.headers, device);
   if (options.body !== undefined && !isForm(options.body)) headers["Content-Type"] = "application/json";
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (WRITE_METHODS.has(method)) {
@@ -143,7 +156,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
   if (!response.ok) {
     const body = json && typeof json === "object" ? (json as Partial<ApiErrorBody>) : {};
-    throw failed(new ApiError(response.status, body));
+    throw failed(new ApiError(response.status, body), device, page);
   }
   return json as T;
 }
@@ -156,7 +169,9 @@ export async function requestBlob(
   path: string,
   options: { query?: RequestOptions["query"]; token?: string | null; signal?: AbortSignal; timeoutMs?: number; accept?: string } = {},
 ): Promise<Blob> {
-  const headers: Record<string, string> = { Accept: `${options.accept ?? "application/pdf"}, application/json`, ...stationHeaders() };
+  const device = deviceId();
+  const page = currentPath();
+  const headers = baseHeaders(`${options.accept ?? "application/pdf"}, application/json`, undefined, device);
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   const limit = withTimeout(options.signal, options.timeoutMs ?? READ_TIMEOUT_MS);
   let response: Response;
@@ -178,7 +193,7 @@ export async function requestBlob(
     } catch {
       body = {};
     }
-    throw failed(new ApiError(response.status, body));
+    throw failed(new ApiError(response.status, body), device, page);
   }
   return blob;
 }
@@ -201,7 +216,9 @@ export async function conditionalGet<T>(
     timeoutMs?: number;
   } = {},
 ): Promise<ConditionalResult<T>> {
-  const headers: Record<string, string> = { Accept: "application/json", ...stationHeaders(), ...options.headers };
+  const device = deviceId();
+  const page = currentPath();
+  const headers = baseHeaders("application/json", options.headers, device);
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (options.etag) headers["If-None-Match"] = options.etag;
 
@@ -229,7 +246,7 @@ export async function conditionalGet<T>(
     }
   }
   if (!response.ok) {
-    throw failed(new ApiError(response.status, json && typeof json === "object" ? (json as Partial<ApiErrorBody>) : {}));
+    throw failed(new ApiError(response.status, json && typeof json === "object" ? (json as Partial<ApiErrorBody>) : {}), device, page);
   }
   return { notModified: false, etag, data: json as T };
 }

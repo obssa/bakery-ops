@@ -333,8 +333,6 @@ jobs:
     # BROADCAST_CONNECTION=null, NEXT_PUBLIC_LIVE_TRANSPORT=poll
     with: { phase: 1, projects: "p1-order-flow p1-shortfall", profiles: "full" }
 
-  # e2e-p5 keeps the stack it had before step 1.2 (worker and Reverb, `ws` now being its own compose profile)
-  # until its phase plan settles the transport; ADR 0009 has the screens poll unless a WebSocket host exists.
   # e2e-p2, e2e-p3 and e2e-p4 are settled (phase-2-plan.md section 2, phase-3-plan.md section 2, F7, phase-4-plan.md 10.9 item 3): polling, with the worker the queued chains need.
   e2e-p2:
     needs: [status, mod-production, mod-notifications, web-build, docker-build]
@@ -382,7 +380,8 @@ jobs:
           COMPOSE_PROFILES: s3
         run: |
           set -o pipefail
-          docker compose -f compose.yml -f compose.ci.yml exec -T -e FILES_S3=1 app vendor/bin/pest --group=files-s3 --colors=never | tee /tmp/files-s3.txt
+          # the stack enforces enrolled devices (compose.ci.yml); the Files contract keeps the code default (off): it is not about devices
+          docker compose -f compose.yml -f compose.ci.yml exec -T -e IDENTITY_REQUIRE_DEVICE=false -e FILES_S3=1 app vendor/bin/pest --group=files-s3 --colors=never | tee /tmp/files-s3.txt
           if grep -Eiq "skipped|No tests (found|executed)" /tmp/files-s3.txt; then echo "::error::files-s3 skipped or ran nothing"; exit 1; fi
       - name: Logs on failure
         if: failure()
@@ -458,11 +457,14 @@ jobs:
         if: always()
         run: docker compose -f compose.yml -f compose.ci.yml down -v
 
+  # Phase 5 (step 5.1b; phase-5 plan 7.1, 10.2 D17, ADR 0009): polling with the worker, as on the live host, beside e2e-p4 instead of after
+  # it; two days of demo history (its projects need none, the default would replay 90). The 30-minute limit is e2e.yml's job timeout (a
+  # job that calls a reusable workflow cannot set its own). Device enforcement is on for every e2e job (compose.ci.yml).
   e2e-p5:
-    needs: [status, e2e-p4]
+    needs: [status, mod-analytics, web-build, docker-build]
     if: fromJSON(needs.status.outputs.phase) >= 5
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 5, projects: "p5-device p5-offline", profiles: "full,ws" }
+    with: { phase: 5, projects: "p5-device p5-offline", profiles: "full", history_days: "2" }
 
   backup-drill:
     needs: [status, e2e-p5]
@@ -551,7 +553,8 @@ jobs:
           # the image has no .env (the variables come from compose): phpdotenv's suppressed read of a missing file is reported by PHPUnit
           # as a warning on every test, so an empty one is put there and a warning then fails the gate like a skip
           docker compose -f compose.yml -f compose.ci.yml exec -T app touch .env
-          docker compose -f compose.yml -f compose.ci.yml exec -T -e GATE_SEED_DATABASE=bakery -e GATE_SEED_DAYS="$GATE_SEED_DAYS" app \
+          # the stack enforces enrolled devices (compose.ci.yml); the tests keep the code default (off) and turn it on where they test it
+          docker compose -f compose.yml -f compose.ci.yml exec -T -e IDENTITY_REQUIRE_DEVICE=false -e GATE_SEED_DATABASE=bakery -e GATE_SEED_DAYS="$GATE_SEED_DAYS" app \
             vendor/bin/pest --group=gate:p4 --colors=never 2>&1 | grep -v ' DEBUG: ' | tee /tmp/gate-p4.txt
           if grep -Eq "No tests (found|executed)" /tmp/gate-p4.txt; then echo "::error::the gate:p4 group ran nothing"; exit 1; fi
           if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky|warning|deprecat|notice)" /tmp/gate-p4.txt; then echo "::error::a gate:p4 test was skipped or warned: the gate fails, it never skips"; exit 1; fi

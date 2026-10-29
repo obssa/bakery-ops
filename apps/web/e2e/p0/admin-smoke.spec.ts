@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { deviceOf, placeDevice } from "../support/devices";
 
 // Phase 0 gate project p0-admin-smoke (manifest phases.0.gate.criteria): an admin signs in, creates an ingredient
 // and a product with English and Amharic names, sees both listed, switches to Amharic and sees the Amharic names in
@@ -44,6 +45,8 @@ function requireDemoAdmin() {
 }
 
 async function signIn(page: Page, account: { phone: string; password: string } = { phone, password }) {
+  // the device enrolled for this account's role in global setup (step 5.1b: CI enforces enrolled devices on the station routes)
+  await placeDevice(page, deviceOf(account.phone));
   await page.goto("en/login/");
   await page.getByLabel("Phone number").fill(account.phone);
   await page.getByLabel("Password").fill(account.password);

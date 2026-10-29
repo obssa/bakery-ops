@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { freshDevice } from "../support/devices";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture, clearStaleOrders } from "../support/fixture";
 import { openPad, openPadAndUnlock, typeCode } from "../support/pad";
@@ -19,7 +20,8 @@ test.describe("p1 order flow: pad lock", () => {
     await clearStaleOrders(credentials);
     const fixture = await buildStationFixture(credentials, "kitchen");
 
-    await openPad(page, fixture.waiter);
+    // the lockout counts per device: this pad is a device of its own (step 5.1b), so the run's waiter device stays unlocked for the flows after
+    await openPad(page, fixture.waiter, "en/pad/", { device: await freshDevice(fixture.admin, "lockout") });
     await expect(page.getByRole("heading", { name: "Enter your short code" })).toBeVisible({ timeout: 30_000 });
 
     await typeCode(page, WRONG);

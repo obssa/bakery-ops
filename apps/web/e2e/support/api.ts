@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { deviceOf } from "./devices";
 import { apiOrigin } from "./env";
 
 // A tiny typed client for the API, for fixtures and post-conditions: bearer token, JSON, and a fresh Idempotency-Key
-// on every write (rule 7), kept across the retries of that write. It does not share code with the app's own client on purpose: the tests must not pass or
-// fail because of a bug in what they check.
+// on every write (rule 7), kept across the retries of that write, and the device of its account's role in X-Device-Id on every request
+// (step 5.1b, devices.ts: CI enforces enrolled devices on the station routes). It does not share code with the app's own client on
+// purpose: the tests must not pass or fail because of a bug in what they check.
 
 export class ApiFailure extends Error {
   constructor(
@@ -117,7 +119,19 @@ export class Api {
     public token: string | null = null,
     readonly origin: string = apiOrigin,
     private readonly account: { phone: string; password: string; branchId?: number } | null = null,
+    /** the device this client sends; by default its account's role's (devices.ts) */
+    private readonly fixedDevice: string | null = null,
   ) {}
+
+  /** The X-Device-Id of every request: the fixed one, or the enrolled device of the account's role. */
+  get device(): string {
+    return this.fixedDevice ?? deviceOf(this.account?.phone);
+  }
+
+  /** The same account and token on another device (a tablet a flow enrols, revokes or leaves unknown). */
+  onDevice(fingerprint: string): Api {
+    return new Api(this.token, this.origin, this.account, fingerprint);
+  }
 
   static async login(phone: string, password: string, branchId?: number, origin: string = apiOrigin): Promise<{ api: Api; login: LoginResult }> {
     const session = await Api.session(phone, password, branchId, origin);
@@ -160,6 +174,7 @@ export class Api {
       method,
       headers: {
         Accept: "application/json",
+        "X-Device-Id": this.device,
         ...(body === undefined || form ? {} : { "Content-Type": "application/json" }),
         ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
         ...(key === null ? {} : { "Idempotency-Key": key }),

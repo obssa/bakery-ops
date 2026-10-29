@@ -4,10 +4,24 @@ import { create } from "zustand";
 import { ApiError, isActingExpired, request, requestBlob, type RequestOptions } from "./api/client";
 import { uuid } from "./api/idempotency";
 import type { LoginResponse, Me } from "./api/types";
+import { isDeviceRefusal } from "./device";
 
 // The signed-in state of this device (ADR 0007): a Sanctum bearer token kept in memory and in localStorage (so a
 // reload or a later visit stays signed in), plus the GET /me answer (user, permissions, locale). Signing out revokes
 // the token on the server and forgets it here; a 401 on any call forgets it too.
+
+/**
+ * GET /me. The API refuses every signed-in call of a revoked device (403 identity.device.revoked, whatever the enforcement flag): the
+ * client has then made this device a new id (lib/device.ts), so /me is asked once more with it instead of signing the person out.
+ */
+async function readMe(token: string): Promise<Me> {
+  try {
+    return await request<Me>("/me", { token });
+  } catch (error) {
+    if (isDeviceRefusal(error)) return request<Me>("/me", { token });
+    throw error;
+  }
+}
 
 const TOKEN_KEY = "bakery-ops.token";
 
@@ -62,7 +76,7 @@ export const useSession = create<SessionState>()((set, get) => ({
       }
       set({ token, unreachable: false });
       try {
-        const me = await request<Me>("/me", { token });
+        const me = await readMe(token);
         set({ me, status: "signed-in" });
       } catch (error) {
         if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
@@ -88,7 +102,7 @@ export const useSession = create<SessionState>()((set, get) => ({
       unreachable: false,
     });
     // the sign-in answer has no work_stations: read /me once more so the station screens know where this person works
-    void request<Me>("/me", { token: login.token })
+    void readMe(login.token)
       .then((me) => {
         if (get().token === login.token) set({ me });
       })
