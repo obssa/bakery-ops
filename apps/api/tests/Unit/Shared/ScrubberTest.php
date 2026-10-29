@@ -66,7 +66,7 @@ it('removes PINs, passwords, tokens and phone numbers from the request body at a
         ],
     ]);
 
-    $json = json_encode(scrubbedJson($event)['request']);
+    $json = json_encode(scrubbedJson($event)['request'], JSON_UNESCAPED_SLASHES);
 
     foreach (['402913', 'Pa55-SECRET-word', 'Old-SECRET-pass', '7788', 'TOKENsecret0003', '251911223344', '0911223344'] as $secret) {
         expect($json)->not->toContain($secret);
@@ -109,7 +109,7 @@ it('removes the Authorization and Cookie headers, the cookies and the server env
     ]);
 
     $request = scrubbedJson($event)['request'];
-    $json = json_encode($request);
+    $json = json_encode($request, JSON_UNESCAPED_SLASHES);
 
     expect($json)->not->toContain('BEARERsecret')->not->toContain('LOWERsecret')->not->toContain('COOKIEsecret')->not->toContain('XSRFsecret')
         ->not->toContain('203.0.113.9')

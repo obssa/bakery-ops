@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Orders\Exceptions\OrderError;
 use App\Modules\Payments\Exceptions\PaymentError;
 use App\Shared\Observability\ErrorTracking;
+use App\Shared\Observability\SentryScrubber;
 use Illuminate\Foundation\PackageManifest;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -27,18 +28,30 @@ uses()->group('module:shared', 'feature');
 // a made-up DSN: the .test top-level domain never resolves, and the fake client answers before any network anyway
 const FAKE_SENTRY_DSN = 'https://0123456789abcdef0123456789abcdef@ingest.sentry.example.test/42';
 
-// what the requests below carry and must never reach the ingest
+// What the requests below carry and must never reach the ingest. Each is written in two halves: Sentry sends the source lines around every
+// in-app frame (this file's among them, which is the repository's own code), so a secret spelt out here would reach the fake ingest that way
+// and hide what the test is about: whether the request's values, the message and the breadcrumbs are scrubbed.
 const SENTRY_SECRETS = [
-    'pin' => '402913',
-    'password' => 'Pa55-SECRET-word',
-    'token' => 'TOKENsecret0003',
-    'bearer' => 'BEARERsecretTOKENvalue0123456789abcdefghijkl',
-    'cookie' => 'COOKIEsecret0004',
-    'phone (international)' => '251911223344',
-    'phone (local)' => '0911223344',
-    'signature' => 'SIGsecret',
-    'expires' => '1893456000',
+    'pin' => '402'.'913',
+    'password' => 'Pa55-'.'SECRET-word',
+    'token' => 'TOKEN'.'secret0003',
+    'bearer' => 'BEARER'.'secretTOKENvalue0123456789abcdefghijkl',
+    'cookie' => 'COOKIE'.'secret0004',
+    'phone' => '2519'.'11223344',
+    'local phone' => '09'.'11223344',
+    'signature' => 'SIG'.'secret',
+    'expires' => '18934'.'56000',
+    'a name' => 'Abebe '.'Kebede',
 ];
+
+/** Fails the test if any secret (or $alsoAbsent) reached the ingest anywhere in what would have been sent. */
+function expectNothingPersonalIn(FakeSentryIngest $ingest, string ...$alsoAbsent): void
+{
+    $raw = $ingest->raw();
+    foreach (SENTRY_SECRETS + $alsoAbsent as $what => $secret) {
+        expect(str_contains($raw, $secret))->toBeFalse("{$what} reached the ingest");
+    }
+}
 
 afterEach(function () {
     // the SDK keeps its current hub in a static: never let one test's client reach the next
@@ -78,45 +91,53 @@ it('sends an unexpected exception to the ingest with nothing personal left in it
     expect(turnSentryOn($ingest))->toBeTrue()
         ->and(ErrorTracking::enabled())->toBeTrue();
 
-    Route::post('/api/v1/__sentry-test/boom', function () {
-        Log::warning('before the failure: the customer on +251911223344 asked twice, pin=402913');
-        throw new RuntimeException('could not reach +251911223344 at http://h/api/v1/receipts/5?expires=1893456000&signature=SIGsecret0001 (password=Pa55-SECRET-word)');
+    $s = SENTRY_SECRETS;
+    $signed = "expires={$s['expires']}&signature={$s['signature']}0001";
+    Route::post('/api/v1/__sentry-test/boom', function () use ($s, $signed) {
+        Log::warning("before the failure: the customer on +{$s['phone']} asked twice, pin={$s['pin']}");
+        throw new RuntimeException("could not reach +{$s['phone']} at http://h/api/v1/receipts/5?{$signed} (password={$s['password']})");
     });
 
     $this->withHeaders([
-        'Authorization' => 'Bearer 7|BEARERsecretTOKENvalue0123456789abcdefghijkl',
-        'Cookie' => 'bakery_session=COOKIEsecret0004',
-    ])->postJson('/api/v1/__sentry-test/boom?expires=1893456000&signature=SIGsecret0002&page=2', [
-        'pin' => '402913',
-        'password' => 'Pa55-SECRET-word',
-        'token' => 'TOKENsecret0003',
-        'phone' => '+251911223344',
-        'note' => 'call 0911223344 after six',
+        'Authorization' => "Bearer 7|{$s['bearer']}",
+        'Cookie' => "bakery_session={$s['cookie']}",
+    ])->postJson("/api/v1/__sentry-test/boom?{$signed}&page=2", [
+        'pin' => $s['pin'],
+        'password' => $s['password'],
+        'token' => $s['token'],
+        'phone' => "+{$s['phone']}",
+        'note' => "call {$s['local phone']} after six",
         'kept' => 'visible-value',
     ])->assertStatus(500);
 
     $events = $ingest->events();
-    expect($events)->toHaveCount(1)
-        ->and($events[0]['exception']['values'][0]['type'] ?? null)->toBe(RuntimeException::class);
+    expect($events)->toHaveCount(1);
+    expectNothingPersonalIn($ingest);
 
-    $raw = $ingest->raw();
-    foreach (SENTRY_SECRETS as $what => $secret) {
-        expect($raw)->not->toContain($secret, "the {$what} reached the ingest");
-    }
-    expect($raw)->toContain('__sentry-test/boom')->toContain('page=2')->toContain('visible-value')
-        ->and($events[0]['user']['ip_address'] ?? null)->toBeNull()
-        ->and($events[0])->not->toHaveKey('spans');
+    $event = $events[0];
+    expect($event['exception']['values'][0]['type'] ?? null)->toBe(RuntimeException::class)
+        ->and($event['exception']['values'][0]['value'] ?? null)->toStartWith('could not reach [phone] at http://h/api/v1/receipts/5')
+        ->and($event['request']['url'] ?? null)->toEndWith('/api/v1/__sentry-test/boom?page=2')
+        ->and($event['request']['headers']['authorization'] ?? null)->toBe(SentryScrubber::FILTERED)
+        ->and($event['request']['data'] ?? null)->toMatchArray(['pin' => SentryScrubber::FILTERED, 'note' => 'call [phone] after six', 'kept' => 'visible-value'])
+        ->and(collect($event['breadcrumbs']['values'] ?? [])->pluck('message')->implode(' '))->toContain('asked twice, pin='.SentryScrubber::FILTERED)
+        ->and($event['user']['ip_address'] ?? null)->toBeNull()
+        ->and($event)->not->toHaveKey('spans');
 });
 
 it('sends nothing from the body of an identity route', function () {
     $ingest = new FakeSentryIngest;
     turnSentryOn($ingest);
     Route::post('/api/v1/users/sentry-test-boom', fn () => throw new RuntimeException('identity boom'));
+    $kept = 'visible'.'-value';
 
-    $this->postJson('/api/v1/users/sentry-test-boom', ['name_en' => 'Abebe Kebede', 'kept' => 'visible-value'])->assertStatus(500);
+    $this->postJson('/api/v1/users/sentry-test-boom', ['name_en' => SENTRY_SECRETS['a name'], 'kept' => $kept])->assertStatus(500);
 
-    expect($ingest->events())->toHaveCount(1)
-        ->and($ingest->raw())->toContain('identity boom')->not->toContain('Abebe')->not->toContain('visible-value');
+    $events = $ingest->events();
+    expect($events)->toHaveCount(1)
+        ->and($events[0]['exception']['values'][0]['value'] ?? null)->toBe('identity boom')
+        ->and($events[0]['request']['data'] ?? null)->toBe(SentryScrubber::FILTERED);
+    expectNothingPersonalIn($ingest, $kept);
 });
 
 it('never sends a refusal, even with a DSN', function () {

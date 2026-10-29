@@ -57,7 +57,7 @@ test("keeps what helps to find the bug", () => {
   expect(out.request.headers["User-Agent"]).toBe("Mozilla/5.0");
   expect(out.extra).toMatchObject({ order_no: "A-0042", amount: "1250.00", day: "2026-10-29" });
   expect(out.tags.station).toBe("bar");
-  expect(out.breadcrumbs[1].data.url).toContain("/api/v1/receipts/5");
+  expect(out.breadcrumbs[1].data?.url).toContain("/api/v1/receipts/5");
   expect(out.breadcrumbs[2].message).toBe("button.pay-complete");
   expect(out.exception.values[0].value).toContain("could not reach");
 });
