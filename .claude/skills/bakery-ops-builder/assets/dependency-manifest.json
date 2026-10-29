@@ -1502,9 +1502,9 @@
           "p5-device",
           "p5-offline"
         ],
-        "note": "phase-5 plan 7.1 and 10.9 item 5: polling, no Reverb (the reference's full,ws becomes full, ADR 0009); beside e2e-p4 rather than after it (D17); ci.yml and ci.e2e_jobs change in step 5.1b, p5-amharic joins in 5.4a"
+        "note": "phase-5 plan 7.1 and 10.9 item 5: polling, no Reverb (the reference's full,ws becomes full, ADR 0009); beside e2e-p4 rather than after it (D17); ci.yml and ci.e2e_jobs changed in step 5.1b (needs status, mod-analytics, web-build, docker-build; e2e.yml's 30-minute job timeout; IDENTITY_REQUIRE_DEVICE=true is set in compose.ci.yml for every e2e job), p5-amharic joins in 5.4a"
       },
-      "corrections": "phase-5 plan 10.9 (step 5.1a): adrs lists 0017 to 0021; ops is a top-level entry, not a module; e2e_profile records the e2e-p5 stack; gate.extra_ci_jobs gains perf-load and print-bridge and ci.gate_jobs.gate-p5 the same in step 5.6b; ci.e2e_jobs.e2e-p5 gets its new needs in 5.1b"
+      "corrections": "phase-5 plan 10.9 (step 5.1a): adrs lists 0017 to 0021; ops is a top-level entry, not a module; e2e_profile records the e2e-p5 stack; gate.extra_ci_jobs gains perf-load and print-bridge and ci.gate_jobs.gate-p5 the same in step 5.6b; ci.e2e_jobs.e2e-p5 got its new needs in 5.1b"
     }
   },
   "ci": {
@@ -1596,7 +1596,9 @@
         "docker-build"
       ],
       "e2e-p5": [
-        "e2e-p4"
+        "mod-analytics",
+        "web-build",
+        "docker-build"
       ]
     },
     "gate_jobs": {

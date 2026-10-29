@@ -13,6 +13,12 @@ services:
       APP_DEBUG: "false"
       APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
       OCTANE_WORKERS: "1"
+      # Device enforcement (Phase 5 step 5.1b, ADR 0017): every station route answers only an enrolled device, so the e2e projects of
+      # every phase and perf-dashboards run against the stack as the shop will. The Playwright fixtures enrol a device per role in global
+      # setup (apps/web/e2e/support/devices.ts); seeders write in process and are not affected. The code default and the live host stay
+      # off until the devices-enrolled sign-off (phase-5 plan 10.5). Pest runs inside this container pass IDENTITY_REQUIRE_DEVICE=false
+      # (ci.yml gate-p4, files-s3): the tests keep the code default and turn the flag on themselves where they test it.
+      IDENTITY_REQUIRE_DEVICE: "true"
       # Phase 3 enforcement rehearsal (phase-3-plan.md 10.1): CI runs the Phase 0-2 e2e flows with the shift rule ON; the
       # default in code, .env.example and .env.ci stays false until step 3.7e, and the live host never sets it.
       LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS: "true"
@@ -27,6 +33,7 @@ services:
     image: bakery-ops-api:ci
     environment:
       APP_ENV: testing
+      IDENTITY_REQUIRE_DEVICE: "true"
       LEDGER_REQUIRE_SHIFT_FOR_STATION_LOCATIONS: "true"
       APP_KEY: base64:Y2ktb25seS1rZXktY2ktb25seS1rZXktY2ktb25seS1rZXk=
 
