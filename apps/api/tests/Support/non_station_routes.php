@@ -97,6 +97,11 @@ return [
     'POST /api/v1/payments/{payment}/verify' => 'payments',
     'PUT /api/v1/receipt-settings' => 'payments',
     'GET /api/v1/receipts/{order}' => 'payments',
+    // the print bridge (step 5.3a): a shop computer with its own token, not a tablet with a person signed in
+    'GET /api/v1/bridge/jobs/next' => 'payments',
+    'POST /api/v1/bridge/jobs/{job}/claim' => 'payments',
+    'POST /api/v1/bridge/jobs/{job}/printed' => 'payments',
+    'POST /api/v1/bridge/jobs/{job}/failed' => 'payments',
     // production
     'POST /api/v1/production/requests/{request}/assign' => 'production',
     // notifications

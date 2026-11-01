@@ -201,6 +201,12 @@ return [
     'PUT /api/v1/receipt-settings' => ['permission' => 'channels.manage', 'roles' => ['admin'], 'module' => 'payments'],
     'GET /api/v1/orders/{order}/receipt.pdf' => ['permission' => 'payments.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
     'POST /api/v1/orders/{order}/receipt-link' => ['permission' => 'payments.take', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    // Printing (step 5.3a, phase-5 plan 4.3): the till asks for a print and reads its jobs, and a till PC may print the bytes itself (print.create and
+    // print.view: admin, manager, cashier). An open cart answers 409 payments.print.not_paid, never 403. The bridge's routes are public in the user
+    // sense: a bridge signs in with its own token (tests/Support/public_routes.php).
+    'POST /api/v1/orders/{order}/print' => ['permission' => 'print.create', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'GET /api/v1/print-jobs' => ['permission' => 'print.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
+    'GET /api/v1/orders/{order}/receipt.escpos' => ['permission' => 'print.view', 'roles' => ['admin', 'manager', 'cashier'], 'module' => 'payments'],
     'GET /api/v1/payments/reconciliation' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
     'GET /api/v1/payments/export' => ['permission' => 'payments.verify', 'roles' => ['admin', 'manager'], 'module' => 'payments'],
 
