@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { orderNoText } from "../../src/lib/orderNo";
 import { collectTyped, sweep } from "../support/amharic";
 
 // Phase 5 step 5.4a, the sweep under p5-amharic on planted pages (a browser, no stack): what counts as English left on an Amharic
@@ -7,7 +8,7 @@ import { collectTyped, sweep } from "../support/amharic";
 const page = (body: string) => `<!doctype html><html lang="am"><body><main>${body}</main></body></html>`;
 
 test.describe("amharic sweep", () => {
-  test("passes Amharic, numbers, ETB, the order number, typed names, text marked as another language and identifiers marked translate=no", async ({ page: tab }) => {
+  test("passes Amharic, numbers, hex digests, ETB, the order number, typed names, text marked as another language and identifiers marked translate=no", async ({ page: tab }) => {
     await tab.setContent(
       page(`
         <h1>የአስተናጋጅ ፓድ</h1>
@@ -17,6 +18,8 @@ test.describe("amharic sweep", () => {
         <nav><a lang="en" href="#">English</a><a lang="am" href="#">አማርኛ</a></nav>
         <table><tbody><tr><td translate="no">payment.void</td></tr></tbody></table>
         <span translate="no" class="font-mono">3F9A2C1B</span>
+        <p>የመጨረሻው ማያያዣ፦ 5124991d…b69826ba</p>
+        <span title="5124991d24bf2e045c91dde2f85f03b3bf240e9062c34f2ecd5d4ef2b69826ba">ሰንሰለት</span>
         <p hidden>Hidden English</p>
         <p style="display:none">Not shown</p>
         <button aria-label="ዝጋ">×</button>
@@ -36,6 +39,8 @@ test.describe("amharic sweep", () => {
         <p class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Skip to content</p>
         <p>Kitchen</p>
         <p>ብዛት 3 g · gold</p>
+        <p>ማያያዣ deadbeef</p>
+        <p>ትዕዛዝ null</p>
       `),
     );
     const gaps = await sweep(tab, ["ኩሽና", "g"]);
@@ -46,6 +51,8 @@ test.describe("amharic sweep", () => {
       "Skip to content",
       "Kitchen",
       "ብዛት 3 g · gold",
+      "ማያያዣ deadbeef",
+      "ትዕዛዝ null",
       'aria-label="Close"',
       'placeholder="Search"',
     ]);
@@ -64,10 +71,15 @@ test.describe("amharic sweep", () => {
         data: [
           { id: 1, name_en: "Club sandwich", name_am: "ክለብ ሳንድዊች", sku: "P-SND-CLUB", status: "open", unit: { code: "pcs", name_en: "Piece" } },
           { id: 2, name: "Meron Tadesse", roles: ["manager"], note: "E2E note" },
+          { id: 3, reference_no: "SEED-261029-4", status: "verified" },
         ],
       },
       names,
     );
-    expect([...names].sort()).toEqual(["E2E note", "Meron Tadesse", "P-SND-CLUB", "pcs"]);
+    expect([...names].sort()).toEqual(["E2E note", "Meron Tadesse", "P-SND-CLUB", "SEED-261029-4", "pcs"]);
+  });
+
+  test("an order without a number yet reads as a dash on the rail and the board, never null (found by the sweep)", () => {
+    expect([orderNoText(null), orderNoText(undefined), orderNoText(""), orderNoText(12), orderNoText("7")]).toEqual(["—", "—", "—", "12", "7"]);
   });
 });

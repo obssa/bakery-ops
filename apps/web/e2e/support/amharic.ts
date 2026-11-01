@@ -3,7 +3,8 @@ import type { Api } from "./api";
 
 // The Amharic screen sweep of step 5.4a (p5-amharic): on a page of /app/am/, every visible text node, and every label a person reads or
 // hears (aria-label, placeholder, title, alt), must hold no Latin letter once the allowed text is taken out (plan 10.2 D19):
-//   - numbers and the order number format (digits, `#`), which hold no letter anyway;
+//   - numbers and the order number format (digits, `#`), which hold no letter anyway, and hex digests (a count's chain hash, a number
+//     in base 16: at least eight hex digits, one of them a digit);
 //   - ALLOWED_WORDS: the currency and the file formats and codes the dictionary keeps as they are (docs/i18n/glossary.md);
 //   - the names the admin and the staff typed (typedNames: products, stations, people, channels, units, tables, devices, notes), in the
 //     form an Amharic screen shows: `name_am` and the other `*_am` fields, never `*_en`, so a screen that shows the English name of a
@@ -20,6 +21,10 @@ export const ALLOWED_WORDS = [
   "PDF", // a file format, after its Amharic label: "ደረሰኙን አውርድ (PDF)"
   "CSV", // a file format: "CSV ላክ"
   "Excel", // a file format: "Excel ላክ"
+  "JSON", // a file format: the audit entry's raw record
+  "JPEG", // image formats, in the photo refusals
+  "PNG",
+  "WebP",
   "SKU", // a code, after its Amharic label: "የዕቃ ኮድ (SKU)"
   "TIN", // the tax number, after its Amharic label: "የግብር ከፋይ መለያ ቁጥር (TIN)"
 ] as const;
@@ -36,7 +41,10 @@ function sweepInPage({ names, words }: { names: string[]; words: string[] }): La
   const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pieces = [...names, ...words].filter((s) => s.length > 0).sort((a, b) => b.length - a.length).map(escape);
   const allowed = new RegExp(`(^|[^A-Za-z])(${pieces.join("|")})(?=$|[^A-Za-z])`, "g");
-  const left = (text: string): string => text.replace(allowed, "$1 ");
+  // A hex digest (a count's chain hash, whole or as "5124991d…b69826ba") is a number written in base 16: at least eight hex digits,
+  // one of them a digit, so "deadbeef" or "facade" stay words.
+  const digest = /(^|[^A-Za-z0-9])(?=[0-9a-f]*[0-9])[0-9a-f]{8,}(?:…[0-9a-f]{8,})?(?=$|[^A-Za-z0-9])/g;
+  const left = (text: string): string => text.replace(allowed, "$1 ").replace(digest, "$1 ");
   const otherLanguage = (el: Element): boolean => {
     if (el.closest('[translate="no"]')) return true;
     const marked = el.closest("[lang]");
@@ -95,7 +103,7 @@ export async function settle(page: Page, budgetMs = 8_000): Promise<void> {
 }
 
 // The fields whose text a person typed: names, codes, notes. `*_en` is left out on purpose (see above).
-const TYPED_KEY = /^(name|code|sku|label|fingerprint|reference|note|notes|comment|address|business_name|tin|phone|invoice_no|symbol|.+_am)$/;
+const TYPED_KEY = /^(name|code|sku|label|fingerprint|reference|reference_no|note|notes|comment|address|business_name|tin|phone|invoice_no|symbol|.+_am)$/;
 
 /** Every string of `value` under a typed field, at any depth. */
 export function collectTyped(value: unknown, into: Set<string>, key = ""): void {
@@ -113,35 +121,35 @@ export function collectTyped(value: unknown, into: Set<string>, key = ""): void 
 }
 
 // The lists that hold typed names, read as an admin of the branch.
-const TYPED_SOURCES = [
-  "/users",
-  "/stations",
-  "/locations",
-  "/items",
-  "/categories",
-  "/units",
-  "/payment-channels",
-  "/suppliers",
-  "/dining-tables",
-  "/variance-reasons",
-  "/devices",
-  "/shift-templates",
-  "/receipt-settings",
-  "/orders",
-  "/payments",
-  "/purchases",
-  "/transfers",
-  "/production/requests",
-  "/stock-counts",
-  "/shifts",
+const TYPED_SOURCES: [string, Record<string, number>][] = [
+  ["/users", {}],
+  ["/stations", {}],
+  ["/locations", {}],
+  ["/items", {}],
+  ["/categories", {}],
+  ["/units", {}],
+  ["/payment-channels", {}],
+  ["/suppliers", {}],
+  ["/dining-tables", {}],
+  ["/variance-reasons", {}],
+  ["/devices", {}],
+  ["/shift-templates", {}],
+  ["/receipt-settings", {}],
+  ["/orders", {}],
+  ["/payments", { limit: 200 }], // the newest 50 by default; a screen shows more
+  ["/purchases", { per_page: 100 }],
+  ["/transfers", { per_page: 100 }],
+  ["/production/requests", {}],
+  ["/stock-counts", {}],
+  ["/shifts", {}],
 ];
 
 /** The names the branch's people typed, longest first (so "Club sandwich" goes before "Club"). */
 export async function typedNames(admin: Api): Promise<string[]> {
   const names = new Set<string>();
-  for (const path of TYPED_SOURCES) {
+  for (const [path, query] of TYPED_SOURCES) {
     try {
-      collectTyped(await admin.get<unknown>(path), names);
+      collectTyped(await admin.get<unknown>(path, query), names);
     } catch {
       // a list this branch cannot read (or one that needs a filter) adds nothing
     }

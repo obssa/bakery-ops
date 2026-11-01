@@ -56,13 +56,14 @@ class Copy(unittest.TestCase):
 
 
 class ReportTest(Copy):
-    def test_lists_copies_of_the_english_lost_placeholders_and_unused_keys(self) -> None:
+    def test_lists_copies_of_the_english_latin_words_lost_placeholders_and_unused_keys(self) -> None:
         report = i18n_report.build_report(self.root)
 
         self.assertEqual(report["same_as_english"], ["web:pad.same"])
         self.assertEqual(report["placeholders"], [("web:pad.greet", ["name"], ["nam"])])
         self.assertEqual(report["unused"], ["web:orphan.old", "api:shifts.shift.gone"])
-        self.assertEqual(report["counts"], {"web": 9, "api": 4})
+        self.assertEqual(report["latin_in_amharic"], [("web:pad.brand_line", ["Bakery", "Ops"])])
+        self.assertEqual(report["counts"], {"web": 10, "api": 4})
 
     def test_never_fails_the_build(self) -> None:
         self.assertEqual(i18n_report.main(["--root", self.root]), 0)
@@ -75,7 +76,7 @@ class ExportTest(Copy):
         rows = self.rows()
         with open(self.sheet, encoding="utf-8-sig", newline="") as fh:
             self.assertEqual(next(csv.reader(fh)), HEADER)
-        self.assertEqual(len(rows), 13)
+        self.assertEqual(len(rows), 14)
         by_key = {r["key"]: r for r in rows}
         self.assertEqual(by_key["web:pad.title"]["english"], "Waiter pad")
         self.assertEqual(by_key["web:pad.title"]["amharic"], "የአስተናጋጅ ፓድ")

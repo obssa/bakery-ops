@@ -6,6 +6,8 @@
 It lists, over apps/web/messages/{en,am}.json and apps/api/lang/{en,am}/*.php:
   same_as_english  Amharic texts that are still the English one, except texts that hold no word outside their placeholders
                    (`{qty} {unit}`) and texts whose only words are in ALLOWED (brand names, units, ETB, codes);
+  latin_in_amharic Amharic texts that hold a Latin word outside ALLOWED (placeholders and <code> parts aside), e.g. a brand
+                   name left in English;
   placeholders     texts whose Amharic names other placeholders than the English ({name} on the web, :name in the API);
   unused           keys no code seems to read any more. A heuristic: a web key counts as read when its path or its last part appears
                    as a string in apps/web/src, or a template there starts with it (t(`status_${s}`)); an API key when it appears as a
@@ -29,7 +31,7 @@ from i18n_common import ROOT, Entry, load_entries, placeholders  # noqa: E402
 # A word goes here with its kind; a word that has an Amharic name does not.
 ALLOWED = {
     # the currency, file formats and codes (the sweep's list)
-    "ETB", "PDF", "CSV", "Excel", "SKU", "TIN",
+    "ETB", "PDF", "CSV", "Excel", "JSON", "JPEG", "PNG", "WebP", "SKU", "TIN",
     # unit symbols, should a message carry one
     "kg", "g", "l", "ml", "pcs",
 }
@@ -39,9 +41,11 @@ SAME_ON_PURPOSE = {
     "web:locale.en": "the language switch names each language in its own script (LanguageSwitcher, lang=\"en\")",
 }
 
-ICU_ARGUMENT =re.compile(r"\{\s*[A-Za-z_]\w*\s*\}")
+ICU_ARGUMENT = re.compile(r"\{\s*[A-Za-z_]\w*\s*\}")
 ICU_HEAD = re.compile(r"\{\s*[A-Za-z_]\w*\s*,\s*(?:plural|select|selectordinal)\s*,")
 ICU_BRANCH = re.compile(r"(?:=\d+|zero|one|two|few|many|other)\s*\{")
+RICH_CODE = re.compile(r"<code>.*?</code>", re.DOTALL)  # a code shown as code (t.rich, rendered translate="no")
+RICH_TAG = re.compile(r"</?[A-Za-z]+>")
 API_ARGUMENT = re.compile(r":[A-Za-z_]\w*")
 WORD = re.compile(r"[A-Za-z]+")
 
@@ -50,9 +54,10 @@ TEMPLATE = re.compile(r"`((?:[^`\\]|\\.)*)`")
 COMMENT = re.compile(r"/\*.*?\*/|^\s*//[^\n]*", re.DOTALL | re.MULTILINE)
 
 
-def words(entry: Entry) -> list[str]:
-    text = entry.en
-    if entry.key.startswith("web:"):
+def words(key: str, text: str) -> list[str]:
+    """The Latin words of a message once its placeholders, ICU syntax and <code> parts are taken out."""
+    if key.startswith("web:"):
+        text = RICH_TAG.sub(" ", RICH_CODE.sub(" ", text))
         text = ICU_BRANCH.sub(" ", ICU_HEAD.sub(" ", ICU_ARGUMENT.sub(" ", text)))
     else:
         text = API_ARGUMENT.sub(" ", text)
@@ -64,9 +69,21 @@ def same_as_english(entries: list[Entry]) -> list[str]:
     for e in entries:
         if e.am != e.en or e.key in SAME_ON_PURPOSE:
             continue
-        found = words(e)
+        found = words(e.key, e.en)
         if found and not all(w in ALLOWED for w in found):
             out.append(e.key)
+    return out
+
+
+def latin_in_amharic(entries: list[Entry]) -> list[tuple[str, list[str]]]:
+    """Amharic texts (not copies of the English, which same_as_english lists) that hold Latin words outside ALLOWED."""
+    out = []
+    for e in entries:
+        if e.am == e.en or e.key in SAME_ON_PURPOSE:
+            continue
+        found = [w for w in dict.fromkeys(words(e.key, e.am)) if w not in ALLOWED]
+        if found:
+            out.append((e.key, found))
     return out
 
 
@@ -138,6 +155,7 @@ def build_report(root: str = ROOT) -> dict:
             "api": sum(1 for e in entries if e.key.startswith("api:")),
         },
         "same_as_english": same_as_english(entries),
+        "latin_in_amharic": latin_in_amharic(entries),
         "placeholders": placeholder_gaps(entries),
         "unused": unused(entries, root),
     }
@@ -156,6 +174,7 @@ def main(argv: list[str]) -> int:
     print(f"== i18n report: {c['web']} web messages, {c['api']} API messages (a report, not a gate)")
     sections = (
         ("same_as_english", "Amharic still the English text", lambda k: k),
+        ("latin_in_amharic", "Latin words in an Amharic text", lambda g: f"{g[0]}: {' '.join(g[1])}"),
         ("placeholders", "placeholders differ", lambda g: f"{g[0]}: en {' '.join(g[1]) or 'none'}, am {' '.join(g[2]) or 'none'}"),
         ("unused", "keys no code seems to read (check by hand)", lambda k: k),
     )

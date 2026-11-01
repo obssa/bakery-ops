@@ -7,7 +7,7 @@ export function Pad({ status, count, qty, unit, name }: { status: string; count:
       <button>{t("send", { count })}</button>
       <p>{t("unit", { qty, unit })}</p>
       <p>{t("brand")} {t("same")} {t("greet", { name })}</p>
-      <p>{t(`status_${status}`)}</p>
+      <p>{t(`status_${status}`)} {t("brand_line")}</p>
     </main>
   );
 }
