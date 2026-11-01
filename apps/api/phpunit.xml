@@ -13,6 +13,7 @@
             <directory>tests/Gate</directory>
             <directory>tests/Modules</directory>
             <directory>tests/Seeders</directory>
+            <directory>tests/Ops</directory>
         </testsuite>
         <testsuite name="Feature">
             <directory>tests/Feature</directory>

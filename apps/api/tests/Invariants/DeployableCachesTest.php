@@ -114,3 +114,41 @@ it('caches the identity config with IDENTITY_REQUIRE_DEVICE unset, false and tru
         @unlink($cache);
     }
 })->with([[null, false], ['false', false], ['true', true]])->group('invariants');
+
+/*
+ * Step 5.5b (ADR 0020): the backups read BACKUP_* from the server .env. The config must cache with every variable unset (the live host
+ * until the runbook's steps: the folder defaults at run time, the drill is skipped, the off-site copy is off) and with them set, and the
+ * cache must carry what the environment says; .env.example names them, the drill database and the remote empty.
+ */
+it('ships the backup settings in .env.example with the drill and the off-site copy off', function () {
+    $example = (string) file_get_contents(base_path('.env.example'));
+    foreach (['BACKUP_PATH=', 'BACKUP_KEEP=30', 'BACKUP_MAX_MB=2048', 'BACKUP_DRILL_DATABASE=', 'BACKUP_REMOTE='] as $line) {
+        expect($example)->toContain("\n{$line}\n");
+    }
+})->group('invariants');
+
+it('caches the backup config with the BACKUP_ variables unset and set', function (array $vars, array $expected) {
+    $cache = app()->getCachedConfigPath();
+    $names = ['BACKUP_PATH', 'BACKUP_KEEP', 'BACKUP_MAX_MB', 'BACKUP_DRILL_DATABASE', 'BACKUP_REMOTE'];
+    $env = ['APP_CONFIG_CACHE' => $cache] + $vars + array_fill_keys($names, false);
+    try {
+        $process = new Process([PHP_BINARY, 'artisan', 'config:cache'], base_path(), $env);
+        $process->run();
+        expect($process->getExitCode())->toBe(0, $process->getErrorOutput().$process->getOutput());
+
+        $cached = require $cache;
+        foreach ($expected as $path => $value) {
+            expect(data_get($cached, $path))->toBe($value, $path);
+        }
+        expect(data_get($cached, 'backup.binaries.mysqldump'))->toBe('mysqldump')
+            ->and(data_get($cached, 'backup.main_tables'))->toContain('stock_movements', 'audit_log');
+    } finally {
+        @unlink($cache);
+    }
+})->with([
+    'unset' => [[], ['backup.path' => null, 'backup.keep' => 30, 'backup.max_mb' => 2048, 'backup.drill_database' => null, 'backup.remote' => null]],
+    'set' => [
+        ['BACKUP_PATH' => '/home/someone/backups/bakery-ops', 'BACKUP_KEEP' => '14', 'BACKUP_MAX_MB' => '512', 'BACKUP_DRILL_DATABASE' => 'someone_drill', 'BACKUP_REMOTE' => 'offsite:bakery'],
+        ['backup.path' => '/home/someone/backups/bakery-ops', 'backup.keep' => 14, 'backup.max_mb' => 512, 'backup.drill_database' => 'someone_drill', 'backup.remote' => 'offsite:bakery'],
+    ],
+])->group('invariants');

@@ -258,3 +258,23 @@ arch('every Analytics listener is queued after the commit: a rebuild never slows
     ->expect('App\Modules\Analytics\Listeners')
     ->toImplement(ShouldQueueAfterCommit::class)
     ->group('arch', 'module:analytics');
+
+/*
+ * App\Ops (step 5.5b, phase-5 plan section 6; ADR 0020) is not a module: the host's own jobs (backups, the restore drill, later the System
+ * status) above every module. It may use the modules' Contracts\* only (the restore drill reads Inventory's LedgerOracle and Shifts'
+ * HashChain), and Shared; nothing below reaches up into it. The forbidden list is read from the directories on disk.
+ */
+arch('App\Ops uses the modules through their Contracts only, never a model, action, ledger class, support or HTTP layer of one')
+    ->expect('App\Ops')
+    ->not->toUse(array_merge(...array_map(fn (string $module): array => $providerInternals($module), $all)))
+    ->group('arch');
+
+arch('no module and nothing of Shared reaches App\Ops: it sits above them')
+    ->expect(['App\Modules', 'App\Shared'])
+    ->not->toUse('App\Ops')
+    ->group('arch');
+
+arch('App\Ops declares strict types')
+    ->expect('App\Ops')
+    ->toUseStrictTypes()
+    ->group('arch');
