@@ -515,7 +515,10 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        tamper behind the triggers' back on it. `LedgerOracle::check` returns `{ok, items, locations, mismatches}`, each mismatch
        `{source, branch_id, item_id, location_id, movements: {on_hand, reserved}, recorded: {on_hand, reserved}}`: the movements are added
        up in SQL by `MovementReason`'s own rule and compared with `stock_balances` and with the restored `item_stock_view` separately (a
-       view restored with another definition is caught). `HashChain::verifyAll` returns `ChainSummary` `{ok, places, links, first_broken,
+       view restored with another definition is caught). The reading is `Inventory\Ledger\Reconciliation` behind the contract, because
+       only the Ledger may name the stock tables in `app/` (`LedgerIsSoleWriterTest`); for the same reason the drill's list of
+       append-only tables is `config/backup.php` `append_only_tables` (kept equal to `scripts/check_invariants.py` by
+       `DrillAppendOnlyListTest`), not a constant of `App\Ops`. `HashChain::verifyAll` returns `ChainSummary` `{ok, places, links, first_broken,
        failures}`; it runs `verify()` over every place of every branch with the default connection pointed at the named one for the call
        and put back, with the current branch, afterwards (a console-time read: the payload rebuild reads through the models).
      - **M5 is `2026_11_11_100600_create_ops_runs_table`** (100300 to 100500 left to 5.3a's M3, M2b and M4, 100700 and 100800 to M6 and
