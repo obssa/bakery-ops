@@ -29,4 +29,7 @@ Schedule::command('analytics:rebuild --since-last')->dailyAt('05:30')->timezone(
 // The weekly summary (phase-4 plan section 5 and 10.2 R-L, step 4.4d): on Monday at 07:00 in the shop's time, after the nightly run has queued
 // Saturday and Sunday and the 05:30 run has healed the late locks, the summary of the week that ended last night is announced once per
 // branch (WeeklySummaryReady; Notifications tells the admin in the inbox, by Telegram and push where those are on).
+// The print jobs (phase-5 plan 4.3, step 5.3a, ADR 0019): every minute, a claim the bridge did not acknowledge within a minute goes back to the
+// queue (failed after the third claim) and a receipt waiting longer than 15 minutes is expired. A few indexed reads when nothing waits.
+Schedule::command('print:sweep')->everyMinute()->withoutOverlapping(5);
 Schedule::command('analytics:weekly-summary')->weeklyOn(1, '07:00')->timezone(config('analytics.timezone', 'Africa/Addis_Ababa'))->withoutOverlapping(30);

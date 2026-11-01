@@ -62,12 +62,14 @@ final class ReceiptRaster
         $sizes = $width >= 512 ? self::WIDE : self::NARROW;
         $fonts = $this->fontFiles();
 
-        /** @var list<array{0: string, 1: int, 2: int, 3: string, 4: float, 5: bool}|array{0: string, 1: int, 2: int, 3: int}> $ops */
-        $ops = [];
+        /** @var list<array{0: int, 1: int, 2: string, 3: float, 4: bool}> $texts x, baseline, text, size in points, bold */
+        $texts = [];
+        /** @var list<array{0: int, 1: int, 2: int}> $rules x from, y, x to */
+        $rules = [];
         $y = self::MARGIN;
         foreach ($rows as $row) {
             if ($row->kind === 'rule') {
-                $ops[] = ['rule', self::MARGIN, $y + 5, $width - self::MARGIN - 1];
+                $rules[] = [self::MARGIN, $y + 5, $width - self::MARGIN - 1];
                 $y += 12;
 
                 continue;
@@ -89,14 +91,14 @@ final class ReceiptRaster
             $room = $usable - ($rightWidth > 0 && ! $below ? $rightWidth + (int) round($em) : 0);
             foreach ($this->wrap($fonts, $size, $bold, $row->left, max(40, $room)) as $i => $text) {
                 $x = $row->align === 'center' ? intdiv($width - $this->measure($fonts, $size, $bold, $text), 2) : self::MARGIN;
-                $ops[] = ['text', max(0, $x), $y + $baseline, $text, $size, $bold];
+                $texts[] = [max(0, $x), $y + $baseline, $text, $size, $bold];
                 if ($i === 0 && $rightWidth > 0 && ! $below) {
-                    $ops[] = ['text', $width - self::MARGIN - $rightWidth, $y + $baseline, $row->right, $size, $bold];
+                    $texts[] = [$width - self::MARGIN - $rightWidth, $y + $baseline, $row->right, $size, $bold];
                 }
                 $y += $lineHeight;
             }
             if ($below) {
-                $ops[] = ['text', max(0, $width - self::MARGIN - $rightWidth), $y + $baseline, $row->right, $size, $bold];
+                $texts[] = [max(0, $width - self::MARGIN - $rightWidth), $y + $baseline, $row->right, $size, $bold];
                 $y += $lineHeight;
             }
         }
@@ -109,20 +111,17 @@ final class ReceiptRaster
         $white = (int) imagecolorallocate($image, 255, 255, 255);
         $black = (int) imagecolorallocate($image, 0, 0, 0);
         imagefilledrectangle($image, 0, 0, $width - 1, $height - 1, $white);
-        foreach ($ops as $op) {
-            if ($op[0] === 'rule') {
-                imagefilledrectangle($image, (int) $op[1], (int) $op[2], (int) $op[3], (int) $op[2] + 1, $black);
-
-                continue;
-            }
-            [, $x, $baselineY, $text, $size, $bold] = $op;
-            foreach (self::runs((string) $text) as [$chunk, $ethiopic]) {
+        foreach ($rules as [$from, $ruleY, $to]) {
+            imagefilledrectangle($image, $from, $ruleY, $to, $ruleY + 1, $black);
+        }
+        foreach ($texts as [$x, $baselineY, $text, $size, $bold]) {
+            foreach (self::runs($text) as [$chunk, $ethiopic]) {
                 $font = $ethiopic ? $fonts['ethiopic'] : ($bold ? $fonts['latin_bold'] : $fonts['latin']);
-                imagettftext($image, (float) $size, 0, (int) $x, (int) $baselineY, $black, $font, $chunk);
+                imagettftext($image, $size, 0, $x, $baselineY, $black, $font, $chunk);
                 if ($ethiopic && $bold) {
-                    imagettftext($image, (float) $size, 0, (int) $x + 1, (int) $baselineY, $black, $font, $chunk);
+                    imagettftext($image, $size, 0, $x + 1, $baselineY, $black, $font, $chunk);
                 }
-                $x += $this->advance($font, (float) $size, $chunk, $ethiopic);
+                $x += $this->advance($font, $size, $chunk, $ethiopic);
             }
         }
 

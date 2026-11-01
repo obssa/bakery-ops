@@ -75,4 +75,12 @@ return [
     'export' => [
         'too_large' => 'Too many payments for one file. Choose fewer days, a channel or a status.',
     ],
+    // step 5.3a: printing through the print bridge
+    'print' => [
+        'not_paid' => 'This order has no receipt to print: it is not paid in full.',
+        'no_bridge' => 'The receipt printer is not connected right now. Give the customer the receipt link instead.',
+        'already_claimed' => 'Another print bridge is printing this receipt, or it is no longer waiting.',
+        'expired' => 'This receipt waited too long and was not printed. Print it again if the customer still wants it.',
+        'not_claimed_by_you' => 'This print bridge is not printing this receipt.',
+    ],
 ];

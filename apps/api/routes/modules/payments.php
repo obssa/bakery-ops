@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Modules\Payments\Http\Controllers\BridgeJobsController;
 use App\Modules\Payments\Http\Controllers\ChannelsController;
 use App\Modules\Payments\Http\Controllers\PaymentDecisionsController;
 use App\Modules\Payments\Http\Controllers\PaymentReadsController;
 use App\Modules\Payments\Http\Controllers\PaymentReportsController;
 use App\Modules\Payments\Http\Controllers\PaymentsController;
+use App\Modules\Payments\Http\Controllers\PrintJobsController;
 use App\Modules\Payments\Http\Controllers\ReceiptsController;
 use App\Modules\Payments\Http\Controllers\ReceiptSettingsController;
 use App\Modules\Payments\Http\Controllers\RefundsController;
@@ -27,10 +29,21 @@ use Illuminate\Support\Facades\Route;
  * protection, tests/Support/public_routes.php). /payments/reconciliation and /payments/export are not a {payment}: it takes digits only.
  * Step 4.3d adds the refund of a closed order (POST /orders/{order}/refund: asked with orders.void_request, approved inside by the PIN of a
  * payments.void holder, as the void).
+ * Step 5.3a adds printing (ADR 0019): the till asks for a print and polls its jobs (print.create, print.view), a till PC may read the receipt's
+ * ESC/POS bytes (print.view), and the print bridge, a shop computer with its own token (the `bridge` middleware, no user, no permission:
+ * tests/Support/public_routes.php), takes the next job, claims it and says whether it printed.
  * Every route is listed in tests/Support/route_permissions.php and every write in tests/Support/write_endpoints.php.
  */
 Route::prefix('api/v1')->middleware(['api', 'signed'])->group(function (): void {
     Route::get('/receipts/{order}', [ReceiptsController::class, 'show'])->whereNumber('order')->name('payments.receipts.show');
+});
+
+// step 5.3a: the print bridge signs in with Authorization: Bridge <token>; its branch is the current one, so another branch's job is 404
+Route::prefix('api/v1/bridge/jobs')->middleware(['api', 'bridge'])->group(function (): void {
+    Route::get('/next', [BridgeJobsController::class, 'next'])->name('payments.bridge.next');
+    Route::post('/{job}/claim', [BridgeJobsController::class, 'claim'])->whereNumber('job')->name('payments.bridge.claim');
+    Route::post('/{job}/printed', [BridgeJobsController::class, 'printed'])->whereNumber('job')->name('payments.bridge.printed');
+    Route::post('/{job}/failed', [BridgeJobsController::class, 'failed'])->whereNumber('job')->name('payments.bridge.failed');
 });
 
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
@@ -64,6 +77,14 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::post('/payments/{payment}/void', [PaymentDecisionsController::class, 'void'])->whereNumber('payment')->middleware('device')->name('payments.void');
         // step 4.3d: the refund of a closed order, asked with orders.void_request and approved inside by the PIN of a payments.void holder
         Route::post('/orders/{order}/refund', [RefundsController::class, 'store'])->whereNumber('order')->middleware('device')->name('payments.refund');
+    });
+
+    // step 5.3a: printing through the bridge (print.create, print.view: admin, manager, cashier), all station routes
+    Route::post('/orders/{order}/print', [PrintJobsController::class, 'store'])->whereNumber('order')
+        ->middleware(['permission:print.create', 'idempotency', 'device'])->name('payments.print');
+    Route::middleware(['permission:print.view', 'device'])->group(function (): void {
+        Route::get('/print-jobs', [PrintJobsController::class, 'index'])->name('payments.print-jobs');
+        Route::get('/orders/{order}/receipt.escpos', [PrintJobsController::class, 'escpos'])->whereNumber('order')->name('payments.receipt.escpos');
     });
 
     Route::middleware(['permission:channels.manage', 'idempotency'])->group(function (): void {

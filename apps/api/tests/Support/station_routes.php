@@ -43,7 +43,7 @@ return [
     'POST /api/v1/orders/{order}/payments' => ['module' => 'payments', 'why' => 'till: a payment'],
     'POST /api/v1/orders/{order}/receipt-link' => ['module' => 'payments', 'why' => 'till: a receipt link'],
     'GET /api/v1/orders/{order}/receipt.pdf' => ['module' => 'payments', 'why' => 'till: the receipt'],
-    'POST /api/v1/orders/{order}/print' => ['module' => 'payments', 'why' => 'till: print the receipt on the bridge's printer'],
+    'POST /api/v1/orders/{order}/print' => ['module' => 'payments', 'why' => 'till: print the receipt on the print bridge'],
     'GET /api/v1/print-jobs' => ['module' => 'payments', 'why' => 'till: whether the receipt printed'],
     'GET /api/v1/orders/{order}/receipt.escpos' => ['module' => 'payments', 'why' => 'till PC: print the receipt on its own printer'],
     'POST /api/v1/orders/{order}/refund' => ['module' => 'payments', 'why' => 'till: a refund (a PIN approves)'],
