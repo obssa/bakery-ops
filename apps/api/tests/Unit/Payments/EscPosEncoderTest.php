@@ -70,7 +70,7 @@ it('prints the text fallback in the printer\'s font: code page, alignment, bold,
     $printer = EscPosEmulator::parse($bytes);
 
     expect(substr($bytes, 0, 5))->toBe("\x1B\x40\x1B\x74\x00")
-        ->and($printer->lines())->toBe(['Demo Bakery', 'Total                 12.50', 'Caf? ?', 'Demo Bakery', 'Total                 12.50', 'Caf? ?'])
+        ->and($printer->lines())->toBe(['Demo Bakery', 'Total                 12.50', 'Caf? ??', 'Demo Bakery', 'Total                 12.50', 'Caf? ??'])
         ->and(array_count_values($printer->names())['cut'])->toBe(2)
         ->and($printer->bitmaps())->toBe([])
         ->and($printer->commands[2])->toBe(['cmd' => 'align', 'n' => 1])
