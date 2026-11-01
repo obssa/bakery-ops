@@ -468,11 +468,19 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        list is in the spec (a screen a role may not use still shows its Amharic refusal); on each screen it follows one link with a query
        to a screen of the same list (an order's record, an item, a product's dashboard, a shift's replay), and the waiter's pad is
        unlocked with a short code the demo admin resets. The sweep (`e2e/support/amharic.ts`) reads text nodes and the read labels; the
-       allowlist is D19 plus the file formats and codes the dictionary keeps (`ETB`, PDF, CSV, Excel, SKU, TIN), the typed names in the
-       form an Amharic screen shows (`*_am` and the single-language fields, never `*_en`), matched as whole words, and text inside an
-       element marked `lang="en"` (the language switch, the catalog's other-language name). `amharic-logic.spec.ts` proves it on planted
-       pages.
-     - **Gaps fixed**: the cash tally's Latin `x` (`shifts.cash_piece`, `counts.cash_tally`) is now `×` in both languages.
+       allowlist is D19 plus the file formats and codes the dictionary keeps (`ETB`, PDF, CSV, Excel, JSON, JPEG, PNG, WebP, SKU, TIN),
+       hex digests (a count's chain hash: a number in base 16, at least eight hex digits with a digit among them), the typed names in the
+       form an Amharic screen shows (`*_am` and the single-language fields such as a payment's reference number, never `*_en`) and the
+       devices' short ids, matched as whole words, text inside an element marked `lang="en"` (the language switch, a row's
+       other-language name) and machine identifiers marked `translate="no"` (the audit log's action codes and changed fields, a pattern
+       example). `amharic-logic.spec.ts` proves it on planted pages. The report gained a fourth list, Latin words left in an Amharic
+       text (17 today, all codes in technical messages: HTTP headers, field names, regex parts; for the reviewer, not a gate).
+     - **Gaps fixed** (the first CI run listed 104 on the admin's screens, the same kinds for the manager, cashier and chef): the cash
+       tally's Latin `x` is `×` in both languages; an order with no number read "ትዕዛዝ null" on the kitchen rail and the orders board
+       (`orderNoText` gives a dash, as the payments list already did; why a numberless order reaches the rail of the seeded bakery is
+       left to the orders owner); three device texts of 5.1b named the app "Bakery Ops" in Latin (now ቤከሪ ኦፕስ); the other-language
+       name of a variance reason and of a payment channel, and the English receipt fields, carry `lang="en"`; the pattern hint's example
+       is `<code translate="no">` through `t.rich` (`Field`'s hint takes markup).
    - **5.4b `phase-5/i18n-review`** (`i18n` `done`). The reviewer's corrections imported from the sheet, the glossary settled, the report
      clean. Opened when the sheet comes back (10.2 Q5); 5.5 and 5.6 do not wait for it. The checklist item `am-reviewed` is a sign-off.
 5. **5.5 ops** (STATUS `ops`), four PRs.
