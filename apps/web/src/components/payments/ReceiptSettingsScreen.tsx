@@ -96,7 +96,7 @@ function SettingsForm({ settings }: { settings: ReceiptSettings }) {
   };
   /** The control of one text field, wired to the form (a long one is a text area). */
   function text(field: TextField, long = false) {
-    const common = { disabled: !editable, maxLength: long ? 255 : field === "phone" || field === "tin" ? 32 : NAME_MAX, lang: field.endsWith("_am") ? "am" : undefined, value: form[field] };
+    const common = { disabled: !editable, maxLength: long ? 255 : field === "phone" || field === "tin" ? 32 : NAME_MAX, lang: field.endsWith("_am") ? "am" : field.endsWith("_en") ? "en" : undefined, value: form[field] };
     function render(props: FieldControlProps) {
       return long ? (
         <Textarea {...props} {...common} onChange={(event) => set(field, event.target.value)} />

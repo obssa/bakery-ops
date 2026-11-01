@@ -1740,7 +1740,7 @@
       "requires_photo": "Ask for a photo of the receipt",
       "requires_reference": "Ask for a reference number",
       "pattern": "Reference pattern",
-      "pattern_hint": "The whole reference must match it, such as FT[0-9]'{10}'. Leave it empty to take any reference.",
+      "pattern_hint": "The whole reference must match it, such as <code>FT[0-9]'{10}'</code>. Leave it empty to take any reference.",
       "pattern_check": "Pattern check",
       "pattern_none": "No pattern: any reference is taken.",
       "pattern_ok": "This browser reads the pattern well. The server checks it again when you save.",
