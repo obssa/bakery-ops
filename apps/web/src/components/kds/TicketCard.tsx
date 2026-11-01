@@ -6,6 +6,7 @@ import type { Line, Locale, RejectReason, Ticket } from "@/lib/api/types";
 import { REJECT_REASONS } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
 import { ageOf, clock, secondsSince, type TicketAge } from "@/lib/kds";
+import { orderNoText } from "@/lib/orderNo";
 import { useNow } from "@/lib/useNow";
 import { queueAcceptLine, queueReadyLine, queueRejectLine, useOutbox } from "@/lib/outbox/store";
 import { Button, Field, TextInput } from "../ui";
@@ -125,7 +126,7 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
       <header className="flex items-start justify-between gap-3">
         <div>
           <h2 id={titleId} className="text-xl font-semibold text-neutral-900">
-            {t("order_no", { no: String(order.order_no) })}
+            {t("order_no", { no: orderNoText(order.order_no) })}
           </h2>
           <p className="text-base text-neutral-700">{order.table_code ? t("table", { code: order.table_code }) : t("takeaway")}</p>
           <p className="text-base text-neutral-700">{t("waiter", { name: order.owner.name ?? "" })}</p>

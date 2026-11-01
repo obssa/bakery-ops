@@ -89,7 +89,9 @@ function EntryBody({ entry }: { entry: AuditDetail }) {
       <dl className="grid gap-x-6 gap-y-2 rounded-lg border border-neutral-200 p-4 sm:grid-cols-2">
         <Fact term={t("entry.time")}>{addisStamp(entry.at, dates)}</Fact>
         <Fact term={t("entry.action")}>
-          <span className="font-mono text-sm">{entry.action}</span>
+          <span className="font-mono text-sm" translate="no">
+            {entry.action}
+          </span>
         </Fact>
         <Fact term={t("entry.who")}>
           {names.person(entry.actor)}
@@ -178,7 +180,7 @@ function DiffTable({ caption, rows, people, nested = false }: { caption: string;
             const quiet = row.bookkeeping;
             return (
               <tr key={row.key} className={`border-b border-neutral-100 last:border-0 ${quiet ? "text-neutral-500" : ROW_TONE[row.status]}`}>
-                <th scope="row" className={`${CELL} break-all font-mono text-sm font-medium`}>
+                <th scope="row" className={`${CELL} break-all font-mono text-sm font-medium`} translate="no">
                   {row.key}
                 </th>
                 <td className={CELL}>{row.status !== "same" && !quiet ? <Badge tone={STATUS_TONE[row.status]}>{t(`entry.status_${row.status}`)}</Badge> : null}</td>
@@ -226,7 +228,7 @@ function ValuesTable({ caption, rows, people, nested = false }: { caption: strin
         <tbody>
           {rows.map((row) => (
             <tr key={row.key} className="border-b border-neutral-100 last:border-0">
-              <th scope="row" className={`${CELL} break-all font-mono text-sm font-medium`}>
+              <th scope="row" className={`${CELL} break-all font-mono text-sm font-medium`} translate="no">
                 {row.key}
               </th>
               <td className={CELL}>
