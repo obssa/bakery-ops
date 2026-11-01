@@ -16,9 +16,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 ARG PHPREDIS_VERSION=6.3.0
 ARG PHPREDIS_SHA256=cb8f81df1a275599e4f8ddcfec7e1f65ed1953e6f5673649149fd680ebff4cad
 
+# mariadb-client (Debian bookworm's signed archive, MariaDB 10.11 like the live host): mysqldump and mysql for backup:run and
+# backup:drill (step 5.5b, ADR 0020), which the backup-drill CI job runs in this image.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-        git unzip ca-certificates \
+        git unzip ca-certificates mariadb-client \
         libpq-dev libzip-dev libicu-dev libpng-dev libjpeg-dev libwebp-dev libfreetype6-dev libonig-dev \
  && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
  && docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_pgsql pgsql intl bcmath gd exif zip pcntl opcache \
