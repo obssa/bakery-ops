@@ -1470,6 +1470,7 @@
       "gate": {
         "pest_group": "gate:p5",
         "ci_job": "gate-p5",
+        "checklist": "docs/go-live-checklist.json",
         "playwright_projects": [
           "p5-device",
           "p5-offline",
