@@ -450,8 +450,10 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      - **`GET /orders/{order}/receipt.escpos` is a station route** like `receipt.pdf` (a till PC); `GET /print-jobs` answers `{data: [...]}`
        with an ETag over the jobs' ids, states and attempts; `POST /orders/{order}/print` answers the whole job (202).
      - **Tests**: `ReceiptRasterTest` lives in `tests/Modules/Payments` (it needs the labels and font paths of the container, no database);
-       the goldens are `tests/Fixtures/receipts/receipt-{80,58}-{am,en}.png`, compared through `EscPosEmulator` with a one-dot neighbourhood
-       and 0.2 % of the dots (`UPDATE_RECEIPT_GOLDENS=1` rewrites them). `PrintClaimRaceTest` is in `tests/Gate` (`CommitsForConcurrency`,
+       the goldens are `tests/Fixtures/receipts/receipt-{80,58}-{am,en}.png`, drawn on CI's runner (Ubuntu 24.04, PHP 8.3, libgd 2.3.3,
+       FreeType 2.13.2) and compared through `EscPosEmulator` within a two-dot neighbourhood, 0.5 % of the dots and 2 rows of height: the
+       PHP image's bundled GD with FreeType 2.12 places glyphs a dot or two apart (0.4 % at most; at one dot it was 1.6 %, which failed the
+       first CI run). `UPDATE_RECEIPT_GOLDENS=1` rewrites them, on CI's environment. `PrintClaimRaceTest` is in `tests/Gate` (`CommitsForConcurrency`,
        30 rounds, `Innodb_deadlocks` unchanged). ADR 0019 is written here (proposed), not in 5.3b.
    - **5.3b `phase-5/print-bridge`**. `tools/print-bridge/`: Node 22, plain JavaScript (ESM), no native modules, one dependency at most;
      a config file `bridge.config.json` (API base URL, token file path, the printer: `tcp` host and port 9100, a Windows shared printer

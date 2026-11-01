@@ -43,7 +43,9 @@ till. Three facts decide how:
    384 (58 mm), Ethiopic letters in Noto Sans Ethiopic (the font the PDF embeds) and the rest in DejaVu Sans; Ethiopic needs no shaping,
    so FreeType without HarfBuzz draws it correctly. `EscPos` sends it as `ESC @`, `GS v 0` bands of at most 960 rows, a feed and a partial
    cut, once per copy. Where FreeType is missing (`print:doctor` says so) or `PRINT_RASTER=false`, the receipt is the printer's own Latin
-   text in English instead. Golden pictures (58 and 80 mm, Amharic on and off) pin the drawing within a one-dot tolerance.
+   text in English instead. Golden pictures (58 and 80 mm, Amharic on and off, drawn on CI's Ubuntu 24.04 PHP) pin the drawing within a
+   two-dot neighbourhood and 0.5% of the dots: GD and FreeType versions place glyphs a dot or two apart (the PHP image's bundled GD and
+   CI's libgd differ by 0.4% at most), and the live host's alt-php83 may differ again, which the shop test sees.
 6. **The receipt's wording** (10.2 Q9). The printed receipt carries the business name in both languages, the address, the phone and the
    **TIN**, the order, the lines, the totals, the payments by channel, the cashier who printed it (the PDF and the customer's link name
    nobody; a paper receipt handed over the counter does), the Gregorian date and, when the receipt settings ask, the Ethiopian one, the
