@@ -945,10 +945,10 @@
         "events only: BackupFailed, BackupStale, DrillFailed, PrintJobFailed"
       ]
     },
-    "tables": [],
-    "tables_phase_5": [
-      "ops_runs (step 5.5b, no branch_id: one host, one database; in the branch_id allowlist with that reason)"
+    "tables": [
+      "ops_runs"
     ],
+    "tables_note": "ops_runs (step 5.5b, migration 2026_11_11_100600_create_ops_runs_table): no branch_id, one host, one database; in the branch_id allowlist with that reason",
     "contracts": [
       "ops->inventory",
       "ops->shifts"
