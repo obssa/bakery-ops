@@ -74,6 +74,9 @@ jobs:
           # Step 3.7e: the till's Pay button waits for a running shift, as the API now requires one for cash (PAYMENTS_REQUIRE_SHIFT_FOR_CASH).
           # A build-time switch, not a secret. If the kill switch is thrown on the server, rebuild with this set to false (runbook).
           NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH: "true"
+          # Step 5.5a (ADR 0021): the browser's error tracking. Off (and the Sentry SDK not in the bundle) while the repository variable
+          # NEXT_PUBLIC_SENTRY_DSN is unset; Ramin sets it to his project's browser DSN to turn it on (docs/runbook/server.md, "Errors").
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
         run: |
           corepack enable && corepack prepare pnpm@9.15.9 --activate
           pnpm install --frozen-lockfile

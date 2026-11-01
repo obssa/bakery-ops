@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Exceptions;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * the HTTP status it maps to and what it is about. Thrown inside an AuditedAction it rolls the whole write back; Laravel renders
  * it through render(). All four are 422: the request names something the branch cannot take as a rule.
  */
-final class ReorderError extends RuntimeException
+final class ReorderError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -48,6 +49,18 @@ final class ReorderError extends RuntimeException
     public static function locationUnknown(int $locationId): self
     {
         return new self('inventory.reorder.location_unknown', 422, ['location_id' => $locationId]);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse

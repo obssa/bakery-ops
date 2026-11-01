@@ -200,7 +200,7 @@
         "web.offline": "in_progress",
         "print-bridge": "todo",
         "i18n": "todo",
-        "ops": "todo",
+        "ops": "in_progress",
         "docs": "todo"
       },
       "playwright_projects": [

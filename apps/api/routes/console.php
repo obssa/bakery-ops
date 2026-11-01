@@ -31,6 +31,11 @@ Schedule::command('analytics:rebuild --since-last')->dailyAt('05:30')->timezone(
 // branch (WeeklySummaryReady; Notifications tells the admin in the inbox, by Telegram and push where those are on).
 Schedule::command('analytics:weekly-summary')->weeklyOn(1, '07:00')->timezone(config('analytics.timezone', 'Africa/Addis_Ababa'))->withoutOverlapping(30);
 
+// Failed jobs (phase-5 plan 10.2 D7, step 5.5a): rows older than 30 days are pruned daily at 04:10 in the shop's time (after the 03:00 chain
+// check, long before opening), so the old rows on the live host go on their own and nobody deletes anything by hand. A failure of the last 30
+// days stays for whoever looks into it (the System page of step 5.5c counts them).
+Schedule::command('queue:prune-failed --hours=720')->dailyAt('04:10')->timezone('Africa/Addis_Ababa');
+
 // Backups and the restore drill (phase-5 plan 5.5b, 10.2 D13; ADR 0020; docs/runbook/backup-restore.md), on the same schedule:run line, in the
 // shop's time while it is closed: the dump and the files snapshot every night at 02:30, before the chain check of 03:00; the drill on Sundays at
 // 03:30, after both (it records `skipped` until BACKUP_DRILL_DATABASE is set). A run that overruns is not started twice.

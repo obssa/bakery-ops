@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalog\Exceptions;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +14,7 @@ use RuntimeException;
  * Every client-facing refusal Catalog makes, as a stable message_key (lang/<locale>/catalog.php, rule 9) plus the HTTP
  * status it maps to. Thrown inside an AuditedAction it rolls the write back; Laravel renders it through render().
  */
-final class CatalogError extends RuntimeException
+final class CatalogError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -106,6 +107,18 @@ final class CatalogError extends RuntimeException
     public static function recipePublishConflict(): self
     {
         return new self('catalog.recipe.publish_conflict', 409);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse
