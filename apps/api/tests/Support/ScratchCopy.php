@@ -143,14 +143,20 @@ final class ScratchCopy
             static fn (object $row): string => (string) $row->name,
             $db->select('select trigger_name as name from information_schema.triggers where trigger_schema = database()'),
         );
+        // generated columns (recipes.active_product_key, reorder_rules.active_key) are computed by the scratch itself: never inserted
+        $generated = [];
+        foreach ($db->select("select table_name as tbl, column_name as col from information_schema.columns where table_schema = database() and (extra like '%GENERATED%' or extra in ('VIRTUAL', 'PERSISTENT', 'STORED'))") as $row) {
+            $generated[(string) $row->tbl][] = (string) $row->col;
+        }
 
-        self::dropping($db, $triggers, function () use ($source, $db, $tables): void {
+        self::dropping($db, $triggers, function () use ($source, $db, $tables, $generated): void {
             $db->statement('SET FOREIGN_KEY_CHECKS=0');
             try {
                 foreach ($tables as $table) {
                     $db->table($table)->delete();
+                    $skip = array_flip($generated[$table] ?? []);
                     foreach ($source->table($table)->get()->chunk(500) as $chunk) {
-                        $db->table($table)->insert($chunk->map(static fn (object $row): array => (array) $row)->all());
+                        $db->table($table)->insert($chunk->map(static fn (object $row): array => array_diff_key((array) $row, $skip))->values()->all());
                     }
                 }
             } finally {
