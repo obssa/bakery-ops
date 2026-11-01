@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Files;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -12,7 +13,7 @@ use RuntimeException;
  * Every refusal of the file store, as a stable message_key (lang/<locale>/files.php, rule 9) and the HTTP status it maps to.
  * Thrown before anything is stored; the key and the bytes of the file are never part of the message.
  */
-final class FilesError extends RuntimeException
+final class FilesError extends RuntimeException implements DomainRefusal
 {
     /** @var list<string> every key this class can carry; FilesLangTest keeps both dictionaries in step */
     public const KEYS = [
@@ -86,6 +87,18 @@ final class FilesError extends RuntimeException
     public static function attached(): self
     {
         return new self('files.attached', 409);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse

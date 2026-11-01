@@ -102,6 +102,11 @@ arch('only the push driver and the VAPID command touch the web push library, so 
     ])
     ->group('arch', 'module:notifications');
 
+arch('only Shared\Observability touches the Sentry SDK, so it is loaded only when SENTRY_LARAVEL_DSN is set (step 5.5a, ADR 0021)')
+    ->expect('Sentry')
+    ->toOnlyBeUsedIn(['App\Shared\Observability', 'Tests\Support\FakeSentryIngest'])
+    ->group('arch');
+
 arch('every Notifications job is queued and runs after the commit, so a send never joins the transaction of the inbox line')
     ->expect('App\Modules\Notifications\Jobs')
     ->toImplement(ShouldQueue::class)

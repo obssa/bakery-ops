@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Exceptions;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * HTTP status it maps to. Laravel renders it through render(), so a controller or middleware simply throws. The
  * exception message is the key itself: logs and tests read it, clients read message_en / message_am.
  */
-final class IdentityError extends RuntimeException
+final class IdentityError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -115,6 +116,18 @@ final class IdentityError extends RuntimeException
     public static function pinRejected(): self
     {
         return new self('identity.pin.rejected', 403);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse
