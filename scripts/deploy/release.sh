@@ -47,6 +47,8 @@ trap '"$PHP_BIN" artisan up >/dev/null 2>&1 || true' EXIT
 "$PHP_BIN" artisan queue:restart || true
 # step 4.3e: register the receipts' Amharic font in storage/fonts now rather than on the first receipt; never fatal (a receipt does it itself)
 "$PHP_BIN" artisan receipts:fonts || echo "receipts:fonts failed: the first receipt registers the font itself (docs/runbook/server.md, Receipts)"
+# step 5.3a: whether receipts print as pictures with Amharic on this host (GD with FreeType); read only, never fatal
+"$PHP_BIN" artisan print:doctor || echo "print:doctor failed (docs/runbook/server.md, Printing)"
 
 # rsync mirrors the runner's modes; LiteSpeed needs a traversable site folder.
 chmod 711 "$APP_DIR"

@@ -94,4 +94,7 @@ it('reports FreeType from gd_info in print:doctor, and what a receipt falls back
 
     config(['print.raster' => false]);
     $this->artisan('print:doctor')->expectsOutputToContain('Latin text')->assertSuccessful();
+
+    // every release prints the line, and a failure of it never fails the release
+    expect((string) file_get_contents(base_path('../../scripts/deploy/release.sh')))->toContain('artisan print:doctor || echo');
 })->group('module:payments', 'feature');
