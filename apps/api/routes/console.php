@@ -30,3 +30,9 @@ Schedule::command('analytics:rebuild --since-last')->dailyAt('05:30')->timezone(
 // Saturday and Sunday and the 05:30 run has healed the late locks, the summary of the week that ended last night is announced once per
 // branch (WeeklySummaryReady; Notifications tells the admin in the inbox, by Telegram and push where those are on).
 Schedule::command('analytics:weekly-summary')->weeklyOn(1, '07:00')->timezone(config('analytics.timezone', 'Africa/Addis_Ababa'))->withoutOverlapping(30);
+
+// Backups and the restore drill (phase-5 plan 5.5b, 10.2 D13; ADR 0020; docs/runbook/backup-restore.md), on the same schedule:run line, in the
+// shop's time while it is closed: the dump and the files snapshot every night at 02:30, before the chain check of 03:00; the drill on Sundays at
+// 03:30, after both (it records `skipped` until BACKUP_DRILL_DATABASE is set). A run that overruns is not started twice.
+Schedule::command('backup:run')->dailyAt('02:30')->timezone('Africa/Addis_Ababa')->withoutOverlapping(120);
+Schedule::command('backup:drill')->weeklyOn(0, '03:30')->timezone('Africa/Addis_Ababa')->withoutOverlapping(120);
