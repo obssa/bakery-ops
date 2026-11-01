@@ -1,0 +1,16 @@
+{
+  "pad": {
+    "title": "የአስተናጋጅ ፓድ",
+    "send": "{count, plural, one {# መስመር} other {# መስመሮች}} ላክ",
+    "unit": "{qty} {unit}",
+    "brand": "Excel",
+    "same": "Close",
+    "greet": "ሰላም {nam}",
+    "status_open": "ክፍት",
+    "status_closed": "ዝግ",
+    "brand_line": "Bakery Opsን ክፈት (PDF)"
+  },
+  "orphan": {
+    "old": "የድሮ ጽሑፍ"
+  }
+}

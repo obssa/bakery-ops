@@ -40,7 +40,7 @@ const control =
 
 interface FieldProps {
   label: string;
-  hint?: string;
+  hint?: ReactNode;
   error?: string;
   optionalLabel?: string;
   children: (props: { id: string; "aria-describedby"?: string; "aria-invalid"?: boolean }) => ReactNode;

@@ -183,7 +183,9 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                   <th scope="row" className={`${TD} font-medium text-neutral-900`}>
                     {label}
                   </th>
-                  <td className={`${TD} text-neutral-700`}>{other}</td>
+                  <td className={`${TD} text-neutral-700`} lang={row.name_am === label ? "en" : "am"}>
+                    {other}
+                  </td>
                   <td className={`${TD} font-mono text-sm`}>{row.code}</td>
                   <td className={TD}>
                     <Rules channel={row} />
@@ -267,7 +269,9 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                       <th scope="row" className={`${TD} font-medium text-neutral-900`}>
                         {label}
                       </th>
-                      <td className={`${TD} text-neutral-700`}>{row.name_am === label ? row.name_en : row.name_am}</td>
+                      <td className={`${TD} text-neutral-700`} lang={row.name_am === label ? "en" : "am"}>
+                        {row.name_am === label ? row.name_en : row.name_am}
+                      </td>
                       <td className={`${TD} font-mono text-sm`}>{row.code}</td>
                       <td className={TD}>
                         <Rules channel={row} />
@@ -391,7 +395,7 @@ function ChannelForm({ editing, saved, onSaved, onCancel }: { editing: PaymentCh
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Field label={t("channels.pattern")} optionalLabel={t("optional")} hint={t("channels.pattern_hint")} error={issue("pattern_long") ?? (patternReason ? t(`channels.pattern_reason.${patternReason}`) : fieldError("reference_pattern"))}>
+            <Field label={t("channels.pattern")} optionalLabel={t("optional")} hint={t.rich("channels.pattern_hint", { code: (chunks) => <code translate="no">{chunks}</code> })} error={issue("pattern_long") ?? (patternReason ? t(`channels.pattern_reason.${patternReason}`) : fieldError("reference_pattern"))}>
               {(props) => (
                 <TextInput {...props} className="font-mono" value={draft.reference_pattern} maxLength={PATTERN_MAX + 20} autoCapitalize="none" spellCheck={false} onChange={(event) => set("reference_pattern", event.target.value)} />
               )}

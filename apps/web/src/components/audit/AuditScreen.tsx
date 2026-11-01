@@ -190,7 +190,9 @@ function AuditTable({ rows, onOpen }: { rows: AuditEntry[]; onOpen: (id: number)
                   {names.person(row.actor)}
                   {row.acting_user ? <span className="block text-sm text-neutral-600">{t("list.acting", { name: names.person(row.acting_user) })}</span> : null}
                 </td>
-                <td className={`${TD} font-mono text-sm`}>{row.action}</td>
+                <td className={`${TD} font-mono text-sm`} translate="no">
+                  {row.action}
+                </td>
                 <td className={TD}>
                   <SubjectCell entry={row} />
                 </td>
@@ -223,7 +225,7 @@ function Summary({ entry }: { entry: AuditEntry }) {
     <>
       {changed.length > 0 ? (
         <span className="block font-mono text-sm text-neutral-800">
-          {changed.join(", ")}
+          <span translate="no">{changed.join(", ")}</span>
           {more > 0 ? <span className="font-sans text-neutral-600"> {t("list.more", { count: more })}</span> : null}
         </span>
       ) : (
