@@ -1,25 +1,42 @@
 import { expect, test } from "@playwright/test";
-import { loadOutbox, memoryOutboxDb, type OutboxDb } from "../../src/lib/outbox/db";
+import am from "../../messages/am.json";
+import en from "../../messages/en.json";
+import type { PaymentChannel } from "../../src/lib/api/types";
+import { DB_VERSION, loadOutbox, memoryOutboxDb, memoryPhotoDb, OUTBOX_STORE, PHOTO_STORE, upgradeDb, type OutboxDb } from "../../src/lib/outbox/db";
 import {
+  ABANDONED_AFTER_MS,
+  abandonedPhotos,
   backoffMs,
   LEGACY_STORAGE_KEY,
+  LocalRefusal,
   migrateLegacy,
   nextSendable,
   nextWakeAt,
   outcomeOf,
   pendingCounts,
+  photoNeeds,
+  PHOTO_QUEUE_MB,
+  photoQueueLimit,
+  photoQuota,
+  photosOf,
+  photoToken,
   pick,
   refuse,
   resumeAll,
   retryLater,
   screenOf,
+  sendPhotos,
   settle,
   type OutboxItem,
+  type PhotoRecord,
 } from "../../src/lib/outbox/logic";
+import { batchRows, keptPhotos, refusedPhoto, rowIssue, type PayRow } from "../../src/lib/paySheet";
 
 // Phase 5 step 5.2a, the logic under the p5-offline flow (no browser, no stack): which queued write goes next (strict order per order, an
 // item after the one it depends on, then with that one's server id), how long a write waits after a failure (1, 2, 4 ... 60 s), what each
 // answer does to it, the pending count per screen, and the move of the old localStorage queue into IndexedDB.
+// Step 5.2b, the photo queue: a payment after the upload of its photos (each file id written into its row), the quota of photos waiting on
+// the tablet, the photos dropped once nothing needs them, the upload that skips what is already up, and the database's version 2.
 
 let seq = 0;
 function item(overrides: Partial<OutboxItem> = {}): OutboxItem {
@@ -278,5 +295,240 @@ test.describe("offline logic: the outbox", () => {
     const none = await loadOutbox(null, new FakeStorage(new Map([[LEGACY_STORAGE_KEY, legacy]])));
     expect(none).toMatchObject({ durable: false });
     expect(none.items.map((i) => i.id)).toEqual(["s"]);
+  });
+});
+
+const MB = 1024 * 1024;
+const HOUR = 3_600_000;
+
+const WALLET: PaymentChannel = {
+  id: 1,
+  code: "wallet",
+  name_en: "Wallet",
+  name_am: "ዋሌት",
+  is_enabled: true,
+  requires_photo: true,
+  requires_reference: true,
+  sort: 1,
+  accepted_now: true,
+  reference_pattern: null,
+  reference_hint_en: null,
+  reference_hint_am: null,
+  photo_hint_en: null,
+  photo_hint_am: null,
+  is_cash: false,
+  deleted_at: null,
+};
+
+function walletRow(id: string, photo: PayRow["photo"]): PayRow {
+  return { id, channel: "wallet", amount: "50.00", tendered: "", reference: "TX123456", photo };
+}
+
+function photoRecord(clientUuid: string, overrides: Partial<PhotoRecord> = {}): PhotoRecord {
+  return {
+    clientUuid,
+    key: `k-${clientUuid}`,
+    purpose: "receipt",
+    blob: new Blob([new Uint8Array(16)], { type: "image/jpeg" }),
+    bytes: 16,
+    userId: 7,
+    createdAt: NOW,
+    fileId: null,
+    ...overrides,
+  };
+}
+
+test.describe("offline logic: the photo queue (step 5.2b)", () => {
+  test("a payment waits for the upload of its photos, then goes with each photo's file id; a refused photo holds it back", () => {
+    const rows = [
+      walletRow("r1", { status: "kept", fileId: null, clientUuid: "p1", key: "k1" }),
+      walletRow("r2", { status: "uploaded", fileId: 31, clientUuid: "p2", key: "k2" }),
+      walletRow("r3", { status: "kept", fileId: null, clientUuid: "p3", key: "k3" }),
+    ];
+    // a photo kept on the tablet completes its row: Complete no longer waits for an upload
+    expect(rows.map((row) => rowIssue(row, WALLET))).toEqual([null, null, null]);
+    expect(rowIssue(walletRow("r4", { status: "kept", fileId: null, clientUuid: null, key: null }), WALLET)).toBe("photo_missing");
+    expect(rowIssue(walletRow("r5", { status: "uploading", fileId: null, clientUuid: "p5", key: "k5" }), WALLET)).toBe("photo_uploading");
+
+    // the photos to upload first, and the batch's rows with a token where a file id will be
+    const kept = keptPhotos(rows, [WALLET]);
+    expect(kept).toEqual(["p1", "p3"]);
+    expect(photoToken("p1")).not.toBe(photoToken("p3"));
+    const body = { client_uuid: "b1", rows: batchRows(rows, [WALLET]) };
+    expect(body.rows.map((r) => r.receipt_file_id)).toEqual([photoToken("p1"), 31, photoToken("p3")]);
+
+    const upload = item({ kind: "upload_photos", path: "/files", body: { photos: kept }, screen: "till" });
+    const pay = item({
+      kind: "pay_batch",
+      path: "/orders/5/payment-batches",
+      body,
+      group: "order:o5",
+      dependsOn: upload.id,
+      needs: photoNeeds(kept),
+      screen: "till",
+    });
+    const queue = [upload, pay];
+    expect(photosOf(upload)).toEqual(["p1", "p3"]);
+    expect(photosOf(pay)).toEqual([]);
+    expect(nextSendable(queue, 7, NOW)?.id).toBe(upload.id);
+    // the upload failed on the network: the payment does not go without its photos
+    expect(nextSendable(retryLater(queue, upload.id, NOW), 7, NOW)).toBeNull();
+
+    // the photos are up: the payment goes, the same write (its key), with each file id where its token was
+    const uploaded = settle(queue, upload.id, { files: [{ client_uuid: "p1", id: 41 }, { client_uuid: "p3", id: 43 }] });
+    expect(uploaded).toHaveLength(1);
+    expect(uploaded[0]).toMatchObject({ id: pay.id, dependsOn: null, needs: null, idempotencyKey: pay.idempotencyKey, state: "pending" });
+    expect((uploaded[0].body as typeof body).rows.map((r) => r.receipt_file_id)).toEqual([41, 31, 43]);
+    expect(nextSendable(uploaded, 7, NOW)?.id).toBe(pay.id);
+
+    // an answer without one of the photos makes the payment a conflict, never a payment without its photo
+    const partial = settle(queue, upload.id, { files: [{ client_uuid: "p1", id: 41 }] });
+    expect(partial[0]).toMatchObject({ state: "conflict", conflict: { blockedBy: upload.id, body: { message_key: "outbox.dependency_answer_missing" } } });
+
+    // a refused photo (not an image, too large) holds the payment back as a conflict, and names the photo
+    const refused = refuse(queue, upload.id, { status: 422, body: { message_key: "files.not_an_image", photo_client_uuid: "p3" } }, NOW);
+    expect(refused.map((i) => [i.state, i.conflict?.blockedBy ?? null])).toEqual([
+      ["conflict", null],
+      ["conflict", upload.id],
+    ]);
+    expect(refusedPhoto({ status: 422, body: refused[1].conflict?.body })).toBe("p3");
+    expect(refusedPhoto({ status: 422, body: { message_key: "payments.batch.sum" } })).toBeNull();
+    expect(refusedPhoto(new Error("x"))).toBeNull();
+
+    // the same upload still running on the server (a slow line, a second tab) is tried again with its key, not refused
+    expect(outcomeOf(409, "idempotency.in_flight")).toBe("retry");
+    expect(outcomeOf(409, "payments.batch.sum")).toBe("conflict");
+  });
+
+  test("the upload sends each photo kept on the tablet with its own client_uuid and key, once: a retry skips what is already up", async () => {
+    const photos = memoryPhotoDb();
+    await photos.putPhoto(photoRecord("p1"));
+    await photos.putPhoto(photoRecord("p2"));
+    const sent: string[] = [];
+    let down = true;
+    const upload = async (photo: PhotoRecord) => {
+      sent.push(`${photo.clientUuid} ${photo.key}`);
+      if (photo.clientUuid === "p2" && down) throw new Error("network");
+      return { id: photo.clientUuid === "p1" ? 41 : 42 };
+    };
+
+    await expect(sendPhotos(["p1", "p2"], photos, upload)).rejects.toThrow("network");
+    // the first is up: its file id is kept with it, and it no longer waits
+    expect((await photos.photo("p1"))?.fileId).toBe(41);
+    expect((await photos.photo("p2"))?.fileId).toBeNull();
+
+    down = false;
+    expect(await sendPhotos(["p1", "p2"], photos, upload)).toEqual({
+      files: [
+        { client_uuid: "p1", id: 41 },
+        { client_uuid: "p2", id: 42 },
+      ],
+    });
+    expect(sent).toEqual(["p1 k-p1", "p2 k-p2", "p2 k-p2"]);
+
+    // a photo no longer on the tablet is refused here, named, in both languages: its payment becomes a conflict instead of going without it
+    const missing = await sendPhotos(["gone"], photos, upload).catch((error: unknown) => error);
+    expect(missing).toBeInstanceOf(LocalRefusal);
+    const refusal = missing as LocalRefusal;
+    expect(refusal.body).toMatchObject({ message_key: "outbox.photo_missing", photo_client_uuid: "gone" });
+    expect(refusal.body.message_en).toBeTruthy();
+    expect(refusal.body.message_am).toBeTruthy();
+    expect(refusal.body.message_am).not.toBe(refusal.body.message_en);
+  });
+
+  test("the quota: a new photo is refused when the photos waiting would pass NEXT_PUBLIC_PHOTO_QUEUE_MB (50 by default), in both languages", () => {
+    expect(PHOTO_QUEUE_MB).toBe(50);
+    expect(photoQueueLimit(undefined)).toBe(50 * MB);
+    expect(photoQueueLimit("")).toBe(50 * MB);
+    expect(photoQueueLimit("20")).toBe(20 * MB);
+    expect(photoQueueLimit("0.5")).toBe(0.5 * MB);
+    for (const bad of ["0", "-3", "lots", "Infinity"]) expect(photoQueueLimit(bad)).toBe(50 * MB);
+
+    const limit = 50 * MB;
+    const waiting = (bytes: number, fileId: number | null = null) => ({ bytes, fileId });
+    expect(photoQuota([], 400_000, limit)).toEqual({ allowed: true, waitingBytes: 0, limitBytes: limit });
+    expect(photoQuota([waiting(30 * MB), waiting(19 * MB)], 400_000, limit)).toEqual({ allowed: true, waitingBytes: 49 * MB, limitBytes: limit });
+    expect(photoQuota([waiting(30 * MB), waiting(19.8 * MB)], 400_000, limit).allowed).toBe(false);
+    // a photo already up (its file id known) waits for nothing and does not count
+    expect(photoQuota([waiting(30 * MB), waiting(19.8 * MB, 77)], 400_000, limit)).toEqual({ allowed: true, waitingBytes: 30 * MB, limitBytes: limit });
+    // up to the limit is allowed, one byte more is not
+    expect(photoQuota([waiting(limit - 10)], 10, limit).allowed).toBe(true);
+    expect(photoQuota([waiting(limit - 10)], 11, limit).allowed).toBe(false);
+
+    // the till says so in both languages, with how much waits and the limit
+    for (const messages of [en, am]) {
+      const text = (messages.till as Record<string, string>).photo_quota;
+      expect(text).toContain("{waiting}");
+      expect(text).toContain("{limit}");
+    }
+    expect(am.till.photo_quota).not.toBe(en.till.photo_quota);
+  });
+
+  test("a photo whose payment was abandoned is dropped; one a queued write or an open pay sheet still needs is kept", () => {
+    expect(ABANDONED_AFTER_MS).toBe(12 * HOUR);
+    const photos = [
+      { clientUuid: "queued", createdAt: NOW - 20 * HOUR },
+      { clientUuid: "refused", createdAt: NOW - 20 * HOUR },
+      { clientUuid: "held", createdAt: NOW - 20 * HOUR },
+      { clientUuid: "dismissed", createdAt: NOW - 60_000 },
+      { clientUuid: "left", createdAt: NOW - 13 * HOUR },
+      { clientUuid: "recent", createdAt: NOW - HOUR },
+    ];
+    const queue = [
+      item({ kind: "upload_photos", path: "/files", body: { photos: ["queued"] } }),
+      item({
+        kind: "upload_photos",
+        path: "/files",
+        body: { photos: ["refused"] },
+        state: "conflict",
+        conflict: { status: 422, body: { message_key: "files.not_an_image" }, at: NOW, blockedBy: null },
+      }),
+      item({ kind: "pay_batch", path: "/orders/5/payment-batches", body: { rows: [{ receipt_file_id: photoToken("recent") }] } }),
+    ];
+    const held = new Set(["held"]);
+
+    // at start nothing was let go of: only a photo nothing needs, taken over 12 hours ago (a sheet a reload or a closed tab left behind)
+    expect(abandonedPhotos(photos, queue, held, new Set(), NOW)).toEqual(["left"]);
+    // a write dismissed, a row's photo replaced or removed: dropped at once, unless a queued write or an open sheet still needs it
+    expect(abandonedPhotos(photos, queue, held, new Set(["dismissed", "queued", "refused", "held"]), NOW)).toEqual(["dismissed", "left"]);
+    // nothing queued and no sheet open: everything let go of goes
+    expect(abandonedPhotos(photos, [], new Set(), new Set(photos.map((p) => p.clientUuid)), NOW)).toHaveLength(photos.length);
+  });
+
+  test("the database's version 2 adds the photo store and keeps the outbox store and the writes in it", async () => {
+    class FakeDb {
+      readonly stores = new Map<string, Map<string, unknown>>();
+      readonly objectStoreNames = { contains: (name: string) => this.stores.has(name) };
+      createObjectStore(name: string, options: { keyPath: string }) {
+        if (this.stores.has(name)) throw new Error(`ConstraintError: ${name} exists`);
+        this.stores.set(name, new Map());
+        return { name, keyPath: options.keyPath };
+      }
+    }
+    expect(DB_VERSION).toBe(2);
+    expect(OUTBOX_STORE).toBe("outbox");
+    expect(PHOTO_STORE).toBe("photos");
+
+    // a tablet that ran step 5.2a: version 1, a write waiting in the outbox
+    const tablet = new FakeDb();
+    const outbox = new Map<string, unknown>([["w1", item({ id: "w1" })]]);
+    tablet.stores.set(OUTBOX_STORE, outbox);
+    expect(upgradeDb(tablet, 1)).toEqual([PHOTO_STORE]);
+    expect(tablet.stores.get(OUTBOX_STORE)).toBe(outbox);
+    expect([...outbox.keys()]).toEqual(["w1"]);
+
+    // a new tablet gets both; one already at version 2 gets nothing
+    const fresh = new FakeDb();
+    expect(upgradeDb(fresh, 0)).toEqual([OUTBOX_STORE, PHOTO_STORE]);
+    expect(upgradeDb(fresh, 2)).toEqual([]);
+
+    // the photo store keeps a photo by its client_uuid until it is dropped
+    const photos = memoryPhotoDb();
+    await photos.putPhoto(photoRecord("a"));
+    await photos.putPhoto(photoRecord("b", { fileId: 9 }));
+    expect((await photos.photos()).map((p) => p.clientUuid).sort()).toEqual(["a", "b"]);
+    await photos.dropPhotos(["a", "missing"]);
+    expect((await photos.photos()).map((p) => [p.clientUuid, p.fileId])).toEqual([["b", 9]]);
+    expect(await photos.photo("a")).toBeNull();
   });
 });
