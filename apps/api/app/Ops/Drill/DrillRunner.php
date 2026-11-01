@@ -37,12 +37,6 @@ final class DrillRunner
 {
     public const string CONNECTION = 'backup_drill';
 
-    /** The append-only tables (scripts/check_invariants.py APPEND_ONLY_TABLES; AppendOnlyListTest keeps the two equal). */
-    public const array APPEND_ONLY = [
-        'stock_movements', 'audit_log', 'order_events', 'item_cost_history', 'handover_notes', 'payment_refunds',
-        'stock_movement_reversals', 'order_refunds', 'order_refund_lines',
-    ];
-
     public function __construct(
         private readonly BackupConfig $config,
         private readonly MysqlClient $client,
@@ -173,7 +167,7 @@ final class DrillRunner
         $silent = [];
         $probed = 0;
         $tables = $target->getSchemaBuilder()->getTableListing($target->getDatabaseName(), false);
-        foreach (self::APPEND_ONLY as $table) {
+        foreach ($this->config->appendOnlyTables() as $table) {
             if (! in_array($table, $tables, true)) {
                 continue;
             }

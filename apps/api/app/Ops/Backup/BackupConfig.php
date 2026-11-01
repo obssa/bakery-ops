@@ -88,6 +88,12 @@ final class BackupConfig
         return array_values(array_map('strval', (array) config('backup.main_tables', [])));
     }
 
+    /** @return list<string> the append-only tables whose triggers the drill checks (config backup.append_only_tables) */
+    public function appendOnlyTables(): array
+    {
+        return array_values(array_map('strval', (array) config('backup.append_only_tables', [])));
+    }
+
     private function home(): ?string
     {
         $home = getenv('HOME');

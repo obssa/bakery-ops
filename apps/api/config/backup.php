@@ -20,6 +20,10 @@ declare(strict_types=1);
  *                   of the API image), rclone (only when a remote is set).
  *   main_tables     the tables whose row counts a manifest records and a drill compares after the restore: ledger, money, shifts
  *                   and audit, none of them ever emptied by a job.
+ *   append_only_tables  the tables whose UPDATE and DELETE triggers the drill checks on the restored copy: the APPEND_ONLY_TABLES of
+ *                   scripts/check_invariants.py (the host has no scripts/ folder; DrillAppendOnlyListTest keeps the two equal). Here and
+ *                   not in App\Ops because only the Ledger names the stock tables in app/ (LedgerIsSoleWriterTest): the drill's probe
+ *                   is a statement the trigger must refuse, on the scratch copy, inside a transaction rolled back.
  */
 return [
     'path' => env('BACKUP_PATH'),
@@ -39,5 +43,9 @@ return [
         'orders', 'order_lines', 'order_events', 'payments', 'order_refunds', 'payment_refunds',
         'shift_instances', 'stock_counts', 'stock_count_lines', 'cash_declarations', 'handover_notes',
         'audit_log',
+    ],
+    'append_only_tables' => [
+        'stock_movements', 'audit_log', 'order_events', 'item_cost_history', 'handover_notes', 'payment_refunds',
+        'stock_movement_reversals', 'order_refunds', 'order_refund_lines',
     ],
 ];
