@@ -198,7 +198,7 @@
       "modules": {
         "identity.devices": "done",
         "web.offline": "in_progress",
-        "print-bridge": "todo",
+        "print-bridge": "in_progress",
         "i18n": "todo",
         "ops": "todo",
         "docs": "todo"
