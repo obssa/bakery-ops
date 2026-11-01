@@ -138,7 +138,9 @@ test.describe("pay-refund", () => {
 
       // the order's card at the till now says what came back; the water's line is all that is left and it cannot be refunded
       await dialog.getByRole("button", { name: "Close", exact: true }).click();
-      await expect(page.getByRole("article", { name: `Order ${no}` })).toContainText("150.00");
+      // exact: the live E2E branch keeps many days of closed orders and numbers restart each day, so "Order 11" would also
+      // match "Order 110" or "Order 11 of 30 Oct"
+      await expect(page.getByRole("article", { name: `Order ${no}`, exact: true })).toContainText("150.00");
     } finally {
       await retireRefundProducts(fixture);
     }
