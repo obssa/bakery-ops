@@ -17,7 +17,7 @@ use Tests\Support\Forks;
  * step 5.2b's photo queue, where a tablet sends a kept photo again after a lost answer, or two tabs of one tablet send the same queued photo).
  * Each is a real POST /files through the whole HTTP stack in its own forked process, with the same client_uuid and its own Idempotency-Key, so
  * the idempotency middleware does not put one behind the other: the unique (branch_id, client_uuid) index decides. The second starts 0 to
- * 290 ms after the first (10 ms more each round), so the rounds sweep from two uploads that meet at the insert to one that finds the row:
+ * 580 ms after the first (20 ms more each round), so the rounds sweep from two uploads that meet at the insert to one that finds the row:
  *   - one after the other: the second finds the stored file and answers it (200);
  *   - raced: both looked before either was stored; the second's insert loses on the unique index, its object is deleted and it answers the
  *     winner's file (200), its own transaction rolled back (so no second audit row).
@@ -72,7 +72,7 @@ it('keeps one file for two uploads of one client_uuid at once: both answered wit
 
         $results = Forks::together([
             ($this->upload)($uuid, $bytes, 0),
-            ($this->upload)($uuid, $bytes, ($round - 1) * 10),
+            ($this->upload)($uuid, $bytes, ($round - 1) * 20),
         ]);
 
         $answers = array_map(
