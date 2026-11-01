@@ -419,7 +419,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
    - **As built (step 5.3a, `phase-5/print-jobs`).** Tests red first (the encoder and its test printer, the golden receipts, then every
      route, the sweep, the migrations and the race), then the code, then the docs. Where the code chose what the plan left open:
      - **Migrations** `2026_11_11_100300_create_print_jobs_table` (M3; besides the plan's index, `(branch_id, order_id, id)` for the till's
-       poll), `2026_11_11_100400_grant_phase_5_print_permissions` (M2b, `GrantRegistryPermissions`) and
+       poll; `shift_instance_id` keyed to `shift_instances` like every shift stamp since 3.2a, which `ShiftStampForeignKeysTest` asks), `2026_11_11_100400_grant_phase_5_print_permissions` (M2b, `GrantRegistryPermissions`) and
        `2026_11_11_100500_add_paper_width_to_receipt_settings` (M4: `paper_width_mm` DEFAULT 80 with CHECK
        `receipt_settings_paper_width_check`, `print_logo` DEFAULT false). Live tables touched: none by M3 (new table), `permissions` and
        `role_has_permissions` by M2b, `receipt_settings` (one row per branch, filled by the defaults, no row updated) by M4.

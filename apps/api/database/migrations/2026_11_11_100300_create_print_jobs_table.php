@@ -41,7 +41,7 @@ return new class extends Migration
             $table->string('failure_key', 64)->nullable();
             $table->foreignId('created_by_user_id')->constrained('users')->restrictOnDelete();
             $table->foreignId('acting_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->unsignedBigInteger('shift_instance_id')->nullable();
+            $table->foreignId('shift_instance_id')->nullable()->constrained('shift_instances')->restrictOnDelete();
             $table->foreignId('station_id')->nullable()->constrained('stations')->nullOnDelete();
             $table->foreignId('device_id')->nullable()->constrained('devices')->nullOnDelete();
             $table->timestamps();
