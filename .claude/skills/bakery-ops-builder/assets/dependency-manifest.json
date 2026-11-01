@@ -899,6 +899,29 @@
         "the key and the signed URL never reach the log"
       ],
       "note": "provider is Shared, built in this phase (step 4.2a); written red in 4.1a, run by mod-payments from 4.2a. Not in phases.4.contracts_required: the entry gate requires a contract whose provider is from an earlier phase (Shared, phase 0) to be green at entry; see phases.4.intra_phase_contracts."
+    },
+    "ops->inventory": {
+      "phase": 5,
+      "file": "apps/api/tests/Contract/Ops/InventoryContractTest.php",
+      "cases": [
+        "LedgerOracle::check(connection) returns {ok, items, locations, mismatches[]}; on a seeded ledger it is ok, on a copy and on the original",
+        "a movement deleted behind the triggers' back on a scratch copy is reported with its (item, location) and both figures; the original stays ok",
+        "stock_balances that disagree with the movements are reported as pairs of their own (source stock_balances)",
+        "an item_stock_view that no longer adds the movements up the ledger's way is reported under source item_stock_view",
+        "it reads only the named connection and writes nothing: every query is a SELECT on that connection; decimals are strings at scale 4"
+      ],
+      "note": "consumer App\\Ops (the restore drill, step 5.5b), not a module; written red in the first commit of 5.5b and turned green by the provider in the same PR; run by mod-inventory. Not in phases.5.contracts_required (the provider is from an earlier phase, so the entry gate would require it before it exists); see phases.5.intra_phase_contracts."
+    },
+    "ops->shifts": {
+      "phase": 5,
+      "file": "apps/api/tests/Contract/Ops/ShiftsContractTest.php",
+      "cases": [
+        "HashChain::verifyAll(connection) answers ok on seeded chains, on a copy and on the original, with the places and links it checked",
+        "it checks every branch and puts back the default connection and the current branch it found",
+        "a locked count's stored hash changed on a scratch copy names the first broken link (branch, place, chain_seq, count, kind); the original stays whole",
+        "it reads only the named connection and writes nothing: every query is a SELECT on that connection"
+      ],
+      "note": "consumer App\\Ops (the restore drill, step 5.5b), not a module; written red in the first commit of 5.5b and turned green by the provider in the same PR; run by mod-shifts. See phases.5.intra_phase_contracts."
     }
   },
   "ops": {
@@ -1423,6 +1446,10 @@
         "phase-5-plan.md approved"
       ],
       "contracts_required": [],
+      "intra_phase_contracts": [
+        "ops->inventory",
+        "ops->shifts"
+      ],
       "steps": [
         {
           "id": "5.1",
