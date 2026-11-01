@@ -190,7 +190,7 @@ export type Block =
 /** Why Complete is disabled, the first reason from the top of the sheet; null when it may be pressed. */
 export function blockReason(state: SheetState): Block | null {
   if (state.shift !== null) return { kind: "shift", reason: state.shift };
-  if (!state.online) return { kind: "offline" };
+  // offline is no block since step 5.2a: a completed batch joins the outbox (plan 10.2 D10)
   if (compareDecimal(state.balance, "0", 2) <= 0) return { kind: "nothing_due" };
   if (state.rows.length === 0) return { kind: "no_rows" };
   if (state.rows.length > MAX_ROWS) return { kind: "too_many_rows" };

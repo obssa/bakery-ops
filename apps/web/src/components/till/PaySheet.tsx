@@ -4,15 +4,16 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
-import { recordPaymentBatch, uploadReceiptPhoto, usePaymentChannels } from "@/lib/api/till";
+import { uploadReceiptPhoto, usePaymentChannels } from "@/lib/api/till";
 import type { Locale, Order, PaymentBatchResult } from "@/lib/api/types";
 import { addDecimal, compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { downscale } from "@/lib/images/downscale";
+import { submit } from "@/lib/outbox/store";
 import { useOrderNo } from "@/lib/orderNo";
 import { forgetPicture, keepPicture, pictureOf, usePayDrafts } from "@/lib/payDrafts";
 import { CASH } from "@/lib/payment";
-import { batchRows, blockReason, keepsKey, MAX_ROWS, newRow, NO_PHOTO, remaining, sheetChannels, type Block, type PayRow } from "@/lib/paySheet";
+import { batchRows, blockReason, changeDue, keepsKey, MAX_ROWS, newRow, NO_PHOTO, remaining, sheetChannels, type Block, type PayRow } from "@/lib/paySheet";
 import type { PayBlock } from "@/lib/shifts";
 import { useOnline } from "@/lib/useOnline";
 import { Alert, Button, Modal } from "../ui";
@@ -29,7 +30,17 @@ import { ReceiptPanel } from "./ReceiptPanel";
 // both reused by a retry), so Complete never waits for an upload. Nothing is lost on a failure: the sheet is kept per order while the page
 // lives (lib/payDrafts.ts), with the photos already on the server, and a retry of the same sheet replays the batch the API recorded instead of
 // taking the money twice. A refusal (a row, the sum, the shift) wrote nothing: it is shown, the row it names is marked, and the next try is a
-// new request. Offline is said before trying; the outbox that queues a payment for later is Phase 5. The rules are lib/paySheet.ts.
+// new request. Offline (or when the connection fails on Complete) the batch joins the outbox with its key and client_uuid (step 5.2a): the
+// sheet says it is saved on this tablet and shows the change to give, and the till holds the order until it was sent. The rules are
+// lib/paySheet.ts.
+
+/** The change of the sheet's cash rows, which the cashier hands back now; null when no row is cash. */
+function localChange(rows: PayRow[]): string | null {
+  return rows.reduce<string | null>((sum, row) => {
+    const change = changeDue(row);
+    return change === null ? sum : addDecimal(sum ?? "0.00", change);
+  }, null);
+}
 
 function issueText(t: ReturnType<typeof useTranslations>, block: Block, currency: string): string {
   switch (block.kind) {
@@ -81,6 +92,7 @@ interface Completed {
 
 export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; shift: PayBlock | null; onClose: () => void; onChanged: () => void }) {
   const t = useTranslations("till");
+  const o = useTranslations("outbox");
   const no = useOrderNo(order);
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
@@ -101,6 +113,8 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [photoFailures, setPhotoFailures] = useState<Record<string, PhotoFailure>>({});
   const [completed, setCompleted] = useState<Completed | null>(null);
+  // the batch was saved on this tablet for the outbox to send (offline, or the connection failed): the change to give
+  const [queued, setQueued] = useState<{ change: string | null } | null>(null);
   // set before the completed sheet's draft is dropped, so no new sheet starts behind the receipt
   const finished = useRef(false);
 
@@ -170,10 +184,26 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
     setError(null);
     setRowErrors({});
     try {
-      const result = await recordPaymentBatch(order.id, body, key);
+      const outcome = await submit<PaymentBatchResult>({
+        kind: "pay_batch",
+        method: "POST",
+        path: `/orders/${order.id}/payment-batches`,
+        body,
+        subjectId: order.id,
+        subjectUuid: order.client_uuid,
+        idempotencyKey: key,
+      });
+      finished.current = true;
+      if (!outcome.sent) {
+        // saved on this tablet: the outbox sends it with the same key when it can; the cash is taken now, so the change is given now
+        setQueued({ change: localChange(current.rows) });
+        for (const row of current.rows) forgetPicture(row.id);
+        drafts().drop(order.id);
+        return;
+      }
+      const result = outcome.answer;
       const references: Record<string, string> = {};
       for (const row of current.rows) if (row.reference.trim() !== "") references[row.id] = row.reference.trim();
-      finished.current = true;
       setCompleted({ result, order, references });
       for (const row of current.rows) forgetPicture(row.id);
       drafts().drop(order.id);
@@ -216,7 +246,7 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
             {completed ? completed.order.totals.balance : balance} {currency}
           </output>
         </p>
-        {completed ? null : (
+        {completed || queued ? null : (
           <p
             className={`flex items-baseline justify-between gap-4 rounded-md px-4 py-3 text-xl font-semibold ${
               compareDecimal(left, "0", 2) === 0 ? "bg-green-50 text-green-900" : "bg-amber-50 text-amber-900"
@@ -229,7 +259,7 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
           </p>
         )}
       </div>
-      {!completed && compareDecimal(order.totals.paid, "0", 2) > 0 ? (
+      {!completed && !queued && compareDecimal(order.totals.paid, "0", 2) > 0 ? (
         <p className="text-base text-neutral-700">{t("already_paid", { amount: order.totals.paid, total: order.totals.total, currency })}</p>
       ) : null}
 
@@ -250,6 +280,16 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
             </div>
           ) : null}
           <ReceiptPanel order={completed.order} payments={completed.result.payments} channels={available} references={completed.references} />
+          <Button type="button" className="min-h-14 w-full text-lg" onClick={onClose}>
+            {t("done")}
+          </Button>
+        </div>
+      ) : queued ? (
+        <div className="space-y-4">
+          <p role="status" className="space-y-1 rounded-md bg-blue-50 px-4 py-3 text-blue-900">
+            <span className="block text-lg font-semibold">{o("queued")}</span>
+            {queued.change !== null ? <span className="block text-xl font-semibold">{t("give_change", { amount: queued.change, currency })}</span> : null}
+          </p>
           <Button type="button" className="min-h-14 w-full text-lg" onClick={onClose}>
             {t("done")}
           </Button>
