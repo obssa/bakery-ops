@@ -1,0 +1,16 @@
+{
+  "pad": {
+    "title": "Waiter pad",
+    "send": "Send {count, plural, one {# line} other {# lines}}",
+    "unit": "{qty} {unit}",
+    "brand": "Excel",
+    "same": "Close",
+    "greet": "Hello {name}",
+    "status_open": "Open",
+    "status_closed": "Closed",
+    "brand_line": "Open Bakery Ops"
+  },
+  "orphan": {
+    "old": "Old text"
+  }
+}

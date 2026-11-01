@@ -485,6 +485,44 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      `phases.5.gate.playwright_projects`, STATUS and e2e-p5's list in the same PR): signed in as each role, visit every screen of that role
      under `/app/am/` and assert no visible text node holds Latin letters outside the allowlist (numbers, `ETB`, names the admin typed,
      the order number format).
+   - **As built (step 5.4a, `phase-5/i18n-checks`).** Tests red first (`LangParityTest` with its planted fixture, the scripts' fixture
+     tests, the lint rule's cases), then each piece, then the sweep. No API change: no route, permission, registry, OpenAPI or ERD change.
+     Where the code chose what the plan left open:
+     - **`LangParityTest`** compares through `tests/Support/LangParity.php` (files, keys at every depth, shape, empty or `__TODO__`
+       values, `:placeholders`); `tests/Fixtures/LangParity` plants one gap of each kind. The 490 API messages already agreed.
+     - **The lint rule** is a short local one, not `react/jsx-no-literals`: `local/no-literal-text` (`apps/web/eslint-rules/`) reports a
+       letter of any script (an Amharic literal is as wrong on the English screen) in JSX text, in a string or template placed as a child
+       (also through `?:`, `&&`, `||`, `??`) and in the attributes a person reads or hears (aria-label, title, placeholder, alt);
+       punctuation, digits and templates whose letters all come from expressions pass. `jsx-no-literals` flagged only punctuation (`·`,
+       `—`, `×`) and missed `{"text"}` unless it flagged every template too. Nothing in the 220 source files broke it; its `node --test`
+       cases run in `web-lint`.
+     - **The scripts** share `scripts/i18n_common.py`, which reads the PHP files with a small tokenizer (no PHP on the host) and rewrites
+       only the corrected string literal. Keys are `web:<path>` and `api:<file>.<path>`. The sheet is UTF-8 with a byte-order mark (a
+       spreadsheet opens the Ethiopic script as it is); exported again it keeps each row's correction and comment. The import checks the
+       whole sheet first (the key exists, the correction names the English placeholders, no `__TODO__`) and writes nothing when a row is
+       wrong. The report's "unused" list is a heuristic (a key's path or last part as a string in the code, or a template or a dotted
+       string joined to a variable that starts it), so it lists, never deletes; 5 keys today for 5.4b to check by hand. Fixture tests
+       and the report run in `i18n-check`.
+     - **The glossary** flags refund (ተመላሽ on lists, ገንዘብ መመለስ on the buttons and the refund screen), void (ውድቅ on the screens,
+       ስረዛ in the API messages; ውድቅ also names a rejected count or transfer, ሰርዝ a cancellation) and batch (ዙር, ምርት, በጅምላ).
+     - **`p5-amharic`** runs in the seeded demo bakery of the CI stack (orders at every stage, shifts and history, names typed in
+       Amharic), not the E2E branch, on a tablet enrolled there with `freshDevice` and opened with `openAs`; CI only. Each role's screen
+       list is in the spec (a screen a role may not use still shows its Amharic refusal); on each screen it follows one link with a query
+       to a screen of the same list (an order's record, an item, a product's dashboard, a shift's replay), and the waiter's pad is
+       unlocked with a short code the demo admin resets. The sweep (`e2e/support/amharic.ts`) reads text nodes and the read labels; the
+       allowlist is D19 plus the file formats and codes the dictionary keeps (`ETB`, PDF, CSV, Excel, JSON, JPEG, PNG, WebP, SKU, TIN),
+       hex digests (a count's chain hash: a number in base 16, at least eight hex digits with a digit among them), the typed names in the
+       form an Amharic screen shows (`*_am` and the single-language fields such as a payment's reference number, never `*_en`) and the
+       devices' short ids, matched as whole words, text inside an element marked `lang="en"` (the language switch, a row's
+       other-language name) and machine identifiers marked `translate="no"` (the audit log's action codes and changed fields, a pattern
+       example). `amharic-logic.spec.ts` proves it on planted pages. The report gained a fourth list, Latin words left in an Amharic
+       text (12 today, all codes in technical messages: HTTP headers, field names, regex parts; for the reviewer, not a gate).
+     - **Gaps fixed** (the first CI run listed 104 on the admin's screens, the same kinds for the manager, cashier and chef): the cash
+       tally's Latin `x` is `×` in both languages; an order with no number read "ትዕዛዝ null" on the kitchen rail and the orders board
+       (`orderNoText` gives a dash, as the payments list already did; why a numberless order reaches the rail of the seeded bakery is
+       left to the orders owner); three device texts of 5.1b named the app "Bakery Ops" in Latin (now ቤከሪ ኦፕስ); the other-language
+       name of a variance reason and of a payment channel, and the English receipt fields, carry `lang="en"`; the pattern hint's example
+       is `<code translate="no">` through `t.rich` (`Field`'s hint takes markup).
    - **5.4b `phase-5/i18n-review`** (`i18n` `done`). The reviewer's corrections imported from the sheet, the glossary settled, the report
      clean. Opened when the sheet comes back (10.2 Q5); 5.5 and 5.6 do not wait for it. The checklist item `am-reviewed` is a sign-off.
 5. **5.5 ops** (STATUS `ops`), four PRs.

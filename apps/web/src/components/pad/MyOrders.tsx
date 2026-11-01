@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import type { Line, LineStatus, Locale, Order } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
 import { visibleLines } from "@/lib/live/pad";
+import { orderNoText } from "@/lib/orderNo";
 import { queueCancelOrder, queueServeLine, useOutbox } from "@/lib/outbox/store";
 import { Badge, Button } from "../ui";
 
@@ -69,7 +70,7 @@ function OrderCard({ order }: { order: Order }) {
     <article className={`rounded-lg border-2 p-4 ${ready > 0 ? "border-green-500 bg-green-50" : "border-neutral-200 bg-white"}`}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-lg font-semibold text-neutral-900">
-          {t("order_heading", { no: String(order.order_no) })}
+          {t("order_heading", { no: orderNoText(order.order_no) })}
           {where ? <span className="font-normal text-neutral-700"> · {where}</span> : null}
         </h3>
         <div className="flex items-center gap-2">
@@ -85,7 +86,7 @@ function OrderCard({ order }: { order: Order }) {
       <footer className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-base font-semibold text-neutral-900">{t("order_total", { total: order.totals.total, currency: order.currency })}</p>
         {order.status === "open" ? (
-          <Button type="button" variant="secondary" aria-label={t("cancel_order_aria", { no: String(order.order_no) })} disabled={pending} onClick={() => queueCancelOrder(order.id, order.client_uuid)}>
+          <Button type="button" variant="secondary" aria-label={t("cancel_order_aria", { no: orderNoText(order.order_no) })} disabled={pending} onClick={() => queueCancelOrder(order.id, order.client_uuid)}>
             {t("cancel_order")}
           </Button>
         ) : null}
