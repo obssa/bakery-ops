@@ -91,9 +91,12 @@ export function usePadOutcomes(onSent: () => void, onChanged: () => void) {
  * again (the API answers the same order for the same client UUID). Run once when the pad or the till opens.
  */
 export function useReleaseStaleSends() {
+  // the saved queue is read from IndexedDB after the page starts (step 5.2a): until then nobody can tell what is queued
+  const loaded = useOutbox((s) => s.loaded);
   useEffect(() => {
+    if (!loaded) return;
     const queued = new Set(useOutbox.getState().items.map((item) => item.subjectUuid));
     const { carts, update } = useCarts.getState();
     for (const [id, cart] of Object.entries(carts)) if (cart.sending && !queued.has(cart.orderUuid)) update(Number(id), (c) => ({ ...c, sending: false }));
-  }, []);
+  }, [loaded]);
 }

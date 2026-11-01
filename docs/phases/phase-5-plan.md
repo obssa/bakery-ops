@@ -346,10 +346,49 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      Retries keep the same key; a 4xx moves the item to the conflict list (5.2c), a 5xx or a network failure backs off (1, 2, 4 … 60 s).
      The pending indicator shows the count per screen. Tests: the outbox logic specs (`e2e/p5/offline-logic.spec.ts`, pure functions:
      ordering, dependencies, back-off, the migration from `localStorage`), and the first `p5-offline` spec, replacing the placeholder:
-     `context.setOffline(true)`, send an order, reload the page while offline (the shell is precached by `sw.js`), go online, and the API
-     holds **exactly one** order with that `client_uuid`; the answer to a send is dropped by `page.route` after the server committed it and
-     the replay still yields one order (idempotency proves it). API: a replay-after-expiry case beside `IdempotencyCoverageTest` (a key
-     older than the retention is gone; the `client_uuid` unique index still refuses a second order and the answer names the existing one).
+     `context.setOffline(true)`, send an order, reload the page with the API unreachable (CI serves `next start`, which has no `sw.js`: see
+     the As built note), go online, and the API holds **exactly one** order with that `client_uuid`; the answer to a send is dropped
+     by `page.route` after the server committed it and the replay still yields one order (idempotency proves it). API: a replay-after-expiry
+     case beside `IdempotencyCoverageTest` (a key older than the retention is gone; the `client_uuid` unique index still refuses a second
+     order and the answer names the existing one).
+   - **As built (step 5.2a, `phase-5/outbox-idb`).** Tests red first (`offline-logic.spec.ts`, the two `p5-offline` flows,
+     `IdempotencyReplayAfterExpiryTest`), then the web. No API change: no route, permission, OpenAPI or ERD change. Where the code chose
+     what the plan left open:
+     - **The store** is a wrapper of our own (`src/lib/outbox/db.ts`: `all` and `replaceAll`, one transaction each; database `bakery-ops`,
+       store `outbox`, version 1, so 5.2b adds its photo store as version 2). The rules are pure functions (`src/lib/outbox/logic.ts`);
+       `store.ts` keeps the queue in memory and writes it through. Without IndexedDB (a private window) the queue lives in the tab's
+       memory. The `localStorage` queue (`bakery-ops.outbox.v1`) moves in on the first start; its key is cleared only after the write, and
+       a queue already moved is not doubled. Its `after` becomes `depends_on`; its kitchen and bar items do not know their screen.
+     - **Order**: every item has a `group`: an order's writes by its client_uuid (else its id), a kitchen, bar or serve action by its line,
+       a batch's steps by request (`production:<id>`), a count's drafts by count (`count:<id>`). The head of each group goes first, and a
+       group waiting on a failure holds up only itself. **`depends_on`** with `needs: {token, from}`: when the dependency is accepted, the
+       token in the dependent's path and body becomes the value at `from` in its answer (`id`, `batch.id`, `lines[client_uuid=…].id`); an
+       answer without it makes the dependent a conflict. No screen queues a line action on an unsent order yet (the pad lists only orders
+       the server has), so 5.2b's payment after its photo is the first user of `needs`.
+     - **Answers**: none (0), 5xx, 408 and 429 retry with the same key after 1, 2, 4 … 60 s (the browser's online event resets the waits);
+       a network failure ends the pass, a 5xx holds up only its own item. Any other 4xx (an ended acting session included) makes the item,
+       and every item that depends on it, a conflict kept in IndexedDB with the API's body (`blockedBy` names the refused one); the shell
+       strip shows them with Dismiss until 5.2c's tray, and the pad still takes its own inline ones. A device refusal keeps everything and
+       stops the timer (5.1b's branch); a 401 signs out and keeps everything.
+     - **Screens that wait for the answer** use `submit()`: online they get the answer, or the refusal thrown as before (not kept as a
+       conflict: the screen shows it); offline, or when the write cannot go now, they are told it is queued. The till: offline no longer
+       blocks Complete (`pay-sheet-logic.spec.ts` changed to match); a queued batch shows "saved on this tablet" with the change to give, and
+       the till's card holds that order until the outbox sent it. A photo channel still needs its photo uploaded (5.2b). Production: start
+       and finish go through the outbox; the card says the step is saved and keeps its other actions disabled until it was sent. Counts:
+       line drafts (a typed figure stays on its line) and the cash declaration (the tally stays as typed); handing in waits for them.
+     - **Online-only**: `OnlineOnlyButton` (disabled offline, "(Needs a connection)" in its text) on void, refund, approve, co-sign, reject
+       and unlock; the admin frame shows a notice and wraps its screens in a disabled fieldset (its links and tabs stay usable).
+     - **Pending per screen**: each item keeps the screen it was queued on (`screenOf` of the page path); the strip says "N waiting to
+       send" for this screen and "M waiting from other screens".
+     - **A page that starts while the API is unreachable** knows nobody (no `GET /me`); the browser's online event now asks again, so the
+       outbox goes on without a tap on Retry.
+     - **The `p5-offline` reload**: CI serves `next start`, which has no `sw.js` (the shell cache is built only for the static export the
+       live host serves), so the spec reloads with every API call aborted and the browser online: what it proves is that the queue lives in
+       IndexedDB. The specs are not `@live`.
+     - **Left for 5.2b and 5.2c**: the photo store and its upload item; the conflict tray (items are already stored as `conflict`); the
+       lookup read. A write that is not a create (a send, a line action) replayed after its key expired runs again and may be refused
+       because it already happened; 5.2c's reconcile decides how to show that. Two tabs of one tablet share IndexedDB but each sends from
+       its own memory; the same key makes a double send harmless.
    - **5.2b `phase-5/photo-queue`**. A receipt photo taken offline is shrunk in the browser as today, kept as a blob in IndexedDB with
      its `client_uuid`, uploaded first when online (`POST /files`, multipart, replay-safe since 4.2b), and the payment that waits on it is
      sent with the file id; a quota guard refuses a new photo when more than `NEXT_PUBLIC_PHOTO_QUEUE_MB` (50) waits, and says so; a photo
