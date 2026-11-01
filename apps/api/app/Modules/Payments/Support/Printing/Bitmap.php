@@ -71,7 +71,7 @@ final readonly class Bitmap
                     if ($x >= $width) {
                         break;
                     }
-                    $color = imagecolorat($image, $x, $y);
+                    $color = (int) imagecolorat($image, $x, $y);
                     $grey = $truecolor ? ($color & 0xFF) : (int) (imagecolorsforindex($image, $color)['blue']);
                     if ($grey < $threshold) {
                         $byte |= 0x80 >> $bit;

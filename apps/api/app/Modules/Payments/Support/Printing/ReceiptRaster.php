@@ -102,7 +102,7 @@ final class ReceiptRaster
                 $y += $lineHeight;
             }
         }
-        $height = $y + self::MARGIN;
+        $height = max(1, $y + self::MARGIN);
 
         $image = imagecreatetruecolor($width, $height);
         if (! $image instanceof GdImage) {
