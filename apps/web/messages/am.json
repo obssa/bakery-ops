@@ -210,6 +210,8 @@
     "photo_failed": "ፎቶው አልተጫነም።",
     "photo_take": "የደረሰኙን ፎቶ አንሳ",
     "photo_retry": "እንደገና ሞክር",
+    "photo_kept": "ፎቶው በዚህ ታብሌት ላይ ተቀምጧል። ከክፍያው በፊት ይላካል።",
+    "photo_quota": "ይህ ታብሌት ለመላክ የሚጠባበቁ {waiting} MB ፎቶዎችን ይዟል፤ ከ{limit} MB በላይ መያዝ አይችልም። ፎቶዎቹ እንዲላኩ ከኢንተርኔት ጋር ያገናኙ፣ ከዚያ ይህን ፎቶ እንደገና ያንሱ።",
     "receipt_preview": "የደረሰኝ ቅድመ እይታ",
     "receipt_total": "ጠቅላላ",
     "receipt_reference_line": "ማጣቀሻ {tail}",
@@ -633,6 +635,7 @@
     "kind_finish_batch": "ምርት መጨረስ",
     "kind_count_lines": "ቆጠራ ማስቀመጥ",
     "kind_count_cash": "የጥሬ ገንዘብ ቆጠራ ማስቀመጥ",
+    "kind_upload_photos": "የደረሰኝ ፎቶ መላክ",
     "online_only": "ግንኙነት ያስፈልጋል",
     "admin_offline": "ከመስመር ውጭ ነዎት። በዚህ ገጽ ላይ ያሉ ለውጦች ግንኙነት ያስፈልጋቸዋል፤ አይጠራቀሙም።",
     "queued": "በዚህ ታብሌት ላይ ተቀምጧል። ግንኙነቱ ሲመለስ ይላካል።"

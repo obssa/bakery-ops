@@ -56,18 +56,23 @@ export function useOrderDetail(orderId: number | null, version: number | null) {
 }
 
 /** An upload of a receipt photo may take a while on a slow line (the photo is shrunk first, about 200 to 400 kB). */
-const UPLOAD_TIMEOUT_MS = 90_000;
+export const UPLOAD_TIMEOUT_MS = 90_000;
+
+/** The multipart body of POST /files: the photo as `file`, its purpose and its own client_uuid (also the outbox's, step 5.2b). */
+export function receiptForm(photo: Blob, clientUuid: string, purpose: StoredFileView["purpose"] = "receipt"): FormData {
+  const form = new FormData();
+  form.append("purpose", purpose);
+  form.append("client_uuid", clientUuid);
+  form.append("file", photo, photo.type === "image/jpeg" || photo.type === "" ? `${purpose}.jpg` : purpose);
+  return form;
+}
 
 /**
  * POST /files (step 4.2b): the photo as `file`, its purpose and its own client_uuid in one multipart body. A retry of the same photo sends
  * the same client_uuid and Idempotency-Key, so the API answers the stored file (200) instead of keeping a second one.
  */
 export function uploadReceiptPhoto(photo: Blob, clientUuid: string, idempotencyKey: string, purpose: StoredFileView["purpose"] = "receipt"): Promise<StoredFileView> {
-  const form = new FormData();
-  form.append("purpose", purpose);
-  form.append("client_uuid", clientUuid);
-  form.append("file", photo, photo.type === "image/jpeg" || photo.type === "" ? `${purpose}.jpg` : purpose);
-  return authed<StoredFileView>("/files", { method: "POST", body: form, idempotencyKey, timeoutMs: UPLOAD_TIMEOUT_MS });
+  return authed<StoredFileView>("/files", { method: "POST", body: receiptForm(photo, clientUuid, purpose), idempotencyKey, timeoutMs: UPLOAD_TIMEOUT_MS });
 }
 
 /**

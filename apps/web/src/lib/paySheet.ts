@@ -1,5 +1,6 @@
 import type { PaymentChannel } from "./api/types";
 import { addDecimal, compareDecimal, subtractDecimal } from "./decimal";
+import { photoToken } from "./outbox/logic";
 import { CASH, changeDue as cashChange, tenderedOf } from "./payment";
 import type { PayBlock } from "./shifts";
 
@@ -18,7 +19,11 @@ export const REFERENCE_MAX = 64;
 
 const MONEY = /^\d{1,10}(\.\d{1,2})?$/;
 
-export type PhotoStatus = "none" | "uploading" | "failed" | "uploaded";
+/**
+ * "kept" (step 5.2b): the photo is kept on the tablet, not up yet (taken offline, or its upload failed on the network); the row is complete,
+ * and Complete queues its upload before the payment (lib/outbox).
+ */
+export type PhotoStatus = "none" | "uploading" | "failed" | "uploaded" | "kept";
 
 /** A row's receipt photo: its upload's own client_uuid and Idempotency-Key are kept, so a retry of a failed upload is the same write. */
 export interface RowPhoto {
@@ -153,6 +158,8 @@ export function rowIssue(row: PayRow, channel: PaymentChannel | undefined): RowI
   if (channel.requires_photo) {
     if (row.photo.status === "uploading") return "photo_uploading";
     if (row.photo.status === "failed") return "photo_failed";
+    // a photo kept on the tablet is enough since step 5.2b: its upload goes first, then the payment
+    if (row.photo.status === "kept") return row.photo.clientUuid === null ? "photo_missing" : null;
     if (row.photo.status !== "uploaded" || row.photo.fileId === null) return "photo_missing";
   }
   return null;
@@ -216,7 +223,8 @@ export interface BatchRow {
   amount: string;
   tendered_amount?: string;
   reference_no?: string;
-  receipt_file_id?: number;
+  /** the file id, or the photo's token (photoToken) while the photo is kept on the tablet: the outbox writes the id in once it is up */
+  receipt_file_id?: number | string;
 }
 
 /**
@@ -233,8 +241,27 @@ export function batchRows(rows: PayRow[], channels: PaymentChannel[]): BatchRow[
     }
     if (channel?.requires_reference) body.reference_no = row.reference.trim();
     if (channel?.requires_photo && row.photo.fileId !== null) body.receipt_file_id = row.photo.fileId;
+    else if (channel?.requires_photo && row.photo.status === "kept" && row.photo.clientUuid !== null) body.receipt_file_id = photoToken(row.photo.clientUuid);
     return body;
   });
+}
+
+/** The photos of the batch still kept on the tablet (by client_uuid, in the rows' order): Complete queues their upload before the payment. */
+export function keptPhotos(rows: PayRow[], channels: PaymentChannel[]): string[] {
+  return rows.flatMap((row) =>
+    channelOf(channels, row.channel)?.requires_photo && row.photo.status === "kept" && row.photo.fileId === null && row.photo.clientUuid !== null
+      ? [row.photo.clientUuid]
+      : [],
+  );
+}
+
+/** The photo a refusal names (a photo's upload the API refused, or one no longer on the tablet): its client_uuid, or null. */
+export function refusedPhoto(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("body" in error)) return null;
+  const body = (error as { body: unknown }).body;
+  if (typeof body !== "object" || body === null) return null;
+  const photo = (body as Record<string, unknown>).photo_client_uuid;
+  return typeof photo === "string" && photo !== "" ? photo : null;
 }
 
 /**

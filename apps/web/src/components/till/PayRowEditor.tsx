@@ -12,16 +12,17 @@ import { Alert, Button, Field, TextInput } from "../ui";
 // One payment of the pay sheet (step 4.5b): the channel, the amount, and what the channel asks for. Cash shows the keypad for the cash
 // handed over and the change; a channel with requires_reference a reference field with the channel's hint, checked against its pattern as
 // it is typed (the API's ReferencePattern decides); a channel with requires_photo the camera button. The camera button is a plain file
-// input (accept="image/*", capture="environment"): a phone opens its camera, a device without one opens the file chooser instead.
+// input (accept="image/*", capture="environment"): a phone opens its camera, a device without one opens the file chooser instead. A photo
+// taken offline, or whose upload failed on the network, is kept on the tablet (step 5.2b): the row says so, and the photo goes up before
+// the payment.
 
 const KEYS: KeypadKey[] = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "00", "0", "."];
 
 const keyClass = `inline-flex min-h-14 items-center justify-center rounded-md border border-neutral-300 bg-white text-2xl font-semibold text-neutral-900 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:text-neutral-300 ${focusRing}`;
 
-/** What the row shows of a failed upload: the API's message, and whether trying the same photo again can help. */
+/** What the row shows of a photo it cannot use: the API's refusal of the upload, or the quota of photos waiting on the tablet. */
 export interface PhotoFailure {
   message: string;
-  retryable: boolean;
 }
 
 export function PayRowEditor({
@@ -36,7 +37,6 @@ export function PayRowEditor({
   onChange,
   onRemove,
   onPhoto,
-  onRetryPhoto,
 }: {
   index: number;
   row: PayRow;
@@ -50,7 +50,6 @@ export function PayRowEditor({
   onChange: (patch: Partial<PayRow>) => void;
   onRemove: (() => void) | null;
   onPhoto: (file: File) => void;
-  onRetryPhoto: () => void;
 }) {
   const t = useTranslations("till");
   const locale = useLocale() as Locale;
@@ -201,14 +200,18 @@ export function PayRowEditor({
             className="sr-only"
             onChange={picked}
           />
-          {row.photo.status === "uploaded" ? (
+          {row.photo.status === "uploaded" || row.photo.status === "kept" ? (
             <div className="flex flex-wrap items-center gap-4">
               {picture?.url ? (
                 // a local object URL of the shrunk picture: next/image has nothing to optimise in a static export
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={picture.url} alt={t("photo_thumb_alt", { n })} className="h-24 w-24 rounded-md border border-neutral-200 object-cover" />
               ) : null}
-              <p className="text-base font-medium text-green-800">{t("photo_attached")}</p>
+              {row.photo.status === "kept" ? (
+                <p className="text-base font-medium text-blue-900">{t("photo_kept")}</p>
+              ) : (
+                <p className="text-base font-medium text-green-800">{t("photo_attached")}</p>
+              )}
               <Button type="button" variant="secondary" onClick={() => fileInput.current?.click()}>
                 {t("photo_replace")}
               </Button>
@@ -220,16 +223,9 @@ export function PayRowEditor({
           ) : (
             <div className="space-y-2">
               {row.photo.status === "failed" ? <Alert>{photoFailure?.message ?? t("photo_failed")}</Alert> : null}
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" className="min-h-14" onClick={() => fileInput.current?.click()}>
-                  {t("photo_take")}
-                </Button>
-                {row.photo.status === "failed" && (photoFailure?.retryable ?? true) ? (
-                  <Button type="button" variant="secondary" className="min-h-14" onClick={onRetryPhoto}>
-                    {t("photo_retry")}
-                  </Button>
-                ) : null}
-              </div>
+              <Button type="button" className="min-h-14" onClick={() => fileInput.current?.click()}>
+                {t("photo_take")}
+              </Button>
             </div>
           )}
         </div>

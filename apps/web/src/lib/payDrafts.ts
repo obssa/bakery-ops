@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { holdPhotos } from "./outbox/store";
 import type { PayRow, RowPhoto } from "./paySheet";
 
 // The pay sheets of this till that are not finished yet, one per order, kept in memory while the page lives (step 4.5b). Closing the sheet
@@ -8,7 +9,8 @@ import type { PayRow, RowPhoto } from "./paySheet";
 // client_uuid and Idempotency-Key, so the cashier picks up where they left off and a retry is the same write: the API replays a batch it
 // recorded instead of taking the money twice. A completed sheet is dropped. Nothing is written to storage: a reload starts afresh, and a
 // photo uploaded but never attached is removed by the server's orphan purge (files:purge-orphans, 24 h). A completed batch that cannot be sent
-// joins the outbox (step 5.2a, lib/outbox/store.ts); the photo queue is step 5.2b.
+// joins the outbox (step 5.2a, lib/outbox/store.ts). Since step 5.2b every photo is also kept on the tablet until it is up and nothing needs
+// it (lib/outbox): the photos of the sheets open here are held, so they are not dropped under them.
 
 export interface PayDraft {
   /** the batch's client_uuid (stored by the API as every payment's batch_uuid) */
@@ -48,6 +50,10 @@ export const usePayDrafts = create<PayDrafts>()((set) => ({
       return { drafts };
     }),
 }));
+
+holdPhotos(() =>
+  Object.values(usePayDrafts.getState().drafts).flatMap((draft) => draft.rows.flatMap((row) => (row.photo.clientUuid ? [row.photo.clientUuid] : []))),
+);
 
 /** The picture behind a row's photo (the shrunk JPEG and its object URL for the thumbnail), kept for a retry of its upload. */
 const pictures = new Map<string, { blob: Blob; url: string | null }>();

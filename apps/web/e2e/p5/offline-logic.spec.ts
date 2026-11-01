@@ -513,14 +513,14 @@ test.describe("offline logic: the photo queue (step 5.2b)", () => {
     const tablet = new FakeDb();
     const outbox = new Map<string, unknown>([["w1", item({ id: "w1" })]]);
     tablet.stores.set(OUTBOX_STORE, outbox);
-    expect(upgradeDb(tablet, 1)).toEqual([PHOTO_STORE]);
+    expect(upgradeDb(tablet)).toEqual([PHOTO_STORE]);
     expect(tablet.stores.get(OUTBOX_STORE)).toBe(outbox);
     expect([...outbox.keys()]).toEqual(["w1"]);
 
     // a new tablet gets both; one already at version 2 gets nothing
     const fresh = new FakeDb();
-    expect(upgradeDb(fresh, 0)).toEqual([OUTBOX_STORE, PHOTO_STORE]);
-    expect(upgradeDb(fresh, 2)).toEqual([]);
+    expect(upgradeDb(fresh)).toEqual([OUTBOX_STORE, PHOTO_STORE]);
+    expect(upgradeDb(fresh)).toEqual([]);
 
     // the photo store keeps a photo by its client_uuid until it is dropped
     const photos = memoryPhotoDb();
