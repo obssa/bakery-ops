@@ -69,7 +69,9 @@ function ReasonTable({ rows, manage, onEdit }: { rows: VarianceReason[]; manage:
                 <tr key={row.id} className="border-b border-neutral-100 last:border-0">
                   <th scope="row" className={`${TD} font-medium text-neutral-900`}>
                     {name(row)}
-                    <span className="block text-sm font-normal text-neutral-600">{row.name_am === name(row) ? row.name_en : row.name_am}</span>
+                    <span className="block text-sm font-normal text-neutral-600" lang={row.name_am === name(row) ? "en" : "am"}>
+                      {row.name_am === name(row) ? row.name_en : row.name_am}
+                    </span>
                   </th>
                   <td className={`${TD} font-mono text-sm`}>{row.code}</td>
                   <td className={TD}>{row.requires_note ? t("reasons.note_required") : t("reasons.note_optional")}</td>

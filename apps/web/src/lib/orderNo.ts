@@ -8,6 +8,14 @@ import { useDateFormat } from "./useDates";
 // Order numbers restart each business day (Africa/Addis_Ababa), so the unpaid queue can hold order 3 of today and order 3 of an
 // earlier day. An order of today is named by its number; any other carries its date too, in every label and accessible name.
 
+/**
+ * An order's number as text, or "—" while it has none, as the payments list already shows it (an order gets its number when it is sent;
+ * the screen never prints "null"). Found by the Amharic sweep of step 5.4a on the kitchen rail and the orders board.
+ */
+export function orderNoText(no: string | number | null | undefined): string {
+  return no === null || no === undefined || no === "" ? "—" : String(no);
+}
+
 /** Today's business date, YYYY-MM-DD, in the bakery's time zone. */
 export function businessToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Addis_Ababa" }).format(now);
@@ -26,7 +34,7 @@ export function otherDayLabel(businessDate: string | null, fmt: DateFormatLike, 
 export function useOrderNo(order: Pick<Order, "order_no" | "business_date">): string {
   const t = useTranslations("common");
   const dates = useDateFormat();
-  const no = String(order.order_no);
+  const no = orderNoText(order.order_no);
   const date = otherDayLabel(order.business_date, dates);
   return date ? t("order_no_dated", { no, date }) : no;
 }
