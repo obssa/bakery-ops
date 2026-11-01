@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Analytics\Exceptions;
 
+use App\Shared\DomainRefusal;
 use App\Shared\Http\ApiError;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
@@ -12,7 +13,7 @@ use RuntimeException;
  * Every client-facing refusal of Analytics, as a stable message_key (lang/<locale>/analytics.php, rule 9), the HTTP status it maps to and what
  * it is about. Laravel renders it through render().
  */
-final class AnalyticsError extends RuntimeException
+final class AnalyticsError extends RuntimeException implements DomainRefusal
 {
     /**
      * @param  array<string, mixed>  $extra
@@ -57,6 +58,18 @@ final class AnalyticsError extends RuntimeException
     public static function weekOpen(string $weekStart, string $weekEnd): self
     {
         return new self('analytics.weekly.week_open', 422, ['field' => 'week_of', 'week_start' => $weekStart, 'week_end' => $weekEnd]);
+    }
+
+    /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
+    public function messageKey(): string
+    {
+        return $this->messageKey;
+    }
+
+    /** DomainRefusal (step 5.5a): a 4xx is a refusal and is not reported; a 5xx is a failure and is. */
+    public function httpStatus(): int
+    {
+        return $this->status;
     }
 
     public function render(): JsonResponse
