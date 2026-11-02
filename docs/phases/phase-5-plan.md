@@ -543,6 +543,60 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      printer (the emulator's rules ported to JS) record the bytes; paper-out and printer-offline paths; the back-off; no log line holds the
      token. CI job `print-bridge` (no Docker, about a minute). `docs/runbook/print-bridge.md`: install, enrol the bridge as a device of kind
      `bridge`, paste the token, test print, what each failure key means. ADR 0019 proposed.
+   - **As built (step 5.3b, `phase-5/print-bridge`).** Tests red first (the emulator, the config, the log, the printer, the bridge against a
+     fake API with 5.3a's rules and a fake TCP printer, the back-off, the local mode, the command line), then the code, the install
+     script, CI and the runbook. No PHP and no route changed. Where the code chose what the plan left open:
+     - **The program**: Node 22, ESM, no dependency at all. `src/main.js` (`--config`, `--serve`, `--check` one poll that claims
+       nothing, `--test-print` a raster stripe and text with no API, `--version`; exit 0, 1 refused or not printed, 2 a wrong config),
+       `bridge.js` (the loop), `api.js`, `printer.js`, `log.js`, `local.js`, `config.js`, `test-receipt.js`, `escpos-emulator.js`.
+       `bridge.config.example.json` ships; `bridge.config.json`, `bridge.token` and `logs/` are git-ignored.
+     - **Config**: `apiBaseUrl` is https (plain http only to loopback: the token never travels in clear); the token lives in
+       `tokenFile`, never in the config, and is read again after a 401, so pasting a new token needs no restart; `printer` is `tcp`
+       (host, port 9100, `statusCheck`), `windows` (the share name, written through `\\host\share` like `copy /b`) or `device` (opened
+       without `O_CREAT`: a missing printer is `offline`, never a new file); `width` 576, 384 or null (the claim leaves it out and the
+       receipt settings decide); `log` 1 MB times 5 files; `serve.origins`. Unknown keys are refused.
+     - **The pace** (`PollSchedule`, tested with the production numbers; the integration tests scale every wait down): 3 s; 15 s once
+       60 s passed since the last job (an outage is not activity); at once after a printed or failed job; 3 s after a skipped one (404,
+       409, 410, 422, so a refused job cannot spin); errors 3, 6, 12 ... 60 s, a `Retry-After` honoured up to 5 minutes; a 401 waits 60 s.
+     - **A job**: the claim carries a `client_uuid` and is asked again with the same one (up to 3 times) after a network error, a 5xx,
+       a 429 or a challenge; the bytes are written once, under a lock the local mode shares; the report has its own `client_uuid`,
+       asked again every 2 s until 55 s after the claim (printer timeouts: 5 s connect, 2 x 1.5 s status, 25 s write). A printed job
+       whose report was given up is remembered for 15 minutes: offered again, it is claimed and reported printed without a second
+       print. A `409 not_claimed_by_you` on a report is logged, not retried.
+     - **Failure keys**: before a job a TCP printer is asked `DLE EOT 2` and `DLE EOT 4` (real-time queries, not part of the job's bytes:
+       the fake printer answers them outside the emulator). Roll paper end or "stopped at the paper end" is `paper_out`, cover open
+       `cover_open`, the error bit `unknown`; no answer within 1.5 s prints anyway (`printer.status_unanswered`, once). Refused, reset or
+       timed-out connections and a missing share or device are `offline`; anything else `unknown`. A Windows share and a device file
+       cannot tell paper out; the runbook says so and prefers `tcp`.
+     - **The log**: `<ISO time> <LEVEL> <event> <JSON>`, rotated by size, written synchronously; every line is scrubbed of the secrets
+       it knows (the bridge token; a local-mode user token while its request lasts) and of whatever follows `Bridge ` or `Bearer `.
+       An event is logged once per change (an outage is two lines) and a poll with nothing writes nothing. The tests scan every log
+       file and the console after runs with refusals, challenges, lost reports and failures.
+     - **How the local mode gets a user token** (D11): it keeps none. The till page sends its own `Authorization: Bearer` and
+       `X-Device-Id` with `POST http://127.0.0.1:9180/print {order_id, width?}`; the bridge forwards them to
+       `GET /orders/{order}/receipt.escpos` for that one call, prints the bytes and forgets them. `GET /health` lets the page see it.
+       Loopback only (`--serve` refuses any other address); CORS for `serve.origins` only, with `Access-Control-Allow-Private-Network`
+       for Chrome's private network preflight; a Host header that is not its own is 403 (DNS rebinding). Answers: 200
+       `{status: printed}`, 503 `{status: failed, failure_key}`, the API's 4xx `{status: refused, message_key}`, 502
+       `{status: unreachable}`. It needs the API: it replaces the pull path when no bridge runs (ADR 0019 point 8), not the internet
+       (the item above says "while the internet is down", which cannot hold while the server draws the receipt).
+     - **Windows**: `install-service.ps1` (ASCII, for Windows PowerShell 5.1): an elevated shell, Node 22 or later, `--check`, `icacls`
+       narrows the token file to SYSTEM and Administrators (by SID), the task `BakeryOpsPrintBridge` at start-up as SYSTEM
+       (`-RunAs CurrentUser` at logon instead), no time limit, started again a minute after a failure (999 times); `-Serve`,
+       `-SkipCheck`, `-Uninstall`.
+     - **Cloudflare (Q10)**: a 403, 429 or 503 with `cf-mitigated: challenge` or an HTML body is `api.challenged`, backed off like an
+       outage and logged once; the `User-Agent` is `bakery-ops-print-bridge/<version> node/<version>`, no cookies. The runbook shows
+       the line and the skip rule for `/api/v1/bridge/` in the owner's account.
+     - **The emulator**: `src/escpos-emulator.js` is the PHP one rule for rule (the same command names and refusal messages), with no
+       Node-only import and `escpos-emulator.d.ts` for 5.3c's TypeScript (`package.json` exports `./escpos-emulator`).
+       `tests/support/escpos.js` is a JS copy of the server's `EscPos` encoder.
+     - **CI** `print-bridge` (needs `status`, phase 5 and later, 20 minutes): at most one dependency and no native module,
+       `node --test --test-reporter=spec "tests/*.test.js"` (103 tests; a skip, todo or cancel fails; the counts go to the step
+       summary), `install-service.ps1` parsed by `pwsh` and checked ASCII. It is a need of `gate-p5` in `ci.yml`, the skill's
+       mirror, the manifest's `ci.gate_jobs` and `phases.5.gate.extra_ci_jobs` (`ci.module_jobs.print-bridge` has none), so the
+       checklist's `print-emulator` row finds it. STATUS `print-bridge` is `done` here: 5.3c merged first (PR #102) and left it to
+       this step. 5.3c's `e2e/p5/print.spec.ts` still checks the claimed bytes' framing with `e2e/support/escpos.ts`; decoding them
+       with this emulator there is left to a later step (the four print flows stay as merged).
    - **5.3c `phase-5/web-print`** (`print-bridge` `done`). The till: Print after payment and on the order record; the job's state (queued,
      printing, printed, failed) by polling `GET /print-jobs?order_id=`; a failed or expired job, or `409 no_bridge`, shows the receipt link
      and its QR code (4.3e's signed link) for the customer to scan; receipt settings get the paper width. Playwright `e2e/p5/print.spec.ts`

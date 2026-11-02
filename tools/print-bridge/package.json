@@ -1,0 +1,24 @@
+{
+  "name": "@bakery-ops/print-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pulls receipt print jobs from the bakery-ops API and writes their ESC/POS bytes to a receipt printer (step 5.3b, ADR 0019).",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "print-bridge": "src/main.js"
+  },
+  "exports": {
+    ".": "./src/bridge.js",
+    "./escpos-emulator": {
+      "types": "./src/escpos-emulator.d.ts",
+      "default": "./src/escpos-emulator.js"
+    }
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "test": "node --test \"tests/*.test.js\""
+  }
+}

@@ -375,6 +375,41 @@ jobs:
         if: failure()
         with: { name: web-errors-report, path: apps/web/playwright-report, retention-days: 7, if-no-files-found: ignore }
 
+  # ------------------------------------------------------------------ the print bridge (step 5.3b, ADR 0019)
+  # tools/print-bridge: Node 22, no dependencies, no Docker. node --test runs it against a fake API (the rules of the bridge routes) and a
+  # fake TCP printer that reads the bytes through the JS port of tests/Support/EscPosEmulator.php; install-service.ps1 must parse.
+  print-bridge:
+    needs: [status]
+    if: fromJSON(needs.status.outputs.phase) >= 5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run: { working-directory: tools/print-bridge }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: One dependency at most, nothing native
+        run: |
+          n=$(jq '((.dependencies // {}) + (.optionalDependencies // {}) + (.devDependencies // {})) | length' package.json)
+          echo "dependencies: $n"
+          if [ "$n" -gt 1 ]; then echo "::error::the print bridge takes one dependency at most (phase-5 plan 5.3b)"; exit 1; fi
+          if find . \( -name '*.node' -o -name binding.gyp \) -print | grep -q .; then echo "::error::no native modules in the print bridge"; exit 1; fi
+      - name: node --test (fake API, fake printer, the emulator)
+        run: |
+          set -o pipefail
+          node --version
+          node --test --test-reporter=spec "tests/*.test.js" | tee /tmp/print-bridge.txt
+          if grep -Eq '(skipped|todo|cancelled) [1-9]' /tmp/print-bridge.txt; then echo "::error::a print-bridge test was skipped, cancelled or left todo"; exit 1; fi
+          { echo "### print-bridge"; grep -E '(tests|pass|fail|duration_ms) [0-9]' /tmp/print-bridge.txt | tail -4; } >> "$GITHUB_STEP_SUMMARY"
+      - name: install-service.ps1 parses, in ASCII (Windows PowerShell 5.1 reads a file without a BOM as ANSI)
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/install-service.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
+          if ([IO.File]::ReadAllBytes("$PWD/install-service.ps1") | Where-Object { $_ -gt 127 }) { Write-Error 'install-service.ps1 holds non-ASCII bytes'; exit 1 }
+
   # ------------------------------------------------------------------ api image for e2e
   docker-build:
     runs-on: ubuntu-24.04
@@ -805,12 +840,12 @@ jobs:
         run: docker compose -f compose.yml -f compose.ci.yml down -v
 
   # The Phase 5 gate (phase-5 plan 7.1 and 10.3, step 5.6b): the needs of the CI design (gate-p4, e2e-p5, i18n-check, the backup drill,
-  # the load run), then the gate:p5 group on the compose stack and gate_check with the go-live checklist. The group needs no seed: its
+  # the load run, the print bridge), then the gate:p5 group on the compose stack and gate_check with the go-live checklist. The group needs no seed: its
   # tests make their own rows in phpunit.xml's bakery_test. The image holds apps/api only, so the checklist test reads the repository's
   # docs/ and scripts/ from a copy in the container named by GATE_REPO_ROOT. A skipped or warning test fails the step, as in gate-p4;
   # its passing is the checklist's `self` (device-enforcement, print-emulator).
   gate-p5:
-    needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill, perf-load]
+    needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill, perf-load, print-bridge]
     if: fromJSON(needs.status.outputs.phase) >= 5
     runs-on: ubuntu-24.04
     timeout-minutes: 25
