@@ -594,7 +594,9 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        `node --test --test-reporter=spec "tests/*.test.js"` (103 tests; a skip, todo or cancel fails; the counts go to the step
        summary), `install-service.ps1` parsed by `pwsh` and checked ASCII. It is a need of `gate-p5` in `ci.yml`, the skill's
        mirror, the manifest's `ci.gate_jobs` and `phases.5.gate.extra_ci_jobs` (`ci.module_jobs.print-bridge` has none), so the
-       checklist's `print-emulator` row finds it. STATUS `print-bridge` stays `in_progress` (5.3c sets `done`).
+       checklist's `print-emulator` row finds it. STATUS `print-bridge` is `done` here: 5.3c merged first (PR #102) and left it to
+       this step. 5.3c's `e2e/p5/print.spec.ts` still checks the claimed bytes' framing with `e2e/support/escpos.ts`; decoding them
+       with this emulator there is left to a later step (the four print flows stay as merged).
    - **5.3c `phase-5/web-print`** (`print-bridge` `done`). The till: Print after payment and on the order record; the job's state (queued,
      printing, printed, failed) by polling `GET /print-jobs?order_id=`; a failed or expired job, or `409 no_bridge`, shows the receipt link
      and its QR code (4.3e's signed link) for the customer to scan; receipt settings get the paper width. Playwright `e2e/p5/print.spec.ts`
