@@ -6,7 +6,7 @@ import { useSaveReceiptSettings } from "@/lib/api/adminPayments";
 import { ApiError } from "@/lib/api/client";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { useReceiptSettings } from "@/lib/api/till";
-import type { ReceiptSettings } from "@/lib/api/types";
+import { PAPER_WIDTHS, type ReceiptSettings } from "@/lib/api/types";
 import { NAME_MAX, receiptBody, receiptFormOf, receiptIssues, type ReceiptForm, type ReceiptIssue } from "@/lib/adminPayments";
 import { ethiopianLabel } from "@/lib/dates";
 import { useErrorText } from "@/lib/errors";
@@ -21,6 +21,8 @@ import { QueryBox } from "../inventory/shared";
 // the business name in both languages, the address and the footer as bilingual pairs, the phone, the TIN, whether Amharic is printed beside
 // English and whether the Ethiopian date is printed too (step 4.5f: with today's date as the receipt prints it). PUT /receipt-settings
 // (channels.manage, the admin) replaces the whole form; anyone else who takes payments reads it here as the till's receipt prints it.
+// Step 5.3c adds the receipt printer's paper (80 or 58 mm, plan 10.2 D18: the print bridge draws 576 or 384 dots) and the logo switch
+// (kept for when a logo can be uploaded; the printed receipt carries none in Phase 5).
 
 export function ReceiptSettingsScreen() {
   const t = useTranslations("adminPayments");
@@ -33,7 +35,7 @@ export function ReceiptSettingsScreen() {
   );
 }
 
-type TextField = Exclude<keyof ReceiptForm, "show_amharic" | "ethiopian_dates">;
+type TextField = Exclude<keyof ReceiptForm, "show_amharic" | "ethiopian_dates" | "paper_width_mm" | "print_logo">;
 
 interface FieldControlProps {
   id: string;
@@ -63,6 +65,9 @@ function SettingsForm({ settings }: { settings: ReceiptSettings }) {
   const [saved, setSaved] = useState(false);
   const dates = useDateFormat();
   const ethiopianHint = useId();
+  const paperLabel = useId();
+  const paperHint = useId();
+  const logoHint = useId();
   const set = <K extends keyof ReceiptForm>(key: K, value: ReceiptForm[K]) => {
     setSaved(false);
     setForm((current) => ({ ...current, [key]: value }));
@@ -159,6 +164,43 @@ function SettingsForm({ settings }: { settings: ReceiptSettings }) {
           {/* the receipt's own converter (Shared\Time\EthiopianDate) and the web's (lib/ethiopianDate.ts) are twins */}
           <p id={ethiopianHint} className="pl-8 text-sm text-neutral-600">
             {t("receipts.ethiopian_today", { date: ethiopianLabel(businessToday(), dates, true) })}
+          </p>
+        </div>
+        <div role="radiogroup" aria-labelledby={paperLabel} aria-describedby={paperHint} className="space-y-1">
+          <p id={paperLabel} className="text-base font-medium text-neutral-900">
+            {t("receipts.paper_width")}
+          </p>
+          {PAPER_WIDTHS.map((width) => (
+            <label key={width} className="flex min-h-12 items-center gap-3 text-base">
+              <input
+                type="radio"
+                name="paper_width_mm"
+                className="size-5"
+                disabled={!editable}
+                checked={form.paper_width_mm === width}
+                onChange={() => set("paper_width_mm", width)}
+              />
+              {t(`receipts.paper_${width}`)}
+            </label>
+          ))}
+          <p id={paperHint} className="text-sm text-neutral-600">
+            {t("receipts.paper_hint")}
+          </p>
+        </div>
+        <div>
+          <label className="flex min-h-12 items-center gap-3 text-base">
+            <input
+              type="checkbox"
+              className="size-5"
+              disabled={!editable}
+              checked={form.print_logo}
+              aria-describedby={logoHint}
+              onChange={(event) => set("print_logo", event.target.checked)}
+            />
+            {t("receipts.print_logo")}
+          </label>
+          <p id={logoHint} className="pl-8 text-sm text-neutral-600">
+            {t("receipts.print_logo_hint")}
           </p>
         </div>
         {save.isError && !(apiError && Object.keys(apiError.fieldErrors).length > 0) ? <Alert>{errorText.message(save.error)}</Alert> : null}

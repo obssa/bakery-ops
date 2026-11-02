@@ -667,7 +667,33 @@ export interface ReceiptSettings {
   footer_am: string | null;
   show_amharic: boolean;
   ethiopian_dates: boolean;
+  /** the receipt printer's paper (step 5.3c, plan 10.2 D18): 80 mm prints 576 dots, 58 mm 384 */
+  paper_width_mm: PaperWidth;
+  /** reserved: no logo can be uploaded in Phase 5 */
+  print_logo: boolean;
   is_default: boolean;
+}
+
+export const PAPER_WIDTHS = [80, 58] as const;
+export type PaperWidth = (typeof PAPER_WIDTHS)[number];
+
+/** A print job's state (step 5.3a): claimed is a bridge printing it; printed, failed and expired are final. */
+export type PrintJobStatus = "queued" | "claimed" | "printed" | "failed" | "expired";
+
+/** POST /orders/{order}/print answers one (202); GET /print-jobs?order_id= answers the order's, newest first. */
+export interface PrintJob {
+  id: number;
+  order_id: number;
+  status: PrintJobStatus;
+  copies: number;
+  attempts: number;
+  /** why the bridge could not print: paper_out, offline, cover_open, unknown, or unacknowledged (the bridge went silent) */
+  failure_key: string | null;
+  created_at: string;
+  claimed_at: string | null;
+  printed_at: string | null;
+  failed_at: string | null;
+  expires_at: string;
 }
 
 /** POST /orders/{order}/receipt-link (step 4.3e): a signed link to the public receipt. */
