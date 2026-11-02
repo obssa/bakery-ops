@@ -98,7 +98,7 @@ it('creates the branch\'s row on the first save, and the till reads it back', fu
         ->and((bool) $row->print_logo)->toBeTrue();
 
     loginAs(makeUser($this->branch, 'cashier'));
-    expect($this->getJson('/api/v1/receipt-settings')->assertOk()->json())->toBe($this->form + ['is_default' => false]);
+    expect($this->getJson('/api/v1/receipt-settings')->assertOk()->json())->toBe($this->form + ['printing_enabled' => true, 'is_default' => false]);
 });
 
 it('replaces the whole form on a second save, in the same row, and audits both with before and after', function () {
