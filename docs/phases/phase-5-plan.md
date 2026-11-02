@@ -511,6 +511,40 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      and its QR code (4.3e's signed link) for the customer to scan; receipt settings get the paper width. Playwright `e2e/p5/print.spec.ts`
      runs under `p5-device` (its `testMatch` widens to `/device|print|ops/`: a till is a device; `ops-live.spec.ts` of 5.5c joins it), with a fake bridge in the test process against
      the CI stack, checking the printed bytes with the JS emulator. The shop test is a human item of the checklist.
+   - **As built (step 5.3c, `phase-5/web-print`).** Tests red first (`ReceiptSettingsTest` with the paper, `print-logic.spec.ts`,
+     the four `print.spec.ts` flows, `pay-admin-logic`'s receipt form), then the API, then the web. Where the code chose what the plan
+     left open:
+     - **Print is online only**, against D10's "every station write without a PIN joins the outbox": a print the outbox sent when the
+       line came back could reach the printer an hour later, in front of the next customer, and the API expires a job after 15 minutes
+       anyway; the bridge needs the internet as much as the till, so a print queued offline would wait for both. Offline the button is
+       an `OnlineOnlyButton` ("Needs a connection"), like the PIN actions. D11's local mode (5.3b's `--serve`) stays the way to print
+       while the internet is down.
+     - **Where Print lives**: in `ReceiptActions` (`components/till/ReceiptPanel.tsx`, the button and the state in
+       `components/till/PrintReceipt.tsx`), so the pay sheet's receipt after payment, the order record and the refund dialog's receipt
+       all print. One copy per press (the API's `copies` stays 1); the button is disabled while the latest job waits or prints, then
+       reads "Print again". A new `Idempotency-Key` and `client_uuid` per press, kept only when the outcome is unknown (`keepsKey`).
+     - **The job's state**: `usePrintJobs` (`lib/api/till.ts`) reads `GET /print-jobs?order_id=` with its ETag (the last answer is kept
+       per order for the 304) and polls through react-query's `refetchInterval` only while the latest job is `queued` or `claimed`:
+       every 2 s, every 10 s once a queued job has waited a minute (`lib/print.ts` `printPollMs`); a printed, failed or expired job stops
+       the poll. The answer of the POST is put in the query at once, which starts the poll. Shown as "Waiting for the printer…",
+       "Printing…" (claimed), "Printed.", or "Not printed: <why>" with the failure key's reason (`paper_out`, `offline`, `cover_open`,
+       `unknown`, `unacknowledged`; another key reads as unknown) or "Not printed: the receipt waited too long" (expired).
+     - **The fallback**: a failed or expired job this screen asked for, or `409 payments.print.no_bridge` or `not_paid` (whose API
+       message is shown too), makes the receipt link once without a press (POST `receipt-link`, the same key as the copy button) and shows
+       it with its QR code. An old failed job seen on the order record does not make a link by itself (a link is an audited write). The
+       QR code is drawn by `uqr` 0.1.2 (MIT, no dependencies, pinned in the lockfile), error correction M, as one SVG path with a
+       four-module quiet zone; the code shows whenever the link does.
+     - **Paper width in the API**: `paper_width_mm` (58 or 80) and `print_logo` join `GET` and `PUT /receipt-settings` (the view, the
+       defaults 80 and false, `ReceiptSettings::PAPER_WIDTHS`). In `PUT` both are optional: left out, the saved value stays (a till that
+       cached the screen before 5.3c must not turn a 58 mm printer back to 80 mm; a first save without them keeps M4's defaults). 70,
+       576 and words are 422. `docs/openapi.json` re-exported. The screen has a radio group (80 mm, the wide roll; 58 mm, the narrow
+       roll) and the logo switch with a note that no logo can be added yet.
+     - **Tests**: `print.spec.ts` runs under `p5-device` (`testMatch` `/device|print|ops/`), serial, CI stack only (skipped on live: the
+       live E2E branch must not collect bridges). Its fake bridge (`e2e/support/bridge.ts`) is enrolled per flow and revoked after; the
+       no-printer flow first revokes every bridge of the branch (a revoked bridge never counts as seen). 5.3b's JS emulator was not on
+       main yet: `e2e/support/escpos.ts` checks the framing instead (`ESC @` first, `GS v 0` bands of one width, the `GS V` cut last,
+       per copy) and the width (576 dots on 80 mm, 384 once the settings say 58 mm). When 5.3b lands, the spec switches to its emulator.
+     - **STATUS**: `print-bridge` stays `in_progress` until 5.3b merges.
 4. **5.4 i18n** (STATUS `i18n`), two PRs.
    - **5.4a `phase-5/i18n-checks`** (`i18n` `in_progress`). The web dictionary already has 2 289 keys in both languages and no `__TODO__`
      (`i18n-check` has run `--strict-i18n` since phase 5 became current). Added: `LangParityTest` (Pest, `invariants`): `apps/api/lang/en`
