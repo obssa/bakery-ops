@@ -1,7 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { authed, authedBlob, useSession } from "../session";
+import { printPollMs } from "../print";
+import { authed, authedBlob, handleUnauthorized, useSession } from "../session";
+import { conditionalGet } from "./client";
 import type {
   Collection,
   NewPayment,
@@ -13,6 +15,7 @@ import type {
   PaymentChannel,
   PaymentResult,
   PaymentView,
+  PrintJob,
   ReceiptLink,
   ReceiptSettings,
   RefundBody,
@@ -128,6 +131,53 @@ export function useClosedOrders(active: boolean) {
     queryFn: async () => (await authed<{ data: Order[] }>("/orders", { query: { status: "closed", limit: CLOSED_ORDERS_LIMIT } })).data,
     enabled,
     staleTime: 0,
+  });
+}
+
+/**
+ * POST /orders/{order}/print (step 5.3a; the till's Print, step 5.3c): a print job for the branch's print bridge, 202 with the job.
+ * Online only (see components/till/PrintReceipt.tsx): a receipt printed long after the customer left helps nobody. 409
+ * payments.print.no_bridge (no bridge seen in two minutes) and payments.print.not_paid are answered with the receipt link instead.
+ */
+export function requestPrint(orderId: number, body: { copies?: number; client_uuid: string }, idempotencyKey: string): Promise<PrintJob> {
+  return authed<PrintJob>(`/orders/${orderId}/print`, { method: "POST", body, idempotencyKey });
+}
+
+/** The last answer of GET /print-jobs per order, with its ETag: a 304 answers what this device already has. */
+const printJobsSeen = new Map<number, { etag: string | null; data: PrintJob[] }>();
+
+async function readPrintJobs(orderId: number, signal: AbortSignal): Promise<PrintJob[]> {
+  const { token } = useSession.getState();
+  const known = printJobsSeen.get(orderId);
+  try {
+    let result = await conditionalGet<{ data: PrintJob[] }>("/print-jobs", { query: { order_id: orderId }, token, etag: known?.etag ?? null, signal });
+    if (result.notModified) {
+      if (known) return known.data;
+      // a 304 for an answer this device no longer has: ask for the whole list once
+      result = await conditionalGet<{ data: PrintJob[] }>("/print-jobs", { query: { order_id: orderId }, token, signal });
+      if (result.notModified) return [];
+    }
+    printJobsSeen.set(orderId, { etag: result.etag, data: result.data.data });
+    return result.data.data;
+  } catch (error) {
+    handleUnauthorized(error);
+    throw error;
+  }
+}
+
+/**
+ * GET /print-jobs?order_id= (step 5.3a): the order's print jobs, newest first. Read once when `enabled`, then polled with its ETag while the
+ * latest job waits or prints (lib/print printPollMs: 2 s, 10 s once it has waited a minute); the poll stops when the job is done.
+ */
+export function usePrintJobs(orderId: number, enabled: boolean) {
+  const signedIn = useSession((s) => s.status === "signed-in");
+  return useQuery({
+    queryKey: ["print-jobs", orderId],
+    queryFn: ({ signal }) => readPrintJobs(orderId, signal),
+    enabled: signedIn && enabled,
+    staleTime: 0,
+    refetchInterval: (query) => printPollMs(query.state.data),
+    refetchIntervalInBackground: false,
   });
 }
 

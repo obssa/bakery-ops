@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
  *   PUT /receipt-settings   channels.manage (the admin), Idempotency-Key: the whole form (UpdateReceiptSettingsRequest), saved by
  *                           Actions\SaveReceiptSettings (one AuditedAction receipt_settings.update with before and after; the first save
  *                           creates the branch's one row without ever locking a missing row). The demo seed (step 4.6a) saves through it too.
+ * Step 5.3c adds the receipt printer's paper (paper_width_mm, 58 or 80) and print_logo to both; a form that leaves them out keeps them.
  */
 final class ReceiptSettingsController
 {
@@ -35,7 +36,7 @@ final class ReceiptSettingsController
     /**
      * The defaults a branch that has saved nothing reads (kept for the callers of step 4.3a).
      *
-     * @return array{business_name_en: string, business_name_am: string, address_en: string|null, address_am: string|null, phone: string|null, tin: string|null, footer_en: string|null, footer_am: string|null, show_amharic: bool, ethiopian_dates: bool, is_default: bool}
+     * @return array{business_name_en: string, business_name_am: string, address_en: string|null, address_am: string|null, phone: string|null, tin: string|null, footer_en: string|null, footer_am: string|null, show_amharic: bool, ethiopian_dates: bool, paper_width_mm: int, print_logo: bool, is_default: bool}
      */
     public static function defaults(string $branchName): array
     {
