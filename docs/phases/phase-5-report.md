@@ -4,8 +4,9 @@ Commit: `main` at `8ec9452` (pull request #99, `phase-5/perf-load`, step 5.5d, t
 branch `phase-5/gate` (pull request #104) on top · CI runs before this step: 41405560226 (PR #99's last head `0f4ac0a`) and 41405359490
 (PR #102's last head `9858247`), every job green in both; the gate run of 5.6b is recorded under "CI evidence" · Date: 2026-11-02
 
-**This is a report of the phase so far, not a claim that it is done.** Twelve of the plan's sixteen steps are merged (the plan itself was
-PR #87). Two are open pull requests: 5.3b, the print bridge program (PR #101), and 5.5c, the System page and the uptime workflow (PR #103).
+**This is a report of the phase so far, not a claim that it is done.** Thirteen of the plan's sixteen steps are merged (the plan itself was
+PR #87), 5.3b, the print bridge program (PR #101), last. One is an open pull request: 5.5c, the System page and the uptime workflow
+(PR #103).
 Step 5.4b waits for the Amharic reviewer (Q5). Step 5.6b is this step (PR #104). STATUS keeps phase 5 `in_progress`, no `done_commit` is
 set and no tag is made: `phase_status.py claim-done 5` runs `gate_check.py --mode done --phase 5` first and refuses until every required
 item of the go-live checklist passes, and eight of those items are sign-offs only Ramin can make.
@@ -13,9 +14,8 @@ item of the go-live checklist passes, and eight of those items are sign-offs onl
 ## Verdict
 
 NOT CLAIMED. The automated part of the gate is built: the `gate:p5` tests, the `gate-p5` job and its needs (`gate-p4`, `e2e-p5`,
-`i18n-check`, `backup-drill`, `perf-load`), and the go-live checklist that `gate_check` reads. Three CI rows of the checklist cannot pass
-until PRs #101 and #103 are merged (`print-emulator`, `print-runbook`, `uptime-monitor`), and the eight required sign-offs are `WAIT
-(Ramin)`. The section "What is open" is the whole list.
+`i18n-check`, `backup-drill`, `perf-load`, `print-bridge`), and the go-live checklist that `gate_check` reads. One CI row of the
+checklist cannot pass until PR #103 is merged (`uptime-monitor`), and the eight required sign-offs are `WAIT (Ramin)`. The section "What is open" is the whole list.
 
 ## What was built, step by step
 
@@ -78,20 +78,24 @@ carries the non-fiscal words of Q9 in both languages. Golden PNGs for 80 and 58 
 `EscPosEmulator`; `print:doctor`; `ReceiptText` prints the English rows in the printer's font without FreeType. `PrintClaimRaceTest`
 (two bridges, one claim). ADR 0019 proposed, here rather than in 5.3b.
 
-**5.3b `phase-5/print-bridge`: open (PR #101), not merged when this is written.** What the plan says it adds: the bridge program in
-`tools/print-bridge/` (Node 22, plain JavaScript, no native modules), its `bridge.config.json`, a poll of `GET /bridge/jobs/next` (3 s,
-15 s after a quiet minute), claim, the bytes written to a TCP printer on port 9100, a Windows shared printer or a device path, `printed`
-or `failed` reported with a key, a rotating log that never holds the token, `install-service.ps1` (Task Scheduler), the optional local
-mode `--serve 127.0.0.1:9180` for a till PC while the internet is down (D11), `node --test` against a fake API and a fake printer, the CI
-job `print-bridge` (20 minutes) and `docs/runbook/print-bridge.md`. The PR also adds `print-bridge` to the needs of `gate-p5` and to the
-manifest.
+**5.3b `phase-5/print-bridge` (PR #101), merged while 5.6b was open.** The bridge program in `tools/print-bridge/`: Node 22, no
+dependency at all, a config whose token lives in its own file (read again after a 401). It polls every 3 s, every 15 s after a quiet
+minute and at once after a job, backs off from 3 s to 60 s on errors and honours `Retry-After`. A claim and a report each carry a
+`client_uuid` and are asked again with it; the bytes are written once, and a printed job whose report was lost is reported again
+without a second print. A TCP printer on port 9100 is asked its status first (`paper_out`, `cover_open`); a Windows share or a device
+file can only tell `offline`. The log rotates by size and is scrubbed of the token. `install-service.ps1` runs it as the scheduled task
+`BakeryOpsPrintBridge`. The local mode `--serve 127.0.0.1:9180` forwards the till page's own token for one request and keeps none; it
+replaces the pull path when no bridge runs, but still needs the API. A Cloudflare challenge is backed off like an outage. The JS
+emulator is the PHP one rule for rule. CI `print-bridge` (20 minutes) runs 103 `node --test` tests and parses the install script;
+`docs/runbook/print-bridge.md` is the runbook. The job is a need of `gate-p5`, and STATUS `print-bridge` is `done`.
 
 **5.3c `phase-5/web-print` (PR #102).** The till's Print button in `ReceiptActions` (the pay sheet's receipt, the order record, the refund
 dialog), online only. The job's state is read with `GET /print-jobs?order_id=` and its ETag while the job is queued or claimed (every
 2 s, every 10 s after a minute). A failed or expired job, or `409 payments.print.no_bridge` or `not_paid`, makes the receipt link with its
 QR code (`uqr` 0.1.2). `paper_width_mm` (58 or 80) and `print_logo` joined `GET` and `PUT /receipt-settings` and the receipt settings
 screen. `print.spec.ts` (four flows) runs in `p5-device` on the CI stack with a fake bridge in the test process; it checks the ESC/POS
-framing and width (`e2e/support/escpos.ts`) until 5.3b's emulator is on `main`. STATUS `print-bridge` stays `in_progress`.
+framing and width (`e2e/support/escpos.ts`); decoding them with 5.3b's emulator is left to a later step. It left STATUS
+`print-bridge` `in_progress` for 5.3b.
 
 **5.4a `phase-5/i18n-checks` (PR #91).** `LangParityTest` (the API's `lang/en` and `lang/am`: files, keys at every depth, shape, empty
 or `__TODO__` values, placeholders; the 490 messages already agreed). A local lint rule, `local/no-literal-text`, for letters of any
@@ -205,11 +209,8 @@ The phase is **not claimed**. `phase_status.py claim-done 5` refuses until every
 - **Step 5.4b**: waits for the Amharic reviewer (Q5). When the filled sheet comes back, `i18n_import.py` applies it, the glossary is
   settled and the report is clean; Ramin then signs `am-reviewed`. The 5 possibly unused keys and the 12 Latin words of the report are
   for that step.
-- **PR #101 (step 5.3b), open at the time of writing.** Until it is merged, `print-emulator` fails (`print-bridge` is not a need of
-  `gate-p5`) and so does `print-runbook` (`docs/runbook/print-bridge.md` missing); STATUS `print-bridge` stays `in_progress`; `print.spec.ts`
-  checks the framing and width only, until it switches to the bridge's emulator. ADR 0019 is accepted in 5.6b while its bridge program is
-  still in this PR. PRs #101 and #104 both change the `needs` line of `gate-p5`; the second to merge keeps both `perf-load` and
-  `print-bridge`.
+- **The print flow test** (`e2e/p5/print.spec.ts`) still checks the claimed bytes' framing and width only; decoding them with the
+  bridge's emulator is left to a later step (5.3b's note).
 - **PR #103 (step 5.5c), open at the time of writing.** Until it is merged, `uptime-monitor` fails (no `uptime.yml`, so no run within a
   day); `PrintJobFailed`, `BackupFailed` and `DrillFailed` have no listener; STATUS `ops` stays `in_progress`. `live-ops` passes today on
   the deploy's `live-e2e` job alone; from 5.5c on, that job also runs `ops-live.spec.ts`, which reads the System page and, once the first
@@ -278,7 +279,7 @@ Every sign-off verifier reads `docs/go-live/signoffs/<item>.md`.
 - [ ] **`devices-enrolled`** (Q6, D9): sign in as an admin once on every shop tablet, till computer and kitchen screen and enrol it
       ("Enrol this device", or Admin > People > Devices), check on the Devices screen that each one is enrolled and seen, then sign. A
       one-line PR then turns device enforcement on (10.5).
-- [ ] **`print-bridge-shop`** (Q3, Q10): once PR #101 is merged, install the bridge on the shop computer (`docs/runbook/print-bridge.md`),
+- [ ] **`print-bridge-shop`** (Q3, Q10): install the bridge on the shop computer (`docs/runbook/print-bridge.md`),
       add it as a print bridge on the Devices screen and paste its token, set the paper width and the shop's own TIN in the receipt
       settings, print a receipt on the shop printer and check both languages and the TIN, then sign. If the bridge's requests are ever
       challenged by the proxy's bot protection, a rule that lets `/api/v1/bridge/*` through is part of this item.
@@ -322,7 +323,8 @@ says:
   with the flag on and an unknown device equals the answer with the flag off.
 - **The lookup read was not added** (5.2c): replays by key or `client_uuid` and `GET /orders/{id}` cover what it was for.
 - **Print is online only** (5.3c), against D10's "every station write without a PIN joins the outbox": a print sent when the line came
-  back could reach the printer long after, and the API expires a job after 15 minutes. D11's local mode is the offline path.
+  back could reach the printer long after, and the API expires a job after 15 minutes. The bridge's local mode needs the API too
+  (5.3b), so nothing prints while the till is offline.
 - **The bridge's writes are idempotent by the job's state**, not by `Idempotency-Key` (5.3a), and ADR 0019 was written in 5.3a, not 5.3b.
 - **The `p5-device` match** is by file name (`/[\\/](device|print|ops)[^\\/]*\.spec\.ts$/`), not the plan's `/device|print|ops/`, which
   matched the checkout's folder name (5.3c).
@@ -333,7 +335,7 @@ says:
   dropped iteration were added to the thresholds; the stack serves PHP with 8 workers and OPcache instead of the image's single-process
   server.
 - **`gate-p5` got its token in 5.6a**, not 5.6b; the sign-off README and template live outside `docs/go-live/signoffs/` (5.6a).
-- **`gate-p5`'s needs lack `print-bridge`** (7.1 lists it) because step 5.3b is not merged; PR #101 adds it with the job. The manifest's
-  `extra_ci_jobs` and `ci.gate_jobs["gate-p5"]` gain `perf-load` in 5.6b and `print-bridge` with PR #101.
+- **`gate-p5`'s needs** came in two steps: `perf-load` in 5.6b and `print-bridge` with PR #101; the merge of main into 5.6b keeps both,
+  in `ci.yml`, the skill's copy and the manifest (`ci.gate_jobs`, `extra_ci_jobs`).
 - **The sample TIN** is saved only when the receipt settings have no TIN (section 8 says the seeder sets it), so a TIN typed for the shop
   is never overwritten (5.6b).

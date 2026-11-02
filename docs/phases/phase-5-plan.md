@@ -955,17 +955,19 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        verifier type resolves**: it is one of `VERIFIER_TYPES` in `scripts/gate_check.py`, the schema allows exactly those, a `script`
        verifier's program is in the repository and a sign-off names its one file. Whether a named job or workflow exists is left to
        `gate_check`'s own rows, so the test does not wait for `print-bridge` (PR #101) or `uptime.yml` (PR #103).
-     - **The `gate-p5` job** needs `status`, `gate-p4`, `e2e-p5`, `i18n-check`, `backup-drill` and `perf-load` (25 minutes; 5.6a's
+     - **The `gate-p5` job** needs `status`, `gate-p4`, `e2e-p5`, `i18n-check`, `backup-drill`, `perf-load` and `print-bridge` (the
+       last from 5.3b, kept by the merge of main; 25 minutes; 5.6a's
        `permissions` and `GH_TOKEN` kept). It loads the image, starts the stack, copies `docs/` and `scripts/` into the container (the
        image holds `apps/api` only) and runs `pest --group=gate:p5` there with `GATE_REPO_ROOT` naming the copy and
        `IDENTITY_REQUIRE_DEVICE=false` (the tests turn the flag on themselves), failing on no tests, a skip or a warning as `gate-p4`
        does; then `gate_check --mode done --phase 5 --ci`, whose checklist rows go to the step summary. No seed: the group's tests make
-       their own rows. The manifest (`ci.gate_jobs`, `extra_ci_jobs`) and the skill's `assets/ci/ci.yml` match. `print-bridge` joins
-       the needs when PR #101 merges.
+       their own rows. The manifest (`ci.gate_jobs`, `extra_ci_jobs`) and the skill's `assets/ci/ci.yml` match.
      - **ADRs 0017 to 0021 are accepted**, each with a note of 2026-11-02 on what changed from the proposal. The sign-offs their status
        lines named gate the phase's claim, not the decisions. **`docs/phases/phase-5-report.md`** reports the phase so far; the skill's
        `ci-cd.md`, `testing-strategy.md` and `traps.md` record the phase's lessons. `docs/handbook/backups.md` was checked against 5.5b
-       and corrected (retention, what the drill checks, who restores); `printer.md` waits for PR #101. The 5.5d note above spelled the
+       and corrected (retention, what the drill checks, who restores); `printer.md` against 5.3a to 5.3c and the bridge's runbook (the
+       button and its states, the setup through Add a print bridge, and that the local mode still needs the website, so nothing prints
+       while the till is offline). ADR 0019's note covers 5.3b too. The 5.5d note above spelled the
        phase marker, which the done gate's marker row would count; it is reworded.
      - **STATUS**: `docs` `done`; `i18n` stays `in_progress` (5.4b waits for the reviewer). The phase is not claimed and nothing is
        tagged: `claim-done 5` refuses while Ramin's sign-offs wait (10.3).
