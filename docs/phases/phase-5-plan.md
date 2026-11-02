@@ -677,6 +677,46 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      ledger property and oracle tests also run against the restored server, and `RestoredLedgerGateTest` (`gate:p5`, `SeededGate`) on the
      restored data. `docs/runbook/backup-restore.md`: where the dumps are, a full restore by hand (the database and the files folder of the
      same night), the drill, what to do when the disk fills. ADR 0020 proposed.
+   - **As built (step 5.5b, `phase-5/ops-backups`).** The two contracts red in the first commit, then their providers, then the ops tests
+     red, then `App\Ops`, then the CI job and the docs. Where the code chose what the plan left open, or differs from the text above:
+     - **The contracts' scratch copy** is a second database on the test server, `bakery_scratch` (`SCRATCH_DB_DATABASE`), created and
+       granted by `scripts/ci/mysql-prepare.sh` in the module jobs and by `docker/mysql/init.sql` on a fresh compose volume (with
+       `bakery_drill`). `Tests\Support\ScratchCopy` migrates it when its migrations differ from the test database's (once per process),
+       copies the test's rows into it with its triggers dropped for the copy and put back as SHOW CREATE TRIGGER printed them, and plays the
+       tamper behind the triggers' back on it. `LedgerOracle::check` returns `{ok, items, locations, mismatches}`, each mismatch
+       `{source, branch_id, item_id, location_id, movements: {on_hand, reserved}, recorded: {on_hand, reserved}}`: the movements are added
+       up in SQL by `MovementReason`'s own rule and compared with `stock_balances` and with the restored `item_stock_view` separately (a
+       view restored with another definition is caught). The reading is `Inventory\Ledger\Reconciliation` behind the contract, because
+       only the Ledger may name the stock tables in `app/` (`LedgerIsSoleWriterTest`); for the same reason the drill's list of
+       append-only tables is `config/backup.php` `append_only_tables` (kept equal to `scripts/check_invariants.py` by
+       `DrillAppendOnlyListTest`), not a constant of `App\Ops`. `HashChain::verifyAll` returns `ChainSummary` `{ok, places, links, first_broken,
+       failures}`; it runs `verify()` over every place of every branch with the default connection pointed at the named one for the call
+       and put back, with the current branch, afterwards (a console-time read: the payload rebuild reads through the models).
+     - **M5 is `2026_11_11_100600_create_ops_runs_table`** (100300 to 100500 left to 5.3a's M3, M2b and M4, 100700 and 100800 to M6 and
+       M2c). `ops_runs` is in `BRANCH_ALLOWLIST` with its reason. `AppendOnlyTest` has no "system tables" set and `ops_runs` is not
+       append-only (a run moves from `running` to its result), so nothing was added there.
+     - **`App\Ops`** (`app/Ops`, `OpsServiceProvider`): `Backup\BackupRunner`, `MysqlClient` (the clients run by `proc_open` without a
+       shell, the dump gzipped as it streams, the option file and the client's stderr in the backup folder, deleted in `finally`; the
+       client's error text goes to the log only), `Manifest`, `BackupFolder`, `FilesSnapshot`, `Retention` (pure), `Offsite`, and
+       `Drill\DrillRunner`. Failure keys are listed in the runbook. The manifest carries, beside the plan's fields, the triggers of the
+       database and `rows_after`: the counts are read just before and just after the dump, and a restored count must lie between them.
+       A dump without a good manifest is deleted at once by retention; the cap counts the dumps and manifests (the hard links are free).
+       `BackupFailed` and `DrillFailed` are plain host-wide events in `App\Shared\Events` (no `branch_id`, so not `DomainEvent`s); no
+       listener yet (5.5c's `NotifyOps`).
+     - **`backup:drill --keep`** leaves the restored copy: the CI job reads it after the drill, and the runbook uses it to look at old data.
+       The drill refuses the app's own database by name before restoring and again before emptying. It probes a trigger only where it
+       exists (a missing one is reported once, as missing) and only on a table with a row.
+     - **CI `backup-drill`** (needs `status`, `docker-build`, `mod-inventory`; 25 minutes): the `ops` group (tests/Ops, the real clients;
+       only this job runs it, inside the API image, which now installs Debian bookworm's `mariadb-client`, MariaDB 10.11), the seed, then
+       `backup:run` and `backup:drill --keep`, then **one Pest process with `--group=gate:p0 --group=gate:p5:restored`**. The group of
+       `RestoredLedgerGateTest` is `gate:p5:restored` (as sections 7 and 7.1 say), not `gate:p5` (as the item above says): the gate-p5 job
+       runs `gate:p5` on a stack without a restored copy. Phase 0's gate tests keep `RefreshDatabase` on `bakery_test` (phpunit.xml pins it)
+       of the same server, so `GATE_SEED_DATABASE=bakery_drill` serves `RestoredLedgerGateTest` only; that test runs the restored copy
+       through both ledger oracles (Inventory's and the suite's own `ledgerOracle()`), the chains, a trigger, new Ledger movements in a
+       rolled-back transaction, and compares every table with the source (`GATE_SOURCE_DATABASE=bakery`; the ledger, chain and money
+       tables row for row).
+     - **Live**: no new cron line (the existing `schedule:run` entry runs both commands); `BACKUP_DRILL_DATABASE` waits for the scratch
+       database Ramin creates in cPanel (10.2 Q8); the off-site hook waits for 10.2 Q2. Nothing was run against the live host.
    - **5.5c `phase-5/ops-status`**. M6, M2c. `GET /system/status` and the admin **System** page (polls every 30 s, conditional):
      scheduler heartbeat, queue depth and the oldest job's age, failed jobs, last backup and drill, the disk used by the files and the
      backups, devices enrolled and seen in 15 minutes, the rollout flags, whether error tracking is on. The hourly `BackupStale` check.

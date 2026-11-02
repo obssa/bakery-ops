@@ -37,6 +37,8 @@ BRANCH_ALLOWLIST = {
     "password_reset_tokens", "personal_access_tokens", "permissions", "roles", "model_has_permissions",
     "model_has_roles", "role_has_permissions", "branches", "units", "idempotency_keys", "telescope_entries",
     "pulse_values", "pulse_entries", "pulse_aggregates", "activity_log", "notifications_dedupe",
+    # step 5.5b (ADR 0020): the runs of the host's backups and restore drills; one host, one database, so no branch owns a run
+    "ops_runs",
 }
 APPEND_ONLY_TABLES = ["stock_movements", "audit_log", "order_events", "item_cost_history", "handover_notes", "payment_refunds", "stock_movement_reversals", "order_refunds", "order_refund_lines"]
 PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify", "api/v1/telegram/webhook/{secret}", "GET api/v1/files/{file}", "GET api/v1/receipts/{order}", "GET api/v1/weekly-summaries/{week}", "GET api/v1/bridge/jobs/next", "POST api/v1/bridge/jobs/{job}/claim", "POST api/v1/bridge/jobs/{job}/printed", "POST api/v1/bridge/jobs/{job}/failed"}

@@ -36,6 +36,12 @@ Schedule::command('analytics:weekly-summary')->weeklyOn(1, '07:00')->timezone(co
 // days stays for whoever looks into it (the System page of step 5.5c counts them).
 Schedule::command('queue:prune-failed --hours=720')->dailyAt('04:10')->timezone('Africa/Addis_Ababa');
 
+// Backups and the restore drill (phase-5 plan 5.5b, 10.2 D13; ADR 0020; docs/runbook/backup-restore.md), on the same schedule:run line, in the
+// shop's time while it is closed: the dump and the files snapshot every night at 02:30, before the chain check of 03:00; the drill on Sundays at
+// 03:30, after both (it records `skipped` until BACKUP_DRILL_DATABASE is set). A run that overruns is not started twice.
+Schedule::command('backup:run')->dailyAt('02:30')->timezone('Africa/Addis_Ababa')->withoutOverlapping(120);
+Schedule::command('backup:drill')->weeklyOn(0, '03:30')->timezone('Africa/Addis_Ababa')->withoutOverlapping(120);
+
 // The print jobs (phase-5 plan 4.3, step 5.3a, ADR 0019): every minute, a claim the bridge did not acknowledge within a minute goes back to the
 // queue (failed after the third claim) and a receipt waiting longer than 15 minutes is expired. A few indexed reads when nothing waits.
 Schedule::command('print:sweep')->everyMinute()->withoutOverlapping(5);

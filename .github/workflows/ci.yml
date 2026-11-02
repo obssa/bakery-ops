@@ -181,7 +181,7 @@ jobs:
     # 30 minutes, not the reusable job's 20: the inventory groups (module:inventory, property, concurrency and four consumers'
     # contracts) took 18 m 34 s on PR #79 (run 40586333985) and 19 m 18 s on main at 76c25a0 (run 40554229133), so the 20-minute
     # default was a minute from cancelling the gate chain (phase-4 plan, 4.6b)
-    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory,contract:analytics->facts", timeout_minutes: 30 }
+    with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory,contract:analytics->facts,contract:ops->inventory", timeout_minutes: 30 }
 
   mod-orders:
     needs: [status, mod-inventory]
@@ -213,7 +213,8 @@ jobs:
     uses: ./.github/workflows/module-tests.yml
     # `seeds`: the demo bakery (Phase0Seeder ..) must stay valid as later phases change. Since step 3.2c the seeders open the
     # stations' shifts through Shifts (Demo\DemoShifts), so they run here, after every module they write through is green.
-    with: { module: shifts, groups: "module:shifts,seeds", contracts: "contract:analytics->facts" }
+    # contract:ops->shifts (step 5.5b): HashChain::verifyAll on a named connection, which the restore drill of App\Ops reads
+    with: { module: shifts, groups: "module:shifts,seeds", contracts: "contract:analytics->facts,contract:ops->shifts" }
 
   # The kill switch rehearsal (phase-3-plan.md 10.1): since step 3.7e the three shift rules are ON by default, so every module job and
   # every e2e job runs with them on. This job runs the Phase 0-2 exit-gate tests with all three OFF, the state the live host is in when
@@ -563,13 +564,66 @@ jobs:
     uses: ./.github/workflows/e2e.yml
     with: { phase: 5, projects: "p5-device p5-offline p5-amharic", profiles: "full", history_days: "2" }
 
+  # The restore drill (phase-5 plan 5.5b and 7.1; ADR 0020; go-live checklist item backup-drill-ci), on the compose stack and the API image,
+  # which carries the MariaDB 10.11 clients of the live host: first the backup tests (group ops: the real mysqldump and mysql against the
+  # test server), then the demo bakery seeded with GATE_SEED_DAYS of history into `bakery`, `backup:run` into a folder outside the app,
+  # `backup:drill --keep` into `bakery_drill` (docker/mysql/init.sql creates it; --keep leaves the restored copy for the next step), and one
+  # Pest process with gate:p0 (Phase 0's ledger property and oracle tests, on the same server) and gate:p5:restored (RestoredLedgerGateTest
+  # on the restored copy, against the source). A skipped or warning test fails the step, as in gate-p4. Nothing here touches the live host.
   backup-drill:
-    needs: [status, e2e-p5]
+    needs: [status, docker-build, mod-inventory]
     if: fromJSON(needs.status.outputs.phase) >= 5
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GATE_SEED_DAYS: "14"
+      DC: docker compose -f compose.yml -f compose.ci.yml
     steps:
       - uses: actions/checkout@v4
-      - run: echo "TODO(p5) backup-drill job is defined in Phase 5"
+      - uses: actions/download-artifact@v4
+        with: { name: api-image, path: /tmp }
+      - run: docker load -i /tmp/api.tar
+      - name: Start the stack (the API, the database, Redis)
+        run: $DC up -d --wait --wait-timeout 180 app
+      - name: The MariaDB clients in the image
+        run: $DC exec -T app sh -c 'mysqldump --version && mysql --version' | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Backup and drill tests (group ops)
+        run: |
+          set -o pipefail
+          # the image has no .env: an empty one keeps phpdotenv's suppressed read from turning into a warning on every test (gate-p4)
+          $DC exec -T app touch .env
+          $DC exec -T -e IDENTITY_REQUIRE_DEVICE=false app vendor/bin/pest --group=ops --colors=never 2>&1 | grep -v ' DEBUG: ' | tee /tmp/ops.txt
+          if grep -Eq "No tests (found|executed)" /tmp/ops.txt; then echo "::error::the ops group ran nothing"; exit 1; fi
+          if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky|warning|deprecat|notice)" /tmp/ops.txt; then echo "::error::an ops test was skipped or warned"; exit 1; fi
+      - name: Migrate and seed ${{ env.GATE_SEED_DAYS }} days of demo history
+        run: |
+          set -o pipefail
+          $DC exec -T -e SEED_PHASE=4 -e DEMO_HISTORY_DAYS="$GATE_SEED_DAYS" app \
+            php artisan migrate:fresh --force --seed --seeder=DemoSeeder 2>&1 | grep -v ' DEBUG: ' | tee /tmp/seed.txt | tail -30
+          grep -E '^Phase 4: ' /tmp/seed.txt | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: backup:run, then backup:drill into bakery_drill
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          $DC exec -T -e BACKUP_PATH=/tmp/bakery-ops-backups app php artisan backup:run 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          $DC exec -T -e BACKUP_PATH=/tmp/bakery-ops-backups -e BACKUP_DRILL_DATABASE=bakery_drill app \
+            php artisan backup:drill --keep 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "backup and drill: $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Pest gate:p0 and gate:p5:restored on the restored server
+        run: |
+          set -o pipefail
+          $DC exec -T -e IDENTITY_REQUIRE_DEVICE=false -e GATE_SEED_DATABASE=bakery_drill -e GATE_SEED_DAYS="$GATE_SEED_DAYS" -e GATE_SOURCE_DATABASE=bakery app \
+            vendor/bin/pest --group=gate:p0 --group=gate:p5:restored --colors=never 2>&1 | grep -v ' DEBUG: ' | tee /tmp/restored.txt
+          if grep -Eq "No tests (found|executed)" /tmp/restored.txt; then echo "::error::the restored gate ran nothing"; exit 1; fi
+          if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky|warning|deprecat|notice)" /tmp/restored.txt; then echo "::error::a restored gate test was skipped or warned: the gate fails, it never skips"; exit 1; fi
+          grep -q 'gate:p5:restored' /tmp/restored.txt || { echo "::error::RestoredLedgerGateTest did not run"; exit 1; }
+          grep -E '^\[gate:p5:restored' /tmp/restored.txt >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Logs on failure
+        if: failure()
+        run: $DC logs --no-color --tail=120 app
+      - name: Stop the stack
+        if: always()
+        run: $DC down -v
 
   # ------------------------------------------------------------------ gates (required checks on main)
   gate-p0:
