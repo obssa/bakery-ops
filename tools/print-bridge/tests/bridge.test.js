@@ -58,7 +58,8 @@ describe('one job', () => {
       assert.match(r.headers['user-agent'], /^bakery-ops-print-bridge\/\d+\.\d+\.\d+ node\/\d+/);
       assert.equal(r.headers['idempotency-key'], undefined);
     }
-    assert.ok(log().some((l) => / INFO job\.printed .*"order_number":"A-014"/.test(l)));
+    // the fake API marks the job printed when the report arrives; the bridge logs it once the answer is back
+    await waitFor(() => log().some((l) => / INFO job\.printed .*"order_number":"A-014"/.test(l)), { what: 'the job.printed line' });
   });
 
   it('writes every copy in one go: the claim already holds them', async () => {
@@ -113,7 +114,7 @@ describe('when the printer cannot print', () => {
         assert.equal(body(f).failure_key, key);
         assert.ok(f.at - claims[i].at < FAST.reportWithinMs);
       });
-      assert.ok(log().some((l) => l.includes(' WARN job.failed ') && l.includes(`"failure_key":"${key}"`)));
+      await waitFor(() => log().some((l) => l.includes(' WARN job.failed ') && l.includes(`"failure_key":"${key}"`)), { what: 'the job.failed line' });
     });
   }
 

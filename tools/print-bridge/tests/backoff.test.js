@@ -53,25 +53,27 @@ describe('the poll against the fake API', () => {
     while (stops.length) await stops.pop()();
   });
 
-  async function rig() {
+  async function rig(timing = FAST) {
     const api = await startFakeApi();
     const printer = await startFakePrinter();
     const { configPath } = writeConfig({ api: api.url, printer: { type: 'tcp', host: printer.host, port: printer.port } });
-    const bridge = createBridge({ config: loadConfig(configPath), timing: FAST });
+    const bridge = createBridge({ config: loadConfig(configPath), timing });
     stops.push(() => api.close(), () => printer.close(), () => bridge.stop());
     return { api, bridge };
   }
+  // a longer quiet spell than FAST, so a busy CI runner still polls a handful of times before it
+  const SLOW_QUIET = { ...FAST, quietMs: 600 };
   const gaps = (rs) => rs.slice(1).map((r, i) => r.at - rs[i].at);
   const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
   it('slows down after a quiet spell and speeds up again when a job comes', async () => {
-    const { api, bridge } = await rig();
+    const { api, bridge } = await rig(SLOW_QUIET);
     const t0 = Date.now();
     await bridge.start();
-    await sleep(FAST.quietMs + 4 * FAST.slowMs);
+    await sleep(SLOW_QUIET.quietMs + 4 * FAST.slowMs);
     const polls = api.bridgeRequests();
-    const early = gaps(polls.filter((r) => r.at - t0 < FAST.quietMs - FAST.fastMs));
-    const late = gaps(polls.filter((r) => r.at - t0 > FAST.quietMs + FAST.slowMs));
+    const early = gaps(polls.filter((r) => r.at - t0 < SLOW_QUIET.quietMs - FAST.fastMs));
+    const late = gaps(polls.filter((r) => r.at - t0 > SLOW_QUIET.quietMs + FAST.slowMs));
     assert.ok(early.length >= 5, `${early.length} early polls`);
     assert.ok(median(early) < FAST.fastMs * 3, `early polls ${median(early)} ms apart`);
     assert.ok(late.length >= 2, `${late.length} late polls`);
@@ -88,15 +90,17 @@ describe('the poll against the fake API', () => {
   });
 
   it('waits longer after each failed poll, and polls at the short pace once the API answers again', async () => {
-    const { api, bridge } = await rig();
+    // wider steps than FAST, so a busy runner's timer jitter cannot reorder them
+    const timing = { ...FAST, fastMs: 50, errorMaxMs: 400, quietMs: 3000 };
+    const { api, bridge } = await rig(timing);
     api.fault({ method: 'GET', path: /\/next$/, action: 'reply', status: 503, body: '{"message_key":"down"}', times: 3 });
     await bridge.start();
-    await waitFor(() => api.bridgeRequests().length >= 8);
+    await waitFor(() => api.bridgeRequests().length >= 6);
     const g = gaps(api.bridgeRequests());
-    // 503 x3: waits of 20, 40 and 80 ms (FAST: errors double from fastMs up to errorMaxMs), then the first 204 is followed by the short
-    // pace: 140 ms in all stays inside the quiet spell of 300 ms (the pace after an outage is the one the last job set)
-    assert.ok(g[0] >= 15 && g[1] >= 35 && g[2] >= 75, `waits ${g.join(', ')}`);
+    // 503 x3: waits of 50, 100 and 200 ms (errors double from fastMs up to errorMaxMs), then the first 204 is followed by the short pace
+    // (the pace after an outage is the one the last job set: here still inside the quiet spell)
+    assert.ok(g[0] >= 45 && g[1] >= 95 && g[2] >= 195, `waits ${g.join(', ')}`);
     assert.ok(g[1] > g[0] && g[2] > g[1], `waits ${g.join(', ')}`);
-    assert.ok(g[3] < FAST.fastMs * 3, `after recovery ${g.slice(3).join(', ')}`);
+    assert.ok(g[3] < 150, `after recovery ${g.slice(3).join(', ')}`);
   });
 });
