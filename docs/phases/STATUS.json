@@ -199,7 +199,7 @@
         "identity.devices": "done",
         "web.offline": "done",
         "print-bridge": "done",
-        "i18n": "in_progress",
+        "i18n": "done",
         "ops": "done",
         "docs": "done"
       },

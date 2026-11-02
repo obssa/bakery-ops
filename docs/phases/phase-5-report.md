@@ -4,9 +4,9 @@ Commit: `main` at `8ec9452` (pull request #99, `phase-5/perf-load`, step 5.5d, t
 branch `phase-5/gate` (pull request #104) on top · CI runs before this step: 41405560226 (PR #99's last head `0f4ac0a`) and 41405359490
 (PR #102's last head `9858247`), every job green in both; the gate run of 5.6b is recorded under "CI evidence" · Date: 2026-11-02
 
-**This is a report of the phase so far, not a claim that it is done.** Fourteen of the plan's sixteen steps are merged (the plan itself was
-PR #87): every step but 5.4b and this one, 5.5c (PR #103) last.
-Step 5.4b waits for the Amharic reviewer (Q5). Step 5.6b is this step (PR #104). STATUS keeps phase 5 `in_progress`, no `done_commit` is
+**This is a report of the phase so far, not a claim that it is done.** All sixteen of the plan's steps are done or closed (the plan itself
+was PR #87): fourteen are merged, 5.5c (PR #103) last; 5.4b was closed by Ramin on 2026-11-02 without a reviewer pass; and 5.6b is
+this step (PR #104). STATUS keeps phase 5 `in_progress`, no `done_commit` is
 set and no tag is made: `phase_status.py claim-done 5` runs `gate_check.py --mode done --phase 5` first and refuses until every required
 item of the go-live checklist passes, and eight of those items are sign-offs only Ramin can make.
 
@@ -104,8 +104,9 @@ script in JSX text, children and the attributes a person reads. `scripts/i18n_re
 sweeps every screen of each role under `/app/am/` in the seeded demo bakery on an enrolled tablet; the gaps its first run found were fixed
 in the step.
 
-**5.4b `phase-5/i18n-review`: not built.** It applies the reviewer's corrections from the sheet, settles the glossary and leaves the
-report clean. It waits for the reviewer (Q5); STATUS `i18n` stays `in_progress`.
+**5.4b `phase-5/i18n-review`: closed by Ramin's decision (2026-11-02), not built.** It was to apply a reviewer's corrections from the
+sheet (Q5). Ramin closed it without a reviewer pass: there is no correction pass before go-live. The review sheet
+`docs/i18n/am-review.csv` and `scripts/i18n_import.py` stay for later corrections. STATUS `i18n` is `done` (set in 5.6b).
 
 **5.5a `phase-5/ops-errors` (PR #92).** The 15 domain refusal classes carry `DomainRefusal` (`DomainRefusalTest` pins the list) and are
 logged at info (`refused: <key>`, no trace) instead of ERROR, Phase 4's gap. Sentry support on the API and the web (`@sentry/browser`
@@ -209,9 +210,9 @@ Recorded from PR #104's gate-p5 run when it is green.
 The phase is **not claimed**. `phase_status.py claim-done 5` refuses until every required checklist item passes, and no tag
 `phase-5-complete` is made. What stands between this report and the claim:
 
-- **Step 5.4b**: waits for the Amharic reviewer (Q5). When the filled sheet comes back, `i18n_import.py` applies it, the glossary is
-  settled and the report is clean; Ramin then signs `am-reviewed`. The 5 possibly unused keys and the 12 Latin words of the report are
-  for that step.
+- **Amharic corrections later**: step 5.4b was closed by Ramin on 2026-11-02 without a reviewer pass. If a reviewer fills the sheet
+  later, `i18n_import.py` applies it in a PR of its own. The 5 possibly unused keys and the 12 Latin words of the report stay as they
+  are. The checklist item `am-reviewed` is unchanged and remains Ramin's sign-off.
 - **The print flow test** (`e2e/p5/print.spec.ts`) still checks the claimed bytes' framing and width only; decoding them with the
   bridge's emulator is left to a later step (5.3b's note).
 - **`uptime-monitor`** passes once `uptime.yml` has run green on `main` within a day of the check; the workflow is skipped until the
@@ -284,8 +285,8 @@ Every sign-off verifier reads `docs/go-live/signoffs/<item>.md`.
       add it as a print bridge on the Devices screen and paste its token, set the paper width and the shop's own TIN in the receipt
       settings, print a receipt on the shop printer and check both languages and the TIN, then sign. If the bridge's requests are ever
       challenged by the proxy's bot protection, a rule that lets `/api/v1/bridge/*` through is part of this item.
-- [ ] **`am-reviewed`** (Q5): have a fluent reviewer fill the correction column of `docs/i18n/am-review.csv` (and read the glossary), send
-      the sheet back for step 5.4b to import, then sign.
+- [ ] **`am-reviewed`** (Q5): unchanged, Ramin's sign-off as its title says. Step 5.4b was closed without a reviewer pass
+      (2026-11-02); a later reviewer's sheet (`docs/i18n/am-review.csv`) can still be imported with `scripts/i18n_import.py`.
 - [ ] **`training-done`** (Q7): hold the sessions of `docs/handbook/training.md` for every role, then sign. Who attended stays outside the
       repository.
 - [ ] **`on-call-agreed`** (Q7): put names and numbers to the roles of `docs/runbook/on-call.md` outside the repository, change the hours

@@ -693,6 +693,9 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        is `<code translate="no">` through `t.rich` (`Field`'s hint takes markup).
    - **5.4b `phase-5/i18n-review`** (`i18n` `done`). The reviewer's corrections imported from the sheet, the glossary settled, the report
      clean. Opened when the sheet comes back (10.2 Q5); 5.5 and 5.6 do not wait for it. The checklist item `am-reviewed` is a sign-off.
+   - **Closed (2026-11-02).** Closed by Ramin on 2026-11-02 without a reviewer pass; the review sheet `docs/i18n/am-review.csv` and
+     `scripts/i18n_import.py` stay for later corrections. STATUS `i18n` is `done` (set in 5.6b). The checklist item `am-reviewed` is
+     unchanged: it stays Ramin's sign-off, committed in GitHub's web editor.
 5. **5.5 ops** (STATUS `ops`), four PRs.
    - **5.5a `phase-5/ops-errors`** (`ops` `in_progress`). The Phase 4 gap first: `PaymentError`, `OrderError`, `IdentityError`, the
      Inventory and Shifts refusals and `IllegalTransition` implement a `DomainRefusal` marker and are **not reported**
@@ -1020,12 +1023,12 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        phase marker, which the done gate's marker row would count; it is reworded.
      - **Merges**: main was merged in twice, with ordinary commits: after 5.3b (`gate-p5` keeps both `perf-load` and `print-bridge`)
        and after 5.5c (ADRs 0017, 0020 and 0021, `backups.md` and the report then describe the System page, the alerts and the uptime
-       workflow as built). Every build step is merged but this one; 5.4b waits for the reviewer.
+       workflow as built). Every build step is merged but this one; 5.4b was closed by Ramin on 2026-11-02 without a reviewer pass.
      - **A trap met**: `Phase5SeederTest` first wrote `$devices->except('demo-bridge-1')` on a collection keyed by fingerprint. An
        Eloquent collection's `except()` takes model ids, not the collection's keys, so it removed nothing and `mod-shifts` failed (run
        41440931690). The test now lists the devices that hold a token and expects the bridge alone (D20).
-     - **STATUS**: `docs` `done`, beside `ops` and `print-bridge` `done` from their steps; `i18n` stays `in_progress` (5.4b waits for the
-       reviewer). The phase is not claimed and nothing is tagged: `claim-done 5` refuses while Ramin's sign-offs wait (10.3).
+     - **STATUS**: `docs` `done`, beside `ops` and `print-bridge` `done` from their steps; `i18n` `done` too, by Ramin's decision of
+       2026-11-02 to close 5.4b without a reviewer pass (the `am-reviewed` item is unchanged). The phase is not claimed and nothing is tagged: `claim-done 5` refuses while Ramin's sign-offs wait (10.3).
 
 ## 7. Test list and CI
 
