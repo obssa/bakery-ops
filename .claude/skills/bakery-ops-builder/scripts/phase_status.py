@@ -9,6 +9,8 @@ Stdlib only. Run from anywhere inside the repo.
   phase_status.py module NAME STATUS        # todo|in_progress|done   (within the module's phase)
   phase_status.py module-stable NAME        # top-level module status -> stable (after gate_check --mode module)
   phase_status.py claim-done N [--commit SHA] [--run-url URL]
+                                            # a phase whose gate names a go-live checklist (5): refused, with the
+                                            # list of waiting items, until gate_check.py --mode done passes here
   phase_status.py set-run-url N URL
   phase_status.py validate                  # against assets/status.schema.json (structural subset)
 
@@ -67,6 +69,20 @@ def now_iso() -> str:
 
 def git(root: str, *args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=root, text=True).strip()
+
+
+def gate_refusal(p: dict, phase: str) -> list[str] | None:
+    """Phase-5 plan 10.3: a phase whose gate names a go-live checklist is claimed only once `gate_check.py --mode done` passes
+    here. Its tests are trusted to CI (they ran in the gate job); the artifact checks and every checklist item run now.
+    Returns the FAIL and WAIT rows when the gate refuses, None when it passes."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gate_check.py")
+    proc = subprocess.run([sys.executable, script, "--mode", "done", "--phase", phase, "--no-tests", "--no-e2e",
+                           "--root", p["root"], "--status", p["status"], "--manifest", p["manifest"]],
+                          cwd=p["root"], text=True, encoding="utf-8", errors="replace", capture_output=True)
+    if proc.returncode == 0:
+        return None
+    rows = [ln.strip() for ln in proc.stdout.splitlines() if ln.strip().startswith(("[FAIL]", "[WAIT]"))]
+    return rows or ((proc.stdout or "") + (proc.stderr or "")).strip().splitlines()[-8:] or ["gate_check failed with no output"]
 
 
 def build_initial_status(manifest: dict) -> dict:
@@ -193,6 +209,14 @@ def main(argv: list[str]) -> int:
         return 0
 
     if a.cmd == "claim-done":
+        if manifest["phases"].get(a.phase, {}).get("gate", {}).get("checklist"):
+            refusal = gate_refusal(p, a.phase)
+            if refusal:
+                print(f"claim-done {a.phase} refused: gate_check --mode done --phase {a.phase} does not pass. Waiting or failing:")
+                for line in refusal:
+                    print("  " + line)
+                print("A sign-off is made by Ramin in GitHub's web editor (docs/go-live/README.md); agents never write in docs/go-live/signoffs/.")
+                return 1
         ph = status["phases"][a.phase]
         commit = a.commit or git(p["root"], "rev-parse", "HEAD")
         ph["status"] = "done"

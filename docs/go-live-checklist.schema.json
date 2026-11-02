@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "go-live-checklist.schema.json",
+  "title": "bakery-ops go-live checklist",
+  "description": "Phase-5 plan 10.3. scripts/gate_check.py validates the file with the same rules (stdlib only, checklist_errors) and reads one row per item in --mode done.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "phase", "items"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": 1 },
+    "phase": { "type": "integer", "minimum": 0 },
+    "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/item" } }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "required", "who", "verifier"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "unique in the file; a sign-off's file is docs/go-live/signoffs/<id>.md" },
+        "title": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean", "description": "false: a missing or failing item is a warning, never a blocker" },
+        "who": { "enum": ["CI", "Ramin"], "description": "who completes it" },
+        "note": { "type": "string" },
+        "verifier": {
+          "oneOf": [
+            { "$ref": "#/$defs/verifier" },
+            { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/verifier" }, "description": "every verifier must pass" }
+          ]
+        }
+      }
+    },
+    "verifier": {
+      "oneOf": [
+        { "$ref": "#/$defs/ci_job_jobs" },
+        { "$ref": "#/$defs/ci_job_workflow" },
+        { "$ref": "#/$defs/script" },
+        { "$ref": "#/$defs/file_exists" }
+      ]
+    },
+    "ci_job_jobs": {
+      "description": "In CI (--ci) each job must be a need of the gate job (directly or through the jobs it needs), so the gate running at all proves them green; self is the gate job's own Pest step. Locally SKIP (trusted to CI).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "jobs"],
+      "properties": {
+        "type": { "const": "ci_job" },
+        "jobs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "ci_job_workflow": {
+      "description": "The newest successful run of the workflow (and job, matched by id or display name) on branch, read from the Actions API, finished within max_age_days before the reference time: now while the phase is open, done_at once claimed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "workflow", "max_age_days"],
+      "properties": {
+        "type": { "const": "ci_job" },
+        "workflow": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+\\.ya?ml$" },
+        "job": { "type": "string", "minLength": 1 },
+        "branch": { "type": "string", "minLength": 1, "default": "main" },
+        "max_age_days": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "script": {
+      "description": "Runs the argument list (no shell) from the repository root; exit 0 is PASS, the last lines of its output are the detail.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "run"],
+      "properties": {
+        "type": { "const": "script" },
+        "run": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "timeout": { "type": "integer", "minimum": 1, "maximum": 600, "default": 120 }
+      }
+    },
+    "file_exists": {
+      "description": "Every path exists and is not empty. With signoff: one path, docs/go-live/signoffs/<id>.md, with the fields item, date, signed_by and statement, every commit that touched it made in GitHub's web editor; a missing sign-off is WAIT, not FAIL.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "paths"],
+      "properties": {
+        "type": { "const": "file_exists" },
+        "paths": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "signoff": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

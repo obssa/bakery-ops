@@ -647,13 +647,63 @@ the phase being closed), so the phase cannot close while a placeholder is left.
    - **5.6a `phase-5/go-live-checklist`** (`docs` `in_progress`). `docs/go-live-checklist.json` and its schema (10.3), the `gate_check.py`
      change that reads it (the repository copy and the skill's copy, kept identical; `scripts/tests/test_gate_checklist.py` with a fixture
      for every verifier type, run by the `invariants` job), `scripts/ops/check_branch_protection.py` (reads the required checks of `main`
-     through the branches API, `GITHUB_TOKEN` in CI), `docs/go-live/signoffs/README.md` and `TEMPLATE.md` (10.3). The **admin handbook**
+     through the branches API, `GITHUB_TOKEN` in CI), `docs/go-live/README.md` and `docs/go-live/signoff-template.md` (10.3; corrected
+     2026-11-02 in 5.6a: this line said `docs/go-live/signoffs/README.md` and `TEMPLATE.md`, inside the folder, which 10.3 keeps for
+     the web editor alone, so no agent commit ever touches `signoffs/`). The **admin handbook**
      `docs/handbook/` (a README and one page per task: opening and closing the day, enrolling and revoking tablets, the printer and its
      bridge, refunds and voids, counts and handover, what the screens do offline and how to clear the conflict tray, the System page,
      backups and who restores them, changing a channel, reading the dashboards), in English with the Amharic page titles, linking the
      runbook rather than repeating it. **`docs/runbook/on-call.md`**: hours, the first checks (the System page, `/health`, the queue), the
      kill switches (shift rules, device enforcement), who is called in which order **by role** (names and numbers live outside the public
      repository), when to restore. A training plan (`docs/handbook/training.md`): sessions per role and what each must be able to do.
+   - **As built (step 5.6a, `phase-5/go-live-checklist`).** Tests red first (`scripts/tests/test_gate_checklist.py`, 53 tests), then the
+     scripts, the checklist, CI, then the docs. Where the code chose what the plan left open:
+     - **The checklist** has the 24 items of the 10.3 table, each with `who` (`CI` or `Ramin`) and an optional `note`. An item's
+       `verifier` is one object or a list that must all pass (`i18n-strict`: `ci_job` and `script`; `uptime-monitor`: `file_exists`
+       and `ci_job` with `workflow`); the item's row takes the worst state. `docs/go-live-checklist.schema.json` is the JSON Schema;
+       `gate_check.checklist_errors` applies the same rules with the standard library (the gate stays stdlib only). A schema error
+       stops the item rows: one `checklist schema` FAIL row per error.
+     - **`ci_job` with `jobs`** counts a job needed by the gate job directly or through the jobs it needs (manifest `ci.module_jobs`,
+       `e2e_jobs`, `gate_jobs`: a job runs only after every need succeeded), and the job must also be defined in `ci.yml`. `self` passes
+       only while the gate job's block in `ci.yml` runs `--group=gate:p5`, which 5.6b adds; until then `device-enforcement` and
+       `print-emulator` say so.
+     - **`ci_job` with `workflow`** asks for the workflow's successful runs on the branch created up to the reference time, newest
+       first, and with a `job` its run's jobs, matched by id or by the display name read from the workflow file (`live-e2e` is
+       "Playwright @live against the site"). A run whose job was skipped is passed over for an older one.
+     - **Rows.** WAIT fails a local run and a strict CI run like FAIL. In the informational CI run (phase open) a checklist FAIL
+       becomes `WARN` with `FAIL:` kept in its detail, and WAIT stays `WAIT` without failing the job. An optional item
+       (`push-telegram`) that is not PASS is `WARN` ("optional, WAIT: ..."), never a blocker. Locally, `ci_job` rows are `SKIP` and do
+       not block, so the claim can be made from the PC.
+     - **Sign-offs**: the four fields are lines `field: value` (the template wraps them in `---`). A value still in angle brackets
+       counts as missing. `item` must equal the file name. `date` is `YYYY-MM-DD` and not after today in Addis Ababa. Every commit
+       that touched the file has the committer `GitHub <noreply@github.com>`, and an uncommitted file fails. D16's fallback (sign from
+       the PC, fields only) is **not built**: nothing in the repository can tell that fallback apart from an agent's commit, so it
+       waits for Ramin's choice.
+     - **`phase_status.py claim-done N`**, for a phase whose gate names a checklist, runs the sibling `gate_check.py --mode done
+       --no-tests --no-e2e` (the tests ran in the gate job) and refuses, listing its FAIL and WAIT rows, until it passes. A phase
+       without a checklist is claimed as before.
+     - **`check_invariants.py --signoffs`** is its own flag, not part of `--all`. It reads every commit that touched the folder
+       (`git log`, default history simplification, so a merge that only brings a browser-made sign-off in from `main` is not listed),
+       fails a shallow clone, and flags an uncommitted file there. The `invariants` job checks out with `fetch-depth: 0` and runs it
+       and the new tests before the API setup. Only the repository copy of `check_invariants.py` changed: the skill's copy already
+       differs (the Phase 4 tables and routes).
+     - **`gate-p5` got its token in this step**, not in 5.6b: `permissions: { contents: read, actions: read }` and
+       `GH_TOKEN: ${{ github.token }}` on the gate_check step, for `live-ops`, `uptime-monitor` and `branch-protection`. Its needs
+       are unchanged: 5.6b adds `perf-load` and `print-bridge` once they exist.
+     - **`check_branch_protection.py`** reads `.protection.required_status_checks.contexts` (and the `checks` contexts) from
+       `GET /repos/{owner}/{repo}/branches/main`, through `GH_TOKEN`/`GITHUB_TOKEN` or the `gh` CLI. `--require` takes names, comma
+       lists and ranges (`gate-p0..gate-p5`). `is_git_repo` in `gate_check.py` now accepts a `.git` file too (a linked worktree).
+     - **Rows that fail informationally until their step lands**: `print-emulator` (`print-bridge`, 5.3b; and `self`), `load-test`
+       (`perf-load`, 5.5d), `uptime-monitor` (`uptime.yml`, 5.5c), `restore-runbook` (`backup-restore.md`, 5.5b), `print-runbook`
+       (`print-bridge.md`, 5.3b/c), `adrs` (0018 to 0020), and `device-enforcement` (`self`, 5.6b). `backup-drill-ci` passes as a need
+       of `gate-p5` although the job is still the placeholder; the gate's phase-marker row (no `TODO(p` + `5)` left) catches the placeholder until 5.5b
+       replaces it. `live-ops` depends on the deploy's `@live` run on `main` within 7 days.
+     - **Handbook pages written from the plan**, each marked "Written from the plan; checked against the build in 5.6b": `printer.md`
+       (5.3a to 5.3c), the conflict tray section of `offline.md` (5.2c), `system-page.md` (5.5c), `backups.md` (5.5b). The photo
+       section of `offline.md` follows 5.2b as built (merged before this step).
+       Their Amharic titles follow `docs/i18n/glossary.md`; the reviewer (Q5) may correct them. The on-call plan's hours and call
+       order are a default by role (shift manager, shop admin, technical on-call, owner) for Ramin to change before he signs
+       `on-call-agreed`.
    - **5.6b `phase-5/gate`** (`docs` `done`). `Phase5Seeder` (the demo branch: a pad, a KDS, a till and a bridge device enrolled, receipt
      settings with a sample TIN, `LOAD_DEVICES` for `perf-load`); `Phase5GateTest` (`gate:p5`): unknown device 403 on every station route
      with the flag on and no 403 on admin routes, an order replayed with the same key and `client_uuid` is one row, the checklist parses and
