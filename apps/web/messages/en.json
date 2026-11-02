@@ -431,7 +431,92 @@
     "analytics": "Analytics",
     "analytics_desc": "Sales, payment methods, products, stations, staff and shifts over any range, with exports; everyone sees their own figures.",
     "audit": "Audit log",
-    "audit_desc": "Who changed what, when and where, with each entry's before and after; export for the admin."
+    "audit_desc": "Who changed what, when and where, with each entry's before and after; export for the admin.",
+    "system": "System",
+    "system_desc": "The health of the server: the scheduler, the backups and the restore drill, the queue, the disk, the tablets and the settings."
+  },
+  "system": {
+    "title": "System",
+    "intro": "The health of the server the bakery runs on, refreshed every 30 seconds. Nothing here changes anything.",
+    "loading": "Reading the server's health…",
+    "stale": "The page could not refresh: what it shows may be out of date. It tries again on its own.",
+    "retry": "Try again",
+    "mb": "{mb} MB",
+    "run": {
+      "running": "Running",
+      "ok": "Finished well",
+      "failed": "Failed",
+      "skipped": "Skipped"
+    },
+    "scheduler": {
+      "title": "Scheduler",
+      "running": "Running",
+      "stopped": "Stopped",
+      "never": "Not seen yet",
+      "last_tick": "Last heartbeat",
+      "help": "The scheduler runs the backups, the alerts and the nightly checks. If it stays stopped, follow the runbook's steps for the scheduler's cron line."
+    },
+    "backups": {
+      "title": "Backups",
+      "ok": "Up to date",
+      "stale": "Too old",
+      "failed": "The last backup failed",
+      "running": "A backup is running",
+      "none": "No backup yet",
+      "never": "None yet",
+      "last_ok": "Last good backup",
+      "age": "{hours} hours ago",
+      "last_status": "Last backup run",
+      "size": "Size of the last good backup",
+      "kept": "Backups kept",
+      "disk": "Disk used by the backups"
+    },
+    "files": {
+      "used": "Disk used by the receipt photos"
+    },
+    "drill": {
+      "title": "Restore drill",
+      "ok": "Passed",
+      "old": "Passed more than 8 days ago",
+      "failed": "Failed",
+      "running": "Running",
+      "not_configured": "Not configured yet",
+      "last_at": "Last drill",
+      "help": "The weekly drill restores the newest backup into a scratch database and checks it. It starts once that database exists on the server."
+    },
+    "queue": {
+      "title": "Background jobs",
+      "pending": "Waiting",
+      "oldest": "Oldest waiting",
+      "seconds": "{seconds} s",
+      "failed_24h": "Failed in the last 24 hours",
+      "failed_total": "Failed, last 30 days"
+    },
+    "devices": {
+      "title": "Tablets and devices",
+      "enrolled": "Enrolled",
+      "seen_15m": "Seen in the last 15 minutes",
+      "revoked": "Revoked",
+      "manage": "Manage the devices"
+    },
+    "flags": {
+      "title": "Rollout switches",
+      "on": "On",
+      "off": "Off",
+      "require_enrolled_device": "Only enrolled tablets may use the stations",
+      "require_shift_for_cash": "Cash needs an open shift",
+      "require_shift_for_station_locations": "Stock moves at a station need an open shift",
+      "open_ad_hoc_on_accept": "Accepting a request opens a shift when none runs",
+      "help": "These are set in the server's settings, not here."
+    },
+    "release": {
+      "title": "Release",
+      "commit": "Version",
+      "no_commit": "Not a release",
+      "released_at": "Released",
+      "migrations": "Database migrations",
+      "error_tracking": "Error tracking"
+    }
   },
   "adminOrders": {
     "title": "Orders",
