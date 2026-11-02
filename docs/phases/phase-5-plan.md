@@ -480,7 +480,8 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        answer and refused as `closed` is looked up with `GET /orders/{id}` and settled when the order already shows it (sent, cancelled).
        Line actions are not looked up (there is no read of one line): they show in the tray with Discard.
      - **Left open**: the tray shows every conflict of the tablet, whoever is signed in (the queue is the tablet's; only the account that
-       queued a write sends it); a rebuilt cart waits while the person's cart holds another order.
+       queued a write sends it); a rebuilt cart waits while the person's cart holds another order; discarding a refused send whose order
+       the server holds open (a shortfall) leaves that order open, shown as not sent on the waiter's "My orders" with its Cancel.
 3. **5.3 print-bridge** (STATUS `print-bridge`), three PRs.
    - **5.3a `phase-5/print-jobs`** (`print-bridge` `in_progress`). M3, M2b, M4. `ReceiptRaster`: the receipt of 4.3e (the view model the
      PDF uses) drawn into a 1-bit image 576 or 384 dots wide with GD and FreeType, Noto Sans Ethiopic for Amharic (the font folder of
