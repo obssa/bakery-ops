@@ -10,6 +10,7 @@ use App\Modules\Orders\OrdersServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
 use App\Modules\Production\ProductionServiceProvider;
 use App\Modules\Shifts\ShiftsServiceProvider;
+use App\Ops\OpsServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Shared\SharedServiceProvider;
 
@@ -26,4 +27,5 @@ return [
     ProductionServiceProvider::class,
     ShiftsServiceProvider::class,
     AnalyticsServiceProvider::class,
+    OpsServiceProvider::class,
 ];

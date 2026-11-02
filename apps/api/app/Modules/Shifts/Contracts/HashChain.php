@@ -9,7 +9,10 @@ use App\Modules\Shifts\Exceptions\ShiftError;
 use App\Modules\Shifts\Hash\ChainVerification;
 use App\Modules\Shifts\Hash\PayloadBuilder;
 use App\Modules\Shifts\Models\StockCount;
+use App\Shared\Models\Branch;
+use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -31,7 +34,9 @@ use LogicException;
  * previous link, and tries n + 2. A stale read costs one more try, never a wrong link. After MAX_ATTEMPTS lost claims it is
  * 409 shifts.lock.chain_busy and the caller's transaction rolls back whole.
  *
- * verify() and export() read the live rows. A final class resolved per use (it carries nothing).
+ * verify() and export() read the live rows. verifyAll() (contract ops->shifts, step 5.5b) runs verify() over every place of every branch
+ * of the database behind a named connection: the restore drill asks it about last night's dump. A final class resolved per use (it
+ * carries nothing).
  */
 final class HashChain
 {
@@ -39,7 +44,46 @@ final class HashChain
 
     public const int MAX_ATTEMPTS = 8;
 
-    public function __construct(private readonly PayloadBuilder $payloads) {}
+    public function __construct(
+        private readonly PayloadBuilder $payloads,
+        private readonly CurrentBranch $current,
+        private readonly DatabaseManager $db,
+    ) {}
+
+    /**
+     * Verify every chain of every branch on $connection by the rules of verify(), the rebuilt payload included, so a restored database
+     * is checked exactly as the nightly shifts:verify-chain checks the live one. The models and the payload builder read the default
+     * connection, so it is pointed at $connection for the run and put back afterwards with the current branch it found: a console-time
+     * read (the restore drill), never one inside a request. Reads only.
+     */
+    public function verifyAll(string $connection): ChainSummary
+    {
+        $default = $this->db->getDefaultConnection();
+        $previous = $this->current->isResolved() ? $this->current->get() : null;
+        $places = 0;
+        $links = 0;
+        $failures = [];
+
+        $this->db->setDefaultConnection($connection);
+        try {
+            foreach (Branch::query()->orderBy('id')->get() as $branch) {
+                $this->current->set($branch);
+                foreach ($this->locations() as $locationId) {
+                    $result = $this->verify($locationId);
+                    $places++;
+                    $links += $result->checked;
+                    foreach ($result->failures as $failure) {
+                        $failures[] = ['branch_id' => $branch->id, 'location_id' => $locationId] + $failure;
+                    }
+                }
+            }
+        } finally {
+            $this->db->setDefaultConnection($default);
+            $previous === null ? $this->current->clear() : $this->current->set($previous);
+        }
+
+        return new ChainSummary($places, $links, $failures);
+    }
 
     /**
      * @throws ShiftError shifts.lock.chain_busy (409)
