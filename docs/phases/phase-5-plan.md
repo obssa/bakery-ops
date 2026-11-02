@@ -659,7 +659,8 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        of `gate-p5` although the job is still the placeholder; the gate's phase-marker row (no `TODO(p` + `5)` left) catches the placeholder until 5.5b
        replaces it. `live-ops` depends on the deploy's `@live` run on `main` within 7 days.
      - **Handbook pages written from the plan**, each marked "Written from the plan; checked against the build in 5.6b": `printer.md`
-       (5.3a to 5.3c), `offline.md` (the conflict tray, 5.2c; the photo queue, 5.2b), `system-page.md` (5.5c), `backups.md` (5.5b).
+       (5.3a to 5.3c), the conflict tray section of `offline.md` (5.2c), `system-page.md` (5.5c), `backups.md` (5.5b). The photo
+       section of `offline.md` follows 5.2b as built (merged before this step).
        Their Amharic titles follow `docs/i18n/glossary.md`; the reviewer (Q5) may correct them. The on-call plan's hours and call
        order are a default by role (shift manager, shop admin, technical on-call, owner) for Ramin to change before he signs
        `on-call-agreed`.

@@ -1,7 +1,5 @@
 # When the internet drops, and the conflict tray (ኢንተርኔት ሲቋረጥና የግጭት ሳጥኑ)
 
-> Written from the plan; checked against the build in 5.6b.
-
 The station screens keep working while the internet is down. What they do is kept on the tablet, in its **outbox**, and sent in
 order once the connection is back. Each write carries its own key, so a write sent twice is still one write: an order replayed
 after a drop is one order on the server.
@@ -9,8 +7,19 @@ after a drop is one order on the server.
 ## What works offline (D10)
 
 - Taking and sending orders on the pad; the KDS and station actions.
-- Payments on every channel, with their receipt photos. A photo waits on the tablet and goes up later.
+- Payments on every channel, with their receipt photos (below).
 - Production batch steps; drafts of counts and of cash declarations.
+
+## Receipt photos (step 5.2b)
+
+- **Every photo is kept on the tablet first**, shrunk, then uploaded: at once when online, or with the payment once the connection is
+  back. A kept photo is enough: the till lets the cashier **Complete** a payment on a photo channel without waiting for the upload.
+- **The limit is 50 MB of photos waiting** for their upload. Past it, the till refuses a new photo and says how much is waiting.
+  Bring the tablet back online and let the queue empty.
+- **A photo nothing uses any more is dropped**: replaced or removed from its row, its payment done, its conflict dismissed. A photo
+  left behind by a closed tab or a reload goes after 12 hours.
+- If the server refuses a photo, the row asks for another one. A photo no longer on the tablet is refused on the tablet, with a
+  message in both languages.
 
 ## What needs the internet
 
@@ -26,12 +35,15 @@ These screens say so when they are offline, and wait.
 
 ## The conflict tray
 
+> Written from the plan; checked against the build in 5.6b.
+
 Sometimes the server refuses something sent from the outbox, because the world changed meanwhile:
 
 - another tablet sold the last unit (a stock shortfall);
 - the shift closed (the shift rules);
 - the order was closed;
-- the tablet was revoked.
+- the tablet was revoked;
+- a receipt photo was refused (the tray shows the photo it names).
 
 Nothing refused is dropped silently. It stays in the **conflict tray** with the server's message in both languages, and with what
 was attempted. For each item, either:
