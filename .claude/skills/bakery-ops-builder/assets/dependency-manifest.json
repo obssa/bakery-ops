@@ -1508,7 +1508,8 @@
         ],
         "extra_ci_jobs": [
           "i18n-check",
-          "backup-drill"
+          "backup-drill",
+          "perf-load"
         ],
         "criteria": [
           "unknown device gets 403 on station routes; admin routes unaffected",
@@ -1675,7 +1676,8 @@
         "gate-p4",
         "e2e-p5",
         "i18n-check",
-        "backup-drill"
+        "backup-drill",
+        "perf-load"
       ]
     }
   }
