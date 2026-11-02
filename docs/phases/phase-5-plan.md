@@ -614,7 +614,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      - **Rows that fail informationally until their step lands**: `print-emulator` (`print-bridge`, 5.3b; and `self`), `load-test`
        (`perf-load`, 5.5d), `uptime-monitor` (`uptime.yml`, 5.5c), `restore-runbook` (`backup-restore.md`, 5.5b), `print-runbook`
        (`print-bridge.md`, 5.3b/c), `adrs` (0018 to 0020), and `device-enforcement` (`self`, 5.6b). `backup-drill-ci` passes as a need
-       of `gate-p5` although the job is still the placeholder; the gate's `no TODO(p5) markers` row catches the placeholder until 5.5b
+       of `gate-p5` although the job is still the placeholder; the gate's phase-marker row (no `TODO(p` + `5)` left) catches the placeholder until 5.5b
        replaces it. `live-ops` depends on the deploy's `@live` run on `main` within 7 days.
      - **Handbook pages written from the plan**, each marked "Written from the plan; checked against the build in 5.6b": `printer.md`
        (5.3a to 5.3c), `offline.md` (the conflict tray, 5.2c; the photo queue, 5.2b), `system-page.md` (5.5c), `backups.md` (5.5b).

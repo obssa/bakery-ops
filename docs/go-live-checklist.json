@@ -25,7 +25,7 @@
       ] },
     { "id": "backup-drill-ci", "title": "A dump restores into a scratch database and passes the ledger tests",
       "required": true, "who": "CI", "verifier": { "type": "ci_job", "jobs": ["backup-drill"] },
-      "note": "the job is a placeholder until step 5.5b; the gate's no TODO(p5) markers row fails while it is" },
+      "note": "the job is a placeholder until step 5.5b; the gate's phase-marker row fails while it is" },
     { "id": "load-test", "title": "k6 load test within its thresholds",
       "required": true, "who": "CI", "verifier": { "type": "ci_job", "jobs": ["perf-load"] },
       "note": "perf-load joins the needs of gate-p5 in step 5.6b, once step 5.5d has added the job" },
