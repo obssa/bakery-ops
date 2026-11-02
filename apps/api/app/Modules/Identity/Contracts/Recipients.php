@@ -26,6 +26,8 @@ use Illuminate\Database\Eloquent\Collection;
  *   overseers: the people flagged as the overseer at one station (step 2.7c: who is asked to sign off a finished batch);
  *   onDuty: StationPresenceResolver::onDuty (the Phase 2 binding says "assigned", Phase 3 rebinds it to the roster),
  *     and when nobody is on duty the assigned people, so an alert is never addressed to nobody while someone could act;
+ *   onCall: the people the admin marked "On call" in People (users.on_call; the go-live settings, 2026-11-02), who hear the ops and
+ *     print alerts beside the admins and the managers on duty; nobody on call is nobody;
  *   localeOf: 'am' or 'en' (a Bilingual pair renders for it with Bilingual::in()).
  * Resolved per use: it carries the scoped CurrentBranch (traps.md, Octane).
  */
@@ -125,6 +127,16 @@ final class Recipients
             ->values();
 
         return $onDuty->isNotEmpty() ? new Collection($onDuty->all()) : $this->forStation($station);
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function onCall(): Collection
+    {
+        $branchId = $this->branch->id();
+
+        return $this->active($branchId)->where('on_call', true)->get();
     }
 
     /** 'am' for an Amharic reader, 'en' for everyone else (a stored locale we do not know is read as English). */

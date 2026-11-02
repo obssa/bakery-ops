@@ -31,6 +31,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property CarbonImmutable|null $pin_locked_until
  * @property string $locale
  * @property bool $is_active
+ * @property bool $on_call
  * @property string|null $photo_url
  * @property string|null $remember_token
  * @property CarbonImmutable|null $created_at
@@ -52,7 +53,7 @@ final class User extends Authenticatable
     protected $table = 'users';
 
     /** @var list<string> */
-    protected $fillable = ['branch_id', 'name', 'phone', 'email', 'password', 'locale', 'is_active', 'photo_url'];
+    protected $fillable = ['branch_id', 'name', 'phone', 'email', 'password', 'locale', 'is_active', 'on_call', 'photo_url'];
 
     /** @var list<string> */
     protected $hidden = ['password', 'remember_token', 'short_code_hash'];
@@ -61,6 +62,7 @@ final class User extends Authenticatable
     protected $attributes = [
         'locale' => 'en',
         'is_active' => true,
+        'on_call' => false,
         'short_code_attempts' => 0,
     ];
 
@@ -75,6 +77,7 @@ final class User extends Authenticatable
             'short_code_attempts' => 'integer',
             'pin_locked_until' => 'immutable_datetime',
             'is_active' => 'boolean',
+            'on_call' => 'boolean',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
             'deleted_at' => 'immutable_datetime',

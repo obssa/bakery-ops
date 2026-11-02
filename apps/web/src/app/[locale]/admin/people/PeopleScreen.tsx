@@ -4,9 +4,9 @@ import { useLocale, useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 import { Alert, Button, Field, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
 import { usePatchStation, useStations } from "@/lib/api/catalog";
-import { useCreateUser, useUsers } from "@/lib/api/hooks";
+import { useCreateUser, usePatchUserOnCall, useUsers } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
-import { ROLES, type Locale, type NewUser, type Role, type Station } from "@/lib/api/types";
+import { ROLES, type Locale, type NewUser, type Role, type Station, type User } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
 import { RequireAuth } from "@/components/RequireAuth";
 import { focusRing } from "@/components/styles";
@@ -15,7 +15,8 @@ import { can, useSession } from "@/lib/session";
 
 // Admin > People (Phase 0 step 0.7, "People minimal"): the branch's users and a form to add one with a role and the
 // language their screens open in. Roles, stations, short codes and devices get their own screens later; the devices screen (step 5.1b)
-// is linked from here.
+// is linked from here. The go-live settings (2026-11-02) add the On call switch to each person: the admin, the shift manager on duty and
+// everyone switched On call hear the ops alerts (backups, the restore drill) and the failed receipt prints.
 
 const LOCALES: readonly Locale[] = ["en", "am"];
 
@@ -58,9 +59,11 @@ function PeoplePanel() {
   const t = useTranslations();
   const errorText = useErrorText();
   const users = useUsers();
+  const [saved, setSaved] = useState<string | null>(null);
 
   return (
     <Panel title={t("people.list")}>
+      <p className="mb-4 text-base text-neutral-600">{t("people.on_call_intro")}</p>
       {users.isPending ? (
         <p className="py-6 text-base text-neutral-600">{t("common.loading")}</p>
       ) : users.isError ? (
@@ -80,13 +83,14 @@ function PeoplePanel() {
                 <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_phone")}</th>
                 <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_role")}</th>
                 <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_language")}</th>
-                <th scope="col" className="py-2 font-medium">{t("people.col_status")}</th>
+                <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_status")}</th>
+                <th scope="col" className="py-2 font-medium">{t("people.col_on_call")}</th>
               </tr>
             </thead>
             <tbody>
               {users.data.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-6 text-neutral-600">
+                  <td colSpan={6} className="py-6 text-neutral-600">
                     {t("people.no_people")}
                   </td>
                 </tr>
@@ -99,7 +103,8 @@ function PeoplePanel() {
                     <td className="py-3 pr-4" lang={user.locale}>
                       {t(`locale.${user.locale}`)}
                     </td>
-                    <td className="py-3">{user.is_active ? t("people.active") : t("people.inactive")}</td>
+                    <td className="py-3 pr-4">{user.is_active ? t("people.active") : t("people.inactive")}</td>
+                    <OnCallCell user={user} onSaved={setSaved} />
                   </tr>
                 ))
               )}
@@ -107,7 +112,52 @@ function PeoplePanel() {
           </table>
         </div>
       )}
+      <div className="mt-4">
+        <Status>{saved}</Status>
+      </div>
     </Panel>
+  );
+}
+
+// The On call switch of one person (PATCH /users/{id} {on_call}, people.manage, audited as user.update). It moves at once and goes back
+// if the server refuses, as the stations' overseer switch does.
+function OnCallCell({ user, onSaved }: { user: User; onSaved: (message: string | null) => void }) {
+  const t = useTranslations("people");
+  const errorText = useErrorText();
+  const patch = usePatchUserOnCall();
+  const idempotency = useIdempotencyKey();
+  const [shown, setShown] = useState<boolean | null>(null);
+  const onCall = shown ?? user.on_call;
+
+  function toggle(next: boolean) {
+    const body = { on_call: next };
+    setShown(next);
+    onSaved(null);
+    patch.mutate(
+      { id: user.id, body, idempotencyKey: idempotency.keyFor({ id: user.id, ...body }) },
+      {
+        onSuccess: () => {
+          idempotency.done();
+          setShown(null);
+          onSaved(next ? t("on_call_saved_on", { name: user.name }) : t("on_call_saved_off", { name: user.name }));
+        },
+        onError: () => setShown(null),
+      },
+    );
+  }
+
+  return (
+    <td className="py-3">
+      <input
+        type="checkbox"
+        className="size-6"
+        aria-label={t("on_call_label", { name: user.name })}
+        checked={onCall}
+        disabled={patch.isPending}
+        onChange={(event) => toggle(event.target.checked)}
+      />
+      {patch.isError ? <span role="alert" className="mt-1 block text-sm font-medium text-red-700">{errorText.message(patch.error)}</span> : null}
+    </td>
   );
 }
 

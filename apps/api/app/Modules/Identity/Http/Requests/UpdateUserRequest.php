@@ -10,7 +10,8 @@ use Illuminate\Validation\Rule;
 
 /**
  * PATCH /users/{id}: any subset of the editable attributes, the role, and the direct permission overrides (sent as
- * the complete new list). Phone is not editable here: it is the login id.
+ * the complete new list). Phone is not editable here: it is the login id. on_call (the go-live settings, 2026-11-02): the "On call"
+ * switch, set by the admin only (the route's people.manage); left out, it stays.
  */
 final class UpdateUserRequest extends FormRequest
 {
@@ -33,6 +34,7 @@ final class UpdateUserRequest extends FormRequest
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['string', Rule::in(PermissionRegistry::permissions())],
             'is_active' => ['sometimes', 'boolean'],
+            'on_call' => ['sometimes', 'boolean'],
             'photo_url' => ['sometimes', 'nullable', 'url', 'max:2048'],
         ];
     }
@@ -51,6 +53,9 @@ final class UpdateUserRequest extends FormRequest
         }
         if (array_key_exists('is_active', $data)) {
             $out['is_active'] = (bool) $data['is_active'];
+        }
+        if (array_key_exists('on_call', $data)) {
+            $out['on_call'] = (bool) $data['on_call'];
         }
 
         return $out;

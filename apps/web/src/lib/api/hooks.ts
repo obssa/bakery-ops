@@ -77,3 +77,13 @@ export function useCreateUser() {
     onSuccess: () => client.invalidateQueries({ queryKey: ["users"] }),
   });
 }
+
+/** PATCH /users/{id} with the On call switch only (the go-live settings, 2026-11-02; people.manage, the admin). */
+export function usePatchUserOnCall() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body, idempotencyKey }: Write<{ on_call: boolean }> & { id: number }) =>
+      authed<User>(`/users/${id}`, { method: "PATCH", body, idempotencyKey }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["users"] }),
+  });
+}

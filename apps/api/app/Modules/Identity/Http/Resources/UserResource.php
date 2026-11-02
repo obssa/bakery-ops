@@ -11,7 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * A user as People and /me show it: never the password, the short-code hash or the code itself; roles, direct
- * permission overrides and station assignments by name/id.
+ * permission overrides and station assignments by name/id; on_call, the admin's "On call" switch (the go-live settings, 2026-11-02).
  *
  * @mixin User
  */
@@ -34,6 +34,7 @@ final class UserResource extends JsonResource
             'email' => $user->email,
             'locale' => $user->locale,
             'is_active' => $user->is_active,
+            'on_call' => (bool) $user->on_call,
             'photo_url' => $user->photo_url,
             'has_short_code' => $user->hasShortCode(),
             'roles' => $user->roles->pluck('name')->map(fn ($n): string => (string) $n)->sort()->values()->all(),

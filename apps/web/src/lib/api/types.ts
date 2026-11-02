@@ -22,6 +22,8 @@ export interface User {
   email: string | null;
   locale: Locale;
   is_active: boolean;
+  /** the admin's "On call" switch (the go-live settings, 2026-11-02): hears the ops and print alerts */
+  on_call: boolean;
   photo_url: string | null;
   has_short_code: boolean;
   roles: Role[];
