@@ -1,8 +1,8 @@
 # ADR 0021: Observability on a shared host
 
 - Status: **accepted** (step 5.6b, 2026-11-02; proposed in step 5.5a, 2026-10-29, from phase-5 plan sections 6, 9, 10.2 Q1, D7, D12, D14
-  and D21). The decision is accepted as built in step 5.5a. The System page and the uptime workflow, step 5.5c (PR #103), are not merged at
-  this gate and record their own differences when they land. The `error-tracking` item (a DSN set and a test event seen, or Ramin's
+  and D21). The decision is accepted as built in steps 5.5a and 5.5c (the System page, the scheduler heartbeat and the uptime
+  workflow). The `error-tracking` item (a DSN set and a test event seen, or Ramin's
   written choice to go live without it) stays a go-live checklist row that Ramin signs before the phase is claimed: it gates the claim,
   not the decision.
 - Date: 2026-10-29
@@ -92,10 +92,19 @@ neither account nor process exists on this host, and the Sentry account and its 
 
 ## Note, 2026-11-02: accepted at the Phase 5 gate (step 5.6b)
 
-This note records the steps merged so far: 5.5a (refusals, error tracking, the prune) and 5.5d (the load test), from their As built notes
-in phase-5 plan section 6. Step 5.5c (PR #103: the System page, `GET /system/status`, the scheduler heartbeat and the uptime workflow of
-decision 6) is not on this branch; it records its own differences, and adds its tests to the Enforcement above, when it lands. Until
-then the checklist row `uptime-monitor` cannot pass. What the build changed from, or made concrete in, the decision:
+This note records steps 5.5a (refusals, error tracking, the prune), 5.5c (the System page, `GET /system/status`, the scheduler
+heartbeat, the uptime workflow) and 5.5d (the load test), from their As built notes in phase-5 plan section 6. What the build changed
+from, or made concrete in, the decision:
+
+- **The heartbeat** (decision 5) is a callback in `schedule:run`'s own process every minute (`ops.scheduler.tick`), which puts the time
+  in the cache: no second PHP process a minute on the shared host. The System page reads the scheduler as fine while the tick is at most
+  180 s old.
+- **`GET /system/status`** (admin, `system.view`) answers counts and ages only: the release, the migrations, the scheduler, the queue
+  and the failed jobs, the backups and the drill, the stored files, the branch's devices and the rollout switches, with an ETag over
+  the body. No path, key or host name is in it.
+- **The uptime workflow** (decision 6) reads the site's address from a repository variable and is skipped while it is unset; it checks
+  that `/health` answers with the app and the database both ok. The checklist row `uptime-monitor` passes once it has run green on
+  `main` within a day.
 
 - **The refusal classes** (decision 1) are found by a scan, not by name: the plan named those of Payments, Orders, Identity, Inventory
   and Shifts and `IllegalTransition`; the scan found the 15 listed, and `DomainRefusalTest` fails on a new one without the marker. Internal

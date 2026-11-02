@@ -129,10 +129,13 @@ made concrete in, the decision:
 - **CI `backup-drill`** runs `--group=gate:p0 --group=gate:p5:restored` in one Pest process. Phase 0's gate tests keep their own test
   database on the same server; only `RestoredLedgerGateTest` reads the restored copy (the plan had Phase 0's ledger tests run on it too).
 - **`BackupFailed` and `DrillFailed`** (decision 8) are plain host-wide events in `App\Shared\Events` (no `branch_id`, so not domain
-  events), and nothing listens to them at this gate. The admins' inbox line, the hourly `BackupStale` check and the System page are step
-  5.5c (PR #103), which records its own differences when it lands; until then a failed run shows in its `ops_runs` row and the log.
+  events). Step 5.5c gave them a listener: `NotifyOps` tells the active admins and holders of `system.view` of every branch, each in
+  their own inbox (critical, in-app and Telegram when that driver is on), with the failure key as written. `backup:check-stale` runs
+  hourly at :15 and raises `BackupStale` once the newest good backup is more than 26 hours old (`backup.stale_hours`), told once per
+  stale period. The System page shows the last good backup, its age, the copies kept, the disk they use and the last drill.
 - **`live-ops`** (Enforcement) is, as built in step 5.6a, a CI row: the deploy's `live-e2e` job passed on `main` within 7 days. The `@live`
-  check of the ages the row's title names (a good backup within 26 hours, a passing drill within 8 days) is part of step 5.5c.
+  check of the ages the row's title names (a good backup within 26 hours, a passing drill within 8 days) is `ops-live.spec.ts` of step
+  5.5c, run by that job; it enforces the backup's age once backups have run on the live host.
 
 The rest (the dump and its options, the folder and the names, the manifest, the hard-link snapshots, retention and the cap, the
 schedule, the off-site hook left off, no HTTP route) is as proposed.

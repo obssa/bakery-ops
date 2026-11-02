@@ -128,8 +128,10 @@ What the build (steps 5.1a and 5.1b, the As built notes of phase-5 plan section 
 - **CI** turns the flag on for the compose stack's `app` and `worker`; the Pest runs inside that stack pass
   `IDENTITY_REQUIRE_DEVICE=false` and turn it on only where a test needs it. The `@live` suites use stable `e2e-live-<role>` ids,
   enrolled once in the E2E test branch.
-- **The System page** of decisions 8 and 9 is step 5.5c (PR #103), not merged at this gate. Until it lands, the Devices screen is where
-  the admin sees which tablets are enrolled and when each was last seen, which is what the `devices-enrolled` sign-off asks.
+- **The System page** of decisions 8 and 9 came with step 5.5c (`/admin/system`, `system.view`): its "Tablets and devices" part counts
+  the branch's devices through Identity's `DeviceCensus` contract (enrolled: not revoked; seen: seen in the last 15 minutes; revoked),
+  and its rollout switches show `require_enrolled_device`. With the Devices screen, which lists each device and when it was last seen,
+  it is where the admin checks what the `devices-enrolled` sign-off asks.
 
 The rest (the flag and its kill switch, the middleware's place and its three refusals, the kinds and the bridge's hashed token, the
 `last_seen_at` debounce) is as proposed.

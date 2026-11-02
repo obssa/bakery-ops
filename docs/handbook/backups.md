@@ -13,8 +13,8 @@
   backup and drill on every pull request and every change to `main`, on the demo bakery.
 - Each backup and each drill is recorded on the server, with the reason when it failed. The admin System page
   ([system-page.md](system-page.md)) shows how they are doing. Alerts in the app (a failed backup or drill, no good backup for
-  26 hours) come with the System page; until then the technical on-call reads a failure on the server
-  ([runbook, "When a run fails"](../runbook/backup-restore.md#when-a-run-fails)).
+  26 hours) reach every admin's inbox, and the technical on-call follows the
+  [runbook, "When a run fails"](../runbook/backup-restore.md#when-a-run-fails).
 
 ## The risk to know
 
