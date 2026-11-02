@@ -1,0 +1,12 @@
+# CI load-test overlay (phase-5 plan 6, step 5.5d; ci.yml perf-load), on top of compose.yml and compose.ci.yml:
+#   docker compose -f compose.yml -f compose.ci.yml -f compose.perf.yml up -d --wait app
+# The image's server is `php artisan serve`, one PHP process, which answers one request at a time: 60 polling devices and a burst of
+# orders would measure that queue, not the code. Here PHP's built-in server forks PHP_CLI_SERVER_WORKERS processes (Laravel honours the
+# variable only with --no-reload), as many as the runner's four cores can keep busy while MariaDB waits on disk. The live host runs PHP
+# behind its own web server, so these figures describe the code under load; the host's share is the poll budget (PollBudgetTest and
+# docs/runbook/server.md).
+services:
+  app:
+    command: ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000", "--no-reload"]
+    environment:
+      PHP_CLI_SERVER_WORKERS: "8"

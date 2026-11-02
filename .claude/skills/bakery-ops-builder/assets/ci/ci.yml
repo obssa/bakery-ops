@@ -2,6 +2,8 @@
 # .claude/skills/bakery-ops-builder/assets/dependency-manifest.json (ci.module_jobs / e2e_jobs / gate_jobs):
 # a module's tests only run after the modules it depends on are green, and gate-pN fans in everything
 # phase N relies on. Jobs for phases above docs/phases/STATUS.json current_phase are skipped.
+# Every job states its timeout-minutes (phase-5 plan 7.1, step 5.5d): 20 unless a measured run needs more, so a hung step cannot hold a
+# runner for six hours; a job that calls a reusable workflow gets the workflow's own (module-tests.yml 20 or its input, e2e.yml 30).
 name: ci
 
 on:
@@ -21,6 +23,7 @@ jobs:
   # ------------------------------------------------------------------ where are we
   status:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     outputs:
       phase: ${{ steps.s.outputs.phase }}
     steps:
@@ -36,6 +39,7 @@ jobs:
   # ------------------------------------------------------------------ api static
   api-lint:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -49,6 +53,7 @@ jobs:
   api-arch:
     needs: api-lint
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     services:
       mysql:
         image: mysql:8.0
@@ -81,6 +86,7 @@ jobs:
   invariants:
     needs: api-arch
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     services:
       mysql:
         image: mysql:8.0
@@ -100,6 +106,7 @@ jobs:
   openapi-check:
     needs: api-arch
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api
@@ -119,6 +126,7 @@ jobs:
   erd-check:
     needs: api-arch
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/erd_check.py
@@ -197,6 +205,7 @@ jobs:
   # ------------------------------------------------------------------ web
   web-lint:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -213,6 +222,7 @@ jobs:
   i18n-check:
     needs: [status, web-lint]
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/check_invariants.py --i18n ${{ fromJSON(needs.status.outputs.phase) >= 5 && '--strict-i18n' || '' }}
@@ -220,6 +230,7 @@ jobs:
   web-build:
     needs: web-lint
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -248,6 +259,7 @@ jobs:
   # ------------------------------------------------------------------ api image for e2e
   docker-build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -361,6 +373,105 @@ jobs:
         if: always()
         run: docker compose -f compose.yml -f compose.ci.yml down -v
 
+  # k6 load test of the shop's busiest hour (phase-5 plan 6, step 5.5d; 7.1; 10.2 D15): on the CI compose stack only, never the live host.
+  # The demo bakery with 7 days of history and the 60 load devices (Phase5Seeder, LOAD_DEVICES=60). scripts/perf/load.k6.js polls from
+  # the 60 devices at the web's cadences (apps/api/tests/Fixtures/perf/poll-profile.json) while 300 orders go from pad to till in 10
+  # minutes; thresholds: polls p95 < 300 ms, writes p95 < 800 ms, errors < 0.5 %, all 300 paid. Then, once the queue is empty, the
+  # perf:load group (tests/Gate/LoadRunGateTest.php) checks the database: exactly 300 new orders, all closed; the ledger reconciled; no
+  # failed_jobs. compose.perf.yml serves the API with several PHP workers (the image's default `artisan serve` is one process; the live
+  # host runs PHP behind LiteSpeed, not this server, so the figures describe the code under load, not the host: PollBudgetTest and
+  # docs/runbook/server.md "Poll budget" speak for the host). The queue worker starts after the seed, so migrate:fresh never races it.
+  perf-load:
+    needs: [status, docker-build, mod-analytics]
+    if: fromJSON(needs.status.outputs.phase) >= 5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DC: docker compose -f compose.yml -f compose.ci.yml -f compose.perf.yml
+      # the demo accounts' documented local/CI password (APP_ENV=testing in compose.ci.yml; DemoCredentials::LOCAL_PASSWORD)
+      DEMO_PASSWORD: demo-bakery-local
+      LOAD_DEVICES: "60"
+      LOAD_HISTORY_DAYS: "7"
+      LOAD_ORDERS: "300"
+      # grafana/k6 1.3.0, pinned by the digest of its image index (the image perf-dashboards uses)
+      K6_IMAGE: grafana/k6:1.3.0@sha256:3ddc8b1a33a2c3d8edc6e99b6a762ae36cba08788463458f5e6a7703e14eb77d
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: api-image, path: /tmp }
+      - run: docker load -i /tmp/api.tar
+      - name: Start the stack (the API with several workers, the database, Redis)
+        run: $DC up -d --wait --wait-timeout 180 app
+      - name: Migrate and seed ${{ env.LOAD_HISTORY_DAYS }} days of demo history and the load devices
+        run: |
+          set -o pipefail
+          $DC exec -T -e SEED_PHASE=5 -e DEMO_HISTORY_DAYS="$LOAD_HISTORY_DAYS" -e LOAD_DEVICES="$LOAD_DEVICES" app \
+            php artisan migrate:fresh --force --seed --seeder=DemoSeeder 2>&1 | grep -v ' DEBUG: ' | tee /tmp/seed.txt | tail -30
+          grep -E '^Phase 4: ' /tmp/seed.txt | tee -a "$GITHUB_STEP_SUMMARY" || true
+      - name: Start the queue worker
+        run: $DC up -d --wait --wait-timeout 120 worker
+      - name: Read the ids the burst uses and the last order before it
+        run: |
+          set -o pipefail
+          q() { $DC exec -T db mariadb -ubakery -psecret bakery -N -e "$1" | tr -d '[:space:]'; }
+          branch=$(q "SELECT id FROM branches WHERE name = 'Demo Bakery' ORDER BY id LIMIT 1")
+          test -n "$branch" || { echo "::error::no demo branch: the seed failed"; exit 1; }
+          devices=$(q "SELECT COUNT(*) FROM devices WHERE branch_id = $branch AND fingerprint LIKE 'load-%' AND revoked_at IS NULL AND deleted_at IS NULL")
+          test "$devices" = "$LOAD_DEVICES" || { echo "::error::$devices load devices enrolled, not $LOAD_DEVICES"; exit 1; }
+          {
+            echo "KITCHEN_STATION=$(q "SELECT id FROM stations WHERE branch_id = $branch AND code = 'kitchen' ORDER BY id LIMIT 1")"
+            echo "BAR_STATION=$(q "SELECT id FROM stations WHERE branch_id = $branch AND code = 'bar' ORDER BY id LIMIT 1")"
+            echo "TILL_STATION=$(q "SELECT id FROM stations WHERE branch_id = $branch AND code = 'till' ORDER BY id LIMIT 1")"
+            echo "KITCHEN_LOCATION=$(q "SELECT id FROM locations WHERE branch_id = $branch AND type = 'kitchen' AND deleted_at IS NULL ORDER BY id LIMIT 1")"
+            echo "BAR_LOCATION=$(q "SELECT id FROM locations WHERE branch_id = $branch AND type = 'bar' AND deleted_at IS NULL ORDER BY id LIMIT 1")"
+            echo "KITCHEN_ITEM=$(q "SELECT id FROM items WHERE branch_id = $branch AND sku = 'P-BRD-TOAST'")"
+            echo "BAR_ITEM=$(q "SELECT id FROM items WHERE branch_id = $branch AND sku = 'P-HOT-BUNA'")"
+            echo "BUNA_ITEM=$(q "SELECT id FROM items WHERE branch_id = $branch AND sku = 'ING-BUNA'")"
+            echo "LOAD_ORDERS_AFTER=$(q "SELECT COALESCE(MAX(id), 0) FROM orders")"
+          } | tee -a "$GITHUB_ENV"
+      - name: k6 (60 devices polling, 300 orders in 10 minutes)
+        id: k6
+        run: |
+          set -o pipefail # k6 exits 99 when a threshold fails; the tee must not hide it
+          mkdir -p /tmp/k6 && chmod 777 /tmp/k6 # the k6 image runs as a user of its own; it writes its summary there
+          docker run --rm --network host -v "$PWD/scripts/perf:/scripts:ro" -v "$PWD/apps/api/tests/Fixtures/perf:/profile:ro" -v /tmp/k6:/out \
+            -e BASE_URL=http://localhost:8000 -e PASSWORD="$DEMO_PASSWORD" -e PROFILE=/profile/poll-profile.json -e PHOTO=/scripts/fixtures/receipt.jpg \
+            -e KITCHEN_STATION -e BAR_STATION -e TILL_STATION -e KITCHEN_LOCATION -e BAR_LOCATION -e KITCHEN_ITEM -e BAR_ITEM -e BUNA_ITEM \
+            "$K6_IMAGE" run --quiet /scripts/load.k6.js | tee /tmp/k6/stdout.txt
+      - name: Wait for the queue to drain (at most 3 minutes)
+        if: always() && steps.k6.outcome != 'skipped'
+        run: |
+          for i in $(seq 1 36); do
+            size=$($DC exec -T app php artisan tinker --execute 'echo "queued=".Illuminate\Support\Facades\Queue::size();' 2>/dev/null | grep -oE 'queued=[0-9]+' | cut -d= -f2)
+            echo "queue: ${size:-?} jobs"
+            [ "$size" = "0" ] && exit 0
+            sleep 5
+          done
+          echo "::error::the queue did not drain in 3 minutes"; exit 1
+      - name: After the run, pest --group=perf:load (exactly the orders sent, all closed; the ledger reconciled; no failed jobs)
+        if: always() && steps.k6.outcome != 'skipped'
+        run: |
+          set -o pipefail
+          # the image has no .env (the variables come from compose): an empty one keeps PHPUnit from warning on every test (as gate-p4)
+          $DC exec -T app touch .env
+          $DC exec -T -e IDENTITY_REQUIRE_DEVICE=false -e GATE_SEED_DATABASE=bakery -e LOAD_ORDERS_AFTER -e LOAD_ORDERS app \
+            vendor/bin/pest --group=perf:load --colors=never 2>&1 | grep -v ' DEBUG: ' | tee /tmp/k6/after.txt
+          if grep -Eq "No tests (found|executed)" /tmp/k6/after.txt; then echo "::error::the perf:load group ran nothing"; exit 1; fi
+          if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky|warning|deprecat|notice)" /tmp/k6/after.txt; then echo "::error::a perf:load check was skipped or warned"; exit 1; fi
+      - name: Figures in the step summary
+        if: always() && steps.k6.outcome != 'skipped'
+        run: |
+          { echo '```'; sed -n '/^perf-load (k6)/,$p' /tmp/k6/stdout.txt; grep -E '^\[perf-load\]' /tmp/k6/after.txt || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Logs on failure
+        if: failure()
+        run: $DC logs --no-color --tail=150 app worker
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: perf-load, path: /tmp/k6, retention-days: 7, if-no-files-found: ignore }
+      - name: Stop the stack
+        if: always()
+        run: $DC down -v
+
   # Phase 5 (step 5.1b; phase-5 plan 7.1, 10.2 D17, ADR 0009): polling with the worker, as on the live host, beside e2e-p4 instead of after
   # it; two days of demo history (its projects need none, the default would replay 90). The 30-minute limit is e2e.yml's job timeout (a
   # job that calls a reusable workflow cannot set its own). Device enforcement is on for every e2e job (compose.ci.yml).
@@ -374,6 +485,7 @@ jobs:
     needs: [status, e2e-p5]
     if: fromJSON(needs.status.outputs.phase) >= 5
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - run: echo "TODO(p5) backup-drill job is defined in Phase 5"
@@ -382,6 +494,7 @@ jobs:
   gate-p0:
     needs: [api-arch, mod-inventory, mod-catalog, e2e-p0, openapi-check, erd-check, invariants]
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
@@ -393,6 +506,7 @@ jobs:
     needs: [status, gate-p0, mod-orders, mod-payments, e2e-p1]
     if: fromJSON(needs.status.outputs.phase) >= 1
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
@@ -404,6 +518,7 @@ jobs:
     needs: [status, gate-p1, mod-production, mod-notifications, e2e-p2]
     if: fromJSON(needs.status.outputs.phase) >= 2
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
@@ -415,6 +530,7 @@ jobs:
     needs: [status, gate-p2, mod-shifts, enforced-gates, e2e-p3]
     if: fromJSON(needs.status.outputs.phase) >= 3
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
@@ -476,6 +592,7 @@ jobs:
     needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill]
     if: fromJSON(needs.status.outputs.phase) >= 5
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
