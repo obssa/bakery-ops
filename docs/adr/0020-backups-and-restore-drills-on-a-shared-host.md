@@ -1,8 +1,9 @@
 # ADR 0020: Backups and restore drills on a shared host
 
-- Status: **proposed** (step 5.5b, 2026-11-01; phase-5 plan sections 6, 9, 10.2 Q2, Q8 and D13). Accepted at the Phase 5 gate (step 5.6b),
-  after the first live drill has passed (checklist item `live-ops`) and the off-site question has an answer (`offsite-backup`: a remote
-  configured and one copy verified, or the host-only risk accepted in writing).
+- Status: **accepted** (step 5.6b, 2026-11-02; proposed in step 5.5b, 2026-11-01, from phase-5 plan sections 6, 9, 10.2 Q2, Q8 and D13).
+  The decision is accepted as built in step 5.5b. The first live drill (checklist item `live-ops`, which the deploy's `@live` run checks)
+  and the off-site answer (`offsite-backup`, which Ramin signs: a remote configured and one copy verified, or the host-only risk accepted
+  in writing) stay go-live checklist rows that must pass before the phase is claimed: they gate the claim, not the decision.
 - Date: 2026-11-01
 - Phase: 5
 
@@ -108,3 +109,30 @@ account (plan 10.2 Q2 and Q8).
 - **Binary logs and point-in-time recovery:** not available to a shared-host account.
 - **Restoring the drill into the app's own server-side copy with `CREATE DATABASE`:** the cPanel user cannot create databases from SQL;
   the scratch database is created once in cPanel.
+
+## Note, 2026-11-02: accepted at the Phase 5 gate (step 5.6b)
+
+This ADR was written with the build in step 5.5b. What the build (the step's As built note in phase-5 plan section 6) changed from, or
+made concrete in, the decision:
+
+- **Where the drill's checks live** (decisions 6 and 7): only the Ledger may name the stock tables in `app/` (`LedgerIsSoleWriterTest`),
+  so `LedgerOracle::check` is `Inventory\Ledger\Reconciliation` behind the contract, and the drill's list of append-only tables is
+  `config/backup.php` `append_only_tables` (kept equal to `scripts/check_invariants.py` by `DrillAppendOnlyListTest`), not a constant of
+  `App\Ops`. The oracle compares the movements with `stock_balances` and with `item_stock_view` separately, so a view restored with
+  another definition is caught.
+- **`HashChain::verifyAll($connection)`** (decision 7) points the default connection at the named one for the call and puts it back,
+  with the current branch, afterwards: the payload rebuild reads through the models. It is a console-time read.
+- **The trigger probe** (decision 6) runs only where the trigger exists (a missing one is reported once, as missing) and only on a table
+  that has a row: on an empty append-only table the drill checks that the triggers are there, not that they refuse.
+- **The contracts' scratch copy** is a second database on the test server, `bakery_scratch` (`SCRATCH_DB_DATABASE`), made by
+  `scripts/ci/mysql-prepare.sh` in the module jobs and by `docker/mysql/init.sql` on a fresh compose volume, beside `bakery_drill`.
+- **CI `backup-drill`** runs `--group=gate:p0 --group=gate:p5:restored` in one Pest process. Phase 0's gate tests keep their own test
+  database on the same server; only `RestoredLedgerGateTest` reads the restored copy (the plan had Phase 0's ledger tests run on it too).
+- **`BackupFailed` and `DrillFailed`** (decision 8) are plain host-wide events in `App\Shared\Events` (no `branch_id`, so not domain
+  events), and nothing listens to them at this gate. The admins' inbox line, the hourly `BackupStale` check and the System page are step
+  5.5c (PR #103), which records its own differences when it lands; until then a failed run shows in its `ops_runs` row and the log.
+- **`live-ops`** (Enforcement) is, as built in step 5.6a, a CI row: the deploy's `live-e2e` job passed on `main` within 7 days. The `@live`
+  check of the ages the row's title names (a good backup within 26 hours, a passing drill within 8 days) is part of step 5.5c.
+
+The rest (the dump and its options, the folder and the names, the manifest, the hard-link snapshots, retention and the cap, the
+schedule, the off-site hook left off, no HTTP route) is as proposed.

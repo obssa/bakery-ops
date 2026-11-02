@@ -1,7 +1,9 @@
 # ADR 0017: Device enrolment and enforcement
 
-- Status: **proposed** (step 5.1a, 2026-10-29; phase-5 plan sections 4.1, 9 and 10.5). Accepted at the Phase 5 gate (step 5.6b), after
-  the web half (step 5.1b) and the live sign-off `devices-enrolled`.
+- Status: **accepted** (step 5.6b, 2026-11-02; proposed in step 5.1a, 2026-10-29, from phase-5 plan sections 4.1, 9 and 10.5). The
+  decision is accepted as built, the API (step 5.1a) and the web half (step 5.1b). The live sign-off `devices-enrolled` stays a go-live
+  checklist row that Ramin signs before the phase is claimed: it gates the claim, not the decision. The code default stays off until he
+  signs it; then a one-line PR turns it on (plan 10.5). What the build changed is in the dated notes below.
 - Date: 2026-10-29
 - Phase: 5
 
@@ -102,3 +104,32 @@ refused. Step 5.1b keeps that, and decides how it looks:
 - **The flow that proves it** (`apps/web/e2e/p5/device.spec.ts`): an unknown tablet sees the screen on the pad, the KDS and the till; the
   same tablet opens catalog, people and devices; the admin enrols it in place and after a reload the pad works; after a revoke the next
   request shows the screen again, with a new code; a device of another branch is refused.
+
+## Note, 2026-11-02: accepted at the Phase 5 gate (step 5.6b)
+
+What the build (steps 5.1a and 5.1b, the As built notes of phase-5 plan section 6) changed from, or made concrete in, the decision:
+
+- **The registry** (decision 2) holds 58 station routes and 126 others. Besides the screens named above it counts the till's receipt
+  photo (`POST /files`, `DELETE /files/{file}`), the display case, the KDS strip's transfer request (`POST /transfers`), the production
+  board's and the count screen's reads, `GET /variance-reasons`, and the till's channels and receipt settings.
+- **One model for every computer** (decision 4, the 2026-10-29 note): the plan's flow had an unenrolled computer's admin pages still
+  working; as built, any page whose call is refused for the device shows the same "not enrolled" screen, an admin page included, and
+  no role or user is exempt.
+- **`GET /devices/this`** (decision 5) answers `{enrolled, revoked, device, enforcement}`; the actor middleware skips the device on that
+  one route, so a revoked device reads `revoked: true` instead of a 403. **`POST /devices`** requires a `client_uuid`, and a
+  fingerprint used before, in any branch, deleted or not, is `422 identity.device.fingerprint_taken`; rename and revoke create no row
+  and take no `client_uuid` (the `Idempotency-Key` makes a retry safe).
+- **A revoked id** (decision 6) is renewed by the web client once, and `GET /me` is asked again with the new id instead of signing the
+  person out. Because the actor middleware refuses a revoked device whatever the flag, a revoked tablet on the live host (flag off)
+  shows the screen once and works again after a reload, as a new device to enrol.
+- **The device id** is `dev-<uuid>`, kept under the pad's old storage key, so the tablets keep the `pad-…` ids they had; its short form
+  (the last eight characters) is what the screen and the admin's list show. The Devices screen is Admin > People > Devices: it lists
+  each device with its last seen time, and adds a print bridge (fingerprint `bridge-<uuid>`, the token shown once).
+- **CI** turns the flag on for the compose stack's `app` and `worker`; the Pest runs inside that stack pass
+  `IDENTITY_REQUIRE_DEVICE=false` and turn it on only where a test needs it. The `@live` suites use stable `e2e-live-<role>` ids,
+  enrolled once in the E2E test branch.
+- **The System page** of decisions 8 and 9 is step 5.5c (PR #103), not merged at this gate. Until it lands, the Devices screen is where
+  the admin sees which tablets are enrolled and when each was last seen, which is what the `devices-enrolled` sign-off asks.
+
+The rest (the flag and its kill switch, the middleware's place and its three refusals, the kinds and the bridge's hashed token, the
+`last_seen_at` debounce) is as proposed.

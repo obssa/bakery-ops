@@ -1,8 +1,10 @@
 # ADR 0019: Printing through a pull bridge
 
-- Status: **proposed** (step 5.3a, 2026-11-01; phase-5 plan sections 4.3, 6, 9 and 10.2 Q3, Q9, D11, D18, D20). The bridge program is step
-  5.3b and the till's side step 5.3c; accepted at the Phase 5 gate (step 5.6b), after the shop test `print-bridge-shop` and the sign-off
-  `receipt-wording`.
+- Status: **accepted** (step 5.6b, 2026-11-02; proposed in step 5.3a, 2026-11-01, from phase-5 plan sections 4.3, 6, 9 and 10.2 Q3, Q9,
+  D11, D18, D20). The decision is accepted as built: the server side (step 5.3a) and the till's side (step 5.3c). The bridge program, step
+  5.3b (PR #101), is not merged at this gate and records its own differences when it lands. The shop test `print-bridge-shop` and the
+  sign-off `receipt-wording` stay go-live checklist rows that Ramin signs before the phase is claimed: they gate the claim, not the
+  decision.
 - Date: 2026-11-01
 - Phase: 5
 
@@ -81,3 +83,36 @@ till. Three facts decide how:
 - **Text with a downloaded Ethiopic font in the printer**: few printers take user fonts, each in its own way; a picture works on all.
 - **A system user for the bridge**: the codebase has none on purpose (ADR 0011); the requester's stamp plus the bridge's device says who
   asked and which computer printed.
+
+## Note, 2026-11-02: accepted at the Phase 5 gate (step 5.6b)
+
+This note records the steps merged so far, 5.3a (the jobs, the raster, the bridge routes) and 5.3c (the till), from their As built notes
+in phase-5 plan section 6. The bridge program, step 5.3b (PR #101), is not on this branch: its polling, its `--serve` mode (decision 8),
+its log that never holds the token and `docs/runbook/print-bridge.md` record their own differences when it lands. What the build changed
+from, or made concrete in, the decision:
+
+- **Claims** (decision 3): a claim not acknowledged in 60 s may be taken over by any bridge at once, as a new claim, without waiting for
+  the sweep. A claim of a job older than 15 minutes expires it and answers 410 (`next` never offers one); a printed, failed or expired job
+  answers a claim with `409 payments.print.already_claimed`.
+- **The bridge's writes** (decision 4) each carry a `client_uuid`, kept in the audit row's context (the plan's failure report had none).
+- **The paper width** is optional on a claim and on `receipt.escpos`; left out, it is the receipt settings' paper. `paper_width_mm` and
+  `print_logo` joined `GET` and `PUT /receipt-settings` in step 5.3c; in `PUT` both are optional and a value left out stays as saved, so
+  a till that cached the old screen cannot turn a 58 mm printer back to 80 mm. The logo switch is there, but no logo can be added yet.
+- **The golden pictures** (decision 5) also allow two rows of height, and are redrawn only on CI's environment
+  (`UPDATE_RECEIPT_GOLDENS=1`).
+- **`GET /orders/{order}/receipt.escpos`** (decision 8) is a station route, like `receipt.pdf`: once device enforcement is on, a till PC
+  that prints its own receipts must be enrolled.
+- **Print is online only** (step 5.3c), an exception to ADR 0018's "every station write without a PIN is queued": a print sent when the
+  line came back could reach the printer an hour later, in front of the next customer. Offline the button says it needs a connection;
+  the bridge's local mode stays the way to print while the internet is down.
+- **The till** (decision 7): Print sits with the receipt actions, so the pay sheet, the order record and the refund dialog all print; one
+  copy per press (the API's `copies` stays 1). The state is read from `GET /print-jobs?order_id=` with its ETag, every 2 s, every 10 s
+  once a queued job has waited a minute, and not at all once the job is printed, failed or expired. A failed or expired job this screen
+  asked for, or `409 payments.print.no_bridge` or `not_paid`, makes the signed receipt link once without a press and shows it with its QR
+  code (`uqr` 0.1.2, error correction M). An old failed job seen on the order record does not make a link by itself: a link is an
+  audited write.
+- **The flow test** (`e2e/p5/print.spec.ts`, CI stack only) enrols a fake bridge and checks the bytes' framing and width with
+  `e2e/support/escpos.ts`; it moves to 5.3b's emulator when 5.3b lands.
+
+The rest (the pull, the bridge as a device, the jobs' life, writes as the person who asked, Amharic as a picture, the receipt's wording,
+the link as the fallback) is as proposed.

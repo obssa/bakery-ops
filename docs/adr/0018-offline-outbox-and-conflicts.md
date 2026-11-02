@@ -1,6 +1,7 @@
 # ADR 0018: The offline outbox and its conflicts
 
-- Status: **proposed** (step 5.2c, 2026-11-02; phase-5 plan sections 4.2, 9 and 10.2 D10). Accepted at the Phase 5 gate (step 5.6b).
+- Status: **accepted** (step 5.6b, 2026-11-02; proposed in step 5.2c, 2026-11-02, from phase-5 plan sections 4.2, 9 and 10.2 D10). The
+  decision is accepted as built in steps 5.2a to 5.2c; the note at the end records what changed from the proposal.
 - Date: 2026-11-02
 - Phase: 5
 
@@ -62,3 +63,26 @@ finally arrives (the stock was sold meanwhile, the shift was closed) must not va
   is created, make it a new write.
 - **A `GET /orders/by-client-uuid/{uuid}` read** (plan 4.2): not added; the replay answers a lost create and the list carries the uuid.
 - **A service-worker Background Sync queue**: not available on every tablet browser, and it could not show the refusals on the screens.
+
+## Note, 2026-11-02: accepted at the Phase 5 gate (step 5.6b)
+
+This ADR was written in step 5.2c, after the outbox was built (steps 5.2a to 5.2c), so its decision already describes the build. What
+the build changed from the proposal of phase-5 plan section 4.2 and the steps' texts, and what came after it:
+
+- **The lookup read was not added** (decision 6; the plan's `GET /orders/by-client-uuid/{uuid}`): a create whose answer was lost is
+  answered by its replay, and only a send or a cancel tried before without an answer and refused as closed is looked up, with
+  `GET /orders/{id}`. Line actions are not looked up; they show in the tray with Discard.
+- **`409 idempotency.in_flight` is retried** with its key (decision 4), not made a conflict as the plan's "a 4xx moves the item to the
+  conflict list" would have it (step 5.2b: a slow upload whose answer timed out, or a second tab).
+- **The photo store** (decision 2) has a quota: a new photo is refused, in both languages, when the photos still waiting for their upload
+  would pass `NEXT_PUBLIC_PHOTO_QUEUE_MB` (50). A photo no queued write needs is dropped when it is let go of, or after 12 hours. A
+  batch's photos go as one `upload_photos` write, and the payment's `needs` is a list, one file id per photo.
+- **One API change**: `FileUploadRaceTest` found the losing one of two uploads with one `client_uuid` answered 404. `Files::put` now
+  inserts under a savepoint and reads the winner with a locking read; the upload that stored the file answers 201, the other 200.
+- **Print is online only** (step 5.3c, ADR 0019): it is a station write without a PIN, an exception to decision 1. A print sent when the
+  line came back could reach the printer long after the customer left, and the API expires a job after 15 minutes anyway.
+- **Left open** (step 5.2c): the tray shows every conflict of the tablet, whoever is signed in (only the account that queued a write
+  sends it); a rebuilt cart waits while the person's cart holds another order; discarding a refused send whose order the server holds
+  open (a shortfall) leaves that order open, shown as not sent on the waiter's "My orders" with its Cancel.
+
+The rest is as proposed.
