@@ -4,9 +4,8 @@ Commit: `main` at `8ec9452` (pull request #99, `phase-5/perf-load`, step 5.5d, t
 branch `phase-5/gate` (pull request #104) on top · CI runs before this step: 41405560226 (PR #99's last head `0f4ac0a`) and 41405359490
 (PR #102's last head `9858247`), every job green in both; the gate run of 5.6b is recorded under "CI evidence" · Date: 2026-11-02
 
-**This is a report of the phase so far, not a claim that it is done.** Thirteen of the plan's sixteen steps are merged (the plan itself was
-PR #87), 5.3b, the print bridge program (PR #101), last. One is an open pull request: 5.5c, the System page and the uptime workflow
-(PR #103).
+**This is a report of the phase so far, not a claim that it is done.** Fourteen of the plan's sixteen steps are merged (the plan itself was
+PR #87): every step but 5.4b and this one, 5.5c (PR #103) last.
 Step 5.4b waits for the Amharic reviewer (Q5). Step 5.6b is this step (PR #104). STATUS keeps phase 5 `in_progress`, no `done_commit` is
 set and no tag is made: `phase_status.py claim-done 5` runs `gate_check.py --mode done --phase 5` first and refuses until every required
 item of the go-live checklist passes, and eight of those items are sign-offs only Ramin can make.
@@ -15,7 +14,8 @@ item of the go-live checklist passes, and eight of those items are sign-offs onl
 
 NOT CLAIMED. The automated part of the gate is built: the `gate:p5` tests, the `gate-p5` job and its needs (`gate-p4`, `e2e-p5`,
 `i18n-check`, `backup-drill`, `perf-load`, `print-bridge`), and the go-live checklist that `gate_check` reads. One CI row of the
-checklist cannot pass until PR #103 is merged (`uptime-monitor`), and the eight required sign-offs are `WAIT (Ramin)`. The section "What is open" is the whole list.
+checklist waits for the uptime workflow's first green run on `main` (`uptime-monitor`, which needs the repository variable with the
+site's address), and the eight required sign-offs are `WAIT (Ramin)`. The section "What is open" is the whole list.
 
 ## What was built, step by step
 
@@ -122,13 +122,16 @@ Addis Ababa time) and the off-site hook `BACKUP_REMOTE`, built and off. The CI j
 `backup:run`, `backup:drill --keep`, then one Pest process with `--group=gate:p0 --group=gate:p5:restored` (`RestoredLedgerGateTest` on
 the restored copy). `docs/runbook/backup-restore.md`, ADR 0020 proposed. Nothing was run against the live host.
 
-**5.5c `phase-5/ops-status`: open (PR #103), not merged when this is written.** What the plan says it adds: `GET /system/status` and the
-admin System page (polled every 30 s, conditional) with the scheduler heartbeat, the queue depth and the oldest job's age, failed jobs,
-the last backup and drill, the disk used, the devices enrolled and seen in 15 minutes, the rollout flags and whether error tracking is
-on; the hourly `BackupStale` check (M6, M2c); `.github/workflows/uptime.yml` (one `GET /health` every 15 minutes, failing after two
-misses, which emails the repository owner); and `e2e/p5/ops-live.spec.ts` (`@live`, the System page on the live host, the scheduler
-ticked in the last 3 minutes, and once backups have run, the last good backup younger than 26 h and the last drill younger than 8
-days). The PR also carries the listeners of `PrintJobFailed`, `BackupFailed` and `DrillFailed`. STATUS `ops` stays `in_progress`.
+**5.5c `phase-5/ops-status` (PR #103), merged while 5.6b was open.** M6 (four notification types) and M2c (`system.view`, admin).
+`NotifyOps` tells the admins and `system.view` holders of every branch about `BackupFailed`, `BackupStale` and `DrillFailed`
+(critical, in-app and Telegram when on); `NotifyPrintFailed` tells the cashier who asked and the managers on duty. `backup:check-stale`
+runs hourly and raises `BackupStale` once the newest good backup is more than 26 hours old, told once per stale period.
+`GET /system/status` (ETag over the body) answers the release, the migrations, the scheduler (fine while its tick is at most 180 s
+old; the tick is a callback in `schedule:run`'s own process every minute), the queue and failed jobs, the backups and the drill, the
+stored files, the branch's devices (Identity's new `DeviceCensus` contract) and the rollout switches. The admin page `/admin/system`
+shows them in six parts. `.github/workflows/uptime.yml` checks `/health` every 15 minutes against the repository variable
+`DEPLOY_URL` and is skipped while it is unset. `e2e/p5/ops-live.spec.ts` runs in `@live` and in CI's `e2e-p5`; the scheduler's tick
+is enforced on the live site only, and the backup's age once backups have run. STATUS `ops` is `done`.
 
 **5.5d `phase-5/perf-load` (PR #99).** `scripts/perf/load.k6.js` on the CI compose stack, never the live host: 60 devices (34 pads, 12
 KDS, 8 tills, 3 orders boards and 3 shift screens) polling at the web's own cadences, read from `tests/Fixtures/perf/poll-profile.json`
@@ -211,10 +214,10 @@ The phase is **not claimed**. `phase_status.py claim-done 5` refuses until every
   for that step.
 - **The print flow test** (`e2e/p5/print.spec.ts`) still checks the claimed bytes' framing and width only; decoding them with the
   bridge's emulator is left to a later step (5.3b's note).
-- **PR #103 (step 5.5c), open at the time of writing.** Until it is merged, `uptime-monitor` fails (no `uptime.yml`, so no run within a
-  day); `PrintJobFailed`, `BackupFailed` and `DrillFailed` have no listener; STATUS `ops` stays `in_progress`. `live-ops` passes today on
-  the deploy's `live-e2e` job alone; from 5.5c on, that job also runs `ops-live.spec.ts`, which reads the System page and, once the first
-  live drill has run, requires a good backup within 26 h and a passing drill within 8 days.
+- **`uptime-monitor`** passes once `uptime.yml` has run green on `main` within a day of the check; the workflow is skipped until the
+  repository variable `DEPLOY_URL` is set. `live-ops` passes on the deploy's `live-e2e` job, which from 5.5c on also runs
+  `ops-live.spec.ts`: the System page on the live site, the scheduler's tick, and once backups have run, a good backup within 26 h
+  and a passing drill within 8 days.
 - **The live restore drill** records `skipped` until Ramin creates the scratch database and `BACKUP_DRILL_DATABASE` is set in the server
   `.env` (Q8). The off-site hook stays off until Q2 is answered.
 - **D16's fallback (signing from the PC) is not built.** Nothing in the repository can tell such a commit apart from an agent's, so it
@@ -232,8 +235,6 @@ The phase is **not claimed**. `phase_status.py claim-done 5` refuses until every
   - why an order with no number reaches the kitchen rail of the seeded demo bakery is left to the orders owner (5.4a);
   - the receipt settings have a logo switch, but no logo can be added yet (5.3c);
   - `api-arch` runs about 3 400 tests in one process at 2 GB; its groups are split over two jobs if it nears that limit (5.5a);
-  - the handbook pages `printer.md` and `system-page.md` describe steps 5.3b and 5.5c, which are not merged; they are checked against the
-    build when those steps land.
 - **Phase 4 gaps carried**, unchanged by Phase 5:
   - display-case products made in the house have no cost of sales, and modifier recipe deltas are not costed (D6: after go-live unless
     Ramin picks a fix: Orders snapshots the recipe version on display-case lines, or Production values its batch output);
@@ -300,7 +301,7 @@ Every sign-off verifier reads `docs/go-live/signoffs/<item>.md`.
 Outside the checklist:
 
 - [ ] Create the scratch database for the live restore drill and set `BACKUP_DRILL_DATABASE` in the server `.env` (Q8); `live-ops`
-      depends on it once PR #103 is merged.
+      depends on it (`ops-live.spec.ts`).
 - [ ] Choose whether a sign-off may also be committed from the PC (D16's fallback, not built).
 - [ ] Decide the display-case COGS gap (D6) when convenient.
 - [ ] If `perf-load` turns flaky across runner generations: a larger runner (paid) or fewer devices per job.

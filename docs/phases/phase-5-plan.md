@@ -1002,7 +1002,8 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        answer each time, with no new stock movement or audit row; (4) the checklist parses (schema 1, phase 5, ids unique) and **every
        verifier type resolves**: it is one of `VERIFIER_TYPES` in `scripts/gate_check.py`, the schema allows exactly those, a `script`
        verifier's program is in the repository and a sign-off names its one file. Whether a named job or workflow exists is left to
-       `gate_check`'s own rows, so the test does not wait for `print-bridge` (PR #101) or `uptime.yml` (PR #103).
+       `gate_check`'s own rows, so the test never waited for `print-bridge` (PR #101) or `uptime.yml` (PR #103), both merged while
+       this step was open.
      - **The `gate-p5` job** needs `status`, `gate-p4`, `e2e-p5`, `i18n-check`, `backup-drill`, `perf-load` and `print-bridge` (the
        last from 5.3b, kept by the merge of main; 25 minutes; 5.6a's
        `permissions` and `GH_TOKEN` kept). It loads the image, starts the stack, copies `docs/` and `scripts/` into the container (the
@@ -1017,8 +1018,14 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        button and its states, the setup through Add a print bridge, and that the local mode still needs the website, so nothing prints
        while the till is offline). ADR 0019's note covers 5.3b too. The 5.5d note above spelled the
        phase marker, which the done gate's marker row would count; it is reworded.
-     - **STATUS**: `docs` `done`; `i18n` stays `in_progress` (5.4b waits for the reviewer). The phase is not claimed and nothing is
-       tagged: `claim-done 5` refuses while Ramin's sign-offs wait (10.3).
+     - **Merges**: main was merged in twice, with ordinary commits: after 5.3b (`gate-p5` keeps both `perf-load` and `print-bridge`)
+       and after 5.5c (ADRs 0017, 0020 and 0021, `backups.md` and the report then describe the System page, the alerts and the uptime
+       workflow as built). Every build step is merged but this one; 5.4b waits for the reviewer.
+     - **A trap met**: `Phase5SeederTest` first wrote `$devices->except('demo-bridge-1')` on a collection keyed by fingerprint. An
+       Eloquent collection's `except()` takes model ids, not the collection's keys, so it removed nothing and `mod-shifts` failed (run
+       41440931690). The test now lists the devices that hold a token and expects the bridge alone (D20).
+     - **STATUS**: `docs` `done`, beside `ops` and `print-bridge` `done` from their steps; `i18n` stays `in_progress` (5.4b waits for the
+       reviewer). The phase is not claimed and nothing is tagged: `claim-done 5` refuses while Ramin's sign-offs wait (10.3).
 
 ## 7. Test list and CI
 
