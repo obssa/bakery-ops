@@ -129,11 +129,13 @@ describe('when the printer cannot print', () => {
 
   it('prints again once the paper is back', async () => {
     const { api, printer, bridge } = await rig({ printerMode: 'paper_out' });
+    // the paper is back from the second connection on: turning it back from the test raced the bridge, and on a slow runner the job
+    // used up its three tries (and stayed failed) before the test saw the first failure
+    Object.defineProperty(printer, 'mode', { get: () => (printer.connections.length <= 1 ? 'paper_out' : 'ready'), configurable: true });
     const id = api.addJob({ bytes: receipt() });
     await bridge.start();
-    await waitFor(() => api.jobs.get(id).failures.length === 1);
-    printer.mode = 'ready';
     await waitFor(() => api.jobs.get(id).status === 'printed');
+    assert.deepEqual(api.jobs.get(id).failures, ['paper_out']);
     assert.equal(printer.jobs.length, 1);
   });
 
