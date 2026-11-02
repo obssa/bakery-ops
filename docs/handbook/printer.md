@@ -4,7 +4,7 @@
 
 The website cannot reach a printer in the shop by itself. A small program, the **bridge**, runs on a computer in the shop. It asks
 the server for receipts to print, and sends them to the printer (plan 10.2 D11). The printer can be on the network (port 9100), a
-Windows shared printer, or a USB device. The paper is 80 mm by default, or 58 mm (receipt settings).
+Windows shared printer, or a USB device. The paper is 80 mm by default, or 58 mm: Admin > Payments > Receipts.
 
 ## Setting it up (once)
 
@@ -15,8 +15,14 @@ bilingual receipt with the right TIN.
 
 ## Every day
 
-- After payment, the till offers **Print**. The order record shows the job's state: queued, printing, printed or failed.
-- If a job fails, or no bridge is online, the till shows the receipt link and its QR code, so the customer can scan it instead.
+- After payment, the receipt on the till's pay sheet, on the order record and in the refund dialog has a **Print receipt** button
+  (ደረሰኙን አትም). One press prints one copy. While the printer works the button waits, and the line under it reads "Waiting for the
+  printer…", then "Printing…", then "Printed."; the button then reads **Print again**.
+- If the printer reports a problem, the line reads "Not printed:" and the reason (paper out, printer offline, cover open), or "Not
+  printed: the receipt waited too long". The till then shows the receipt link and its QR code by itself, so the customer can scan it
+  instead. It does the same when no bridge is online.
+- Printing needs a connection: while the till is offline the button says "Needs a connection". The bridge's local mode (see the
+  runbook) is the way to print while the internet is down.
 - The receipt says, in both languages, that it is a customer receipt and **not a fiscal receipt** (Q9). The shop's own sales
   register, if it has one, stays the fiscal record.
 
