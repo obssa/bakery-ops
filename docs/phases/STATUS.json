@@ -190,8 +190,8 @@
       "report": "docs/phases/phase-5-report.md",
       "gate_job": "gate-p5",
       "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/41492437547",
-      "done_commit": "3a3a8562c7e4527aec99c39db5a06415dc0a37af",
-      "done_at": "2026-11-02T19:26:52Z",
+      "done_commit": "d07db7d7417bff8f526d7777c94b1ec0dc866fd0",
+      "done_at": "2026-11-02T21:00:21Z",
       "adrs": [
         "0017-device-enrolment-and-enforcement",
         "0018-offline-outbox-and-conflicts",

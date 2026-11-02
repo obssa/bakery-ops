@@ -213,7 +213,10 @@ phase taught.
 ## What is open
 
 The phase is **claimed**: `phase_status.py claim-done 5` on 2026-11-02 at `3a3a856` with gate-p5 run 41492437547, tag
-`phase-5-complete`. Ramin's go-live decisions of 2026-11-02 are in the plan's dated note. What stays open after the claim:
+`phase-5-complete`. **Restated on 2026-11-03 at `d07db7d`**: the go-live settings of PR #106 (the receipt-printing switch, On call,
+the manual backup download) carry Ramin's go-live decisions of 2026-11-02 and belong to the phase, but they were still in CI when the
+claim was made, and the strict gate freezes app code after `done_commit`. The phase was set back to `gate_pending` and claimed again at
+PR #106's last code commit, after the same local gate re-check; the tag `phase-5-complete` stays on `3a3a856`, the first claim. Ramin's go-live decisions of 2026-11-02 are in the plan's dated note. What stays open after the claim:
 
 - **Amharic corrections later**: step 5.4b was closed by Ramin on 2026-11-02 without a reviewer pass. If a reviewer fills the sheet
   later, `i18n_import.py` applies it in a PR of its own. The 5 possibly unused keys and the 12 Latin words of the report stay as they
