@@ -796,7 +796,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        compose stack too): there the heartbeat is not enforced (that stack runs no scheduler); on the live site it is. The "not configured
        yet" cases are test annotations. `ops-logic.spec.ts` pins the reading.
      - **Live database.** M6 changes only the CHECK of `notifications` (no row is written or changed); M2c inserts the `system.view` row in
-       `permissions` and its admin grant in `role_has_permissions`. `ops` stays `in_progress` until 5.5d merges.
+       `permissions` and its admin grant in `role_has_permissions`. `ops` stays `in_progress` until 5.5d merges; 5.5d merged first (8ec9452), so the merge of main into this branch sets `ops` `done`.
    - **5.5d `phase-5/perf-load`** (`ops` `done`). `scripts/perf/load.k6.js` on the CI compose stack (never the live host): 60 devices
      (34 pads, 12 KDS, 8 tills, 6 admin and shift screens) polling at the web app's own cadences with `If-None-Match`, and a burst of
      300 orders in 10 minutes, each sent, accepted, made ready, served and paid (a quarter by photo channels with a small fixture photo).
