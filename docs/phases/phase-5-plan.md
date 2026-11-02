@@ -669,9 +669,11 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        interval after each answer, as the web's poll transport does. A threshold `orders_paid == 300` and `dropped_iterations == 0` sit
        beside the plan's three. The arrival schedule stops at 598 s: a duration of exactly 600 s starts a 301st order, which the first
        run showed.
-     - **The server**: the image's `artisan serve` answers one request at a time, so `compose.perf.yml` runs it with
-       `PHP_CLI_SERVER_WORKERS=8` and `--no-reload` (Laravel ignores the variable without it). The live host runs LiteSpeed, so the
-       k6 figures describe the code under load and the poll budget describes the host.
+     - **The server**: the image's `artisan serve` answers one request at a time and, being the CLI, runs without OPcache. So
+       `compose.perf.yml` starts PHP's built-in server on Laravel's own router file with `PHP_CLI_SERVER_WORKERS=8` and OPcache on
+       (timestamps unchecked), and the job runs `php artisan optimize` before k6, as `scripts/deploy/release.sh` does on the live host
+       (`optimize:clear` before the after-checks, so Pest reads `phpunit.xml`). The live host runs LiteSpeed, so the k6 figures
+       describe the code under load and the poll budget describes the host.
      - **The after-checks** are the group `perf:load` (`tests/Gate/LoadRunGateTest.php`), run in the app container once the queue
        has drained (`Queue::size()` through tinker). The checks: exactly 300 orders after the id noted before the run, all closed and
        settled; 225 paid in cash and 75 by Telebirr, each with a photo; `ledgerOracle()` of `tests/Support/helpers.php`
@@ -683,9 +685,14 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        state 20. The longest of them measured 7 minutes (`api-arch`, main run 41363303323). The same was done in the skill's
        `assets/ci/ci.yml`, which also carries `perf-load`.
      - **STATUS**: `ops` stays `in_progress`, because 5.5b (PR #94) and 5.5c are not merged.
-     - **First measured run** (PR #99, while the job still skipped `mod-analytics`): polls p50 76 ms and p95 206 ms, writes p50
-       111 ms and p95 265 ms, no failed request of 44 018 (60.9 a second, against the profile's 59.8 for polls alone), the ledger
-       reconciled over 125 item-locations, no failed job, 14 minutes for the job.
+     - **Measured runs** (PR #99). Without OPcache or the caches: polls p95 206 ms on one runner and 351 ms on a slower one (that
+       run failed the threshold; writes 265 and 393 ms, no failed request either time). With them (run 41388083454): polls p50 65 ms
+       and p95 171 ms, writes p50 92 ms and p95 230 ms (the slowest step, the send, 297 ms), no failed request of 44 233 (61.2 a
+       second, against the profile's 59.8 for polls alone), 300 orders closed (225 cash, 75 Telebirr with a photo), the ledger
+       reconciled over 125 item-locations, no failed job. The job took 14.5 minutes, with the seed of 8 days played in 52 s.
+       **Left open**: how the poll threshold behaves across GitHub's runner generations. The 4-core runner is close to busy at 61
+       requests a second, and one slow runner moved p95 by 70 %. If `perf-load` turns flaky, the choices are a larger runner (paid,
+       Ramin's call) or fewer devices per job; the plan's thresholds are kept as written.
      - **For 5.6b**: `gate-p5` gains `perf-load` in its needs and the manifest's `extra_ci_jobs` lists it. `Phase5Seeder` gets the demo
        devices beside `LOAD_DEVICES`. `LoadRunGateTest` may switch to `LedgerOracle::check` once 5.5b is on main.
 6. **5.6 docs** (STATUS `docs`), two PRs.
