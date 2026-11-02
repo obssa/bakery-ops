@@ -101,6 +101,13 @@ jobs:
         options: --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 30
     steps:
       - uses: actions/checkout@v4
+        # full history: --signoffs reads every commit that touched docs/go-live/signoffs/ (phase-5 plan 10.3)
+        with: { fetch-depth: 0 }
+      # go-live sign-offs are made only in GitHub's web editor: a PR carrying a local commit in that folder fails here
+      - name: Sign-offs only from the web editor
+        run: python3 scripts/check_invariants.py --signoffs
+      - name: The go-live checklist and how gate_check reads it (step 5.6a)
+        run: python3 -m unittest discover -s scripts/tests -p "test_gate_checklist.py" -v
       - uses: ./.github/actions/setup-api
       - name: Route list
         working-directory: apps/api
@@ -744,9 +751,13 @@ jobs:
     if: fromJSON(needs.status.outputs.phase) >= 5
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # the go-live checklist (step 5.6a) reads the Actions API (live-ops, uptime-monitor) and main's required checks
+    permissions: { contents: read, actions: read }
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
-        # no app code changed after it, which a shallow clone cannot answer
+        # no app code changed after it, which a shallow clone cannot answer; the sign-off rows read who committed each file
         with: { fetch-depth: 0 }
-      - run: python3 scripts/gate_check.py --mode done --phase 5 --ci
+      - name: gate_check (with the go-live checklist)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: python3 scripts/gate_check.py --mode done --phase 5 --ci

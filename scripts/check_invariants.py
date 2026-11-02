@@ -4,6 +4,7 @@
   check_invariants.py --all [--routes apps/api/tmp/routes.json] [--strict-i18n]
   check_invariants.py --numeric | --branch-id | --bilingual | --append-only | --idempotency | --i18n
   check_invariants.py --selftest        # plants violations in a temp dir and asserts each is caught
+  check_invariants.py --signoffs        # needs the full history (fetch-depth: 0); not part of --all
 
 What each check does (details in references/invariants.md):
   numeric      migrations: no float/double/real columns; money columns decimal(12,2); qty columns decimal(14,4);
@@ -15,6 +16,9 @@ What each check does (details in references/invariants.md):
                auth:sanctum + a permission/can middleware unless in the public allowlist; a read-like write (a write
                method that writes nothing, READ_LIKE_WRITES) needs no idempotency but keeps auth + permission
   i18n         apps/web/messages/en.json and am.json have identical key sets (am may hold __TODO__ unless --strict-i18n)
+  signoffs     every commit that touched docs/go-live/signoffs/ was made in GitHub's web editor (committer
+               GitHub <noreply@github.com>) and nothing there is left uncommitted: only Ramin signs go-live items, in the
+               browser; agents never write in that folder (phase-5 plan 10.3, D16)
 Exit 0 clean, 1 violations, 2 usage.
 """
 from __future__ import annotations
@@ -24,6 +28,7 @@ import glob
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -249,6 +254,40 @@ def check_i18n(root: str, f: Findings, strict: bool) -> None:
                 f.add("i18n", f"am.json {k} still __TODO__ (strict mode, Phase 5)")
 
 
+SIGNOFF_DIR = "docs/go-live/signoffs"
+WEB_EDITOR_COMMITTER = ("GitHub", "noreply@github.com")
+
+
+def check_signoffs(root: str, f: Findings) -> None:
+    def git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", *args], cwd=root, text=True, encoding="utf-8", errors="replace", capture_output=True)
+
+    try:
+        inside = git("rev-parse", "--is-inside-work-tree")
+    except OSError:
+        f.add("signoffs", "git is not available: the check reads the history")
+        return
+    if inside.returncode != 0 or inside.stdout.strip() != "true":
+        f.add("signoffs", "not a git work tree: the check reads the history")
+        return
+    if git("rev-parse", "--is-shallow-repository").stdout.strip() == "true":
+        f.add("signoffs", "shallow clone: check out with fetch-depth: 0 so every commit that touched the folder is read")
+        return
+    log = git("log", "--format=%H%x09%cn%x09%ce", "--", SIGNOFF_DIR)
+    if log.returncode != 0:
+        f.add("signoffs", f"git log failed: {(log.stderr or '').strip()[:200]}")
+        return
+    for line in log.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3 and (parts[1], parts[2]) != WEB_EDITOR_COMMITTER:
+            f.add("signoffs", f"commit {parts[0][:12]} (committer {parts[1]}) touches {SIGNOFF_DIR}/: sign-offs are made only in "
+                              "GitHub's web editor and agents never write there; drop the commit from the branch")
+    pending = git("status", "--porcelain", "--untracked-files=all", "--", SIGNOFF_DIR)
+    for line in pending.stdout.splitlines():
+        if line.strip():
+            f.add("signoffs", f"uncommitted change in {line[3:]}: sign-offs are made only in GitHub's web editor")
+
+
 def selftest() -> int:
     tmp = tempfile.mkdtemp(prefix="bakery-invariants-")
     mig = os.path.join(tmp, "apps", "api", "database", "migrations")
@@ -320,7 +359,7 @@ Schema::create('stock_movements', function (Blueprint $t) {
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    for flag in ("all", "numeric", "branch-id", "bilingual", "append-only", "idempotency", "i18n", "selftest"):
+    for flag in ("all", "numeric", "branch-id", "bilingual", "append-only", "idempotency", "i18n", "selftest", "signoffs"):
         ap.add_argument(f"--{flag}", action="store_true")
     ap.add_argument("--routes")
     ap.add_argument("--strict-i18n", action="store_true")
@@ -342,6 +381,7 @@ def main(argv: list[str]) -> int:
     if a.all or a.idempotency:
         if check_idempotency(root, f, a.routes): run.append("idempotency")
     if a.all or a.i18n: check_i18n(root, f, a.strict_i18n); run.append("i18n")
+    if a.signoffs: check_signoffs(root, f); run.append("signoffs")
     if not run:
         ap.error("choose a check or --all")
     return f.report(run)
