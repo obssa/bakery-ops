@@ -674,6 +674,54 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      admin): the System page renders and the scheduler ticked in the last 3 minutes; once backups have run, the last good backup is
      younger than 26 h and the last drill younger than 8 days and `ok` (until the first drill has run the spec reports "not configured
      yet" without failing, then it enforces).
+   - **As built (step 5.5c, `phase-5/ops-status`).** Tests red first, then M6, M2c and the listeners, then the status read, then the page,
+     then the uptime workflow and the docs. Where the code chose what the plan left open:
+     - **M6 is `2026_11_11_100700_extend_notification_types_for_ops`** (the CHECK only: the sixteen types before it and the four new ones; its
+       `down()` deletes the four types' lines first) and **M2c `2026_11_11_100800_grant_phase_5_ops_permissions`** (`system.view`, admin).
+       `OpsMigrationsTest` never runs M6's `down()`: DDL commits on MariaDB inside the test's transaction.
+     - **Who hears the host's alerts.** `BackupFailed`, `BackupStale` and `DrillFailed` have no branch, so `NotifyOps` tells the active admins
+       and holders of `system.view` of **every** branch, each in their own branch's inbox, running as nobody (on the live host that includes
+       the admins of the demo and E2E branches). Severity critical, channels `in_app` and `telegram` (DriverRegistry sends by Telegram only
+       with the driver on and its keys set), inbox keys `backup_failed:{run}`, `backup_stale:{run}`, `drill_failed:{run}`; every line opens
+       `/admin/system`. The failure key is written as it is in the body: it is the line of `backup-restore.md` that says what to do.
+     - **The stale check.** `backup:check-stale` (`App\Ops\Backup\StaleCheck`), hourly at :15 with `withoutOverlapping`, reads `ops_runs`
+       only: stale once the newest `ok` backup finished more than `backup.stale_hours` (26, in `config/backup.php`, no env) ago. The stale
+       period is named by that run (`run_id`), or 0 while no backup has ever ended ok, counted from the first backup tried; before any backup
+       was tried nothing is stale (the heartbeat shows a scheduler that never ran). The check raises `BackupStale` every hour the period lasts,
+       and "once per period" is Notifications' delivery gate `backup_stale:{run}` (the stock alerts' one-insert claim, ADR 0011) with the
+       inbox key: a job lost in the queue heals within the hour and nobody is told twice. Its key `backup.stale` is in the runbook.
+     - **"The managers on shift"** for `NotifyPrintFailed`: the managers among `Recipients::onDuty` of every station of the branch (the
+       running shifts' rosters), or every active manager when none is on duty, besides the cashier who asked (`byIds`). `PrintJobFailed`
+       carries no station and Notifications reads nothing of Payments, so it is not limited to the till's roster. `print_failed` is
+       warning, inbox only, `print_failed:{job}`, opens `/till`; the reason is worded (`notifications.print_failure.*`; a key Payments adds
+       later reads as "a problem"); a job without an order number gets the unnumbered title.
+     - **`GET /system/status`** (`App\Ops\Http\SystemStatusController`, `routes/modules/ops.php` loaded by `OpsServiceProvider`; registered
+       with module `shared` in `route_permissions.php`, since App\Ops has no module job, and as a non-station route). The ETag is taken over
+       the body (`ConditionalPoll::etag('system.status', ...)`): the body is a few indexed counts and a listing of some 30 files, and the
+       heartbeat moves the tag about once a minute. Field by field (`App\Ops\Status\SystemStatus`): `app.commit` from the `REVISION` file
+       (hex only), `released_at` its mtime, `migrations` the rows of the migrations table; `scheduler.ok` while the tick is at most 180 s old;
+       `queue` reads the `jobs` table when the default connection's driver is `database` (pending, the oldest `created_at`), otherwise the
+       driver's size and a null age, and `failed_jobs` for `failed_24h` and `failed_total` (30 days, D7); `backups.last_ok_at` and `bytes`
+       from the newest `ok` backup run, `last_status` from the newest backup run of any status, `age_h` whole hours, `kept` the good dumps
+       and `disk_used_mb` the dumps and manifests (the hard-linked snapshots cost nothing), read only when the folder already exists
+       (`BackupConfig::existingFolder`: a read creates nothing); `drill.last_at` its `finished_at` (or `started_at` while running);
+       `files.used_mb` the stored files of every branch (one disk), deleted ones left out; `devices` the branch's own through a new
+       Identity contract, `DeviceCensus::count()` with its `DeviceCount` view (enrolled: not revoked; seen: not revoked and seen in 900 s;
+       revoked); `flags` `require_enrolled_device`, `require_shift_for_cash`, `require_shift_for_station_locations`,
+       `open_ad_hoc_on_accept`. Sizes are whole MiB rounded half up from integer bytes.
+     - **The heartbeat** is `Schedule::call(new SchedulerTick)` every minute, named `ops.scheduler.tick`: a callback in `schedule:run`'s
+       own process (no second PHP process a minute on the shared host) that puts the UTC time in the cache for a day.
+     - **The page** (`/admin/system`, `RequireAuth` `system.view`, a System tab and an overview card for its holders): Scheduler, Backups
+       with the restore drill inside it, Background jobs, Tablets and devices, Rollout switches, Release. `lib/system.ts` holds the reading
+       the page and the specs share: `skipped` and no drill read "Not configured yet", an `ok` drill older than 8 days reads "old", a backup
+       older than 26 h "Too old". The commit and any switch the page does not name yet are marked `translate="no"`.
+     - **`uptime.yml`** reads `vars.DEPLOY_URL` with no fallback (the job is skipped while it is unset), with a cache-busting query like
+       the deploy smoke, and checks `status` and `database` are both `ok`.
+     - **`ops-live.spec.ts` also runs in CI's e2e-p5** (the `p5-device` project, now `/device|print|ops/`, runs its `@live` specs on the
+       compose stack too): there the heartbeat is not enforced (that stack runs no scheduler); on the live site it is. The "not configured
+       yet" cases are test annotations. `ops-logic.spec.ts` pins the reading.
+     - **Live database.** M6 changes only the CHECK of `notifications` (no row is written or changed); M2c inserts the `system.view` row in
+       `permissions` and its admin grant in `role_has_permissions`. `ops` stays `in_progress` until 5.5d merges.
    - **5.5d `phase-5/perf-load`** (`ops` `done`). `scripts/perf/load.k6.js` on the CI compose stack (never the live host): 60 devices
      (34 pads, 12 KDS, 8 tills, 6 admin and shift screens) polling at the web app's own cadences with `If-None-Match`, and a burst of
      300 orders in 10 minutes, each sent, accepted, made ready, served and paid (a quarter by photo channels with a small fixture photo).
