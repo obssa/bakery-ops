@@ -119,6 +119,7 @@ own error text is in `storage/logs` (`ops: mysqldump failed`, `ops: mysql failed
 | `drill.chain_broken` | a restored hash chain is broken (`detail.chains.first_broken`) | as for a live break (docs/runbook/server.md, "When the chain reports a break") |
 | `drill.triggers_missing` / `drill.trigger_silent` | the restored copy lacks an append-only trigger, or it does not refuse | the dump lost them: check the live database's triggers |
 | `drill.row_counts` | a restored table's rows differ from the manifest (`detail.rows.off`) | the dump is not the night the manifest describes |
+| `backup.stale` | (step 5.5c, not a run's key: the hourly `backup:check-stale`) the newest good backup is older than 26 hours, or none has ended ok more than 26 hours after the first try | find the failed nights above; run `php artisan backup:run` by hand once the cause is fixed. Each admin is told once per stale period |
 
 ## Off-site copy (off)
 
