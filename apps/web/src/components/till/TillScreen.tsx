@@ -6,6 +6,7 @@ import type { Order } from "@/lib/api/types";
 import { createQueueFeed, queueOf } from "@/lib/live/orders";
 import { createMenuFeed } from "@/lib/live/pad";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
+import { onReconnect } from "@/lib/reconnect";
 import { useSession } from "@/lib/session";
 import { OrderingSurface } from "../pad/OrderingSurface";
 import { usePadOutcomes, useReleaseStaleSends } from "../pad/outcomes";
@@ -49,6 +50,8 @@ export function TillScreen() {
   const payBlocked = block === null ? null : t(block === "no_shift" ? "pay_blocked_no_shift" : "pay_blocked_not_open");
 
   const queueFeed = useMemo(() => createQueueFeed(branchId), [branchId]);
+  // reconnect reconcile (step 5.2c): back online, or visible again after a gap, the queue is read again from the start
+  useEffect(() => onReconnect(() => queueFeed.reload()), [queueFeed]);
   const menuFeed = useMemo(() => createMenuFeed(branchId), [branchId]);
   const queue = useLiveFeed(queueFeed);
   const menu = useLiveFeed(menuFeed);

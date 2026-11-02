@@ -8,8 +8,8 @@ import { onOutboxApplied, useOutbox, type OutboxFailure } from "@/lib/outbox/sto
 
 // What happened to the sends this pad queued, put back where the waiter looks: a refused send lands on the cart (the
 // shortfall on its exact line, another refusal on the line it names), an accepted one finishes the cart. The outbox
-// reports both, whichever screen of the pad is open (this hook lives above the tabs), and the shell strip stays quiet
-// about the pad sends (`inline`).
+// reports both, whichever screen of the pad is open (this hook lives above the tabs). Since step 5.2c the refusal also stays in the
+// conflict tray until the order is sent again from the cart (which supersedes it) or discarded there; it is put on the cart once.
 
 function refusalOf(error: ApiError): Refusal {
   return { key: error.key, message_en: error.messages.en ?? error.key, message_am: error.messages.am ?? error.messages.en ?? error.key };
@@ -44,12 +44,17 @@ export function cartAfterRefusal(cart: Cart, error: ApiError): Cart {
   return { ...base, error: refusalOf(error) };
 }
 
+/** The refusals already put on a cart (by write and time), so a cart the waiter is fixing is not reset by the next change of the list. */
+const handled = new Set<string>();
+
 function handle(failure: OutboxFailure) {
   if (!failure.inline || !failure.subjectUuid) return false;
+  const seen = `${failure.id}@${failure.at}`;
+  if (handled.has(seen)) return false;
+  handled.add(seen);
   const { carts, update } = useCarts.getState();
   const owner = Object.entries(carts).find(([, cart]) => cart.orderUuid === failure.subjectUuid);
   if (owner) update(Number(owner[0]), (cart) => cartAfterRefusal(cart, failure.error));
-  useOutbox.getState().dismissFailure(failure.id);
   return true;
 }
 

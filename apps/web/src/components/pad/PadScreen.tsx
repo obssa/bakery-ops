@@ -9,6 +9,7 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import type { Menu } from "@/lib/api/types";
 import type { FeedSnapshot } from "@/lib/live/feed";
 import type { OrdersState } from "@/lib/live/pad";
+import { onReconnect } from "@/lib/reconnect";
 import { useSession } from "@/lib/session";
 import { PageHeader } from "../ui";
 import { focusRing } from "../styles";
@@ -153,6 +154,8 @@ export function PadScreen() {
 
   // the feeds: the waiter own orders while a waiter has the pad, the menu for the screen
   const ordersFeed = useMemo(() => (user ? createOrdersFeed(user.id) : null), [user]);
+  // reconnect reconcile (step 5.2c): back online, or visible again after a gap, the waiter's list is read again from the start
+  useEffect(() => onReconnect(() => ordersFeed?.reload()), [ordersFeed]);
   const menuFeed = useMemo(() => createMenuFeed(branchId), [branchId]);
   const orders = useLiveFeed(ordersFeed);
   const menu = useLiveFeed(menuFeed);

@@ -56,6 +56,8 @@ export class LiveFeed<Page, State> {
   private etag: string | null = null;
   private running = false;
   private again = false;
+  /** the next look starts from scratch (reload) */
+  private fresh = false;
 
   constructor(
     private readonly source: FeedSource<Page>,
@@ -98,6 +100,15 @@ export class LiveFeed<Page, State> {
     else void this.poll();
   }
 
+  /**
+   * Look again from the start (step 5.2c, reconnect reconcile): the whole list without the cursor and the ETag, and its answer replaces
+   * the state instead of being merged into it. The pad and the till call it after the tablet was offline or hidden for a while.
+   */
+  reload(): void {
+    this.fresh = true;
+    this.refresh();
+  }
+
   /** One look. Never two requests in flight for one feed: a call during a look waits for it and looks once more. */
   poll(): Promise<PollResult> {
     if (this.inFlight) {
@@ -117,8 +128,10 @@ export class LiveFeed<Page, State> {
   private async look(): Promise<PollResult> {
     this.abort = new AbortController();
     const { signal } = this.abort;
+    const fresh = this.fresh;
+    this.fresh = false;
     try {
-      const result = await this.source.fetchPage({ cursor: this.snapshot.cursor, etag: this.etag, signal });
+      const result = await this.source.fetchPage({ cursor: fresh ? null : this.snapshot.cursor, etag: fresh ? null : this.etag, signal });
       if (signal.aborted) return "stopped";
       if (result.etag) this.etag = result.etag;
       if (result.notModified) {
@@ -127,7 +140,7 @@ export class LiveFeed<Page, State> {
       }
       const page = result.data;
       this.set({
-        state: this.spec.merge(this.snapshot.state, page),
+        state: this.spec.merge(fresh ? this.spec.initial : this.snapshot.state, page),
         cursor: this.spec.cursorOf(page) ?? this.snapshot.cursor,
         loaded: true,
         error: null,
@@ -136,6 +149,8 @@ export class LiveFeed<Page, State> {
       });
       return "changed";
     } catch (error) {
+      // a reload that failed is tried again by the next look
+      if (fresh) this.fresh = true;
       if (signal.aborted) return "stopped";
       this.set({ error, failures: this.snapshot.failures + 1 });
       return "failed";
