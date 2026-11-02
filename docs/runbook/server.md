@@ -606,7 +606,7 @@ page, or `uptime` in the Terminal), the first lever is fewer tablets left on scr
 enrolled and polling with `If-None-Match`, while 300 orders go from pad to till in 10 minutes (a quarter paid by Telebirr with a photo),
 with device enforcement on. It fails when polls take more than 300 ms at p95, writes more than 800 ms at p95, more than 0.5 % of requests
 fail, or afterwards the orders, the ledger or `failed_jobs` are not what the run should have left. Its figures are in the job's step
-summary. The CI server is PHP's built-in one with 8 workers on a 4-core runner, not LiteSpeed, so they describe the code under load,
+summary; the first run (PR #99) measured polls p95 206 ms, writes p95 265 ms and no failed request of 44 018 (61 a second). The CI server is PHP's built-in one with 8 workers on a 4-core runner, not LiteSpeed, so they describe the code under load,
 not this host.
 
 ## Manual operations
