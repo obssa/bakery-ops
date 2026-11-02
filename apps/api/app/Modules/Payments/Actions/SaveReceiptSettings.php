@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
  * receipt_settings.update with before and after. The row is created by the first save: a no-op insert (INSERT IGNORE / ON CONFLICT DO
  * NOTHING) makes sure it exists before it is locked, so two first saves never lock a missing row (traps.md, "First-row race") and the second
  * simply overwrites the first. Taken out of ReceiptSettingsController in step 4.6a so the demo seed saves the demo's settings the same way.
+ * The paper and the logo switch (step 5.3c) change only when the form carries them; a first save without them keeps M4's defaults.
  */
 final class SaveReceiptSettings
 {
@@ -26,7 +27,7 @@ final class SaveReceiptSettings
     ) {}
 
     /**
-     * @param  array{business_name_en: string, business_name_am: string, address_en: string|null, address_am: string|null, phone: string|null, tin: string|null, footer_en: string|null, footer_am: string|null, show_amharic: bool, ethiopian_dates: bool}  $settings
+     * @param  array{business_name_en: string, business_name_am: string, address_en: string|null, address_am: string|null, phone: string|null, tin: string|null, footer_en: string|null, footer_am: string|null, show_amharic: bool, ethiopian_dates: bool, paper_width_mm?: int, print_logo?: bool}  $settings
      */
     public function handle(array $settings): ReceiptSettings
     {
