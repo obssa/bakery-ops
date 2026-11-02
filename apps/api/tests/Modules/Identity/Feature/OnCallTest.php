@@ -46,7 +46,7 @@ it('shows whether each person is on call in the people list, and on /me', functi
         ->and($rows[$cashier->id]['on_call'])->toBeTrue()
         ->and($rows[$this->admin->id]['on_call'])->toBeFalse();
     loginAs($cashier);
-    $this->getJson('/api/v1/me')->assertOk()->assertJsonPath('on_call', true);
+    $this->getJson('/api/v1/me')->assertOk()->assertJsonPath('user.on_call', true);
 });
 
 it('puts a person on call and takes them off again, each an audited user.update with before and after', function () {

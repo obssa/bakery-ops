@@ -89,7 +89,7 @@ it('creates the branch\'s row on the first save, and the till reads it back', fu
     $response = ($this->put)($this->form);
 
     $response->assertOk();
-    expect($response->json())->toBe($this->form + ['is_default' => false]);
+    expect($response->json())->toBe($this->form + ['printing_enabled' => true, 'is_default' => false]);
     $row = DB::table('receipt_settings')->sole();
     expect($row->branch_id)->toBe($this->branch->id)
         ->and($row->created_by_user_id)->toBe($this->admin->id)
