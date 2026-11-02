@@ -6,6 +6,7 @@ use App\Modules\Identity\Models\Device;
 use App\Ops\Backup\BackupFolder;
 use App\Ops\Backup\Manifest;
 use App\Ops\Models\OpsRun;
+use App\Ops\Status\SystemStatus;
 use App\Shared\Models\Branch;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\CallbackEvent;
@@ -249,10 +250,26 @@ it('is a conditional read: the same status answers 304 with no body, a new backu
         ->and($changed->json('backups.bytes'))->toBe(2097152);
 });
 
-it('names the release: the migrations that ran, and no commit outside a release', function () {
+it('names the release from the REVISION file the deploy writes: its commit and when, and the migrations that ran', function () {
+    $revision = $this->folder.'/REVISION';
+    app()->when(SystemStatus::class)->needs('$revisionFile')->give($revision);
+    file_put_contents($revision, "0123abcd4567ef89\n");
+    touch($revision, CarbonImmutable::parse('2026-11-19 22:10:00', 'UTC')->getTimestamp());
+
     expect(($this->status)()->json('app'))->toBe([
-        'commit' => null,
-        'released_at' => null,
+        'commit' => '0123abcd4567ef89',
+        'released_at' => '2026-11-19T22:10:00Z',
         'migrations' => DB::table('migrations')->count(),
     ]);
-})->skip(fn (): bool => is_file(base_path('REVISION')), 'a release folder has a REVISION');
+});
+
+it('names no commit outside a release, nor from a REVISION that holds anything but a commit', function () {
+    $revision = $this->folder.'/REVISION';
+    app()->when(SystemStatus::class)->needs('$revisionFile')->give($revision);
+    $none = ['commit' => null, 'released_at' => null, 'migrations' => DB::table('migrations')->count()];
+
+    expect(($this->status)()->json('app'))->toBe($none);
+
+    file_put_contents($revision, "release of the night, see /home/somebody\n");
+    expect(($this->status)()->json('app'))->toBe($none);
+});

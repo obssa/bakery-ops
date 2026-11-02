@@ -36,9 +36,11 @@ final class SystemStatus
 {
     private const int MIB = 1048576;
 
+    /** $revisionFile: the file the deploy writes the release's commit in; empty means the app's own REVISION (a test names another). */
     public function __construct(
         private readonly BackupConfig $backups,
         private readonly DeviceCensus $devices,
+        private readonly string $revisionFile = '',
     ) {}
 
     /**
@@ -76,7 +78,8 @@ final class SystemStatus
      */
     private function app(): array
     {
-        $file = base_path('REVISION');
+        $file = $this->revisionFile !== '' ? $this->revisionFile : base_path('REVISION');
+        clearstatcache(true, $file); // a deploy replaces the file under a long-lived worker
         $revision = is_file($file) ? trim((string) file_get_contents($file)) : '';
         $commit = preg_match('/^[0-9a-f]{7,40}$/', $revision) === 1 ? $revision : null;
         $written = $commit === null ? false : filemtime($file);
