@@ -1,0 +1,9 @@
+{
+  "$comment": "Copy to bridge.config.json and fill in. docs/runbook/print-bridge.md explains every key. The token goes in its own file (tokenFile), never here.",
+  "apiBaseUrl": "https://bakery.example/api/v1",
+  "tokenFile": "bridge.token",
+  "printer": { "type": "tcp", "host": "192.0.2.10", "port": 9100 },
+  "width": 576,
+  "log": { "file": "logs/bridge.log", "maxBytes": 1048576, "keep": 5 },
+  "serve": { "origins": ["https://bakery.example"] }
+}

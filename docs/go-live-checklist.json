@@ -16,7 +16,7 @@
       "required": true, "who": "CI", "verifier": { "type": "ci_job", "jobs": ["e2e-p5"] } },
     { "id": "print-emulator", "title": "Receipt bytes decode to the golden images; the bridge's own tests pass",
       "required": true, "who": "CI", "verifier": { "type": "ci_job", "jobs": ["print-bridge", "self"] },
-      "note": "print-bridge joins the needs of gate-p5 in step 5.6b, once step 5.3b has added the job" },
+      "note": "print-bridge is a need of gate-p5 since step 5.3b added the job" },
     { "id": "i18n-strict", "title": "Parity strict, API parity, every am screen swept",
       "required": true, "who": "CI",
       "verifier": [
