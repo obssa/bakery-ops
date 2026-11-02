@@ -128,3 +128,66 @@ go-live checklist item `offsite-backup`). To turn it on, Ramin picks the storage
 `rclone` in the account, runs `rclone config` to create a remote (its credentials stay in rclone's own config file, never in the app's
 `.env` or this repository), and sets `BACKUP_REMOTE=<remote>:<folder>`. Each good backup then copies its dump, manifest and files snapshot
 there and writes an `offsite` row.
+
+## Downloading a backup by hand
+
+Ramin decided on 2026-11-02 to go live without the off-site copy and to download a backup by hand instead. Do this until
+`BACKUP_REMOTE` is set. The owner or the technical on-call does it with the hosting account. No admin screen can download a backup.
+
+**How often:**
+
+- Weekly. The best time is Monday, after Sunday's drill has passed, so the copy you take is one the drill restored.
+- After any big change: a deploy that ran migrations, a large import, or a big clean-up of the menu, the stock or the people.
+- Before any risky work on the host.
+
+**Where the files are:**
+
+- The backup folder is `BACKUP_PATH` (`config/backup.php`). When it is unset, it is `backups/bakery-ops` in the hosting account's home
+  folder.
+- That folder is beside the app's folder, not inside it, so a deploy never touches it.
+- Each night's files are named as in [Where the dumps are](#where-the-dumps-are).
+
+**Which one to take:**
+
+1. On the System page, read **Last good backup**. It gives the date and time of the newest good backup, in Addis Ababa time.
+2. The file names carry the UTC time the backup started, which is three hours behind Addis Ababa. A backup that started at 02:30 in
+   Addis Ababa is named `...-233000Z` of the day before. The nightly backup starts at 02:30, so a copy is named like this.
+3. Take the newest `bakery-ops-YYYYMMDD-HHMMSSZ.sql.gz` that has its `.json` manifest beside it. A dump without a manifest, or anything
+   ending in `.partial`, is not a good backup.
+
+**How to download it:**
+
+- **With cPanel File Manager:**
+  1. Open the home folder, then `backups/bakery-ops`.
+  2. Select the `.sql.gz` and its `.json`, and choose **Download**, one file at a time.
+- **With SFTP** (for example WinSCP or FileZilla):
+  1. Sign in with the hosting account's SFTP access.
+  2. Go to the same folder and copy the two files to your computer.
+  3. Keep the SFTP login in your password manager, never in this repository.
+- **The night's files folder** (`.files/`, the payment photos) is optional and can be large. To take it:
+  1. Compress it in File Manager to a `.zip` outside the backup folder.
+  2. Download the `.zip`, then delete it from the host.
+
+**How to check the copy:** compare the dump's SHA-256 with the `sha256` in the manifest. The two must be equal (ignore upper and lower
+case).
+
+- **Windows PowerShell:** `Get-FileHash .\bakery-ops-...sql.gz -Algorithm SHA256`
+- **Windows command prompt:** `certutil -hashfile bakery-ops-...sql.gz SHA256`
+- **Linux or macOS:** `sha256sum bakery-ops-...sql.gz` (on macOS, `shasum -a 256`)
+
+A copy whose checksum does not match is damaged. Download it again, or take the night before.
+
+**Where to keep it:**
+
+- Off the shop premises, so a fire or a theft at the shop does not take both the computers and the copy.
+- Encrypted, because the dump holds the staff list (names and phone numbers) and every sale and payment. Use an encrypted USB drive (for
+  example BitLocker To Go), or an encrypted archive (for example 7-Zip with AES-256) in the owner's own cloud storage.
+- Keep the password apart from the copy.
+- Keep the last four weekly copies, plus any taken after a big change, and delete older ones.
+- Never put a copy in this repository, in an email, or in a chat.
+
+To restore from a downloaded copy:
+
+1. Upload the `.sql.gz` and its `.json` back into the backup folder.
+2. Check the checksum again.
+3. Follow [A full restore by hand](#a-full-restore-by-hand).

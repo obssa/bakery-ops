@@ -23,6 +23,21 @@ off until the owner chooses one and pays for it (Q2). The owner signs `offsite-b
 [go-live checklist](../go-live/README.md) either way: once an off-site copy is set up and one copy was restored, or, until then, to
 accept that risk in writing.
 
+## Until then: download a copy by hand (go-live decision, 2026-11-02)
+
+The owner decided to go live without the off-site copy and to download a backup by hand instead. The steps are in the
+[runbook, "Downloading a backup by hand"](../runbook/backup-restore.md#downloading-a-backup-by-hand). In short:
+
+- **Who:** the owner, or the technical on-call. You need the hosting account (cPanel File Manager or SFTP). The website itself cannot
+  download a backup.
+- **How often:** once a week, best on Monday after Sunday's restore drill has passed. Also after any big change: a new version of the app
+  that changed the database, a large import, or a big clean-up of the menu or the stock.
+- **What:** the newest good copy. The System page gives its date and time under "Last good backup". Download two files: the database
+  copy (`.sql.gz`) and its manifest (`.json`, which holds the checksum). Then check the checksum on your own computer.
+- **Where to keep it:** off the shop premises, and encrypted. Examples: an encrypted USB drive kept at home, or an encrypted archive
+  in your own cloud storage, with the password kept apart from it. The copy holds the staff list and every sale. Keep the last four
+  weekly copies and delete older ones.
+
 ## Who restores, and when
 
 - **The owner decides; only the technical on-call restores**, following the

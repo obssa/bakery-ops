@@ -1029,6 +1029,65 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        41440931690). The test now lists the devices that hold a token and expects the bridge alone (D20).
      - **STATUS**: `docs` `done`, beside `ops` and `print-bridge` `done` from their steps; `i18n` `done` too, by Ramin's decision of
        2026-11-02 to close 5.4b without a reviewer pass (the `am-reviewed` item is unchanged). The phase is not claimed and nothing is tagged: `claim-done 5` refuses while Ramin's sign-offs wait (10.3).
+   - **Go-live decisions (2026-11-02).** Ramin's decisions for going live, in his words where he gave them:
+     1. **No shop printer at go-live.** "We can go live for now without the shop printer; we can turn it off in the admin." Printing
+        gets a switch in Admin > Payments > Receipts (below). `print-bridge-shop` is for when the printer is set up.
+     2. **Who gets the call.** "The admin and the shift manager get the call, or anyone the admin assigns to it." The ops alerts and
+        the failed-print alerts follow it, with a per-person On call switch in Admin > People (below). The rule is in
+        `docs/runbook/on-call.md`.
+     3. **Backups are downloaded by hand.** "We can download the backup manually for now." There is no off-site storage yet:
+        `BACKUP_REMOTE` stays empty (10.2 Q2). `docs/runbook/backup-restore.md` ("Downloading a backup by hand") and
+        `docs/handbook/backups.md` say how, how often (weekly, and after any big change) and where to keep the copy (off the shop
+        premises, encrypted).
+     4. **Receipts stay non-fiscal** for now (Q9 unchanged). **Staff training is done.**
+     5. **No error tracking at go-live.** "We can go live without error tracking for now." Sentry stays off until Ramin sets up an
+        account (5.5a's support stays switched off: no DSN). Until then, the server logs, the System page and the uptime emails cover
+        it.
+     6. **Go live without `devices-enrolled`.** "Let's go live without it." Go-live happens with the device check **off**.
+        - Devices are not enrolled yet. Ramin will test and enrol every shop tablet and PC on the Devices page before the check is
+          switched on, so `devices-enrolled` is the sign-off that still waits for him.
+        - The one-line PR that flips the device-enforcement default to on (5.6b above, 10.2 D9, 10.5) is **not** made at go-live. It
+          waits for Ramin's explicit word, not only for the sign-off.
+        - Until then, the code default stays off and the live `.env` stays silent.
+
+     None of this is a sign-off: the files in `docs/go-live/signoffs/` are Ramin's alone, and the checklist is unchanged.
+   - **As built (go-live settings, `phase-5/go-live-settings`).** Red tests first: `PrintingSwitchTest`, `OnCallTest`, the `onCall` case
+     of the notifications->identity contract, the new audiences in `OpsNotificationsTest` and `PrintFailedNotificationTest`, and a
+     `p5-device` case in `e2e/p5/print.spec.ts`. Then the printing switch, then On call, then the docs.
+     - **The printing switch.**
+       - `receipt_settings.printing_enabled` (`2026_11_12_100000_add_printing_enabled_to_receipt_settings`, BOOLEAN NOT NULL DEFAULT
+         true): every live row stays printing until Ramin turns it off.
+       - It is on GET and PUT `/receipt-settings`. It is optional on PUT, like `paper_width_mm`: a form that leaves it out keeps the
+         saved value.
+       - While it is off, `POST /orders/{order}/print` answers `409 payments.print.disabled` (en and am). The check comes after the order
+         is found (another branch's order is still 404) and before `not_paid` and `no_bridge`, so the till hears the same answer
+         whatever the order or the bridge. A `client_uuid` already used still answers its job. The bridge routes are unchanged: a job
+         queued before the switch is still handed out and printed.
+       - The till reads the switch from the receipt settings it already loads (`useReceiptSettings`, asked only by those who hold
+         `print.create`). Off, there is no Print, and the link and its QR code come at once (5.3c's `no_bridge` fallback, without a
+         press). A till that read the settings before the change is refused with `payments.print.disabled`, falls back the same way
+         and reads the settings again.
+       - The admin screen has the switch above the paper choice. `docs/handbook/printer.md` says how to turn printing off and on.
+     - **On call.**
+       - `users.on_call` (`2026_11_12_100100_add_on_call_to_users`, BOOLEAN NOT NULL DEFAULT false): nobody is on call until the admin
+         says so.
+       - It is on `UserResource`, so it shows on GET `/users` and on `/me`. It is set with PATCH `/users/{id}`, `people.manage` (the
+         admin), in the same `user.update` audit row as any other edit of a person. POST `/users` does not take it.
+       - Admin > People has an On call column with a switch per person (the overseer switch's pattern: it moves at once and goes back
+         if the server refuses).
+       - `Recipients::onCall()`: the active users of the branch with `on_call`, in id order. Nobody on call means nobody, never
+         everybody.
+     - **The audiences.**
+       - The "manager on duty" rule of 5.5c moved out of `NotifyPrintFailed` into `Notifications\Support\ManagersOnShift`: the
+         managers among `Recipients::onDuty` at any station of the branch, or every active manager when none is on duty.
+       - `NotifyOps` (backup failed, backup stale, drill failed) tells, in each branch: the admins, the holders of `system.view`, the
+         managers on shift and everyone On call.
+       - `NotifyPrintFailed` tells the cashier who asked, the managers on shift and everyone On call.
+       - `Audience::of` tells each person once.
+       - The 5.5c Ops fixture's bystander is now a cashier, because a manager is now in the audience.
+     - **Route permissions** are unchanged: no new route. The OpenAPI export and the ERD carry the two columns, and
+       `docs/i18n/am-review.csv` is refreshed for the new keys.
+     - **STATUS** is unchanged: no module changes, and Phase 5 stays unclaimed.
 
 ## 7. Test list and CI
 

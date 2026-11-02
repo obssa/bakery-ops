@@ -26,6 +26,28 @@ D14). It is a signal, not a person: whoever reads it starts at step 1 below.
 If a role does not answer within 15 minutes, call the next one. The hosting provider's support is reached only by the technical
 on-call or the owner, through the hosting account.
 
+## Who gets the call from the system (go-live decision, 2026-11-02)
+
+The owner's rule: **the admin and the shift manager on duty get the call, plus anyone the admin marks On call.** The system follows it
+for the alerts it raises by itself:
+
+| Alert | Who is told |
+|---|---|
+| A backup failed, a backup is late (no good backup for 26 hours), the restore drill failed | Every admin. Every holder of `system.view`. The shift manager on duty. Everyone marked On call. |
+| A receipt did not print (out of paper, offline, cover open, or not acknowledged) | The cashier who asked. The shift manager on duty. Everyone marked On call. |
+
+- **The shift manager on duty** is a manager on the roster of a shift running at any station of the branch. When no manager is on
+  duty (at night, for example), every active manager of the branch is told, so an alert always reaches someone who can act.
+- **On call** is a switch beside each person in **Admin > People**. Only an admin can set it, and every change is in the audit log as
+  `user.update`. Use it for the technical on-call or the owner, so they get the alerts without being made admins.
+- Each person gets each alert once, even when they are, for example, both an admin and On call.
+- The backup and drill alerts are critical. They go to the inbox, and by Telegram once the Telegram channel is set up. A failed print
+  goes to the inbox only.
+- The uptime email (above) is separate: it goes to the repository owner's address, whatever the On call switches say.
+
+The names and phone numbers of the people on call stay outside this repository, on the owner's list. The repository and the People
+screen record only who is On call.
+
 ## The first checks (in this order)
 
 1. **The System page** (Admin > System, [handbook](../handbook/system-page.md)): the scheduler heartbeat, the queue, failed jobs,

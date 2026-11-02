@@ -9143,6 +9143,9 @@
                                                 "print_logo": {
                                                     "type": "string"
                                                 },
+                                                "printing_enabled": {
+                                                    "type": "string"
+                                                },
                                                 "is_default": {
                                                     "type": "boolean"
                                                 }
@@ -9160,6 +9163,7 @@
                                                 "ethiopian_dates",
                                                 "paper_width_mm",
                                                 "print_logo",
+                                                "printing_enabled",
                                                 "is_default"
                                             ]
                                         },
@@ -9203,6 +9207,9 @@
                                                 "print_logo": {
                                                     "type": "boolean"
                                                 },
+                                                "printing_enabled": {
+                                                    "type": "boolean"
+                                                },
                                                 "is_default": {
                                                     "type": "boolean"
                                                 }
@@ -9220,6 +9227,7 @@
                                                 "ethiopian_dates",
                                                 "paper_width_mm",
                                                 "print_logo",
+                                                "printing_enabled",
                                                 "is_default"
                                             ]
                                         }
@@ -9294,6 +9302,9 @@
                                                 "print_logo": {
                                                     "type": "string"
                                                 },
+                                                "printing_enabled": {
+                                                    "type": "string"
+                                                },
                                                 "is_default": {
                                                     "type": "boolean"
                                                 }
@@ -9311,6 +9322,7 @@
                                                 "ethiopian_dates",
                                                 "paper_width_mm",
                                                 "print_logo",
+                                                "printing_enabled",
                                                 "is_default"
                                             ]
                                         },
@@ -9354,6 +9366,9 @@
                                                 "print_logo": {
                                                     "type": "boolean"
                                                 },
+                                                "printing_enabled": {
+                                                    "type": "boolean"
+                                                },
                                                 "is_default": {
                                                     "type": "boolean"
                                                 }
@@ -9371,6 +9386,7 @@
                                                 "ethiopian_dates",
                                                 "paper_width_mm",
                                                 "print_logo",
+                                                "printing_enabled",
                                                 "is_default"
                                             ]
                                         }
@@ -14843,6 +14859,30 @@
                 }
             }
         },
+        "/v1/system/status": {
+            "get": {
+                "operationId": "ops.system.status",
+                "summary": "The status of the host (SystemStatus): app, scheduler, queue, backups, files, devices, flags, error_tracking",
+                "tags": [
+                    "SystemStatus"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/telegram/webhook/{secret}": {
             "post": {
                 "operationId": "telegram.webhook",
@@ -16011,30 +16051,6 @@
                         "$ref": "#/components/responses/ValidationException"
                     }
                 }
-            }
-        },
-        "/v1/system/status": {
-            "get": {
-                "operationId": "ops.system.status",
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    }
-                },
-                "summary": "The status of the host (SystemStatus): app, scheduler, queue, backups, files, devices, flags, error_tracking",
-                "tags": [
-                    "SystemStatus"
-                ]
             }
         }
     },
@@ -19360,7 +19376,7 @@
             },
             "UpdateReceiptSettingsRequest": {
                 "type": "object",
-                "description": "PUT /receipt-settings (phase-4 plan section 4.2 and M5, step 4.3e): the whole form each time, so a field left out is cleared. The\nbusiness name in both languages (up to 120); the address and the footer as bilingual pairs (both or neither, up to 255 each); a phone of\ndigits, spaces, +, - and brackets; a TIN of letters, digits and dashes (up to 32); show_amharic and ethiopian_dates as booleans.\nStep 5.3c (phase-5 plan 10.2 D18): paper_width_mm (58 or 80) and print_logo (a boolean), each optional: left out, the saved value\nstays (a till that cached the screen before 5.3c sends the form without them, and must not turn a 58 mm printer back to 80 mm).\nAnything else is 422 validation.failed.",
+                "description": "PUT /receipt-settings (phase-4 plan section 4.2 and M5, step 4.3e): the whole form each time, so a field left out is cleared. The\nbusiness name in both languages (up to 120); the address and the footer as bilingual pairs (both or neither, up to 255 each); a phone of\ndigits, spaces, +, - and brackets; a TIN of letters, digits and dashes (up to 32); show_amharic and ethiopian_dates as booleans.\nStep 5.3c (phase-5 plan 10.2 D18): paper_width_mm (58 or 80) and print_logo (a boolean), each optional: left out, the saved value\nstays (a till that cached the screen before 5.3c sends the form without them, and must not turn a 58 mm printer back to 80 mm).\nThe go-live settings (2026-11-02): printing_enabled (a boolean), optional the same way: left out, the saved switch stays.\nAnything else is 422 validation.failed.",
                 "properties": {
                     "business_name_en": {
                         "type": "string",
@@ -19428,6 +19444,9 @@
                         ]
                     },
                     "print_logo": {
+                        "type": "boolean"
+                    },
+                    "printing_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -19579,7 +19598,7 @@
             },
             "UpdateUserRequest": {
                 "type": "object",
-                "description": "PATCH /users/{id}: any subset of the editable attributes, the role, and the direct permission overrides (sent as\nthe complete new list). Phone is not editable here: it is the login id.",
+                "description": "PATCH /users/{id}: any subset of the editable attributes, the role, and the direct permission overrides (sent as\nthe complete new list). Phone is not editable here: it is the login id. on_call (the go-live settings, 2026-11-02): the \"On call\"\nswitch, set by the admin only (the route's people.manage); left out, it stays.",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -19674,6 +19693,9 @@
                     "is_active": {
                         "type": "boolean"
                     },
+                    "on_call": {
+                        "type": "boolean"
+                    },
                     "photo_url": {
                         "type": [
                             "string",
@@ -19760,6 +19782,9 @@
                     "is_active": {
                         "type": "boolean"
                     },
+                    "on_call": {
+                        "type": "boolean"
+                    },
                     "photo_url": {
                         "type": [
                             "string",
@@ -19836,6 +19861,7 @@
                     "email",
                     "locale",
                     "is_active",
+                    "on_call",
                     "photo_url",
                     "has_short_code",
                     "roles",
