@@ -716,15 +716,15 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        describe the code under load and the poll budget describes the host.
      - **The after-checks** are the group `perf:load` (`tests/Gate/LoadRunGateTest.php`), run in the app container once the queue
        has drained (`Queue::size()` through tinker). The checks: exactly 300 orders after the id noted before the run, all closed and
-       settled; 225 paid in cash and 75 by Telebirr, each with a photo; `ledgerOracle()` of `tests/Support/helpers.php`
-       (movements = balances = view) agrees; `failed_jobs` is empty. PR #94 (`Inventory\Contracts\LedgerOracle`, 5.5b) is not on main
-       yet, so the check uses the existing reconciliation (a `TODO(p5)` to add the contract once it lands). The worker starts after the
-       seed so `migrate:fresh` never races it.
+       settled; 225 paid in cash and 75 by Telebirr, each with a photo; `Inventory\Contracts\LedgerOracle::check` (5.5b) reports ok
+       on the stack's database, and `ledgerOracle()` of `tests/Support/helpers.php` (movements = balances = view) agrees; `failed_jobs`
+       is empty. The worker starts after the seed so `migrate:fresh` never races it.
      - **Timeouts**: the 16 `ci.yml` jobs that had none (`status`, `api-lint`, `api-arch`, `invariants`, `openapi-check`,
-       `erd-check`, `web-lint`, `i18n-check`, `web-build`, `docker-build`, `backup-drill`, `gate-p0` to `gate-p3`, `gate-p5`) now
-       state 20. The longest of them measured 7 minutes (`api-arch`, main run 41363303323). The same was done in the skill's
-       `assets/ci/ci.yml`, which also carries `perf-load`.
-     - **STATUS**: `ops` stays `in_progress`, because 5.5b (PR #94) and 5.5c are not merged.
+       `erd-check`, `web-lint`, `i18n-check`, `web-build`, `docker-build`, the placeholder `backup-drill`, `gate-p0` to `gate-p3`,
+       `gate-p5`) were given 20. The longest of them measured 7 minutes (`api-arch`, main run 41363303323). 5.5b's real
+       `backup-drill` came with its own 25 and keeps it. The same was done in the skill's `assets/ci/ci.yml`, which also carries
+       `perf-load`.
+     - **STATUS**: `ops` stays `in_progress`, because 5.5c is not merged (5.5a and 5.5b are).
      - **Measured runs** (PR #99). Without OPcache or the caches: polls p95 206 ms on one runner and 351 ms on a slower one (that
        run failed the threshold; writes 265 and 393 ms, no failed request either time). With them (run 41388083454): polls p50 65 ms
        and p95 171 ms, writes p50 92 ms and p95 230 ms (the slowest step, the send, 297 ms), no failed request of 44 233 (61.2 a
@@ -734,7 +734,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        requests a second, and one slow runner moved p95 by 70 %. If `perf-load` turns flaky, the choices are a larger runner (paid,
        Ramin's call) or fewer devices per job; the plan's thresholds are kept as written.
      - **For 5.6b**: `gate-p5` gains `perf-load` in its needs and the manifest's `extra_ci_jobs` lists it. `Phase5Seeder` gets the demo
-       devices beside `LOAD_DEVICES`. `LoadRunGateTest` may switch to `LedgerOracle::check` once 5.5b is on main.
+       devices beside `LOAD_DEVICES`.
 6. **5.6 docs** (STATUS `docs`), two PRs.
    - **5.6a `phase-5/go-live-checklist`** (`docs` `in_progress`). `docs/go-live-checklist.json` and its schema (10.3), the `gate_check.py`
      change that reads it (the repository copy and the skill's copy, kept identical; `scripts/tests/test_gate_checklist.py` with a fixture

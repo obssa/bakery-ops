@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Inventory\Contracts\LedgerOracle;
 use Database\Seeders\Phase0Seeder;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Assert;
@@ -17,9 +18,9 @@ pest()->group('perf:load');
  *   LOAD_ORDERS         the orders the run sent (300).
  * It reads only. The group runs nowhere else: without the variables it fails and says how the job runs it.
  *
- * The ledger check is the reconciliation the gates already use (tests/Support/helpers.php ledgerOracle(): the stock movements folded by the
- * ledger's rule against stock_balances and item_stock_view). TODO(p5): once Inventory\Contracts\LedgerOracle (step 5.5b) is on main,
- * check through it as well.
+ * The ledger is checked twice: by the ledger's own reconciliation, Inventory\Contracts\LedgerOracle (step 5.5b, the check the restore
+ * drill runs), which must report ok, and by the reconciliation the gates already use (tests/Support/helpers.php ledgerOracle(): the
+ * stock movements folded by the ledger's rule against stock_balances and item_stock_view), whose three readings must agree.
  */
 
 beforeEach(function () {
@@ -66,14 +67,26 @@ it('holds exactly the orders the burst sent, every one closed and paid in full, 
         ->and($byChannel->keys()->all())->toBe(['cash', 'telebirr']);
 });
 
-it('leaves the ledger reconciled: the movements, the balances and the stock view agree', function () {
+it('leaves the ledger reconciled: the ledger oracle reports ok, and the movements, the balances and the stock view agree', function () {
     $branch = Phase0Seeder::existingBranch();
     expect($branch)->not->toBeNull('the database holds no demo branch');
 
+    $oracle = app(LedgerOracle::class)->check((string) config('database.default'));
     $readings = ledgerOracle($branch->id);
-    fwrite(STDERR, sprintf("[perf-load] ledger: %d item-locations, movements = balances = view: %s\n", count($readings['movements']), $readings['movements'] === $readings['balances'] && $readings['balances'] === $readings['view'] ? 'ok' : 'NOT OK'));
+    fwrite(STDERR, sprintf(
+        "[perf-load] ledger oracle: %s (%d items, %d places, %d mismatches); movements = balances = view over %d item-locations: %s\n",
+        $oracle->ok() ? 'ok' : 'NOT OK',
+        $oracle->items,
+        $oracle->locations,
+        count($oracle->mismatches),
+        count($readings['movements']),
+        $readings['movements'] === $readings['balances'] && $readings['balances'] === $readings['view'] ? 'ok' : 'NOT OK',
+    ));
 
-    expect(array_diff_assoc(array_map('json_encode', $readings['balances']), array_map('json_encode', $readings['movements'])))->toBe([])
+    expect(array_slice($oracle->mismatches, 0, 5))->toBe([])
+        ->and($oracle->ok())->toBeTrue()
+        ->and($oracle->items)->toBeGreaterThan(0)
+        ->and(array_diff_assoc(array_map('json_encode', $readings['balances']), array_map('json_encode', $readings['movements'])))->toBe([])
         ->and($readings['balances'])->toBe($readings['movements'])
         ->and($readings['view'])->toBe($readings['movements']);
 });
