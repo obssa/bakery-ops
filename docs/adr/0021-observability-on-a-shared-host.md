@@ -1,8 +1,10 @@
 # ADR 0021: Observability on a shared host
 
-- Status: **proposed** (step 5.5a, 2026-10-29; phase-5 plan sections 6, 9, 10.2 Q1, D7, D12, D14 and D21). Accepted at the Phase 5 gate
-  (step 5.6b), after the System page and the uptime workflow (step 5.5c) and the `error-tracking` checklist item (a DSN set and a test event
-  seen, or Ramin's written choice to go live without it).
+- Status: **accepted** (step 5.6b, 2026-11-02; proposed in step 5.5a, 2026-10-29, from phase-5 plan sections 6, 9, 10.2 Q1, D7, D12, D14
+  and D21). The decision is accepted as built in steps 5.5a and 5.5c (the System page, the scheduler heartbeat and the uptime
+  workflow). The `error-tracking` item (a DSN set and a test event seen, or Ramin's
+  written choice to go live without it) stays a go-live checklist row that Ramin signs before the phase is claimed: it gates the claim,
+  not the decision.
 - Date: 2026-10-29
 - Phase: 5
 
@@ -87,3 +89,36 @@ neither account nor process exists on this host, and the Sentry account and its 
 - **Scrub with Sentry's server-side data scrubbing only.** Rejected: the data would already have left the host; D21 says it never leaves.
 - **Laravel Pulse, Telescope or a hosted log service.** Rejected for now: Pulse and Telescope write on every request and want a
   long-running process; a hosted log service is another account and another cost (the System page and the uptime workflow cover the gap).
+
+## Note, 2026-11-02: accepted at the Phase 5 gate (step 5.6b)
+
+This note records steps 5.5a (refusals, error tracking, the prune), 5.5c (the System page, `GET /system/status`, the scheduler
+heartbeat, the uptime workflow) and 5.5d (the load test), from their As built notes in phase-5 plan section 6. What the build changed
+from, or made concrete in, the decision:
+
+- **The heartbeat** (decision 5) is a callback in `schedule:run`'s own process every minute (`ops.scheduler.tick`), which puts the time
+  in the cache: no second PHP process a minute on the shared host. The System page reads the scheduler as fine while the tick is at most
+  180 s old.
+- **`GET /system/status`** (admin, `system.view`) answers counts and ages only: the release, the migrations, the scheduler, the queue
+  and the failed jobs, the backups and the drill, the stored files, the branch's devices and the rollout switches, with an ETag over
+  the body. No path, key or host name is in it.
+- **The uptime workflow** (decision 6) reads the site's address from a repository variable and is skipped while it is unset; it checks
+  that `/health` answers with the app and the database both ok. The checklist row `uptime-monitor` passes once it has run green on
+  `main` within a day.
+
+- **The refusal classes** (decision 1) are found by a scan, not by name: the plan named those of Payments, Orders, Identity, Inventory
+  and Shifts and `IllegalTransition`; the scan found the 15 listed, and `DomainRefusalTest` fails on a new one without the marker. Internal
+  control-flow exceptions (`SendRefused`, `SentMeanwhile`, the `Already*` ones) are caught where they are thrown, and the append-only
+  guards are real failures: neither carries the marker. The info line is written where Laravel decides not to report, so it covers
+  HTTP, the queue and the console alike.
+- **The identity routes whose bodies are dropped** (decision 3) are matched by path, and are more than the five named: `login`,
+  `logout`, `me`, `short-code`, `users`, `stations`, `devices` and `broadcasting/auth`.
+- **The fake ingest** is the SDK's own `http_client` option, so a test event goes through the real client, `before_send` and the
+  serialisation, and nothing leaves the process; the secrets in `ErrorTrackingTest` are written in halves, because the source lines
+  sent around in-app frames would otherwise carry them.
+- **Load is measured in CI, never on the host** (with decision 6's "no Pulse"): step 5.5d's `perf-load` job runs k6 on the compose stack
+  (60 devices polling at the web's own cadences and 300 orders in 10 minutes, the ledger oracle checked after), and `PollBudgetTest`
+  computes what the tablets ask of the host: 740 requests a minute at 12 tablets, 3 590 at 60 (the server runbook's "Poll budget and
+  the load test"). Left open there: how the poll threshold behaves across GitHub's runner generations.
+
+The rest (Sentry built and off, the scrubbing, the browser's build-time switch, the prune at 04:10, no Pulse) is as proposed.

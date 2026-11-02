@@ -693,6 +693,9 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        is `<code translate="no">` through `t.rich` (`Field`'s hint takes markup).
    - **5.4b `phase-5/i18n-review`** (`i18n` `done`). The reviewer's corrections imported from the sheet, the glossary settled, the report
      clean. Opened when the sheet comes back (10.2 Q5); 5.5 and 5.6 do not wait for it. The checklist item `am-reviewed` is a sign-off.
+   - **Closed (2026-11-02).** Closed by Ramin on 2026-11-02 without a reviewer pass; the review sheet `docs/i18n/am-review.csv` and
+     `scripts/i18n_import.py` stay for later corrections. STATUS `i18n` is `done` (set in 5.6b). The checklist item `am-reviewed` is
+     unchanged: it stays Ramin's sign-off, committed in GitHub's web editor.
 5. **5.5 ops** (STATUS `ops`), four PRs.
    - **5.5a `phase-5/ops-errors`** (`ops` `in_progress`). The Phase 4 gap first: `PaymentError`, `OrderError`, `IdentityError`, the
      Inventory and Shifts refusals and `IllegalTransition` implement a `DomainRefusal` marker and are **not reported**
@@ -874,7 +877,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        tills, `55`..`60` tablets; any device past 60 is a tablet). Each device is enrolled through `EnrolDevice` as the demo admin
        (audited `device.enrol`, no station on the device), a fingerprint already enrolled is skipped, and `LOAD_DEVICES` outside 1-99
        is refused. With no `LOAD_DEVICES` the seeder still writes nothing. Its demo devices and receipt settings stay for 5.6b (a
-       `TODO(p5)` in the class).
+       to-do marker of the phase in the class, gone since 5.6b).
      - **The burst** is one k6 iteration per order, every 2 s from 30 s in: a dine-in order of one toast slice (kitchen, from its
        stock) and one buna (bar, made to order), sent from a pad by one of the two demo waiters (who sign in themselves: the pad
        account's short code would add a write per order and is limited to 30 a minute). The chef and the barista accept the order and
@@ -983,6 +986,49 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      phase taught. Then `gate_check --mode done --phase 5` passes every automated row and lists the sign-offs still waiting: **claim-done
      waits for Ramin** (10.3). When his "every tablet enrolled" sign-off lands, a one-line PR flips the device-enforcement default to on
      (the pattern of 3.7e), with the kill switch in the runbook.
+   - **As built (step 5.6b, `phase-5/gate`).** Tests red first (`Phase5GateTest`, the demo-device cases of `Phase5SeederTest`), then
+     the seeder, then the job, then the docs. Where the code chose what the plan left open:
+     - **`Phase5Seeder`** enrols `DEMO_DEVICES` through `EnrolDevice` as the demo admin (audited `device.enrol`): `demo-pad-1` (a tablet,
+       no station), `demo-kds-1` at the kitchen, `demo-till-1` at the till and `demo-bridge-1`, whose token `EnrolDevice` makes and the
+       seeder drops (it prints nothing). The receipts get `SAMPLE_TIN` (`0000000100`, ten digits, the same made-up value as Phase 4's
+       demo receipts) and 80 mm paper **only when they have no TIN**, through `SaveReceiptSettings` with the rest of the settings kept;
+       a TIN already typed is the shop's own and is left with its paper (section 8 says "sets"; after `Phase4Seeder` the TIN is already
+       there, so a full seed writes nothing here). With `APP_ENV=production` it writes nothing at all, `LOAD_DEVICES` included (10.2 D5).
+       5.5d's `LOAD_DEVICES` part is unchanged, the marker it left is gone, and a second run still writes nothing.
+     - **`Phase5GateTest`** (`gate:p5`; each case also carries `module:identity`, `module:orders` or `invariants`, so a module job runs it
+       an hour before the gate does): (1) with the flag on, every station route answers an unknown device and a missing header with
+       `403 identity.device.unknown`, the admin included, and lets an enrolled tablet of the branch past the check; (2) every back-office
+       route the admin may call (`non_station_routes.php`, admin among the route's roles in `route_permissions.php`), one case each,
+       answers the admin with the flag on and an unknown device with the same status as with the flag off and no `identity.device.*` key,
+       so the flag never adds a 403 there (a status is read with `getStatusCode()`: the exports answer a streamed response); (3) an order
+       sent from an enrolled pad with the flag on and replayed three times with the same key and `client_uuid` is one order, the first
+       answer each time, with no new stock movement or audit row; (4) the checklist parses (schema 1, phase 5, ids unique) and **every
+       verifier type resolves**: it is one of `VERIFIER_TYPES` in `scripts/gate_check.py`, the schema allows exactly those, a `script`
+       verifier's program is in the repository and a sign-off names its one file. Whether a named job or workflow exists is left to
+       `gate_check`'s own rows, so the test never waited for `print-bridge` (PR #101) or `uptime.yml` (PR #103), both merged while
+       this step was open.
+     - **The `gate-p5` job** needs `status`, `gate-p4`, `e2e-p5`, `i18n-check`, `backup-drill`, `perf-load` and `print-bridge` (the
+       last from 5.3b, kept by the merge of main; 25 minutes; 5.6a's
+       `permissions` and `GH_TOKEN` kept). It loads the image, starts the stack, copies `docs/` and `scripts/` into the container (the
+       image holds `apps/api` only) and runs `pest --group=gate:p5` there with `GATE_REPO_ROOT` naming the copy and
+       `IDENTITY_REQUIRE_DEVICE=false` (the tests turn the flag on themselves), failing on no tests, a skip or a warning as `gate-p4`
+       does; then `gate_check --mode done --phase 5 --ci`, whose checklist rows go to the step summary. No seed: the group's tests make
+       their own rows. The manifest (`ci.gate_jobs`, `extra_ci_jobs`) and the skill's `assets/ci/ci.yml` match.
+     - **ADRs 0017 to 0021 are accepted**, each with a note of 2026-11-02 on what changed from the proposal. The sign-offs their status
+       lines named gate the phase's claim, not the decisions. **`docs/phases/phase-5-report.md`** reports the phase so far; the skill's
+       `ci-cd.md`, `testing-strategy.md` and `traps.md` record the phase's lessons. `docs/handbook/backups.md` was checked against 5.5b
+       and corrected (retention, what the drill checks, who restores); `printer.md` against 5.3a to 5.3c and the bridge's runbook (the
+       button and its states, the setup through Add a print bridge, and that the local mode still needs the website, so nothing prints
+       while the till is offline). ADR 0019's note covers 5.3b too. The 5.5d note above spelled the
+       phase marker, which the done gate's marker row would count; it is reworded.
+     - **Merges**: main was merged in twice, with ordinary commits: after 5.3b (`gate-p5` keeps both `perf-load` and `print-bridge`)
+       and after 5.5c (ADRs 0017, 0020 and 0021, `backups.md` and the report then describe the System page, the alerts and the uptime
+       workflow as built). Every build step is merged but this one; 5.4b was closed by Ramin on 2026-11-02 without a reviewer pass.
+     - **A trap met**: `Phase5SeederTest` first wrote `$devices->except('demo-bridge-1')` on a collection keyed by fingerprint. An
+       Eloquent collection's `except()` takes model ids, not the collection's keys, so it removed nothing and `mod-shifts` failed (run
+       41440931690). The test now lists the devices that hold a token and expects the bridge alone (D20).
+     - **STATUS**: `docs` `done`, beside `ops` and `print-bridge` `done` from their steps; `i18n` `done` too, by Ramin's decision of
+       2026-11-02 to close 5.4b without a reviewer pass (the `am-reviewed` item is unchanged). The phase is not claimed and nothing is tagged: `claim-done 5` refuses while Ramin's sign-offs wait (10.3).
 
 ## 7. Test list and CI
 

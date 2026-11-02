@@ -680,14 +680,53 @@ jobs:
         if: always()
         run: docker compose -f compose.yml -f compose.ci.yml down -v
 
+  # The Phase 5 gate (phase-5 plan 7.1 and 10.3, step 5.6b): the needs of the CI design (gate-p4, e2e-p5, i18n-check, the backup drill,
+  # the load run, the print bridge), then the gate:p5 group on the compose stack and gate_check with the go-live checklist. The group needs no seed: its
+  # tests make their own rows in phpunit.xml's bakery_test. The image holds apps/api only, so the checklist test reads the repository's
+  # docs/ and scripts/ from a copy in the container named by GATE_REPO_ROOT. A skipped or warning test fails the step, as in gate-p4;
+  # its passing is the checklist's `self` (device-enforcement, print-emulator).
   gate-p5:
-    needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill, print-bridge]
+    needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill, perf-load, print-bridge]
     if: fromJSON(needs.status.outputs.phase) >= 5
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
+    # the go-live checklist (step 5.6a) reads the Actions API (live-ops, uptime-monitor) and main's required checks
+    permissions: { contents: read, actions: read }
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
-        # no app code changed after it, which a shallow clone cannot answer
+        # no app code changed after it, which a shallow clone cannot answer; the sign-off rows read who committed each file
         with: { fetch-depth: 0 }
-      - run: python3 scripts/gate_check.py --mode done --phase 5 --ci
+      - uses: actions/download-artifact@v4
+        with: { name: api-image, path: /tmp }
+      - run: docker load -i /tmp/api.tar
+      - name: Start the stack (the API, the database, Redis)
+        run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180 app
+      - name: Pest group gate:p5
+        run: |
+          set -o pipefail
+          dc="docker compose -f compose.yml -f compose.ci.yml"
+          # the image has no .env (the variables come from compose): an empty one keeps phpdotenv's read from warning on every test
+          $dc exec -T app touch .env
+          # the checklist test reads docs/go-live-checklist.json, its schema and scripts/ from the repository, which the image lacks
+          $dc exec -T app mkdir -p /tmp/repo
+          $dc cp docs app:/tmp/repo/docs
+          $dc cp scripts app:/tmp/repo/scripts
+          # the stack enforces enrolled devices (compose.ci.yml); the tests keep the code default (off) and turn it on where they test it
+          $dc exec -T -e IDENTITY_REQUIRE_DEVICE=false -e GATE_REPO_ROOT=/tmp/repo app \
+            vendor/bin/pest --group=gate:p5 --colors=never 2>&1 | grep -v ' DEBUG: ' | tee /tmp/gate-p5.txt
+          if grep -Eq "No tests (found|executed)" /tmp/gate-p5.txt; then echo "::error::the gate:p5 group ran nothing"; exit 1; fi
+          if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky|warning|deprecat|notice)" /tmp/gate-p5.txt; then echo "::error::a gate:p5 test was skipped or warned: the gate fails, it never skips"; exit 1; fi
+          grep -E "^ +Tests:" /tmp/gate-p5.txt | sed 's/^ */gate:p5 /' >> "$GITHUB_STEP_SUMMARY" || true
+      - name: gate_check (with the go-live checklist)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          set -o pipefail
+          python3 scripts/gate_check.py --mode done --phase 5 --ci 2>&1 | tee /tmp/gate-check.txt
+          { echo '```'; grep -E "checklist " /tmp/gate-check.txt || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=120 app
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f compose.yml -f compose.ci.yml down -v

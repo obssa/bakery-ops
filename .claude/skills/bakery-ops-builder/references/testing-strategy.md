@@ -16,9 +16,9 @@ that mechanical rather than a matter of discipline.
 | Concurrency | `concurrency` | row locks really block a second connection; deterministic lock order never deadlocks | `mod-inventory`, `mod-orders` |
 | **Contract** | `contract:<consumer>-><provider>` | the provider behaves the way *this consumer* needs | before the consumer is written; then in the provider's module job forever |
 | Module | `module:<name>` | everything the module owns | the module's job |
-| Gate | `gate:p<N>` + Playwright projects `p<N>-*` | the phase's critical path end to end | the module jobs (a gate test also carries its module's group); from Phase 4 the seeded part of `gate:p4` in the `gate-p4` job itself, on the 90-day seed |
+| Gate | `gate:p<N>` + Playwright projects `p<N>-*` | the phase's critical path end to end | the module jobs (a gate test also carries its module's group); from Phase 4 the seeded part of `gate:p4` in the `gate-p4` job itself, on the 90-day seed; from Phase 5 `gate:p5` in the `gate-p5` job on the compose stack, and `gate:p5:restored` in `backup-drill` on the restored copy |
 | E2E | Playwright (`apps/web/e2e/p<N>/`) | real browser, real compose stack, several roles in separate contexts | `e2e-p<N>` jobs |
-| Performance | k6 (`perf-dashboards`, CI compose stack only), timed in-process Pest budgets (`DashboardBudgetGateTest`, `analytics:bench`) | p95 budgets | gates 4 and 5 |
+| Performance | k6 (`perf-dashboards`, `perf-load`; CI compose stack only), timed in-process Pest budgets (`DashboardBudgetGateTest`, `analytics:bench`), `PollBudgetTest` (requests a minute per device count) | p95 budgets; the load the shop puts on the host | gates 4 and 5 |
 
 ## Contract tests: the rule that makes dependencies real
 
@@ -70,13 +70,37 @@ depended on by the next step.
 - **In-process timing** (Phase 4, R-G): `DashboardBudgetTest` (module, hand-written summaries) and `DashboardBudgetGateTest` (the seed) time 3 warm-ups and 30 requests per dashboard read through the HTTP kernel (p95 < 400 ms, at most 8 statements after the endpoint resolves its `RangeRequest`); the gate test and `php artisan analytics:bench` share `App\Console\Support\DashboardBench`, so the owner's measure on the live host is the gate's. k6 runs only in `perf-dashboards` on the CI stack; the browser's first-data budget (1000 ms from `GET /me` answering) is `dashboards.spec.ts` in `e2e-p4`.
 - **Shift rules**: the three rollout rules (`ledger.require_shift_for_station_locations`, `payments.require_shift_for_cash`, `shifts.open_ad_hoc_on_accept`) ship on. `ShiftsFixture::build` pins them off so a test can stock a station before a shift runs; a test about a rule turns it on after building. The `rules-off-gates` job runs the Phase 0-2 gates with all three off (the kill-switch state); everything else runs on. Tests that expect a 304 or an unchanged tag after writing stock first travel past the 5 s settling window (`OverlapCursor`).
 - **Money and quantities in assertions**: compare decimal strings (`'12.5000'`), never floats.
+- **Never skip; take environment paths from variables** (Phase 5): `->skip(` is banned in module tests and the gate jobs fail
+  on a skip or a warning, so a test that needs a path of one environment (a binary, a repository file outside `apps/api`)
+  reads it from an environment variable with a default that works on a runner checkout, and fails when it is missing.
+  `Phase5GateTest` reads the go-live checklist from `GATE_REPO_ROOT` (the `gate-p5` job copies `docs/` and `scripts/` into the
+  container), defaulting to two folders above `base_path()`; `SeededGate` likewise fails, never skips, when its seed is missing (traps.md).
+- **A gate test that needs one job's environment gets a subgroup** (Phase 5): `RestoredLedgerGateTest` is `gate:p5:restored`,
+  run by `backup-drill` beside the restored copy, because `gate-p5` runs `gate:p5` on a stack without one. Each case of
+  `Phase5GateTest` also carries a module group (or `invariants`), so a module job sees it long before the gate does.
+- **Golden images** (Phase 5): drawn in CI's own environment (its fonts and libraries; `UPDATE_RECEIPT_GOLDENS=1` there), never
+  on a developer PC, and compared within a measured tolerance, because two FreeType builds place glyphs a dot or two apart
+  (traps.md).
+- **Device enforcement** (Phase 5): the CI stack enforces enrolled devices (`compose.ci.yml`); Pest runs inside it pass
+  `IDENTITY_REQUIRE_DEVICE=false`, tests keep the code default (off) and turn it on where they test it; Playwright's global setup
+  enrols each role's device (`E2E_DEVICES`). The short-code lockout counts per branch and device, so the lockout flow runs on a
+  fresh device of its own (`freshDevice`) rather than the role's shared one.
+- **A negative check needs a positive twin** (Phase 5): "no Sentry SDK in the bundle" proves something only because a second
+  build with a made-up DSN must be found by the same grep (`web-errors`); the same holds for any "nothing was sent" assertion.
+- **Load** (Phase 5): the devices' poll cadences live in one file (`apps/api/tests/Fixtures/perf/poll-profile.json`) that k6
+  reads and `PollBudgetTest` turns into requests a minute (740 at 12 tablets, 3 590 at 60); `scripts/tests/test_poll_profile.py`
+  fails when `apps/web` changes a cadence. What must hold after the run (exactly the orders sent, all closed, the ledger oracle
+  `ok`, no failed job) is a Pest group, `perf:load`, run in the app container once the queue drained, not k6 checks. The server
+  and schedule traps are in traps.md.
 
 ## Naming
 
 - Pest files mirror the module: `tests/Modules/Inventory/Feature/ReserveStockTest.php`,
   `tests/Modules/Orders/Unit/OrderStatusMachineTest.php`.
 - Gate tests: `tests/Gate/Phase1GateTest.php` with `->group('gate:p1')`. A gate test may also live in its module and carry the tag (Phase 3 tags `HashChainTest`, `ShiftAttributionTest`, `PresenceResolverSwapTest`, `ReplayPropertyTest`, `LedgerEnforcementTest`, the state-machine, window and cash unit tests with `gate:p3`; `EnforcementDefaultGateTest` and `ReplaySeededHistoryTest` are in `tests/Gate/`). Tests that drop triggers (DDL commits) use `CommitsForConcurrency` and so live in `tests/Gate/`, not `Modules/`.
-- Playwright: `apps/web/e2e/p1/order-flow.spec.ts` under project `p1-order-flow`.
+- Playwright: `apps/web/e2e/p1/order-flow.spec.ts` under project `p1-order-flow`. A project's `testMatch` is anchored on the
+  file name (`/ops-live\.spec\.ts$/`): Playwright matches it against the absolute path, and the CI checkout path holds "ops"
+  (traps.md).
 - Every test name says the behaviour, not the method: `it('releases the reservation when a line is rejected')`.
 
 ## Where tests run

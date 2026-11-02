@@ -1509,6 +1509,7 @@
         "extra_ci_jobs": [
           "i18n-check",
           "backup-drill",
+          "perf-load",
           "print-bridge"
         ],
         "criteria": [
@@ -1678,6 +1679,7 @@
         "e2e-p5",
         "i18n-check",
         "backup-drill",
+        "perf-load",
         "print-bridge"
       ]
     }
