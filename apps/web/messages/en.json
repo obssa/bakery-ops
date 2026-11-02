@@ -638,7 +638,22 @@
     "kind_upload_photos": "send receipt photo",
     "online_only": "Needs a connection",
     "admin_offline": "You are offline. Changes on this screen need a connection; they are not queued.",
-    "queued": "Saved on this tablet. It will be sent when the connection is back."
+    "queued": "Saved on this tablet. It will be sent when the connection is back.",
+    "tray_region": "Changes not saved",
+    "tray_what": "Not saved: {what}",
+    "tray_held": "{count, plural, one {# change that waited for it was not sent either} other {# changes that waited for it were not sent either}}",
+    "tray_device": "{count, plural, one {# change is kept on this tablet} other {# changes are kept on this tablet}} until an admin enrols it again. Nothing is lost.",
+    "edit": "Edit and resend",
+    "resend": "Send again",
+    "discard": "Discard",
+    "hint_shortfall": "Change the lines that are short in the cart, then send the order again.",
+    "hint_stock": "Send it again once the stock is there, or discard it.",
+    "hint_shift": "Start the shift first, then send it again.",
+    "hint_closed": "The order has moved on since, so this change can no longer be made. Discard it.",
+    "hint_photo": "The receipt photo cannot be sent. Discard this, then take the payment again on the till with a new photo.",
+    "hint_dependency": "The change it waited for was saved without what this one needs. Discard it and do it again.",
+    "hint_session": "The code had expired before it was sent. Unlock again with the code and do it again.",
+    "hint_other": "Read the message, then change it and send it again, or discard it."
   },
   "bell": {
     "bell": "Notifications",

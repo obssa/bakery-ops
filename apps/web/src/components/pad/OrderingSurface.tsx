@@ -1,12 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback } from "react";
-import { addToCart, emptyCart, newOrderOf, orderLinesOf, useCarts, type Cart as CartState } from "@/lib/cart";
+import { useCallback, useEffect } from "react";
+import { addToCart, cartFrom, emptyCart, newOrderOf, orderLinesOf, useCarts, type Cart as CartState } from "@/lib/cart";
 import { useErrorText } from "@/lib/errors";
 import type { Menu } from "@/lib/api/types";
 import type { FeedSnapshot } from "@/lib/live/feed";
-import { queueCancelOrder, queuePadSend, queueReplaceLines, queueSendExisting } from "@/lib/outbox/store";
+import { queueCancelOrder, queuePadSend, queueReplaceLines, queueSendExisting, useOutbox } from "@/lib/outbox/store";
 import { Cart } from "./Cart";
 import { MenuPanel } from "./MenuPanel";
 import { TablesPanel } from "./TablesPanel";
@@ -37,9 +37,23 @@ export function OrderingSurface({
   const update = useCarts((s) => s.update);
   const act = useCallback((change: (cart: CartState) => CartState) => update(userId, change), [update, userId]);
 
+  // the conflict tray's "Edit and resend" (step 5.2c): the refused order comes back into this person's cart once the menu is here, unless
+  // the cart already holds another order (that one is sent or cleared first)
+  const restore = useCarts((s) => s.restore);
+  const menuItems = menu?.loaded ? menu.state?.items : undefined;
+  useEffect(() => {
+    if (!restore || !menuItems) return;
+    const current = useCarts.getState().carts[userId];
+    if (current && current.lines.length > 0 && current.orderUuid !== restore.source.orderUuid) return;
+    const restored = cartFrom(restore.source, menuItems, restore, restore.resolves);
+    useCarts.setState((s) => ({ restore: null, carts: { ...s.carts, [userId]: restored } }));
+  }, [restore, menuItems, userId]);
+
   function send() {
     if (cart.sending) return;
-    act((c) => ({ ...c, sending: true, shortfall: [], lineErrors: {}, error: null }));
+    // the new send replaces this order's refused writes in the conflict tray (and the ones this cart was rebuilt from)
+    useOutbox.getState().supersede(cart.orderUuid, cart.resolves);
+    act((c) => ({ ...c, sending: true, shortfall: [], lineErrors: {}, error: null, resolves: [] }));
     onSendStarted();
     if (cart.serverOrderId === null) {
       queuePadSend(newOrderOf(cart));
