@@ -445,6 +445,43 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      stock conflict made while the pad was offline (another context sells the last unit) lands in the tray with the shortfall message and
      the order can be edited and resent; a KDS that was offline for a minute shows the tickets sent meanwhile after reconnect; two tablets
      offline at once replay without duplicates. ADR 0018 proposed.
+   - **As built (step 5.2c, `phase-5/offline-conflicts`).** Tests red first (the tray's nine cases in `offline-logic.spec.ts`, and
+     `offline-conflicts.spec.ts` in `p5-offline`), then the web. No API change: no route, permission, request rule, OpenAPI or ERD change.
+     ADR 0018 proposed. Where the code chose what the plan left open:
+     - **The tray** (`src/lib/outbox/tray.ts` pure, `components/ConflictTray.tsx`) sits in the shell where 5.2a's strip was, region
+       "Changes not saved". One entry per refused write, with the writes it held back (`blockedBy`) under it; a held write whose refused
+       write is gone is an entry of its own. The reason comes from the key: `shortfall`, `stock`, `shift` (`inventory.` and
+       `payments.shift.required`), `closed` (`orders.order.not_open`, `orders.order.paid`, `payments.order.not_payable`,
+       `state_machine.illegal_transition`), `photo` (`outbox.photo_missing`, or a body naming `photo_client_uuid`), `dependency`, `session`
+       (an ended acting session) and `other`. Each entry shows what was tried, the server's `message_en` and `message_am` (and a
+       shortfall's lines) in `lang="en"`/`lang="am"` spans, so the `p5-amharic` sweep stays clean, and a hint per reason.
+     - **Actions**: the cart's sends (`send_order`, `replace_lines`, `send_existing`) get **Edit and resend**; a write refused for a shift
+       or for stock gets **Send again** (a new id and Idempotency-Key, every `client_uuid` in its body new; the writes it held back wait
+       for it again with their own keys); a closed order, a photo and a dependency only **Discard**, which every entry has. Discard drops
+       the held writes too and passes their photos to `releasePhotos`. A refused photo upload is discarded and the payment taken again on
+       the till; a batch refused for a shift after its upload was accepted is sent again with the uploaded file id.
+     - **Edit and resend**: a cart still in memory is simply shown (the screen the write was queued on, pad or till). Otherwise it is
+       rebuilt (`cartSourceOf`, `cartFrom`): after a shortfall, from the open order in the 409 body (same client_uuids and server id, the
+       shortfall on its line, then PUT lines and send, each a new write with a new key); a refused new order as a NEW order with new
+       client_uuids; a refused change without the order in its body after `GET /orders/{id}`. The rebuilt cart goes to the next person who
+       opens the pad or till with an empty cart (or the same order). The cart's next send supersedes the order's refused cart writes (by
+       its client_uuid, and the ones it was rebuilt from). The pad's own refusals are put on the cart once (no longer dismissed), so they
+       stay in the tray until the order is sent again or discarded, online too.
+     - **A device refusal** keeps every write pending, as in 5.1b; the tray counts them with the API's message in both languages ("Nothing
+       is lost") and offers no action: the tablet is enrolled on the "not enrolled" screen below it.
+     - **Reconnect** (`src/lib/reconnect.ts`): the `online` event every time, and visibility after 30 s or more hidden. The outbox resumes
+       (and on `online` asks `GET /me` again, as before); the pad's order list and the till's queue are read again from the start
+       (`LiveFeed.reload`: no cursor, no ETag, the answer replaces the state; a failed reload is retried by the next look). The kitchen and
+       bar rails already replayed `tickets?since=<cursor>` through the poll transport (it looks again on `online` and on visibility), so the
+       kitchen display flow tests behaviour that existed; it and the two-tablet flow were not run red (no stack on this PC).
+     - **The lookup read was not added.** A create whose answer was lost is answered by its replay: the stored answer under its key, or
+       after the key's retention the `client_uuid` (`IdempotencyReplayAfterExpiryTest`); `GET /orders` carries `client_uuid`. What the
+       reads did not cover was a non-create replayed after its key expired: a `send_existing` or `cancel_order` tried before without an
+       answer and refused as `closed` is looked up with `GET /orders/{id}` and settled when the order already shows it (sent, cancelled).
+       Line actions are not looked up (there is no read of one line): they show in the tray with Discard.
+     - **Left open**: the tray shows every conflict of the tablet, whoever is signed in (the queue is the tablet's; only the account that
+       queued a write sends it); a rebuilt cart waits while the person's cart holds another order; discarding a refused send whose order
+       the server holds open (a shortfall) leaves that order open, shown as not sent on the waiter's "My orders" with its Cancel.
 3. **5.3 print-bridge** (STATUS `print-bridge`), three PRs.
    - **5.3a `phase-5/print-jobs`** (`print-bridge` `in_progress`). M3, M2b, M4. `ReceiptRaster`: the receipt of 4.3e (the view model the
      PDF uses) drawn into a 1-bit image 576 or 384 dots wide with GD and FreeType, Noto Sans Ethiopic for Amharic (the font folder of

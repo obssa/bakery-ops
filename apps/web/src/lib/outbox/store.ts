@@ -7,6 +7,8 @@ import { receiptForm, UPLOAD_TIMEOUT_MS } from "../api/till";
 import type { NewOrder, NewOrderLine, RejectBody, StoredFileView } from "../api/types";
 import { actingHooks, useSession } from "../session";
 import { actingHeaders } from "../acting";
+import type { Order } from "../api/types";
+import { onReconnect } from "../reconnect";
 import { loadOutbox, memoryPhotoDb, openOutboxDb, type OutboxDb, type PhotoDb } from "./db";
 import {
   abandonedPhotos,
@@ -28,17 +30,22 @@ import {
   type OutboxKind,
   type PhotoRecord,
 } from "./logic";
+import { discardEntry, landed, needsLookup, reasonOf, resendEntry, supersede } from "./tray";
 
 // The outbox (step 1.6a; IndexedDB and every station write without a PIN since step 5.2a, plan 10.2 D10): the writes a screen must not
 // lose to a bad connection. Each is queued with its Idempotency-Key (and the client UUID of what it creates) fixed at enqueue, kept in
 // IndexedDB (db.ts; in memory when the browser refuses it), and sent by the rules of logic.ts: strict order per order, after the write it
 // depends on, again with the SAME key after a network failure or a 5xx (1, 2, 4 ... 60 s, at once when the browser comes back online),
 // and moved to the conflict list on any other refusal (the tray is step 5.2c; until then the shell strip shows them). A device refusal
-// keeps everything (step 5.1b). Screens that wait for the answer (the till, the production board, the count drafts) `submit()`: online
+// keeps everything (step 5.1b) and the tray says so. Screens that wait for the answer (the till, the production board, the count drafts) `submit()`: online
 // they get the answer or the refusal as before; offline, or when the write cannot go now, they are told it is queued.
 // Step 5.2b: the till's receipt photos are kept on the tablet (keepPhoto, within the quota) until the `upload_photos` write that sends them
 // was accepted; the payment batch waits for that write and takes each file id from its answer. A photo nothing needs is dropped
 // (releasePhotos).
+// Step 5.2c, the conflict tray (tray.ts, components/ConflictTray.tsx): a refused write stays until someone sends it again as a new write
+// (resend), changes it in the cart (the cart's next send supersedes it) or discards it. An order write tried before without an answer and
+// refused because the order moved on is looked up (GET /orders/{id}) and settled when it had landed. The outbox resumes on every reconnect
+// (reconnect.ts: online, or visible after a gap).
 
 export type { OutboxItem, OutboxKind } from "./logic";
 
@@ -86,8 +93,15 @@ interface OutboxState {
   sending: boolean;
   /** the write on the wire */
   sendingId: string | null;
+  /** set while a device refusal holds every write on this tablet (step 5.1b): the API's key and its message in both languages */
+  held: { key: string; en: string | null; am: string | null } | null;
   enqueue: (input: EnqueueInput) => OutboxItem | null;
-  dismissFailure: (id: string) => void;
+  /** the tray's Discard: a refused write and what it held back leave; their photos go too, unless something still needs them */
+  discard: (id: string) => void;
+  /** the tray's "Send again": the refused write goes again as a new write (new key, new client_uuids) */
+  resend: (id: string) => void;
+  /** the cart sent its order again: that order's refused cart writes, and the ones the cart was rebuilt from, leave the tray */
+  supersede: (orderUuid: string | null, ids?: readonly string[]) => void;
   flush: () => Promise<void>;
 }
 
@@ -312,6 +326,7 @@ export const useOutbox = create<OutboxState>()((set, get) => {
     durable: false,
     sending: false,
     sendingId: null,
+    held: null,
 
     enqueue: (input) => {
       const me = useSession.getState().me;
@@ -348,14 +363,25 @@ export const useOutbox = create<OutboxState>()((set, get) => {
       return item;
     },
 
-    dismissFailure: (id) => {
-      const queue = get().queue;
-      const dismissed = queue.find((i) => i.id === id && i.state === "conflict");
-      if (!dismissed) return;
-      commit(queue.filter((i) => i.id !== id));
-      // its photos go with it, unless another write or an open pay sheet still needs them
-      const photos = photosOf(dismissed);
+    discard: (id) => {
+      const { queue, photos } = discardEntry(get().queue, id);
+      if (queue === get().queue) return;
+      commit(queue);
+      // their photos go with them, unless another write or an open pay sheet still needs them
       if (photos.length > 0) void releasePhotos(photos);
+    },
+
+    resend: (id) => {
+      const queue = resendEntry(get().queue, id, uuid);
+      if (queue === get().queue) return;
+      commit(queue);
+      void get().flush();
+    },
+
+    supersede: (orderUuid, ids = []) => {
+      const before = get().queue;
+      const queue = supersede(before, orderUuid, ids);
+      if (queue.length !== before.length) commit(queue);
     },
 
     flush: async () => {
@@ -387,9 +413,26 @@ export const useOutbox = create<OutboxState>()((set, get) => {
             }
             if (outcome === "device") {
               // this tablet is not enrolled (or was revoked): the "not enrolled" screen says so; the write waits, with its key, until an
-              // admin enrols the device and the page starts again (step 5.1b)
+              // admin enrols the device and the page starts again (step 5.1b); the tray says what is kept (step 5.2c)
               deviceHalt = true;
+              set({ held: { key: error.key, en: error.messages.en ?? null, am: error.messages.am ?? null } });
               return;
+            }
+            if (outcome === "conflict" && !local && needsLookup(item, reasonOf({ status: error.status, body: error.body }))) {
+              // tried before without an answer, then refused because the order moved on: the first try may have landed (its key expired
+              // since); the order as the server has it says so (step 5.2c)
+              const order = await request<Order>(`/orders/${item.subjectId}`, { token }).catch(() => null);
+              if (landed(item, order)) {
+                answer = order;
+                commit(settle(get().queue, item.id, answer));
+                const waiter = waiters.get(item.id);
+                if (waiter) {
+                  waiters.delete(item.id);
+                  waiter.resolve({ sent: true, answer });
+                }
+                appliedListeners.forEach((l) => l(item, "accepted"));
+                continue;
+              }
             }
             if (outcome === "conflict") {
               const waiter = waiters.get(item.id);
@@ -417,6 +460,7 @@ export const useOutbox = create<OutboxState>()((set, get) => {
             if (error.isNetwork) return;
             continue;
           }
+          if (get().held) set({ held: null });
           commit(settle(get().queue, item.id, answer));
           // the photos are up: kept no longer, unless an open pay sheet still holds them (its payment was refused and is tried again)
           if (item.kind === "upload_photos") void releasePhotos(photosOf(item));
@@ -510,12 +554,13 @@ export function startOutbox(): () => void {
     resume();
   }
 
-  window.addEventListener("online", online);
+  // the online event, and the page visible again after a gap (a locked tablet's timers were slowed or stopped): send what waits
+  const stopReconnect = onReconnect((cause) => (cause === "online" ? online() : resume()));
   const stopWatching = useSession.subscribe((state, previous) => {
     if (state.status === "signed-in" && previous.status !== "signed-in") resume();
   });
   return () => {
-    window.removeEventListener("online", online);
+    stopReconnect();
     stopWatching();
     if (wakeTimer !== null) clearTimeout(wakeTimer);
     wakeTimer = null;
