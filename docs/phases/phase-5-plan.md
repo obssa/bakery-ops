@@ -805,6 +805,61 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      enrolled by `Phase5Seeder` when `LOAD_DEVICES=60`; k6 in the pinned image `perf-dashboards` uses; timeout 30. `PollBudgetTest` (Pest,
      `gate:p5`) computes the requests per minute N devices make at the configured cadences, so the runbook can state what the shared host
      is asked for (12 tablets, 60 tablets) next to the load average it showed in Phase 4.
+   - **As built (step 5.5d, `phase-5/perf-load`).** Tests red first (`PollBudgetTest`, the load-device cases of `Phase5SeederTest`),
+     then the profile and the seeder, then the script and the job, then the docs. Where the code chose what the plan left open:
+     - **The cadences are one file**, `apps/api/tests/Fixtures/perf/poll-profile.json` (inside the image, so `gate:p5` can run it
+       there): per kind of device, the feeds of its screen, each with its interval and the web constant it comes from;
+       `scripts/tests/test_poll_profile.py` (run by `i18n-check`'s unittest discovery) fails when `apps/web` changes one. Only visible
+       screens with nothing failing are modelled. A hidden tab's slower cadence is a saving, not a load. The kinds: a pad (its orders
+       2 s, the menu 5 s, the bell 15 s: 46 a minute), a KDS (tickets and stock strip 2 s, its shift 5 s, the bell: 76), a till (queue
+       and display case 2 s, menu, production board, shift and cash 5 s, the counts' 15 s refetch and the bell: 116), the admin's
+       orders board (34) and a shift screen (running shifts and counts queue 5 s, the bell: 28). The plan's "6 admin and shift screens"
+       are 3 of each. Day one's 12 tablets are the same mix scaled: 7 pads, 2 KDS, 2 tills, 1 board. **740 requests a minute at
+       12 tablets, 3 590 at 60** (runbook "Poll budget", beside the Phase 4 load average of about 10 from 10.1).
+     - **`Phase5Seeder::LOAD_MIX`** orders the kinds the way the profile does (`load-01`..`34` tablets, `35`..`46` KDS, `47`..`54`
+       tills, `55`..`60` tablets; any device past 60 is a tablet). Each device is enrolled through `EnrolDevice` as the demo admin
+       (audited `device.enrol`, no station on the device), a fingerprint already enrolled is skipped, and `LOAD_DEVICES` outside 1-99
+       is refused. With no `LOAD_DEVICES` the seeder still writes nothing. Its demo devices and receipt settings stay for 5.6b (a
+       `TODO(p5)` in the class).
+     - **The burst** is one k6 iteration per order, every 2 s from 30 s in: a dine-in order of one toast slice (kitchen, from its
+       stock) and one buna (bar, made to order), sent from a pad by one of the two demo waiters (who sign in themselves: the pad
+       account's short code would add a write per order and is limited to 30 a minute). The chef and the barista accept the order and
+       make it ready on their KDS devices (X-Station-Id set). The waiter serves it, and a cashier pays it at a till. Every fourth order
+       is paid by Telebirr with a unique reference and `scripts/perf/fixtures/receipt.jpg` (10 KB, 360 by 480) through `POST /files`.
+       The rest are paid in cash. Setup signs in seven accounts (the login allows ten a minute per address), starts any of the
+       kitchen, bar and till shifts that is not running (carried, as the demo admin) and buys in 400 toast slices and 6 kg of ground
+       coffee, so the burst never meets a shortfall. The polls stagger their first look within one interval and then poll one
+       interval after each answer, as the web's poll transport does. A threshold `orders_paid == 300` and `dropped_iterations == 0` sit
+       beside the plan's three. The arrival schedule stops at 598 s: a duration of exactly 600 s starts a 301st order, which the first
+       run showed.
+     - **The server**: the image's `artisan serve` answers one request at a time and, being the CLI, runs without OPcache. So
+       `compose.perf.yml` starts PHP's built-in server on Laravel's own router file with `PHP_CLI_SERVER_WORKERS=8` and OPcache on
+       (timestamps unchecked), and the job runs `php artisan optimize` before k6, as `scripts/deploy/release.sh` does on the live host
+       (`optimize:clear` before the after-checks, so Pest reads `phpunit.xml`). The live host runs LiteSpeed, so the k6 figures
+       describe the code under load and the poll budget describes the host.
+     - **The after-checks** are the group `perf:load` (`tests/Gate/LoadRunGateTest.php`), run in the app container once the queue
+       has drained (`Queue::size()` through tinker). The checks: exactly 300 orders after the id noted before the run, all closed and
+       settled; 225 paid in cash and 75 by Telebirr, each with a photo; `Inventory\Contracts\LedgerOracle::check` (5.5b) reports ok
+       on the stack's database, and `ledgerOracle()` of `tests/Support/helpers.php` (movements = balances = view) agrees; `failed_jobs`
+       is empty. The worker starts after the seed so `migrate:fresh` never races it.
+     - **Timeouts**: the 16 `ci.yml` jobs that had none (`status`, `api-lint`, `api-arch`, `invariants`, `openapi-check`,
+       `erd-check`, `web-lint`, `i18n-check`, `web-build`, `docker-build`, the placeholder `backup-drill`, `gate-p0` to `gate-p3`,
+       `gate-p5`) were given 20. The longest of them measured 7 minutes (`api-arch`, main run 41363303323). 5.5b's real
+       `backup-drill` came with its own 25 and keeps it. The same was done in the skill's `assets/ci/ci.yml`, which also carries
+       `perf-load`.
+     - **STATUS**: `ops` stays `in_progress`, because 5.5c is not merged (5.5a and 5.5b are).
+     - **Measured runs** (PR #99). Without OPcache or the caches: polls p95 206 ms on one runner and 351 ms on a slower one (that
+       run failed the threshold; writes 265 and 393 ms, no failed request either time). With them (run 41388083454): polls p50 65 ms
+       and p95 171 ms, writes p50 92 ms and p95 230 ms (the slowest step, the send, 297 ms), no failed request of 44 233 (61.2 a
+       second, against the profile's 59.8 for polls alone), 300 orders closed (225 cash, 75 Telebirr with a photo), the ledger
+       reconciled over 125 item-locations, no failed job. The job took 14.5 minutes, with the seed of 8 days played in 52 s. The next
+       full run (41396586731, after mod-analytics) landed on a faster runner: polls p95 45 ms, writes p95 64 ms, no failed request of
+       45 132, the oracle ok over 57 items and 6 places, 14 minutes.
+       **Left open**: how the poll threshold behaves across GitHub's runner generations. The 4-core runner is close to busy at 61
+       requests a second; one slow runner moved p95 by 70 % and a fast one cut it to a quarter. If `perf-load` turns flaky, the choices are a larger runner (paid,
+       Ramin's call) or fewer devices per job; the plan's thresholds are kept as written.
+     - **For 5.6b**: `gate-p5` gains `perf-load` in its needs and the manifest's `extra_ci_jobs` lists it. `Phase5Seeder` gets the demo
+       devices beside `LOAD_DEVICES`.
 6. **5.6 docs** (STATUS `docs`), two PRs.
    - **5.6a `phase-5/go-live-checklist`** (`docs` `in_progress`). `docs/go-live-checklist.json` and its schema (10.3), the `gate_check.py`
      change that reads it (the repository copy and the skill's copy, kept identical; `scripts/tests/test_gate_checklist.py` with a fixture

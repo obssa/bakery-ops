@@ -1,0 +1,64 @@
+{
+  "about": [
+    "What each kind of device polls, and how often, with nothing failing and the screen visible (phase-5 plan 6, step 5.5d; ADR 0009: the live host polls, no WebSockets).",
+    "Read by tests/Unit/Perf/PollBudgetTest.php (the requests a minute N devices ask for) and by scripts/perf/load.k6.js (the CI job perf-load polls exactly this).",
+    "Every feed names the web constant its interval comes from; scripts/tests/test_poll_profile.py fails when the web changes one and this file does not follow.",
+    "A path may hold {station} (the device's station), {shift} (that station's running shift) and {cursor} (the feed's last cursor: left out on the first look, as the web does)."
+  ],
+  "kinds": {
+    "pad": {
+      "device_kind": "tablet",
+      "screen": "the pad (components/pad/PadScreen.tsx), a waiter signed in",
+      "feeds": [
+        { "name": "orders_mine", "path": "/orders?mine=1", "cursor": true, "interval_ms": 2000, "web": { "file": "apps/web/src/lib/live/transport.ts", "constant": "DEFAULT_POLL" } },
+        { "name": "menu", "path": "/menu?include_unavailable=1", "cursor": false, "interval_ms": 5000, "web": { "file": "apps/web/src/lib/live/pad.ts", "constant": "MENU_POLL" } },
+        { "name": "bell", "path": "/notifications?limit=30", "cursor": true, "interval_ms": 15000, "web": { "file": "apps/web/src/lib/live/notifications.ts", "constant": "BELL_POLL" } }
+      ]
+    },
+    "kds": {
+      "device_kind": "kds",
+      "screen": "a kitchen or bar display (components/kds/KdsScreen.tsx, StockStrip.tsx, the shift bar), the station's chef or barista",
+      "feeds": [
+        { "name": "tickets", "path": "/stations/{station}/tickets", "cursor": true, "interval_ms": 2000, "web": { "file": "apps/web/src/lib/live/transport.ts", "constant": "DEFAULT_POLL" } },
+        { "name": "stock_strip", "path": "/stations/{station}/stock-strip?limit=8", "cursor": false, "interval_ms": 2000, "web": { "file": "apps/web/src/lib/live/transport.ts", "constant": "DEFAULT_POLL" } },
+        { "name": "shift", "path": "/stations/{station}/shifts/current", "cursor": false, "interval_ms": 5000, "web": { "file": "apps/web/src/lib/live/shifts.ts", "constant": "SHIFT_POLL" } },
+        { "name": "bell", "path": "/notifications?limit=30", "cursor": true, "interval_ms": 15000, "web": { "file": "apps/web/src/lib/live/notifications.ts", "constant": "BELL_POLL" } }
+      ]
+    },
+    "till": {
+      "device_kind": "till",
+      "screen": "the till (components/till/TillScreen.tsx, DisplayCasePanel.tsx, CashWidget.tsx, the shift bar), the cashier",
+      "feeds": [
+        { "name": "queue", "path": "/orders?unpaid=1", "cursor": true, "interval_ms": 2000, "web": { "file": "apps/web/src/lib/live/transport.ts", "constant": "DEFAULT_POLL" } },
+        { "name": "menu", "path": "/menu?include_unavailable=1", "cursor": false, "interval_ms": 5000, "web": { "file": "apps/web/src/lib/live/pad.ts", "constant": "MENU_POLL" } },
+        { "name": "display_case", "path": "/display-case", "cursor": false, "interval_ms": 2000, "web": { "file": "apps/web/src/lib/live/transport.ts", "constant": "DEFAULT_POLL" } },
+        { "name": "production_board", "path": "/production/requests?view=board&limit=200", "cursor": false, "interval_ms": 5000, "web": { "file": "apps/web/src/lib/live/production.ts", "constant": "BOARD_POLL" } },
+        { "name": "shift", "path": "/stations/{station}/shifts/current", "cursor": false, "interval_ms": 5000, "web": { "file": "apps/web/src/lib/live/shifts.ts", "constant": "SHIFT_POLL" } },
+        { "name": "cash", "path": "/shifts/{shift}/cash", "cursor": false, "interval_ms": 5000, "web": { "file": "apps/web/src/lib/live/cash.ts", "constant": "CASH_POLL" } },
+        { "name": "counts", "path": "/shifts/{shift}/counts", "cursor": false, "interval_ms": 15000, "web": { "file": "apps/web/src/components/shifts/CashWidget.tsx", "literal": "refetchInterval: 15_000" } },
+        { "name": "bell", "path": "/notifications?limit=30", "cursor": true, "interval_ms": 15000, "web": { "file": "apps/web/src/lib/live/notifications.ts", "constant": "BELL_POLL" } }
+      ]
+    },
+    "admin": {
+      "device_kind": "tablet",
+      "screen": "the admin's orders board (components/admin/OrdersBoard.tsx), a manager",
+      "feeds": [
+        { "name": "board", "path": "/orders?limit=200", "cursor": true, "interval_ms": 2000, "web": { "file": "apps/web/src/lib/live/transport.ts", "constant": "DEFAULT_POLL" } },
+        { "name": "bell", "path": "/notifications?limit=30", "cursor": true, "interval_ms": 15000, "web": { "file": "apps/web/src/lib/live/notifications.ts", "constant": "BELL_POLL" } }
+      ]
+    },
+    "shift": {
+      "device_kind": "tablet",
+      "screen": "the shifts overview and the counts queue (components/shifts/admin/Overview.tsx, ApprovalQueue.tsx), a manager",
+      "feeds": [
+        { "name": "running", "path": "/shifts?running=1&per_page=100", "cursor": false, "interval_ms": 5000, "web": { "file": "apps/web/src/lib/live/running.ts", "constant": "RUNNING_POLL" } },
+        { "name": "counts_queue", "path": "/stock-counts", "cursor": false, "interval_ms": 5000, "web": { "file": "apps/web/src/lib/live/counts.ts", "constant": "QUEUE_POLL" } },
+        { "name": "bell", "path": "/notifications?limit=30", "cursor": true, "interval_ms": 15000, "web": { "file": "apps/web/src/lib/live/notifications.ts", "constant": "BELL_POLL" } }
+      ]
+    }
+  },
+  "mixes": {
+    "ci": { "pad": 34, "kds": 12, "till": 8, "admin": 3, "shift": 3 },
+    "day_one": { "pad": 7, "kds": 2, "till": 2, "admin": 1, "shift": 0 }
+  }
+}
