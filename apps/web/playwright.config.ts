@@ -55,7 +55,7 @@ export default defineConfig({
     { name: "p3-opening-prefill", testDir: "./e2e/p3", testMatch: /prefill/, use: tablet },
     { name: "p4-pay-photo-split", testDir: "./e2e/p4", testMatch: /pay/, use: tablet },
     { name: "p4-dashboards", testDir: "./e2e/p4", testMatch: /dashboards/, use: tablet },
-    { name: "p5-device", testDir: "./e2e/p5", testMatch: /device/, use: tablet },
+    { name: "p5-device", testDir: "./e2e/p5", testMatch: /device|print|ops/, use: tablet },
     { name: "p5-offline", testDir: "./e2e/p5", testMatch: /offline/, use: { ...tablet, serviceWorkers: "allow" } },
     { name: "p5-amharic", testDir: "./e2e/p5", testMatch: /amharic/, use: tablet },
     // Step 5.5a (ADR 0021), run by CI's web-errors job: -off on a build without NEXT_PUBLIC_SENTRY_DSN (no SDK, nothing sent), -on on a build
