@@ -348,20 +348,23 @@
         "verify / dispute",
         "void / refund (Phase 4; as built: POST /payments/{payment}/void in 4.3c, POST /orders/{order}/refund in 4.3d on Orders::refund, Actions\\RefundPayments)",
         "Totals::byChannel(date | shift_instance)",
-        "Totals::cash(shift_instance) (net of the cash refunds paid out in that shift, 4.3d)"
+        "Totals::cash(shift_instance) (net of the cash refunds paid out in that shift, 4.3d)",
+        "Phase 5 (5.3a): print jobs for the pull bridge (POST /orders/{order}/print, GET /print-jobs, the bridge routes, GET /orders/{order}/receipt.escpos; ADR 0019)"
       ],
       "events": [
         "PaymentRecorded",
         "PaymentVoided",
         "PaymentVerified",
         "PaymentDisputed",
-        "RefundPaid"
+        "RefundPaid",
+        "PrintJobFailed"
       ],
       "tables": [
         "payment_channels",
         "payments",
         "payment_refunds",
-        "receipt_settings"
+        "receipt_settings",
+        "print_jobs"
       ]
     },
     "notifications": {

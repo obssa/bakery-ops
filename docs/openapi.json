@@ -1036,6 +1036,191 @@
                 }
             }
         },
+        "/v1/bridge/jobs/next": {
+            "get": {
+                "operationId": "payments.bridge.next",
+                "tags": [
+                    "BridgeJobs"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "job_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "job_id"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/bridge/jobs/{job}/claim": {
+            "post": {
+                "operationId": "payments.bridge.claim",
+                "tags": [
+                    "BridgeJobs"
+                ],
+                "parameters": [
+                    {
+                        "name": "job",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BridgeJobRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "job_id": {
+                                            "type": "integer"
+                                        },
+                                        "order_number": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "copies": {
+                                            "type": "integer"
+                                        },
+                                        "escpos_base64": {
+                                            "type": "string"
+                                        },
+                                        "expires_at": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "job_id",
+                                        "order_number",
+                                        "copies",
+                                        "escpos_base64",
+                                        "expires_at"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/bridge/jobs/{job}/printed": {
+            "post": {
+                "operationId": "payments.bridge.printed",
+                "tags": [
+                    "BridgeJobs"
+                ],
+                "parameters": [
+                    {
+                        "name": "job",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BridgeJobRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/bridge/jobs/{job}/failed": {
+            "post": {
+                "operationId": "payments.bridge.failed",
+                "tags": [
+                    "BridgeJobs"
+                ],
+                "parameters": [
+                    {
+                        "name": "job",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BridgeJobRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/broadcasting/auth": {
             "post": {
                 "operationId": "identity.broadcasting.auth",
@@ -8221,6 +8406,167 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/orders/{order}/print": {
+            "post": {
+                "operationId": "payments.print",
+                "tags": [
+                    "PrintJobs"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PrintOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {}
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/print-jobs": {
+            "get": {
+                "operationId": "payments.print-jobs",
+                "tags": [
+                    "PrintJobs"
+                ],
+                "parameters": [
+                    {
+                        "name": "order_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/orders/{order}/receipt.escpos": {
+            "get": {
+                "operationId": "payments.receipt.escpos",
+                "tags": [
+                    "PrintJobs"
+                ],
+                "parameters": [
+                    {
+                        "name": "order",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "width",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "enum": [
+                                "576",
+                                "384"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Content-Length": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -15664,6 +16010,20 @@
                 ],
                 "title": "AssignProductionRequest"
             },
+            "BridgeJobRequest": {
+                "type": "object",
+                "description": "The print bridge's writes (step 5.3a, phase-5 plan 4.3), told apart by the route:\n  POST /bridge/jobs/{job}/claim    {width?: 576|384 dots (the receipt settings' paper when left out), client_uuid}\n  POST /bridge/jobs/{job}/printed  {client_uuid}\n  POST /bridge/jobs/{job}/failed   {failure_key: paper_out|offline|cover_open|unknown, client_uuid}\nclient_uuid is the bridge's id of the request (a UUID), written to the audit row. Anything else is 422 validation.failed.",
+                "properties": {
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "client_uuid"
+                ],
+                "title": "BridgeJobRequest"
+            },
             "BroadcastingAuthRequest": {
                 "type": "object",
                 "description": "What Laravel Echo (pusher-js) sends before it joins a private channel: the socket id the transport gave the\nconnection (\"1234.5678\") and the channel name (\"private-station.5\"), as JSON or form-encoded.",
@@ -16402,6 +16762,25 @@
                     "client_uuid"
                 ],
                 "title": "OpenAdHocShiftRequest"
+            },
+            "PrintOrderRequest": {
+                "type": "object",
+                "description": "POST /orders/{order}/print (step 5.3a, phase-5 plan 4.3): {copies?: 1 to 3, one when left out; client_uuid: the till's id of this\nrequest, a UUID}. Anything else is 422 validation.failed.",
+                "properties": {
+                    "copies": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3
+                    },
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "client_uuid"
+                ],
+                "title": "PrintOrderRequest"
             },
             "PublishRecipeRequest": {
                 "type": "object",
@@ -18468,7 +18847,9 @@
                                 "analytics.manage",
                                 "audit.export",
                                 "devices.manage",
-                                "devices.self"
+                                "devices.self",
+                                "print.create",
+                                "print.view"
                             ]
                         }
                     },
@@ -19214,7 +19595,9 @@
                                 "analytics.manage",
                                 "audit.export",
                                 "devices.manage",
-                                "devices.self"
+                                "devices.self",
+                                "print.create",
+                                "print.view"
                             ]
                         }
                     },

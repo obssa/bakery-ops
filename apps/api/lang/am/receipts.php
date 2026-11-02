@@ -33,6 +33,9 @@ return [
     'refunded' => 'ተመላሽ የተደረገ',
     'net_paid' => 'የተጣራ ክፍያ',
     'more_items' => 'እና :count ተጨማሪ እቃዎች',
+    // step 5.3a: the printed receipt (the print bridge) names the cashier who printed it and says it is not a fiscal receipt (phase-5 plan 10.2 Q9)
+    'cashier' => 'ገንዘብ ተቀባይ',
+    'non_fiscal' => 'የደንበኛ ደረሰኝ። ይህ የፊስካል (የሽያጭ መመዝገቢያ ማሽን) ደረሰኝ አይደለም።',
     'type' => [
         'dine_in' => 'እዚሁ መመገቢያ',
         'takeaway' => 'ይዞ መሄጃ',

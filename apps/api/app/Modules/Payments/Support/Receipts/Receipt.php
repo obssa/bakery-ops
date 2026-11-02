@@ -46,6 +46,13 @@ final readonly class Receipt
         public array $refunds,
     ) {}
 
+    /** The same receipt in another locale (step 5.3a: the printer's own font has no Ethiopic, so its fallback prints English only). */
+    public function inLocale(string $locale): self
+    {
+        return new self($this->business, $locale, $this->proforma, $this->orderNo, $this->businessDate, $this->orderType, $this->tableCode,
+            $this->issuedAt, $this->ethiopianDate, $this->lines, $this->money, $this->payments, $this->refunds);
+    }
+
     /** The file name a receipt is offered under: receipt-<number>-<business date>.pdf (pro-forma-... for a pro-forma). */
     public function fileName(): string
     {

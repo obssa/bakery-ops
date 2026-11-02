@@ -77,6 +77,8 @@ it('follows the matrix row by row', function (string $permission, array $roles) 
     'export the audit log (Phase 4)' => ['audit.export', ['admin']],
     'enrol, rename and revoke the devices (Phase 5)' => ['devices.manage', ['admin']],
     'ask whether this tablet is enrolled (Phase 5)' => ['devices.self', ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker']],
+    'print a receipt on the bridge (Phase 5)' => ['print.create', ['admin', 'manager', 'cashier']],
+    'see the print jobs and the receipt bytes (Phase 5)' => ['print.view', ['admin', 'manager', 'cashier']],
 ])->group('unit', 'module:identity');
 
 it('knows no role outside the eight and no permission outside the matrix', function () {

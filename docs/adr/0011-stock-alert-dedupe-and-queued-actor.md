@@ -112,3 +112,12 @@ automatic request). The decisions above hold; what the code adds or says differe
   `Queue::fake` / `sync` pairs, and `StockOutToProductionGateTest` on the seeded demo product.
 - **Live timing.** As the consequences say: the chain waits for the cron tick on the live host; the first `@live` run of it took about a
   minute end to end, and the e2e helper `waitForQueue` allows 150 s there and 30 s in CI.
+
+## Note, 2026-11-01: the print bridge writes as the person who asked (step 5.3a, ADR 0019)
+
+The print bridge (phase-5 plan 4.3) is a shop computer with a device token, not a person, and the sweep of the print jobs runs from the
+scheduler: both change rows with nobody signed in. They follow decision 4 of this ADR rather than a system user (none exists): every
+change of a print job (`print_job.claim`, `printed`, `failed`, `requeue`, `expire`) is written through `ActorContext::runAs` with the actor
+stamp of the person who asked for the print (`created_by_user_id`, `acting_user_id`, shift and station of the job), and the bridge's
+`device_id` on the bridge's own writes (none on the sweep's). The audit row therefore says who asked and which computer printed;
+`AuthenticateBridge` puts only the device on the request's actor, never a user, so a bridge cannot act as anyone outside a job.

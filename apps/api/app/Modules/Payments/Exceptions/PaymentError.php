@@ -230,6 +230,39 @@ final class PaymentError extends RuntimeException implements DomainRefusal
         return new self('payments.refund.proof_invalid', 422, ['field' => 'refund_proof_file_id', 'reason' => $reason]);
     }
 
+    /**
+     * Step 5.3a (phase-5 plan 4.3): a print, or the receipt's ESC/POS bytes, of an order that has no receipt: not paid in full, or
+     * cancelled or voided. $status is the order's.
+     */
+    public static function printNotPaid(string $status): self
+    {
+        return new self('payments.print.not_paid', 409, ['status' => $status]);
+    }
+
+    /** Step 5.3a: no print bridge of the branch was seen in print.bridge_seen_seconds; the till offers the receipt link at once. */
+    public static function printNoBridge(): self
+    {
+        return new self('payments.print.no_bridge', 409);
+    }
+
+    /** Step 5.3a: a claim of a job another bridge holds, or that is no longer waiting (printed, failed). $status is the job's. */
+    public static function printAlreadyClaimed(string $status): self
+    {
+        return new self('payments.print.already_claimed', 409, ['status' => $status]);
+    }
+
+    /** Step 5.3a: a claim of a job older than print.expire_minutes: it is expired, never printed. */
+    public static function printExpired(): self
+    {
+        return new self('payments.print.expired', 410);
+    }
+
+    /** Step 5.3a: printed or failed for a job this bridge does not hold. $status is the job's. */
+    public static function printNotClaimedByYou(string $status): self
+    {
+        return new self('payments.print.not_claimed_by_you', 409, ['status' => $status]);
+    }
+
     /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */
     public function messageKey(): string
     {

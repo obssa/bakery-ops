@@ -34,6 +34,9 @@ return [
     'refunded' => 'Refunded',
     'net_paid' => 'Net paid',
     'more_items' => 'and :count more items',
+    // step 5.3a: the printed receipt (the print bridge) names the cashier who printed it and says it is not a fiscal receipt (phase-5 plan 10.2 Q9)
+    'cashier' => 'Cashier',
+    'non_fiscal' => 'Customer receipt. This is not a fiscal receipt.',
     'type' => [
         'dine_in' => 'Dine in',
         'takeaway' => 'Takeaway',
