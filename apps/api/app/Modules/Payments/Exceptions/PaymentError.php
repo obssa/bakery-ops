@@ -239,6 +239,12 @@ final class PaymentError extends RuntimeException implements DomainRefusal
         return new self('payments.print.not_paid', 409, ['status' => $status]);
     }
 
+    /** Go-live settings (2026-11-02): the admin turned printing off in the receipt settings; the till offers the receipt link instead. */
+    public static function printDisabled(): self
+    {
+        return new self('payments.print.disabled', 409);
+    }
+
     /** Step 5.3a: no print bridge of the branch was seen in print.bridge_seen_seconds; the till offers the receipt link at once. */
     public static function printNoBridge(): self
     {

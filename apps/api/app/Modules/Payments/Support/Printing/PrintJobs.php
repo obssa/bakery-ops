@@ -11,6 +11,7 @@ use App\Modules\Orders\Contracts\Orders;
 use App\Modules\Payments\Enums\PrintJobStatus;
 use App\Modules\Payments\Exceptions\PaymentError;
 use App\Modules\Payments\Models\PrintJob;
+use App\Modules\Payments\Models\ReceiptSettings;
 use App\Modules\Payments\Support\PaymentAccess;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Events\PrintJobFailed;
@@ -23,8 +24,10 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The life of a print job (step 5.3a, phase-5 plan 4.3; ADR 0019), one transaction and one audit row per change:
- *   request  the till asks (POST /orders/{order}/print): only an order paid in full (409 payments.print.not_paid), only while a bridge of
- *            the branch was seen in print.bridge_seen_seconds (409 payments.print.no_bridge); a client_uuid already used answers its job;
+ *   request  the till asks (POST /orders/{order}/print): only while the branch prints at all (receipt_settings.printing_enabled, the
+ *            go-live settings' switch: 409 payments.print.disabled before anything else is asked of the order or the bridge), only an
+ *            order paid in full (409 payments.print.not_paid), only while a bridge of the branch was seen in print.bridge_seen_seconds
+ *            (409 payments.print.no_bridge); a client_uuid already used answers its job;
  *            print_job.create, as the person (and the one acting by short code, who must hold print.create too);
  *   next     the oldest queued job of the bridge's branch that is not too old to print: one indexed read, no write;
  *   claim    the job's row is locked; a queued job (or one whose claim nobody acknowledged for print.claim_ack_seconds) becomes the
@@ -54,7 +57,7 @@ final class PrintJobs
      * @return array{0: PrintJob, 1: bool} the job, and whether this call queued it
      *
      * @throws ModelNotFoundException an order of another branch, or none
-     * @throws PaymentError payments.print.not_paid, payments.print.no_bridge, auth.forbidden
+     * @throws PaymentError payments.print.disabled, payments.print.not_paid, payments.print.no_bridge, auth.forbidden
      */
     public function request(int $orderId, int $copies, string $clientUuid): array
     {
@@ -65,6 +68,9 @@ final class PrintJobs
         }
 
         $order = $this->orders->forReceipt($orderId);
+        if (! self::printingEnabled()) {
+            throw PaymentError::printDisabled();
+        }
         if (in_array($order->status, ['cancelled', 'voided'], true) || ! $order->isSettled()) {
             throw PaymentError::printNotPaid($order->status);
         }
@@ -88,6 +94,14 @@ final class PrintJobs
         }
 
         return [$job, true];
+    }
+
+    /** Whether the current branch prints receipts at all: its receipt settings' switch, on for a branch that has saved none. */
+    public static function printingEnabled(): bool
+    {
+        $enabled = ReceiptSettings::query()->value('printing_enabled');
+
+        return $enabled === null || (bool) $enabled;
     }
 
     /** The oldest queued job of the current branch that is young enough to print, or null. */

@@ -373,6 +373,7 @@ test.describe("admin payments logic", () => {
       ethiopian_dates: false,
       paper_width_mm: 80 as const,
       print_logo: false,
+      printing_enabled: true,
       is_default: true,
     };
     const form = receiptFormOf(settings);
@@ -391,6 +392,7 @@ test.describe("admin payments logic", () => {
       ethiopian_dates: false,
       paper_width_mm: 80,
       print_logo: false,
+      printing_enabled: true,
     });
     expect(receiptIssues({ ...form, business_name_am: " " })).toEqual(["business_name_am"]);
     expect(receiptIssues({ ...form, address_en: "Bole road" })).toEqual(["address_pair"]);
@@ -403,6 +405,9 @@ test.describe("admin payments logic", () => {
     // the receipt printer's paper and the logo switch (step 5.3c): read from the settings and sent back as they were set
     expect(receiptFormOf({ ...settings, paper_width_mm: 58 }).paper_width_mm).toBe(58);
     expect(receiptBody({ ...form, paper_width_mm: 58, print_logo: true })).toMatchObject({ paper_width_mm: 58, print_logo: true });
+    // the printing switch (the go-live settings, 2026-11-02): on unless the settings say off, and sent back as it was set
+    expect(receiptFormOf({ ...settings, printing_enabled: false }).printing_enabled).toBe(false);
+    expect(receiptBody({ ...form, printing_enabled: false }).printing_enabled).toBe(false);
   });
 });
 

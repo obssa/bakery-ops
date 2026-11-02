@@ -671,6 +671,8 @@ export interface ReceiptSettings {
   paper_width_mm: PaperWidth;
   /** reserved: no logo can be uploaded in Phase 5 */
   print_logo: boolean;
+  /** the go-live settings (2026-11-02): off, POST /orders/{order}/print answers 409 payments.print.disabled and the till offers the link */
+  printing_enabled: boolean;
   is_default: boolean;
 }
 

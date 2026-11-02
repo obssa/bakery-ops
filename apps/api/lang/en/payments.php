@@ -82,5 +82,7 @@ return [
         'already_claimed' => 'Another print bridge is printing this receipt, or it is no longer waiting.',
         'expired' => 'This receipt waited too long and was not printed. Print it again if the customer still wants it.',
         'not_claimed_by_you' => 'This print bridge is not printing this receipt.',
+        // go-live settings (2026-11-02): the admin turned printing off
+        'disabled' => 'Receipt printing is turned off in the receipt settings. Give the customer the receipt link instead.',
     ],
 ];

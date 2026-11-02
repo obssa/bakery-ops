@@ -428,6 +428,8 @@ export interface ReceiptForm {
   /** the receipt printer's paper (step 5.3c): 80 or 58 mm */
   paper_width_mm: PaperWidth;
   print_logo: boolean;
+  /** the go-live settings (2026-11-02): off, the till offers the receipt link instead of Print */
+  printing_enabled: boolean;
 }
 
 export function receiptFormOf(settings: ReceiptSettings): ReceiptForm {
@@ -444,6 +446,7 @@ export function receiptFormOf(settings: ReceiptSettings): ReceiptForm {
     ethiopian_dates: settings.ethiopian_dates,
     paper_width_mm: settings.paper_width_mm === 58 ? 58 : 80,
     print_logo: settings.print_logo === true,
+    printing_enabled: settings.printing_enabled !== false,
   };
 }
 
@@ -484,5 +487,6 @@ export function receiptBody(form: ReceiptForm): ReceiptSettingsInput {
     ethiopian_dates: form.ethiopian_dates,
     paper_width_mm: form.paper_width_mm,
     print_logo: form.print_logo,
+    printing_enabled: form.printing_enabled,
   };
 }

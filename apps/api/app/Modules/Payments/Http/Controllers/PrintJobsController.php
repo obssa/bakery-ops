@@ -26,7 +26,8 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
  *   POST /orders/{order}/print            print.create (admin, manager, cashier), Idempotency-Key. {copies?, client_uuid}: 202 the job,
  *                                         queued for the branch's bridge; a client_uuid already used answers its job. 409
  *                                         payments.print.not_paid (only a paid or closed order has a receipt), 409 payments.print.no_bridge
- *                                         (no bridge seen in print.bridge_seen_seconds: the till shows the receipt link at once).
+ *                                         (no bridge seen in print.bridge_seen_seconds: the till shows the receipt link at once), 409
+ *                                         payments.print.disabled before both when the admin turned printing off (the go-live settings).
  *   GET  /print-jobs?order_id=            print.view, conditional (ETag over the jobs' ids, states and attempts; 304 while nothing changed):
  *                                         {data: [job]}, newest first; another branch's order has none.
  *   GET  /orders/{order}/receipt.escpos   print.view. ?width=576|384: application/octet-stream, the receipt's ESC/POS bytes for a till PC

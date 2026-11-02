@@ -29,6 +29,25 @@ bilingual receipt with the right TIN.
 - The receipt says, in both languages, that it is a customer receipt and **not a fiscal receipt** (Q9). The shop's own sales
   register, if it has one, stays the fiscal record.
 
+## Turning printing off and on (ማተምን ማጥፋትና ማብራት)
+
+The shop can work without its receipt printer, for example before the printer is set up or while it is being repaired. Customers
+then get the receipt link and its QR code instead of paper. This was decided for go-live on 2026-11-02.
+
+- **To turn printing off:** as an admin, open **Admin > Payments > Receipts**. Clear **Print receipts on the shop's receipt printer**
+  (ደረሰኞችን በሱቁ የደረሰኝ ማተሚያ አትም) and press **Save receipt settings**.
+- **While printing is off:**
+  - There is no **Print receipt** button on the till's pay sheet, on the order record or in the refund dialog.
+  - After payment, the receipt link and its QR code show at once, without a press, for the customer to scan.
+  - The server refuses any print ("Receipt printing is turned off in the receipt settings").
+  - A till that loaded the settings a few minutes before the change may still show Print once. Pressing it is refused, and the link
+    is shown.
+  - The bridge, if one is installed, keeps running and prints anything that was already waiting. Nothing new reaches it.
+- **To turn printing on again:** tick the same box and save. Print returns on the tills within a few minutes, or at once after a page
+  reload. Print a receipt from the till to check the printer.
+- Every change of the switch is in the audit log (`receipt_settings.update`, with the value before and after).
+- Turning printing off leaves the paper width, the business details and the bridge as they were.
+
 ## When it stops printing
 
 1. Check the printer: paper, power, cable or network.

@@ -22,7 +22,8 @@ import { QueryBox } from "../inventory/shared";
 // English and whether the Ethiopian date is printed too (step 4.5f: with today's date as the receipt prints it). PUT /receipt-settings
 // (channels.manage, the admin) replaces the whole form; anyone else who takes payments reads it here as the till's receipt prints it.
 // Step 5.3c adds the receipt printer's paper (80 or 58 mm, plan 10.2 D18: the print bridge draws 576 or 384 dots) and the logo switch
-// (kept for when a logo can be uploaded; the printed receipt carries none in Phase 5).
+// (kept for when a logo can be uploaded; the printed receipt carries none in Phase 5). The go-live settings (2026-11-02) add the printing
+// switch: off, the till hides Print and offers the receipt link and its QR code at once (the shop can go live without its printer).
 
 export function ReceiptSettingsScreen() {
   const t = useTranslations("adminPayments");
@@ -35,7 +36,7 @@ export function ReceiptSettingsScreen() {
   );
 }
 
-type TextField = Exclude<keyof ReceiptForm, "show_amharic" | "ethiopian_dates" | "paper_width_mm" | "print_logo">;
+type TextField = Exclude<keyof ReceiptForm, "show_amharic" | "ethiopian_dates" | "paper_width_mm" | "print_logo" | "printing_enabled">;
 
 interface FieldControlProps {
   id: string;
@@ -68,6 +69,7 @@ function SettingsForm({ settings }: { settings: ReceiptSettings }) {
   const paperLabel = useId();
   const paperHint = useId();
   const logoHint = useId();
+  const printingHint = useId();
   const set = <K extends keyof ReceiptForm>(key: K, value: ReceiptForm[K]) => {
     setSaved(false);
     setForm((current) => ({ ...current, [key]: value }));
@@ -164,6 +166,22 @@ function SettingsForm({ settings }: { settings: ReceiptSettings }) {
           {/* the receipt's own converter (Shared\Time\EthiopianDate) and the web's (lib/ethiopianDate.ts) are twins */}
           <p id={ethiopianHint} className="pl-8 text-sm text-neutral-600">
             {t("receipts.ethiopian_today", { date: ethiopianLabel(businessToday(), dates, true) })}
+          </p>
+        </div>
+        <div>
+          <label className="flex min-h-12 items-center gap-3 text-base">
+            <input
+              type="checkbox"
+              className="size-5"
+              disabled={!editable}
+              checked={form.printing_enabled}
+              aria-describedby={printingHint}
+              onChange={(event) => set("printing_enabled", event.target.checked)}
+            />
+            {t("receipts.printing_enabled")}
+          </label>
+          <p id={printingHint} className="pl-8 text-sm text-neutral-600">
+            {t("receipts.printing_enabled_hint")}
           </p>
         </div>
         <div role="radiogroup" aria-labelledby={paperLabel} aria-describedby={paperHint} className="space-y-1">

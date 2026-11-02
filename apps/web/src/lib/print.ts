@@ -7,7 +7,8 @@ import type { PrintJob, PrintJobStatus } from "./api/types";
 //
 // The receipt link and its QR code (4.3e's signed link) take over when a job fails (three tries) or expires (15 minutes), and when the
 // print is refused at once: no bridge of the branch was seen in the last two minutes (payments.print.no_bridge), or the order is not
-// paid (payments.print.not_paid). The customer scans the code with a phone and keeps the receipt there.
+// paid (payments.print.not_paid), or the admin turned printing off (payments.print.disabled; a till that knows it shows the link at once,
+// with no Print). The customer scans the code with a phone and keeps the receipt there.
 
 /** What the till says: a claimed job is a bridge printing it. */
 export type PrintPhase = "waiting" | "printing" | "printed" | "failed" | "expired";
@@ -51,8 +52,11 @@ export function printPollMs(jobs: readonly PrintJob[] | undefined, now: number =
   return Number.isFinite(age) && age > SLOW_AFTER_MS ? PRINT_SLOW_POLL_MS : PRINT_POLL_MS;
 }
 
+/** The go-live settings (2026-11-02): the admin turned printing off in the receipt settings (the till hides Print once it knows). */
+export const PRINTING_DISABLED = "payments.print.disabled";
+
 /** The refusals of POST /orders/{order}/print that the receipt link answers instead of an error. */
-export const PRINT_FALLBACK_REFUSALS: readonly string[] = ["payments.print.no_bridge", "payments.print.not_paid"];
+export const PRINT_FALLBACK_REFUSALS: readonly string[] = ["payments.print.no_bridge", "payments.print.not_paid", PRINTING_DISABLED];
 
 /** Whether the receipt link and its QR code take over: the latest job failed or expired, or the print was refused for no printer. */
 export function showsLink(job: PrintJob | null, refusal: string | null): boolean {

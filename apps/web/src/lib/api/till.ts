@@ -181,13 +181,16 @@ export function usePrintJobs(orderId: number, enabled: boolean) {
   });
 }
 
-/** GET /receipt-settings (step 4.3e): the business name the receipt preview carries. */
-export function useReceiptSettings() {
-  const enabled = useSession((s) => s.status === "signed-in");
+/**
+ * GET /receipt-settings (step 4.3e): the business name the receipt preview carries, and (the go-live settings) whether the branch prints
+ * receipts at all. `wanted` false asks nothing (the Print button asks only for those who may print).
+ */
+export function useReceiptSettings(wanted = true) {
+  const signedIn = useSession((s) => s.status === "signed-in");
   return useQuery({
     queryKey: ["receipt-settings"],
     queryFn: () => authed<ReceiptSettings>("/receipt-settings"),
-    enabled,
+    enabled: signedIn && wanted,
     staleTime: 300_000,
   });
 }

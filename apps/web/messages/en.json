@@ -1952,6 +1952,8 @@
       "paper_hint": "Choose the roll the receipt printer holds: a receipt drawn for the wrong width prints cut off or too small.",
       "print_logo": "Print the logo at the top",
       "print_logo_hint": "No logo can be added yet: until one can, the printed receipt starts with the business name.",
+      "printing_enabled": "Print receipts on the shop's receipt printer",
+      "printing_enabled_hint": "Turn this off while the shop has no receipt printer: the till then hides Print and shows the receipt link and its QR code for the customer to scan. Turn it on again once the printer is set up.",
       "issue_business_name_en": "Type the business name in English.",
       "issue_business_name_am": "Type the business name in Amharic.",
       "issue_address_pair": "Give the address in both languages, or in neither.",

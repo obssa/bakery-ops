@@ -75,6 +75,7 @@ test.describe("p5 print logic", () => {
     expect(showsLink(job({ status: "expired" }), null)).toBe(true);
     expect(showsLink(null, "payments.print.no_bridge")).toBe(true);
     expect(showsLink(null, "payments.print.not_paid")).toBe(true);
+    expect(showsLink(null, "payments.print.disabled")).toBe(true);
     // any other refusal (a permission, an unenrolled device, the network) is an error, not the fallback
     expect(showsLink(null, "auth.forbidden")).toBe(false);
     expect(showsLink(null, "identity.device.unknown")).toBe(false);

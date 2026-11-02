@@ -27,7 +27,7 @@ final class SaveReceiptSettings
     ) {}
 
     /**
-     * @param  array{business_name_en: string, business_name_am: string, address_en: string|null, address_am: string|null, phone: string|null, tin: string|null, footer_en: string|null, footer_am: string|null, show_amharic: bool, ethiopian_dates: bool, paper_width_mm?: int, print_logo?: bool}  $settings
+     * @param  array{business_name_en: string, business_name_am: string, address_en: string|null, address_am: string|null, phone: string|null, tin: string|null, footer_en: string|null, footer_am: string|null, show_amharic: bool, ethiopian_dates: bool, paper_width_mm?: int, print_logo?: bool, printing_enabled?: bool}  $settings
      */
     public function handle(array $settings): ReceiptSettings
     {

@@ -36,7 +36,7 @@ final class ReceiptSettingsController
     /**
      * The defaults a branch that has saved nothing reads (kept for the callers of step 4.3a).
      *
-     * @return array{business_name_en: string, business_name_am: string, address_en: string|null, address_am: string|null, phone: string|null, tin: string|null, footer_en: string|null, footer_am: string|null, show_amharic: bool, ethiopian_dates: bool, paper_width_mm: int, print_logo: bool, is_default: bool}
+     * @return array{business_name_en: string, business_name_am: string, address_en: string|null, address_am: string|null, phone: string|null, tin: string|null, footer_en: string|null, footer_am: string|null, show_amharic: bool, ethiopian_dates: bool, paper_width_mm: int, print_logo: bool, printing_enabled: bool, is_default: bool}
      */
     public static function defaults(string $branchName): array
     {

@@ -5,11 +5,11 @@ import { useTranslations } from "next-intl";
 import { useMemo, useRef, useState } from "react";
 import { ApiError } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
-import { requestPrint, usePrintJobs } from "@/lib/api/till";
+import { requestPrint, usePrintJobs, useReceiptSettings } from "@/lib/api/till";
 import type { PrintJob } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
 import { keepsKey } from "@/lib/paySheet";
-import { failureReason, inFlight, latestJob, PRINT_FALLBACK_REFUSALS, printPhase, qrModules, showsLink } from "@/lib/print";
+import { failureReason, inFlight, latestJob, PRINT_FALLBACK_REFUSALS, PRINTING_DISABLED, printPhase, qrModules, showsLink } from "@/lib/print";
 import { can, useSession } from "@/lib/session";
 import { OnlineOnlyButton } from "../OnlineOnly";
 
@@ -23,10 +23,18 @@ import { OnlineOnlyButton } from "../OnlineOnly";
 // customer has gone and the receipt lands in front of the next one; the API also expires a job after 15 minutes. The bridge needs the
 // internet as much as the till does, so a print queued offline would wait for both anyway. Offline the button says it needs a connection.
 
-/** The Print button's state and action, used by ReceiptActions (the pay sheet's receipt and the order record). */
+/**
+ * The Print button's state and action, used by ReceiptActions (the pay sheet's receipt and the order record). The go-live settings
+ * (2026-11-02): the admin may turn printing off in the receipt settings; then there is no Print at all and the link and its QR code take
+ * over at once, as for a refusal (printing counts as on until the settings are read; a till that read them before the switch is refused
+ * with payments.print.disabled, shows the link, and reads them again).
+ */
 export function usePrintReceipt(orderId: number) {
-  const canPrint = useSession((s) => can(s.me, "print.create"));
+  const mayPrint = useSession((s) => can(s.me, "print.create"));
   const canView = useSession((s) => can(s.me, "print.view"));
+  const settings = useReceiptSettings(mayPrint);
+  const printingOff = settings.data?.printing_enabled === false;
+  const canPrint = mayPrint && !printingOff;
   const client = useQueryClient();
   const jobs = usePrintJobs(orderId, canPrint && canView);
   const [busy, setBusy] = useState(false);
@@ -44,7 +52,7 @@ export function usePrintReceipt(orderId: number) {
   };
 
   const latest = canView ? latestJob(jobs.data ?? []) : answered;
-  const fallback = asked && showsLink(latest, refusal);
+  const fallback = printingOff || (asked && showsLink(latest, refusal));
 
   async function print() {
     setBusy(true);
@@ -62,6 +70,7 @@ export function usePrintReceipt(orderId: number) {
       if (failure instanceof ApiError && PRINT_FALLBACK_REFUSALS.includes(failure.key)) {
         setAsked(true);
         setRefusal(failure.key);
+        if (failure.key === PRINTING_DISABLED) void client.invalidateQueries({ queryKey: ["receipt-settings"] });
       }
       if (!keepsKey(failure)) renew();
     } finally {
