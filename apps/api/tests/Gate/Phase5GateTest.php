@@ -96,12 +96,12 @@ it('refuses a device nobody enrolled on every station route, the admin too, and 
     $problems = [];
     foreach (array_keys($stationRoutes) as $key) {
         $unknown = phase5Call($this, $key, [ResolveActor::DEVICE_HEADER => 'never-enrolled-'.Str::uuid()]);
-        if ($unknown->status() !== 403 || phase5MessageKey($unknown) !== 'identity.device.unknown') {
-            $problems[] = "{$key}: an unknown device got {$unknown->status()} ".phase5MessageKey($unknown);
+        if ($unknown->getStatusCode() !== 403 || phase5MessageKey($unknown) !== 'identity.device.unknown') {
+            $problems[] = "{$key}: an unknown device got {$unknown->getStatusCode()} ".phase5MessageKey($unknown);
         }
         $missing = phase5Call($this, $key, []);
-        if ($missing->status() !== 403 || phase5MessageKey($missing) !== 'identity.device.unknown') {
-            $problems[] = "{$key}: no device header got {$missing->status()} ".phase5MessageKey($missing);
+        if ($missing->getStatusCode() !== 403 || phase5MessageKey($missing) !== 'identity.device.unknown') {
+            $problems[] = "{$key}: no device header got {$missing->getStatusCode()} ".phase5MessageKey($missing);
         }
         $enrolled = phase5Call($this, $key, [ResolveActor::DEVICE_HEADER => $tablet->fingerprint]);
         if (str_starts_with(phase5MessageKey($enrolled), 'identity.device.')) {
@@ -124,8 +124,8 @@ it('answers the admin on a back-office route the same with the flag on and an un
     $off = phase5Call($this, $key, []);
 
     expect(phase5MessageKey($on))->not->toStartWith('identity.device.', "{$key} answered the device check: ".$on->getContent())
-        ->and($on->status())->toBe($off->status(), "{$key}: {$on->status()} with the flag on, {$off->status()} with it off: ".$on->getContent());
-    if ($on->status() === 403) {
+        ->and($on->getStatusCode())->toBe($off->getStatusCode(), "{$key}: {$on->getStatusCode()} with the flag on, {$off->getStatusCode()} with it off: ".$on->getContent());
+    if ($on->getStatusCode() === 403) {
         // a refusal that has nothing to do with the device: the admin gets it with the flag off too, so name it here
         expect(phase5MessageKey($on))->toBe(phase5MessageKey($off), "{$key}: a 403 that differs with the flag off");
     }
