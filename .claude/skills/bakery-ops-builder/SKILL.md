@@ -113,6 +113,11 @@ and requires `docs/phases/phase-<N>-report.md` (from `assets/templates/gate-repo
 `phase_status.py claim-done <N>` records `done_commit`, commit, push, wait for `gate-p<N>` green on
 `main`, record the run URL, tag `phase-<N>-complete`.
 
+When the manifest's gate names a `checklist` (phase 5: `docs/go-live-checklist.json`, plan 10.3), the gate adds one row per
+item (PASS, FAIL, SKIP, WAIT) and `claim-done` runs the gate first and refuses while any required item is not PASS. The
+`WAIT (Ramin)` rows are sign-offs only Ramin makes, in GitHub's web editor: **agents never write in `docs/go-live/signoffs/`**
+(no file created, edited or deleted there, no item signed); `check_invariants.py --signoffs` fails a PR that does.
+
 ### 6. Report and continue
 
 Write the gate report, add `gate-p<N+1>` to the required checks (`gh api` works with the owner's token),
@@ -145,7 +150,7 @@ need Ramin's accounts or money wait for him.
 - PHP runs only in Docker (`scripts/php`, `scripts/artisan`, `scripts/composer`, `scripts/pest`). The
   host PHP is 8.0 and will corrupt `composer.lock` if used.
 - Never weaken a contract test to make a consumer pass; never mark a module stable by editing STATUS
-  by hand; never set `plan_approved` yourself.
+  by hand; never set `plan_approved` yourself; never write in `docs/go-live/signoffs/` (Ramin signs there, in the browser).
 - Money and quantities are decimal strings end to end. If you type `(float)` or `parseFloat`, stop.
 - Every table gets `branch_id`; every write gets an idempotency key and an actor stamp; every user-facing
   string has `_en` and `_am`. `check_invariants.py --all` will tell you when you forgot.
