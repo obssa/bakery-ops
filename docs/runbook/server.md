@@ -442,7 +442,8 @@ Unattached uploads are purged after 24 hours (`files:purge-orphans`).
   Act before 70% of the account's quota.
 - **Backup.** The nightly backup must include `storage/app/private/files` as well as the database: a database restored without the folder has
   rows whose objects are gone (the signed URL answers 404, nothing else breaks). Restore both from the same night. A copy of the folder is
-  plain files, so `rsync -a storage/app/private/files/ <backup>/files/` is enough.
+  plain files, so `rsync -a storage/app/private/files/ <backup>/files/` is enough. Since step 5.5b the nightly `backup:run` does both (the
+  folder as hard links beside the dump) and a weekly drill proves the dump restores: docs/runbook/backup-restore.md (ADR 0020).
 - **Moving to S3 or R2.** (1) Create the bucket and an access key; set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`,
   `AWS_BUCKET` and `AWS_ENDPOINT` (the bucket's own endpoint, the host the URLs are signed for: it must be reachable from the browser;
   `AWS_USE_PATH_STYLE_ENDPOINT=true` for MinIO) in `.env`. (2) Copy the folder key for key:

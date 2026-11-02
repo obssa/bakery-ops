@@ -7,14 +7,14 @@ use App\Shared\Tenancy\CurrentBranch;
 
 /*
  * traps.md, Octane: a singleton that remembers the actor or the branch leaks one user's context into the next
- * request. Request state lives only in scoped() bindings; no class under App\Modules or App\Shared keeps mutable
- * static state.
+ * request. Request state lives only in scoped() bindings; no class under App\Modules, App\Shared or App\Ops (step 5.5b)
+ * keeps mutable static state.
  */
 
 it('has no mutable static properties in domain code', function () {
     $root = dirname(__DIR__, 2);
     $offenders = [];
-    foreach (['app/Shared', 'app/Modules'] as $dir) {
+    foreach (['app/Shared', 'app/Modules', 'app/Ops'] as $dir) {
         $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$dir, FilesystemIterator::SKIP_DOTS));
         foreach ($iterator as $file) {
             if (! $file instanceof SplFileInfo || $file->getExtension() !== 'php') {
