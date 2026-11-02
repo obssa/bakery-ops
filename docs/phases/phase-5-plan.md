@@ -394,6 +394,48 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      sent with the file id; a quota guard refuses a new photo when more than `NEXT_PUBLIC_PHOTO_QUEUE_MB` (50) waits, and says so; a photo
      whose payment was abandoned is dropped locally (the server already purges orphans after 24 h). `p5-offline` spec: offline, pay by a
      channel that needs a photo, attach it, go online: one file, one payment, the photo readable through its signed URL.
+   - **As built (step 5.2b, `phase-5/photo-queue`).** Tests red first (the five photo-queue cases of `offline-logic.spec.ts`, the
+     `p5-offline` photo flow, `FileUploadRaceTest`), then the API fix, then the web. No route, permission, request rule, OpenAPI or ERD
+     change. Where the code chose what the plan left open:
+     - **The store**: `bakery-ops` version 2 adds the object store `photos` (key `clientUuid`; a record keeps the shrunk blob, its size,
+       the upload's Idempotency-Key fixed when the photo was taken, the account, the time, and the file id once it is up). `upgradeDb`
+       creates only the stores that are missing (it looks at the stores, not at the old version: a database first opened without a version
+       is version 1 with no store), so a tablet's queued writes are kept. Without IndexedDB, or when a write to it fails, the photos live in
+       the tab's memory, as the queue then does.
+     - **Every photo is kept first** (`keepPhoto`), online too. Online it is still uploaded at once (`uploaded`); offline, or when its
+       upload gets no answer or a 5xx, it stays `kept`, which completes its row: the till block is lifted. A 4xx makes the row need
+       another photo (the "Try again" button is gone: what it retried is now `kept` and goes with the payment).
+     - **One upload write per batch**: Complete queues `upload_photos` (body `{photos: [client_uuid, ...]}`, no group) for the batch's kept
+       photos, then the batch with `depends_on` that write and `needs` as a **list**, one entry per photo
+       (`{token: "{{photo:<client_uuid>}}", from: "files[client_uuid=<client_uuid>].id"}`); 5.2a's single `{token, from}` still works. The
+       outbox sends each photo (POST /files, multipart) with its own client_uuid and key, writes the file id into the photo's record as soon
+       as it is answered (a retry after a failure halfway sends only the rest), and answers `{files: [{client_uuid, id}]}`. Rows whose photo
+       was uploaded online carry their file id as before.
+     - **Refusals**: a photo's 4xx names it (`photo_client_uuid` added to the API's body); the upload and the batch become conflicts. A photo
+       no longer on the tablet is refused on the tablet (`outbox.photo_missing`, status 0, both languages); `errors.ts` and the pay sheet
+       show such a body's own message rather than "network". A screen waiting for a write refused through its dependency (the till, online)
+       is given that refusal; the write, and the refused upload when nothing else waits on it, leave the queue, and the row's photo is
+       cleared for a new one. `409 idempotency.in_flight` (a slow upload whose answer timed out here, a second tab) is now retried with its
+       key instead of becoming a conflict.
+     - **Quota**: `NEXT_PUBLIC_PHOTO_QUEUE_MB` (unset, or not a positive number: 50; not set in `deploy.yml`). A new photo is refused when
+       the photos still waiting for their upload (no file id yet) and it would pass the limit; the row shows `till.photo_quota` with the MB
+       waiting and the limit, in both languages.
+     - **Abandoned photos** (`abandonedPhotos`): a photo that no queued write uploads (pending, or a conflict that may be sent again) and no
+       open pay sheet of this tab holds (`holdPhotos`: the till's drafts) is dropped at once when it is let go of (a row's photo replaced or
+       removed, a conflict dismissed, its upload accepted, its batch paid), and otherwise after 12 h (`ABANDONED_AFTER_MS`, swept at start:
+       a sheet a reload or a closed tab left behind; the grace keeps another tab's open sheet safe). The server still purges uploaded
+       orphans after 24 h.
+     - **API**: `FileUploadRaceTest` (30 forked rounds, the second upload 0 to 580 ms after the first, one client_uuid, two keys) found the
+       losing upload answered **404**: inside the controller's transaction, its `firstOrFail` read the snapshot taken before the winner
+       committed. `Files::put` now inserts under a savepoint (PostgreSQL would abort the whole transaction) and reads the winner with a
+       locking read; the controller audits, and answers 201, only for the upload that stored the file (the other gets 200). In Docker: 18
+       rounds raced, 12 went one after the other.
+     - **The flow** (`p5-offline`, not `@live`): offline, the whole bill on the run's wallet channel with its reference and the photo
+       attached (kept; Complete enabled); IndexedDB holds the shrunk photo and the two writes, which survive a reload with the API
+       unreachable; online, one POST /files (201), then one payment with that file, the order closed, the photo read through its signed URL
+       at 1600 x 1200.
+     - **Left for 5.2c**: the tray shows an `upload_photos` conflict with the photo it names; editing and resending a refused batch needs
+       its photo, which stays on the tablet until the conflict is dismissed.
    - **5.2c `phase-5/offline-conflicts`** (`web.offline` `done`). The **conflict tray**: every item refused on sync (a stock shortfall
      `orders.send.shortfall` or `inventory.stock.insufficient`, `inventory.shift.required`, `payments.shift.required`, a closed order, a revoked device) stays visible with the
      server's message in both languages, what was attempted, and the actions the refusal allows (edit and resend as a new write with a new

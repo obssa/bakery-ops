@@ -35,14 +35,17 @@ final class FilesController
 
         $file = $existing ?? DB::transaction(function () use ($request, $files, $audit, $uuid): StoredFile {
             $stored = $files->put($request->upload(), $request->purpose(), $uuid);
-            $audit->recordEvent('file.upload', 'stored_file', $stored->id, [
-                'purpose' => $stored->purpose, 'bytes' => $stored->bytes, 'width' => $stored->width, 'height' => $stored->height,
-            ]);
+            // an upload of the same client_uuid at the same moment stored it first (FileUploadRaceTest): that one is audited, this one wrote nothing
+            if ($stored->wasRecentlyCreated) {
+                $audit->recordEvent('file.upload', 'stored_file', $stored->id, [
+                    'purpose' => $stored->purpose, 'bytes' => $stored->bytes, 'width' => $stored->width, 'height' => $stored->height,
+                ]);
+            }
 
             return $stored;
         });
 
-        return response()->json($this->view($files, $file), $existing === null ? 201 : 200);
+        return response()->json($this->view($files, $file), $file->wasRecentlyCreated ? 201 : 200);
     }
 
     public function url(Request $request, Files $files, int $file): JsonResponse

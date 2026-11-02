@@ -3,22 +3,30 @@
 import { create } from "zustand";
 import { ApiError, isActingExpired, request } from "../api/client";
 import { uuid } from "../api/idempotency";
-import type { NewOrder, NewOrderLine, RejectBody } from "../api/types";
+import { receiptForm, UPLOAD_TIMEOUT_MS } from "../api/till";
+import type { NewOrder, NewOrderLine, RejectBody, StoredFileView } from "../api/types";
 import { actingHooks, useSession } from "../session";
 import { actingHeaders } from "../acting";
-import { loadOutbox, openOutboxDb, type OutboxDb } from "./db";
+import { loadOutbox, memoryPhotoDb, openOutboxDb, type OutboxDb, type PhotoDb } from "./db";
 import {
+  abandonedPhotos,
   groupOf,
+  LocalRefusal,
   nextSendable,
   nextWakeAt,
   outcomeOf,
+  photoQueueLimit,
+  photoQuota,
+  photosOf,
   refuse,
   resumeAll,
   retryLater,
   screenOf,
+  sendPhotos,
   settle,
   type OutboxItem,
   type OutboxKind,
+  type PhotoRecord,
 } from "./logic";
 
 // The outbox (step 1.6a; IndexedDB and every station write without a PIN since step 5.2a, plan 10.2 D10): the writes a screen must not
@@ -28,6 +36,9 @@ import {
 // and moved to the conflict list on any other refusal (the tray is step 5.2c; until then the shell strip shows them). A device refusal
 // keeps everything (step 5.1b). Screens that wait for the answer (the till, the production board, the count drafts) `submit()`: online
 // they get the answer or the refusal as before; offline, or when the write cannot go now, they are told it is queued.
+// Step 5.2b: the till's receipt photos are kept on the tablet (keepPhoto, within the quota) until the `upload_photos` write that sends them
+// was accepted; the payment batch waits for that write and takes each file id from its answer. A photo nothing needs is dropped
+// (releasePhotos).
 
 export type { OutboxItem, OutboxKind } from "./logic";
 
@@ -135,14 +146,137 @@ interface Waiter {
 }
 const waiters = new Map<string, Waiter>();
 
-/** The screens still waiting are told their write is queued (the pass ended without it). */
+/**
+ * The screens still waiting are told their write is queued (the pass ended without it), or, when it was refused with the write it depended
+ * on (a payment after its photos' upload), given that refusal: the screen shows it, and the write is not kept as a conflict.
+ */
 function releaseWaiters(): void {
   const { queue } = useOutbox.getState();
+  const told = new Set<string>();
   for (const [id, waiter] of waiters) {
     const item = queue.find((i) => i.id === id);
     waiters.delete(id);
-    if (item) waiter.resolve({ sent: false, item });
+    if (!item) continue;
+    if (item.state === "conflict" && item.conflict) {
+      told.add(id);
+      waiter.reject(new ApiError(item.conflict.status, item.conflict.body));
+    } else {
+      waiter.resolve({ sent: false, item });
+    }
   }
+  if (told.size > 0) {
+    // the write that refused them goes too, when nothing else waits on it: the screen showed its refusal (a photo's upload)
+    const blockers = new Set(queue.flatMap((i) => (told.has(i.id) && i.conflict?.blockedBy ? [i.conflict.blockedBy] : [])));
+    let rest = queue.filter((i) => !told.has(i.id));
+    const shown = rest.filter((i) => blockers.has(i.id) && !rest.some((o) => o.dependsOn === i.id || o.conflict?.blockedBy === i.id));
+    rest = rest.filter((i) => !shown.includes(i));
+    persist(rest);
+    useOutbox.setState(view(rest));
+    const photos = shown.flatMap(photosOf);
+    if (photos.length > 0) void releasePhotos(photos);
+  }
+}
+
+// The receipt photos kept on the tablet (step 5.2b): in IndexedDB once the database is open; in this tab's memory before that, without
+// IndexedDB, or when a write to it failed (a full disk), as the queue itself is then.
+let photoDb: PhotoDb | null = null;
+const photosInMemory = memoryPhotoDb();
+const photoStore: PhotoDb = {
+  photos: async () => {
+    const stored = photoDb ? await photoDb.photos().catch(() => [] as PhotoRecord[]) : [];
+    return [...stored, ...(await photosInMemory.photos())];
+  },
+  photo: async (clientUuid) => (await photosInMemory.photo(clientUuid)) ?? (photoDb ? await photoDb.photo(clientUuid) : null),
+  putPhoto: async (photo) => {
+    if (photoDb) {
+      try {
+        await photoDb.putPhoto(photo);
+        await photosInMemory.dropPhotos([photo.clientUuid]);
+        return;
+      } catch {
+        // kept in memory below
+      }
+    }
+    await photosInMemory.putPhoto(photo);
+  },
+  dropPhotos: async (clientUuids) => {
+    await photosInMemory.dropPhotos(clientUuids);
+    if (photoDb) await photoDb.dropPhotos(clientUuids).catch(() => {});
+  },
+};
+
+const photoHolders = new Set<() => Iterable<string>>();
+
+/** A screen that holds photos not queued yet (the till's open pay sheets) names them, so they are not dropped under it. */
+export function holdPhotos(holder: () => Iterable<string>): () => void {
+  photoHolders.add(holder);
+  return () => {
+    photoHolders.delete(holder);
+  };
+}
+
+/**
+ * Drops the photos nothing needs any more (logic.ts abandonedPhotos): the ones named here at once (a dismissed write's, a replaced or removed
+ * row's, an accepted upload's) unless a queued write or an open pay sheet still needs them, and any other after 12 hours.
+ */
+export async function releasePhotos(clientUuids: readonly string[] = []): Promise<void> {
+  try {
+    const held = new Set<string>();
+    for (const holder of photoHolders) for (const clientUuid of holder()) held.add(clientUuid);
+    const drop = abandonedPhotos(await photoStore.photos(), useOutbox.getState().queue, held, new Set(clientUuids), Date.now());
+    if (drop.length > 0) await photoStore.dropPhotos(drop);
+  } catch {
+    // dropped by a later call
+  }
+}
+
+const PHOTO_QUEUE_LIMIT = photoQueueLimit(process.env.NEXT_PUBLIC_PHOTO_QUEUE_MB);
+
+export type KeptPhoto = { kept: true; photo: PhotoRecord } | { kept: false; waitingBytes: number; limitBytes: number };
+
+/**
+ * Keeps a shrunk receipt photo on the tablet, with its own client_uuid and Idempotency-Key fixed now, unless the photos still waiting for
+ * their upload would pass NEXT_PUBLIC_PHOTO_QUEUE_MB (50 MB by default): then nothing is kept, and the till says how much waits.
+ */
+export async function keepPhoto(blob: Blob): Promise<KeptPhoto> {
+  const quota = photoQuota(await photoStore.photos(), blob.size, PHOTO_QUEUE_LIMIT);
+  if (!quota.allowed) return { kept: false, waitingBytes: quota.waitingBytes, limitBytes: quota.limitBytes };
+  const photo: PhotoRecord = {
+    clientUuid: uuid(),
+    key: uuid(),
+    purpose: "receipt",
+    blob,
+    bytes: blob.size,
+    userId: useSession.getState().me?.user.id ?? 0,
+    createdAt: Date.now(),
+    fileId: null,
+  };
+  await photoStore.putPhoto(photo);
+  return { kept: true, photo };
+}
+
+/** Sends a queued write: an `upload_photos` write sends its photos (POST /files each, its own client_uuid and key), any other its request. */
+function send(item: OutboxItem, token: string): Promise<unknown> {
+  if (item.kind !== "upload_photos") {
+    return request(item.path, { method: item.method, body: item.body, idempotencyKey: item.idempotencyKey, token, headers: item.headers });
+  }
+  return sendPhotos(photosOf(item), photoStore, async (photo) => {
+    try {
+      return await request<StoredFileView>("/files", {
+        method: "POST",
+        body: receiptForm(photo.blob, photo.clientUuid, photo.purpose),
+        idempotencyKey: photo.key,
+        token,
+        timeoutMs: UPLOAD_TIMEOUT_MS,
+      });
+    } catch (thrown) {
+      // a refusal names the photo it is about, so the screen (and the tray) can say which
+      if (thrown instanceof ApiError && outcomeOf(thrown.status, thrown.key) === "conflict") {
+        throw new ApiError(thrown.status, { ...thrown.body, photo_client_uuid: photo.clientUuid } as ConstructorParameters<typeof ApiError>[1]);
+      }
+      throw thrown;
+    }
+  });
 }
 
 let wakeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -216,8 +350,12 @@ export const useOutbox = create<OutboxState>()((set, get) => {
 
     dismissFailure: (id) => {
       const queue = get().queue;
-      if (!queue.some((i) => i.id === id && i.state === "conflict")) return;
+      const dismissed = queue.find((i) => i.id === id && i.state === "conflict");
+      if (!dismissed) return;
       commit(queue.filter((i) => i.id !== id));
+      // its photos go with it, unless another write or an open pay sheet still needs them
+      const photos = photosOf(dismissed);
+      if (photos.length > 0) void releasePhotos(photos);
     },
 
     flush: async () => {
@@ -236,10 +374,12 @@ export const useOutbox = create<OutboxState>()((set, get) => {
           let answer: unknown;
           try {
             set({ sendingId: item.id });
-            answer = await request(item.path, { method: item.method, body: item.body, idempotencyKey: item.idempotencyKey, token, headers: item.headers });
+            answer = await send(item, token);
           } catch (thrown) {
-            const error = thrown instanceof ApiError ? thrown : new ApiError(0, {});
-            const outcome = outcomeOf(error.status, error.key);
+            // a refusal made here (a photo no longer on the tablet) is a conflict like the API's, with status 0
+            const local = thrown instanceof LocalRefusal;
+            const error = local ? new ApiError(0, thrown.body) : thrown instanceof ApiError ? thrown : new ApiError(0, {});
+            const outcome = local ? "conflict" : outcomeOf(error.status, error.key);
             if (outcome === "signed_out") {
               // the account's session ended: everything waits, with its key, for the next sign-in
               useSession.getState().expire();
@@ -278,6 +418,8 @@ export const useOutbox = create<OutboxState>()((set, get) => {
             continue;
           }
           commit(settle(get().queue, item.id, answer));
+          // the photos are up: kept no longer, unless an open pay sheet still holds them (its payment was refused and is tried again)
+          if (item.kind === "upload_photos") void releasePhotos(photosOf(item));
           const waiter = waiters.get(item.id);
           if (waiter) {
             waiters.delete(item.id);
@@ -341,7 +483,8 @@ export function startOutbox(): () => void {
   if (!started) {
     started = true;
     void (async () => {
-      db = await openOutboxDb();
+      const opened = await openOutboxDb();
+      db = opened;
       let storage: Storage | null = null;
       try {
         storage = window.localStorage;
@@ -350,6 +493,7 @@ export function startOutbox(): () => void {
       }
       const { items, durable } = await loadOutbox(db, storage);
       if (!durable) db = null;
+      photoDb = durable ? opened : null;
       // writes queued while the saved queue was being read go after it
       const known = new Set(items.map((i) => i.id));
       const last = items.reduce((max, i) => Math.max(max, i.seq), 0);
@@ -359,6 +503,8 @@ export function startOutbox(): () => void {
       persist(queue);
       useOutbox.setState({ ...view(queue), loaded: true, durable });
       resume();
+      // the photos a reload or a closed tab left behind, that nothing queued needs
+      void releasePhotos();
     })();
   } else {
     resume();
@@ -443,6 +589,21 @@ export function queueSendExisting(orderId: number, orderUuid: string, after: str
 
 export function queueServeLine(lineId: number): OutboxItem | null {
   return useOutbox.getState().enqueue({ kind: "serve_line", method: "POST", path: `/order-lines/${lineId}/served`, body: {}, subjectId: lineId, headers: actingHeaders() });
+}
+
+/**
+ * The upload of a payment batch's photos kept on the tablet (step 5.2b), queued before the batch: the batch then depends on it and takes
+ * each file id from its answer (photoNeeds).
+ */
+export function queuePhotoUpload(clientUuids: string[], orderId: number, orderUuid: string | null): OutboxItem | null {
+  return useOutbox.getState().enqueue({
+    kind: "upload_photos",
+    method: "POST",
+    path: "/files",
+    body: { photos: clientUuids },
+    subjectId: orderId,
+    subjectUuid: orderUuid,
+  });
 }
 
 /** POST /orders/{id}/cancel; with the order's client UUID it goes after that order's other queued writes. */
