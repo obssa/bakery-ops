@@ -24,6 +24,11 @@ return [
         'fingerprint_taken' => 'This device is already enrolled.',
         'kind_invalid' => 'A device is a tablet, a till, a kitchen screen or a print bridge.',
     ],
+    // step 5.3a: the print bridge signs in with its own token (Authorization: Bridge <token>)
+    'bridge' => [
+        'unknown' => 'This print bridge is not enrolled, or its token is wrong. Enrol it as a device of kind bridge and paste the token it was given.',
+        'revoked' => 'This print bridge was revoked. Ask the admin to enrol it again as a new device and paste the new token.',
+    ],
     'acting_session' => [
         'expired' => 'Your short-code session has ended; enter your code again.',
     ],

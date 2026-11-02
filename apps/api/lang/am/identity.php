@@ -23,6 +23,11 @@ return [
         'fingerprint_taken' => 'ይህ መሣሪያ አስቀድሞ ተመዝግቧል።',
         'kind_invalid' => 'መሣሪያ ታብሌት፣ የክፍያ ቦታ፣ የወጥ ቤት ማያ ገጽ ወይም የህትመት ድልድይ ነው።',
     ],
+    // step 5.3a: the print bridge signs in with its own token (Authorization: Bridge <token>)
+    'bridge' => [
+        'unknown' => 'ይህ የህትመት ድልድይ አልተመዘገበም፣ ወይም ቶከኑ ትክክል አይደለም። እንደ ድልድይ መሣሪያ ይመዝግቡትና የተሰጠውን ቶከን ያስገቡ።',
+        'revoked' => 'ይህ የህትመት ድልድይ ተሰርዟል። አስተዳዳሪው እንደ አዲስ መሣሪያ እንዲመዘግበው ይጠይቁ፣ አዲሱንም ቶከን ያስገቡ።',
+    ],
     'acting_session' => [
         'expired' => 'የአጭር ኮድ ክፍለ ጊዜዎ አብቅቷል፤ ኮድዎን እንደገና ያስገቡ።',
     ],

@@ -35,3 +35,7 @@ Schedule::command('analytics:weekly-summary')->weeklyOn(1, '07:00')->timezone(co
 // check, long before opening), so the old rows on the live host go on their own and nobody deletes anything by hand. A failure of the last 30
 // days stays for whoever looks into it (the System page of step 5.5c counts them).
 Schedule::command('queue:prune-failed --hours=720')->dailyAt('04:10')->timezone('Africa/Addis_Ababa');
+
+// The print jobs (phase-5 plan 4.3, step 5.3a, ADR 0019): every minute, a claim the bridge did not acknowledge within a minute goes back to the
+// queue (failed after the third claim) and a receipt waiting longer than 15 minutes is expired. A few indexed reads when nothing waits.
+Schedule::command('print:sweep')->everyMinute()->withoutOverlapping(5);

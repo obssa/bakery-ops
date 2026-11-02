@@ -58,6 +58,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\Support\NotificationDrivers;
 use Tests\Support\OrdersMenu;
+use Tests\Support\PrintFixture;
 use Tests\Support\ProductionFixture;
 use Tests\Support\Shifts;
 use Tests\Support\ShiftsFixture;
@@ -792,6 +793,21 @@ return [
             return ['{order}' => (string) $order->id];
         },
         'payload' => fn (): array => ['ttl_hours' => 24],
+    ],
+    // Printing (step 5.3a): a print request writes one print_jobs row (202); the branch's bridge was seen just now, so it is not refused
+    // with payments.print.no_bridge. The bridge's own writes are public routes (tests/Support/public_routes.php), idempotent by their state.
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/orders/{order}/print',
+        'module' => 'payments',
+        'table' => 'print_jobs',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            PrintFixture::bridge(Branch::query()->findOrFail($me->branch_id));
+
+            return ['{order}' => (string) PrintFixture::paidOrder($me, 41)->id];
+        },
+        'payload' => fn (): array => ['copies' => 1, 'client_uuid' => (string) Str::uuid()],
     ],
 
     // Payment channels (step 4.3a): a create writes the channel row; an edit, the reorder and the soft delete write one audit_log row each

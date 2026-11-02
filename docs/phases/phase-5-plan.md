@@ -458,6 +458,45 @@ the phase being closed), so the phase cannot close while a placeholder is left.
      A new `print:doctor` reports `FreeType Support` from `gd_info()`; when it is missing the raster falls back to the printer's own Latin text
      without Amharic and the till offers the link (the deploy smoke prints the doctor line, non-fatal). Feature tests for every route
      (403 per role, the bridge token cases, replay, two bridges racing to claim one job).
+   - **As built (step 5.3a, `phase-5/print-jobs`).** Tests red first (the encoder and its test printer, the golden receipts, then every
+     route, the sweep, the migrations and the race), then the code, then the docs. Where the code chose what the plan left open:
+     - **Migrations** `2026_11_11_100300_create_print_jobs_table` (M3; besides the plan's index, `(branch_id, order_id, id)` for the till's
+       poll; `shift_instance_id` keyed to `shift_instances` like every shift stamp since 3.2a, which `ShiftStampForeignKeysTest` asks), `2026_11_11_100400_grant_phase_5_print_permissions` (M2b, `GrantRegistryPermissions`) and
+       `2026_11_11_100500_add_paper_width_to_receipt_settings` (M4: `paper_width_mm` DEFAULT 80 with CHECK
+       `receipt_settings_paper_width_check`, `print_logo` DEFAULT false). Live tables touched: none by M3 (new table), `permissions` and
+       `role_has_permissions` by M2b, `receipt_settings` (one row per branch, filled by the defaults, no row updated) by M4.
+     - **The bridge's token** is checked by Identity's `AuthenticateBridge` (alias `bridge`): `Authorization: Bridge <token>`, looked up by
+       its sha256; 401 `identity.bridge.unknown` (no header, a bearer token, a wrong or deleted bridge's token) or `identity.bridge.revoked`.
+       It sets the bridge's branch, puts the device (no user) on the actor and moves `last_seen_at` through `DeviceLastSeen` (once a minute),
+       which is what `print.bridge_seen_seconds` (120) reads through the new contract `Identity\Contracts\Bridges::seenWithin`.
+     - **The bridge's writes are idempotent by the job's state, not by `Idempotency-Key`** (that store is scoped to a user, and a bridge has
+       none): the bridge that holds a job asking claim, printed or failed again gets the same answer and nothing changes. Every bridge write
+       carries a `client_uuid` (the plan's `failed` row had none: it has one too), kept in the audit row's context. The four bridge routes
+       are in `public_routes.php` (and `check_invariants.py`'s mirror) and in `non_station_routes.php`.
+     - **Who writes**: the bridge's and the sweep's changes are audited as the person who asked for the print (`ActorContext::runAs` with
+       the job's stamp) on the bridge's device (the note on ADR 0011): `print_job.create`, `claim`, `printed`, `failed`, `requeue`, `expire`.
+     - **Claims**: a claim not acknowledged in 60 s may be taken over by any bridge at once (the scheduler on the live host ticks once a
+       minute after a random sleep), counting as a new claim; after the third claim a failure report, or the sweep finding it silent
+       (`failure_key unacknowledged`), fails the job and raises `PrintJobFailed` (payload job_id, order_id, order_number, failure_key,
+       requested_by_user_id; no listener until 5.5c). A claim of a job older than 15 minutes expires it and answers 410; `next` never offers
+       one. A printed, failed or expired job answers a claim with 409 `payments.print.already_claimed {status}`. `print:sweep` runs every
+       minute (`withoutOverlapping`).
+     - **The receipt** is `ReceiptLayout` (rows from the 4.3e view model) drawn by `ReceiptRaster` (Noto Sans Ethiopic from
+       `resources/fonts`, the file `receipts:fonts` installs; DejaVu Sans and Bold from `vendor/dompdf/dompdf/lib/fonts`, config `print.fonts`)
+       and encoded by `EscPos` (`ESC @`, `GS v 0` bands of 960 rows, `ESC d 4`, `GS V 1` partial cut, per copy). It names the **cashier**:
+       the person who asked for the print (the one acting by short code first); the PDF and the customer's link still name nobody. The
+       non-fiscal words are `receipts.non_fiscal` in both languages (Q9, awaiting `receipt-wording`). Without FreeType, or with
+       `PRINT_RASTER=false`, `ReceiptText` prints the English rows in the printer's font (48 or 32 columns); `print:doctor` says which.
+     - **Widths**: the claim's and `receipt.escpos`'s `width` is optional; left out, the receipt settings' paper (58 mm: 384, else 576).
+       `receipt_settings.paper_width_mm` is not yet in `GET`/`PUT /receipt-settings`: 5.3c adds it with the screen.
+     - **`GET /orders/{order}/receipt.escpos` is a station route** like `receipt.pdf` (a till PC); `GET /print-jobs` answers `{data: [...]}`
+       with an ETag over the jobs' ids, states and attempts; `POST /orders/{order}/print` answers the whole job (202).
+     - **Tests**: `ReceiptRasterTest` lives in `tests/Modules/Payments` (it needs the labels and font paths of the container, no database);
+       the goldens are `tests/Fixtures/receipts/receipt-{80,58}-{am,en}.png`, drawn on CI's runner (Ubuntu 24.04, PHP 8.3, libgd 2.3.3,
+       FreeType 2.13.2) and compared through `EscPosEmulator` within a two-dot neighbourhood, 0.5 % of the dots and 2 rows of height: the
+       PHP image's bundled GD with FreeType 2.12 places glyphs a dot or two apart (0.4 % at most; at one dot it was 1.6 %, which failed the
+       first CI run). `UPDATE_RECEIPT_GOLDENS=1` rewrites them, on CI's environment. `PrintClaimRaceTest` is in `tests/Gate` (`CommitsForConcurrency`,
+       30 rounds, `Innodb_deadlocks` unchanged). ADR 0019 is written here (proposed), not in 5.3b.
    - **5.3b `phase-5/print-bridge`**. `tools/print-bridge/`: Node 22, plain JavaScript (ESM), no native modules, one dependency at most;
      a config file `bridge.config.json` (API base URL, token file path, the printer: `tcp` host and port 9100, a Windows shared printer
      name, or a device path; the width); it polls `GET /bridge/jobs/next` (3 s, 15 s after a quiet minute), claims, writes the bytes,

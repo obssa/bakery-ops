@@ -85,6 +85,11 @@ final class PermissionRegistry
         // people.manage, which the admin keeps); devices.self: GET /devices/this, every role's "is this tablet enrolled?".
         'devices.manage' => ['admin'],
         'devices.self' => self::EVERYONE,
+        // Phase 5 (step 5.3a; plan sections 3 M2b, 4.3 and 10.6). They reach a live database through the grant-only migration
+        // 2026_11_11_100400_grant_phase_5_print_permissions. print.create: POST /orders/{order}/print; print.view: GET /print-jobs and
+        // GET /orders/{order}/receipt.escpos. The print bridge's own routes are authorised by its device token, not by a permission.
+        'print.create' => ['admin', 'manager', 'cashier'],
+        'print.view' => ['admin', 'manager', 'cashier'],
     ];
 
     /**
