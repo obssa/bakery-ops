@@ -31,6 +31,9 @@ import {
   type PhotoRecord,
 } from "../../src/lib/outbox/logic";
 import { batchRows, keptPhotos, refusedPhoto, rowIssue, type PayRow } from "../../src/lib/paySheet";
+import { cartFrom } from "../../src/lib/cart";
+import { actionsFor, CART_KINDS, cartSourceOf, discardEntry, landed, needsLookup, reasonOf, resendEntry, supersede, trayEntries } from "../../src/lib/outbox/tray";
+import { afterGap, RECONNECT_GAP_MS } from "../../src/lib/reconnect";
 
 // Phase 5 step 5.2a, the logic under the p5-offline flow (no browser, no stack): which queued write goes next (strict order per order, an
 // item after the one it depends on, then with that one's server id), how long a write waits after a failure (1, 2, 4 ... 60 s), what each
@@ -530,5 +533,219 @@ test.describe("offline logic: the photo queue (step 5.2b)", () => {
     await photos.dropPhotos(["a", "missing"]);
     expect((await photos.photos()).map((p) => [p.clientUuid, p.fileId])).toEqual([["b", 9]]);
     expect(await photos.photo("a")).toBeNull();
+  });
+});
+
+// Step 5.2c, the conflict tray and reconnect reconcile: every write refused on sync is an entry with the server's message in both
+// languages, what was tried, and the actions the refusal allows (edit and resend, send again as a new write, discard); a new send of the
+// same order from the cart replaces its refused writes; an order write whose answer was lost is looked up; the pad's cart comes back
+// from a refused send; a page reconciles on the online event and when it becomes visible after a gap.
+test.describe("offline logic: the conflict tray (step 5.2c)", () => {
+  const shortfallBody = {
+    message_key: "orders.send.shortfall",
+    message_en: "Some lines cannot be made with the stock on hand.",
+    message_am: "አንዳንድ መስመሮች ባለው ክምችት ሊሠሩ አይችሉም።",
+    order: {
+      id: 41,
+      client_uuid: "order-1",
+      type: "dine_in",
+      dining_table: { id: 3, code: "T3", name_en: "T3", name_am: "T3" },
+      notes: null,
+      status: "open",
+      lines: [{ id: 90, client_uuid: "line-1", item: { id: 5, name_en: "Cake", name_am: "ኬክ" }, qty: "2.0000", modifiers: [{ id: 8, name_en: "Big", name_am: "ትልቅ", price_delta: "5.00" }], notes: "warm" }],
+    },
+    shortfall: [{ line_client_uuid: "line-1", message_en: "Cannot add Cake ×2: Flour short by 100 g.", message_am: "ኬክ ×2 መጨመር አይቻልም፦ ዱቄት 100 g ጎድሏል።" }],
+  };
+  const refused = (overrides: Partial<OutboxItem>, body: Record<string, unknown>, status = 409, blockedBy: string | null = null) =>
+    item({ ...overrides, state: "conflict", conflict: { status, body, at: NOW, blockedBy } });
+
+  test("each refusal is one entry: the server's message in both languages, what was tried, why, and what may be done", () => {
+    const send = refused({ kind: "send_order", subjectUuid: "order-1", inline: true, body: { client_uuid: "order-1", send: true, lines: [] } }, shortfallBody);
+    const ready = refused({ kind: "ready_line", subjectId: 90 }, { message_key: "inventory.shift.required", message_en: "No shift is open.", message_am: "ፈረቃ አልተከፈተም።" });
+    const pay = refused({ kind: "pay_batch", subjectId: 41 }, { message_key: "payments.shift.required", message_en: "Start your shift.", message_am: "ፈረቃዎን ይጀምሩ።" }, 422);
+    const stock = refused({ kind: "finish_batch" }, { message_key: "inventory.stock.insufficient", message_en: "Not enough.", message_am: "በቂ የለም።" });
+    const closed = refused({ kind: "accept_line", subjectId: 91 }, { message_key: "state_machine.illegal_transition", message_en: "Not allowed.", message_am: "አይፈቀድም።" });
+    const gone = refused({ kind: "send_existing", subjectId: 41, subjectUuid: "order-2" }, { message_key: "orders.order.not_open", message_en: "No longer open.", message_am: "ክፍት አይደለም።" });
+    const missing = { message_key: "outbox.photo_missing", message_en: "The photo is gone.", message_am: "ፎቶው የለም።" };
+    const upload = refused({ kind: "upload_photos", body: { photos: ["p1"] } }, missing, 0);
+    const batch = refused({ kind: "pay_batch", dependsOn: upload.id, subjectId: 42 }, missing, 0, upload.id);
+    const lost = refused({ kind: "pay_batch", subjectId: 43 }, { message_key: "outbox.dependency_answer_missing", message_en: "Saved without it.", message_am: "ያለ እሱ ተቀምጧል።" }, 0);
+    const pending = item({ kind: "serve_line", subjectId: 92 });
+
+    const entries = trayEntries([send, ready, pay, stock, closed, gone, upload, batch, lost, pending]);
+    // the batch held back by its photo's upload is shown with that upload, not on its own; a pending write is not in the tray
+    expect(entries.map((e) => e.item.id)).toEqual([send.id, ready.id, pay.id, stock.id, closed.id, gone.id, upload.id, lost.id]);
+    const of = (id: string) => entries.find((e) => e.item.id === id)!;
+
+    expect(of(send.id)).toMatchObject({
+      reason: "shortfall",
+      status: 409,
+      key: "orders.send.shortfall",
+      message: { en: shortfallBody.message_en, am: shortfallBody.message_am },
+      details: [{ en: shortfallBody.shortfall[0].message_en, am: shortfallBody.shortfall[0].message_am }],
+      actions: ["edit", "discard"],
+      held: [],
+    });
+    expect(of(ready.id)).toMatchObject({ reason: "shift", actions: ["resend", "discard"] });
+    expect(of(pay.id)).toMatchObject({ reason: "shift", actions: ["resend", "discard"] });
+    expect(of(stock.id)).toMatchObject({ reason: "stock", actions: ["resend", "discard"] });
+    // a closed order: sending it again would be refused again
+    expect(of(closed.id)).toMatchObject({ reason: "closed", actions: ["discard"] });
+    expect(of(gone.id)).toMatchObject({ reason: "closed", actions: ["discard"] });
+    // refused on the tablet (status 0) with its own message: the photo it names, and the batch it held back
+    expect(of(upload.id)).toMatchObject({ reason: "photo", status: 0, photo: "p1", message: { en: missing.message_en, am: missing.message_am }, actions: ["discard"] });
+    expect(of(upload.id).held.map((h) => h.id)).toEqual([batch.id]);
+    expect(of(lost.id)).toMatchObject({ reason: "dependency", actions: ["discard"] });
+
+    // a held write whose refused write is no longer there is an entry of its own
+    expect(trayEntries([batch]).map((e) => e.item.id)).toEqual([batch.id]);
+  });
+
+  test("why a write was refused, from the API's key (and a photo the refusal names)", () => {
+    const reason = (key: string, status = 409, extra: Record<string, unknown> = {}) => reasonOf({ status, body: { message_key: key, ...extra } });
+    expect(reason("orders.send.shortfall")).toBe("shortfall");
+    expect(reason("inventory.stock.insufficient")).toBe("stock");
+    expect(reason("inventory.shift.required")).toBe("shift");
+    expect(reason("payments.shift.required", 422)).toBe("shift");
+    for (const key of ["orders.order.not_open", "orders.order.paid", "payments.order.not_payable", "state_machine.illegal_transition"]) expect(reason(key)).toBe("closed");
+    expect(reason("outbox.photo_missing", 0)).toBe("photo");
+    expect(reason("validation.failed", 422, { photo_client_uuid: "p1" })).toBe("photo");
+    expect(reason("outbox.dependency_answer_missing", 0)).toBe("dependency");
+    expect(reason("identity.acting_session.expired", 401)).toBe("session");
+    expect(reason("orders.item.not_sellable", 422)).toBe("other");
+
+    // the pad's own sends go back to the cart to be changed; any other write is sent again only when its cause can be put right
+    expect(CART_KINDS).toEqual(["send_order", "replace_lines", "send_existing"]);
+    for (const kind of CART_KINDS) for (const why of ["shortfall", "stock", "shift", "session", "other"] as const) expect(actionsFor(kind, why)).toEqual(["edit", "discard"]);
+    for (const kind of CART_KINDS) expect(actionsFor(kind, "closed")).toEqual(["discard"]);
+    for (const why of ["closed", "photo", "dependency", "session", "other"] as const) expect(actionsFor("ready_line", why)).toEqual(["discard"]);
+    for (const why of ["shortfall", "stock", "shift"] as const) expect(actionsFor("start_batch", why)).toEqual(["resend", "discard"]);
+  });
+
+  test("send again: a new write with a new Idempotency-Key and new client_uuids; what it held back waits for it again", () => {
+    const body = { client_uuid: "pay-1", payments: [{ client_uuid: "row-1", amount: "10.00" }, { client_uuid: "row-2", amount: "5.00" }] };
+    const pay = refused({ kind: "pay_batch", subjectId: 41, subjectUuid: "order-1", group: "order:order-1", body, attempts: 3, nextAttemptAt: NOW }, { message_key: "payments.shift.required" }, 422);
+    const after = refused({ kind: "cancel_order", dependsOn: pay.id, subjectId: 41 }, { message_key: "payments.shift.required" }, 422, pay.id);
+    const other = refused({ kind: "ready_line" }, { message_key: "inventory.shift.required" });
+    let made = 0;
+    const fresh = () => `new-${++made}`;
+
+    const queue = resendEntry([pay, after, other], pay.id, fresh);
+    const again = queue.find((i) => i.kind === "pay_batch")!;
+    expect(again.id).not.toBe(pay.id);
+    expect(again.idempotencyKey).not.toBe(pay.idempotencyKey);
+    expect(again).toMatchObject({ state: "pending", conflict: null, attempts: 0, nextAttemptAt: 0, seq: pay.seq, subjectId: 41, subjectUuid: "order-1" });
+    const sent = again.body as typeof body;
+    expect(sent.client_uuid).not.toBe("pay-1");
+    expect(new Set([sent.client_uuid, ...sent.payments.map((p) => p.client_uuid)]).size).toBe(3);
+    for (const old of ["pay-1", "row-1", "row-2"]) expect(JSON.stringify(sent)).not.toContain(old);
+    expect(sent.payments.map((p) => p.amount)).toEqual(["10.00", "5.00"]);
+    // the write it held back was never sent: it waits for the new one, with its own key
+    const held = queue.find((i) => i.kind === "cancel_order")!;
+    expect(held).toMatchObject({ id: after.id, state: "pending", conflict: null, dependsOn: again.id, idempotencyKey: after.idempotencyKey });
+    expect(queue.find((i) => i.id === other.id)).toEqual(other);
+    expect(nextSendable(queue, 7, NOW)?.id).toBe(again.id);
+    // only a refused write can be sent again
+    expect(resendEntry(queue, held.id, fresh)).toEqual(queue);
+  });
+
+  test("discard: the refused write and the writes it held back leave; the photos they named are let go", () => {
+    const upload = refused({ kind: "upload_photos", body: { photos: ["p1", "p2"] } }, { message_key: "outbox.photo_missing" }, 0);
+    const batch = refused({ kind: "pay_batch", dependsOn: upload.id, body: { payments: [] } }, { message_key: "outbox.photo_missing" }, 0, upload.id);
+    const keep = item({ kind: "serve_line" });
+    const { queue, photos } = discardEntry([upload, batch, keep], upload.id);
+    expect(queue.map((i) => i.id)).toEqual([keep.id]);
+    expect(photos).toEqual(["p1", "p2"]);
+    // a pending write is not discarded from the tray
+    expect(discardEntry([keep], keep.id)).toEqual({ queue: [keep], photos: [] });
+  });
+
+  test("a new send of the order from its cart replaces the order's refused writes; another order's stay", () => {
+    const send = refused({ kind: "send_order", subjectUuid: "order-1", inline: true }, shortfallBody);
+    const replace = refused({ kind: "replace_lines", subjectUuid: "order-1", subjectId: 41 }, shortfallBody);
+    const held = refused({ kind: "send_existing", subjectUuid: "order-1", subjectId: 41, dependsOn: replace.id }, shortfallBody, 409, replace.id);
+    const restored = refused({ kind: "send_order", subjectUuid: "order-7", inline: true }, { message_key: "orders.item.not_sellable" }, 422);
+    const elsewhere = refused({ kind: "send_order", subjectUuid: "order-2" }, shortfallBody);
+    const kitchen = refused({ kind: "ready_line", subjectUuid: "order-1" }, { message_key: "inventory.shift.required" });
+    const waiting = item({ kind: "send_existing", subjectUuid: "order-1" });
+
+    const queue = supersede([send, replace, held, restored, elsewhere, kitchen, waiting], "order-1", [restored.id]);
+    expect(queue.map((i) => i.id)).toEqual([elsewhere.id, kitchen.id, waiting.id]);
+  });
+
+  test("an order write whose answer was lost is looked up: what the server shows says whether it already happened", () => {
+    const sendExisting = item({ kind: "send_existing", subjectId: 41, attempts: 2 });
+    const cancel = item({ kind: "cancel_order", subjectId: 41, attempts: 1 });
+    // only a write that was tried before without an answer, about an order, refused because the order moved on
+    expect(needsLookup(sendExisting, "closed")).toBe(true);
+    expect(needsLookup(cancel, "closed")).toBe(true);
+    expect(needsLookup({ ...sendExisting, attempts: 0 }, "closed")).toBe(false);
+    expect(needsLookup(sendExisting, "shift")).toBe(false);
+    expect(needsLookup({ ...sendExisting, subjectId: null }, "closed")).toBe(false);
+    expect(needsLookup(item({ kind: "ready_line", subjectId: 90, attempts: 2 }), "closed")).toBe(false);
+
+    for (const status of ["sent", "in_progress", "ready", "served", "closed"]) expect(landed(sendExisting, { status })).toBe(true);
+    for (const status of ["open", "cancelled", "voided"]) expect(landed(sendExisting, { status })).toBe(false);
+    expect(landed(cancel, { status: "cancelled" })).toBe(true);
+    expect(landed(cancel, { status: "sent" })).toBe(false);
+    expect(landed(cancel, null)).toBe(false);
+  });
+
+  test("edit and resend on the pad: the cart comes back from the refused send", () => {
+    let made = 0;
+    const fresh = () => `fresh-${++made}`;
+    // a shortfall: the server holds the order open, so the cart is that order (same client_uuids) and goes as PUT lines + send
+    const short = refused({ kind: "send_order", subjectUuid: "order-1", inline: true }, shortfallBody);
+    expect(cartSourceOf(short, fresh)).toEqual({
+      orderUuid: "order-1",
+      serverOrderId: 41,
+      type: "dine_in",
+      tableId: 3,
+      notes: null,
+      lines: [{ client_uuid: "line-1", item_id: 5, qty: "2", modifier_ids: [8], notes: "warm" }],
+    });
+    // nothing was kept on the server: a new order, new client_uuids for it and its lines
+    const body = { client_uuid: "order-9", type: "takeaway", dining_table_id: null, notes: "no sugar", send: true, lines: [{ client_uuid: "line-9", item_id: 6, qty: "1" }] };
+    const notSellable = refused({ kind: "send_order", subjectUuid: "order-9", inline: true, body }, { message_key: "orders.item.not_sellable" }, 422);
+    expect(cartSourceOf(notSellable, fresh)).toEqual({
+      orderUuid: "fresh-1",
+      serverOrderId: null,
+      type: "takeaway",
+      tableId: null,
+      notes: "no sugar",
+      lines: [{ client_uuid: "fresh-2", item_id: 6, qty: "1" }],
+    });
+    // a refused change of an order already on the server, without the order in the answer: the screen reads it first
+    expect(cartSourceOf(refused({ kind: "send_existing", subjectId: 41, subjectUuid: "order-1" }, { message_key: "identity.acting_session.expired" }, 401), fresh)).toBeNull();
+
+    // the cart: each line with its menu row; a product the menu no longer has is left out; the shortfall on its line
+    const menu = [
+      { item_id: 5, name_en: "Cake", name_am: "ኬክ", category_id: 1, unit: "pcs", price: "50.00", currency: "ETB", available: "1.0000", low: true, is_new: false, station_id: 1, location_id: 1, modifiers: [] },
+    ];
+    const source = cartSourceOf(short, fresh)!;
+    const cart = cartFrom({ ...source, lines: [...source.lines, { client_uuid: "line-2", item_id: 77, qty: "1" }] }, menu, { shortfall: shortfallBody.shortfall as never, error: null }, [short.id]);
+    expect(cart).toMatchObject({ orderUuid: "order-1", serverOrderId: 41, type: "dine_in", tableId: 3, notes: "", sending: false, resolves: [short.id] });
+    expect(cart.lines).toEqual([{ uuid: "line-1", item: menu[0], qty: "2", modifierIds: [8], notes: "warm" }]);
+    expect(cart.shortfall.map((s) => s.line_client_uuid)).toEqual(["line-1"]);
+  });
+
+  test("reconnect: the online event always reconciles; a page that becomes visible again does after a gap", () => {
+    expect(RECONNECT_GAP_MS).toBe(30_000);
+    expect(afterGap(null, NOW)).toBe(false);
+    expect(afterGap(NOW - 29_999, NOW)).toBe(false);
+    expect(afterGap(NOW - 30_000, NOW)).toBe(true);
+    expect(afterGap(NOW - 5_000, NOW, 1_000)).toBe(true);
+  });
+
+  test("the tray speaks both languages: every key it uses is in English and in Amharic", () => {
+    const keys = ["tray_region", "tray_what", "tray_held", "tray_device", "edit", "resend", "discard", ...["shortfall", "stock", "shift", "closed", "photo", "dependency", "session", "other"].map((r) => `hint_${r}`)];
+    const ethiopic = /[ሀ-፿]/;
+    for (const key of keys) {
+      const english = (en.outbox as Record<string, string>)[key];
+      const amharic = (am.outbox as Record<string, string>)[key];
+      expect(english, key).toBeTruthy();
+      expect(amharic, key).toMatch(ethiopic);
+      expect(amharic).not.toBe(english);
+    }
   });
 });
