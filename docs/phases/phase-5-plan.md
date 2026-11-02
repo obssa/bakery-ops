@@ -539,7 +539,11 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        cached the screen before 5.3c must not turn a 58 mm printer back to 80 mm; a first save without them keeps M4's defaults). 70,
        576 and words are 422. `docs/openapi.json` re-exported. The screen has a radio group (80 mm, the wide roll; 58 mm, the narrow
        roll) and the logo switch with a note that no logo can be added yet.
-     - **Tests**: `print.spec.ts` runs under `p5-device` (`testMatch` `/device|print|ops/`), serial, CI stack only (skipped on live: the
+     - **The `p5-device` match**: the plan's `testMatch` `/device|print|ops/` matched the repo folder name (Playwright matches the
+       absolute path, and CI checks out into `.../bakery-ops/bakery-ops/`, so "ops" took every spec in `e2e/p5`, 5.5a's `errors-on`
+       among them). It is `/[\\/](device|print|ops)[^\\/]*\.spec\.ts$/`: the file name only (device, print and ops specs and their
+       logic specs), the same line as 5.5c's.
+     - **Tests**: `print.spec.ts` runs under `p5-device`, serial, CI stack only (skipped on live: the
        live E2E branch must not collect bridges). Its fake bridge (`e2e/support/bridge.ts`) is enrolled per flow and revoked after; the
        no-printer flow first revokes every bridge of the branch (a revoked bridge never counts as seen). 5.3b's JS emulator was not on
        main yet: `e2e/support/escpos.ts` checks the framing instead (`ESC @` first, `GS v 0` bands of one width, the `GS V` cut last,
