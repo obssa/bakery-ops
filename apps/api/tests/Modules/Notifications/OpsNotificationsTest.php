@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Identity\Contracts\StationPresenceResolver;
 use App\Modules\Notifications\Listeners\NotifyOps;
 use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Models\NotificationDelivery;
@@ -11,9 +12,12 @@ use App\Modules\Notifications\Support\NotificationTypes;
 use App\Shared\Events\BackupFailed;
 use App\Shared\Events\BackupStale;
 use App\Shared\Events\DrillFailed;
+use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
+use App\Shared\Models\Station;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Events\CallQueuedListener;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -27,6 +31,9 @@ pest()->group('module:notifications', 'feature');
  * Telegram driver is on with its keys, by Telegram (the type's channels; DriverRegistry decides). One line per run however often the
  * event is delivered (backup_failed:{run}, drill_failed:{run}); a stale backup is told once per stale period (backup_stale:{run}, the
  * delivery gate of the stock alerts, ADR 0011). Each line opens the System page. Queued after commit on the default queue.
+ * Go-live settings (2026-11-02, "the admin and the shift manager get the call, or anyone the admin assigns to it"): beside the admins
+ * and the holders of system.view, each branch's managers on duty (Recipients::onDuty at any station of the branch, as NotifyPrintFailed;
+ * every active manager when none is on duty) and every person the admin marked On call (Recipients::onCall), each person once.
  */
 
 beforeEach(function () {
@@ -34,11 +41,22 @@ beforeEach(function () {
     seedRoles();
     $this->branch = actInBranch(Branch::factory()->create());
     $this->admin = makeUser($this->branch, 'admin');
-    $this->manager = makeUser($this->branch, 'manager');
+    // somebody who is none of the audience: not an admin, not a manager, not on call
+    $this->cashier = makeUser($this->branch, 'cashier');
     makeUser($this->branch, 'admin', ['is_active' => false]);
     $this->other = Branch::factory()->create();
     $this->otherAdmin = makeUser($this->other, 'admin');
     withActor($this->admin->id);
+    $this->duty = [];
+    app()->instance(StationPresenceResolver::class, new class($this) implements StationPresenceResolver
+    {
+        public function __construct(private readonly object $test) {}
+
+        public function onDuty(Station $station): Collection
+        {
+            return new Collection($this->test->duty);
+        }
+    });
     $this->heard = fn (string $type) => Notification::query()->withoutGlobalScopes()->where('type', $type)->orderBy('user_id')->pluck('user_id')->all();
     $this->ids = fn (...$users) => collect($users)->map(fn ($u): int => $u->id)->sort()->values()->all();
 });
@@ -156,4 +174,53 @@ it('has the three types in the registry: in the inbox and on Telegram, keyed per
         ->and(NotificationTypes::inboxKey('drill_failed', $drill))->toBe('drill_failed:12')
         ->and(NotificationTypes::deepLink('drill_failed', $drill))->toBe('/admin/system')
         ->and(NotificationTypes::deepLink('backup_stale', $stale))->toBe('/admin/system');
+});
+
+it('tells the managers on duty beside the admins, not the managers off shift (go-live settings)', function () {
+    Station::factory()->create(['branch_id' => $this->branch->id, 'code' => StationCode::Till]);
+    $onShift = makeUser($this->branch, 'manager');
+    makeUser($this->branch, 'manager');
+    $this->duty = [$onShift, $this->cashier];
+
+    app(NotifyOps::class)->handle(new BackupFailed(11, 'backup', 'backup.dump_failed', 30));
+
+    expect(($this->heard)('backup_failed'))->toBe(($this->ids)($this->admin, $onShift, $this->otherAdmin));
+});
+
+it('tells every active manager when no manager is on duty (go-live settings)', function () {
+    Station::factory()->create(['branch_id' => $this->branch->id, 'code' => StationCode::Till]);
+    $first = makeUser($this->branch, 'manager');
+    $second = makeUser($this->branch, 'manager');
+    makeUser($this->branch, 'manager', ['is_active' => false]);
+    $this->duty = [$this->cashier];
+
+    app(NotifyOps::class)->handle(new DrillFailed(12, 'drill.ledger_mismatch', 3));
+
+    expect(($this->heard)('drill_failed'))->toBe(($this->ids)($this->admin, $first, $second, $this->otherAdmin));
+});
+
+it('tells everyone the admin marked On call, in every branch, whatever their role, but not one who is inactive (go-live settings)', function () {
+    $this->cashier->forceFill(['on_call' => true])->save();
+    $baker = makeUser($this->other, 'bread_baker', ['on_call' => true]);
+    makeUser($this->branch, 'waiter', ['on_call' => true, 'is_active' => false]);
+    makeUser($this->branch, 'waiter');
+
+    app(NotifyOps::class)->handle(new BackupStale(10, 'backup', 'backup.stale', 27));
+
+    expect(($this->heard)('backup_stale'))->toBe(($this->ids)($this->admin, $this->cashier, $this->otherAdmin, $baker));
+});
+
+it('tells the holders of system.view, and each person once however many of the groups they fall in (go-live settings)', function () {
+    Station::factory()->create(['branch_id' => $this->branch->id, 'code' => StationCode::Till]);
+    $manager = makeUser($this->branch, 'manager', ['on_call' => true]);
+    $manager->givePermissionTo('system.view');
+    $viewer = makeUser($this->branch, 'waiter');
+    $viewer->givePermissionTo('system.view');
+    $this->admin->forceFill(['on_call' => true])->save();
+    $this->duty = [$manager, $this->admin];
+
+    app(NotifyOps::class)->handle(new BackupFailed(11, 'backup', 'backup.dump_failed', 30));
+
+    expect(($this->heard)('backup_failed'))->toBe(($this->ids)($this->admin, $manager, $viewer, $this->otherAdmin))
+        ->and(Notification::query()->withoutGlobalScopes()->where('type', 'backup_failed')->count())->toBe(4);
 });

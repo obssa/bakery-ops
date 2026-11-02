@@ -85,6 +85,20 @@ it('tells the cashier who asked and the managers on duty, not the managers off s
     expect(($this->heard)())->toBe(($this->ids)($this->cashier, $this->onShift));
 });
 
+it('tells everyone the admin marked On call too, each once, but not one who is inactive (go-live settings)', function () {
+    $this->duty = [$this->onShift];
+    $this->otherCashier->forceFill(['on_call' => true])->save();
+    $this->onShift->forceFill(['on_call' => true])->save();
+    $this->cashier->forceFill(['on_call' => true])->save();
+    makeUser($this->branch, 'waiter', ['on_call' => true, 'is_active' => false]);
+    makeUser(Branch::factory()->create(), 'manager', ['on_call' => true]);
+
+    app(NotifyPrintFailed::class)->handle(($this->event)());
+
+    expect(($this->heard)())->toBe(($this->ids)($this->cashier, $this->otherCashier, $this->onShift))
+        ->and(Notification::query()->where('type', 'print_failed')->count())->toBe(3);
+});
+
 it('tells every active manager when no manager is on duty', function () {
     $this->duty = [$this->otherCashier];
 

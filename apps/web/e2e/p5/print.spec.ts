@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { uuid, type Api } from "../support/api";
+import { ApiFailure, uuid, type Api } from "../support/api";
 import { claimBytes, FakeBridge } from "../support/bridge";
 import { live, requireAdmin } from "../support/env";
 import { checkReceiptFrame } from "../support/escpos";
@@ -19,9 +19,13 @@ import { buildPayFixture, payBatch, takeawayOrder, tidyOrder, type PayFixture } 
 //   printed; the bytes are one copy on 80 mm paper (576 dots).
 // - On the order record, a job the printer fails three times (out of paper) is failed, and the record shows the link and its QR code.
 // - The receipt settings choose 58 mm paper: the bridge's claim, sent without a width, draws 384 dots.
+// - Go-live settings (2026-11-02): the admin turns printing off in the receipt settings; with a bridge connected all the same, the till
+//   hides Print and shows the receipt link and its QR code at once after payment, and the API refuses a print with
+//   payments.print.disabled. Printing is turned back on afterwards.
 // The CI stack only: the live E2E branch must not collect bridges, and a bridge's polls make the branch's printer look connected.
 
 const NO_PRINTER = "The receipt printer is not connected right now. Give the customer the receipt link instead.";
+const PRINTING = { name: "Print receipts on the shop's receipt printer", exact: true } as const;
 const QR = { name: "QR code of the receipt", exact: true } as const;
 
 interface PrintJobRead {
@@ -172,6 +176,50 @@ test.describe("p5 printing from the till", () => {
       const settings = await admin.get<Record<string, unknown>>("/receipt-settings");
       if (settings.paper_width_mm !== 80) {
         const form: Record<string, unknown> = { ...settings, paper_width_mm: 80 };
+        delete form.is_default;
+        await admin.put("/receipt-settings", form).catch(() => undefined);
+      }
+      await bridge.revoke(admin).catch(() => undefined);
+      await tidyOrder(fixture, sent.id);
+    }
+  });
+
+  test("with printing off in the receipt settings, the till hides Print and shows the receipt link and its QR code at once", async ({ page }) => {
+    test.setTimeout(180_000);
+    const fixture = await buildPayFixture(requireAdmin(test.skip), "60.00");
+    const { admin } = fixture;
+    const bridge = await FakeBridge.enrol(admin, "off");
+    const sent = await takeawayOrder(fixture, "1");
+    try {
+      await drain(bridge);
+      await openAs(page, admin, "en/admin/payments/receipts/");
+      const printing = page.getByRole("checkbox", PRINTING);
+      await expect(printing).toBeChecked({ timeout: 30_000 });
+      await printing.uncheck();
+      await page.getByRole("button", { name: "Save receipt settings" }).click();
+      await expect(page.getByRole("status").filter({ hasText: "Receipt settings saved." })).toBeVisible({ timeout: 15_000 });
+      expect((await admin.get<{ printing_enabled: boolean }>("/receipt-settings")).printing_enabled).toBe(false);
+      await page.reload();
+      await expect(page.getByRole("checkbox", PRINTING)).not.toBeChecked({ timeout: 30_000 });
+
+      const sheet = await payAtTill(page, fixture, orderLabel(sent));
+      await expect(sheet.getByLabel("Receipt link", { exact: true })).toHaveValue(/^https?:\/\/\S+$/, { timeout: 15_000 });
+      await expect(sheet.getByRole("img", QR)).toBeVisible();
+      await expect(sheet.getByRole("button", { name: "Print receipt" })).toHaveCount(0);
+      await expect(sheet.getByRole("button", { name: "Print again" })).toHaveCount(0);
+
+      const refused = await fixture.cashier.api.post(`/orders/${sent.id}/print`, { client_uuid: uuid() }).then(
+        () => null,
+        (failure: unknown) => failure,
+      );
+      expect(refused).toBeInstanceOf(ApiFailure);
+      expect((refused as ApiFailure).status).toBe(409);
+      expect((refused as ApiFailure).key).toBe("payments.print.disabled");
+      expect((await jobsOf(fixture.cashier.api, sent.id)).data).toEqual([]);
+    } finally {
+      const settings = await admin.get<Record<string, unknown>>("/receipt-settings");
+      if (settings.printing_enabled !== true) {
+        const form: Record<string, unknown> = { ...settings, printing_enabled: true };
         delete form.is_default;
         await admin.put("/receipt-settings", form).catch(() => undefined);
       }

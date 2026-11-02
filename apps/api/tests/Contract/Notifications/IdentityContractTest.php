@@ -223,3 +223,25 @@ it('finds named people for an event about one person (the owner of an order, the
         ->and(recipientIds($this->recipients->byIds([])))->toBe([])
         ->and(recipientIds($this->recipients->byIds([999999])))->toBe([]);
 })->group('contract:notifications->identity', 'contract');
+
+it('finds the people on call (go-live settings, 2026-11-02): the active users of the branch the admin marked On call, each once, in id order', function () {
+    $waiter = $this->people['waiter'];
+    $chef = $this->people['chef'];
+    $chef->forceFill(['on_call' => true])->save();
+    $waiter->forceFill(['on_call' => true])->save();
+    $inactive = makeUser($this->branch, 'cashier', ['on_call' => true]);
+    $inactive->forceFill(['is_active' => false])->save();
+    $gone = makeUser($this->branch, 'cashier', ['on_call' => true]);
+    $gone->delete();
+    $this->foreign['manager']->forceFill(['on_call' => true])->save();
+    $both = collect([$waiter->id, $chef->id])->sort()->values()->all();
+
+    expect(recipientIds($this->recipients->onCall()))->toBe($both, 'inactive, deleted and foreign people are not told')
+        ->and($this->recipients->onCall()->every(fn (User $u): bool => $u->branch_id === $this->branch->id))->toBeTrue();
+
+    $chef->forceFill(['on_call' => false])->save();
+    expect(recipientIds($this->recipients->onCall()))->toBe([$waiter->id], 'reads current data');
+
+    $waiter->forceFill(['on_call' => false])->save();
+    expect(recipientIds($this->recipients->onCall()))->toBe([], 'nobody on call is nobody, never everybody');
+})->group('contract:notifications->identity', 'contract');

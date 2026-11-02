@@ -66,6 +66,7 @@ it('answers the defaults of a branch that has saved nothing', function (string $
         'ethiopian_dates' => false,
         'paper_width_mm' => 80,
         'print_logo' => false,
+        'printing_enabled' => true,
         'is_default' => true,
     ]);
 })->with(['admin', 'manager', 'cashier']);
@@ -197,7 +198,7 @@ it('is saved by the admin only (channels.manage)', function (string $role) {
 it('has one row per branch (M5)', function () {
     expect(Schema::hasColumns('receipt_settings', [
         'id', 'branch_id', 'business_name_en', 'business_name_am', 'address_en', 'address_am', 'phone', 'tin', 'footer_en', 'footer_am',
-        'show_amharic', 'ethiopian_dates', 'paper_width_mm', 'print_logo', 'created_by_user_id', 'created_at', 'updated_at',
+        'show_amharic', 'ethiopian_dates', 'paper_width_mm', 'print_logo', 'printing_enabled', 'created_by_user_id', 'created_at', 'updated_at',
     ]))->toBeTrue();
     ($this->put)($this->form)->assertOk();
 
