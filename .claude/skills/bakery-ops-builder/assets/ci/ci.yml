@@ -378,9 +378,10 @@ jobs:
   # the 60 devices at the web's cadences (apps/api/tests/Fixtures/perf/poll-profile.json) while 300 orders go from pad to till in 10
   # minutes; thresholds: polls p95 < 300 ms, writes p95 < 800 ms, errors < 0.5 %, all 300 paid. Then, once the queue is empty, the
   # perf:load group (tests/Gate/LoadRunGateTest.php) checks the database: exactly 300 new orders, all closed; the ledger reconciled; no
-  # failed_jobs. compose.perf.yml serves the API with several PHP workers (the image's default `artisan serve` is one process; the live
-  # host runs PHP behind LiteSpeed, not this server, so the figures describe the code under load, not the host: PollBudgetTest and
-  # docs/runbook/server.md "Poll budget" speak for the host). The queue worker starts after the seed, so migrate:fresh never races it.
+  # failed_jobs. compose.perf.yml serves the API with 8 PHP workers and OPcache on, and the job caches the config, routes and events as
+  # a release does (the image's default `artisan serve` is one process without OPcache; the live host runs PHP behind LiteSpeed, so the
+  # figures describe the code under load, not the host: PollBudgetTest and docs/runbook/server.md "Poll budget" speak for the host).
+  # The queue worker starts after the seed, so migrate:fresh never races it.
   perf-load:
     needs: [status, docker-build, mod-analytics]
     if: fromJSON(needs.status.outputs.phase) >= 5
@@ -408,8 +409,10 @@ jobs:
           $DC exec -T -e SEED_PHASE=5 -e DEMO_HISTORY_DAYS="$LOAD_HISTORY_DAYS" -e LOAD_DEVICES="$LOAD_DEVICES" app \
             php artisan migrate:fresh --force --seed --seeder=DemoSeeder 2>&1 | grep -v ' DEBUG: ' | tee /tmp/seed.txt | tail -30
           grep -E '^Phase 4: ' /tmp/seed.txt | tee -a "$GITHUB_STEP_SUMMARY" || true
-      - name: Start the queue worker
-        run: $DC up -d --wait --wait-timeout 120 worker
+      - name: Start the queue worker; cache the config, routes and events as a release does (scripts/deploy/release.sh)
+        run: |
+          $DC up -d --wait --wait-timeout 120 worker
+          $DC exec -T app php artisan optimize
       - name: Read the ids the burst uses and the last order before it
         run: |
           set -o pipefail
@@ -452,6 +455,8 @@ jobs:
         if: always() && steps.k6.outcome != 'skipped'
         run: |
           set -o pipefail
+          # the tests read phpunit.xml's configuration, not the release cache k6 ran with
+          $DC exec -T app php artisan optimize:clear
           # the image has no .env (the variables come from compose): an empty one keeps PHPUnit from warning on every test (as gate-p4)
           $DC exec -T app touch .env
           $DC exec -T -e IDENTITY_REQUIRE_DEVICE=false -e GATE_SEED_DATABASE=bakery -e LOAD_ORDERS_AFTER -e LOAD_ORDERS app \
