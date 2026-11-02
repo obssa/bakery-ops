@@ -772,7 +772,7 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        tills, `55`..`60` tablets; any device past 60 is a tablet). Each device is enrolled through `EnrolDevice` as the demo admin
        (audited `device.enrol`, no station on the device), a fingerprint already enrolled is skipped, and `LOAD_DEVICES` outside 1-99
        is refused. With no `LOAD_DEVICES` the seeder still writes nothing. Its demo devices and receipt settings stay for 5.6b (a
-       `TODO(p5)` in the class).
+       to-do marker of the phase in the class, gone since 5.6b).
      - **The burst** is one k6 iteration per order, every 2 s from 30 s in: a dine-in order of one toast slice (kitchen, from its
        stock) and one buna (bar, made to order), sent from a pad by one of the two demo waiters (who sign in themselves: the pad
        account's short code would add a write per order and is limited to 30 a minute). The chef and the barista accept the order and

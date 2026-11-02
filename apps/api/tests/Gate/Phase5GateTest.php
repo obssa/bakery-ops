@@ -25,7 +25,7 @@ use Tests\Support\OrderFloor;
  *   outbox does after a lost answer, is one row, one set of stock movements and the first answer again.
  * - The go-live checklist (docs/go-live-checklist.json): it parses, its ids are unique, and every verifier's type is one that
  *   scripts/gate_check.py implements (VERIFIER_TYPES) and the schema allows; a script verifier's program is in the repository. The image
- *   holds apps/api only, so the gate job copies docs/, scripts/ and .github/ into the container and names the copy in GATE_REPO_ROOT;
+ *   holds apps/api only, so the gate job copies docs/ and scripts/ into the container and names the copy in GATE_REPO_ROOT;
  *   on a runner checkout the root is two folders above base_path().
  *
  * Each case also carries a module group (or `invariants`), so a module job sees it long before the gate does.
