@@ -28,13 +28,15 @@ it('has an English and an Amharic text for every Payments message, with the same
         'receipt.unpaid', 'receipt.link_invalid', 'reconciliation.range_too_large', 'export.too_large',
         // step 4.3d: refunds (the money side; Orders' refusals are in lang/{en,am}/orders.php)
         'refund.pin_required', 'refund.allocation_invalid', 'refund.reference_required', 'refund.proof_invalid',
+        // step 5.3a: printing through the print bridge
+        'print.not_paid', 'print.no_bridge', 'print.already_claimed', 'print.expired', 'print.not_claimed_by_you',
     ] as $key) {
         expect($en[$key] ?? null)->toBeString()->not->toBeEmpty("en {$key}")
             ->and($am[$key] ?? null)->toBeString()->not->toBeEmpty("am {$key}")
             ->and($am[$key])->not->toBe($en[$key], "am {$key} is not a copy of the English")
             ->and($am[$key])->toMatch('/\p{Ethiopic}/u');
     }
-    expect(array_keys($en))->toHaveCount(33);
+    expect(array_keys($en))->toHaveCount(38);
 })->group('module:payments');
 
 it('no longer tells the till that photos cannot be taken, that part payments are refused, or that only cash needs a shift (step 4.3b)', function () {

@@ -582,6 +582,19 @@ database queue, run by the `queue:work` cron line:
 - **Failed jobs** older than 30 days are pruned by the scheduler daily at 04:10 Addis Ababa time (`queue:prune-failed --hours=720`, on the
   existing `schedule:run` cron line). Nobody deletes rows by hand; `php artisan queue:failed` lists what is left.
 
+## Printing (Phase 5, step 5.3a; ADR 0019)
+
+- **How receipts reach the printer.** A print bridge on a shop computer (step 5.3b, its own runbook) polls `/api/v1/bridge/jobs/next`
+  with its device token, claims a job and prints the ESC/POS bytes the host draws. Nothing on the host listens for the shop; the host only
+  answers. The admin enrols the bridge as a device of kind `bridge`; its token is shown once and stored hashed.
+- **`php artisan print:doctor`** (read only, printed by every release, never fatal) says whether this host draws receipts as pictures with
+  Amharic: `FreeType Support: yes` from `gd_info()`, the `print.raster` switch and the receipt fonts. With FreeType missing, or
+  `PRINT_RASTER=false` in the server `.env` (then `php artisan config:cache`), receipts print as the printer's own Latin text in English
+  and the till offers the receipt link for an Amharic one.
+- **`print:sweep`** runs every minute on the existing `schedule:run` cron line: a claim the bridge did not acknowledge in 60 s goes back
+  to the queue (failed after the third claim) and a receipt waiting longer than 15 minutes is expired. A few indexed reads when nothing
+  waits. A till sees "no printer" (409 `payments.print.no_bridge`) when no bridge was seen for two minutes.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.

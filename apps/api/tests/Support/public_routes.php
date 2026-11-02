@@ -25,4 +25,12 @@ return [
     // it from Telegram has no bearer token, so the `signed` middleware (week, branch, locale and expiry under the signature, seven days) is the
     // protection; it answers the PDF only, read from the summaries, never cached.
     'GET api/v1/weekly-summaries/{week}',
+    // The print bridge (step 5.3a, phase-5 plan 4.3, ADR 0019): a shop computer, not a person, so no bearer token and no permission. The `bridge`
+    // middleware is the protection: Authorization: Bridge <token> must name an unrevoked device of kind bridge (only the token's sha256 is stored),
+    // else 401; the jobs are those of the bridge's branch. Its writes are idempotent by the job's state (a repeated claim, printed or failed of the
+    // same bridge answers the same and changes nothing) and audited as the person who asked for the print, on the bridge's device.
+    'GET api/v1/bridge/jobs/next',
+    'POST api/v1/bridge/jobs/{job}/claim',
+    'POST api/v1/bridge/jobs/{job}/printed',
+    'POST api/v1/bridge/jobs/{job}/failed',
 ];

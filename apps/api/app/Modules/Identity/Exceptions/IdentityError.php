@@ -82,6 +82,21 @@ final class IdentityError extends RuntimeException implements DomainRefusal
         return new self('identity.device.kind_invalid', 422);
     }
 
+    /**
+     * Step 5.3a (phase-5 plan 4.3, ADR 0019): a bridge route without `Authorization: Bridge <token>`, or with a token no bridge has (a deleted
+     * one included). 401: the bridge's runbook says to paste the token again.
+     */
+    public static function bridgeUnknown(): self
+    {
+        return new self('identity.bridge.unknown', 401);
+    }
+
+    /** Step 5.3a: the token of a bridge the admin revoked. 401: a revoked bridge is enrolled again as a new device, with a new token. */
+    public static function bridgeRevoked(): self
+    {
+        return new self('identity.bridge.revoked', 401);
+    }
+
     public static function actingSessionExpired(): self
     {
         return new self('identity.acting_session.expired', 401);

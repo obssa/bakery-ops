@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Identity\Http\Middleware\AuthenticateBridge;
 use App\Modules\Identity\Http\Middleware\EnsureEnrolledDevice;
 use App\Modules\Identity\Http\Middleware\ResolveActor;
 use App\Shared\Http\ApiError;
@@ -40,6 +41,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'actor' => ResolveActor::class,
             // Identity (step 5.1a, ADR 0017): on every station route (tests/Support/station_routes.php), off unless identity.require_enrolled_device.
             'device' => EnsureEnrolledDevice::class,
+            // Identity (step 5.3a, ADR 0019): the print bridge's routes, `Authorization: Bridge <token>` instead of a user
+            'bridge' => AuthenticateBridge::class,
             'permission' => PermissionMiddleware::class,
             'role' => RoleMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
