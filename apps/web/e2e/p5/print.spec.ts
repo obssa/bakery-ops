@@ -22,7 +22,7 @@ import { buildPayFixture, payBatch, takeawayOrder, tidyOrder, type PayFixture } 
 // The CI stack only: the live E2E branch must not collect bridges, and a bridge's polls make the branch's printer look connected.
 
 const NO_PRINTER = "The receipt printer is not connected right now. Give the customer the receipt link instead.";
-const QR = { name: "QR code of the receipt link" } as const;
+const QR = { name: "QR code of the receipt", exact: true } as const;
 
 interface PrintJobRead {
   id: number;
@@ -73,7 +73,7 @@ test.describe("p5 printing from the till", () => {
 
       await sheet.getByRole("button", { name: "Print receipt" }).click();
       await expect(sheet.getByRole("alert").filter({ hasText: NO_PRINTER })).toBeVisible({ timeout: 15_000 });
-      await expect(sheet.getByLabel("Receipt link")).toHaveValue(/^https?:\/\/\S+$/, { timeout: 15_000 });
+      await expect(sheet.getByLabel("Receipt link", { exact: true })).toHaveValue(/^https?:\/\/\S+$/, { timeout: 15_000 });
       await expect(sheet.getByRole("img", QR)).toBeVisible();
       expect((await jobsOf(fixture.cashier.api, sent.id)).data).toEqual([]);
     } finally {
@@ -135,7 +135,7 @@ test.describe("p5 printing from the till", () => {
         await bridge.failed(jobId, "paper_out");
       }
       await expect(status).toContainText("Not printed: the printer is out of paper.", { timeout: 15_000 });
-      await expect(receipt.getByLabel("Receipt link")).toHaveValue(/^https?:\/\/\S+$/, { timeout: 15_000 });
+      await expect(receipt.getByLabel("Receipt link", { exact: true })).toHaveValue(/^https?:\/\/\S+$/, { timeout: 15_000 });
       await expect(receipt.getByRole("img", QR)).toBeVisible();
       expect((await jobsOf(fixture.admin, sent.id)).data[0]).toMatchObject({ status: "failed", attempts: 3, failure_key: "paper_out" });
     } finally {

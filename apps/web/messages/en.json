@@ -224,7 +224,7 @@
     "receipt_link_copied": "Copied. Send it to the customer.",
     "receipt_link_copy_by_hand": "Copy the link from here and send it to the customer.",
     "receipt_link_scan": "Let the customer scan the code with a phone camera, or send them the link.",
-    "receipt_qr": "QR code of the receipt link",
+    "receipt_qr": "QR code of the receipt",
     "receipt_qr_hint": "Scan with a phone camera to open the receipt.",
     "print": "Print receipt",
     "print_again": "Print again",

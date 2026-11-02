@@ -213,7 +213,7 @@ web:till.receipt_link_field,/till,Receipt link,የደረሰኝ ማስፈንጠ�
 web:till.receipt_link_copied,/till,Copied. Send it to the customer.,ተቀድቷል። ለደንበኛው ይላኩት።,,
 web:till.receipt_link_copy_by_hand,/till,Copy the link from here and send it to the customer.,ማስፈንጠሪያውን ከዚህ ቀድተው ለደንበኛው ይላኩ።,,
 web:till.receipt_link_scan,/till,"Let the customer scan the code with a phone camera, or send them the link.",ደንበኛው ኮዱን በስልክ ካሜራ እንዲያነብ ያድርጉ፣ ወይም ማስፈንጠሪያውን ይላኩለት።,,
-web:till.receipt_qr,/till,QR code of the receipt link,የደረሰኙ ማስፈንጠሪያ ኪውአር ኮድ,,
+web:till.receipt_qr,/till,QR code of the receipt,የደረሰኙ ኪውአር ኮድ,,
 web:till.receipt_qr_hint,/till,Scan with a phone camera to open the receipt.,ደረሰኙን ለመክፈት በስልክ ካሜራ ያንብቡት።,,
 web:till.print,/till,Print receipt,ደረሰኙን አትም,,
 web:till.print_again,/till,Print again,እንደገና አትም,,
