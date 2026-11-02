@@ -44,10 +44,47 @@ export interface Cart {
   lineErrors: Record<string, Refusal>;
   /** a refusal that belongs to no line (table unknown, order no longer open ...) */
   error: Refusal | null;
+  /** the refused writes of the conflict tray this cart was rebuilt from (step 5.2c): its next send replaces them */
+  resolves: string[];
 }
 
 export function emptyCart(): Cart {
-  return { orderUuid: uuid(), type: "dine_in", tableId: null, notes: "", lines: [], serverOrderId: null, sending: false, shortfall: [], lineErrors: {}, error: null };
+  return { orderUuid: uuid(), type: "dine_in", tableId: null, notes: "", lines: [], serverOrderId: null, sending: false, shortfall: [], lineErrors: {}, error: null, resolves: [] };
+}
+
+/** What a cart is rebuilt from (step 5.2c, outbox/tray.ts cartSourceOf): an order's client UUID, its server id when the API holds it open. */
+export interface CartSource {
+  orderUuid: string;
+  serverOrderId: number | null;
+  type: OrderType;
+  tableId: number | null;
+  notes: string | null;
+  lines: NewOrderLine[];
+}
+
+/**
+ * The cart a refused send is changed in (the conflict tray's "Edit and resend", step 5.2c): each line with the menu row it names (a
+ * product the menu no longer has is left out), the refusal on it, and the refused writes its next send replaces.
+ */
+export function cartFrom(source: CartSource, menu: MenuItem[], refusal: { shortfall: ShortfallLine[]; error: Refusal | null }, resolves: string[]): Cart {
+  const lines: CartLine[] = [];
+  for (const line of source.lines) {
+    const item = menu.find((m) => m.item_id === line.item_id);
+    if (item) lines.push({ uuid: line.client_uuid, item, qty: line.qty, modifierIds: line.modifier_ids ?? [], notes: line.notes ?? "" });
+  }
+  return {
+    orderUuid: source.orderUuid,
+    type: source.type,
+    tableId: source.type === "dine_in" ? source.tableId : null,
+    notes: source.notes ?? "",
+    lines,
+    serverOrderId: source.serverOrderId,
+    sending: false,
+    shortfall: refusal.shortfall,
+    lineErrors: {},
+    error: refusal.error,
+    resolves,
+  };
 }
 
 /** A line of this product with no modifiers and no note: tapping the tile again adds to it instead of a new row. */
@@ -142,8 +179,17 @@ export function isSoldOut(line: CartLine, menu: MenuItem[] | undefined): boolean
 
 // --- the store: one cart per waiter, in memory only -----------------------------------------------------------
 
+/** A cart the conflict tray asked for (step 5.2c): the pad or till that opens next gives it to the person whose cart is empty there. */
+export interface CartRestore {
+  source: CartSource;
+  shortfall: ShortfallLine[];
+  error: Refusal | null;
+  resolves: string[];
+}
+
 interface CartsState {
   carts: Record<number, Cart>;
+  restore: CartRestore | null;
   update: (userId: number, change: (cart: Cart) => Cart) => void;
   reset: (userId: number) => void;
   /** a cart whose order was sent is finished: the waiter starts a new one (dine-in or takeaway is kept, the table is not) */
@@ -152,6 +198,7 @@ interface CartsState {
 
 export const useCarts = create<CartsState>()((set, get) => ({
   carts: {},
+  restore: null,
   update(userId, change) {
     const current = get().carts[userId] ?? emptyCart();
     set({ carts: { ...get().carts, [userId]: change(current) } });
@@ -169,5 +216,5 @@ export const useCarts = create<CartsState>()((set, get) => ({
 
 // signing the pad account out ends every parked cart: they belong to the waiters of that sign-in
 useSession.subscribe((state, previous) => {
-  if (previous.status === "signed-in" && state.status !== "signed-in") useCarts.setState({ carts: {} });
+  if (previous.status === "signed-in" && state.status !== "signed-in") useCarts.setState({ carts: {}, restore: null });
 });
