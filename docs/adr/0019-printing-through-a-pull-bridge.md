@@ -1,8 +1,8 @@
 # ADR 0019: Printing through a pull bridge
 
 - Status: **accepted** (step 5.6b, 2026-11-02; proposed in step 5.3a, 2026-11-01, from phase-5 plan sections 4.3, 6, 9 and 10.2 Q3, Q9,
-  D11, D18, D20). The decision is accepted as built: the server side (step 5.3a) and the till's side (step 5.3c). The bridge program, step
-  5.3b (PR #101), is not merged at this gate and records its own differences when it lands. The shop test `print-bridge-shop` and the
+  D11, D18, D20). The decision is accepted as built: the server side (step 5.3a), the bridge program (step 5.3b) and the till's side
+  (step 5.3c). The shop test `print-bridge-shop` and the
   sign-off `receipt-wording` stay go-live checklist rows that Ramin signs before the phase is claimed: they gate the claim, not the
   decision.
 - Date: 2026-11-01
@@ -89,10 +89,8 @@ till. Three facts decide how:
 
 ## Note, 2026-11-02: accepted at the Phase 5 gate (step 5.6b)
 
-This note records the steps merged so far, 5.3a (the jobs, the raster, the bridge routes) and 5.3c (the till), from their As built notes
-in phase-5 plan section 6. The bridge program, step 5.3b (PR #101), is not on this branch: its polling, its `--serve` mode (decision 8),
-its log that never holds the token and `docs/runbook/print-bridge.md` record their own differences when it lands. What the build changed
-from, or made concrete in, the decision:
+This note records the three steps, 5.3a (the jobs, the raster, the bridge routes), 5.3b (the bridge program) and 5.3c (the till), from
+their As built notes in phase-5 plan section 6. What the build changed from, or made concrete in, the decision:
 
 - **Claims** (decision 3): a claim not acknowledged in 60 s may be taken over by any bridge at once, as a new claim, without waiting for
   the sweep. A claim of a job older than 15 minutes expires it and answers 410 (`next` never offers one); a printed, failed or expired job
@@ -106,8 +104,18 @@ from, or made concrete in, the decision:
 - **`GET /orders/{order}/receipt.escpos`** (decision 8) is a station route, like `receipt.pdf`: once device enforcement is on, a till PC
   that prints its own receipts must be enrolled.
 - **Print is online only** (step 5.3c), an exception to ADR 0018's "every station write without a PIN is queued": a print sent when the
-  line came back could reach the printer an hour later, in front of the next customer. Offline the button says it needs a connection;
-  the bridge's local mode stays the way to print while the internet is down.
+  line came back could reach the printer an hour later, in front of the next customer. Offline the button says it needs a connection.
+- **The bridge program** (decision 1, step 5.3b): Node 22 with no dependency at all, `tools/print-bridge/`. It polls every 3 s, every
+  15 s after a quiet minute, at once after a job; errors back off from 3 s to 60 s and honour `Retry-After`. A claim and a report each
+  carry a `client_uuid` and are asked again with it after a network error; the bytes are written once, and a printed job whose report
+  was lost is reported again without a second print. A TCP printer is asked its status before a job, so `paper_out` and `cover_open`
+  are known; a Windows share or a device file cannot tell paper out, and the runbook prefers TCP. The token lives in its own file,
+  never in the config, and is read again after a 401; the log scrubs it from every line. On Windows it runs as a scheduled task
+  (`install-service.ps1`). A Cloudflare challenge is backed off like an outage.
+- **The local mode** (decision 8) keeps no user token: the till page sends its own with `POST http://127.0.0.1:9180/print`, and the
+  bridge forwards it to `receipt.escpos` for that one request. It listens on loopback only and refuses a foreign Host header. It
+  replaces the pull path when no bridge runs; it still needs the API, which draws the receipt, so it does not print while the internet
+  is down.
 - **The till** (decision 7): Print sits with the receipt actions, so the pay sheet, the order record and the refund dialog all print; one
   copy per press (the API's `copies` stays 1). The state is read from `GET /print-jobs?order_id=` with its ETag, every 2 s, every 10 s
   once a queued job has waited a minute, and not at all once the job is printed, failed or expired. A failed or expired job this screen
@@ -115,7 +123,8 @@ from, or made concrete in, the decision:
   code (`uqr` 0.1.2, error correction M). An old failed job seen on the order record does not make a link by itself: a link is an
   audited write.
 - **The flow test** (`e2e/p5/print.spec.ts`, CI stack only) enrols a fake bridge and checks the bytes' framing and width with
-  `e2e/support/escpos.ts`; it moves to 5.3b's emulator when 5.3b lands.
+  `e2e/support/escpos.ts`. The bridge's own suite (CI job `print-bridge`, `node --test`) runs against 5.3b's emulator, a rule-for-rule
+  copy of the PHP one; decoding the flow test's bytes with it is left to a later step.
 
 The rest (the pull, the bridge as a device, the jobs' life, writes as the person who asked, Amharic as a picture, the receipt's wording,
 the link as the fallback) is as proposed.
