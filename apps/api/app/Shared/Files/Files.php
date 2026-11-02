@@ -9,6 +9,7 @@ use App\Shared\Tenancy\CurrentBranch;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -36,7 +37,8 @@ final class Files
     ) {}
 
     /**
-     * Cleans, shrinks and stores an image, and records it. A second call with the same client_uuid returns the first row and stores nothing.
+     * Cleans, shrinks and stores an image, and records it. A second call with the same client_uuid returns the first row and stores nothing,
+     * also when the two run at once (the returned row's wasRecentlyCreated says which call stored it).
      *
      * @throws FilesError a refusal (nothing stored)
      */
@@ -80,12 +82,14 @@ final class Files
         ]);
 
         try {
-            $file->save();
+            // a savepoint inside the caller's transaction: a lost race undoes this insert only (PostgreSQL would abort the whole transaction)
+            DB::transaction(fn () => $file->save());
         } catch (UniqueConstraintViolationException) {
-            // a concurrent put of the same client_uuid won: drop our object, answer with its row
+            // a concurrent put of the same client_uuid won (FileUploadRaceTest): drop our object, answer with its row. A locking read: a plain
+            // one inside the caller's transaction reads the snapshot taken before the winner committed and would not find it
             $disk->delete($key);
 
-            return StoredFile::query()->where('client_uuid', $clientUuid)->firstOrFail();
+            return StoredFile::query()->where('client_uuid', $clientUuid)->sharedLock()->firstOrFail();
         } catch (Throwable $e) {
             $disk->delete($key);
 

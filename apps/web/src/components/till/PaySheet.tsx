@@ -9,11 +9,26 @@ import type { Locale, Order, PaymentBatchResult } from "@/lib/api/types";
 import { addDecimal, compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { downscale } from "@/lib/images/downscale";
-import { submit } from "@/lib/outbox/store";
+import { photoNeeds } from "@/lib/outbox/logic";
+import { keepPhoto, queuePhotoUpload, releasePhotos, submit } from "@/lib/outbox/store";
 import { useOrderNo } from "@/lib/orderNo";
-import { forgetPicture, keepPicture, pictureOf, usePayDrafts } from "@/lib/payDrafts";
+import { forgetPicture, keepPicture, usePayDrafts } from "@/lib/payDrafts";
 import { CASH } from "@/lib/payment";
-import { batchRows, blockReason, changeDue, keepsKey, MAX_ROWS, newRow, NO_PHOTO, remaining, sheetChannels, type Block, type PayRow } from "@/lib/paySheet";
+import {
+  batchRows,
+  blockReason,
+  changeDue,
+  keepsKey,
+  keptPhotos,
+  MAX_ROWS,
+  newRow,
+  NO_PHOTO,
+  refusedPhoto,
+  remaining,
+  sheetChannels,
+  type Block,
+  type PayRow,
+} from "@/lib/paySheet";
 import type { PayBlock } from "@/lib/shifts";
 import { useOnline } from "@/lib/useOnline";
 import { Alert, Button, Modal } from "../ui";
@@ -22,9 +37,10 @@ import { ReceiptPanel } from "./ReceiptPanel";
 
 // The till's pay sheet (step 4.5b, docs/phases/phase-4-plan.md section 6 item 5): the amount due and what is left to cover at the top, then
 // one row per payment (PayRowEditor), so a bill can be split over channels down to exactly the balance. Complete stays disabled until every
-// row is complete (each photo uploaded, each reference valid), the amounts add up to the balance, and the till's shift is running where the
-// shift rule is on (every channel since step 4.3b); the reason is always shown. Complete posts POST /orders/{order}/payment-batches once,
-// with the batch's client_uuid, each row's own client_uuid and one Idempotency-Key: all the payments are recorded or none is.
+// row is complete (each photo uploaded or kept on the tablet, each reference valid), the amounts add up to the balance, and the till's
+// shift is running where the shift rule is on (every channel since step 4.3b); the reason is always shown. Complete posts
+// POST /orders/{order}/payment-batches once, with the batch's client_uuid, each row's own client_uuid and one Idempotency-Key: all the
+// payments are recorded or none is.
 //
 // A photo is shrunk in the browser (lib/images/downscale.ts) and uploaded as soon as it is taken (POST /files, its own client_uuid and key,
 // both reused by a retry), so Complete never waits for an upload. Nothing is lost on a failure: the sheet is kept per order while the page
@@ -33,8 +49,23 @@ import { ReceiptPanel } from "./ReceiptPanel";
 // new request. Offline (or when the connection fails on Complete) the batch joins the outbox with its key and client_uuid (step 5.2a): the
 // sheet says it is saved on this tablet and shows the change to give, and the till holds the order until it was sent. The rules are
 // lib/paySheet.ts.
+//
+// Step 5.2b, the photo queue: every photo is first kept on the tablet (lib/outbox keepPhoto: within NEXT_PUBLIC_PHOTO_QUEUE_MB, or refused
+// with how much waits). Online it is uploaded at once as before; offline, or when its upload fails on the network, it stays kept and the row
+// is complete all the same: Complete queues one upload of the kept photos, then the batch, which waits for it and takes each file id from
+// its answer. A photo replaced, removed or paid for is let go of; the outbox drops it once nothing needs it.
 
 /** The change of the sheet's cash rows, which the cashier hands back now; null when no row is cash. */
+/** The photos the sheet's rows hold (by client_uuid). */
+function photosHeld(rows: PayRow[]): string[] {
+  return rows.flatMap((row) => (row.photo.clientUuid ? [row.photo.clientUuid] : []));
+}
+
+/** Bytes as MB with one decimal, for the quota message. */
+function megabytes(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(1);
+}
+
 function localChange(rows: PayRow[]): string | null {
   return rows.reduce<string | null>((sum, row) => {
     const change = changeDue(row);
@@ -139,38 +170,55 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
   }
 
   function removeRow(rowId: string) {
+    const photo = drafts().drafts[order.id]?.rows.find((row) => row.id === rowId)?.photo.clientUuid ?? null;
     forgetPicture(rowId);
     drafts().rows(order.id, (all) => all.filter((row) => row.id !== rowId));
+    if (photo) void releasePhotos([photo]);
   }
 
-  /** Uploads the row's kept picture under the photo's client_uuid and key; a retry sends the same, so the API answers the stored file. */
+  /**
+   * Uploads the row's photo now (online) under its client_uuid and key. No answer, or a server error: the photo stays kept on the tablet and
+   * Complete queues its upload, with the same key, before the payment. A refusal: the row needs another photo.
+   */
   async function upload(rowId: string, blob: Blob, clientUuid: string, key: string) {
-    drafts().photo(order.id, rowId, (photo) => ({ ...photo, status: "uploading" }));
-    setPhotoFailures((all) => without(all, rowId));
     try {
       const stored = await uploadReceiptPhoto(blob, clientUuid, key);
       // a replaced photo's late answer changes nothing
       drafts().photo(order.id, rowId, (photo) => (photo.clientUuid === clientUuid ? { ...photo, status: "uploaded", fileId: stored.id } : photo));
     } catch (failure) {
-      drafts().photo(order.id, rowId, (photo) => (photo.clientUuid === clientUuid ? { ...photo, status: "failed", fileId: null } : photo));
-      setPhotoFailures((all) => ({ ...all, [rowId]: { message: errorText.message(failure), retryable: keepsKey(failure) } }));
+      if (keepsKey(failure)) {
+        drafts().photo(order.id, rowId, (photo) => (photo.clientUuid === clientUuid ? { ...photo, status: "kept", fileId: null } : photo));
+        return;
+      }
+      drafts().photo(order.id, rowId, (photo) => (photo.clientUuid === clientUuid ? { ...NO_PHOTO, status: "failed" } : photo));
+      setPhotoFailures((all) => ({ ...all, [rowId]: { message: errorText.message(failure) } }));
+      void releasePhotos([clientUuid]);
     }
   }
 
   async function takePhoto(rowId: string, file: File) {
-    const clientUuid = uuid();
-    const key = uuid();
-    drafts().photo(order.id, rowId, () => ({ status: "uploading", fileId: null, clientUuid, key }));
+    const replaced = drafts().drafts[order.id]?.rows.find((row) => row.id === rowId)?.photo.clientUuid ?? null;
+    drafts().photo(order.id, rowId, () => ({ ...NO_PHOTO, status: "uploading" }));
+    setPhotoFailures((all) => without(all, rowId));
+    if (replaced) void releasePhotos([replaced]);
     const blob = await downscale(file);
+    const kept = await keepPhoto(blob);
+    if (!kept.kept) {
+      // the tablet already keeps as much as it may: the photos waiting must go first
+      forgetPicture(rowId);
+      drafts().photo(order.id, rowId, () => ({ ...NO_PHOTO, status: "failed" }));
+      setPhotoFailures((all) => ({ ...all, [rowId]: { message: t("photo_quota", { waiting: megabytes(kept.waitingBytes), limit: megabytes(kept.limitBytes) }) } }));
+      return;
+    }
+    const { clientUuid, key } = kept.photo;
     keepPicture(rowId, blob);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      // offline: the photo waits on the tablet, and Complete queues its upload before the payment
+      drafts().photo(order.id, rowId, () => ({ status: "kept", fileId: null, clientUuid, key }));
+      return;
+    }
+    drafts().photo(order.id, rowId, () => ({ status: "uploading", fileId: null, clientUuid, key }));
     await upload(rowId, blob, clientUuid, key);
-  }
-
-  async function retryPhoto(rowId: string) {
-    const row = drafts().drafts[order.id]?.rows.find((r) => r.id === rowId);
-    const kept = pictureOf(rowId);
-    if (!row?.photo.clientUuid || !row.photo.key || !kept) return;
-    await upload(rowId, kept.blob, row.photo.clientUuid, row.photo.key);
   }
 
   async function complete() {
@@ -184,6 +232,10 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
     setError(null);
     setRowErrors({});
     try {
+      // the photos still kept on the tablet go up first, in one write; the batch waits for it and takes their file ids from its answer
+      const photos = keptPhotos(current.rows, available);
+      const upload = photos.length > 0 ? queuePhotoUpload(photos, order.id, order.client_uuid) : null;
+      if (photos.length > 0 && !upload) throw new ApiError(401, { message_key: "auth.unauthenticated" });
       const outcome = await submit<PaymentBatchResult>({
         kind: "pay_batch",
         method: "POST",
@@ -192,6 +244,7 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
         subjectId: order.id,
         subjectUuid: order.client_uuid,
         idempotencyKey: key,
+        ...(upload ? { dependsOn: upload.id, needs: photoNeeds(photos) } : {}),
       });
       finished.current = true;
       if (!outcome.sent) {
@@ -207,6 +260,8 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
       setCompleted({ result, order, references });
       for (const row of current.rows) forgetPicture(row.id);
       drafts().drop(order.id);
+      // the photos are on the payments now: the tablet keeps them no longer
+      void releasePhotos(photosHeld(current.rows));
       onChanged();
     } catch (failure) {
       setError(failure);
@@ -221,7 +276,17 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
         if (refused.error.message_key === "payments.photo.invalid") {
           forgetPicture(target.id);
           drafts().photo(order.id, target.id, () => NO_PHOTO);
+          void releasePhotos(photosHeld([target]));
         }
+      }
+      // a photo the API refused to store, or one no longer on the tablet (step 5.2b): its row needs a new one
+      const photo = refusedPhoto(failure);
+      const photoRow = photo ? current.rows.find((row) => row.photo.clientUuid === photo) : undefined;
+      if (photo && photoRow) {
+        forgetPicture(photoRow.id);
+        drafts().photo(order.id, photoRow.id, () => NO_PHOTO);
+        setRowErrors((all) => ({ ...all, [photoRow.id]: errorText.message(failure) }));
+        void releasePhotos([photo]);
       }
       // the order may have changed under the cashier (a line added, paid or voided elsewhere): look again
       onChanged();
@@ -233,7 +298,8 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
   const changeTotal = completed
     ? completed.result.payments.reduce<string | null>((sum, p) => (p.channel_code === CASH ? addDecimal(sum ?? "0.00", p.change_amount ?? "0.00") : sum), null)
     : null;
-  const network = error instanceof ApiError && error.isNetwork;
+  // no answer at all (a refusal made on the tablet has no status either, but says what it is)
+  const network = error instanceof ApiError && error.isNetwork && !error.messages.en;
 
   return (
     // while the batch is on its way the sheet stays open: the cashier must see whether it was taken and the change to give
@@ -319,7 +385,6 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
                 onChange={(patch) => change(row.id, patch)}
                 onRemove={rows.length > 1 ? () => removeRow(row.id) : null}
                 onPhoto={(file) => void takePhoto(row.id, file)}
-                onRetryPhoto={() => void retryPhoto(row.id)}
               />
             ))}
           </div>

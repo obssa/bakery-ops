@@ -210,6 +210,8 @@
     "photo_failed": "The photo was not uploaded.",
     "photo_take": "Take a photo of the receipt",
     "photo_retry": "Try again",
+    "photo_kept": "Photo saved on this tablet. It is sent before the payment.",
+    "photo_quota": "This tablet already keeps {waiting} MB of photos waiting to be sent, and keeps at most {limit} MB. Connect so they are sent, then take this photo again.",
     "receipt_preview": "Receipt preview",
     "receipt_total": "Total",
     "receipt_reference_line": "Reference {tail}",
@@ -633,6 +635,7 @@
     "kind_finish_batch": "finish batch",
     "kind_count_lines": "save count",
     "kind_count_cash": "save cash count",
+    "kind_upload_photos": "send receipt photo",
     "online_only": "Needs a connection",
     "admin_offline": "You are offline. Changes on this screen need a connection; they are not queued.",
     "queued": "Saved on this tablet. It will be sent when the connection is back."

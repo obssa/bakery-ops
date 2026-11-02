@@ -15,7 +15,8 @@ export function useErrorText() {
   return {
     message(error: unknown): string {
       if (error instanceof ApiError) {
-        if (error.isNetwork) return t("network");
+        // a refusal made on the tablet (a photo no longer kept, step 5.2b) has no status but says what it is
+        if (error.isNetwork && !error.messages.en) return t("network");
         if (error.status === 401 && error.key === "auth.unauthenticated") return t("session_expired");
         return error.messages[locale] || error.messages.en || t("unknown");
       }
