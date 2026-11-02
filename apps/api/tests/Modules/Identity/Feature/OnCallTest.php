@@ -45,7 +45,8 @@ it('shows whether each person is on call in the people list, and on /me', functi
     expect($rows[$manager->id]['on_call'])->toBeFalse()
         ->and($rows[$cashier->id]['on_call'])->toBeTrue()
         ->and($rows[$this->admin->id]['on_call'])->toBeFalse();
-    loginAs($cashier);
+    // the guard keeps the instance it is given: sign in with the row as stored now, after the switch
+    loginAs($cashier->refresh());
     $this->getJson('/api/v1/me')->assertOk()->assertJsonPath('user.on_call', true);
 });
 
