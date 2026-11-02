@@ -157,7 +157,7 @@ final class SystemStatus
             'kept' => $kept,
             'disk_used_mb' => self::mib($bytes),
             'drill' => [
-                'last_at' => ($drill?->finished_at ?? $drill?->started_at)?->toIso8601ZuluString(),
+                'last_at' => $drill === null ? null : ($drill->finished_at ?? $drill->started_at)->toIso8601ZuluString(),
                 'status' => $drill?->status,
             ],
         ];
