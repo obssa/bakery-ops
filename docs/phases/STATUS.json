@@ -189,7 +189,7 @@
       "plan_approved_by": "standing approval: Ramin, 2026-10-19",
       "report": "docs/phases/phase-5-report.md",
       "gate_job": "gate-p5",
-      "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/41492437547",
+      "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/41524453909",
       "done_commit": "d07db7d7417bff8f526d7777c94b1ec0dc866fd0",
       "done_at": "2026-11-02T21:00:21Z",
       "adrs": [
