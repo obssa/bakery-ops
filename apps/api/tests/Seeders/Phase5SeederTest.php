@@ -57,6 +57,8 @@ it('enrols the demo pad, KDS, till and bridge and gives the receipts the sample 
     app(Phase0Seeder::class)->run();
     $branch = Phase0Seeder::existingBranch();
     $before = Device::query()->withoutGlobalScopes()->count();
+    $untouched = fn (): array => [DB::table('stock_movements')->count(), DB::table('orders')->count(), DB::table('payments')->count()];
+    $ledger = $untouched();
 
     ob_start();
     (new Phase5Seeder)->run();
@@ -74,7 +76,7 @@ it('enrols the demo pad, KDS, till and bridge and gives the receipts the sample 
         ->and($devices['demo-kds-1']->station_id)->toEqual($station('kitchen'))
         ->and($devices['demo-till-1']->station_id)->toEqual($station('till'))
         ->and($devices['demo-bridge-1']->token_hash)->toMatch('/^[0-9a-f]{64}$/')
-        ->and($devices->except('demo-bridge-1')->whereNotNull('token_hash'))->toBeEmpty()
+        ->and($devices->filter(fn (Device $d): bool => $d->token_hash !== null)->keys()->all())->toBe(['demo-bridge-1'])
         ->and($devices->whereNotNull('revoked_at'))->toBeEmpty()
         ->and(DB::table('audit_log')->where('action', 'device.enrol')->whereIn('subject_id', $devices->pluck('id'))->count())->toBe(4)
         ->and($printed)->toBe('');
@@ -89,9 +91,7 @@ it('enrols the demo pad, KDS, till and bridge and gives the receipts the sample 
     app(CurrentBranch::class)->clear();
     expect(phase5Writes(fn () => (new Phase5Seeder)->run()))->toBe([])
         ->and(Device::query()->withoutGlobalScopes()->count())->toBe($before + 4)
-        ->and(DB::table('stock_movements')->count())->toBe(0)
-        ->and(DB::table('orders')->count())->toBe(0)
-        ->and(DB::table('payments')->count())->toBe(0);
+        ->and($untouched())->toBe($ledger);
 });
 
 it('fills in the TIN and the paper of receipt settings that have no TIN, and keeps a TIN already typed', function () {
