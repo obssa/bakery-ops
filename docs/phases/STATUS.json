@@ -197,7 +197,7 @@
       "contracts_required": [],
       "modules": {
         "identity.devices": "done",
-        "web.offline": "in_progress",
+        "web.offline": "done",
         "print-bridge": "todo",
         "i18n": "in_progress",
         "ops": "in_progress",
