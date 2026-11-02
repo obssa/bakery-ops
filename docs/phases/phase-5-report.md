@@ -203,12 +203,17 @@ phase taught.
 
 ### The gate run of step 5.6b
 
-Recorded from PR #104's gate-p5 run when it is green.
+- **PR #104** (head `6cc8b62`, run 41458278563, every job green): `gate:p5` 135 passed (390 assertions); the checklist's 15 automated
+  rows and its schema PASS, the eight required sign-offs WAIT, `push-telegram` WARN (optional). Result PASS (informational).
+- **The claim run on `main`** (head `3a3a856`, Ramin's last sign-off commit; run 41492437547, gate-p5 job 125487156641, every job
+  green): `gate:p5` 135 passed (390 assertions); all 23 required checklist rows PASS, the eight sign-offs among them, each "signed in
+  GitHub's web editor"; `push-telegram` WARN (optional). Result PASS (0 failed, 1 warning, 44 checks). The deploy of `3a3a856`: 40
+  `@live` tests passed.
 
 ## What is open
 
-The phase is **not claimed**. `phase_status.py claim-done 5` refuses until every required checklist item passes, and no tag
-`phase-5-complete` is made. What stands between this report and the claim:
+The phase is **claimed**: `phase_status.py claim-done 5` on 2026-11-02 at `3a3a856` with gate-p5 run 41492437547, tag
+`phase-5-complete`. Ramin's go-live decisions of 2026-11-02 are in the plan's dated note. What stays open after the claim:
 
 - **Amharic corrections later**: step 5.4b was closed by Ramin on 2026-11-02 without a reviewer pass. If a reviewer fills the sheet
   later, `i18n_import.py` applies it in a PR of its own. The 5 possibly unused keys and the 12 Latin words of the report stay as they
@@ -226,7 +231,8 @@ The phase is **not claimed**. `phase_status.py claim-done 5` refuses until every
 - **`perf-load` runner variance** (5.5d, left open): the 4-core runner is close to busy at 61 requests a second; one slow runner moved the
   poll p95 by 70 % and a fast one cut it to a quarter. If the job turns flaky, the choices are a larger runner (paid, Ramin's call) or
   fewer devices per job; the plan's thresholds are kept as written.
-- **Device enforcement stays off on the live host** until Ramin signs `devices-enrolled`. Then a one-line PR turns the code default on
+- **Device enforcement stays off on the live host.** Ramin signed `devices-enrolled` as "go live with the device check off": he tests and
+  enrols every shop device first, and only on his explicit word does a one-line PR turn the code default on
   (10.5, the pattern of 3.7e); the kill switch is `IDENTITY_REQUIRE_DEVICE=false` in the server `.env`, then `php artisan config:cache`.
 - **Left open in the As built notes**:
   - the conflict tray shows every conflict of the tablet, whoever is signed in; a rebuilt cart waits while the person's cart holds
