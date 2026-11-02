@@ -38,6 +38,8 @@ export default async function AdminHome(props: LocaleProps) {
         ))}
         {/* the audit log is shown to the holders of audit.view only (step 4.5f) */}
         <PermittedCard permission="audit.view" href="/admin/audit" title={t("audit")} body={t("audit_desc")} className={CARD} />
+        {/* the System page is the admin's (system.view, step 5.5c) */}
+        <PermittedCard permission="system.view" href="/admin/system" title={t("system")} body={t("system_desc")} className={CARD} />
       </ul>
       <StationsPanel />
     </>

@@ -107,6 +107,41 @@ return [
             'body' => 'Revenue :revenue ETB (:revenue_change on :revenue_before ETB the week before), :orders orders (:orders_before the week before). Best margins: :best. Lowest margins: :worst. Channels: :channels. Refunds :refunds ETB, voids :voids ETB. Count variances: :variance_lines lines, cash :cash_variance ETB. Stock-outs: :stockouts. The full summary (PDF, 7 days): :pdf',
             'body_no_link' => 'Revenue :revenue ETB (:revenue_change on :revenue_before ETB the week before), :orders orders (:orders_before the week before). Best margins: :best. Lowest margins: :worst. Channels: :channels. Refunds :refunds ETB, voids :voids ETB. Count variances: :variance_lines lines, cash :cash_variance ETB. Stock-outs: :stockouts.',
         ],
+        // Phase 5, step 5.5c: a receipt the printer will not print (the cashier who asked and the managers on shift)
+        'print_failed' => [
+            'numbered' => [
+                'title' => 'Receipt not printed: order #:order_no',
+                'body' => 'The receipt of order #:order_no could not be printed: :reason. Print it again from the till, or give the customer the receipt link.',
+            ],
+            'unnumbered' => [
+                'title' => 'Receipt not printed',
+                'body' => 'A receipt could not be printed: :reason. Print it again from the till, or give the customer the receipt link.',
+            ],
+        ],
+        // Phase 5, step 5.5c: the host's backups and restore drill (every admin; the key is listed in the backup runbook)
+        'backup_failed' => [
+            'title' => 'The backup failed',
+            'body' => 'Last night\'s backup did not finish (:key). The newest good backup is :age hours old. The System page and the backup runbook say what to do.',
+            'body_none' => 'The backup did not finish (:key), and no backup has finished well yet. The System page and the backup runbook say what to do.',
+        ],
+        'backup_stale' => [
+            'title' => 'No recent backup',
+            'body' => 'The newest good backup is :age hours old: the nightly backup has not worked since. The System page and the backup runbook say what to do.',
+            'body_none' => 'No backup has finished well since backups started more than a day ago. The System page and the backup runbook say what to do.',
+        ],
+        'drill_failed' => [
+            'title' => 'The restore drill failed',
+            'body' => 'The weekly restore drill failed (:key, :mismatches differences found): a backup may not restore as it should. The System page and the backup runbook say what to do.',
+        ],
+    ],
+
+    // why a receipt was not printed (Payments' failure keys, step 5.3a; "unacknowledged": the bridge never answered)
+    'print_failure' => [
+        'paper_out' => 'the printer is out of paper',
+        'offline' => 'the printer is not connected',
+        'cover_open' => 'the printer\'s cover is open',
+        'unknown' => 'the printer reported a problem',
+        'unacknowledged' => 'the print bridge did not answer',
     ],
 
     'chain_kind' => [

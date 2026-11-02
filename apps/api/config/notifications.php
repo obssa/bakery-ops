@@ -185,5 +185,38 @@ return [
             'gate' => null,
             'deep_link' => '/admin/analytics?from={week_start}&to={week_end}',
         ],
+        // Phase 5 (step 5.5c, plan section 5; migration 2026_11_11_100700 lets the inbox hold them). A receipt that will not be printed
+        // (PrintJobFailed): the cashier who asked and the managers on shift, in the inbox only, one line per job; the line opens the till.
+        'print_failed' => [
+            'severity' => 'warning',
+            'channels' => ['in_app'],
+            'inbox_key' => 'print_failed:{job_id}',
+            'gate' => null,
+            'deep_link' => '/till',
+        ],
+        // The host's safety net (ADR 0020): a backup or a restore drill that failed, and a backup too old (the hourly check). Every admin, in
+        // the inbox and by Telegram where that driver is on with its keys; one line per run. A stale backup is told once per stale period:
+        // the gate is keyed by the last good run, so the hourly check raising it again writes nothing until a new period starts.
+        'backup_failed' => [
+            'severity' => 'critical',
+            'channels' => ['in_app', 'telegram'],
+            'inbox_key' => 'backup_failed:{run_id}',
+            'gate' => null,
+            'deep_link' => '/admin/system',
+        ],
+        'backup_stale' => [
+            'severity' => 'critical',
+            'channels' => ['in_app', 'telegram'],
+            'inbox_key' => 'backup_stale:{run_id}',
+            'gate' => 'backup_stale:{run_id}',
+            'deep_link' => '/admin/system',
+        ],
+        'drill_failed' => [
+            'severity' => 'critical',
+            'channels' => ['in_app', 'telegram'],
+            'inbox_key' => 'drill_failed:{run_id}',
+            'gate' => null,
+            'deep_link' => '/admin/system',
+        ],
     ],
 ];

@@ -6,6 +6,10 @@ use App\Modules\Notifications\Exceptions\MissingPayloadKey;
 use App\Modules\Notifications\Exceptions\UnknownNotificationType;
 use App\Modules\Notifications\Support\NotificationText;
 use App\Modules\Notifications\Support\NotificationTypes;
+use App\Shared\Events\BackupFailed;
+use App\Shared\Events\BackupStale;
+use App\Shared\Events\DrillFailed;
+use App\Shared\Events\PrintJobFailed;
 use Tests\Support\NotificationEvents;
 
 /*
@@ -35,6 +39,10 @@ function samplePayloads(): array
         'payment_disputed' => NotificationEvents::paymentDisputed(1, 5)->payload(),
         'weekly_summary' => NotificationEvents::weeklySummaryReady(1)->payload(),
         'order_refunded' => NotificationEvents::refundPaid(1, 5, 6)->payload(),
+        'print_failed' => (new PrintJobFailed(1, 41, 21, 17, 'paper_out', 5))->payload(),
+        'backup_failed' => (new BackupFailed(11, 'backup', 'backup.dump_failed', 30))->payload(),
+        'backup_stale' => (new BackupStale(10, 'backup', 'backup.stale', 27))->payload(),
+        'drill_failed' => (new DrillFailed(12, 'drill.ledger_mismatch', 3))->payload(),
     ];
 }
 
@@ -164,7 +172,7 @@ it('refuses a type it does not know and a payload that lacks what the text needs
 })->group('module:notifications', 'unit');
 
 it('knows every type of the registry with a severity, channels and keys, and only the types the inbox table accepts', function () {
-    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary', 'order_refunded'];
+    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary', 'order_refunded', 'print_failed', 'backup_failed', 'backup_stale', 'drill_failed'];
 
     foreach (NotificationTypes::all() as $type) {
         expect($accepted)->toContain($type)

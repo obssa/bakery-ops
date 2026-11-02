@@ -15,7 +15,9 @@ use App\Modules\Notifications\Listeners\NotifyChainBroken;
 use App\Modules\Notifications\Listeners\NotifyCountSubmitted;
 use App\Modules\Notifications\Listeners\NotifyLineReady;
 use App\Modules\Notifications\Listeners\NotifyLineRejected;
+use App\Modules\Notifications\Listeners\NotifyOps;
 use App\Modules\Notifications\Listeners\NotifyPaymentDisputed;
+use App\Modules\Notifications\Listeners\NotifyPrintFailed;
 use App\Modules\Notifications\Listeners\NotifyProductionAssigned;
 use App\Modules\Notifications\Listeners\NotifyProductionRequested;
 use App\Modules\Notifications\Listeners\NotifyRefund;
@@ -25,12 +27,16 @@ use App\Modules\Notifications\Listeners\NotifyTransferDecided;
 use App\Modules\Notifications\Listeners\NotifyTransferRequested;
 use App\Modules\Notifications\Listeners\NotifyVarianceDecided;
 use App\Modules\Notifications\Listeners\NotifyWeeklySummary;
+use App\Shared\Events\BackupFailed;
+use App\Shared\Events\BackupStale;
 use App\Shared\Events\BatchDone;
 use App\Shared\Events\ChainBroken;
 use App\Shared\Events\CountSubmitted;
+use App\Shared\Events\DrillFailed;
 use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
 use App\Shared\Events\PaymentDisputed;
+use App\Shared\Events\PrintJobFailed;
 use App\Shared\Events\ProductionAssigned;
 use App\Shared\Events\ProductionRequested;
 use App\Shared\Events\RefundPaid;
@@ -79,6 +85,11 @@ final class NotificationsServiceProvider extends ServiceProvider
         Event::listen(PaymentDisputed::class, [NotifyPaymentDisputed::class, 'handle']);
         Event::listen(RefundPaid::class, [NotifyRefund::class, 'handle']);
         Event::listen(WeeklySummaryReady::class, [NotifyWeeklySummary::class, 'handle']);
+        // step 5.5c: a receipt that will not be printed, and the host's backups and restore drill (plan section 5)
+        Event::listen(PrintJobFailed::class, [NotifyPrintFailed::class, 'handle']);
+        Event::listen(BackupFailed::class, [NotifyOps::class, 'handle']);
+        Event::listen(BackupStale::class, [NotifyOps::class, 'handle']);
+        Event::listen(DrillFailed::class, [NotifyOps::class, 'handle']);
 
         $this->loadRoutesFrom(base_path('routes/modules/notifications.php'));
 

@@ -51,6 +51,36 @@ final class BackupConfig
         return $real;
     }
 
+    /**
+     * The folder folder() answers, but only when it already exists (step 5.5c): a read, the System page, never creates it. Null when no
+     * folder can be named, it is not there yet, or folder() refuses it.
+     */
+    public function existingFolder(): ?string
+    {
+        $configured = trim((string) config('backup.path'));
+        $home = $this->home();
+        if ($configured === '' || str_starts_with($configured, '~/')) {
+            if ($home === null) {
+                return null;
+            }
+            $configured = $configured === '' ? $home.'/'.self::DEFAULT_FOLDER : $home.substr($configured, 1);
+        }
+        if (! is_dir(rtrim($configured, '/'))) {
+            return null;
+        }
+        try {
+            return $this->folder();
+        } catch (OpsFailure) {
+            return null;
+        }
+    }
+
+    /** Step 5.5c: how old the newest good backup may be before it is stale (backup.stale_hours, 26). */
+    public function staleHours(): int
+    {
+        return max(1, (int) config('backup.stale_hours', 26));
+    }
+
     public function keep(): int
     {
         return max(1, (int) config('backup.keep', 30));

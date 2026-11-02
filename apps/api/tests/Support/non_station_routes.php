@@ -154,4 +154,6 @@ return [
     'GET /api/v1/files/{file}' => 'shared',
     'GET /api/v1/files/{file}/url' => 'shared',
     'GET /api/v1/health' => 'shared',
+    // ops (step 5.5c): the System page, an admin screen
+    'GET /api/v1/system/status' => 'shared',
 ];

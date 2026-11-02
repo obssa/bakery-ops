@@ -16012,6 +16012,30 @@
                     }
                 }
             }
+        },
+        "/v1/system/status": {
+            "get": {
+                "operationId": "ops.system.status",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                },
+                "summary": "The status of the host (SystemStatus): app, scheduler, queue, backups, files, devices, flags, error_tracking",
+                "tags": [
+                    "SystemStatus"
+                ]
+            }
         }
     },
     "components": {
@@ -18883,7 +18907,8 @@
                                 "devices.manage",
                                 "devices.self",
                                 "print.create",
-                                "print.view"
+                                "print.view",
+                                "system.view"
                             ]
                         }
                     },
@@ -19641,7 +19666,8 @@
                                 "devices.manage",
                                 "devices.self",
                                 "print.create",
-                                "print.view"
+                                "print.view",
+                                "system.view"
                             ]
                         }
                     },

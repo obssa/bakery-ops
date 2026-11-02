@@ -57,6 +57,7 @@ const ADMIN = [
   "am/admin/analytics/staff/",
   "am/admin/analytics/me/",
   "am/admin/audit/",
+  "am/admin/system/",
 ];
 const OWN = ["am/admin/analytics/me/"];
 

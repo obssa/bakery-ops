@@ -290,4 +290,7 @@ return [
     'GET /api/v1/audit-log' => ['permission' => 'audit.view', 'roles' => ['admin', 'manager'], 'module' => 'audit'],
     'GET /api/v1/audit-log/export' => ['permission' => 'audit.export', 'roles' => ['admin'], 'module' => 'audit'],
     'GET /api/v1/audit-log/{id}' => ['permission' => 'audit.view', 'roles' => ['admin', 'manager'], 'module' => 'audit'],
+    // Ops (step 5.5c, phase-5 plan 4.4 and 10.6): the System page's one read, the admin's (system.view). App\Ops is not a module; its route
+    // runs in the foundation job's matrix with Shared's
+    'GET /api/v1/system/status' => ['permission' => 'system.view', 'roles' => ['admin'], 'module' => 'shared'],
 ];
