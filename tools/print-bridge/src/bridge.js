@@ -274,6 +274,8 @@ export function createBridge({ config, timing: overrides = {}, serve = null, log
         ...(serve ? { serve: String(serve) } : {}),
       });
       if (serve) {
+        // without the site's origin every page is refused: say so rather than refuse in silence
+        if (config.serve.origins.length === 0) log.warn('local.no_origins', { hint: 'serve.origins in bridge.config.json names no origin' });
         server = await startLocalServer({
           address: parseServeAddress(serve),
           origins: config.serve.origins,
