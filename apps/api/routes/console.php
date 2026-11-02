@@ -1,5 +1,6 @@
 <?php
 
+use App\Ops\SchedulerTick;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -45,3 +46,9 @@ Schedule::command('backup:drill')->weeklyOn(0, '03:30')->timezone('Africa/Addis_
 // The print jobs (phase-5 plan 4.3, step 5.3a, ADR 0019): every minute, a claim the bridge did not acknowledge within a minute goes back to the
 // queue (failed after the third claim) and a receipt waiting longer than 15 minutes is expired. A few indexed reads when nothing waits.
 Schedule::command('print:sweep')->everyMinute()->withoutOverlapping(5);
+
+// The System page (phase-5 plan 4.4, step 5.5c): the scheduler's heartbeat, every minute, inside schedule:run's own process (one cache write,
+// ops.scheduler.tick; GET /system/status calls the scheduler stopped once it is more than 3 minutes old), and the stale-backup check every
+// hour at a quarter past (BackupStale while the newest good backup is older than 26 hours; Notifications tells every admin once per period).
+Schedule::call(new SchedulerTick)->everyMinute()->name(SchedulerTick::CACHE_KEY);
+Schedule::command('backup:check-stale')->hourlyAt(15)->withoutOverlapping(10);

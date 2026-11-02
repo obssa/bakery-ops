@@ -24,11 +24,14 @@ declare(strict_types=1);
  *                   scripts/check_invariants.py (the host has no scripts/ folder; DrillAppendOnlyListTest keeps the two equal). Here and
  *                   not in App\Ops because only the Ledger names the stock tables in app/ (LedgerIsSoleWriterTest): the drill's probe
  *                   is a statement the trigger must refuse, on the scratch copy, inside a transaction rolled back.
+ *   stale_hours     step 5.5c: the hourly `backup:check-stale` raises BackupStale once the newest good backup is older than this (26: a
+ *                   night's backup plus two hours of slack), and the System page shows a backup that old as stale.
  */
 return [
     'path' => env('BACKUP_PATH'),
     'keep' => (int) env('BACKUP_KEEP', 30),
     'max_mb' => (int) env('BACKUP_MAX_MB', 2048),
+    'stale_hours' => 26,
     'drill_database' => env('BACKUP_DRILL_DATABASE'),
     'remote' => env('BACKUP_REMOTE'),
     'binaries' => [
