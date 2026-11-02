@@ -55,7 +55,10 @@ till. Three facts decide how:
    was seen in 120 s, and a failed or expired job is visible on `GET /print-jobs`: the till then shows the signed receipt link and its QR
    code (5.3c).
 8. **A local mode for a till PC** (10.2 D11). `GET /orders/{order}/receipt.escpos` (`print.view`) answers the same bytes, so a till PC
-   with its own printer can print while the bridge is down (the bridge's `--serve` mode, 5.3b).
+   with its own printer can print while the bridge is down (the bridge's `--serve` mode, 5.3b). That route needs a user's token, which
+   the bridge never keeps: the till page sends its own bearer token and device id with each local print, and the bridge forwards them
+   to the API for that one request, prints and forgets them (5.3b). It listens on the loopback address only and answers only the site's
+   origin.
 
 ## Consequences
 
