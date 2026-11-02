@@ -77,34 +77,36 @@ function Entry({ entry }: { entry: TrayEntry }) {
   }
 
   return (
-    <li role="alert" className="space-y-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base text-red-900">
-      <p className="font-semibold">{t("tray_what", { what: t(`kind_${item.kind}`) })}</p>
-      <div className="space-y-1">{said ? <Both text={entry.message} /> : <span>{errorText.message(new ApiError(entry.status, item.conflict?.body ?? {}))}</span>}</div>
-      {entry.details.length > 0 ? (
-        <ul className="list-disc space-y-1 pl-5">
-          {entry.details.map((detail, index) => (
-            <li key={index}>
-              <Both text={detail} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {entry.held.length > 0 ? <p>{t("tray_held", { count: entry.held.length })}</p> : null}
-      <p className="text-red-800">{t(`hint_${entry.reason}`)}</p>
-      <div className="flex flex-wrap gap-2">
-        {entry.actions.includes("edit") ? (
-          <button type="button" disabled={busy} onClick={() => void edit()} className={`${button} border-red-300 bg-white hover:bg-red-100 disabled:opacity-60`}>
-            {t("edit")}
-          </button>
+    <li className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base text-red-900">
+      <div role="alert" className="space-y-2">
+        <p className="font-semibold">{t("tray_what", { what: t(`kind_${item.kind}`) })}</p>
+        <div className="space-y-1">{said ? <Both text={entry.message} /> : <span>{errorText.message(new ApiError(entry.status, item.conflict?.body ?? {}))}</span>}</div>
+        {entry.details.length > 0 ? (
+          <ul className="list-disc space-y-1 pl-5">
+            {entry.details.map((detail, index) => (
+              <li key={index}>
+                <Both text={detail} />
+              </li>
+            ))}
+          </ul>
         ) : null}
-        {entry.actions.includes("resend") ? (
-          <button type="button" onClick={() => resend(item.id)} className={`${button} border-red-300 bg-white hover:bg-red-100`}>
-            {t("resend")}
+        {entry.held.length > 0 ? <p>{t("tray_held", { count: entry.held.length })}</p> : null}
+        <p className="text-red-800">{t(`hint_${entry.reason}`)}</p>
+        <div className="flex flex-wrap gap-2">
+          {entry.actions.includes("edit") ? (
+            <button type="button" disabled={busy} onClick={() => void edit()} className={`${button} border-red-300 bg-white hover:bg-red-100 disabled:opacity-60`}>
+              {t("edit")}
+            </button>
+          ) : null}
+          {entry.actions.includes("resend") ? (
+            <button type="button" onClick={() => resend(item.id)} className={`${button} border-red-300 bg-white hover:bg-red-100`}>
+              {t("resend")}
+            </button>
+          ) : null}
+          <button type="button" onClick={() => discard(item.id)} className={`${button} border-transparent hover:bg-red-100`}>
+            {t("discard")}
           </button>
-        ) : null}
-        <button type="button" onClick={() => discard(item.id)} className={`${button} border-transparent hover:bg-red-100`}>
-          {t("discard")}
-        </button>
+        </div>
       </div>
     </li>
   );
@@ -123,9 +125,11 @@ export function ConflictTray() {
     <section role="region" aria-label={t("tray_region")}>
       <ul className="flex flex-col gap-2">
         {kept ? (
-          <li role="alert" className="space-y-1 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
-            <p className="font-semibold">{t("tray_device", { count: waiting })}</p>
-            <Both text={{ en: held.en, am: held.am }} />
+          <li className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
+            <div role="alert" className="space-y-1">
+              <p className="font-semibold">{t("tray_device", { count: waiting })}</p>
+              <Both text={{ en: held.en, am: held.am }} />
+            </div>
           </li>
         ) : null}
         {entries.map((entry) => (
