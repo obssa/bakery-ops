@@ -40,9 +40,9 @@ const PHONES = {
 };
 
 const ORDERS = 300;
-const BURST = "10m";
+const EVERY_S = 2; // one order every 2 s: 300 in 10 minutes
 const BURST_START_S = 30; // the devices load their screens first
-const POLL_S = BURST_START_S + 10 * 60 + 90; // and keep polling until the last order is paid
+const POLL_S = BURST_START_S + ORDERS * EVERY_S + 90; // and keep polling until the last order is paid
 const ids = {};
 for (const name of ["KITCHEN_STATION", "BAR_STATION", "TILL_STATION", "KITCHEN_LOCATION", "BAR_LOCATION", "KITCHEN_ITEM", "BAR_ITEM", "BUNA_ITEM"]) {
   ids[name] = Number(__ENV[name]);
@@ -80,9 +80,11 @@ export const options = {
     burst: {
       executor: "constant-arrival-rate",
       exec: "order",
-      rate: ORDERS,
-      timeUnit: BURST,
-      duration: BURST,
+      // k6 starts an iteration at 0 s and every 2 s after; a duration of exactly 600 s also starts one at 600 s (a 301st), so the last
+      // start is at 598 s: 300 orders
+      rate: 1,
+      timeUnit: `${EVERY_S}s`,
+      duration: `${ORDERS * EVERY_S - 1}s`,
       startTime: `${BURST_START_S}s`,
       preAllocatedVUs: 40,
       maxVUs: 120,
@@ -238,6 +240,7 @@ const think = (from, to) => sleep(from + Math.random() * (to - from));
 
 export function order(data) {
   const n = exec.scenario.iterationInTest;
+  if (n >= ORDERS) return; // never more than the 300 the database check counts
   const pad = pads[n % pads.length];
   const waiter = data.tokens[pad.account];
   const kitchen = kitchenKds[n % kitchenKds.length];

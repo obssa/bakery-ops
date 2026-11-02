@@ -533,7 +533,7 @@ jobs:
   # host runs PHP behind LiteSpeed, not this server, so the figures describe the code under load, not the host: PollBudgetTest and
   # docs/runbook/server.md "Poll budget" speak for the host). The queue worker starts after the seed, so migrate:fresh never races it.
   perf-load:
-    needs: [status, docker-build]  # TODO(p5) 5.5d iteration: mod-analytics back before review
+    needs: [status, docker-build, mod-analytics]
     if: fromJSON(needs.status.outputs.phase) >= 5
     runs-on: ubuntu-24.04
     timeout-minutes: 30
