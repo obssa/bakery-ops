@@ -581,6 +581,34 @@ database queue, run by the `queue:work` cron line:
 - **Failed jobs** older than 30 days are pruned by the scheduler daily at 04:10 Addis Ababa time (`queue:prune-failed --hours=720`, on the
   existing `schedule:run` cron line). Nobody deletes rows by hand; `php artisan queue:failed` lists what is left.
 
+## Poll budget and the load test (Phase 5, step 5.5d; plan 10.2 D15)
+
+The screens poll this host; nothing is pushed (ADR 0009). What every kind of tablet asks for, visible and with nothing failing, is one
+file, `apps/api/tests/Fixtures/perf/poll-profile.json`, kept equal to the web app's cadences by `scripts/tests/test_poll_profile.py`:
+a pad 46 requests a minute (its orders every 2 s, the menu every 5 s, the bell every 15 s), a KDS 76, a till 116, the admin's orders
+board 34, a shift screen 28. Most of these answer `304 Not Modified` from a cheap version check when nothing changed. `PollBudgetTest`
+(`gate:p5`) adds them up:
+
+| Devices | Mix | Requests a minute | A second |
+|---|---|---|---|
+| **12 tablets** (the day-one assumption, D15) | 7 pads, 2 KDS, 2 tills, 1 admin board | **740** | 12.3 |
+| **60 devices** (what CI measures) | 34 pads, 12 KDS, 8 tills, 3 admin boards, 3 shift screens | **3 590** | 59.8 |
+
+Writes add little next to the polls: an order from pad to till is about 8 requests, so 300 orders an hour is under one request a second.
+
+**What this host showed in Phase 4:** a load average around 10 at busy times on the shared account, and live tests that saw `ECONNRESET`
+(the e2e client retries with the same Idempotency-Key). The 12 tablets of day one ask for 12 requests a second, a fifth of the 60 that CI
+loads the code with. If the load average climbs well past what the account showed before the shop opened (cPanel's resource usage
+page, or `uptime` in the Terminal), the first lever is fewer tablets left on screens nobody watches (a hidden screen polls every 10 to
+120 s instead of every 2 to 30 s); the second is moving to the VPS stack (ADR 0006), where WebSockets replace most polls.
+
+**The load test** (`scripts/perf/load.k6.js`, CI job `perf-load`) runs only on CI's compose stack, never here: the 60 devices above,
+enrolled and polling with `If-None-Match`, while 300 orders go from pad to till in 10 minutes (a quarter paid by Telebirr with a photo),
+with device enforcement on. It fails when polls take more than 300 ms at p95, writes more than 800 ms at p95, more than 0.5 % of requests
+fail, or afterwards the orders, the ledger or `failed_jobs` are not what the run should have left. Its figures are in the job's step
+summary. The CI server is PHP's built-in one with 8 workers on a 4-core runner, not LiteSpeed, so they describe the code under load,
+not this host.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.
