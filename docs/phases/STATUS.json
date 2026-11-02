@@ -201,7 +201,7 @@
         "print-bridge": "todo",
         "i18n": "in_progress",
         "ops": "in_progress",
-        "docs": "todo"
+        "docs": "in_progress"
       },
       "playwright_projects": [
         "p5-device",

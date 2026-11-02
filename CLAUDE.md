@@ -34,6 +34,9 @@ PostgreSQL 16 + Redis 7 remain the VPS upgrade path (ADR 0006).
 - **PHP runs only inside Docker.** The host has PHP 8.0; Laravel 13 needs 8.3. Use `scripts/php`,
   `scripts/artisan`, `scripts/composer`, `scripts/pest` (they `docker compose exec` into `app`).
 - Phase state lives in `docs/phases/STATUS.json`. `plan_approved: true` is set only by Ramin's own commit.
+- **Agents never write in `docs/go-live/signoffs/`** (never create, edit or delete a file there, never sign an item).
+  Only Ramin signs go-live items, in GitHub's web editor (`docs/go-live/README.md`); `check_invariants.py --signoffs`
+  fails a PR that carries a local commit touching that folder.
 - Source of truth for the architecture: `docs/architecture.md` (sections 1 to 13) and the skill's references.
 
 ## Non-negotiables (from the architecture document)
