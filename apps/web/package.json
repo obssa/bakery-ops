@@ -18,6 +18,7 @@
     "pusher-js": "8.6.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "uqr": "0.1.2",
     "zustand": "^5"
   },
   "devDependencies": {

@@ -371,6 +371,8 @@ test.describe("admin payments logic", () => {
       footer_am: null,
       show_amharic: true,
       ethiopian_dates: false,
+      paper_width_mm: 80 as const,
+      print_logo: false,
       is_default: true,
     };
     const form = receiptFormOf(settings);
@@ -387,6 +389,8 @@ test.describe("admin payments logic", () => {
       footer_am: null,
       show_amharic: true,
       ethiopian_dates: false,
+      paper_width_mm: 80,
+      print_logo: false,
     });
     expect(receiptIssues({ ...form, business_name_am: " " })).toEqual(["business_name_am"]);
     expect(receiptIssues({ ...form, address_en: "Bole road" })).toEqual(["address_pair"]);
@@ -396,6 +400,9 @@ test.describe("admin payments logic", () => {
     // the Ethiopian date switch (step 4.5f): read from the settings and sent back as it was set
     expect(receiptFormOf({ ...settings, ethiopian_dates: true }).ethiopian_dates).toBe(true);
     expect(receiptBody({ ...form, ethiopian_dates: true }).ethiopian_dates).toBe(true);
+    // the receipt printer's paper and the logo switch (step 5.3c): read from the settings and sent back as they were set
+    expect(receiptFormOf({ ...settings, paper_width_mm: 58 }).paper_width_mm).toBe(58);
+    expect(receiptBody({ ...form, paper_width_mm: 58, print_logo: true })).toMatchObject({ paper_width_mm: 58, print_logo: true });
   });
 });
 

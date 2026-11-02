@@ -1,5 +1,6 @@
 import type {
   NewPaymentChannel,
+  PaperWidth,
   PaymentChannel,
   PaymentChannelChanges,
   PaymentListRow,
@@ -424,6 +425,9 @@ export interface ReceiptForm {
   footer_am: string;
   show_amharic: boolean;
   ethiopian_dates: boolean;
+  /** the receipt printer's paper (step 5.3c): 80 or 58 mm */
+  paper_width_mm: PaperWidth;
+  print_logo: boolean;
 }
 
 export function receiptFormOf(settings: ReceiptSettings): ReceiptForm {
@@ -438,6 +442,8 @@ export function receiptFormOf(settings: ReceiptSettings): ReceiptForm {
     footer_am: settings.footer_am ?? "",
     show_amharic: settings.show_amharic,
     ethiopian_dates: settings.ethiopian_dates,
+    paper_width_mm: settings.paper_width_mm === 58 ? 58 : 80,
+    print_logo: settings.print_logo === true,
   };
 }
 
@@ -476,5 +482,7 @@ export function receiptBody(form: ReceiptForm): ReceiptSettingsInput {
     footer_am: stored(form.footer_am),
     show_amharic: form.show_amharic,
     ethiopian_dates: form.ethiopian_dates,
+    paper_width_mm: form.paper_width_mm,
+    print_logo: form.print_logo,
   };
 }
