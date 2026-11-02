@@ -70,6 +70,15 @@ The photos count against the account's quota and must be in its nightly backup t
 process that lives longer than the cron's 50 seconds, and it measures the dashboards in process (`php artisan analytics:bench`) instead
 of loading the shared host from outside (k6 runs only against the CI compose stack).
 
+Note (Phase 5, step 5.5b, 2026-11-01; ADR 0020): backups run on this host as it is. `backup:run` (nightly, 02:30 Addis Ababa) and
+`backup:drill` (Sundays, 03:30) are console commands on the existing `schedule:run` cron line, so no new cron entry and no process that
+outlives a run. They need the MariaDB client programs `mysqldump` and `mysql` on the account's PATH (present on cPanel hosts), a backup
+folder outside the app (`BACKUP_PATH`, default `~/backups/bakery-ops`, beyond the deploy's `rsync --delete`), and, for the drill, a second
+database created once in cPanel for the app's own database user (`BACKUP_DRILL_DATABASE`; until then the drill records `skipped`). The
+dumps and the files snapshots count against the account's quota, under a cap (`BACKUP_MAX_MB`). A copy on this host does not survive the
+loss of the host: the off-site hook (`BACKUP_REMOTE`, rclone) is built and off until Ramin chooses the storage. The API image carries the
+same MariaDB 10.11 clients (Debian's `mariadb-client`), so CI's `backup-drill` job runs the real dump and restore on the compose stack.
+
 ## Consequences
 
 - Positive: one URL, automatic deploys, honest tests in the environment the shop will use, no local
