@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { uuid } from "@/lib/api/idempotency";
 import { receiptLink, receiptPdf, useReceiptSettings } from "@/lib/api/till";
 import type { Locale, Order, PaymentChannel, ReceiptLink, RecordedPaymentRow } from "@/lib/api/types";
@@ -14,13 +14,15 @@ import { whenText, type DateFormat } from "@/lib/dates";
 import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { Alert, Button, Field, TextInput } from "../ui";
+import { PrintButton, PrintStatus, ReceiptQr, usePrintReceipt } from "./PrintReceipt";
 
 // The receipt of a bill the pay sheet just completed (step 4.5b): a preview on screen, the PDF (GET /orders/{order}/receipt.pdf, the
 // bilingual receipt of step 4.3e, downloaded with the till's token) and a link to send the customer (POST /orders/{order}/receipt-link: a
 // signed link to the public receipt, 72 hours). The preview is the order as the till holds it and the payments as the API recorded them (with
 // the references the cashier typed, which the API does not echo back); the PDF is the API's and has the last word. A reference shows its last
 // 4 characters only, as the printed receipt does. The two actions are `ReceiptActions`, which the order record page (step 4.5d) shows too,
-// each to the holders of its permission (the PDF: payments.view; the link: payments.take).
+// each to the holders of its permission (the PDF: payments.view; the link: payments.take). Step 5.3c adds a third, Print (print.create:
+// PrintReceipt.tsx), and the link's QR code; when the receipt cannot be printed the link is made at once for the customer to scan.
 
 const ADDIS = "Africa/Addis_Ababa";
 
@@ -104,15 +106,18 @@ export function ReceiptPanel({
 }
 
 /**
- * The receipt's two actions: download the PDF (GET /orders/{order}/receipt.pdf, payments.view) and copy a signed link for the customer
- * (POST /orders/{order}/receipt-link, payments.take), each shown to the holders of its permission; nothing when neither is held. The
- * order must be paid in full (the API answers 409 payments.receipt.unpaid otherwise).
+ * The receipt's actions: print it on the shop's receipt printer (POST /orders/{order}/print, print.create, step 5.3c), download the PDF
+ * (GET /orders/{order}/receipt.pdf, payments.view) and copy a signed link for the customer (POST /orders/{order}/receipt-link,
+ * payments.take), each shown to the holders of its permission; nothing when none is held. The order must be paid in full (the API
+ * answers 409 payments.receipt.unpaid otherwise). The link shows with its QR code; when a print fails, expires or is refused for no
+ * printer, the link is made without a press (once) so the customer can scan it.
  */
 export function ReceiptActions({ order }: { order: Pick<Order, "id" | "order_no" | "business_date"> }) {
   const t = useTranslations("till");
   const errorText = useErrorText();
   const canPdf = useSession((s) => can(s.me, "payments.view"));
   const canLink = useSession((s) => can(s.me, "payments.take"));
+  const printing = usePrintReceipt(order.id);
   const [busy, setBusy] = useState<"pdf" | "link" | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [link, setLink] = useState<ReceiptLink | null>(null);
@@ -140,12 +145,16 @@ export function ReceiptActions({ order }: { order: Pick<Order, "id" | "order_no"
     }
   }
 
-  async function copyLink() {
+  async function makeLink(copy: boolean) {
     setBusy("link");
     setError(null);
     try {
       const made = await receiptLink(order.id, linkKey.current);
       setLink(made);
+      if (!copy) {
+        setCopied(null);
+        return;
+      }
       try {
         await navigator.clipboard.writeText(made.url);
         setCopied(true);
@@ -161,26 +170,44 @@ export function ReceiptActions({ order }: { order: Pick<Order, "id" | "order_no"
     }
   }
 
-  if (!canPdf && !canLink) return null;
+  // the receipt cannot be printed: make the link once, without a press, for the customer to scan
+  const fallbackAsked = useRef(false);
+  useEffect(() => {
+    if (!printing.fallback || !canLink || link || fallbackAsked.current) return;
+    fallbackAsked.current = true;
+    void makeLink(false);
+    // makeLink is the same function every render; the ref keeps this to one link per screen
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printing.fallback, canLink, link]);
+
+  if (!canPdf && !canLink && !printing.canPrint) return null;
   return (
     <div className="space-y-4">
       {error ? <Alert>{errorText.message(error)}</Alert> : null}
+      <PrintStatus state={printing} />
       <div className="flex flex-wrap gap-2">
+        {printing.canPrint ? <PrintButton state={printing} disabled={busy !== null} /> : null}
         {canPdf ? (
           <Button type="button" variant="secondary" className="min-h-14" disabled={busy !== null} onClick={() => void downloadPdf()}>
             {busy === "pdf" ? t("receipt_pdf_busy") : t("receipt_pdf")}
           </Button>
         ) : null}
         {canLink ? (
-          <Button type="button" variant="secondary" className="min-h-14" disabled={busy !== null} onClick={() => void copyLink()}>
+          <Button type="button" variant="secondary" className="min-h-14" disabled={busy !== null} onClick={() => void makeLink(true)}>
             {busy === "link" ? t("receipt_link_busy") : t("receipt_link")}
           </Button>
         ) : null}
       </div>
       {link ? (
-        <Field label={t("receipt_link_field")} hint={copied ? t("receipt_link_copied") : t("receipt_link_copy_by_hand")}>
-          {(props) => <TextInput {...props} readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} />}
-        </Field>
+        <div className="space-y-3">
+          <Field
+            label={t("receipt_link_field")}
+            hint={copied === null ? t("receipt_link_scan") : copied ? t("receipt_link_copied") : t("receipt_link_copy_by_hand")}
+          >
+            {(props) => <TextInput {...props} readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} />}
+          </Field>
+          <ReceiptQr url={link.url} />
+        </div>
       ) : null}
     </div>
   );
