@@ -90,6 +90,9 @@ final class PermissionRegistry
         // GET /orders/{order}/receipt.escpos. The print bridge's own routes are authorised by its device token, not by a permission.
         'print.create' => ['admin', 'manager', 'cashier'],
         'print.view' => ['admin', 'manager', 'cashier'],
+        // Phase 5 (step 5.5c; plan sections 3 M2c, 4.4 and 10.6), through the grant-only migration
+        // 2026_11_11_100800_grant_phase_5_ops_permissions. system.view: the System page and GET /system/status (the host's health).
+        'system.view' => ['admin'],
     ];
 
     /**

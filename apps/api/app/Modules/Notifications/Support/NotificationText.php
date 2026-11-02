@@ -21,6 +21,9 @@ use LogicException;
  */
 final class NotificationText
 {
+    /** The reasons lang/{en,am}/notifications.php words (print_failure.*): the bridge's four keys and the sweep's unacknowledged. */
+    private const array PRINT_FAILURES = ['paper_out', 'offline', 'cover_open', 'unknown', 'unacknowledged'];
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -62,6 +65,8 @@ final class NotificationText
             'transfer_decided' => ['text.transfer_decided.'.($this->str($type, $payload, 'status') === 'rejected' ? 'rejected' : 'confirmed'), 'body'],
             'chain_broken' => ['text.chain_broken', 'body'],
             'weekly_summary' => ['text.weekly_summary', is_string($payload['pdf_url_en'] ?? null) ? 'body' : 'body_no_link'],
+            'print_failed' => ['text.print_failed.'.(($payload['order_number'] ?? null) === null ? 'unnumbered' : 'numbered'), 'body'],
+            'backup_failed', 'backup_stale' => ["text.{$type}", ($payload['age_h'] ?? null) === null ? 'body_none' : 'body'],
             default => ["text.{$type}", 'body'],
         };
     }
@@ -167,6 +172,20 @@ final class NotificationText
                 'cash_variance' => $this->str($type, $p, 'cash_variance_total'),
                 'stockouts' => $this->stockouts($type, $p, $locale),
                 'pdf' => $this->optional($type, $p, 'pdf_url_'.$locale) ?? $this->optional($type, $p, 'pdf_url_en') ?? '',
+            ],
+            // step 5.5c: why the receipt was not printed, in the reader's words (a key Payments adds later reads as "a problem")
+            'print_failed' => [
+                'order_no' => ($p['order_number'] ?? null) === null ? '' : (string) $this->int($type, $p, 'order_number'),
+                'reason' => $this->printReason($type, $p, $locale),
+            ],
+            // the failure key stays as it is: it is the line of the backup runbook that says what to do
+            'backup_failed', 'backup_stale' => [
+                'key' => $this->str($type, $p, 'failure_key'),
+                'age' => ($p['age_h'] ?? null) === null ? '' : (string) $this->int($type, $p, 'age_h'),
+            ],
+            'drill_failed' => [
+                'key' => $this->str($type, $p, 'failure_key'),
+                'mismatches' => (string) $this->int($type, $p, 'mismatches'),
             ],
             default => throw UnknownNotificationType::named($type),
         };
@@ -329,6 +348,18 @@ final class NotificationText
     private function withUnit(string $quantity, ?string $unit): string
     {
         return $unit === null || $unit === '' ? $quantity : $quantity.' '.$unit;
+    }
+
+    /**
+     * Why a receipt was not printed, in the reader's language; a failure key this list does not know reads as "a problem".
+     *
+     * @param  array<string, mixed>  $p
+     */
+    private function printReason(string $type, array $p, string $locale): string
+    {
+        $key = $this->str($type, $p, 'failure_key');
+
+        return $this->template('print_failure.'.(in_array($key, self::PRINT_FAILURES, true) ? $key : 'unknown'), $locale);
     }
 
     private function template(string $key, string $locale): string
