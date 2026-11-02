@@ -766,9 +766,11 @@ the phase being closed), so the phase cannot close while a placeholder is left.
        run failed the threshold; writes 265 and 393 ms, no failed request either time). With them (run 41388083454): polls p50 65 ms
        and p95 171 ms, writes p50 92 ms and p95 230 ms (the slowest step, the send, 297 ms), no failed request of 44 233 (61.2 a
        second, against the profile's 59.8 for polls alone), 300 orders closed (225 cash, 75 Telebirr with a photo), the ledger
-       reconciled over 125 item-locations, no failed job. The job took 14.5 minutes, with the seed of 8 days played in 52 s.
+       reconciled over 125 item-locations, no failed job. The job took 14.5 minutes, with the seed of 8 days played in 52 s. The next
+       full run (41396586731, after mod-analytics) landed on a faster runner: polls p95 45 ms, writes p95 64 ms, no failed request of
+       45 132, the oracle ok over 57 items and 6 places, 14 minutes.
        **Left open**: how the poll threshold behaves across GitHub's runner generations. The 4-core runner is close to busy at 61
-       requests a second, and one slow runner moved p95 by 70 %. If `perf-load` turns flaky, the choices are a larger runner (paid,
+       requests a second; one slow runner moved p95 by 70 % and a fast one cut it to a quarter. If `perf-load` turns flaky, the choices are a larger runner (paid,
        Ramin's call) or fewer devices per job; the plan's thresholds are kept as written.
      - **For 5.6b**: `gate-p5` gains `perf-load` in its needs and the manifest's `extra_ci_jobs` lists it. `Phase5Seeder` gets the demo
        devices beside `LOAD_DEVICES`.
