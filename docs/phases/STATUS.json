@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "current_phase": 5,
+  "current_phase": 6,
   "invariants_version": 2,
   "phases": {
     "0": {
@@ -213,6 +213,33 @@
         "p5-device",
         "p5-offline",
         "p5-amharic"
+      ]
+    },
+    "6": {
+      "status": "planning",
+      "plan": "docs/phases/phase-6-plan.md",
+      "plan_approved": false,
+      "plan_approved_by": null,
+      "report": null,
+      "gate_job": "gate-p6",
+      "gate_run_url": null,
+      "done_commit": null,
+      "done_at": null,
+      "adrs": [],
+      "adr_waiver": null,
+      "contracts_required": [
+        "orders->catalog"
+      ],
+      "modules": {
+        "catalog.images": "todo",
+        "web.design-system": "todo",
+        "web.stations": "todo",
+        "web.admin": "todo",
+        "docs": "todo"
+      },
+      "playwright_projects": [
+        "p6-product-photo",
+        "p6-a11y"
       ]
     }
   },
