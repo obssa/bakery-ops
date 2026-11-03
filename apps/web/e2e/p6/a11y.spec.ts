@@ -4,7 +4,7 @@ import en from "../../messages/en.json";
 import { expectAccessible } from "../support/a11y";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture } from "../support/fixture";
-import { openPad, typeCode } from "../support/pad";
+import { chooseTable, openPad, typeCode } from "../support/pad";
 import { attachPhoto, removePhoto } from "../support/productPhoto";
 
 // Phase 6 gate project p6-a11y (docs/phases/phase-6-plan.md D7 and section 7; fresh-counter.md 5): on each restyled screen, in English and
@@ -86,14 +86,19 @@ test.describe("a11y", () => {
         await expectAccessible(page, `${locale}/pad/ (locked)`);
 
         await typeCode(page, fixture.waiter.shortCode, t.pad.unlock);
-        await expect(page.getByText(fill(t.pad.acting, { name: fixture.waiter.name }))).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText(`${t.pad.acting_prefix} ${fixture.waiter.name}`)).toBeVisible({ timeout: 30_000 });
         await page.getByRole("tab", { name: t.pad.tab_other }).click();
         const card = page.getByRole("button", { name: prefix(t.pad.add_item, { name }) });
         await expect(card.locator("img")).toHaveAttribute("alt", name);
         await expectAccessible(page, `${locale}/pad/ (the menu, nothing in the order)`);
 
         await card.click();
-        await page.getByRole("button", { name: prefix(t.pad.table_button, { code: fixture.table.code }) }).click();
+        // the tables sheet, open (step 6.3a: "Change" opens it), then the table chosen in it
+        await page.getByRole("button", { name: t.pad.change_table_aria }).click();
+        await expect(page.getByRole("dialog", { name: t.pad.tables })).toBeVisible();
+        await expectAccessible(page, `${locale}/pad/ (the tables sheet)`);
+        await page.keyboard.press("Escape");
+        await chooseTable(page, fixture.table.code, { change: t.pad.change_table_aria, sheet: t.pad.tables, table: prefix(t.pad.table_button, { code: fixture.table.code }) });
         await expect(page.getByRole("region", { name: t.pad.cart }).getByRole("listitem").filter({ hasText: name })).toBeVisible();
         await expectAccessible(page, `${locale}/pad/ (an order with a line)`);
       } finally {

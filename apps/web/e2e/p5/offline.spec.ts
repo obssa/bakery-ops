@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture, clearStaleOrders, orderLabel, type StationFixture } from "../support/fixture";
 import { ordersWithUuid, photosOnTablet, queuedWrites } from "../support/outbox";
-import { openAs, openPadAndUnlock } from "../support/pad";
+import { chooseTable, openAs, openPadAndUnlock } from "../support/pad";
 import { buildPayFixture, paymentsOf, removeChannel, serveAll, takeawayOrder, tidyOrder } from "../support/payments";
 import { fetchBytes, jpegSize, receiptPhoto } from "../support/photo";
 
@@ -24,7 +24,7 @@ const API_CALLS = "**/api/v1/**";
 
 async function cartWithProduct(page: Page, fixture: StationFixture) {
   await openPadAndUnlock(page, fixture.waiter);
-  await page.getByRole("button", { name: `Table ${fixture.table.code}` }).click();
+  await chooseTable(page, fixture.table.code);
   await page.getByRole("tab", { name: "Other" }).click();
   await page.getByRole("button", { name: `Add ${fixture.product.name_en}` }).click();
   await expect(page.getByRole("region", { name: "Cart" }).getByRole("listitem").filter({ hasText: fixture.product.name_en })).toBeVisible();

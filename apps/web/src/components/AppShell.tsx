@@ -1,14 +1,16 @@
 "use client";
 
-import { Croissant, LogOut } from "lucide-react";
+import { Croissant, Lock, LogOut } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Suspense, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useActing } from "@/lib/acting";
 import type { Locale } from "@/lib/api/types";
 import { frameOf, isCurrent, SCREENS } from "@/lib/screens";
 import { useSession } from "@/lib/session";
 import { barMode, type BarMode } from "@/lib/shifts";
 import { useStationChrome } from "@/lib/station";
+import { useTopBarSlots } from "@/lib/topBar";
 import { useIsoDay } from "@/lib/useDates";
 import { useOnline } from "@/lib/useOnline";
 import { DateDisplaySwitch } from "./DateDisplaySwitch";
@@ -161,15 +163,46 @@ function SyncChip() {
   );
 }
 
+/**
+ * The waiter who has the pad (the `fill` frame, step 6.3a, fresh-counter.md 3.2): their initials, their name and "On the pad", and "Lock
+ * pad", in the place of the signed-in pad account and its "Sign out" (which come back when the pad locks). The name line reads
+ * "Acting: <name>" to readers, as the pad always said it.
+ */
+function ActingPerson({ name }: { name: string }) {
+  const t = useTranslations("pad");
+  return (
+    <div className="flex items-center gap-2.5 pl-1">
+      <Avatar name={name} />
+      <span className="flex min-w-0 max-w-44 flex-col leading-tight">
+        <span className="truncate text-sm font-semibold text-neutral-900">
+          <span className="sr-only">{t("acting_prefix")} </span>
+          {name}
+        </span>
+        <span className="truncate text-xs text-neutral-600">{t("acting_role")}</span>
+      </span>
+      <button
+        type="button"
+        onClick={() => useActing.getState().lock("manual")}
+        className={`ml-1 inline-flex h-10 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 ${focusRing}`}
+      >
+        <Lock className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        {t("lock")}
+      </button>
+    </div>
+  );
+}
+
 /** The person signed in on this device: initials, name and role (the name and role from 1280 px), and "Sign out"; or "Sign in". */
-function Account() {
+function Account({ fill }: { fill: boolean }) {
   const t = useTranslations();
   const router = useRouter();
   const status = useSession((s) => s.status);
   const me = useSession((s) => s.me);
   const signOut = useSession((s) => s.signOut);
+  const acting = useActing((s) => s.user);
 
   if (status === "unknown") return <span className="inline-block h-12 w-24" aria-hidden="true" />;
+  if (fill && status === "signed-in" && acting) return <ActingPerson name={acting.name} />;
 
   if (status !== "signed-in" || !me) {
     return (
@@ -202,10 +235,14 @@ function Account() {
   );
 }
 
-function TopBar() {
+function TopBar({ fill }: { fill: boolean }) {
   const t = useTranslations("app");
   const signedIn = useSession((s) => s.status === "signed-in");
   const atStation = useStationChrome((s) => s.chrome !== null);
+  const setTitle = useTopBarSlots((s) => s.setTitle);
+  const setActions = useTopBarSlots((s) => s.setActions);
+  // the pad's own name (its title slot) takes the app name's place, as a station's name does
+  const named = atStation || fill;
 
   return (
     <header className="border-b border-neutral-200 bg-white">
@@ -214,19 +251,21 @@ function TopBar() {
           <Link href="/" className={`flex shrink-0 items-center gap-3 rounded-xl ${focusRing}`}>
             <AppMark />
             {/* on a station screen the station's name takes the place; the link is still named after the app */}
-            <span className={atStation ? "sr-only" : "text-lg font-bold tracking-tight text-neutral-900"}>{t("name")}</span>
+            <span className={named ? "sr-only" : "text-lg font-bold tracking-tight text-neutral-900"}>{t("name")}</span>
           </Link>
-          <StationContext />
+          {fill ? <div ref={setTitle} className="contents" /> : <StationContext />}
         </div>
         {/* on a phone the right-hand group wraps inside the window rather than pushing past it */}
         <div className="flex max-w-full flex-wrap items-center gap-2 md:shrink-0">
           {signedIn ? <SyncChip /> : null}
-          {signedIn ? <DateDisplaySwitch /> : null}
+          {/* the pad's board (fresh-counter.md 3.2): its own buttons, the language and the person; no calendar switch and no bell */}
+          {fill ? <div ref={setActions} className="contents" /> : null}
+          {signedIn && !fill ? <DateDisplaySwitch /> : null}
           <Suspense fallback={<LanguageSwitcher look="toggle" />}>
             <LanguageSwitcherWithQuery look="toggle" />
           </Suspense>
-          {signedIn ? <NotificationBell /> : null}
-          <Account />
+          {signedIn && !fill ? <NotificationBell /> : null}
+          <Account fill={fill} />
         </div>
       </div>
       <ScreensNav />
@@ -240,7 +279,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // `fill` (the waiter pad): from 1024 px the frame is the window's height, so the page's zones scroll on their own under the bar; below
   // it the page flows and scrolls as any other. Its main has no padding: the screen draws its zones edge to edge. A screen that is not
-  // drawn yet there (the sign-in check, a refusal, the not-enrolled screen) keeps the padding of every other station page.
+  // drawn yet there (the sign-in check, a refusal, the not-enrolled screen) keeps the padding of every other station page. The main never
+  // gets shorter than 34rem: a tall band above it (the conflict tray) makes the page scroll instead of crushing the order panel.
   const fill = frame === "fill";
   return (
     <div className={`flex min-h-screen flex-col ${fill ? "lg:h-dvh lg:min-h-0" : ""}`}>
@@ -250,7 +290,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {t("skip_to_content")}
       </a>
-      {frame === "login" ? null : <TopBar />}
+      {frame === "login" ? null : <TopBar fill={fill} />}
       <PendingIndicator />
       {frame === "admin" ? (
         children
@@ -261,7 +301,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             frame === "login"
               ? "flex flex-1 flex-col"
               : fill
-                ? "flex w-full flex-1 flex-col px-4 py-6 sm:px-6 has-[[data-shell-fill]]:p-0 lg:min-h-0 lg:overflow-y-auto"
+                ? "flex w-full flex-1 flex-col px-4 py-6 sm:px-6 has-[[data-shell-fill]]:p-0 lg:min-h-[34rem] lg:overflow-y-auto"
                 : "w-full flex-1 px-4 py-6 sm:px-6"
           }
         >

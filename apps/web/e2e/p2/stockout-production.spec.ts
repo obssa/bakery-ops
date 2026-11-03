@@ -3,7 +3,7 @@ import { uuid } from "../support/api";
 import { live, requireAdmin } from "../support/env";
 import { buildStationFixture, menuAvailable, sendOrder } from "../support/fixture";
 import { transfersOf } from "../support/inventory";
-import { ensureUnlocked, openAs, openPadAndUnlock } from "../support/pad";
+import { chooseTable, ensureUnlocked, openAs, openPadAndUnlock } from "../support/pad";
 import { buildProductionFixture, stockAlertsOf, inboxOf, movementsOf, pushOffered, requestById, requestsOf, waitForQueue, type ProductionFixture } from "../support/production";
 
 // Phase 2 gate project p2-stockout-production (manifest phases.2.gate.criteria; docs/phases/phase-2-plan.md section 7),
@@ -38,7 +38,7 @@ async function runFlow(f: ProductionFixture, pages: { pad: Page; baker: Page; ov
   // the pad sells the last cake
   expect(await menuAvailable(f.waiter.api, f.cake.id)).toBe("1.0000");
   await openPadAndUnlock(pad, f.waiter);
-  await pad.getByRole("button", { name: `Table ${f.table.code}` }).click();
+  await chooseTable(pad, f.table.code);
   await pad.getByRole("tab", { name: "Other" }).click();
   await pad.getByRole("button", { name: `Add ${cake}` }).click();
   await pad.getByRole("button", { name: "Send order" }).click();

@@ -1,8 +1,9 @@
 "use client";
 
-import { CircleCheck, Lock, Volume2, VolumeX } from "lucide-react";
+import { CircleCheck, Volume2, VolumeX, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { lockDue, useActing } from "@/lib/acting";
 import { playChime, storeMuted, storedMuted, unlockAudio } from "@/lib/kds";
 import { createMenuFeed, createOrdersFeed, openOrdersOf, readyLineIds } from "@/lib/live/pad";
@@ -12,7 +13,9 @@ import type { FeedSnapshot } from "@/lib/live/feed";
 import type { OrdersState } from "@/lib/live/pad";
 import { onReconnect } from "@/lib/reconnect";
 import { useSession } from "@/lib/session";
-import { Avatar, Button, SegmentedControl } from "../ui";
+import { useTopBarSlots } from "@/lib/topBar";
+import { Drawer, IconButton } from "../ui";
+import { focusRing } from "../styles";
 import { LockScreen } from "./LockScreen";
 import { MyOrders } from "./MyOrders";
 import { OrderingSurface } from "./OrderingSurface";
@@ -22,13 +25,11 @@ import { usePadOutcomes, useReleaseStaleSends } from "./outcomes";
 // then has the pad for 10 minutes (the API acting session) and for as long as they keep touching it (60 s idle lock).
 // Locking parks the waiter cart in memory under their id; nothing of them is on screen while it is locked.
 //
-// Step 6.3a (fresh-counter.md 3.2): the pad is drawn edge to edge under the station top bar (the shell's `fill` frame). Unlocked, a white
-// bar holds the "Pad views" tabs (New order, My orders with its ready count) and, on the right, who has the pad, the chime switch and
-// "Lock pad"; under it the ordering surface (the menu and the order panel) or the waiter's open orders. "Order sent" shows as a toast over
-// the menu, so nothing on the screen moves under the waiter's finger. The page's h1 is for readers: the top bar and the "Screens" tabs
-// already say where the screen is.
-
-type View = "order" | "orders";
+// Step 6.3a (fresh-counter.md 3.2 and the Pad board): the pad is drawn edge to edge under the station top bar (the shell's `fill` frame),
+// the menu and the order panel side by side. The top bar carries the pad's name and, while a waiter has the pad, "Tables" (the tables
+// sheet), "My orders · N" (a drawer with the waiter's open orders), the chime and the waiter with "Lock pad" (lib/topBar.ts and the
+// shell's Account). "Order sent" shows as a toast over the menu, so nothing on the screen moves under the waiter's finger. The page's h1
+// is for readers: the top bar and the "Screens" tab already say where the screen is.
 
 const IDLE_CHECK_MS = 1000;
 const NOTICE_MS = 8000;
@@ -56,16 +57,14 @@ function useAutoLock() {
 
 interface WorkspaceProps {
   userId: number;
-  userName: string;
   notice: boolean;
   onNoticeOff: () => void;
   orders: FeedSnapshot<OrdersState> | null;
   menu: FeedSnapshot<Menu | null> | null;
 }
 
-function Workspace({ userId, userName, notice, onNoticeOff, orders, menu }: WorkspaceProps) {
+function Workspace({ userId, notice, onNoticeOff, orders, menu }: WorkspaceProps) {
   const t = useTranslations("pad");
-  const [view, setView] = useState<View>("order");
 
   const open = useMemo(() => (orders ? openOrdersOf(orders.state) : []), [orders]);
 
@@ -94,58 +93,48 @@ function Workspace({ userId, userName, notice, onNoticeOff, orders, menu }: Work
 
   const readyCount = useMemo(() => open.reduce((n, order) => n + order.lines.filter((line) => line.status === "ready").length, 0), [open]);
 
+  // the board's top bar holds the pad's own buttons (lib/topBar.ts): "Tables", "My orders · N" and the chime
+  const actions = useTopBarSlots((s) => s.actions);
+  const [tablesOpen, setTablesOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const topButton = `inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 ${focusRing}`;
+
+  // the pad's touches also reach the top bar's buttons (a portal keeps React's events in this tree)
   return (
     <div className="flex flex-col lg:min-h-0 lg:flex-1" onPointerDown={unlockAudio} onKeyDown={unlockAudio}>
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-2.5 sm:px-6">
-        <SegmentedControl
-          tabs
-          tone="station"
-          label={t("views")}
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "order", label: t("tab_new_order") },
-            {
-              value: "orders",
-              label: (
-                <>
-                  {t("tab_my_orders")}
-                  {readyCount > 0 ? (
-                    <span className="inline-flex min-h-6 items-center rounded-full bg-brand-600 px-2 text-[13px] font-bold tabular-nums text-white">
-                      {t("ready_badge", { count: readyCount })}
-                    </span>
-                  ) : null}
-                </>
-              ),
-            },
-          ]}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="mr-1 flex min-w-0 items-center gap-2.5">
-            <Avatar name={userName} size="sm" />
-            <p className="truncate text-base font-semibold text-neutral-900">{t("acting", { name: userName })}</p>
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            aria-pressed={muted}
-            onClick={() => {
-              unlockAudio();
-              const next = !muted;
-              mutedRef.current = next;
-              setMuted(next);
-              storeMuted(next);
-            }}
-          >
-            {muted ? <VolumeX className="size-5" strokeWidth={1.75} aria-hidden="true" /> : <Volume2 className="size-5" strokeWidth={1.75} aria-hidden="true" />}
-            {muted ? t("unmute") : t("mute")}
-          </Button>
-          <Button type="button" variant="dark" onClick={() => useActing.getState().lock("manual")}>
-            <Lock className="size-5" strokeWidth={1.75} aria-hidden="true" />
-            {t("lock")}
-          </Button>
-        </div>
-      </div>
+      {actions
+        ? createPortal(
+            <>
+              <button type="button" aria-haspopup="dialog" onClick={() => setTablesOpen(true)} className={topButton}>
+                {t("tables")}
+              </button>
+              <button type="button" aria-haspopup="dialog" onClick={() => setOrdersOpen(true)} className={topButton}>
+                {t("orders_button", { count: open.length })}
+                {readyCount > 0 ? (
+                  <span className="inline-flex min-h-6 items-center rounded-full bg-brand-600 px-2 text-xs font-bold tabular-nums text-white">
+                    {t("ready_badge", { count: readyCount })}
+                  </span>
+                ) : null}
+              </button>
+              <IconButton
+                label={muted ? t("unmute") : t("mute")}
+                aria-pressed={muted}
+                variant="secondary"
+                className="size-10 rounded-xl border-neutral-200"
+                onClick={() => {
+                  unlockAudio();
+                  const next = !muted;
+                  mutedRef.current = next;
+                  setMuted(next);
+                  storeMuted(next);
+                }}
+              >
+                {muted ? <VolumeX className="size-5" strokeWidth={1.75} aria-hidden="true" /> : <Volume2 className="size-5" strokeWidth={1.75} aria-hidden="true" />}
+              </IconButton>
+            </>,
+            actions,
+          )
+        : null}
 
       {/* a toast over the menu (centred on it from 1024 px, beside the 368 px order panel); a polite live region either way */}
       <p
@@ -166,19 +155,26 @@ function Workspace({ userId, userName, notice, onNoticeOff, orders, menu }: Work
         )}
       </p>
 
-      {view === "order" ? (
-        <OrderingSurface fill userId={userId} menu={menu} onSendStarted={onNoticeOff} />
-      ) : (
-        <div className="px-4 py-5 sm:px-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      <OrderingSurface fill userId={userId} menu={menu} onSendStarted={onNoticeOff} tablesOpen={tablesOpen} onTablesOpen={setTablesOpen} />
+
+      {ordersOpen ? (
+        <Drawer label={t("orders_title")} onClose={() => setOrdersOpen(false)}>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold text-neutral-900">{t("orders_title")}</h2>
+            <IconButton label={t("close")} size="md" onClick={() => setOrdersOpen(false)}>
+              <X className="size-5" strokeWidth={2} aria-hidden="true" />
+            </IconButton>
+          </div>
           <MyOrders orders={open} loaded={!!orders?.loaded} stale={orders?.error ? t("stale") : null} />
-        </div>
-      )}
+        </Drawer>
+      ) : null}
     </div>
   );
 }
 
 export function PadScreen() {
   const t = useTranslations("pad");
+  const titleSlot = useTopBarSlots((s) => s.title);
   const user = useActing((s) => s.user);
   const branchId = useSession((s) => s.me?.user.branch_id ?? 0);
   useAutoLock();
@@ -213,8 +209,10 @@ export function PadScreen() {
   return (
     <div data-shell-fill className="flex flex-1 flex-col lg:min-h-0">
       <h1 className="sr-only">{t("title")}</h1>
+      {/* the board's station name beside the mark */}
+      {titleSlot ? createPortal(<span className="min-w-0 truncate text-lg font-semibold text-neutral-900">{t("title")}</span>, titleSlot) : null}
       {user ? (
-        <Workspace key={user.id} userId={user.id} userName={user.name} notice={notice} onNoticeOff={() => setNotice(false)} orders={orders} menu={menu} />
+        <Workspace key={user.id} userId={user.id} notice={notice} onNoticeOff={() => setNotice(false)} orders={orders} menu={menu} />
       ) : (
         <div className="flex flex-1 items-start justify-center px-4 py-8 sm:items-center lg:min-h-0 lg:overflow-y-auto">
           <LockScreen />

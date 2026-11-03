@@ -9,15 +9,15 @@ import { Alert, Button, IconButton, ProductImage, Skeleton } from "../ui";
 import { controlClass, focusRing } from "../styles";
 import { isUnavailable, ProductCard } from "./ProductCard";
 
-// The menu (fresh-counter.md 3.2, step 6.3a): a 52 px search that filters the menu in the browser, by either name; the category chips in
-// the "Menu categories" tablist ("New" first for products marked new, then the categories in their order, then "Other" for products
-// without one), each with its count, hidden from readers so a tab is named by its label alone; and the grid of product cards, 2 columns
+// The menu (fresh-counter.md 3.2 and the Pad board, step 6.3a): a 52 px search that filters the menu in the browser, by either name; the
+// category chips in the "Menu categories" tablist ("All" first, as the board has it, then "New" for products marked new, the categories
+// in their order, and "Other" for products without one), each with its count, hidden from readers so a tab is named by its label alone; and the grid of product cards, 2 columns
 // on a phone, 3 from 640 px and 4 from 1152 px (72rem: the 1180 px tablet). While a search is typed, the chips and their counts follow what
 // matches. Tap adds one; long-press, or the card's "More" button, opens the sheet with quantity, modifiers and a note.
 
 export { isUnavailable };
 
-type TabId = "new" | "other" | number;
+type TabId = "all" | "new" | "other" | number;
 
 /** The announcement of a tap on a card that cannot be sold stays this long (it is read out once). */
 const SAID_MS = 4000;
@@ -29,8 +29,10 @@ interface TabSpec {
   items: MenuItem[];
 }
 
-export function tabsOf(menu: Menu, locale: Locale, labels: { new: string; other: string }): TabSpec[] {
+export function tabsOf(menu: Menu, locale: Locale, labels: { all: string; new: string; other: string }): TabSpec[] {
   const tabs: TabSpec[] = [];
+  // the board's first chip: everything on the menu
+  if (menu.items.length > 0) tabs.push({ id: "all", label: labels.all, items: menu.items });
   const fresh = menu.items.filter((item) => item.is_new);
   if (fresh.length > 0) tabs.push({ id: "new", label: labels.new, items: fresh });
   for (const category of [...menu.categories].sort((a, b) => a.sort - b.sort || a.id - b.id)) {
@@ -192,7 +194,7 @@ export function MenuPanel({
     return () => clearTimeout(off);
   }, [said]);
 
-  const labels = useMemo(() => ({ new: t("tab_new"), other: t("tab_other") }), [t]);
+  const labels = useMemo(() => ({ all: t("tab_all"), new: t("tab_new"), other: t("tab_other") }), [t]);
   const found = useMemo(() => (menu ? searchMenu(menu, query) : null), [menu, query]);
   const tabs = useMemo(() => (found ? tabsOf(found, locale, labels) : []), [found, locale, labels]);
   const current = tabs.find((tab) => tab.id === chosen) ?? tabs[0];
@@ -239,10 +241,10 @@ export function MenuPanel({
   }
 
   return (
-    <section className="space-y-3">
-      <div className={`space-y-3 ${sticky ? "sticky top-0 z-10 bg-ground pb-1 pt-5" : ""}`}>
+    <section className="space-y-3.5">
+      <div className={`space-y-3.5 ${sticky ? "sticky top-0 z-10 bg-ground pb-0.5 pt-5" : ""}`}>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-neutral-500" strokeWidth={2} aria-hidden="true" />
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-neutral-600" strokeWidth={2} aria-hidden="true" />
           <input
             type="search"
             value={query}

@@ -8,13 +8,14 @@ import { compareDecimal, trimDecimal } from "@/lib/decimal";
 import { focusRing } from "../styles";
 import { IconButton, ProductImage } from "../ui";
 
-// A product as the waiter sees it (fresh-counter.md 3.2, step 6.3a): a white card with the 4:3 photo on top (the card rendition, or the
-// category's placeholder), the name (two lines at most) and the price under it. Over the photo: "3 left" in amber when the API says the
-// stock is low (nothing when there is plenty), the brand-teal "New" chip, or, for a product that cannot be sold, the photo in grey with the
-// reason in a red chip. The whole card is the add button, named as it always was (name, price, availability; or why it is not available),
-// so the earlier specs still find it; a tap adds one, a long press or the small "More" button beside the price opens the options. An
-// unavailable card is aria-disabled, not disabled: it stays focusable and a tap says why. Also drawn without handlers as a `preview`
-// (the catalog's grid view, step 6.4a, and the photo card's live preview, step 6.4b).
+// A product as the waiter sees it (fresh-counter.md 3.2 and the Pad board, step 6.3a): a white card with the 4:3 photo on top (the card
+// rendition, or the category's placeholder), the name on one line (on the English page the Amharic name under it, as the board has it)
+// and the price. Over the photo: "3 left" in amber when the API says the stock is low (nothing when there is plenty), the brand-teal "New"
+// chip, or, for a product that cannot be sold, the photo in grey with the reason in a red chip. The whole card is the add button, named as
+// it always was (name, price, availability; or why it is not available), so the earlier specs still find it; a tap adds one, a long press
+// or the small "More" button beside the price opens the options. An unavailable card is aria-disabled, not disabled: it stays focusable
+// and a tap says why. Also drawn without handlers as a `preview` (the catalog's grid view, step 6.4a, and the photo card's live preview,
+// step 6.4b).
 
 /** What a card shows: a menu entry, or a catalog row put in the same shape. */
 export type ProductCardItem = Pick<
@@ -99,17 +100,23 @@ export function ProductCard<T extends ProductCardItem>({ item, locale, category,
         ) : null}
         {unavailable ? (
           <span
-            className={`absolute left-1/2 top-1/2 inline-flex min-h-7.5 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white px-3 py-0.5 text-center text-[13px] font-bold leading-tight text-red-700 shadow-xs motion-safe:transition-shadow motion-safe:duration-150 ${nudged ? "ring-4 ring-red-200" : ""}`}
+            className={`absolute left-1/2 top-1/2 inline-flex min-h-7.5 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white px-3 py-0.5 text-center text-[13px] font-bold leading-tight text-red-700 motion-safe:transition-shadow motion-safe:duration-150 ${nudged ? "ring-4 ring-red-200" : ""}`}
           >
             {reason}
           </span>
         ) : null}
       </span>
-      <span className="flex flex-1 flex-col gap-1.5 px-3 pb-3 pt-2.5">
-        <span className="line-clamp-2 text-base font-semibold leading-snug text-neutral-900">{name}</span>
-        <span className={`mt-auto pr-10 text-base font-bold tabular-nums ${unavailable ? "text-neutral-600" : "text-neutral-900"}`}>
-          {item.price} {item.currency}
-        </span>
+      <span className="flex flex-col gap-px px-3 pt-2.5">
+        <span className="truncate text-[15px] font-semibold leading-snug text-neutral-900">{name}</span>
+        {/* the board's second line: the Amharic name under the English one on the English page; Amharic only in Amharic (plan Q13) */}
+        {locale === "en" ? (
+          <span lang="am" className="truncate text-[13px] text-neutral-600">
+            {item.name_am}
+          </span>
+        ) : null}
+      </span>
+      <span className={`mt-auto flex h-12 items-center pl-3 pr-12 text-base font-bold tabular-nums ${unavailable ? "text-neutral-600" : "text-neutral-900"}`}>
+        {item.currency} {item.price}
       </span>
     </>
   );

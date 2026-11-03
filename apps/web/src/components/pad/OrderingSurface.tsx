@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { addToCart, cartFrom, cartTotal, emptyCart, newOrderOf, orderLinesOf, useCarts, type Cart as CartState } from "@/lib/cart";
 import { useErrorText } from "@/lib/errors";
 import type { Menu } from "@/lib/api/types";
@@ -11,11 +11,12 @@ import { queueCancelOrder, queuePadSend, queueReplaceLines, queueSendExisting, u
 import { focusRing } from "../styles";
 import { Cart, unitsOf } from "./Cart";
 import { MenuPanel } from "./MenuPanel";
-import { TablesPanel } from "./TablesPanel";
+import { OrderHead, TablesSheet } from "./TablesPanel";
 
-// The ordering surface shared by the waiter pad and the cashier till (fresh-counter.md 3.2, step 6.3a), for one person's cart (the waiter
-// who unlocked the pad, or the signed-in cashier): the menu on the left, filling the width, and the 368 px white order panel on the right,
-// with the table (dine-in or takeaway, the table grid) at its head, then the cart with its Send button. Sending goes through the outbox;
+// The ordering surface shared by the waiter pad and the cashier till (fresh-counter.md 3.2 and the Pad board, step 6.3a), for one person's
+// cart (the waiter who unlocked the pad, or the signed-in cashier): the menu on the left, filling the width, and the 368 px white order
+// panel on the right, with what the order is for at its head ("Change" opens the "Tables" sheet: dine-in or takeaway, the table grid),
+// then the cart with its Send button. Sending goes through the outbox;
 // what the API answers is put back on the cart by `usePadOutcomes` (outcomes.ts), which the hosting screen mounts once.
 //
 // `fill` (the pad, in the shell's `fill` frame): from 1024 px the two zones hold the window's height, the menu scrolls under its search and
@@ -32,6 +33,8 @@ export function OrderingSurface({
   menu,
   onSendStarted,
   fill = false,
+  tablesOpen,
+  onTablesOpen,
 }: {
   /** whose cart this is: the acting waiter on the pad, the signed-in cashier on the till */
   userId: number;
@@ -40,6 +43,9 @@ export function OrderingSurface({
   onSendStarted: () => void;
   /** the zones hold the window's height and scroll on their own (the pad, in the shell's `fill` frame) */
   fill?: boolean;
+  /** the "Tables" sheet, when the host opens it too (the pad's top bar "Tables"); else the surface keeps it */
+  tablesOpen?: boolean;
+  onTablesOpen?: (open: boolean) => void;
 }) {
   const t = useTranslations("pad");
   const errorText = useErrorText();
@@ -88,22 +94,27 @@ export function OrderingSurface({
   const currency = items?.[0]?.currency ?? "ETB";
   const menuError = menu?.error ? t("stale") : null;
 
+  const [ownSheet, setOwnSheet] = useState(false);
+  const sheetOpen = tablesOpen ?? ownSheet;
+  const setSheet = onTablesOpen ?? setOwnSheet;
+  const locked = cart.serverOrderId !== null || cart.sending;
+
   const panel = (
     <>
-      {/* the picker scrolls on its own when a long table list would push the lines and Send out of the panel */}
-      <div className="shrink-0 border-b border-neutral-200 px-5 py-4 lg:max-h-[50%] lg:overflow-y-auto">
-        <TablesPanel
-          type={cart.type}
-          tableId={cart.tableId}
-          locked={cart.serverOrderId !== null || cart.sending}
-          sent={cart.serverOrderId !== null}
-          onType={(type) => act((c) => ({ ...c, type }))}
-          onTable={(id) => act((c) => ({ ...c, tableId: id }))}
-        />
-      </div>
+      <OrderHead type={cart.type} tableId={cart.tableId} locked={locked} sent={cart.serverOrderId !== null} onChange={() => setSheet(true)} />
       <Cart cart={cart} menu={items} categories={menu?.state?.categories} currency={currency} onChange={act} onSend={send} onClear={clear} />
     </>
   );
+  const sheet =
+    sheetOpen && !locked ? (
+      <TablesSheet
+        type={cart.type}
+        tableId={cart.tableId}
+        onType={(type) => act((c) => ({ ...c, type }))}
+        onTable={(id) => act((c) => ({ ...c, tableId: id }))}
+        onClose={() => setSheet(false)}
+      />
+    ) : null;
   const menuPanel = (
     <MenuPanel
       menu={menu?.state ?? null}
@@ -118,9 +129,10 @@ export function OrderingSurface({
     return (
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_368px]">
         <div className="min-w-0">{menuPanel}</div>
-        <div className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white lg:sticky lg:top-4 lg:self-start">
+        <div className="flex max-h-[calc(100dvh-2rem)] flex-col gap-3.5 overflow-hidden rounded-2xl border border-neutral-200 bg-white p-5 lg:sticky lg:top-4 lg:self-start">
           {panel}
         </div>
+        {sheet}
       </div>
     );
   }
@@ -129,14 +141,15 @@ export function OrderingSurface({
     <div className="flex flex-col lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_368px]">
       {/* the menu's search and chips stick to the top of this zone and bring their own top padding */}
       <div className="min-w-0 px-4 pb-5 sm:px-6 lg:min-h-0 lg:overflow-y-auto">{menuPanel}</div>
-      <div id={ORDER_PANEL_ID} className="flex scroll-mt-4 flex-col border-t border-neutral-200 bg-white lg:min-h-0 lg:border-l lg:border-t-0">
+      <div id={ORDER_PANEL_ID} className="flex scroll-mt-4 flex-col gap-3.5 border-t border-neutral-200 bg-white p-5 lg:min-h-0 lg:border-l lg:border-t-0">
         {panel}
       </div>
+      {sheet}
       {cart.lines.length > 0 ? (
         // below 1024 px the panel is under the menu: the count and the total stay in sight, with the way down to them
         <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t border-neutral-200 bg-white px-4 py-3 shadow-float lg:hidden">
           <p className="min-w-0 truncate text-base font-semibold tabular-nums text-neutral-900">
-            {t("items_count", { count: unitsOf(cart) })} · {cartTotal(cart)} {currency}
+            {t("items_count", { count: Number(unitsOf(cart)) })} · {currency} {cartTotal(cart)}
           </p>
           <a
             href={`#${ORDER_PANEL_ID}`}

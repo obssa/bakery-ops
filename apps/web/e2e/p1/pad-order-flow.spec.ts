@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { freshDevice } from "../support/devices";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture, clearStaleOrders } from "../support/fixture";
-import { openPad, openPadAndUnlock, typeCode } from "../support/pad";
+import { closeMyOrders, openMyOrders, openPad, openPadAndUnlock, typeCode } from "../support/pad";
 
 // Phase 1 gate project p1-order-flow, the pad lock screen (step 1.6b; the full flow arrives in step 1.6c). A shared pad
 // is signed in as the pad account and locked by a short code (docs/architecture.md section 6, "Waiter pad"):
@@ -56,8 +56,8 @@ test.describe("p1 order flow: pad lock", () => {
 
     // a touch every 40 s keeps it open
     await page.clock.fastForward(40_000);
-    await page.getByRole("tab", { name: "My orders" }).click();
-    await page.getByRole("tab", { name: "New order" }).click();
+    await openMyOrders(page);
+    await closeMyOrders(page);
     await page.clock.fastForward(40_000);
     await expect(page.getByText(`Acting: ${fixture.waiter.name}`)).toBeVisible();
 
