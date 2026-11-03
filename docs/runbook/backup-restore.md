@@ -8,7 +8,7 @@ this runbook is run by an agent or by CI against the live host.
 
 | Job | When (Africa/Addis_Ababa) | What it does |
 |---|---|---|
-| `backup:run` | every night at 02:30 | dumps the database (gzip) and snapshots the files folder as hard links into the backup folder, writes the manifest, applies retention |
+| `backup:run` | every night at 02:30 | dumps the database (gzip) and snapshots the files folder (receipt photos) and the media folder (product photos, step 6.1b) as hard links into the backup folder, writes the manifest, applies retention |
 | `backup:drill` | Sundays at 03:30 | restores the newest good dump into the scratch database, checks the ledger, the hash chains, the triggers and the row counts, empties it again |
 
 Both run from the **existing** `schedule:run` cron entry (docs/runbook/server.md, "Cron entries"): **no new cron line is needed.** Each run
@@ -34,12 +34,15 @@ Settings (all in `<app>/.env`, then `php artisan config:cache`): `BACKUP_PATH` (
 
 ## Where the dumps are
 
-In the backup folder, one night is three entries named by the UTC time the backup started:
+In the backup folder, one night is four entries named by the UTC time the backup started:
 
 - `bakery-ops-YYYYMMDD-HHMMSSZ.sql.gz` the dump (gzip of a plain SQL file);
 - `bakery-ops-YYYYMMDD-HHMMSSZ.json` its manifest: `sha256`, `bytes`, the row counts of the main tables (`rows`, and `rows_after` for a
-  table that changed during the dump), `migrations`, the `triggers`, `app_commit`, and the `files` snapshot's figures;
-- `bakery-ops-YYYYMMDD-HHMMSSZ.files/` the files folder of that night (hard links: they take no space while the app still has the file).
+  table that changed during the dump), `migrations`, the `triggers`, `app_commit`, and the `files` and `media` snapshots' figures;
+- `bakery-ops-YYYYMMDD-HHMMSSZ.files/` the files folder of that night, the receipt photos (hard links: they take no space while the app
+  still has the file);
+- `bakery-ops-YYYYMMDD-HHMMSSZ.media/` the media folder of that night, the product photos (step 6.1b; hard links too, so a photo the
+  daily prune deletes stays in the nights before). A night written before step 6.1b has no `.media/` folder.
 
 A dump without its manifest is not a good backup (the run was interrupted): retention deletes it. Anything ending in `.partial` is a run in
 progress or one the host killed; the next run removes it.
@@ -62,7 +65,7 @@ the drill again without `--keep` afterwards, or empty it in phpMyAdmin, so it do
 ## A full restore by hand
 
 A restore replaces the live data with the data of one night: everything written after that dump started is lost (ADR 0020). It is Ramin's
-decision. Restore the database **and** the files folder of the **same** night.
+decision. Restore the database **and** the files and media folders of the **same** night.
 
 1. **Pick the night**: the newest whose drill passed, or the newest good dump before the problem. Check its sha256 (above).
 2. **Stop writes**: `php artisan down` (the app answers 503 to everyone; the cron jobs keep running but write nothing that matters while
@@ -73,7 +76,11 @@ decision. Restore the database **and** the files folder of the **same** night.
    - in phpMyAdmin: *Import*, the `.sql.gz` file, format SQL; or
    - in the terminal: `zcat <folder>/bakery-ops-<night>.sql.gz | mysql <app database>` (the client asks for the password with `-p`, or
      reads it from `~/.my.cnf`; never type it on the command line).
-5. **Restore the files folder** of the same night: `rsync -a --delete <folder>/bakery-ops-<night>.files/ <app>/storage/app/private/files/`.
+5. **Restore the files folder and the media folder** of the same night:
+   - `rsync -a --delete <folder>/bakery-ops-<night>.files/ <app>/storage/app/private/files/` (the receipt photos);
+   - `rsync -a --delete <folder>/bakery-ops-<night>.media/ <app>/storage/app/private/media/` (the product photos; a night from before
+     step 6.1b has no `.media/` folder: leave the media folder as it is). A photo row whose files are missing answers 404 and the product
+     shows its placeholder (docs/runbook/server.md, "Product photos").
 6. **Check it** before opening: `php artisan migrate --force` (nothing to run when the release is the dump's `app_commit`; a later
    release migrates forward), `php artisan shifts:verify-chain` (every chain whole), then `php artisan up`.
 7. **Record what happened**: which night, why, and what was lost. The next nightly backup runs as usual.
@@ -83,16 +90,18 @@ instead, or use `backup:drill --keep`, which restores the newest good dump there
 
 ## When the disk fills
 
-The account's disk holds the app, its files folder (receipt photos), the database and the backups. Retention keeps 30 dumps under
+The account's disk holds the app, its files folder (receipt photos), its media folder (product photos), the database and the backups. Retention keeps 30 dumps under
 `BACKUP_MAX_MB` (2 GB): the oldest go first, the newest good one never. A run that cannot stay under the cap even with one dump records
 `over_cap` in its row.
 
-1. Look at the sizes: `du -sh ~/backups/bakery-ops <app>/storage/app/private/files` and the cPanel *Disk Usage* page.
+1. Look at the sizes: `du -sh ~/backups/bakery-ops <app>/storage/app/private/files <app>/storage/app/private/media` and the cPanel *Disk
+   Usage* page.
 2. Lower the number kept (`BACKUP_KEEP=14`) or the cap (`BACKUP_MAX_MB=1024`), then `php artisan config:cache`; the next run applies it.
-3. The files snapshots are hard links: they free space only when the app has also purged the same photos. Deleting an old night's
-   `.files/` folder by hand loses only photos the app no longer has.
+3. The files and media snapshots are hard links: they free space only when the app has also purged the same photos (the hourly orphan
+   sweep, the daily product photo prune). Deleting an old night's `.files/` or `.media/` folder by hand loses only photos the app no
+   longer has.
 4. When the photos are what fills the disk, move them to an S3-compatible bucket (`FILES_DISK=files_s3`, docs/runbook/server.md, "Files").
-5. Never delete the newest good dump to make room. If the disk is full now, delete the oldest nights (all three entries of a night).
+5. Never delete the newest good dump to make room. If the disk is full now, delete the oldest nights (all four entries of a night).
 
 ## When a run fails
 
@@ -108,7 +117,7 @@ own error text is in `storage/logs` (`ops: mysqldump failed`, `ops: mysql failed
 | `backup.dump_failed` | mysqldump exited with an error (`exit_code`) | run `php artisan backup:run` by hand and read the log line; check `command -v mysqldump` |
 | `backup.dump_incomplete` | the dump did not end with `-- Dump completed` | usually a killed process or a full disk |
 | `backup.write_failed` | the dump or manifest could not be written | the disk is full or the folder unwritable |
-| `backup.files_failed` | the files snapshot could not be made | check the files folder and the disk |
+| `backup.files_failed` | the files or media snapshot could not be made | check the files and media folders and the disk |
 | `offsite.copy_failed` | rclone could not copy (only with `BACKUP_REMOTE` set) | the local backup stands; check `rclone` and its remote |
 | `drill.not_configured` | (`skipped`) no `BACKUP_DRILL_DATABASE` | one-time setup step 3 |
 | `drill.same_database` | the drill database is the app's own | set a separate scratch database |
@@ -126,8 +135,8 @@ own error text is in `storage/logs` (`ops: mysqldump failed`, `ops: mysql failed
 `BACKUP_REMOTE` is empty: no copy leaves the host, and a copy on the same host does not survive the loss of the host (plan 10.2 Q2; the
 go-live checklist item `offsite-backup`). To turn it on, Ramin picks the storage (an R2 or S3 bucket, Backblaze, a drive he owns), installs
 `rclone` in the account, runs `rclone config` to create a remote (its credentials stay in rclone's own config file, never in the app's
-`.env` or this repository), and sets `BACKUP_REMOTE=<remote>:<folder>`. Each good backup then copies its dump, manifest and files snapshot
-there and writes an `offsite` row.
+`.env` or this repository), and sets `BACKUP_REMOTE=<remote>:<folder>`. Each good backup then copies its dump, manifest and files and
+media snapshots there and writes an `offsite` row.
 
 ## Downloading a backup by hand
 
@@ -164,7 +173,8 @@ Ramin decided on 2026-11-02 to go live without the off-site copy and to download
   1. Sign in with the hosting account's SFTP access.
   2. Go to the same folder and copy the two files to your computer.
   3. Keep the SFTP login in your password manager, never in this repository.
-- **The night's files folder** (`.files/`, the payment photos) is optional and can be large. To take it:
+- **The night's files and media folders** (`.files/`, the payment photos; `.media/`, the product photos) are optional and can be large.
+  To take one:
   1. Compress it in File Manager to a `.zip` outside the backup folder.
   2. Download the `.zip`, then delete it from the host.
 
