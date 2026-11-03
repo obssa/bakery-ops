@@ -315,6 +315,11 @@ jobs:
           if grep -rlE "fonts\.(googleapis|gstatic)\.com" out; then echo "::error::the export references Google Fonts (fonts.googleapis.com or fonts.gstatic.com): self-host the font through @fontsource-variable"; exit 1; fi
           ls out/_next/static/media | grep -q '^inter-latin-wght' || { echo "::error::the export has no self-hosted Inter (out/_next/static/media/inter-latin-wght-*)"; exit 1; }
           ls out/_next/static/media | grep -q '^noto-sans-ethiopic-ethiopic-wght' || { echo "::error::the export has no self-hosted Noto Sans Ethiopic"; exit 1; }
+          # step 6.3a (ADR 0022, the note on ADR 0018): the shell cache keeps the product photos, CacheFirst for the public, immutable
+          # /api/v1/media/ only, in the cache "product-images"; no other API answer is cached (the worker has that one runtime route)
+          grep -q '"/api/v1/media/"' out/sw.js || { echo "::error::out/sw.js has no runtime route for /api/v1/media/ (scripts/build-sw.mjs)"; exit 1; }
+          grep -q '"product-images"' out/sw.js || { echo "::error::out/sw.js does not keep the product photos in the cache product-images"; exit 1; }
+          grep -q 'CacheFirst' out/sw.js || { echo "::error::out/sw.js serves the product photos without CacheFirst"; exit 1; }
           rm -rf out
       - run: pnpm build
         working-directory: apps/web
