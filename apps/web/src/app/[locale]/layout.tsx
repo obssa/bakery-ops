@@ -1,3 +1,4 @@
+import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/noto-sans-ethiopic/wght.css";
 import "../globals.css";
 import type { Metadata } from "next";

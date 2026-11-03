@@ -54,7 +54,7 @@ export function EntryDrawer({ id, onClose }: { id: number; onClose: () => void }
   }
 
   return (
-    <Drawer label={title} onClose={onClose}>
+    <Drawer label={title} onClose={onClose} size="lg">
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-xl font-semibold text-neutral-900">{title}</h2>
         <Button variant="secondary" onClick={onClose}>
@@ -265,7 +265,7 @@ function Value({ shown, field, people }: { shown: Shown; field: string; people: 
   switch (shown.kind) {
     case "missing":
       return (
-        <span className="text-neutral-400">
+        <span className="text-neutral-600">
           <span aria-hidden="true">—</span>
           <span className="sr-only">{t("entry.missing")}</span>
         </span>

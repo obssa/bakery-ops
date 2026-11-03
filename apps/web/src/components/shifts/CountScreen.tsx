@@ -12,6 +12,7 @@ import { authed, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
 import { useIsoDay } from "@/lib/useDates";
+import { focusRing } from "../styles";
 import { Alert, Badge, Button, PageHeader, Panel } from "../ui";
 import { useRouter } from "@/i18n/navigation";
 import { CountPanel, StageBadge } from "./CountPanel";
@@ -173,7 +174,7 @@ function Loaded({ shiftId }: { shiftId: number }) {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setChosen(count.location?.id ?? null)}
-                className={`flex min-h-12 items-center gap-3 rounded-md border px-4 text-base font-medium focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-600/40 ${
+                className={`flex min-h-12 items-center gap-3 rounded-md border px-4 text-base font-medium ${focusRing} ${
                   active ? "border-blue-700 bg-blue-50 text-blue-900" : "border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
                 }`}
               >
