@@ -118,7 +118,7 @@ function LineRow({ count, line, reasons, editable, onEdit }: RowProps) {
               aria-invalid={invalid || undefined}
               placeholder={placeholder}
               value={text}
-              className="text-right font-semibold tabular-nums"
+              className="text-right font-semibold tabular-nums placeholder:font-normal"
               onFocus={() => setTyping(true)}
               onChange={(event) => setText(event.target.value)}
               onBlur={commit}
@@ -137,7 +137,7 @@ function LineRow({ count, line, reasons, editable, onEdit }: RowProps) {
       <td className={`py-3 text-base ${tableNum}`}>
         <Difference line={line} />
       </td>
-      <td className="min-w-56 py-2 text-base">
+      <td className="min-w-52 py-2 text-base">
         {editable ? (
           explain ? (
             <div className="space-y-2">
@@ -183,7 +183,7 @@ function LineRow({ count, line, reasons, editable, onEdit }: RowProps) {
         )}
       </td>
       <td className="py-2 text-base">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
           <Badge tone={touched ? "brand" : "amber"} dot>
             {touched ? t("mark_counted") : t("mark_not_counted")}
           </Badge>

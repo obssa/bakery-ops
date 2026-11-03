@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Chip } from "./ui";
 
 // The head of a station screen drawn by the screen itself (step 6.3c: the production board, fresh-counter.md 3.5, and the count screen):
 // the screen's name (its Amharic name beside it on the English page), a chip with the station and its shift, and the screen's actions on
@@ -33,7 +32,10 @@ export function ScreenHead({
             {titleAm}
           </span>
         ) : null}
-        {subtitle ? <Chip className="self-center">{subtitle}</Chip> : null}
+        {/* the board's neutral chip, white with a hairline here because the head sits on the ground, not on a white bar */}
+        {subtitle ? (
+          <span className="inline-flex min-h-7 items-center self-center rounded-full border border-neutral-200 bg-white px-3 text-[13px] font-semibold text-neutral-700">{subtitle}</span>
+        ) : null}
         {status ? <span className="self-center">{status}</span> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}

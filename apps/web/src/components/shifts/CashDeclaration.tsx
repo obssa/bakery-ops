@@ -219,7 +219,7 @@ export function CashDeclaration({
                           aria-invalid={invalid[key] || undefined}
                           placeholder="0"
                           value={tally[key] ?? ""}
-                          className="text-right font-semibold tabular-nums"
+                          className="text-right font-semibold tabular-nums placeholder:font-normal"
                           onChange={(event) => setTally((m) => ({ ...m, [key]: event.target.value }))}
                           onBlur={(event) => commitTally(key, event.target.value)}
                           onKeyDown={(event) => {
