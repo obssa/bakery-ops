@@ -4,6 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
 import en from "../../messages/en.json";
 import { fontsReady } from "../support/a11y";
+import type { Api } from "../support/api";
 import { freshDevice } from "../support/devices";
 import { live } from "../support/env";
 import { loginOnce } from "../support/fixture";
@@ -17,7 +18,8 @@ import { openAs, typeCode } from "../support/pad";
 // only bring each screen to the state its board shows.
 //
 // Step 6.3a: the waiter pad (Pad.dc.html): the lock screen's keypad, the menu with an order of three lines at a table, the tables sheet
-// open, and the menu in Amharic.
+// open, My orders, and the menu in Amharic; and the station top bar every station screen now has (the kitchen display's, before step
+// 6.3b rebuilds the display under it).
 //
 // Step 6.4a: the admin frame and its first pages, as the demo bakery's admin, at 1440 x 900: Today (Admin.dc.html) in English and in
 // Amharic, the catalog list as a table and as pad cards (CatalogList.dc.html), the Orders board in the new frame, and the sidebar as the
@@ -27,31 +29,43 @@ const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
 const MESSAGES = { en, am } as const;
 
-interface DemoWaiter {
+interface DemoAccount {
   api: { token: string | null };
   device: string;
   code: string;
 }
 
-let waiter: Promise<DemoWaiter> | null = null;
+interface DemoBakery {
+  admin: Api;
+  device: string;
+  users: { id: number; phone: string; roles: string[] }[];
+}
 
-/** The demo bakery's waiter, signed in on a tablet enrolled for these captures, with a fresh short code. Once per worker. */
-function demoWaiter(): Promise<DemoWaiter> {
-  waiter ??= (async () => {
+let bakery: Promise<DemoBakery> | null = null;
+
+/** The demo bakery as its admin sees it, and a tablet enrolled there for these captures. Once per worker. */
+function demoBakery(): Promise<DemoBakery> {
+  bakery ??= (async () => {
     const phone = process.env.DEMO_ADMIN_PHONE ?? "";
     const password = process.env.DEMO_ADMIN_PASSWORD ?? "";
     if (!phone || !password) throw new Error("DEMO_ADMIN_PHONE and DEMO_ADMIN_PASSWORD must be set (e2e.yml): the e2e job seeds the demo bakery.");
     const { api: admin } = await loginOnce(phone, password);
     const device = await freshDevice(admin, "screens");
     const users = (await admin.get<{ data: { id: number; phone: string; roles: string[] }[] }>("/users")).data;
-    const user = users.find((u) => u.roles.includes("waiter"));
-    if (!user) throw new Error("the demo bakery has no waiter");
-    const { api } = await loginOnce(user.phone, password);
-    const { short_code: code } = await admin.post<{ short_code: string }>(`/users/${user.id}/short-code/reset`);
-    return { api, device, code };
+    return { admin, device, users };
   })();
-  waiter.catch(() => (waiter = null));
-  return waiter;
+  bakery.catch(() => (bakery = null));
+  return bakery;
+}
+
+/** The first demo account of `role`, signed in on the captures' tablet, with a fresh short code (every demo account has the demo password). */
+async function demoAccount(role: string): Promise<DemoAccount> {
+  const demo = await demoBakery();
+  const user = demo.users.find((u) => u.roles.includes(role));
+  if (!user) throw new Error(`the demo bakery has no ${role}`);
+  const { api } = await loginOnce(user.phone, process.env.DEMO_ADMIN_PASSWORD ?? "");
+  const { short_code: code } = await demo.admin.post<{ short_code: string }>(`/users/${user.id}/short-code/reset`);
+  return { api, device: demo.device, code };
 }
 
 /** Saves the page as it is now, once its fonts and the photos in view have loaded. */
@@ -76,7 +90,7 @@ async function capture(page: Page, name: string): Promise<void> {
 /** The pad of the demo waiter in `locale`, unlocked, with the first three products that can be sold in the order. */
 async function padWithOrder(page: Page, locale: keyof typeof MESSAGES, shotLocked?: string): Promise<void> {
   const t = MESSAGES[locale];
-  const who = await demoWaiter();
+  const who = await demoAccount("waiter");
   await openAs(page, who.api, `${locale}/pad/`, { device: who.device });
   await expect(page.getByRole("heading", { name: t.pad.enter_code })).toBeVisible({ timeout: 30_000 });
   if (shotLocked) await capture(page, shotLocked);
@@ -113,6 +127,18 @@ test.describe("screens", () => {
     await padWithOrder(page, "am");
     await capture(page, "pad-1180x820-am");
   });
+
+  test("the station top bar on the kitchen display, in en", async ({ page }) => {
+    test.setTimeout(120_000);
+    const chef = await demoAccount("chef");
+    await openAs(page, chef.api, "en/kds/kitchen/", { device: chef.device });
+    await expect(page.getByRole("heading", { level: 1, name: "Kitchen" })).toBeVisible({ timeout: 30_000 });
+    await capture(page, "kds-kitchen-1180x820-en");
+    // the bar's menus open: the screens and the person's (the dates' calendar and Sign out)
+    await page.getByRole("button", { name: en.nav.main, exact: true }).click();
+    await expect(page.getByRole("navigation", { name: en.nav.main })).toBeVisible();
+    await capture(page, "kds-kitchen-screens-menu-1180x820-en");
+  });
 });
 
 // --- step 6.4a: the admin frame, Today, the catalog list --------------------------------------------------------------------------------
@@ -120,30 +146,10 @@ test.describe("screens", () => {
 const DESKTOP = { width: 1440, height: 900 };
 const PORTRAIT = { width: 820, height: 1180 };
 
-interface DemoAdmin {
-  api: { token: string | null };
-  device: string;
-}
-
-let demoAdminSession: Promise<DemoAdmin> | null = null;
-
-/** The demo bakery's admin, signed in on a computer enrolled for these captures. Once per worker. */
-function demoAdmin(): Promise<DemoAdmin> {
-  demoAdminSession ??= (async () => {
-    const phone = process.env.DEMO_ADMIN_PHONE ?? "";
-    const password = process.env.DEMO_ADMIN_PASSWORD ?? "";
-    if (!phone || !password) throw new Error("DEMO_ADMIN_PHONE and DEMO_ADMIN_PASSWORD must be set (e2e.yml): the e2e job seeds the demo bakery.");
-    const { api } = await loginOnce(phone, password);
-    return { api, device: await freshDevice(api, "screens-admin") };
-  })();
-  demoAdminSession.catch(() => (demoAdminSession = null));
-  return demoAdminSession;
-}
-
-/** An admin page of the demo bakery, once its h1 shows. */
+/** An admin page of the demo bakery as its admin sees it, on the captures' tablet, once its h1 shows. */
 async function openAdmin(page: Page, path: string, heading: string): Promise<void> {
-  const who = await demoAdmin();
-  await openAs(page, who.api, path, { device: who.device });
+  const demo = await demoBakery();
+  await openAs(page, demo.admin, path, { device: demo.device });
   await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible({ timeout: 30_000 });
 }
 
