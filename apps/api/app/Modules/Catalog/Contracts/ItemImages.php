@@ -57,8 +57,6 @@ final class ItemImages
         // one disk holds every branch's photos, so the figure is the host's: the branch scope is lifted on purpose
         $photos = ItemImage::query()->withoutGlobalScope(BranchScope::class)->toBase()
             ->select('sha256')->selectRaw('MAX(bytes) AS bytes')->groupBy('sha256');
-        $sum = DB::query()->fromSub($photos, 'photos')->sum('bytes');
-
-        return is_numeric($sum) ? (int) $sum : 0;
+        return (int) DB::query()->fromSub($photos, 'photos')->sum('bytes'); // whole bytes: SUM of an integer column
     }
 }
