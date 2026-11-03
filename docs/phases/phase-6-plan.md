@@ -726,7 +726,67 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   - The count screen on the primitives.
   - `p6-a11y`: production in `en` and `am`.
   - STATUS `web.stations` `done` after this merges.
-  - As built: (to be written by 6.3c)
+  - **As built (step 6.3c, `phase-6/web-production`).** Built region by region from the Production board (`Production.dc.html`) and, for
+    the count screen, from the spec's primitives and the Main board. Web only, plus this note, STATUS and the review sheet: no API,
+    route, registry, OpenAPI or ERD change, and **no Playwright selector changed**. Where the code chose what the plan left open:
+    - **The thumbs.** `lib/productImages.ts` and `lib/images/orderThumbs.ts` are 6.3b's files, copied unchanged from
+      `phase-6/web-kds-till`, so the merge keeps them as they are. The board joins the catalog's photos by product id (10.2 Q7) and,
+      for a product without one, its category's name for the placeholder's icon (`useCategories`).
+    - **The head.** One small component, `components/ScreenHead.tsx` (title, `titleAm`, subtitle, status, actions), shared by the board
+      and the count screen: the name at 20 / 700 (still the page's h1, "Production board" and "Shift count"), the Amharic name beside it
+      on the English page (read from `am.json` at build time, `production/twins.ts`, as 6.2b's catalog twin and 6.3b's KDS twins), the
+      station and shift in a chip, and the actions on the right. Its props are the station top bar's header slot that 6.3a builds; once
+      that slot is on `main`, each screen passes the same values to it and `ScreenHead` goes. Until then it is drawn on the ground, so
+      its chip is white with a hairline (a `neutral-100` chip disappears there). The board's actions: the station filter (a 44 px select,
+      when there is a choice; it was a labelled field above the board), **Display case stock** (`inventory.view`: the till's
+      `DisplayCasePanel` in a drawer) and **New batch** (`production.request`: a dialog asking for a product a production station makes,
+      the quantity, its usual batch when empty, and a note, POST `/production/requests` with its client UUID and one Idempotency-Key).
+      The board's intro line is gone (`production.intro` removed).
+    - **The shift bar** stays under the head as it is (`ShiftBar` is shared, and 6.3b gives it a one-line `strip` look); the board
+      switches to that look, or moves the shift line into the header slot, once those are on `main`.
+    - **The columns** sit on the ground without a tray: the name (16 / 600) over its Amharic name on the English page, a 30 px count
+      pill, and a dashed "Nothing here." when empty. Their region names are kept: Requested, In progress, Pending confirmation and Done
+      today (`p2-stockout-production` selects them). The spec's words "In the oven" and "Check and confirm" are not used, because the
+      selector rule keeps the visible copy that specs read (6.0.2).
+    - **The cards** (`RequestCard`): white, 16 px corners, 14 px padding. The 56 × 42 `thumb` (`ProductImage`, 10 px corners), the name
+      (15 / 600, two lines at most) over the Amharic name, and the quantity at 22 / 700 with its unit under it (what was made once the
+      batch is counted). One chip: "Stock out · asked automatically" (amber), "Asked by <name>" or "Scheduled" (blue) and the priority
+      while it waits; "Made 2 of 2 asked" (blue, with the waste when there is some) while it waits for its overseer. The meta line: the
+      note, the due time and who has it; "<baker> · started 07:58 · 22 min so far" in the oven; "<baker> · needs an overseer";
+      "Confirmed 06:40 · <name>". The name is still the button "Open <product>" (`aria-pressed`), and the card whose request card is
+      open has the 2 px brand border.
+    - **One action per column** (`cardMove` in `lib/live/production.ts`), at 48 px, only for the person whose move it is: **Accept
+      request** (ink) on an open request, **Start batch** (ink) on the one they accepted, **Finish · count made** (secondary) on their
+      batch in the oven, which opens the request card on its Done form with the focus on Produced, and **Confirm batch** (brand) on a
+      finished batch they may sign off and did not make (the API refuses the one who made it). Each is named "<action>: <product>".
+      Accept, Start and Confirm write from the card through the request card's own path (`useRequestRun`: one Idempotency-Key per
+      logical write; Start goes through the outbox as before and the card says so while it waits); a refusal shows on the card.
+    - **The oven's progress bar is not drawn** (10.2 Q5): no batch payload carries a planned duration (`production_batches` has no such
+      column), so the card says the minutes so far instead.
+    - **The request card** (`RequestDetail`) opens in a 480 px drawer from the right instead of beside the board, which leaves the four
+      columns their width on a tablet. Its section keeps the name "Request card: <product>"; inside, the product's photo, the facts in a
+      `neutral-50` well, the recipe on the `Table` (shortfalls red, with "Request transfer"), the steps, the Done form and the moves at
+      52 px. Accept, Start, Done, Confirm, Send back and Cancel request keep their names. "Close card" is an icon button of that name.
+    - **The count screen**: `ScreenHead` (Shift count, the station, the shift's day and open time, the shift state, Back); the intro;
+      the handover panel above an opening count (rows per place with Locked or Waiting for approval chips, the chain link and the start
+      of the fingerprint); the places as station segments (ink when chosen) with their stage chip, still the `navigation` "Places to
+      count" of `aria-pressed` buttons; the count in a `Panel` named by the place with its kind, stage and attempt beside the name;
+      tinted notices with line icons; "Nothing changed" in a well with its hint; the lines on the `Table` (tabular figures, right
+      aligned; the figure field right aligned with the prefill in regular weight; not-counted lines tinted amber and saying so); "Add an
+      item" in a dashed well; **Review and submit** at `xl`. The cash declaration: the notes and coins on the `Table`, three figure
+      tiles, the float as a `MoneyInput` beside "To take to the bank" in the ink block, the channels' sums as `MoneyInput`s, the reason
+      in an amber well. Every label, region and button name the p3 specs read is kept.
+    - **Colours**: a locked count, a counted line and the chain card are brand teal now (green means money confirmed only, spec 1.3);
+      the drawer's "Declared" stays green. Notes, the review list and the cash summary take the new radii.
+    - Messages, both languages: `production.chip_*` (3), `meta_*` (6), `action_*` (5), `display_case`, `new_batch*` (12);
+      `production.intro` removed. `docs/i18n/am-review.csv` regenerated.
+    - Tests: `p6-a11y` gains the production board in `en` and `am`, with a request card open (`e2e/support/demoProduction.ts`: the demo
+      bakery's board with a card in each column; the seed leaves Requested, Pending confirmation and Done today, and the demo admin puts
+      a cake-room batch in the oven). `e2e/p6/screens.spec.ts` captures the board, a request card, New batch and the display case in
+      `en`, the board in `am`, and the count screen in both (the cake room's shift closed or started by its cake baker, one line counted
+      short and one as expected; afterwards the counts are handed in, the admin decides what waits and the shift opens again). The file,
+      the `p6-a11y` testMatch and the `screens` upload in `e2e.yml` have the shape 6.3a gave them, for the coordinator's merge. STATUS
+      `web.stations` `in_progress` (as 6.3a and 6.3b set it; `done` once all three are in).
 
 ### 6.4 web.admin (STATUS `web.admin`), four PRs
 

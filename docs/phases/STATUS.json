@@ -233,7 +233,7 @@
       "modules": {
         "catalog.images": "done",
         "web.design-system": "done",
-        "web.stations": "todo",
+        "web.stations": "in_progress",
         "web.admin": "todo",
         "docs": "todo"
       },
