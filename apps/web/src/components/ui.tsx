@@ -546,6 +546,19 @@ export function ProductImage({
   const src = image ? mediaUrl(image[size]) : null;
   // the URL that failed, so a new photo (a new content-addressed URL) is tried again
   const [failed, setFailed] = useState<string | null>(null);
+  const photo = useRef<HTMLImageElement>(null);
+  // A photo already in a prerendered page's HTML can fail before React listens for its error event. On mount, an image that reports
+  // itself complete without a single pixel is probed once (a lazy one not fetched yet may report the same), and a failed probe counts.
+  useEffect(() => {
+    const img = photo.current;
+    if (!src || !img || !img.complete || img.naturalWidth > 0) return;
+    const probe = new Image();
+    probe.onerror = () => setFailed(src);
+    probe.src = img.currentSrc || src;
+    return () => {
+      probe.onerror = null;
+    };
+  }, [src]);
   const frame = `relative block aspect-[4/3] overflow-hidden bg-neutral-100 ${className}`;
   if (!image || !src || failed === src) {
     return (
@@ -560,6 +573,7 @@ export function ProductImage({
       {/* a static export serves no image optimiser (next.config images.unoptimized); the renditions are already the right sizes */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        ref={photo}
         src={src}
         srcSet={srcSetOf(image)}
         sizes={sizesFor(size)}
