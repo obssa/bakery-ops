@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Suspense, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/lib/api/types";
-import { frameOf, isCurrent, SCREENS } from "@/lib/screens";
+import { frameOf, isCurrent, isNightScreen, SCREENS } from "@/lib/screens";
 import { useSession } from "@/lib/session";
 import { barMode, type BarMode } from "@/lib/shifts";
 import { useStationChrome } from "@/lib/station";
@@ -234,10 +234,13 @@ function TopBar() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations("app");
-  const frame = frameOf(usePathname());
+  const pathname = usePathname();
+  const frame = frameOf(pathname);
+  // the kitchen and bar displays are kitchen night from the top bar down (step 6.3b): the palette is remapped inside this frame only
+  const night = isNightScreen(pathname);
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className={`flex min-h-screen flex-col ${night ? "kitchen-night" : ""}`}>
       <a
         href="#content"
         className={`sr-only rounded-xl bg-white px-4 py-3 text-base font-semibold focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 ${focusRing}`}

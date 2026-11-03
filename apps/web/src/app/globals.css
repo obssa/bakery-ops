@@ -59,8 +59,10 @@
   --color-night-late-text: #fca5a5;
   --color-night-note: #f5c66a;
 
-  /* Depth: surfaces sit flat on a hairline border; only floating layers (dialogs, drawers, menus, toasts) cast this one shadow. */
+  /* Depth: surfaces sit flat on a hairline border; only floating layers (dialogs, drawers, menus, toasts) cast this one shadow. The
+     scrim behind a dialog or a drawer is neutral-900 at 40 % (black at 60 % under kitchen night, below). */
   --shadow-float: 0 12px 32px -8px rgb(14 23 38 / 0.18);
+  --color-scrim: rgb(14 23 38 / 0.4);
 
   /* Motion, used only under motion-safe: a slow pulse for skeletons, 200 ms for a drawer coming in (from the right; the admin sidebar's
      drawer below 1024 px comes in from the left). */
@@ -95,6 +97,81 @@ body {
   background-color: var(--color-ground);
   color: var(--color-neutral-900);
   font-family: var(--font-sans);
+}
+
+/* Kitchen night, scoped (fresh-counter.md 1.6, step 6.3b): the kitchen and bar displays are the one dark screen, top bar included. The
+   shell puts `kitchen-night` on its frame on those routes only (lib/screens.ts isNightScreen), and inside it the light scale is remapped
+   onto the night tokens: white is the ticket surface, the ground is the night ground, neutral runs from the divider (100) to the night
+   text (900), brand 600 and 700 are the accent teal, and the status scales take the night fills and texts. So everything the shell and a
+   station screen share (the top bar, the Screens strip, the outbox band, the shift bar, the stock strip's sheet, a dialog) is drawn dark
+   with the classes it already has, and nothing outside the scope changes. Every text pair stays at 4.5:1 or more (neutral-600 on white is
+   6.9:1, brand-700 on brand-50 8.2:1, amber-800 on amber-50 8.2:1, red-700 on red-50 7.9:1); neutral-400 is still for disabled text and
+   placeholder icons only. Text on a filled control ("text-white" on the primary button, the selected segment, the avatar) becomes the dark
+   surface, 9.2:1 on the accent. */
+.kitchen-night {
+  color-scheme: dark;
+  --color-white: var(--color-night-surface);
+  --color-ground: var(--color-night-ground);
+  --color-neutral-50: #161f33;
+  --color-neutral-100: var(--color-night-divider);
+  --color-neutral-200: var(--color-night-border);
+  --color-neutral-300: #3a4866;
+  --color-neutral-400: #5b6882;
+  --color-neutral-500: #8794ab;
+  --color-neutral-600: var(--color-night-text-muted);
+  --color-neutral-700: #b8c2d3;
+  --color-neutral-800: #d3dae6;
+  --color-neutral-900: var(--color-night-text);
+  --color-neutral-950: #f4f6fa;
+  --color-brand-50: var(--color-night-fresh);
+  --color-brand-100: #145347;
+  --color-brand-600: var(--color-night-accent);
+  --color-brand-700: var(--color-night-fresh-text);
+  --color-amber-50: var(--color-night-waiting);
+  --color-amber-200: #5c4212;
+  --color-amber-300: #7a5716;
+  --color-amber-400: #b7811f;
+  --color-amber-700: var(--color-night-waiting-text);
+  --color-amber-800: var(--color-night-waiting-text);
+  --color-amber-900: #fcd34d;
+  --color-red-50: var(--color-night-late);
+  --color-red-100: #5a1a1a;
+  --color-red-200: #6e2222;
+  --color-red-300: #8a2b2b;
+  --color-red-500: #f87171;
+  --color-red-600: var(--color-night-late-text);
+  --color-red-700: var(--color-night-late-text);
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+  --color-blue-50: #0e2a47;
+  --color-blue-100: #12355a;
+  --color-blue-300: #2b5c8f;
+  --color-blue-600: #93c5fd;
+  --color-blue-700: #93c5fd;
+  --color-blue-800: #bfdbfe;
+  --color-blue-900: #dbeafe;
+  --color-green-50: #0f3d24;
+  --color-green-100: #134d2e;
+  --color-green-200: #1a6b3f;
+  --color-green-300: #22884f;
+  --color-green-700: #86efac;
+  --color-green-800: #86efac;
+  --color-green-900: #bbf7d0;
+  --color-scrim: rgb(0 0 0 / 0.6);
+  background-color: var(--color-ground);
+  color: var(--color-neutral-900);
+}
+
+/* The focus ring's 1 px offset is white by default: on the night ground it is the ground, so the teal ring reads as one ring. */
+.kitchen-night *,
+.kitchen-night ::before,
+.kitchen-night ::after {
+  --tw-ring-offset-color: var(--color-night-ground);
+}
+
+/* The page behind the frame (an overscroll, a short page) is night too while a kitchen display is open. */
+body:has(.kitchen-night) {
+  background-color: var(--color-night-ground);
 }
 
 /* Ethiopic glyphs are taller than Latin ones: a little more line height keeps Amharic text from feeling cramped. */

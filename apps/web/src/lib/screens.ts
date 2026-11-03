@@ -29,3 +29,12 @@ export function frameOf(pathname: string): ShellFrame {
   if (isCurrent(pathname, "/login")) return "login";
   return "station";
 }
+
+/**
+ * The screens drawn in kitchen night (step 6.3b, fresh-counter.md 1.6): the kitchen and bar displays, the one dark screen, read across a hot
+ * room. The shell scopes the night palette to its frame on these routes only (globals.css `.kitchen-night`), so the dark ground, top bar
+ * included, never reaches another screen.
+ */
+export function isNightScreen(pathname: string): boolean {
+  return isCurrent(pathname, "/kds");
+}
