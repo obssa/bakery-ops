@@ -1,24 +1,35 @@
 "use client";
 
+import { PackagePlus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
-import type { Locale, StripRow } from "@/lib/api/types";
+import { useId, useMemo, useState } from "react";
+import type { Locale, StockState, StripRow } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { createStripFeed } from "@/lib/live/stations";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { can, useSession } from "@/lib/session";
 import { RequestTransferSheet } from "../inventory/RequestTransferSheet";
-import { Alert, Badge, Button, Panel } from "../ui";
+import { focusRing } from "../styles";
+import { Alert } from "../ui";
 
-// The stock strip of a kitchen or bar display: the ingredients held at the station's own place, the ones running out
-// first, each with "Request transfer" to ask the store for more. A LiveFeed over GET /stations/{station}/stock-strip
-// (ETag, 304) at the display's own cadence. Quantities show in the item's base unit as the API sends them ("1000 g").
+// The stock strip of a kitchen or bar display (step 6.3b, fresh-counter.md 3.3): the ingredients held at the station's own place, the ones
+// running out first, as a strip of chips along the bottom of the window, amber with "Low" when an ingredient runs low and red with "Out" when
+// it is out (the word is there as well as the colour). Each chip's button asks the store for more ("Request transfer of <name>"). A LiveFeed
+// over GET /stations/{station}/stock-strip (ETag, 304) at the display's own cadence. Quantities show in the item's base unit as the API sends
+// them ("1000 g").
+
+const CHIP: Record<StockState, string> = {
+  ok: "bg-night-divider text-neutral-700",
+  low: "bg-night-waiting text-night-waiting-text",
+  out: "bg-night-late text-night-late-text",
+};
 
 export function StockStrip({ stationId }: { stationId: number }) {
   const t = useTranslations("stations");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
+  const titleId = useId();
   const me = useSession((s) => s.me);
   const mayAsk = can(me, "transfers.request");
   const feed = useMemo(() => createStripFeed(stationId), [stationId]);
@@ -29,55 +40,80 @@ export function StockStrip({ stationId }: { stationId: number }) {
   const rows = snapshot?.state.rows ?? [];
 
   return (
-    <Panel title={t("strip_title")}>
-      {!snapshot?.loaded ? (
-        snapshot?.error ? (
-          <Alert>{errorText.message(snapshot.error)}</Alert>
-        ) : (
-          <p role="status" className="text-base text-neutral-600">
-            {t("strip_loading")}
-          </p>
-        )
-      ) : (
-        <div className="space-y-3">
-          {snapshot.error ? (
-            <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
-              {t("strip_stale")}
-            </p>
-          ) : null}
-          {place === null ? (
-            <p className="text-base text-neutral-700">{t("strip_no_place")}</p>
-          ) : rows.length === 0 ? (
-            <p className="text-base text-neutral-700">{t("strip_empty")}</p>
+    <>
+      {/* on a wall tablet the strip stays at the bottom of the window while the rail scrolls behind it */}
+      <section
+        aria-labelledby={titleId}
+        className="-mx-4 border-t border-night-divider bg-night-ground px-4 py-3 sm:-mx-6 sm:px-6 lg:sticky lg:bottom-0 lg:z-10"
+      >
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-4">
+        <h2 id={titleId} className="shrink-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-night-text-muted">
+          {t("strip_title")}
+        </h2>
+        {!snapshot?.loaded ? (
+          snapshot?.error ? (
+            <Alert>{errorText.message(snapshot.error)}</Alert>
           ) : (
-            <ul className="divide-y divide-neutral-200">
-              {rows.map((row) => {
-                const name = locale === "am" ? row.item.name_am : row.item.name_en;
-                return (
-                  <li key={row.item.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                    <div className="min-w-0">
-                      <p className="text-base font-medium text-neutral-900">{name}</p>
-                      <p className="text-sm text-neutral-700">
-                        {t("available", { qty: trimDecimal(row.available), unit: row.unit })}
-                        {row.min_qty !== null ? ` · ${t("minimum", { qty: trimDecimal(row.min_qty), unit: row.unit })}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {row.state !== "ok" ? <Badge tone={row.state === "out" ? "red" : "amber"}>{t(row.state === "out" ? "state_out" : "state_low")}</Badge> : null}
+            <p role="status" className="text-[15px] text-night-text-muted">
+              {t("strip_loading")}
+            </p>
+          )
+        ) : (
+          <div className="min-w-0 flex-1 space-y-2">
+            {snapshot.error ? (
+              <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-[15px] text-amber-900">
+                {t("strip_stale")}
+              </p>
+            ) : null}
+            {place === null ? (
+              <p className="text-[15px] text-night-text-muted">{t("strip_no_place")}</p>
+            ) : rows.length === 0 ? (
+              <p className="text-[15px] text-night-text-muted">{t("strip_empty")}</p>
+            ) : (
+              <ul className="flex max-h-[7.5rem] flex-wrap gap-2 overflow-y-auto">
+                {rows.map((row) => {
+                  const name = locale === "am" ? row.item.name_am : row.item.name_en;
+                  return (
+                    <li key={row.item.id} className={`inline-flex min-h-13 items-center gap-1 rounded-full py-0.5 pl-4 text-sm font-semibold ${mayAsk ? "pr-0.5" : "pr-4"} ${CHIP[row.state]}`}>
+                      <span>
+                        {name}
+                        <span aria-hidden="true"> · </span>
+                        <span className="tabular-nums">{t("available", { qty: trimDecimal(row.available), unit: row.unit })}</span>
+                        {row.min_qty !== null ? (
+                          <span className="font-medium opacity-90">
+                            <span aria-hidden="true"> · </span>
+                            {t("minimum", { qty: trimDecimal(row.min_qty), unit: row.unit })}
+                          </span>
+                        ) : null}
+                        {row.state !== "ok" ? (
+                          <>
+                            <span aria-hidden="true"> · </span>
+                            <span className="font-bold uppercase tracking-wide">{t(row.state === "out" ? "state_out" : "state_low")}</span>
+                          </>
+                        ) : null}
+                      </span>
                       {mayAsk ? (
-                        <Button type="button" variant="secondary" aria-label={t("request_transfer_of", { name })} onClick={() => setAsking(row)}>
-                          {t("request_transfer")}
-                        </Button>
+                        <button
+                          type="button"
+                          aria-label={t("request_transfer_of", { name })}
+                          title={t("request_transfer")}
+                          onClick={() => setAsking(row)}
+                          className={`inline-flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-black/25 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
+                        >
+                          <PackagePlus className="size-5" strokeWidth={2} aria-hidden="true" />
+                        </button>
                       ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+      </section>
 
+      {/* outside the sticky strip, so the sheet is not held in the strip's layer */}
       {asking && place !== null ? (
         <RequestTransferSheet
           subject={{
@@ -90,6 +126,6 @@ export function StockStrip({ stationId }: { stationId: number }) {
           onRequested={() => feed.refresh()}
         />
       ) : null}
-    </Panel>
+    </>
   );
 }
