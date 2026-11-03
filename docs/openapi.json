@@ -4594,6 +4594,111 @@
                 }
             }
         },
+        "/v1/items/{item}/image": {
+            "post": {
+                "operationId": "catalog.items.image.store",
+                "tags": [
+                    "ItemImages"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreItemImageRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "catalog.items.image.destroy",
+                "tags": [
+                    "ItemImages"
+                ],
+                "parameters": [
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "description": "The item ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "item_id": {
+                                                    "type": "integer"
+                                                },
+                                                "image": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "required": [
+                                                "item_id",
+                                                "image"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/items/{item}/prices": {
             "get": {
                 "operationId": "catalog.items.prices.index",
@@ -5446,6 +5551,77 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/media/items/{sha}/{rendition}.{ext}": {
+            "get": {
+                "operationId": "catalog.media.show",
+                "tags": [
+                    "Media"
+                ],
+                "parameters": [
+                    {
+                        "name": "sha",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "rendition",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ext",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "304": {
+                        "description": "",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "public, max-age=31536000, immutable"
+                                }
+                            },
+                            "ETag": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
                     }
                 }
             }
@@ -16510,6 +16686,43 @@
                     "refund_restock": {
                         "type": "boolean"
                     },
+                    "image": {
+                        "anyOf": [
+                            {
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "thumb": {
+                                        "type": "string"
+                                    },
+                                    "card": {
+                                        "type": "string"
+                                    },
+                                    "large": {
+                                        "type": "string"
+                                    },
+                                    "width": {
+                                        "type": "integer"
+                                    },
+                                    "height": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "required": [
+                                    "thumb",
+                                    "card",
+                                    "large",
+                                    "width",
+                                    "height"
+                                ]
+                            }
+                        ]
+                    },
                     "station_ids": {
                         "type": "array",
                         "items": {
@@ -16557,6 +16770,7 @@
                     "production_station_id",
                     "refundable",
                     "refund_restock",
+                    "image",
                     "station_ids",
                     "created_by_user_id",
                     "created_at",
@@ -18112,6 +18326,38 @@
                     "body"
                 ],
                 "title": "StoreHandoverNoteRequest"
+            },
+            "StoreItemImageRequest": {
+                "type": "object",
+                "description": "POST /items/{item}/image (multipart/form-data, step 6.1a, phase-6 plan 4.1):\n  photo        the picture (JPEG, PNG or WebP; at most catalog.images.max_upload_bytes; the web sends at most 2400 px on the long edge);\n  crop_x, crop_y, crop_width, crop_height   integers, all four or none, in the pixels of the uploaded image after its EXIF orientation;\n               none means the largest centred 4:3 rectangle; whether they lie inside the image and are 4:3 is the pipeline's to say\n               (catalog.image.crop_invalid);\n  client_uuid  the write's own id (rule 7, ADR 0003).\nNo usable file part is catalog.image.not_an_image; a part over the limit (or one the server cut off at its own) is catalog.image.too_large.\nEverything else wrong with the fields is the ordinary validation.failed.",
+                "properties": {
+                    "photo": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream"
+                    },
+                    "crop_x": {
+                        "type": "integer"
+                    },
+                    "crop_y": {
+                        "type": "integer"
+                    },
+                    "crop_width": {
+                        "type": "integer"
+                    },
+                    "crop_height": {
+                        "type": "integer"
+                    },
+                    "client_uuid": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "photo",
+                    "client_uuid"
+                ],
+                "title": "StoreItemImageRequest"
             },
             "StoreItemPriceRequest": {
                 "type": "object",
