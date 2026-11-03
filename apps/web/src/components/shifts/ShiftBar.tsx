@@ -42,7 +42,9 @@ const BADGE: Record<BarMode, { tone: "amber" | "blue" | "brand"; key: string }> 
 
 type ActionName = "start" | "start_carried" | "join" | "leave" | "close" | "cancel";
 
-export function ShiftBar({ model }: { model: ShiftStation }) {
+export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?: "card" | "strip" }) {
+  const strip = look === "strip";
+  const size = strip ? ("md" as const) : undefined;
   const t = useTranslations("shifts");
   const tc = useTranslations("counts");
   const locale = useLocale() as Locale;
@@ -125,7 +127,7 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   const count = (
     <Link
       href={{ pathname: "/shifts/count", query: { shift: shift?.id ?? "" } }}
-      className={buttonClass({ variant: "primary" })}
+      className={buttonClass({ variant: "primary", size })}
     >
       {t("open_count")}
     </Link>
@@ -152,25 +154,30 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   }
 
   return (
-    <section aria-label={t("region")} className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+    // `strip` (step 6.3b, the kitchen and bar displays and the till): one line under the screen's title, as the boards show the shift there
+    // ("Morning shift · Chef ..."): no card, the state, the shift and who is on it, the actions at 44 px; the same region, names and actions
+    <section aria-label={t("region")} className={strip ? "space-y-2" : "space-y-3 rounded-2xl border border-neutral-200 bg-white p-4"}>
+      <div className={`flex flex-wrap items-center justify-between ${strip ? "gap-x-4 gap-y-2" : "gap-4"}`}>
+        <div className={`min-w-0 ${strip ? "flex flex-wrap items-center gap-x-3 gap-y-1" : "space-y-2"}`}>
+          <div className={`flex flex-wrap items-center ${strip ? "gap-x-2.5 gap-y-1" : "gap-x-3 gap-y-1"}`}>
             {loaded ? <Badge tone={BADGE[actions.mode].tone}>{t(BADGE[actions.mode].key)}</Badge> : null}
-            <p className="text-lg font-semibold text-neutral-900">{loaded ? headline : t("checking")}</p>
-            {loaded && shift ? <p className="text-base font-medium text-neutral-800">{shiftLabel}</p> : null}
-            {loaded && detail ? <p className="text-base text-neutral-600">{detail}</p> : null}
-            {loaded && shift && shift.notes_count > 0 ? <p className="text-base text-neutral-600">{t("notes", { count: shift.notes_count })}</p> : null}
+            <p className={strip ? "text-[15px] font-semibold text-neutral-900" : "text-lg font-semibold text-neutral-900"}>{loaded ? headline : t("checking")}</p>
+            {loaded && shift ? <p className={strip ? "text-sm text-neutral-600" : "text-base font-medium text-neutral-800"}>{shiftLabel}</p> : null}
+            {loaded && detail ? <p className={strip ? "text-sm text-neutral-600" : "text-base text-neutral-600"}>{detail}</p> : null}
+            {loaded && shift && shift.notes_count > 0 ? <p className={strip ? "text-sm text-neutral-600" : "text-base text-neutral-600"}>{t("notes", { count: shift.notes_count })}</p> : null}
           </div>
           {loaded && shift && (actions.mode === "open" || actions.mode === "opening") ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base text-neutral-600">{t("on_duty")}:</span>
+              <span className={strip ? "text-sm text-neutral-600" : "text-base text-neutral-600"}>{t("on_duty")}:</span>
               {crew.length === 0 ? (
-                <span className="text-base text-neutral-600">{t("nobody")}</span>
+                <span className={strip ? "text-sm text-neutral-600" : "text-base text-neutral-600"}>{t("nobody")}</span>
               ) : (
-                <ul className="flex flex-wrap gap-2" aria-label={t("on_duty")}>
+                <ul className={`flex flex-wrap ${strip ? "gap-1.5" : "gap-2"}`} aria-label={t("on_duty")}>
                   {crew.map((row) => (
-                    <li key={row.user?.id} className="rounded-full bg-neutral-100 px-3 py-1 text-base font-medium text-neutral-900">
+                    <li
+                      key={row.user?.id}
+                      className={strip ? "rounded-full bg-neutral-100 px-2.5 py-0.5 text-sm font-medium text-neutral-900" : "rounded-full bg-neutral-100 px-3 py-1 text-base font-medium text-neutral-900"}
+                    >
                       {row.user?.name}
                     </li>
                   ))}
@@ -178,10 +185,12 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
               )}
             </div>
           ) : null}
-          {loaded && actions.mode === "idle" && !showNotice && powers.canCount ? <p className="max-w-2xl text-base text-neutral-600">{t("idle_hint")}</p> : null}
+          {loaded && actions.mode === "idle" && !showNotice && powers.canCount ? (
+            <p className={strip ? "basis-full text-sm text-neutral-600" : "max-w-2xl text-base text-neutral-600"}>{t("idle_hint")}</p>
+          ) : null}
         </div>
 
-        <div className="flex flex-wrap items-end gap-3">
+        <div className={`flex flex-wrap items-end ${strip ? "gap-2" : "gap-3"}`}>
           {choices.length > 1 ? (
             <div className="w-52">
               <Field label={t("station")}>
@@ -200,48 +209,48 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
           {loaded ? (
             <>
               {actions.start ? (
-                <Button type="button" disabled={busy !== null} onClick={() => void start(false)}>
+                <Button type="button" size={size} disabled={busy !== null} onClick={() => void start(false)}>
                   {busy === "start" ? t("working") : t("start")}
                 </Button>
               ) : null}
               {actions.startCarried ? (
-                <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void start(true)}>
+                <Button type="button" variant="secondary" size={size} disabled={busy !== null} onClick={() => void start(true)}>
                   {busy === "start_carried" ? t("working") : t("start_carried")}
                 </Button>
               ) : null}
               {actions.mode === "opening" && station.code === "till" && powers.canCount ? (
-                <Button type="button" variant="secondary" onClick={() => setDeclaring(true)}>
+                <Button type="button" variant="secondary" size={size} onClick={() => setDeclaring(true)}>
                   {t("declare_drawer")}
                 </Button>
               ) : null}
               {actions.continueCount ? count : null}
               {actions.cancel ? (
-                <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void act("cancel", cancelShift)}>
+                <Button type="button" variant="secondary" size={size} disabled={busy !== null} onClick={() => void act("cancel", cancelShift)}>
                   {t("cancel_start")}
                 </Button>
               ) : null}
               {actions.join ? (
-                <Button type="button" disabled={busy !== null} onClick={() => void act("join", joinShift)}>
+                <Button type="button" size={size} disabled={busy !== null} onClick={() => void act("join", joinShift)}>
                   {busy === "join" ? t("working") : t("join")}
                 </Button>
               ) : null}
               {actions.leave ? (
-                <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => void act("leave", leaveShift)}>
+                <Button type="button" variant="secondary" size={size} disabled={busy !== null} onClick={() => void act("leave", leaveShift)}>
                   {busy === "leave" ? t("working") : t("leave")}
                 </Button>
               ) : null}
               {actions.close ? (
-                <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => setConfirmClose(true)}>
+                <Button type="button" variant="secondary" size={size} disabled={busy !== null} onClick={() => setConfirmClose(true)}>
                   {t("close")}
                 </Button>
               ) : null}
               {actions.mode === "idle" || actions.mode === "opening" ? (
-                <Button type="button" variant="secondary" aria-expanded={showHandover} onClick={() => setShowHandover((open) => !open)}>
+                <Button type="button" variant="secondary" size={size} aria-expanded={showHandover} onClick={() => setShowHandover((open) => !open)}>
                   {showHandover ? tc("handover_hide") : tc("handover_show")}
                 </Button>
               ) : null}
               {shift && actions.mode !== "idle" && powers.canCount ? (
-                <Button type="button" variant="secondary" onClick={() => setNoting(true)}>
+                <Button type="button" variant="secondary" size={size} onClick={() => setNoting(true)}>
                   {tc("note_open")}
                 </Button>
               ) : null}

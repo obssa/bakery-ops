@@ -12,22 +12,24 @@ import { boardColumns, COLUMNS, createProductionFeed, ownStationId, type Column 
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useProductImages } from "@/lib/productImages";
 import { authed, can, useSession } from "@/lib/session";
+import { useStationHeader } from "@/lib/topBar";
 import { useNow } from "@/lib/useNow";
 import { ICON_STROKE } from "../icons";
+import { StationHeaderActions } from "../StationHeaderActions";
 import { DisplayCasePanel } from "../till/DisplayCasePanel";
 import { Alert, Button, Drawer, Select } from "../ui";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
-import { ScreenHead } from "../ScreenHead";
 import { NewBatchDialog } from "./NewBatchDialog";
 import { RequestCard } from "./RequestCard";
 import { RequestDetail } from "./RequestDetail";
 import type { ProductionTwins } from "./twins";
 
-// The production board (/production, docs/architecture.md section 6; fresh-counter.md 3.5, the Production board, step 6.3c): the head
-// with the board's name (its Amharic name beside it on the English page), the station and its shift, the station filter, "Display case
-// stock" and "New batch"; the shift bar; then four columns, Requested, In progress, Pending confirmation and Done today, each a region
-// named by its column with its count, holding the cards. Polled every 5 s (30 s while hidden) through a LiveFeed over GET
+// The production board (/production, docs/architecture.md section 6; fresh-counter.md 3.5, the Production board, step 6.3c). The station
+// top bar is the board's header (lib/topBar.ts): the board's name with its Amharic name beside it on the English page, the station and its
+// shift under it, and "Display case stock" and "New batch" among the bar's buttons. Under the bar the shift is one strip (ShiftBar's
+// `strip`, with the board's station filter at its end), then four columns, Requested, In progress, Pending confirmation and Done today,
+// each a region named by its column with its count, holding the cards. Polled every 5 s (30 s while hidden) through a LiveFeed over GET
 // /production/requests?view=board with ETag / 304. Accepted cards sit in Requested with their baker shown. A baker who works at one
 // production station sees that station first; everyone can widen the board to all stations. A card's name opens the request card in a
 // drawer from the right, and ?request=<id> (a notification link) opens it at once. The product thumbs are the catalog's photos
@@ -92,22 +94,52 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   const openedName = openedRequest ? (locale === "am" ? openedRequest.product.name_am : openedRequest.product.name_en) : "";
   const open = useCallback((request: ProductionRequest, focus?: "finish") => setOpened((current) => (current?.id === request.id && !focus ? null : { id: request.id, focus })), []);
 
-  // the board head's chip: the station whose shift the bar follows, and that shift (the board's "Bakery oven · Morning shift")
+  // the station top bar names the board (the Production board's header): its name, its Amharic name on the English page, and the station
+  // whose shift the strip follows with that shift ("Bakery oven · Morning shift")
   const station = shiftStation.station;
   const template = shiftStation.shift?.template;
-  const chip = station
+  const subtitle = station
     ? [locale === "am" ? station.name_am : station.name_en, template ? (locale === "am" ? template.name_am : template.name_en) : null].filter(Boolean).join(" · ")
-    : null;
+    : undefined;
+  useStationHeader({ title: t("title"), titleAm: twins?.title, subtitle });
 
-  // the head's actions: the station filter (when there is a choice), the display case and a new batch
-  const actions = (
-    <>
-      {choices.length > 1 ? (
-        <>
-          <label htmlFor="production-station" className="sr-only">
-            {t("station")}
-          </label>
-          <div className="w-52">
+  // one station picker: choosing a station on the board also points the shift strip at it, so the strip draws no picker of its own
+  const { choices: shiftChoices, choose } = shiftStation;
+  useEffect(() => {
+    if (stationId !== "all" && shiftChoices.some((choice) => choice.station_id === stationId)) choose(stationId);
+  }, [stationId, shiftChoices, choose]);
+  const strip = { ...shiftStation, choices: [] };
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* the page's heading; the station top bar shows the name */}
+      <h1 className="sr-only">{t("title")}</h1>
+      {/* the board's buttons in the station top bar, before the sync chip */}
+      <StationHeaderActions>
+        {can(me, "inventory.view") ? (
+          <Button type="button" variant="secondary" size="md" onClick={() => setSheet("display_case")}>
+            <Store className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
+            {t("display_case")}
+          </Button>
+        ) : null}
+        {can(me, "production.request") ? (
+          <Button type="button" size="md" onClick={() => setSheet("new_batch")}>
+            <Plus className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
+            {t("new_batch")}
+          </Button>
+        ) : null}
+      </StationHeaderActions>
+
+      {/* the shift as one strip (the state, the shift, who is on it, its actions), with the board's station filter at its end */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <ShiftBar model={strip} look="strip" />
+        </div>
+        {choices.length > 1 ? (
+          <div className="w-52 shrink-0">
+            <label htmlFor="production-station" className="sr-only">
+              {t("station")}
+            </label>
             <Select id="production-station" controlSize="md" value={String(stationId)} onChange={(event) => setStationId(event.target.value === "all" ? "all" : Number(event.target.value))}>
               <option value="all">{t("all_stations")}</option>
               {choices.map((choice) => (
@@ -117,29 +149,8 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
               ))}
             </Select>
           </div>
-        </>
-      ) : null}
-      {can(me, "inventory.view") ? (
-        <Button type="button" variant="secondary" size="md" onClick={() => setSheet("display_case")}>
-          <Store className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
-          {t("display_case")}
-        </Button>
-      ) : null}
-      {can(me, "production.request") ? (
-        <Button type="button" size="md" onClick={() => setSheet("new_batch")}>
-          <Plus className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
-          {t("new_batch")}
-        </Button>
-      ) : null}
-    </>
-  );
-
-  return (
-    <div className="flex flex-col gap-5">
-      {/* the board's head; it moves into the station top bar's header slot once the shared bar has one (step 6.3a) */}
-      <ScreenHead title={t("title")} titleAm={twins?.title} subtitle={chip} actions={actions} />
-
-      <ShiftBar model={shiftStation} />
+        ) : null}
+      </div>
 
       {snapshot?.error && snapshot.loaded ? (
         <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">

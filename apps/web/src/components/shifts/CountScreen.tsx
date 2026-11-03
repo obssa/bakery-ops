@@ -12,9 +12,10 @@ import { useErrorText } from "@/lib/errors";
 import { authed, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
+import { useStationHeader } from "@/lib/topBar";
 import { useIsoDay } from "@/lib/useDates";
 import { ICON_STROKE } from "../icons";
-import { ScreenHead } from "../ScreenHead";
+import { StationHeaderActions } from "../StationHeaderActions";
 import { focusRing } from "../styles";
 import { Alert, Badge, Button, EmptyState, Panel, type Tone } from "../ui";
 import { useRouter } from "@/i18n/navigation";
@@ -23,11 +24,18 @@ import { HandoverPanel } from "./HandoverPanel";
 import { NoteForm, NotesList } from "./Notes";
 
 // The count screen (step 3.7b; on the Fresh Counter primitives since step 6.3c), /shifts/count?shift=<id>: one component for the opening and
-// the closing count. Its head names the screen, the station and the shift's day and state, with "Back" on the right; then the handover from
-// the last shift above an opening count, the places to count as a row of station segments (each with the stage it is at), the count of
-// the chosen place, and the handover notes. It shows the counts of the shift for the phase it is in (the opening ones while the shift is
-// being opened, the closing ones from the moment it is closed), one place at a time, and polls the shift and its counts every 6 s so that
-// a hand-in by someone else, an approval or a rejection shows without a reload.
+// the closing count. The station top bar names it (lib/topBar.ts): "Shift count" with its Amharic name on the English page, the station,
+// the shift's day and since when under it, and "Back to the station" among the bar's buttons. Under the bar: the shift's state and the
+// intro, the handover from the last shift above an opening count, the places to count as a row of station segments (each with the stage
+// it is at), the count of the chosen place, and the handover notes. It shows the counts of the shift for the phase it is in (the opening
+// ones while the shift is being opened, the closing ones from the moment it is closed), one place at a time, and polls the shift and its
+// counts every 6 s so that a hand-in by someone else, an approval or a rejection shows without a reload.
+
+/** Names the screen in the station top bar and is the page's h1 (read by screen readers and the specs; the bar shows the name). */
+function Named({ title, titleAm, subtitle }: { title: string; titleAm?: string; subtitle?: string }) {
+  useStationHeader({ title, titleAm, subtitle });
+  return <h1 className="sr-only">{title}</h1>;
+}
 
 const POLL_MS = 6000;
 
@@ -51,7 +59,7 @@ export function CountScreen({ titleAm }: { titleAm?: string }) {
   if (!/^\d+$/.test(raw)) {
     return (
       <div className="max-w-xl space-y-5">
-        <ScreenHead title={t("title")} titleAm={titleAm} />
+        <Named title={t("title")} titleAm={titleAm} />
         <Alert>{t("no_shift")}</Alert>
       </div>
     );
@@ -123,26 +131,33 @@ function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
     return locale === "am" ? place.name_am || place.name_en : place.name_en;
   }
 
+  // "Back to the station", in the station top bar before the sync chip
   const back = (
-    <Button type="button" variant="secondary" size="md" onClick={() => router.back()}>
-      <ArrowLeft className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
-      {ts("count_back")}
-    </Button>
+    <StationHeaderActions>
+      <Button type="button" variant="secondary" size="md" onClick={() => router.back()}>
+        <ArrowLeft className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        {ts("count_back")}
+      </Button>
+    </StationHeaderActions>
   );
 
   if (shiftQuery.isError && !shift) {
     return (
       <div className="max-w-xl space-y-5">
-        <ScreenHead title={t("title")} titleAm={titleAm} actions={back} />
+        <Named title={t("title")} titleAm={titleAm} />
+        {back}
         <Alert>{errorText.message(shiftQuery.error)}</Alert>
       </div>
     );
   }
   if (!shift) {
     return (
-      <p role="status" className="text-base text-neutral-600">
-        {t("loading")}
-      </p>
+      <>
+        <Named title={t("title")} titleAm={titleAm} />
+        <p role="status" className="text-base text-neutral-600">
+          {t("loading")}
+        </p>
+      </>
     );
   }
 
@@ -152,19 +167,15 @@ function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* the screen's head; it moves into the station top bar's header slot once the shared bar has one (step 6.3a) */}
-      <ScreenHead
-        title={t("title")}
-        titleAm={titleAm}
-        subtitle={subtitle}
-        status={
-          <Badge tone={SHIFT_TONE[shift.status]} dot>
-            {t(`shift_${shift.status}`)}
-          </Badge>
-        }
-        actions={back}
-      />
-      <p className="-mt-2 max-w-3xl text-[15px] text-neutral-600">{t("intro")}</p>
+      <Named title={t("title")} titleAm={titleAm} subtitle={subtitle} />
+      {back}
+      {/* the shift's state, then what the screen is for */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Badge tone={SHIFT_TONE[shift.status]} dot>
+          {t(`shift_${shift.status}`)}
+        </Badge>
+        <p className="min-w-0 flex-1 text-[15px] text-neutral-600">{t("intro")}</p>
+      </div>
 
       {countsQuery.isError && !countsQuery.data ? <Alert>{errorText.message(countsQuery.error)}</Alert> : null}
       {countsQuery.isError && countsQuery.data ? (
