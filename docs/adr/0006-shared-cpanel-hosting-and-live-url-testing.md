@@ -87,6 +87,13 @@ same MariaDB 10.11 clients (Debian's `mariadb-client`), so CI's `backup-drill` j
   queue latency (up to a minute), shared-host CPU limits; the pilot must confirm these are acceptable or
   trigger the VPS move described in the architecture document (section 10, option b/c).
 
+## Note, 2026-11-03 (step 6.1a): uploads live under storage/, never public/
+
+The deploy rsyncs `public/` with the release and deletes what is not in it, so nothing the application writes may live there. Product photos
+(ADR 0022) go to the `media` disk at `storage/app/private/media`, beside the receipt photos' `files` disk, and are streamed by the public
+route `GET /api/v1/media/items/{sha}/{rendition}.{ext}`, cached as immutable. `ModuleBoundariesTest` forbids `public_path()` in the modules
+and Shared, and `DeployableCachesTest` checks the cached disk root.
+
 ## Enforcement
 
 `deploy.yml` (workflow_run gated on `ci` success and `main`), `scripts/deploy/*`, `.githooks/commit-msg`,
