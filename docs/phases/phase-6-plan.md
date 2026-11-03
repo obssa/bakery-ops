@@ -497,7 +497,42 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       only the five keys.
   - Done when `mod-shifts` is green with the seeds group, `e2e-p6` seeds `SEED_PHASE=6` with photos, and `e2e-p0` to `e2e-p5` (seeding
     0 to 5, so no photos) are still green.
-  - As built: (to be written by 6.1c)
+  - As built (branch `phase-6/demo-photos`, 2026-11-03):
+    - **Order kept.** First the photos as supplied, then the tests (red), then the service, the command and the seeder, the merge of
+      6.1b, the runbook and this note. One commit of its own fixes two flaky tests and touches test files only (`UsersEndpointsTest`'s
+      short-code reset, `PaymentVoidRaceTest`'s "both orders").
+    - **The photos.** 29 files `<slug>.webp` (1600 × 1200, one VP8 chunk, no EXIF, XMP or ICC, 38 to 197 KB, 3.1 MB in all),
+      `manifest.json` with exactly the five keys (Unsplash and Pexels pages and licences) and the folder's README. The 29 names are
+      exactly the products of `DemoBakery::PRODUCTS` (28) and Phase 2's gate product "Honey cake (slice)"; no seeder name lacks a photo.
+      `.gitattributes` gained `*.webp binary`. The deploy assembles the release by rsyncing `apps/api/` with excludes that do not touch
+      `resources/` (`deploy.yml`), and the Docker image copies `apps/api`, so the folder ships as it is.
+    - **Code.** `App\Console\Support\DemoProductImages` (the service), `DemoProductImagesRefused`,
+      `App\Console\Commands\DemoProductImagesCommand` and `Database\Seeders\Phase6Seeder`. They sit beside `SeedDemoCommand`, outside the
+      modules, because the demo spans them, and Catalog's provider is unchanged. Every photo goes through `ProductPhotos::set(..., 'demo')`
+      with a centre crop and a new `client_uuid`, so the renditions, the sha256, `catalog_version` and the audit row all come from the
+      upload's code path. `DemoSeeder::LAST_PHASE` is 6, and `bakery:seed-demo --phase` takes 0 to `LAST_PHASE`. `DemoCounts` (the
+      seed report) counts `item_images`.
+    - **Decisions worth a look.**
+      - The actor: the branch's first active admin (lowest id, the `admin` role), or `--as=<id>`: an active user of the branch for whom
+        `checkPermissionTo('catalog.manage')` holds. With neither, it refuses before writing. The seeder takes the first active admin.
+      - Only a demo branch (`settings.demo`, as `bakery:seed-demo` makes it). A shop's own branch is refused, so stock photos never land
+        on real products.
+      - Matching by `name_en` ignores case and the spaces around a name. A name listed in two entries refuses the manifest.
+      - The manifest check runs whole before anything is written: the five keys, a slug, a plain file name in the folder, at least one
+        name, an `https` source page, a licence, a JPEG, PNG or WebP that is exactly 4:3 and at least `catalog.images.min_width` ×
+        `min_height`.
+      - Each product is its own transaction (`ProductPhotos`). A run that stops halfway is finished by running it again. The product is
+        read again just before its write, so a photo uploaded meanwhile is kept. A photo the pipeline refuses is reported per product,
+        and the command exits 1. The seeder then throws, because a seed never skips a photo.
+      - `--force` makes a new row for each demo photo and soft-deletes the old row. Its files wait for the 6.1b prune.
+      - `Phase6Seeder` has no production guard, unlike `Phase5Seeder`. In production it runs only through `bakery:seed-demo --force` (a
+        deploy never seeds), and there it does what the command does for a demo branch.
+    - **Tests added.** `DemoPhotoManifestTest` (seeds, 5 cases), `DemoProductImagesCommandTest` (module:catalog: 9 cases, two with
+      datasets of ten bad entries and three bad sizes; the fixtures are JPEGs built with GD in a folder of their own, and one case
+      attaches a committed WebP), `Phase6SeederTest` (seeds, 3 cases: the 29 products of a Phase 2 seed, an upload kept, another
+      branch and the ledger untouched, a second run without one write). `DemoSeederTest` and `SeedDemoCommandTest` were updated; the
+      latter fakes the media disk, because seeding every phase now writes photos. All of them ran in CI, since a worktree cannot run
+      local Pest; PHPStan (level 8) and Pint ran in the API container on the new code.
 
 ### 6.2 web.design-system (STATUS `web.design-system`), two PRs
 
