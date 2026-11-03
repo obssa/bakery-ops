@@ -69,7 +69,7 @@ add-phase 6`, commit `89d9660`) and before the plan. There is no PHP on this PC;
 ```
 
 The two red lines are the ones this PR answers: the plan, and `plan_approved` with Ramin's approval of 2026-11-03. The same command after
-the approval commit is in section 1.1.
+the approval commit passes (section 1.1).
 
 **What CI proves, not this PC:**
 - `gate:p5` is proved by `gate-p5` on `main` (run 41524453909, strict) and again on this PR's own run.
@@ -86,24 +86,49 @@ the approval commit is in section 1.1.
 
 ### 1.1 After the approval commit, and the Phase 5 freeze
 
-The entry check after `plan_approved` and phase 6 `in_progress` is written here by the approval commit (it needs a clean tree, so it runs
-after that commit).
+The same entry check after the approval commit (`3fdc869`: `plan_approved: true` and phase 6 `in_progress`):
 
-**Phase 5's freeze row.** Once phase 5 was claimed, `gate_check --mode done --phase 5` freezes `apps/` after `done_commit`: the row "no
-app code after done_commit" fails on any app file changed after `d07db7d`, until phase 6 is `in_progress`. This PR changes
-`apps/web/playwright.config.ts` and adds the two placeholders under `apps/web/e2e/p6/`. While STATUS said phase 6 `planning` (commit
-`89d9660`), the row failed as designed:
+```
+== gate_check: entry phase 6 (Fresh Counter redesign and product photos)
+  [PASS] phase 5 done                    status=done done_commit=d07db7d7417bff8f526d7777c94b1ec0dc866fd0
+  [PASS] phase 5 commit in history       d07db7d7417b is an ancestor of HEAD
+  [SKIP] gate:p5 green                   pest --group=gate:p5 not run (--no-tests/--ci)
+  [PASS] clean working tree              clean
+  [PASS] phase plan exists               docs/phases/phase-6-plan.md
+  [PASS] plan approved by Ramin          plan_approved=True by Ramin, 2026-11-03 ('check and then implement')
+  [PASS] approval author                 obssa77@gmail.com
+  [PASS] contract orders->catalog file   apps/api/tests/Contract/Orders/CatalogContractTest.php
+  [PASS] contract orders->catalog first  consumer unchanged since previous gate
+  [SKIP] contract orders->catalog green  pest --group=contract:orders->catalog not run (--no-tests/--ci)
+  [SKIP] Phase6Seeder                    not yet (created during the phase)
+== result: PASS (0 failed, 0 warnings, 11 checks)
+```
+
+**Phase 5's freeze row.** Once phase 5 was claimed, `gate_check --mode done --phase 5` froze `apps/` after `done_commit`. Its row "no app
+code after done_commit" fails on any app file changed after `d07db7d`, until phase 6 is `in_progress`. This PR changes
+`apps/web/playwright.config.ts` and adds the two placeholders under `apps/web/e2e/p6/`.
+
+While STATUS said phase 6 `planning` (commit `89d9660`), `python scripts/gate_check.py --mode done --phase 5 --no-tests --no-e2e` failed
+that row, as designed:
 
 ```
   [FAIL] no app code after done_commit                         3 app file(s) changed after done_commit
 ```
 
-The approval commit sets phase 6 `in_progress`, and from then on the row reads SKIP ("phase 6 is in_progress: app code moves on with
-it"). Phase 5 is then proved by its tests and projects, which `gate-p5` keeps running in every CI run. The output is in section 1.1's
-second block.
+That run also failed the two checklist rows that read the GitHub API (`branch-protection`, `uptime-monitor`), with connection timeouts
+from this PC. In CI, `gate-p5` reads them with `GH_TOKEN`.
 
-On this PC the Phase 5 checklist rows that read the GitHub API (`branch-protection`, `uptime-monitor`) also failed with connection
-timeouts. That is this PC's network: `gate-p5` reads them in CI with `GH_TOKEN`.
+The same command after the approval commit passes. The freeze row now reads SKIP, and Phase 5 is proved by its tests and projects, which
+`gate-p5` keeps running in every CI run:
+
+```
+  [SKIP] no app code after done_commit                         phase 6 is in_progress: app code moves on with it
+  [PASS] all phase steps done                                  all done
+== result: PASS (0 failed, 1 warnings, 47 checks)
+```
+
+The warning is the optional `push-telegram` sign-off, which is still waiting, as at the claim. Phase 5's checklist logic is unchanged
+by this PR.
 
 ## 2. Contract tests to write first (green before any consumer code)
 
@@ -540,7 +565,7 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   - `lib/images/frame.ts` turns the frame, zoom and pan into the source rectangle in the downscaled file's pixels, with clamping and the
     quality tier.
   - `lib/images/downscale.ts` takes `{maxEdge, quality}`: product photos use 2400 px and JPEG 0.9; receipts keep 1600 px and 0.82.
-  - `e2e/p6/product-photo.spec.ts` replaces the placeholder (the `TODO(p6)` marker goes with it). The admin drops the fixture, drags,
+  - `e2e/p6/product-photo.spec.ts` replaces the placeholder (the phase's to-do marker goes with it). The admin drops the fixture, drags,
     zooms and saves; the pad card and order line show the new photo (6.3a's pad); replacing changes the URLs; removing brings the
     placeholder back; the menu's ETag moves each time.
   - `product-photo-logic.spec.ts` gains the frame maths cases.
@@ -687,7 +712,7 @@ takes. Part A of 10.2 needs Ramin, part B is decided by the default unless he ob
 
 - Rows from the manifest: `gate:p6` (6.5) and `gate:p0` to `gate:p5` still green; `arch,invariants`; the projects `p6-product-photo` and
   `p6-a11y` (trusted to `e2e-p6` in CI); ADRs (from 6.5: 0022 and 0023); `phase-6-report.md`; `docs/openapi.json`; the ERD covering
-  every table of every module (with `item_images` from 6.1a); no `TODO(p6)` (the two placeholders carry one until 6.2b and 6.4b); no
+  every table of every module (with `item_images` from 6.1a); no phase 6 to-do marker (the two placeholders carry one until 6.2b and 6.4b); no
   `->skip(` in phase modules (none are phase 6 modules).
 - No go-live checklist: Phase 6 changes how the shop looks, not whether it may run. Phase 5's checklist stays Phase 5's and is untouched.
 - While phase 6 is open, `gate-p6` is informational. `claim-done 6` runs only after `gate-p6` is green on `main` with every row passing
@@ -737,5 +762,5 @@ The live host is a shared, CPU-limited cPanel account behind Cloudflare.
 | Driver name checks | the `mime` and `origin` CHECKs are written for MariaDB and PostgreSQL; driver checks use `in_array` |
 | Login rate limit | `p6-a11y` signs in each role once through `global-setup`'s token file, like `p5-amharic` |
 | Windows host | the photo files are binary to git: `.gitattributes` already marks `*.jpg` and `*.png`, and gains `*.webp binary` in 6.1c, so `text=auto` never touches them |
-| Phase scope creep | code-only sign-in, a refunds list, branch switching, user photos and a customer menu stay out (10.2); a `TODO(p6)` marker for any of them would block the gate, so they live here instead |
+| Phase scope creep | code-only sign-in, a refunds list, branch switching, user photos and a customer menu stay out (10.2); a phase 6 to-do marker for any of them would block the gate, so they live here instead |
 | A shared photo (new) | two items with the same photo share one sha and one set of files: the media route serves while any live row points at it, and the prune keeps files a live row uses (`PruneProductImagesTest`) |

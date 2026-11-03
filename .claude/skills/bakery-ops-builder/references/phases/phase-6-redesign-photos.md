@@ -38,7 +38,7 @@ written under `public/` (deploys rsync it).
 
 ## Exit gate (`gate:p6`, CI job `gate-p6`)
 `p6-product-photo` and `p6-a11y` green in `e2e-p6`. `Phase6GateTest` green: renditions, headers, 404, demo photos on every seeded
-product. Every p0–p5 project and `gate-p0`…`gate-p5` green in the same run. ADRs 0022 and 0023 accepted. No `TODO(p6)`.
+product. Every p0–p5 project and `gate-p0`…`gate-p5` green in the same run. ADRs 0022 and 0023 accepted. No phase 6 to-do marker left.
 `gate-p6` is informational (`gate_check --ci`) until STATUS claims the phase done. After the merge, the coordinator adds it to the
 required checks.
 
