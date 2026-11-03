@@ -108,7 +108,7 @@ export function CashSummaryView({ count, cash }: { count: Count; cash: CashBlock
         ) : (
           <ul className="flex flex-wrap gap-2">
             {held.map((key) => (
-              <li key={key} className="rounded-md bg-neutral-100 px-3 py-2 text-base text-neutral-900">
+              <li key={key} className="rounded-xl bg-neutral-100 px-3 py-2 text-base text-neutral-900">
                 {t("cash_tally", { count: cash.denominations[key], value: key, amount: multiplyDecimal(key, String(cash.denominations[key]), 2) })}
               </li>
             ))}

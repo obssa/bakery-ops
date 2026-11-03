@@ -18,7 +18,7 @@ import { DisplayCasePanel } from "../till/DisplayCasePanel";
 import { Alert, Button, Drawer, Select } from "../ui";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
-import { BoardHead } from "./BoardHead";
+import { ScreenHead } from "../ScreenHead";
 import { NewBatchDialog } from "./NewBatchDialog";
 import { RequestCard } from "./RequestCard";
 import { RequestDetail } from "./RequestDetail";
@@ -137,7 +137,7 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   return (
     <div className="flex flex-col gap-5">
       {/* the board's head; it moves into the station top bar's header slot once the shared bar has one (step 6.3a) */}
-      <BoardHead title={t("title")} titleAm={twins?.title} subtitle={chip} actions={actions} />
+      <ScreenHead title={t("title")} titleAm={twins?.title} subtitle={chip} actions={actions} />
 
       <ShiftBar model={shiftStation} />
 
