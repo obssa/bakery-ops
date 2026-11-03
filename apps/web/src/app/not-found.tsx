@@ -1,3 +1,4 @@
+import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/noto-sans-ethiopic/wght.css";
 import "./globals.css";
 import Link from "next/link";
@@ -9,7 +10,7 @@ import en from "../../messages/en.json";
 export default function NotFound() {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-neutral-50 text-neutral-900 antialiased">
+      <body className="min-h-screen bg-ground text-neutral-900 antialiased">
         <title>{en.not_found.title}</title>
         <main className="mx-auto flex max-w-xl flex-col gap-4 px-4 py-16">
           <h1 className="text-2xl font-semibold">

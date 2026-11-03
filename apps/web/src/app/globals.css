@@ -1,11 +1,82 @@
 @import "tailwindcss";
 
-/* One quiet, light theme for the admin console and the shell (the KDS dark and big-type modes arrive in Phase 1).
-   Noto Sans Ethiopic is self-hosted (@fontsource-variable, bundled into /app/_next/static/media); it covers the
-   Latin script too, so English and Amharic share one typeface. */
+/* Fresh Counter, the design system of every screen (docs/design/fresh-counter.md section 1, ADR 0023). A calm, bright counter: a
+   neutral ground, white surfaces with a hairline border, one teal accent for "go" and the current choice, status colours that only
+   mean status. Components use the Tailwind names these tokens make (bg-ground, text-brand-700, bg-night-surface, shadow-float, ...) and
+   never write a hex value.
+
+   The fonts are self-hosted (@fontsource-variable, bundled into /app/_next/static/media, imported by the layouts), so a pad works
+   offline; nothing is ever loaded from Google Fonts at runtime (web-build fails an export that names its hosts). Inter comes first and
+   draws Latin; Ethiopic glyphs fall through to Noto Sans Ethiopic, so a line in both scripts renders in both. */
 @theme {
-  --font-sans: "Noto Sans Ethiopic Variable", "Noto Sans Ethiopic", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter Variable", "Noto Sans Ethiopic Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* Neutral, remapped: the design's greys are cooler than Tailwind's stock ones, and remapping the scale moves every screen at once
+     without touching a class. 400 is for disabled text and placeholder icons only, never for text that carries information; secondary
+     text is 600 (5.9:1 on white, 5.5:1 on the ground). */
+  --color-neutral-50: #f9fafb;
+  --color-neutral-100: #f2f4f7;
+  --color-neutral-200: #e4e7ec;
+  --color-neutral-300: #d0d5dd;
+  --color-neutral-400: #98a2b3;
+  --color-neutral-500: #667085;
+  --color-neutral-600: #5a6474;
+  --color-neutral-700: #344054;
+  --color-neutral-800: #1d2939;
+  --color-neutral-900: #0e1726;
+  --color-neutral-950: #0b1220;
+  /* the page behind the white surfaces */
+  --color-ground: #f4f5f7;
+
+  /* Brand teal: primary buttons, the focus ring, links and the current choice (600, white text 5.1:1); 700 for hover and for text on
+     50 (6.7:1); 400 only on the kitchen's dark ground. Amber, red, blue and green stay Tailwind's and mean low/waiting, out/error,
+     information and money confirmed, each with a word or an icon beside the colour. */
+  --color-brand-50: #e6f4f0;
+  --color-brand-100: #cde9e1;
+  --color-brand-200: #9dd3c4;
+  --color-brand-300: #5fb8a2;
+  --color-brand-400: #2dd4bf;
+  --color-brand-500: #138a72;
+  --color-brand-600: #0e7c66;
+  --color-brand-700: #0a5f4e;
+  --color-brand-800: #084c3f;
+  --color-brand-900: #063a30;
+
+  /* Kitchen night (fresh-counter.md 1.6): the one dark screen, the kitchen and bar displays, read across a hot room. */
+  --color-night-ground: #0b1220;
+  --color-night-surface: #131c2e;
+  --color-night-border: #23304a;
+  --color-night-divider: #1c2740;
+  --color-night-text: #e6eaf2;
+  --color-night-text-muted: #9aa6bc;
+  --color-night-accent: #2dd4bf;
+  --color-night-accent-ink: #04241f;
+  --color-night-fresh: #0f3d33;
+  --color-night-fresh-text: #5eead4;
+  --color-night-waiting: #3d2a0b;
+  --color-night-waiting-text: #fbbf24;
+  --color-night-late: #4a1515;
+  --color-night-late-text: #fca5a5;
+  --color-night-note: #f5c66a;
+
+  /* Depth: surfaces sit flat on a hairline border; only floating layers (dialogs, drawers, menus, toasts) cast this one shadow. */
+  --shadow-float: 0 12px 32px -8px rgb(14 23 38 / 0.18);
+
+  /* Motion, used only under motion-safe: a slow pulse for skeletons, 200 ms for a drawer coming in. */
+  --animate-skeleton: skeleton 2.4s ease-in-out infinite;
+  --animate-drawer-in: drawer-in 200ms ease-out;
+
+  @keyframes skeleton {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  @keyframes drawer-in {
+    from {
+      transform: translateX(100%);
+    }
+  }
 }
 
 :root {
@@ -13,7 +84,7 @@
 }
 
 body {
-  background-color: var(--color-neutral-50);
+  background-color: var(--color-ground);
   color: var(--color-neutral-900);
   font-family: var(--font-sans);
 }
@@ -21,4 +92,17 @@ body {
 /* Ethiopic glyphs are taller than Latin ones: a little more line height keeps Amharic text from feeling cramped. */
 :lang(am) {
   line-height: 1.65;
+}
+
+/* Every transition and animation is written under motion-safe:; this turns off any that slips through when the person asks the
+   system for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
