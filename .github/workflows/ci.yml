@@ -686,8 +686,8 @@ jobs:
     with: { phase: 5, projects: "p5-device p5-offline p5-amharic", profiles: "full", history_days: "2" }
 
   # Phase 6 (step 6.0; phase-6 plan 7.1): the redesign and product photos, on the stack e2e-p5 runs (polling with the worker, two days of
-  # history, device enforcement on), beside it after mod-analytics. SEED_PHASE=6 composes every phase seeder up to Phase5Seeder until step
-  # 6.1c adds Phase6Seeder with the demo photos. p6-product-photo and p6-a11y start as fixme placeholders (e2e.yml refuses an empty project of
+  # history, device enforcement on), beside it after mod-analytics. SEED_PHASE=6 composes every phase seeder, Phase6Seeder last (step 6.1c):
+  # every demo product gets its demo photo. p6-product-photo and p6-a11y start as fixme placeholders (e2e.yml refuses an empty project of
   # a phase in progress); 6.2b replaces the a11y one, 6.4b the product-photo one.
   e2e-p6:
     needs: [status, mod-analytics, web-build, docker-build]
