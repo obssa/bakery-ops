@@ -13,13 +13,14 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { onOutboxApplied } from "@/lib/outbox/store";
 import { addisClock } from "@/lib/shifts";
 import { useNow } from "@/lib/useNow";
-import { Alert, Chip, Field, PageHeader, Select } from "../ui";
+import { Alert, Chip, Field, IconButton, Select } from "../ui";
 import { ICON_STROKE } from "../icons";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
-import { buttonClass } from "../styles";
+
 import { StockStrip } from "./StockStrip";
 import { TicketCard } from "./TicketCard";
+import type { KdsTwins } from "./twins";
 
 // One display for a station kind (/kds/kitchen, /kds/bar): the user own station of that kind (a picker when there are several), its ticket
 // rail through the live feed, a chime on new tickets with a mute toggle. Step 6.3b (fresh-counter.md 3.3): kitchen night, the one dark
@@ -72,15 +73,22 @@ const COLUMN_EMPTY: Record<"kitchen" | "bar", Record<KdsColumn, string>> = {
   bar: { new: "column_new_empty", cooking: "column_making_empty", ready: "column_ready_empty" },
 };
 
-function Column({ kind, column, tickets }: { kind: "kitchen" | "bar"; column: KdsColumn; tickets: Ticket[] }) {
+function Column({ kind, column, tickets, twin }: { kind: "kitchen" | "bar"; column: KdsColumn; tickets: Ticket[]; twin?: string }) {
   const t = useTranslations("kds");
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} className="flex min-w-0 flex-col gap-3">
       <div className="flex items-center justify-between gap-3 px-1">
-        <h2 id={titleId} className="text-lg font-semibold text-night-text">
-          {t(COLUMN_TITLE[kind][column])}
-        </h2>
+        <div className="flex min-w-0 items-baseline gap-2.5">
+          <h2 id={titleId} className="text-lg font-semibold text-night-text">
+            {t(COLUMN_TITLE[kind][column])}
+          </h2>
+          {twin ? (
+            <span lang="am" className="truncate text-[15px] font-medium text-night-text-muted">
+              {twin}
+            </span>
+          ) : null}
+        </div>
         <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-night-divider px-2.5 text-[15px] font-semibold tabular-nums text-night-text">
           {tickets.length}
         </span>
@@ -100,7 +108,7 @@ function Column({ kind, column, tickets }: { kind: "kitchen" | "bar"; column: Kd
   );
 }
 
-export function KdsScreen({ kind }: { kind: "kitchen" | "bar" }) {
+export function KdsScreen({ kind, twins }: { kind: "kitchen" | "bar"; /** the Amharic names beside the English ones (the English page) */ twins?: KdsTwins }) {
   const t = useTranslations("kds");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
@@ -149,43 +157,56 @@ export function KdsScreen({ kind }: { kind: "kitchen" | "bar" }) {
   const title = kind === "kitchen" ? t("kitchen_title") : t("bar_title");
   const loaded = !!snapshot?.loaded;
   const MuteIcon = muted ? BellOff : Bell;
-
-  const actions = (
-    <>
-      {stations.length > 1 ? (
-        <div className="w-60">
-          <Field label={t("station")}>
-            {(props) => (
-              <Select {...props} value={stationId ?? ""} onChange={(e) => setChosen(Number(e.target.value))}>
-                {stations.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {locale === "am" ? s.name_am : s.name_en}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        </div>
-      ) : null}
-      {stationId !== null && loaded ? (
-        // the rail's own state: live, or showing what was last read (the stale line below says why)
-        <Chip tone={snapshot?.error ? "amber" : "brand"} dot className="min-h-9 px-3.5 text-sm">
-          {snapshot?.error ? t("feed_stale") : t("feed_live")}
-        </Chip>
-      ) : null}
-      <WallClock />
-      <button type="button" aria-pressed={muted} onClick={toggleMute} className={buttonClass({ variant: muted ? "dark" : "secondary", size: "lg" })}>
-        <MuteIcon className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
-        {muted ? t("unmute") : t("mute")}
-      </button>
-    </>
-  );
+  const twin: Record<KdsColumn, string | undefined> = { new: twins?.new, cooking: twins?.cooking, ready: twins?.ready };
 
   return (
     // the first tap on the screen unlocks audio, as browsers require
     <div className="flex flex-col gap-5" onPointerDown={unlockAudio} onKeyDown={unlockAudio}>
-      <PageHeader title={title} intro={stations.length <= 1 && station ? t("station_name", { name: locale === "am" ? station.name_am : station.name_en }) : undefined} actions={actions} />
-      <ShiftBar model={shiftStation} />
+      {/* the Kitchen board's header: the display's name (with its Amharic name on the English page) and its shift on the left; the feed's
+          state, the wall clock and the chime on the right */}
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-night-divider pb-4">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
+            <h1 className="text-2xl font-bold tracking-tight text-night-text">{title}</h1>
+            {twins ? (
+              <span lang="am" className="text-xl font-medium text-night-text-muted">
+                {twins.title}
+              </span>
+            ) : null}
+            {stations.length <= 1 && station ? (
+              <span className="text-sm text-night-text-muted">{t("station_name", { name: locale === "am" ? station.name_am : station.name_en })}</span>
+            ) : null}
+          </div>
+          <ShiftBar model={shiftStation} look="strip" />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {stations.length > 1 ? (
+            <div className="w-56">
+              <Field label={t("station")}>
+                {(props) => (
+                  <Select {...props} controlSize="md" value={stationId ?? ""} onChange={(e) => setChosen(Number(e.target.value))}>
+                    {stations.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {locale === "am" ? s.name_am : s.name_en}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            </div>
+          ) : null}
+          {stationId !== null && loaded ? (
+            // the rail's own state: live, or showing what was last read (the stale line below says why)
+            <Chip tone={snapshot?.error ? "amber" : "brand"} dot className="min-h-[34px] px-3.5 text-sm">
+              {snapshot?.error ? t("feed_stale") : t("feed_live")}
+            </Chip>
+          ) : null}
+          <WallClock />
+          <IconButton label={muted ? t("unmute") : t("mute")} title={muted ? t("unmute") : t("mute")} aria-pressed={muted} variant={muted ? "dark" : "ghost"} onClick={toggleMute}>
+            <MuteIcon className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+          </IconButton>
+        </div>
+      </header>
 
       {loading ? (
         <p role="status" className="text-base text-night-text-muted">
@@ -212,9 +233,9 @@ export function KdsScreen({ kind }: { kind: "kitchen" | "bar" }) {
           <p role="status" className="sr-only">
             {rail.length === 0 ? t("no_tickets") : ""}
           </p>
-          <div className="grid items-start gap-5 md:grid-cols-3">
+          <div className="grid min-h-[calc(100dvh-24rem)] items-start gap-5 md:grid-cols-3">
             {KDS_COLUMNS.map((column) => (
-              <Column key={column} kind={kind} column={column} tickets={columns[column]} />
+              <Column key={column} kind={kind} column={column} tickets={columns[column]} twin={twin[column]} />
             ))}
           </div>
         </>

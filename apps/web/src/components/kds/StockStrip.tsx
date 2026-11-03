@@ -74,7 +74,7 @@ export function StockStrip({ stationId }: { stationId: number }) {
                 {rows.map((row) => {
                   const name = locale === "am" ? row.item.name_am : row.item.name_en;
                   return (
-                    <li key={row.item.id} className={`inline-flex min-h-13 items-center gap-1 rounded-full py-0.5 pl-4 text-sm font-semibold ${mayAsk ? "pr-0.5" : "pr-4"} ${CHIP[row.state]}`}>
+                    <li key={row.item.id} className={`inline-flex min-h-11 items-center gap-1 rounded-full pl-3.5 text-sm font-semibold ${mayAsk ? "pr-0" : "pr-3.5"} ${CHIP[row.state]}`}>
                       <span>
                         {name}
                         <span aria-hidden="true"> · </span>
@@ -98,9 +98,9 @@ export function StockStrip({ stationId }: { stationId: number }) {
                           aria-label={t("request_transfer_of", { name })}
                           title={t("request_transfer")}
                           onClick={() => setAsking(row)}
-                          className={`inline-flex size-12 shrink-0 items-center justify-center rounded-full hover:bg-black/25 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
+                          className={`inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-black/25 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
                         >
-                          <PackagePlus className="size-5" strokeWidth={2} aria-hidden="true" />
+                          <PackagePlus className="size-[18px]" strokeWidth={2} aria-hidden="true" />
                         </button>
                       ) : null}
                     </li>

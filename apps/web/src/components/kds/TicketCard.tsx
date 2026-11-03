@@ -1,6 +1,6 @@
 "use client";
 
-import { AlarmClock, Hourglass, Timer, type LucideIcon } from "lucide-react";
+import { AlarmClock, Hourglass, Timer, X, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState } from "react";
 import type { Line, Locale, RejectReason, Ticket } from "@/lib/api/types";
@@ -11,7 +11,7 @@ import { orderNoText } from "@/lib/orderNo";
 import { useNow } from "@/lib/useNow";
 import { queueAcceptLine, queueReadyLine, queueRejectLine, useOutbox } from "@/lib/outbox/store";
 import { focusRing } from "../styles";
-import { Button, Field, TextInput } from "../ui";
+import { Button, Field, IconButton, TextInput } from "../ui";
 
 // A ticket of the rail (step 6.3b, fresh-counter.md 3.3): a night card with the order's number, its table or takeaway and the waiter, a timer
 // chip, the order's note, and each line of this station: "2×" in the accent, the name, its options and its note in the note colour, and
@@ -88,6 +88,7 @@ function RejectPanel({ line, itemName, onDone }: { line: Line; itemName: string;
   );
 }
 
+
 function LineRow({ line, waiter }: { line: Line; waiter: string }) {
   const t = useTranslations("kds");
   const locale = useLocale() as Locale;
@@ -100,39 +101,46 @@ function LineRow({ line, waiter }: { line: Line; waiter: string }) {
 
   return (
     <li className="space-y-3 py-3 first:pt-0 last:pb-0">
-      <div className="flex items-start gap-3">
-        <span className="min-w-8 shrink-0 text-lg font-bold leading-snug tabular-nums text-night-accent">{trimDecimal(line.qty)}×</span>
+      <div className="flex items-baseline gap-2.5">
+        <span className="min-w-8 shrink-0 text-lg font-bold tabular-nums text-night-accent">{trimDecimal(line.qty)}×</span>
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-[17px] font-semibold leading-snug text-night-text">{name}</p>
-          {modifiers.length > 0 ? <p className="text-[15px] text-night-text-muted">{modifiers.join(", ")}</p> : null}
-          {line.notes ? <p className="text-[15px] font-medium text-night-note">{t("line_notes", { notes: line.notes })}</p> : null}
+          <p className="text-[17px] font-semibold text-night-text">{name}</p>
+          {modifiers.length > 0 ? <p className="text-sm text-night-text-muted">{modifiers.join(", ")}</p> : null}
+          {line.notes ? <p className="text-sm text-night-note">{t("line_notes", { notes: line.notes })}</p> : null}
         </div>
-        {/* the line's own state, in words: a ticket may hold a line still new beside one being made */}
-        {!ready || pending ? (
-          <span className="shrink-0 rounded-full bg-night-divider px-2.5 py-1 text-[13px] font-semibold text-neutral-700">{pending ? t("sending") : status}</span>
-        ) : null}
+        {/* the line's state in words for a reader (the column and the line's own button show it on screen); "Sending…" while it waits */}
+        {pending ? (
+          <span className="shrink-0 rounded-full bg-night-divider px-2.5 py-1 text-[13px] font-semibold text-neutral-700">{t("sending")}</span>
+        ) : (
+          <span className="sr-only">{status}</span>
+        )}
       </div>
       {ready ? (
+        // the Kitchen board's Ready strip: in the fresh colours, with the waiter who picks it up
         <p className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 rounded-xl bg-night-fresh px-3.5 py-2 text-[15px] font-semibold text-night-fresh-text">
           <span>{t("status_ready")}</span>
           {waiter ? <span className="font-medium text-night-text-muted">{waiter}</span> : null}
         </p>
       ) : rejecting ? (
         <RejectPanel line={line} itemName={name} onDone={() => setRejecting(false)} />
-      ) : (
+      ) : line.status === "queued" ? (
         <div className="flex gap-2">
-          {line.status === "queued" ? (
-            <Button size="lg" className="flex-1 font-bold" aria-label={t("accept_line", { name })} disabled={pending} onClick={() => queueAcceptLine(line.id)}>
-              {t("accept")}
-            </Button>
-          ) : (
-            <Button size="lg" className="flex-1 font-bold" aria-label={t("ready_line", { name })} disabled={pending} onClick={() => queueReadyLine(line.id)}>
-              {t("ready")}
-            </Button>
-          )}
+          <Button size="lg" className="flex-1 font-bold" aria-label={t("accept_line", { name })} disabled={pending} onClick={() => queueAcceptLine(line.id)}>
+            {t("accept")}
+          </Button>
           <Button size="lg" variant="secondary" aria-label={t("reject_line", { name })} disabled={pending} onClick={() => setRejecting(true)}>
             {t("reject")}
           </Button>
+        </div>
+      ) : (
+        // Cooking: "Ready" across the card as the board has it; a line found spoiled while being made is still rejected, from the small button
+        <div className="flex gap-2">
+          <Button size="lg" className="flex-1 font-bold" aria-label={t("ready_line", { name })} disabled={pending} onClick={() => queueReadyLine(line.id)}>
+            {t("ready")}
+          </Button>
+          <IconButton size="lg" variant="secondary" label={t("reject_line", { name })} title={t("reject")} disabled={pending} onClick={() => setRejecting(true)}>
+            <X className="size-5" strokeWidth={2} aria-hidden="true" />
+          </IconButton>
         </div>
       )}
     </li>
@@ -151,24 +159,25 @@ export function TicketCard({ ticket }: { ticket: Ticket }) {
 
   return (
     <article aria-labelledby={titleId} className="space-y-3 rounded-[18px] border border-night-border bg-night-surface p-4">
-      <header className="flex items-start justify-between gap-3">
+      <header className="flex items-center justify-between gap-3">
         <div className="min-w-0 space-y-0.5">
           <h3 id={titleId} className="text-xl font-bold text-night-text">
             {t("order_no", { no: orderNoText(order.order_no) })}
           </h3>
+          {/* "Table 4 · Meron", as the board has it: the table (or takeaway) and the waiter */}
           <p className="text-sm text-night-text-muted">
             {where}
             {waiter ? (
               <>
                 <span aria-hidden="true"> · </span>
-                {t("waiter", { name: waiter })}
+                {waiter}
               </>
             ) : null}
           </p>
         </div>
         <TimerChip sentAt={order.sent_at} seconds={seconds} age={age} />
       </header>
-      {order.notes ? <p className="rounded-xl bg-night-ground px-3 py-2 text-[15px] font-medium text-night-note">{t("order_notes", { notes: order.notes })}</p> : null}
+      {order.notes ? <p className="text-sm font-medium text-night-note">{t("order_notes", { notes: order.notes })}</p> : null}
       <ul className="divide-y divide-night-divider">
         {ticket.lines.map((line) => (
           <LineRow key={line.id} line={line} waiter={waiter} />
