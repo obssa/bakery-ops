@@ -384,7 +384,48 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   - Done when `mod-catalog` is green with the image cases of `contract:orders->catalog` green and `app/Modules/Orders` unchanged.
     `api-arch`, `invariants`, `openapi-check`, `erd-check` and every e2e job must be green too, and the deploy's smoke and `@live`
     stage must pass.
-  - As built: (to be written by 6.1a)
+  - As built (branch `phase-6/item-images-api`, 2026-11-03):
+    - **Order kept.** The three `orders->catalog` cases were committed red first (with STATUS `catalog.images` `in_progress`), then M1
+      and M2, the `ImageProcessor` split, the feature and unit tests (red), the Catalog code, the routes, the registries, the language
+      files, OpenAPI and the ERD, the manifest, ADR 0022 with the notes on ADR 0015 and ADR 0006, and this note. `app/Modules/Orders` is
+      unchanged; the cases went green through Catalog alone.
+    - **`ImageProcessor`.** `process()` is now `load()` (the refusals, the decode, the EXIF orientation), the edge resample and
+      `encodeScrubbed($image, 'jpeg')`, with its tests unchanged. Besides `load()` and `encodeScrubbed()` it gained a third public step,
+      `resample()` (one rectangle onto white, so a PNG's transparency never turns black), which `process()` and the photo pipeline both use,
+      and `canWebp()`. `ImageProcessorStepsTest` covers the four.
+    - **Catalog.** `Models/ItemImage`, `Support/CropRect`, `Support/ProductPhotoPipeline` with its value `Support/ProductPhoto`,
+      `Services/ProductPhotos`, `Contracts/ItemImages` and `Contracts/ItemImageView`, `ItemImagesController`, `MediaController`,
+      `StoreItemImageRequest`, `Http/Resources/ItemImagePayload` (the `image` of the item payloads), `config/catalog.php` and the `media`
+      disk. `ItemResource` gained `image` (a summary in `GET /items`, eager-loaded, and the detail on `GET /items/{item}` through
+      `withImageDetail()`); `Item` gained `image()` and the `image_id` cast, never fillable.
+    - **Decisions worth a look.**
+      - The snap: a crop within 1 px of 4:3 (`|4h - 3w| <= 4`) becomes the largest exact 4:3 rectangle (4k × 3k) inside it, centred in it,
+        so it can never leave the image; it loses at most 3 px a side. The 800 × 600 minimum is checked on the snapped crop, and
+        `too_small` reports the snapped size (a 799 × 600 crop reads `width 796, height 597`).
+      - The eight keys are `not_a_product`, `not_an_image`, `unsupported_type`, `too_large`, `crop_invalid`, `too_small`, `unavailable`
+        and `processing_failed` (the eighth: a rendition that failed its re-read, 500). `ImageProcessor`'s own refusals are told in
+        Catalog's words (`CatalogError::fromFilesError`): a cut file is `not_an_image`; over the pixel cap is `too_large` with
+        `max_pixels`. A request without a photo part is `not_an_image`; a crop with only some of its four fields is `validation.failed`.
+      - The audit rows are `recordEvent` rows on the item (`catalog.item.image_set` with `{item_id, before_image_id, after_image_id, crop,
+        width, height, origin}`, `catalog.item.image_removed` with `{item_id, before_image_id}`), written inside the photo's transaction,
+        so a lost `client_uuid` race and a remove without a photo write none.
+      - Files are written before the transaction, under a temporary name and moved into place: a reader never sees half of a file that
+        is cached as immutable, and a second upload of the same photo rewriting it is harmless. A write whose transaction then fails
+        leaves content-addressed files that a retry reuses (the prune of 6.1b sweeps rows, so such a file stays until a row names it).
+      - `catalog.images.format` `webp` on a `gd` without WebP answers `catalog.image.unavailable` (503) instead of a JPEG, so the JPEG
+        path is proved by `format = jpeg`, never by the runner's `gd`. Every feature test forces `jpeg`; the WebP cases run where `gd` has it.
+      - `DELETE` on an ingredient answers like a product without a photo (200, nothing written), as the plan's error list gives it only 404.
+      - The media route sits in the `api` group only (bindings), so no session or cookie can start there; `MediaRouteTest` checks the
+        route's middleware and that no `Set-Cookie` is sent.
+    - **Tests added.** Unit: `CropRectTest`, `ProductPhotoPipelineTest`, `ImageProcessorStepsTest`. Feature: `ItemImageUploadTest` (14
+      cases), `ItemImageRemoveTest`, `MediaRouteTest`. Concurrency: `ItemImageRaceTest` in `tests/Gate` (`CommitsForConcurrency`, forks,
+      30 rounds each for one `client_uuid` twice and for two photos on one product; locally 27 of 30 rounds raced on the unique index).
+      Arch: Catalog never uses `Files`, `StoredFile`, `ServeFile` or signed URLs, the pipeline uses `ImageProcessor`, and nothing in the
+      modules or Shared names `public_path()`. Invariants: `DeployableCachesTest` caches `catalog.images` and the `media` disk (under
+      `storage/`), and the registries cover the three routes. There is no `AuditCoverageTest` in the suite; the audit rows are asserted in
+      the feature tests and the race test.
+    - **Generated.** `docs/openapi.json` (the upload is `multipart/form-data`), `docs/erd.dbml` (`item_images`, `items.image_id`) and
+      `docs/i18n/am-review.csv` (the eight new API messages, for the reviewer).
 
 - **6.1b `phase-6/menu-images`** (API; the consumer).
   - `MenuBuilder` reads `ItemImages::for` once per build; `MenuItem` gains `image`.
