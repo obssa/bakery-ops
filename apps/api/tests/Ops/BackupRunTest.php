@@ -164,7 +164,7 @@ it('keeps 30 dumps by default and BACKUP_KEEP when set: the oldest go with their
     expect($left)->toBe([$old[2], $new])
         ->and(file_exists($this->ops->folder.'/'.OpsFixture::base($old[0]).'.json'))->toBeFalse()
         ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($old[0]).'.files'))->toBeFalse()
-        ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($old[0]).'.media'))->toBeFalse('a night's media folder goes with it')
+        ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($old[0]).'.media'))->toBeFalse('the media folder goes with its night')
         ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($old[2]).'.media'))->toBeTrue()
         ->and(OpsRun::query()->where('status', 'ok')->sole()->detail)->toMatchArray(['kept' => 2, 'deleted' => 3, 'over_cap' => false]);
 });
