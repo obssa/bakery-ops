@@ -676,7 +676,8 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       holds the rest of the window, so the menu scrolls under its search and chips and the order panel's lines scroll above its footer: Send
       is always in reach. Below 1024 px the page flows: the panel follows the menu, and a white bar at the bottom of the window keeps the
       item count and the total in sight with "View order", a link down to the panel. The till keeps its padded frame; its "New order" tab
-      draws the same restyled surface, with the panel sticking beside the menu as before (6.3b rebuilds the till).
+      draws the same restyled surface, with the panel sticking beside the menu as before (6.3b rebuilds the till). One fix to 6.2b's top bar:
+      on a phone its right-hand group wraps inside the window (it ran past a 390 px one).
     - **The pad's bar.** Under the station top bar, a white bar holds the "Pad views" tabs (a station `SegmentedControl` in tab mode, the
       ready count a brand-teal pill inside "My orders") and, on the right, the waiter's initials with "Acting: <name>", the chime button
       (same names and `aria-pressed`) and "Lock pad". The page's `h1` "Waiter pad" is for readers only: the top bar and the "Screens" tab
