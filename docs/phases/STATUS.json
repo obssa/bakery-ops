@@ -232,7 +232,7 @@
       ],
       "modules": {
         "catalog.images": "todo",
-        "web.design-system": "todo",
+        "web.design-system": "in_progress",
         "web.stations": "todo",
         "web.admin": "todo",
         "docs": "todo"

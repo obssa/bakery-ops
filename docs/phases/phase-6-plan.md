@@ -454,7 +454,46 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
     each demo category and for none, initials from the name in each language.
   - Done when every p0 to p5 project is green with the new look and `web-lint` (`no-literal-text`, `tsc`) passes. Screens change only
     through the primitives here.
-  - As built: (to be written by 6.2a)
+  - **As built (step 6.2a, `phase-6/web-tokens`).** Dependencies first (`@fontsource-variable/inter` 5.3.0, `lucide-react` 1.59.0,
+    `@axe-core/playwright` 4.14.0 dev, each published at least two weeks before), then the logic spec red, then the code. Web only: no
+    API, route, registry, message, OpenAPI or ERD change, and **no Playwright selector changed**. Where the code chose what the plan left
+    open:
+    - **Tokens.** `@theme` holds exactly the spec's section 1. The night tokens are `night-ground`, `-surface`, `-border`, `-divider`,
+      `-text`, `-text-muted`, `-accent`, `-accent-ink`, `-fresh`/`-fresh-text`, `-waiting`/`-waiting-text`, `-late`/`-late-text` and
+      `-note`. The floating shadow is a token (`shadow-float`), and so are the skeleton pulse and the drawer's entry (`animate-skeleton`,
+      `animate-drawer-in`, used only under `motion-safe:`). A `prefers-reduced-motion` rule turns off any transition that slips through.
+      Inter is imported beside Noto in `[locale]/layout.tsx`, the start page and the bare 404, which also sit on `bg-ground` now.
+    - **Defaults that keep layouts still.** A `Button` without a size keeps Phase 0's 48 px (`md` 44, `lg` 52, `xl` 64 are opt-in), and
+      the inputs likewise (`controlSize` `md`/`lg`). So no screen's layout moves in 6.2a. Corners, weight, colours and the focus ring
+      change everywhere. The class strings live in `styles.ts` (`buttonClass`, `controlClass`, `surface`, `tableNum` beside
+      `focusRing`), so a link that looks like a button, or a server component, uses the same look (10.5 item 5).
+    - **Primitives restyled in place**, names and props unchanged: `Button` gains `ghost`, `danger`, `dark`, `size` and `loading` (the
+      spinner sits over the label, which stays in the accessible name at opacity 0); `Badge` is now a `Chip` and gains the `brand` tone
+      and an optional dot, keeping `green` for money confirmed; `Panel` is a titled `Card` and gains an optional `action`; `PageHeader`
+      gains optional `actions` (the Amharic title beside it is 6.2b's); `Alert` gains a line icon; `Status` moves from green to
+      brand-50/brand-700, since green now means money confirmed only. `Drawer` is 480 px by default as the spec says and takes
+      `size="lg"` (768 px). The audit log's entry, the one drawer, passes it, keeping the width its before-and-after table had.
+    - **Added**: `IconButton` (a required `label` is its `aria-label`), `Chip`, `MoneyInput` (an "ETB" prefix unless the screen
+      passes the payload's `currency`), `Switch` (a labelled `role="switch"` button; a tap on the label toggles it too), `SegmentedControl` (pressed
+      buttons, or `tabs` for a tablist as the pad's and till's views are), `Card`, `Stat`, `Avatar` (initials, `translate="no"`),
+      `EmptyState` (a `level` for its heading, 1 for the device gate in 6.2b), `Skeleton`, `Table` and `ProductImage`. No screen uses
+      the new ones yet.
+    - **`ProductImage`** (`lib/images/productImage.ts`). The `srcSet` lists each rendition at its real width: the large one at the
+      API's `width`, and a rendition no wider than the one before it is left out, so an 800 × 600 photo lists no width twice. The
+      `sizes` hints are 64 px (thumb), a pad card's column (card) and 480 px (large). Media paths go on `NEXT_PUBLIC_API_URL`, read as
+      the API client does, so the module loads in Node. The placeholder icon is chosen from the category's name in either language (no
+      category code exists): bread (`Wheat`), cake (`CakeSlice`), sandwich, pizza, cup (`Coffee`), glass (`GlassWater`), otherwise the
+      plate (`UtensilsCrossed`). Its initials skip a bracketed word and numbers and, in Amharic, the possessive የ at the front of a
+      word ("የማንጎ ጭማቂ" gives "ማጭ"). A thumb shows the icon only. A failed load falls back to the placeholder until the URL changes.
+    - **`neutral-400` text**: the two places where it carried information, the audit entry's "missing" dash and the roster's empty day,
+      are now `neutral-600`. The rest of its uses are disabled text, placeholders, a chart's dashed line, a dot and hover borders. The
+      count screen's hand-written blue focus ring is now `focusRing`.
+    - **Left for the screen steps**: screens that write their own accents (blue selected tabs and rows, blue links, green notices) keep
+      them until 6.2b to 6.4d rebuild them (ADR 0023, consequences).
+    - **`web-build`** fails an export that names `fonts.googleapis.com` or `fonts.gstatic.com`, or that lacks Inter's or Noto Sans
+      Ethiopic's files under `out/_next/static/media`. The shell cache grows by Inter's seven subsets (about 220 KB).
+    - Tests: `e2e/p6/product-photo-logic.spec.ts` (18 cases in `p6-product-photo`). ADR 0023 (proposed). STATUS
+      `web.design-system` `in_progress` (done after 6.2b).
 
 - **6.2b `phase-6/web-shell`** (web only).
   - `AppShell` becomes the 68 px station top bar (spec 3):
