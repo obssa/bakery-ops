@@ -148,7 +148,7 @@ it('refuses a --days below 1', function () {
 
     foreach (['0', '-3', 'soon'] as $days) {
         [$code] = ($this->prune)(['--days' => $days]);
-        expect($code)->toBe(1, "--days={$days}");
+        expect($code)->toBe(2, "--days={$days}: invalid");
     }
     expect(($this->files)($removed))->toBe(['thumb', 'card', 'large']);
 })->group('module:catalog', 'feature');
