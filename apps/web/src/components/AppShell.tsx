@@ -26,8 +26,9 @@ import { Avatar, Chip, IconButton, type Tone } from "./ui";
 // and the page. The bar holds, on the left, the app's mark (the way home) and, on a station screen, the station's name and a chip with its
 // shift; on the right, in this order, the sync chip, the person's calendar (step 4.5f), the language button (the other language's name),
 // the bell and the person (initials, name and role) with "Sign out". The "Screens" navigation keeps its name and its link names, visible
-// under the bar: at 1280 px there is no room for it beside the bar's own contents in either language. The admin console draws its sidebar
-// frame and its own `main` (AdminFrame); the sign-in screen is a split of its own, without the bar, and carries "Screens" itself; the waiter
+// under the bar: at 1280 px there is no room for it beside the bar's own contents in either language. The admin console has no top bar
+// (step 6.4a, the Admin board): it is its sidebar and the content, and AdminFrame draws both, its `main`, the outbox's band and, in the
+// sidebar, the sync chip, the bell, the account menu and "Screens"; the sign-in screen is a split of its own, without the bar, and carries "Screens" itself; the waiter
 // pad (the `fill` frame, step 6.3a) draws its zones edge to edge and, from 1024 px, in the window's height. A page
 // whose calls are refused because this device is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate).
 
@@ -137,7 +138,7 @@ function StationContext() {
 }
 
 /** Whether this tablet's writes reached the server, in a word: online and sent, waiting (offline or not), or refused writes to look at. */
-function SyncChip() {
+export function SyncChip() {
   const t = useTranslations("shell");
   const online = useOnline();
   const { here, elsewhere, conflicts, held } = useSyncState();
@@ -290,8 +291,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {t("skip_to_content")}
       </a>
-      {frame === "login" ? null : <TopBar fill={fill} />}
-      <PendingIndicator />
+      {/* the admin console draws its own frame, the band included (AdminFrame) */}
+      {frame === "login" || frame === "admin" ? null : <TopBar fill={fill} />}
+      {frame === "admin" ? null : <PendingIndicator />}
       {frame === "admin" ? (
         children
       ) : (

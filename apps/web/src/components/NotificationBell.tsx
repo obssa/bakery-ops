@@ -22,7 +22,8 @@ import { buttonClass, focusRing } from "./styles";
 // The shell bell: the unread count and the inbox of the signed-in person, a LiveFeed over GET /notifications?since= (15 s
 // while the tab is visible, 60 s hidden, ETag / 304). Lines are read one at a time or all at once through the API. A line
 // links to the screen it is about when the web has that screen. "Enable notifications" is offered only when the API says
-// push is on.
+// push is on. In the station top bar the panel opens below the bell; at the foot of the admin sidebar (step 6.4a) it opens above it and to
+// the right, over the page, and the bell is the admin's 44 px.
 
 function Line({ line, locale, onRead, onFollow }: { line: AppNotification; locale: Locale; onRead: (line: AppNotification) => void; onFollow: (line: AppNotification) => void }) {
   const t = useTranslations("bell");
@@ -68,7 +69,7 @@ function Line({ line, locale, onRead, onFollow }: { line: AppNotification; local
   );
 }
 
-export function NotificationBell() {
+export function NotificationBell({ placement = "below" }: { placement?: "below" | "above" } = {}) {
   const t = useTranslations("bell");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
@@ -162,7 +163,7 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((v) => !v)}
-        className={`relative inline-flex size-12 items-center justify-center rounded-xl border border-neutral-200 text-neutral-700 hover:bg-neutral-100 motion-safe:transition-colors motion-safe:duration-150 ${
+        className={`relative inline-flex ${placement === "above" ? "size-11" : "size-12"} items-center justify-center rounded-xl border border-neutral-200 text-neutral-700 hover:bg-neutral-100 motion-safe:transition-colors motion-safe:duration-150 ${
           open ? "bg-neutral-100" : "bg-white"
         } ${focusRing}`}
       >
@@ -178,7 +179,11 @@ export function NotificationBell() {
       </button>
 
       {open ? (
-        <section id={panelId} aria-label={t("title")} className="absolute right-0 z-30 mt-2 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-neutral-200 bg-white p-4 shadow-float">
+        <section
+          id={panelId}
+          aria-label={t("title")}
+          className={`absolute z-30 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-neutral-200 bg-white p-4 shadow-float ${placement === "above" ? "bottom-full left-0 mb-2" : "right-0 mt-2"}`}
+        >
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-neutral-900">{t("title")}</h2>
             <div className="flex gap-2">

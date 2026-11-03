@@ -34,6 +34,7 @@ export const SCREEN_ICONS: Record<ScreenNavKey, LucideIcon> = {
 
 /** The admin console's sections (AdminFrame's sidebar). */
 export const SECTION_ICONS: Record<string, LucideIcon> = {
+  today: LayoutDashboard,
   orders: ReceiptText,
   payments: CreditCard,
   catalog: Tag,

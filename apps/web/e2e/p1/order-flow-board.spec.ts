@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openAccountMenu } from "../support/admin";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture, clearStaleOrders, sendOrder } from "../support/fixture";
 import { openAs } from "../support/pad";
@@ -45,7 +46,8 @@ test.describe("p1 order flow: admin orders board", () => {
     await page.getByLabel("Table").selectOption({ label: fixture.table.code });
     await expect(sent.getByRole("article").filter({ hasText: product })).toBeVisible();
 
-    // the same board in Amharic
+    // the same board in Amharic (step 6.4a: an admin page has no top bar; the language button is in the sidebar's account menu)
+    await openAccountMenu(page, "en");
     await page.getByRole("link", { name: "አማርኛ" }).click();
     await expect(page).toHaveURL(/\/app\/am\/admin\/orders\/$/);
     await expect(page.getByRole("heading", { level: 1, name: "ትዕዛዞች" })).toBeVisible();

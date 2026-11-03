@@ -103,8 +103,10 @@ test.describe("p3 admin shifts", () => {
     });
 
     await openAs(page, admin, "en/admin/");
-    await expect(page.getByRole("heading", { name: "Admin console", level: 1 })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("region", { name: "Stations and shifts" })).toBeVisible({ timeout: 30_000 });
+    // step 6.4a: the console's first page is Today (its h1 was "Admin console"), and the stations' panel is its "Shifts" card (it was the
+    // "Stations and shifts" panel under the old overview's cards); the card reads the same GET /me work_stations
+    await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("region", { name: "Shifts", exact: true })).toBeVisible({ timeout: 30_000 });
     // the session's own GET /me, then the stations panel's: the panel's answer is in the query cache before the tab is clicked
     await expect.poll(() => meAnswers, { timeout: 30_000 }).toBeGreaterThanOrEqual(2);
 
