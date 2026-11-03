@@ -44,6 +44,7 @@ final class PruneProductImagesCommand extends Command
     public function handle(): int
     {
         $days = $this->option('days');
+        $days = is_int($days) ? (string) $days : $days; // Artisan::call and the scheduler may pass an int
         if (! is_string($days) || preg_match('/^[1-9]\d{0,4}$/', $days) !== 1) {
             $this->error('--days must be a whole number of at least 1.');
 
