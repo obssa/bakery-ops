@@ -1,24 +1,27 @@
 "use client";
 
+import { Search, SearchX, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Locale, Menu, MenuItem } from "@/lib/api/types";
-import { compareDecimal, trimDecimal } from "@/lib/decimal";
-import { Alert, Badge, Button } from "../ui";
-import { focusRing } from "../styles";
+import { compareDecimal } from "@/lib/decimal";
+import { Alert, Button, IconButton, ProductImage, Skeleton } from "../ui";
+import { controlClass, focusRing } from "../styles";
+import { isUnavailable, ProductCard } from "./ProductCard";
 
-// The menu: category tabs (a "New" tab first for products marked new, an "Other" tab for products without a category),
-// and a tile per product with its price and availability ("3 left" when the API says low, the count otherwise, greyed
-// with the reason when it cannot be sold). Tap adds one; long-press, or the visible "More" button, opens the sheet
-// with quantity, modifiers and a note.
+// The menu (fresh-counter.md 3.2, step 6.3a): a 52 px search that filters the menu in the browser, by either name; the category chips in
+// the "Menu categories" tablist ("New" first for products marked new, then the categories in their order, then "Other" for products
+// without one), each with its count, hidden from readers so a tab is named by its label alone; and the grid of product cards, 2 columns
+// on a phone, 3 from 640 px and 4 from 1150 px (the 1180 px tablet). While a search is typed, the chips and their counts follow what
+// matches. Tap adds one; long-press, or the card's "More" button, opens the sheet with quantity, modifiers and a note.
+
+export { isUnavailable };
 
 type TabId = "new" | "other" | number;
 
-const LONG_PRESS_MS = 500;
-
-export function isUnavailable(item: MenuItem): boolean {
-  return item.unavailable_reason !== undefined || compareDecimal(item.available, "0") <= 0;
-}
+/** The announcement of a tap on a card that cannot be sold stays this long (it is read out once). */
+const SAID_MS = 4000;
+const SKELETON_CARDS = 8;
 
 interface TabSpec {
   id: TabId;
@@ -40,77 +43,30 @@ export function tabsOf(menu: Menu, locale: Locale, labels: { new: string; other:
   return tabs;
 }
 
-function Tile({ item, onAdd, onMore }: { item: MenuItem; onAdd: (item: MenuItem) => void; onMore: (item: MenuItem) => void }) {
-  const t = useTranslations("pad");
-  const locale = useLocale() as Locale;
-  const name = locale === "am" ? item.name_am : item.name_en;
-  const unavailable = isUnavailable(item);
-  const reason = unavailable ? t(`reason_${item.unavailable_reason ?? "out_of_stock"}`) : null;
-  const availability = item.low ? t("left", { count: trimDecimal(item.available) }) : t("available_count", { count: trimDecimal(item.available) });
+/** The search as it is compared: trimmed, in lower case (Ethiopic has no case, so an Amharic name compares as typed). */
+function normalise(text: string): string {
+  return text.trim().toLocaleLowerCase();
+}
 
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pressed = useRef(false);
-  const clear = () => {
-    if (timer.current !== null) clearTimeout(timer.current);
-    timer.current = null;
-  };
-  useEffect(() => clear, []);
-
-  return (
-    <li
-      className={`relative flex flex-col rounded-lg border-2 ${
-        unavailable ? "border-neutral-200 bg-neutral-100 text-neutral-500" : "border-neutral-300 bg-white text-neutral-900"
-      }`}
-    >
-      <button
-        type="button"
-        disabled={unavailable}
-        aria-label={unavailable ? t("unavailable_item", { name, price: item.price, currency: item.currency, reason: reason ?? "" }) : t("add_item", { name, price: item.price, currency: item.currency, availability })}
-        onPointerDown={() => {
-          pressed.current = false;
-          clear();
-          timer.current = setTimeout(() => {
-            pressed.current = true;
-            onMore(item);
-          }, LONG_PRESS_MS);
-        }}
-        onPointerUp={clear}
-        onPointerLeave={clear}
-        onPointerCancel={clear}
-        onContextMenu={(event) => event.preventDefault()}
-        onClick={() => {
-          if (pressed.current) {
-            pressed.current = false;
-            return;
-          }
-          onAdd(item);
-        }}
-        className={`flex min-h-28 flex-1 flex-col items-start justify-between gap-2 rounded-t-md p-3 text-left disabled:cursor-not-allowed ${unavailable ? "" : "hover:bg-neutral-50 active:bg-neutral-100"} ${focusRing}`}
-      >
-        <span className="text-lg font-semibold leading-snug">{name}</span>
-        <span className="flex w-full items-end justify-between gap-2">
-          <span className="text-base font-medium">
-            {item.price} {item.currency}
-          </span>
-          {unavailable ? <Badge tone="neutral">{reason}</Badge> : <Badge tone={item.low ? "amber" : "green"}>{availability}</Badge>}
-        </span>
-      </button>
-      {unavailable ? null : (
-        <button
-          type="button"
-          aria-label={t("more_options", { name })}
-          onClick={() => onMore(item)}
-          className={`min-h-12 rounded-b-md border-t border-neutral-200 text-base font-medium text-blue-800 hover:bg-blue-50 ${focusRing}`}
-        >
-          {t("more")}
-        </button>
-      )}
-    </li>
-  );
+/** The products whose English or Amharic name holds the search; all of them for an empty one. */
+export function searchMenu(menu: Menu, query: string): Menu {
+  const q = normalise(query);
+  if (q === "") return menu;
+  return { ...menu, items: menu.items.filter((item) => normalise(item.name_en).includes(q) || normalise(item.name_am).includes(q)) };
 }
 
 /** Quantity, modifiers and a note for one product, as a dialog over the pad. */
-function OptionsSheet({ item, onAdd, onClose }: { item: MenuItem; onAdd: (item: MenuItem, extra: { qty: string; modifierIds: number[]; notes: string }) => void; onClose: () => void }) {
+function OptionsSheet({
+  item,
+  category,
+  onAdd,
+  onClose,
+}: {
+  item: MenuItem;
+  category: string | null;
+  onAdd: (item: MenuItem, extra: { qty: string; modifierIds: number[]; notes: string }) => void;
+  onClose: () => void;
+}) {
   const t = useTranslations("pad");
   const locale = useLocale() as Locale;
   const name = locale === "am" ? item.name_am : item.name_en;
@@ -119,8 +75,9 @@ function OptionsSheet({ item, onAdd, onClose }: { item: MenuItem; onAdd: (item: 
   const [notes, setNotes] = useState("");
   const first = useRef<HTMLInputElement>(null);
 
+  // the quantity is selected once, when the sheet opens (not again when the menu's next answer draws the pad anew)
+  useEffect(() => first.current?.select(), []);
   useEffect(() => {
-    first.current?.select();
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
     }
@@ -131,21 +88,29 @@ function OptionsSheet({ item, onAdd, onClose }: { item: MenuItem; onAdd: (item: 
   const valid = /^\d{1,3}$/.test(qty) && compareDecimal(qty, "0", 0) > 0;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-900/50 p-4 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-900/40 p-4 sm:items-center" onClick={onClose}>
       <form
         role="dialog"
         aria-modal="true"
         aria-label={t("options_title", { name })}
-        className="w-full max-w-md space-y-4 rounded-lg bg-white p-5 shadow-xl"
+        className="max-h-full w-full max-w-md space-y-5 overflow-y-auto rounded-[20px] bg-white p-6 shadow-float"
         onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
           if (valid) onAdd(item, { qty: qty.replace(/^0+(?=\d)/, ""), modifierIds, notes });
         }}
       >
-        <h3 className="text-lg font-semibold text-neutral-900">{name}</h3>
+        <div className="flex items-center gap-4">
+          <ProductImage image={item.image} name={name} category={category} size="thumb" className="w-20 shrink-0 rounded-xl" />
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold leading-snug text-neutral-900">{name}</h3>
+            <p className="text-base font-semibold tabular-nums text-neutral-700">
+              {item.price} {item.currency}
+            </p>
+          </div>
+        </div>
         <div className="space-y-1.5">
-          <label htmlFor="pad-options-qty" className="block text-sm font-medium text-neutral-800">
+          <label htmlFor="pad-options-qty" className="block text-sm font-semibold text-neutral-900">
             {t("options_qty")}
           </label>
           <input
@@ -154,37 +119,42 @@ function OptionsSheet({ item, onAdd, onClose }: { item: MenuItem; onAdd: (item: 
             inputMode="numeric"
             value={qty}
             onChange={(event) => setQty(event.target.value.replace(/\D/g, "").slice(0, 3))}
-            className={`block min-h-12 w-28 rounded-md border border-neutral-300 px-3 text-lg ${focusRing}`}
+            className={`${controlClass("lg")} w-28 text-lg font-semibold tabular-nums`}
           />
         </div>
         {item.modifiers.length > 0 ? (
           <fieldset className="space-y-1">
-            <legend className="text-sm font-medium text-neutral-800">{t("options_modifiers")}</legend>
+            <legend className="text-sm font-semibold text-neutral-900">{t("options_modifiers")}</legend>
             {item.modifiers.map((modifier) => (
-              <label key={modifier.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md px-2 text-base hover:bg-neutral-100">
+              <label key={modifier.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-2 text-base hover:bg-neutral-50">
                 <input
                   type="checkbox"
-                  className="size-5"
+                  className="size-5 accent-brand-600"
                   checked={modifierIds.includes(modifier.id)}
                   onChange={(event) => setModifierIds(event.target.checked ? [...modifierIds, modifier.id] : modifierIds.filter((id) => id !== modifier.id))}
                 />
                 <span className="flex-1">{locale === "am" ? modifier.name_am : modifier.name_en}</span>
-                {compareDecimal(modifier.price_delta, "0") !== 0 ? <span className="text-neutral-700">{compareDecimal(modifier.price_delta, "0") > 0 ? "+" : ""}{modifier.price_delta}</span> : null}
+                {compareDecimal(modifier.price_delta, "0") !== 0 ? (
+                  <span className="tabular-nums text-neutral-700">
+                    {compareDecimal(modifier.price_delta, "0") > 0 ? "+" : ""}
+                    {modifier.price_delta}
+                  </span>
+                ) : null}
               </label>
             ))}
           </fieldset>
         ) : null}
         <div className="space-y-1.5">
-          <label htmlFor="pad-options-note" className="block text-sm font-medium text-neutral-800">
-            {t("options_note")} <span className="font-normal text-neutral-500">({t("optional")})</span>
+          <label htmlFor="pad-options-note" className="block text-sm font-semibold text-neutral-900">
+            {t("options_note")} <span className="font-normal text-neutral-600">({t("optional")})</span>
           </label>
-          <input id="pad-options-note" value={notes} maxLength={200} onChange={(event) => setNotes(event.target.value)} className={`block min-h-12 w-full rounded-md border border-neutral-300 px-3 text-base ${focusRing}`} />
+          <input id="pad-options-note" value={notes} maxLength={200} onChange={(event) => setNotes(event.target.value)} className={controlClass("lg")} />
         </div>
-        <div className="flex gap-2">
-          <Button type="submit" disabled={!valid}>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" size="lg" disabled={!valid}>
             {t("options_add")}
           </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" size="lg" variant="secondary" onClick={onClose}>
             {t("options_cancel")}
           </Button>
         </div>
@@ -198,56 +168,172 @@ export function MenuPanel({
   loading,
   error,
   onAdd,
+  sticky = false,
 }: {
   menu: Menu | null;
   loading: boolean;
   error: string | null;
   onAdd: (item: MenuItem, extra?: { qty: string; modifierIds: number[]; notes: string }) => void;
+  /** the search and the chips stay at the top while the grid scrolls under them (the pad's menu zone scrolls on its own) */
+  sticky?: boolean;
 }) {
   const t = useTranslations("pad");
   const locale = useLocale() as Locale;
+  const ids = useId();
+  const [query, setQuery] = useState("");
   const [chosen, setChosen] = useState<TabId | null>(null);
   const [sheet, setSheet] = useState<MenuItem | null>(null);
+  const [said, setSaid] = useState("");
 
-  const tabs = useMemo(() => (menu ? tabsOf(menu, locale, { new: t("tab_new"), other: t("tab_other") }) : []), [menu, locale, t]);
+  useEffect(() => {
+    if (!said) return;
+    const off = setTimeout(() => setSaid(""), SAID_MS);
+    return () => clearTimeout(off);
+  }, [said]);
+
+  const labels = useMemo(() => ({ new: t("tab_new"), other: t("tab_other") }), [t]);
+  const found = useMemo(() => (menu ? searchMenu(menu, query) : null), [menu, query]);
+  const tabs = useMemo(() => (found ? tabsOf(found, locale, labels) : []), [found, locale, labels]);
   const current = tabs.find((tab) => tab.id === chosen) ?? tabs[0];
 
+  // the placeholder's icon reads the category's name, in either language
+  const categories = useMemo(() => new Map((menu?.categories ?? []).map((c) => [c.id, `${c.name_en} ${c.name_am}`])), [menu]);
+  const categoryOf = (item: MenuItem) => (item.category_id === null ? null : (categories.get(item.category_id) ?? null));
+
+  const tabId = (id: TabId) => `${ids}-tab-${String(id)}`;
+  const panelId = `${ids}-panel`;
+
+  // the chips are a tablist: the arrow keys, Home and End move between them
+  function onTabKey(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!current) return;
+    const at = tabs.findIndex((tab) => tab.id === current.id);
+    const next =
+      event.key === "ArrowRight" ? (at + 1) % tabs.length : event.key === "ArrowLeft" ? (at - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    setChosen(tabs[next].id);
+    document.getElementById(tabId(tabs[next].id))?.focus();
+  }
+
   if (!menu) {
-    return error ? <Alert>{error}</Alert> : (
-      <p role="status" className="text-base text-neutral-600">
-        {loading ? t("loading_menu") : null}
-      </p>
+    if (error) return <Alert>{error}</Alert>;
+    return (
+      <div className="space-y-4">
+        <p role="status" className="text-base text-neutral-600">
+          {loading ? t("loading_menu") : null}
+        </p>
+        {loading ? (
+          <ul aria-hidden="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3 min-[1150px]:grid-cols-4">
+            {Array.from({ length: SKELETON_CARDS }, (_, index) => (
+              <li key={index} className="space-y-3 rounded-2xl border border-neutral-200 bg-white pb-3">
+                <Skeleton className="aspect-[4/3] rounded-b-none rounded-t-[15px]" />
+                <Skeleton className="mx-3 h-4" />
+                <Skeleton className="mx-3 h-4 w-1/3" />
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     );
   }
 
   return (
     <section className="space-y-3">
-      <div role="tablist" aria-label={t("menu_tabs")} className="flex flex-wrap gap-2">
-        {tabs.map((tab) => (
-          <button
-            key={String(tab.id)}
-            type="button"
-            role="tab"
-            aria-selected={tab.id === current?.id}
-            onClick={() => setChosen(tab.id)}
-            className={`min-h-12 rounded-full px-5 text-base font-medium ${tab.id === current?.id ? "bg-neutral-900 text-white" : "border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100"} ${focusRing}`}
+      <div className={`space-y-3 ${sticky ? "sticky top-0 z-10 -mt-5 bg-ground pb-1 pt-5" : ""}`}>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-neutral-500" strokeWidth={2} aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && query !== "") {
+                event.stopPropagation();
+                setQuery("");
+              }
+            }}
+            aria-label={t("search")}
+            placeholder={t("search")}
+            autoComplete="off"
+            spellCheck={false}
+            enterKeyHint="search"
+            className={`${controlClass("lg")} pl-12 ${query ? "pr-14" : ""} [&::-webkit-search-cancel-button]:appearance-none`}
+          />
+          {query ? (
+            <IconButton label={t("search_clear")} size="md" className="absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setQuery("")}>
+              <X className="size-5" strokeWidth={2} aria-hidden="true" />
+            </IconButton>
+          ) : null}
+        </div>
+        {tabs.length > 0 ? (
+          <div
+            role="tablist"
+            aria-label={t("menu_tabs")}
+            onKeyDown={onTabKey}
+            className="-mx-1.5 flex gap-2 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:thin]"
           >
-            {tab.label}
-          </button>
-        ))}
+            {tabs.map((tab) => {
+              const selected = tab.id === current?.id;
+              return (
+                <button
+                  key={String(tab.id)}
+                  id={tabId(tab.id)}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls={panelId}
+                  onClick={() => setChosen(tab.id)}
+                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 text-[15px] font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
+                    selected ? "border-transparent bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-100"
+                  } ${focusRing}`}
+                >
+                  {tab.label}
+                  <span aria-hidden="true" className={`text-[13px] tabular-nums ${selected ? "text-white/70" : "font-medium text-neutral-600"}`}>
+                    {tab.items.length}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
       {error ? (
-        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
           {error}
         </p>
       ) : null}
-      <div role="tabpanel">
+      {/* a tap on a card that cannot be sold says why (the card outlines its reason too) */}
+      <p role="status" className="sr-only">
+        {said}
+      </p>
+      <div role="tabpanel" id={panelId} aria-labelledby={current ? tabId(current.id) : undefined}>
         {current && current.items.length > 0 ? (
-          <ul className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 min-[1150px]:grid-cols-4">
             {current.items.map((item) => (
-              <Tile key={item.item_id} item={item} onAdd={(i) => onAdd(i)} onMore={setSheet} />
+              <li key={item.item_id}>
+                <ProductCard
+                  item={item}
+                  locale={locale}
+                  category={categoryOf(item)}
+                  onAdd={(chosenItem) => onAdd(chosenItem)}
+                  onMore={setSheet}
+                  onUnavailable={(chosenItem, reason) =>
+                    setSaid(t("unavailable_said", { name: locale === "am" ? chosenItem.name_am : chosenItem.name_en, reason }))
+                  }
+                />
+              </li>
             ))}
           </ul>
+        ) : query.trim() !== "" ? (
+          <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+            <span aria-hidden="true" className="inline-flex size-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+              <SearchX className="size-6" strokeWidth={1.75} aria-hidden="true" />
+            </span>
+            <p className="text-base font-semibold text-neutral-900">{t("search_none", { query: query.trim() })}</p>
+            <Button type="button" variant="secondary" size="lg" onClick={() => setQuery("")}>
+              {t("search_clear")}
+            </Button>
+          </div>
         ) : (
           <p className="text-base text-neutral-600">{t("no_items")}</p>
         )}
@@ -255,6 +341,7 @@ export function MenuPanel({
       {sheet ? (
         <OptionsSheet
           item={sheet}
+          category={categoryOf(sheet)}
           onClose={() => setSheet(null)}
           onAdd={(item, extra) => {
             onAdd(item, extra);

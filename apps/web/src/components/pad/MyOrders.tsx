@@ -9,12 +9,13 @@ import { queueCancelOrder, queueServeLine, useOutbox } from "@/lib/outbox/store"
 import { Badge, Button } from "../ui";
 
 // The acting waiter own open orders with the live status of every line: sent, cooking, ready, served. A ready line
-// has a green badge and a Served button; an unsent order (open) can be cancelled. Void is not on the pad.
+// has a brand-teal badge and a Served button; an unsent order (open) can be cancelled. Void is not on the pad. Step 6.3a: the cards
+// are Fresh Counter surfaces, and "ready" is brand teal (green means money confirmed only, fresh-counter.md 1.3).
 
-const TONE: Record<LineStatus, "neutral" | "blue" | "green" | "amber" | "red"> = {
+const TONE: Record<LineStatus, "neutral" | "blue" | "brand" | "amber" | "red"> = {
   queued: "neutral",
   accepted: "blue",
-  ready: "green",
+  ready: "brand",
   served: "neutral",
   rejected: "red",
   voided: "neutral",
@@ -40,16 +41,16 @@ function LineRow({ line }: { line: Line }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 py-3">
       <div className="min-w-0">
-        <p className="text-lg font-semibold text-neutral-900">
-          {trimDecimal(line.qty)} × {name}
+        <p className="text-[17px] font-semibold text-neutral-900">
+          <span className="tabular-nums">{trimDecimal(line.qty)} ×</span> {name}
         </p>
-        {modifiers.length > 0 ? <p className="text-base text-neutral-700">{modifiers.join(", ")}</p> : null}
-        {line.notes ? <p className="text-base italic text-neutral-700">{line.notes}</p> : null}
+        {modifiers.length > 0 ? <p className="text-[15px] text-neutral-700">{modifiers.join(", ")}</p> : null}
+        {line.notes ? <p className="text-[15px] italic text-neutral-700">{line.notes}</p> : null}
       </div>
       <div className="flex items-center gap-2">
         <Badge tone={TONE[line.status]}>{pending ? t("sending") : status}</Badge>
         {line.status === "ready" ? (
-          <Button type="button" aria-label={t("serve_line", { name })} disabled={pending} onClick={() => queueServeLine(line.id)}>
+          <Button type="button" size="lg" aria-label={t("serve_line", { name })} disabled={pending} onClick={() => queueServeLine(line.id)}>
             {t("serve")}
           </Button>
         ) : null}
@@ -67,14 +68,18 @@ function OrderCard({ order }: { order: Order }) {
   const where = order.type === "takeaway" ? k("takeaway") : order.dining_table ? k("table", { code: order.dining_table.code }) : "";
 
   return (
-    <article className={`rounded-lg border-2 p-4 ${ready > 0 ? "border-green-500 bg-green-50" : "border-neutral-200 bg-white"}`}>
+    <article className={`rounded-2xl border bg-white p-5 ${ready > 0 ? "border-brand-600 ring-1 ring-brand-600" : "border-neutral-200"}`}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-lg font-semibold text-neutral-900">
           {t("order_heading", { no: orderNoText(order.order_no) })}
           {where ? <span className="font-normal text-neutral-700"> · {where}</span> : null}
         </h3>
         <div className="flex items-center gap-2">
-          {ready > 0 ? <Badge tone="green">{t("ready_badge", { count: ready })}</Badge> : null}
+          {ready > 0 ? (
+            <Badge tone="brand" dot>
+              {t("ready_badge", { count: ready })}
+            </Badge>
+          ) : null}
           {order.status === "open" ? <Badge tone="amber">{t("order_unsent")}</Badge> : null}
         </div>
       </header>
@@ -84,7 +89,7 @@ function OrderCard({ order }: { order: Order }) {
         ))}
       </ul>
       <footer className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-base font-semibold text-neutral-900">{t("order_total", { total: order.totals.total, currency: order.currency })}</p>
+        <p className="text-base font-semibold tabular-nums text-neutral-900">{t("order_total", { total: order.totals.total, currency: order.currency })}</p>
         {order.status === "open" ? (
           <Button type="button" variant="secondary" aria-label={t("cancel_order_aria", { no: orderNoText(order.order_no) })} disabled={pending} onClick={() => queueCancelOrder(order.id, order.client_uuid)}>
             {t("cancel_order")}
@@ -100,7 +105,7 @@ export function MyOrders({ orders, loaded, stale }: { orders: Order[]; loaded: b
   return (
     <section aria-label={t("orders_title")} className="space-y-3">
       {stale ? (
-        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
           {stale}
         </p>
       ) : null}
@@ -109,7 +114,7 @@ export function MyOrders({ orders, loaded, stale }: { orders: Order[]; loaded: b
           {t("orders_loading")}
         </p>
       ) : orders.length === 0 ? (
-        <p className="rounded-md border border-neutral-200 bg-white px-4 py-6 text-base text-neutral-700">{t("no_orders")}</p>
+        <p className="rounded-2xl border border-neutral-200 bg-white px-5 py-8 text-center text-base text-neutral-700">{t("no_orders")}</p>
       ) : (
         <ul aria-label={t("orders_list")} className="grid gap-4 lg:grid-cols-2">
           {orders.map((order) => (
