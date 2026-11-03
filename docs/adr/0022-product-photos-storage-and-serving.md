@@ -109,3 +109,13 @@ uses `Files`, `StoredFile` or signed URLs; the pipeline uses `ImageProcessor`; n
 - **The System page.** `GET /system/status`'s `files` gains `media_used_mb`: the live photos of every branch, a photo two products share
   once (`ItemImages::liveBytes`, a Catalog contract, because `App\Ops` uses the modules through their contracts only). A replaced photo's
   files, waiting for the prune, are not counted.
+
+## Note, 2026-11-03 (step 6.3a): the pad and the service worker
+
+- **The worker's route** (decision 8). The static export's `sw.js` caches `GET` requests on its own origin under `/api/v1/media/`,
+  `CacheFirst`, in `product-images`: at most 400 files, 30 days, a 200 only, the cache dropped first on a quota error. Nothing else under
+  `/api/` is cached (the note on ADR 0018). `web-build` fails an export whose `sw.js` lacks the route.
+- **The pad** (fresh-counter.md 3.2). The menu's cards draw the `card` rendition through `ProductImage` (the `srcSet` lists all three, so
+  a 1x tablet may take the thumb for a 180 px card); the order line draws the `thumb`, from the menu's photo of the product as it is now,
+  so a photo replaced or removed since the line was added shows as it is. A product without a photo, or one whose file fails, shows the
+  category's placeholder.

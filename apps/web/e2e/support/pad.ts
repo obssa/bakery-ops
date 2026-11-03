@@ -68,3 +68,29 @@ export async function ensureUnlocked(page: Page, who: { name: string; shortCode:
     await expect(acting).toBeVisible({ timeout: 30_000 });
   }
 }
+
+/**
+ * Chooses the order's table (step 6.3a): the order panel's "Change" opens the "Tables" sheet, and the table's button, named as before
+ * ("Table T1, free"), chooses it and closes the sheet. The same on the pad and on the till's "New order" tab. Labels in English by
+ * default.
+ */
+export async function chooseTable(page: Page, code: string, labels: { change: string; sheet: string; table: string } = { change: "Change the table or the order type", sheet: "Tables", table: `Table ${code}` }) {
+  await page.getByRole("button", { name: labels.change }).click();
+  const sheet = page.getByRole("dialog", { name: labels.sheet });
+  await sheet.getByRole("button", { name: labels.table }).click();
+  await expect(sheet).toHaveCount(0);
+}
+
+/** Opens the waiter's open orders (step 6.3a: the top bar's "My orders · N" opens them in a drawer) and returns the drawer. */
+export async function openMyOrders(page: Page) {
+  await page.getByRole("button", { name: /^My orders/ }).click();
+  const drawer = page.getByRole("dialog", { name: "My orders" });
+  await expect(drawer).toBeVisible();
+  return drawer;
+}
+
+/** Closes the drawer of the waiter's open orders, back to the menu and the order. */
+export async function closeMyOrders(page: Page) {
+  await page.getByRole("dialog", { name: "My orders" }).getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "My orders" })).toHaveCount(0);
+}

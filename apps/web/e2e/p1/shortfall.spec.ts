@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture, clearStaleOrders, ledgerReasons } from "../support/fixture";
-import { openPadAndUnlock } from "../support/pad";
+import { chooseTable, openMyOrders, openPadAndUnlock } from "../support/pad";
 
 // Phase 1 gate project p1-shortfall (manifest phases.1.gate.criteria; docs/phases/phase-1-plan.md section 7), built in
 // step 1.6b.
@@ -26,7 +26,7 @@ test.describe("p1 shortfall", () => {
     await openPadAndUnlock(page, fixture.waiter);
 
     // dine-in at the fixture table, the product from the menu
-    await page.getByRole("button", { name: `Table ${fixture.table.code}` }).click();
+    await chooseTable(page, fixture.table.code);
     await page.getByRole("tab", { name: "Other" }).click();
     await page.getByRole("button", { name: `Add ${product}` }).click();
 
@@ -74,7 +74,7 @@ test.describe("p1 shortfall", () => {
     expect(await ledgerReasons(fixture)).toEqual(["purchase_in", "reservation"]);
 
     // and it is on the waiter's own list with its line status
-    await page.getByRole("tab", { name: "My orders" }).click();
+    await openMyOrders(page);
     await expect(page.getByRole("article").filter({ hasText: product })).toContainText("Sent");
   });
 });

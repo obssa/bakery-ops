@@ -86,3 +86,19 @@ the build changed from the proposal of phase-5 plan section 4.2 and the steps' t
   open (a shortfall) leaves that order open, shown as not sent on the waiter's "My orders" with its Cancel.
 
 The rest is as proposed.
+
+## Note, 2026-11-03 (step 6.3a): the shell cache keeps the product photos
+
+The shell cache (`apps/web/scripts/build-sw.mjs`, the static export's `sw.js`) had no runtime route: it answered its precache list and
+left every other request, `/api/` included, to the network. Phase 6 gives it **exactly one** (ADR 0022 decision 8): `CacheFirst` for `GET`
+requests on its own origin under `/api/v1/media/`, in the cache `product-images`, at most 400 files for 30 days, keeping a 200 only (a
+removed photo's 404 is never kept), with the cache dropped first when the browser runs out of quota.
+
+- **Why this one is safe to cache.** It is the public, content-addressed photo route: no session, no token and no cookie is read or set
+  there, and a URL holds the photo's sha256 and is served `immutable`, so a cached file is always the right one. The worker still never
+  caches an authenticated answer: the menu, the orders, the tables and every write go to the network untouched, as before, and the outbox
+  of this ADR is unchanged (the worker queues nothing).
+- **What it gives the floor.** A pad that has shown its photos once keeps them through a Wi-Fi drop and a reload; a photo it never fetched
+  shows its placeholder offline, never a broken image (`ProductImage`, step 6.2a).
+- **How it is proved.** CI serves `next start`, which has no `sw.js` (trap "Playwright"), so `web-build` checks the export's `sw.js` for
+  the route, the cache name and the strategy, and the runbook's tablet check covers it on the live host.

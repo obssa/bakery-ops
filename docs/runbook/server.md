@@ -677,6 +677,11 @@ figures describe the code under load, not this host.
   <folder>/bakery-ops-<night>.media/ <app>/storage/app/private/media/` (docs/runbook/backup-restore.md, "A full restore by hand", step 5).
   A database restored without it has photo rows whose URLs answer 404: the products show their placeholder until the folder is back.
   Nothing else breaks, and uploading the photo again rewrites a missing file.
+- **On the tablets** (step 6.3a). The pad's service worker keeps every photo it has shown in the browser cache `product-images` (at most
+  400 files, 30 days), so a pad that lost its Wi-Fi still shows them. To check a tablet: open the pad online once, on the menu's tabs, then
+  switch the Wi-Fi off and open the tabs again: the photos are there, and the products whose photos were never shown have their
+  placeholder (in Chrome's DevTools, Application, Cache storage lists `product-images`). Only the photos are kept this way: the menu,
+  orders and every write still need the server or wait in the outbox.
 
 ## Manual operations
 

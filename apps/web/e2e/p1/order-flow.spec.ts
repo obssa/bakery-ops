@@ -1,7 +1,7 @@
 import { test, expect, type Browser, type Page, type Request } from "@playwright/test";
 import { requireAdmin, TICKET_VISIBLE_MS } from "../support/env";
 import { buildFlowFixture, clearStaleOrders, ledgerReasonsOf, menuAvailable, type FlowFixture } from "../support/fixture";
-import { openAs, openPadAndUnlock } from "../support/pad";
+import { chooseTable, openAs, openMyOrders, openPadAndUnlock } from "../support/pad";
 
 // Phase 1 gate project p1-order-flow (manifest phases.1.gate.criteria; docs/phases/phase-1-plan.md section 7), the full
 // flow of step 1.6c with four browser contexts, one per screen: the waiter pad, the kitchen display, the bar display
@@ -68,10 +68,10 @@ async function runFlow(f: FlowFixture, pages: { pad: Page; kitchen: Page; bar: P
 
   // the waiter: short code, table, three products, send
   await openPadAndUnlock(pad, f.waiter);
-  await pad.getByRole("button", { name: `Table ${f.table.code}` }).click();
+  await chooseTable(pad, f.table.code);
   await pad.getByRole("tab", { name: "Other" }).click();
   for (const product of [sandwich, latte, croissant]) await pad.getByRole("button", { name: `Add ${product}` }).click();
-  await expect(pad.getByRole("region", { name: "Cart" })).toContainText("330.00 ETB");
+  await expect(pad.getByRole("region", { name: "Cart" })).toContainText("ETB 330.00");
   await pad.getByRole("button", { name: "Send order" }).click();
   await expect(pad.getByRole("status").filter({ hasText: "Order sent" })).toBeVisible({ timeout: 30_000 });
 
@@ -83,7 +83,7 @@ async function runFlow(f: FlowFixture, pages: { pad: Page; kitchen: Page; bar: P
   await work(bar, latte);
 
   // the pad: three lines ready (the croissant was ready at send), then the waiter serves each
-  await pad.getByRole("tab", { name: /My orders/ }).click();
+  await openMyOrders(pad);
   // this run's own order shows its three lines ready (the badge also counts any other open order of the shared waiter)
   const card = pad.getByRole("article").filter({ hasText: sandwich });
   for (const product of [sandwich, latte, croissant]) await expect(card.getByRole("button", { name: `Mark ${product} served` })).toBeVisible({ timeout: 15_000 });

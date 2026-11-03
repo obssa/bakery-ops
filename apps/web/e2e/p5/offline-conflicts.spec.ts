@@ -3,7 +3,7 @@ import { freshDevice } from "../support/devices";
 import { requireAdmin, TICKET_VISIBLE_MS } from "../support/env";
 import { buildStationFixture, clearStaleOrders, loginOnce, sendOrder, type StationFixture } from "../support/fixture";
 import { ordersWithUuid, queuedWrites } from "../support/outbox";
-import { ensureUnlocked, openAs, openPad, openPadAndUnlock, typeCode } from "../support/pad";
+import { chooseTable, ensureUnlocked, openAs, openPad, openPadAndUnlock, typeCode } from "../support/pad";
 
 // Phase 5 gate project p5-offline (docs/phases/phase-5-plan.md, step 5.2c and section 7): the conflict tray and reconnect reconcile.
 // - A stock conflict made while the pad was offline: the waiter's send waits on the tablet, another sale takes the stock it needed, and
@@ -18,7 +18,7 @@ const tray = (page: Page) => page.getByRole("region", { name: "Changes not saved
 const ETHIOPIC = /[ሀ-፿]/;
 
 async function cartWith(page: Page, fixture: StationFixture, qty: number) {
-  await page.getByRole("button", { name: `Table ${fixture.table.code}` }).click();
+  await chooseTable(page, fixture.table.code);
   await page.getByRole("tab", { name: "Other" }).click();
   const product = fixture.product.name_en;
   await page.getByRole("button", { name: `Add ${product}` }).click();

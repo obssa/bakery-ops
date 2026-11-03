@@ -4,10 +4,12 @@ import { expect, test, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
 import en from "../../messages/en.json";
 import { fontsReady } from "../support/a11y";
-import { uuid } from "../support/api";
+import { uuid, type Api } from "../support/api";
 import { demoPerson, demoProduction } from "../support/demoProduction";
+import { freshDevice } from "../support/devices";
 import { live } from "../support/env";
-import { openAs } from "../support/pad";
+import { loginOnce } from "../support/fixture";
+import { openAs, typeCode } from "../support/pad";
 import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCounts } from "../support/shifts";
 
 // Screenshots for review (brief "Design fidelity"; phase-6 plan section 7), in project p6-a11y, so they run in e2e-p6 on the demo bakery
@@ -17,6 +19,10 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 // compares each picture with its board before the merge. Nothing is asserted about pixels (no golden images, plan 10.2 Q18): the specs
 // only bring each screen to the state its board shows.
 //
+// Step 6.3a: the waiter pad (Pad.dc.html): the lock screen's keypad, the menu with an order of three lines at a table, the tables sheet
+// open, My orders, and the menu in Amharic; and the station top bar every station screen now has (the kitchen display's, before step
+// 6.3b rebuilds the display under it).
+//
 // Step 6.3c: the production board (Production.dc.html) with a card in each column, a request card open, New batch and the display case;
 // and the count screen (the spec's primitives) with a line that differs and one not counted yet. The count closes or starts the cake
 // room's shift, so it runs last and leaves the shift open again.
@@ -24,6 +30,45 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
 const MESSAGES = { en, am } as const;
+
+interface DemoAccount {
+  api: { token: string | null };
+  device: string;
+  code: string;
+}
+
+interface DemoBakery {
+  admin: Api;
+  device: string;
+  users: { id: number; phone: string; roles: string[] }[];
+}
+
+let bakery: Promise<DemoBakery> | null = null;
+
+/** The demo bakery as its admin sees it, and a tablet enrolled there for these captures. Once per worker. */
+function demoBakery(): Promise<DemoBakery> {
+  bakery ??= (async () => {
+    const phone = process.env.DEMO_ADMIN_PHONE ?? "";
+    const password = process.env.DEMO_ADMIN_PASSWORD ?? "";
+    if (!phone || !password) throw new Error("DEMO_ADMIN_PHONE and DEMO_ADMIN_PASSWORD must be set (e2e.yml): the e2e job seeds the demo bakery.");
+    const { api: admin } = await loginOnce(phone, password);
+    const device = await freshDevice(admin, "screens");
+    const users = (await admin.get<{ data: { id: number; phone: string; roles: string[] }[] }>("/users")).data;
+    return { admin, device, users };
+  })();
+  bakery.catch(() => (bakery = null));
+  return bakery;
+}
+
+/** The first demo account of `role`, signed in on the captures' tablet, with a fresh short code (every demo account has the demo password). */
+async function demoAccount(role: string): Promise<DemoAccount> {
+  const demo = await demoBakery();
+  const user = demo.users.find((u) => u.roles.includes(role));
+  if (!user) throw new Error(`the demo bakery has no ${role}`);
+  const { api } = await loginOnce(user.phone, process.env.DEMO_ADMIN_PASSWORD ?? "");
+  const { short_code: code } = await demo.admin.post<{ short_code: string }>(`/users/${user.id}/short-code/reset`);
+  return { api, device: demo.device, code };
+}
 
 /** Saves the page as it is now, once its fonts and the photos in view have loaded. */
 async function capture(page: Page, name: string): Promise<void> {
@@ -42,6 +87,20 @@ async function capture(page: Page, name: string): Promise<void> {
     .catch(() => undefined);
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
+}
+
+/** The pad of the demo waiter in `locale`, unlocked, with the first three products that can be sold in the order. */
+async function padWithOrder(page: Page, locale: keyof typeof MESSAGES, shotLocked?: string): Promise<void> {
+  const t = MESSAGES[locale];
+  const who = await demoAccount("waiter");
+  await openAs(page, who.api, `${locale}/pad/`, { device: who.device });
+  await expect(page.getByRole("heading", { name: t.pad.enter_code })).toBeVisible({ timeout: 30_000 });
+  if (shotLocked) await capture(page, shotLocked);
+  await typeCode(page, who.code, t.pad.unlock);
+  await expect(page.getByRole("heading", { name: t.pad.enter_code })).toBeHidden({ timeout: 30_000 });
+  const add = page.getByRole("tabpanel").getByRole("button", { name: locale === "am" ? /ን ጨምር፣/ : /^Add / });
+  await expect(add.first()).toBeVisible({ timeout: 30_000 });
+  for (const index of [0, 0, 1, 2]) await add.nth(index).click();
 }
 
 /** The demo admin's production board in `locale`, drawn: its four columns, a card in one of them and the product thumbs. */
@@ -77,6 +136,41 @@ interface CountRow {
 test.describe("screens", () => {
   test.skip(live, "CI only: the captures read the seeded demo bakery");
   test.use({ viewport: TABLET });
+
+  test("the waiter pad (Pad board): locked, with an order, the tables sheet, in en", async ({ page }) => {
+    test.setTimeout(120_000);
+    const t = MESSAGES.en;
+    await padWithOrder(page, "en", "pad-locked-1180x820-en");
+    // a table from the sheet, as the board's "Table 7"
+    await page.getByRole("button", { name: t.pad.change_table_aria }).click();
+    const sheet = page.getByRole("dialog", { name: t.pad.tables });
+    await expect(sheet.getByRole("button", { name: /^Table / }).first()).toBeVisible({ timeout: 30_000 });
+    await capture(page, "pad-tables-1180x820-en");
+    await sheet.getByRole("button", { name: /^Table / }).first().click();
+    await expect(sheet).toHaveCount(0);
+    await capture(page, "pad-1180x820-en");
+    await page.getByRole("button", { name: /^My orders/ }).click();
+    await expect(page.getByRole("dialog", { name: t.pad.orders_title })).toBeVisible();
+    await capture(page, "pad-orders-1180x820-en");
+  });
+
+  test("the waiter pad (Pad board) with an order, in am", async ({ page }) => {
+    test.setTimeout(120_000);
+    await padWithOrder(page, "am");
+    await capture(page, "pad-1180x820-am");
+  });
+
+  test("the station top bar on the kitchen display, in en", async ({ page }) => {
+    test.setTimeout(120_000);
+    const chef = await demoAccount("chef");
+    await openAs(page, chef.api, "en/kds/kitchen/", { device: chef.device });
+    await expect(page.getByRole("heading", { level: 1, name: "Kitchen" })).toBeVisible({ timeout: 30_000 });
+    await capture(page, "kds-kitchen-1180x820-en");
+    // the bar's menus open: the screens and the person's (the dates' calendar and Sign out)
+    await page.getByRole("button", { name: en.nav.main, exact: true }).click();
+    await expect(page.getByRole("navigation", { name: en.nav.main })).toBeVisible();
+    await capture(page, "kds-kitchen-screens-menu-1180x820-en");
+  });
 
   test("the production board (Production board): the board, a request card, New batch and the display case, in en", async ({ page }) => {
     test.setTimeout(120_000);

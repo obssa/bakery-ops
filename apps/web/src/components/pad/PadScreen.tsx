@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleCheck, Lock, Volume2, VolumeX, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { lockDue, useActing } from "@/lib/acting";
@@ -11,7 +12,9 @@ import type { FeedSnapshot } from "@/lib/live/feed";
 import type { OrdersState } from "@/lib/live/pad";
 import { onReconnect } from "@/lib/reconnect";
 import { useSession } from "@/lib/session";
-import { PageHeader } from "../ui";
+import { useStationHeader } from "@/lib/topBar";
+import { StationHeaderActions } from "../StationHeaderActions";
+import { Drawer, IconButton } from "../ui";
 import { focusRing } from "../styles";
 import { LockScreen } from "./LockScreen";
 import { MyOrders } from "./MyOrders";
@@ -21,8 +24,12 @@ import { usePadOutcomes, useReleaseStaleSends } from "./outcomes";
 // The waiter pad (/pad). Signed in as the pad account, it is locked until a waiter types their short code; the waiter
 // then has the pad for 10 minutes (the API acting session) and for as long as they keep touching it (60 s idle lock).
 // Locking parks the waiter cart in memory under their id; nothing of them is on screen while it is locked.
-
-type View = "order" | "orders";
+//
+// Step 6.3a (fresh-counter.md 3.2 and the Pad board): the pad is drawn edge to edge under the station top bar (the shell's `fill` frame),
+// the menu and the order panel side by side. The top bar carries the pad's name and, while a waiter has the pad, "Tables" (the tables
+// sheet), "My orders · N" (a drawer with the waiter's open orders), the chime and "Lock pad" (useStationHeader and StationHeaderActions,
+// lib/topBar.ts), and its person menu shows the waiter. "Order sent" shows as a toast over the menu, so nothing on the screen moves under
+// the waiter's finger. The page's h1 is for readers: the top bar already says where the screen is.
 
 const IDLE_CHECK_MS = 1000;
 const NOTICE_MS = 8000;
@@ -50,16 +57,14 @@ function useAutoLock() {
 
 interface WorkspaceProps {
   userId: number;
-  userName: string;
   notice: boolean;
   onNoticeOff: () => void;
   orders: FeedSnapshot<OrdersState> | null;
   menu: FeedSnapshot<Menu | null> | null;
 }
 
-function Workspace({ userId, userName, notice, onNoticeOff, orders, menu }: WorkspaceProps) {
+function Workspace({ userId, notice, onNoticeOff, orders, menu }: WorkspaceProps) {
   const t = useTranslations("pad");
-  const [view, setView] = useState<View>("order");
 
   const open = useMemo(() => (orders ? openOrdersOf(orders.state) : []), [orders]);
 
@@ -88,66 +93,88 @@ function Workspace({ userId, userName, notice, onNoticeOff, orders, menu }: Work
 
   const readyCount = useMemo(() => open.reduce((n, order) => n + order.lines.filter((line) => line.status === "ready").length, 0), [open]);
 
+  // the board's top bar holds the pad's own buttons (lib/topBar.ts): "Tables", "My orders · N", the chime and "Lock pad"
+  const [tablesOpen, setTablesOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const topButton = `inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 ${focusRing}`;
+
+  // the pad's touches also reach the top bar's buttons (a portal keeps React's events in this tree)
   return (
-    <div className="space-y-4" onPointerDown={unlockAudio} onKeyDown={unlockAudio}>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-2">
-        <p className="text-lg font-semibold text-neutral-900">{t("acting", { name: userName })}</p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-pressed={muted}
-            onClick={() => {
-              unlockAudio();
-              const next = !muted;
-              mutedRef.current = next;
-              setMuted(next);
-              storeMuted(next);
-            }}
-            className={`min-h-12 rounded-md border border-neutral-300 px-4 text-base font-medium ${muted ? "bg-neutral-900 text-white" : "bg-white text-neutral-900 hover:bg-neutral-100"} ${focusRing}`}
-          >
-            {muted ? t("unmute") : t("mute")}
-          </button>
-          <button
-            type="button"
-            onClick={() => useActing.getState().lock("manual")}
-            className={`min-h-12 rounded-md bg-neutral-900 px-5 text-base font-medium text-white hover:bg-neutral-800 ${focusRing}`}
-          >
-            {t("lock")}
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col lg:min-h-0 lg:flex-1" onPointerDown={unlockAudio} onKeyDown={unlockAudio}>
+      <StationHeaderActions>
+        <button type="button" aria-haspopup="dialog" onClick={() => setTablesOpen(true)} className={topButton}>
+          {t("tables")}
+        </button>
+        <button type="button" aria-haspopup="dialog" onClick={() => setOrdersOpen(true)} className={topButton}>
+          {t("orders_button", { count: open.length })}
+          {readyCount > 0 ? (
+            <span className="inline-flex min-h-6 items-center rounded-full bg-brand-600 px-2 text-xs font-bold tabular-nums text-white">
+              {t("ready_badge", { count: readyCount })}
+            </span>
+          ) : null}
+        </button>
+        <button
+          type="button"
+          aria-label={muted ? t("unmute") : t("mute")}
+          title={muted ? t("unmute") : t("mute")}
+          aria-pressed={muted}
+          onClick={() => {
+            unlockAudio();
+            const next = !muted;
+            mutedRef.current = next;
+            setMuted(next);
+            storeMuted(next);
+          }}
+          className={`inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-100 ${focusRing}`}
+        >
+          {muted ? <VolumeX className="size-5" strokeWidth={1.75} aria-hidden="true" /> : <Volume2 className="size-5" strokeWidth={1.75} aria-hidden="true" />}
+        </button>
+        <button type="button" onClick={() => useActing.getState().lock("manual")} className={topButton}>
+          <Lock className="size-[18px]" strokeWidth={1.75} aria-hidden="true" />
+          {t("lock")}
+        </button>
+      </StationHeaderActions>
 
-      <div role="tablist" aria-label={t("views")} className="flex gap-2">
-        {(["order", "orders"] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            aria-selected={view === value}
-            onClick={() => setView(value)}
-            className={`inline-flex min-h-12 items-center gap-2 rounded-md px-5 text-base font-medium ${view === value ? "bg-blue-700 text-white" : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"} ${focusRing}`}
-          >
-            {value === "order" ? t("tab_new_order") : t("tab_my_orders")}
-            {value === "orders" && readyCount > 0 ? <span className="rounded-full bg-green-600 px-2 py-0.5 text-sm text-white">{t("ready_badge", { count: readyCount })}</span> : null}
-          </button>
-        ))}
-      </div>
-
-      <p role="status" className={notice ? "rounded-md bg-green-50 px-4 py-3 text-base font-medium text-green-800" : "sr-only"}>
-        {notice ? t("sent") : ""}
+      {/* a toast over the menu (centred on it from 1024 px, beside the 368 px order panel); a polite live region either way */}
+      <p
+        role="status"
+        className={
+          notice
+            ? "fixed bottom-6 left-1/2 z-30 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-2xl border border-brand-100 bg-brand-50 px-5 py-3.5 text-base font-semibold text-brand-700 shadow-float lg:left-[calc((100%-368px)/2)]"
+            : "sr-only"
+        }
+      >
+        {notice ? (
+          <>
+            <CircleCheck className="size-5 shrink-0" strokeWidth={2} aria-hidden="true" />
+            {t("sent")}
+          </>
+        ) : (
+          ""
+        )}
       </p>
 
-      {view === "order" ? (
-        <OrderingSurface userId={userId} menu={menu} onSendStarted={onNoticeOff} />
-      ) : (
-        <MyOrders orders={open} loaded={!!orders?.loaded} stale={orders?.error ? t("stale") : null} />
-      )}
+      <OrderingSurface fill userId={userId} menu={menu} onSendStarted={onNoticeOff} tablesOpen={tablesOpen} onTablesOpen={setTablesOpen} />
+
+      {ordersOpen ? (
+        <Drawer label={t("orders_title")} onClose={() => setOrdersOpen(false)}>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold text-neutral-900">{t("orders_title")}</h2>
+            <IconButton label={t("close")} size="md" onClick={() => setOrdersOpen(false)}>
+              <X className="size-5" strokeWidth={2} aria-hidden="true" />
+            </IconButton>
+          </div>
+          <MyOrders orders={open} loaded={!!orders?.loaded} stale={orders?.error ? t("stale") : null} />
+        </Drawer>
+      ) : null}
     </div>
   );
 }
 
 export function PadScreen() {
   const t = useTranslations("pad");
+  // the one top bar names the pad (the board has no bell on it)
+  useStationHeader({ title: t("title"), bell: false });
   const user = useActing((s) => s.user);
   const branchId = useSession((s) => s.me?.user.branch_id ?? 0);
   useAutoLock();
@@ -180,12 +207,14 @@ export function PadScreen() {
   useReleaseStaleSends();
 
   return (
-    <div>
-      <PageHeader title={t("title")} />
+    <div data-shell-fill className="flex flex-1 flex-col lg:min-h-0">
+      <h1 className="sr-only">{t("title")}</h1>
       {user ? (
-        <Workspace key={user.id} userId={user.id} userName={user.name} notice={notice} onNoticeOff={() => setNotice(false)} orders={orders} menu={menu} />
+        <Workspace key={user.id} userId={user.id} notice={notice} onNoticeOff={() => setNotice(false)} orders={orders} menu={menu} />
       ) : (
-        <LockScreen />
+        <div className="flex flex-1 items-start justify-center px-4 py-8 sm:items-center lg:min-h-0 lg:overflow-y-auto">
+          <LockScreen />
+        </div>
       )}
     </div>
   );

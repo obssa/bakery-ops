@@ -20,12 +20,18 @@ export function isCurrent(pathname: string, href: string): boolean {
 /**
  * The frame the shell draws around a page (step 6.2b, fresh-counter.md 3, 3.1 and 4.1). `admin`: the admin console, under the station top
  * bar, draws its own sidebar frame and its `main` (AdminFrame). `login`: the sign-in screen is a full-bleed split of its own, without the
- * top bar. `station`: every other page sits under the station top bar in the shell's `main`.
+ * top bar. `fill` (step 6.3a): a station screen that draws its own zones edge to edge under the top bar, the waiter pad's menu and order
+ * panel (fresh-counter.md 3.2); from 1024 px it holds the rest of the window, and each zone scrolls on its own. `station`: every other page
+ * sits under the station top bar in the shell's padded `main`.
  */
-export type ShellFrame = "admin" | "login" | "station";
+export type ShellFrame = "admin" | "login" | "fill" | "station";
+
+/** The station screens drawn edge to edge (`fill`). */
+const FILL_SCREENS = ["/pad"] as const;
 
 export function frameOf(pathname: string): ShellFrame {
   if (isCurrent(pathname, "/admin")) return "admin";
   if (isCurrent(pathname, "/login")) return "login";
+  if (FILL_SCREENS.some((href) => isCurrent(pathname, href))) return "fill";
   return "station";
 }
