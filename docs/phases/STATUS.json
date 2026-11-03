@@ -216,10 +216,10 @@
       ]
     },
     "6": {
-      "status": "planning",
+      "status": "in_progress",
       "plan": "docs/phases/phase-6-plan.md",
-      "plan_approved": false,
-      "plan_approved_by": null,
+      "plan_approved": true,
+      "plan_approved_by": "Ramin, 2026-11-03 ('check and then implement')",
       "report": null,
       "gate_job": "gate-p6",
       "gate_run_url": null,
