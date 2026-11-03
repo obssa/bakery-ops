@@ -19,7 +19,7 @@ final class BackupRunCommand extends Command
     protected $signature = 'backup:run';
 
     /** @var string */
-    protected $description = 'Dump the database and snapshot the files folder into the backup folder, then apply retention';
+    protected $description = 'Dump the database and snapshot the files and media folders into the backup folder, then apply retention';
 
     public function handle(BackupRunner $runner): int
     {

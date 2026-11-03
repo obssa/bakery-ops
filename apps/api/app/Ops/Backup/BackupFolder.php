@@ -11,11 +11,12 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
- * The backup folder (ADR 0020; docs/runbook/backup-restore.md "Where the dumps are"). One night is three entries named by the UTC time
+ * The backup folder (ADR 0020; docs/runbook/backup-restore.md "Where the dumps are"). One night is four entries named by the UTC time
  * the backup started:
  *   bakery-ops-YYYYMMDD-HHMMSSZ.sql.gz   the dump (gzip)
  *   bakery-ops-YYYYMMDD-HHMMSSZ.json     its manifest, written last: a dump without it is not a good backup
- *   bakery-ops-YYYYMMDD-HHMMSSZ.files/   the snapshot of the files folder, hard links
+ *   bakery-ops-YYYYMMDD-HHMMSSZ.files/   the snapshot of the files folder (receipt photos), hard links
+ *   bakery-ops-YYYYMMDD-HHMMSSZ.media/   the snapshot of the media folder (product photos, step 6.1b), hard links
  * Work in progress carries `.partial` and is renamed when complete, so a reader never takes half a dump for a whole one.
  */
 final readonly class BackupFolder
@@ -47,6 +48,11 @@ final readonly class BackupFolder
     public function filesPath(string $dumpName): string
     {
         return $this->path.'/'.self::base($dumpName).'.files';
+    }
+
+    public function mediaPath(string $dumpName): string
+    {
+        return $this->path.'/'.self::base($dumpName).'.media';
     }
 
     /**
@@ -88,12 +94,13 @@ final readonly class BackupFolder
         return null;
     }
 
-    /** Delete a night: the dump, its manifest and its files snapshot. */
+    /** Delete a night: the dump, its manifest and its files and media snapshots. */
     public function remove(string $dumpName): void
     {
         @unlink($this->dumpPath($dumpName));
         @unlink($this->manifestPath($dumpName));
         self::removeTree($this->filesPath($dumpName));
+        self::removeTree($this->mediaPath($dumpName));
     }
 
     /** Delete what a run the host killed left behind (nothing runs beside a backup: the scheduler does not overlap it). */

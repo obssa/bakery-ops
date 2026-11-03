@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
 /**
- * The off-site hook (ADR 0020; plan 10.2 Q2): after a good backup, its dump, manifest and files snapshot are copied to BACKUP_REMOTE with
- * rclone (`copyto` for the two files, `copy` for the snapshot), one `offsite` row per backup. It is off: BACKUP_REMOTE is unset, nothing
+ * The off-site hook (ADR 0020; plan 10.2 Q2): after a good backup, its dump, manifest and files and media snapshots are copied to
+ * BACKUP_REMOTE with rclone (`copyto` for the two files, `copy` for each snapshot), one `offsite` row per backup. It is off: BACKUP_REMOTE is unset, nothing
  * runs and no row is written, until Ramin picks the storage and sets the remote up in rclone's own config on the host (no credential
  * of the remote is ever in this repository or the .env). A failed copy fails only its own row: the backup on the disk stands.
  */
@@ -36,6 +36,9 @@ final class Offsite
         ];
         if (is_dir($folder->filesPath($dumpName))) {
             $commands[] = [$rclone, 'copy', $folder->filesPath($dumpName), "{$remote}/{$base}.files"];
+        }
+        if (is_dir($folder->mediaPath($dumpName))) {
+            $commands[] = [$rclone, 'copy', $folder->mediaPath($dumpName), "{$remote}/{$base}.media"];
         }
 
         foreach ($commands as $command) {
