@@ -2,9 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
 import en from "../../messages/en.json";
 import { expectAccessible } from "../support/a11y";
+import { openAccountMenu } from "../support/admin";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture } from "../support/fixture";
-import { chooseTable, openPad, typeCode } from "../support/pad";
+import { chooseTable, openAs, openPad, typeCode } from "../support/pad";
 import { attachPhoto, removePhoto } from "../support/productPhoto";
 
 // Phase 6 gate project p6-a11y (docs/phases/phase-6-plan.md D7 and section 7; fresh-counter.md 5): on each restyled screen, in English and
@@ -101,6 +102,42 @@ test.describe("a11y", () => {
         await chooseTable(page, fixture.table.code, { change: t.pad.change_table_aria, sheet: t.pad.tables, table: prefix(t.pad.table_button, { code: fixture.table.code }) });
         await expect(page.getByRole("region", { name: t.pad.cart }).getByRole("listitem").filter({ hasText: name })).toBeVisible();
         await expectAccessible(page, `${locale}/pad/ (an order with a line)`);
+      } finally {
+        await removePhoto(fixture.admin, fixture.product.id);
+      }
+    });
+  }
+
+  // Step 6.4a: the admin frame with Today and its account menu open, then the catalog list as a table (a product with a photo among
+  // ones without), as pad cards, and with the drawer of a new item open.
+  for (const locale of ["en", "am"] as const) {
+    test(`admin Today and the catalog list (${locale}) have no serious or critical axe violation`, async ({ page }) => {
+      test.setTimeout(150_000);
+      const t = MESSAGES[locale];
+      const credentials = requireAdmin(test.skip);
+      const fixture = await buildStationFixture(credentials, "kitchen");
+      await attachPhoto(fixture.admin, fixture.product.id);
+      try {
+        await openAs(page, fixture.admin, `${locale}/admin/`);
+        await expect(page.locator("html")).toHaveAttribute("lang", locale);
+        await expect(page.getByRole("heading", { level: 1, name: t.today.title })).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByRole("group", { name: t.today.kpi_sales, exact: true })).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
+        await expectAccessible(page, `${locale}/admin/ (Today)`);
+        await openAccountMenu(page, locale);
+        await expectAccessible(page, `${locale}/admin/ (the account menu)`);
+
+        await page.goto(`${locale}/admin/catalog/`);
+        await expect(page.getByRole("heading", { level: 1, name: t.catalog.title })).toBeVisible({ timeout: 30_000 });
+        const name = locale === "am" ? fixture.product.name_am : fixture.product.name_en;
+        const row = page.getByRole("table", { name: t.catalog.items }).getByRole("row").filter({ hasText: name });
+        await expect(row.locator("img")).toHaveAttribute("alt", name, { timeout: 30_000 });
+        await expectAccessible(page, `${locale}/admin/catalog/ (the table)`);
+        await page.getByRole("button", { name: t.catalog.view_grid }).click();
+        await expect(page.getByRole("region", { name: t.catalog.grid }).getByRole("listitem").first()).toBeVisible({ timeout: 30_000 });
+        await expectAccessible(page, `${locale}/admin/catalog/?view=grid (the pad cards)`);
+        await page.getByRole("button", { name: t.catalog.add_product }).click();
+        await expect(page.getByRole("dialog", { name: t.catalog.new_item })).toBeVisible();
+        await expectAccessible(page, `${locale}/admin/catalog/ (the drawer of a new item)`);
       } finally {
         await removePhoto(fixture.admin, fixture.product.id);
       }
