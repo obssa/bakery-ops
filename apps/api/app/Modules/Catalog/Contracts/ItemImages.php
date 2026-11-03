@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Contracts;
 
 use App\Modules\Catalog\Models\Item;
+use App\Modules\Catalog\Models\ItemImage;
+use App\Shared\Tenancy\BranchScope;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The display photo of each product (step 6.1a, phase-6 plan section 2; manifest catalog.provides; contract orders->catalog). Orders'
@@ -14,6 +17,10 @@ use Illuminate\Database\Query\JoinClause;
  * for(ids): item id => ItemImageView for an item with a current photo, null for one without (none yet, or removed); keyed and ordered by
  * id; another branch's ids and unknown ids are left out; a deleted item is answered like the others. One query whatever the number of ids:
  * the items of the branch, left-joined to their live item_images row. Resolved per use (CurrentBranch through the model's scope).
+ *
+ * liveBytes() (step 6.1b, for the System page's files.media_used_mb): the bytes the live photos of every branch take on the disk, from
+ * item_images.bytes (the three renditions together); a photo two products share is one set of files, so it counts once. A replaced or
+ * removed photo is not counted, though its files stay until the prune (bakery:prune-product-images). One query.
  */
 final class ItemImages
 {
@@ -43,5 +50,15 @@ final class ItemImages
         }
 
         return $images;
+    }
+
+    public function liveBytes(): int
+    {
+        // one disk holds every branch's photos, so the figure is the host's: the branch scope is lifted on purpose
+        $photos = ItemImage::query()->withoutGlobalScope(BranchScope::class)->toBase()
+            ->select('sha256')->selectRaw('MAX(bytes) AS bytes')->groupBy('sha256');
+        $sum = DB::query()->fromSub($photos, 'photos')->sum('bytes');
+
+        return is_numeric($sum) ? (int) $sum : 0;
     }
 }

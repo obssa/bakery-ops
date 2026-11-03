@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ops\Status;
 
+use App\Modules\Catalog\Contracts\ItemImages;
 use App\Modules\Identity\Contracts\DeviceCensus;
 use App\Ops\Backup\BackupConfig;
 use App\Ops\Backup\BackupFolder;
@@ -25,7 +26,9 @@ use Illuminate\Support\Facades\Queue;
  *   backups        from ops_runs: the last good backup (when, how big, how many hours old), the status of the last backup run, the last
  *                  drill (when it ended and its status: `skipped` until the scratch database exists), and from the backup folder the good
  *                  dumps kept and the MiB the dumps and manifests take (read only if the folder already exists: a read creates nothing);
- *   files          the MiB the stored receipt photos take, all branches (one disk holds them all);
+ *   files          used_mb, the MiB the stored receipt photos take, all branches (one disk holds them all); media_used_mb (step 6.1b),
+ *                  the MiB the live product photos take, all branches, a photo two products share once (Catalog's ItemImages::liveBytes;
+ *                  a replaced photo's files wait for the prune and are not counted);
  *   devices        the branch's devices: enrolled, seen in the last 15 minutes, revoked (Identity's DeviceCensus);
  *   flags          the rollout switches the server's .env decides;
  *   error_tracking whether a DSN is set (never the DSN).
@@ -40,6 +43,7 @@ final class SystemStatus
     public function __construct(
         private readonly BackupConfig $backups,
         private readonly DeviceCensus $devices,
+        private readonly ItemImages $images,
         private readonly string $revisionFile = '',
     ) {}
 
@@ -55,7 +59,10 @@ final class SystemStatus
             'scheduler' => $this->scheduler($now),
             'queue' => $this->queue($now),
             'backups' => $this->backups($now),
-            'files' => ['used_mb' => self::mib((int) StoredFile::query()->withoutGlobalScope(BranchScope::class)->sum('bytes'))],
+            'files' => [
+                'used_mb' => self::mib((int) StoredFile::query()->withoutGlobalScope(BranchScope::class)->sum('bytes')),
+                'media_used_mb' => self::mib($this->images->liveBytes()),
+            ],
             'devices' => $this->devices(),
             'flags' => [
                 'require_enrolled_device' => (bool) config('identity.require_enrolled_device'),
