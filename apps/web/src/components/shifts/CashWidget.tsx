@@ -129,7 +129,7 @@ function Loaded({ shift, look }: { shift: Shift; look: "panel" | "summary" }) {
         <ChevronDown className={`size-4 motion-safe:transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden="true" />
       </button>
       {open ? (
-        <div className="absolute right-0 top-full z-30 mt-2 w-[min(44rem,calc(100vw-2rem))] rounded-[20px] border border-neutral-200 bg-white p-5 shadow-float">
+        <div className="absolute right-0 top-full z-20 mt-2 w-[min(44rem,calc(100vw-2rem))] rounded-[20px] border border-neutral-200 bg-white p-5 shadow-float">
           {details}
         </div>
       ) : null}

@@ -10,10 +10,13 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { onReconnect } from "@/lib/reconnect";
 import { useProductImages } from "@/lib/productImages";
 import { useSession } from "@/lib/session";
+import { useStationHeader } from "@/lib/topBar";
 import { useWide } from "@/lib/useWide";
 import { OrderingSurface } from "../pad/OrderingSurface";
 import { usePadOutcomes, useReleaseStaleSends } from "../pad/outcomes";
-import { EmptyState, SegmentedControl } from "../ui";
+import { EmptyState } from "../ui";
+import { StationHeaderActions } from "../StationHeaderActions";
+import { focusRing } from "../styles";
 import { CashWidget } from "../shifts/CashWidget";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
@@ -120,43 +123,45 @@ export function TillScreen({ titleTwin }: { /** the Amharic title beside the Eng
     setView(next);
   };
 
-  const tabs = [
-    {
-      value: "queue" as const,
-      label: (
-        <>
-          {t("tab_queue")}
-          {orders.length > 0 ? (
-            <span className={`rounded-full px-2 py-0.5 text-sm tabular-nums ${view === "queue" ? "bg-white text-neutral-900" : "bg-neutral-900 text-white"}`}>{orders.length}</span>
-          ) : null}
-        </>
-      ),
-    },
-    { value: "order" as const, label: t("tab_new_order") },
-    { value: "closed" as const, label: t("tab_closed") },
-  ];
+  // the till's views, as tabs at the head of the waiting list (the Till board's left column), and in the same place in the other two views
+  const viewTabs = (
+    <div role="tablist" aria-label={t("views")} className="flex w-full max-w-[360px] gap-1 rounded-xl border border-neutral-200 bg-white p-1">
+      {(["queue", "order", "closed"] as const).map((value) => {
+        const selected = view === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => switchView(value)}
+            className={`inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-center text-sm font-semibold leading-tight motion-safe:transition-colors motion-safe:duration-150 ${
+              selected ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-100"
+            } ${focusRing}`}
+          >
+            {value === "queue" ? t("tab_queue") : value === "order" ? t("tab_new_order") : t("tab_closed")}
+            {value === "queue" && orders.length > 0 ? (
+              <span className={`rounded-full px-1.5 text-xs tabular-nums ${selected ? "bg-white text-neutral-900" : "bg-neutral-900 text-white"}`}>{orders.length}</span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  // the Till board's header is the one station top bar (lib/topBar.ts): the till's name and its Amharic name there, the shift's line under
+  // them; the shift's menu and the drawer's figure on its right
+  useStationHeader({ title: t("title"), titleAm: titleTwin });
 
   return (
     <div className="space-y-5">
-      {/* the Till board's title row: the till's name (with its Amharic name on the English page) over its shift; on the right the drawer's
-          figure and the till's views */}
-      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-neutral-200 pb-4">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h1 className="text-2xl font-bold tracking-tight text-neutral-900">{t("title")}</h1>
-            {titleTwin ? (
-              <span lang="am" className="text-lg font-medium text-neutral-600">
-                {titleTwin}
-              </span>
-            ) : null}
-          </div>
-          <ShiftBar model={shiftStation} look="strip" />
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <CashWidget shift={shiftStation.shift} look="summary" />
-          <SegmentedControl label={t("views")} tabs tone="station" options={tabs} value={view} onChange={switchView} />
-        </div>
-      </header>
+      {/* the page's heading is the bar's name, for a reader */}
+      <h1 className="sr-only">{t("title")}</h1>
+      <ShiftBar model={shiftStation} look="menu" />
+      <StationHeaderActions>
+        <CashWidget shift={shiftStation.shift} look="summary" />
+      </StationHeaderActions>
+
 
       <p role="status" className={notice ? "rounded-xl bg-brand-50 px-4 py-3 text-base font-medium text-brand-700" : "sr-only"}>
         {notice ? t("sent") : ""}
@@ -173,6 +178,7 @@ export function TillScreen({ titleTwin }: { /** the Amharic title beside the Eng
             images={images}
             categoryOf={categoryOf}
             onOpen={choose}
+            head={viewTabs}
           />
           {wide && sheet ? (
             sheet
@@ -188,10 +194,16 @@ export function TillScreen({ titleTwin }: { /** the Amharic title beside the Eng
           )}
         </div>
       ) : view === "order" ? (
-        <OrderingSurface userId={userId} menu={menu} onSendStarted={() => setNotice(false)} />
+        <div className="space-y-4">
+          {viewTabs}
+          <OrderingSurface userId={userId} menu={menu} onSendStarted={() => setNotice(false)} />
+        </div>
       ) : (
         // step 4.5g: the orders closed lately, where a refund starts (the void dialog's path for a closed order)
-        <ClosedOrders active={view === "closed"} onRefund={setVoiding} />
+        <div className="space-y-4">
+          {viewTabs}
+          <ClosedOrders active={view === "closed"} onRefund={setVoiding} />
+        </div>
       )}
 
       {sheet && !(wide && view === "queue") ? sheet : null}

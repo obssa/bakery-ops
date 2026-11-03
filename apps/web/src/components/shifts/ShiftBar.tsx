@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
@@ -8,12 +9,13 @@ import { uuid } from "@/lib/api/idempotency";
 import { closeShift, joinShift, leaveShift, cancelShift, startShift } from "@/lib/api/shifts";
 import type { Locale, Shift } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
-import { addisClock, barActions, onDuty, type BarMode } from "@/lib/shifts";
+import { addisClock, barActions, barMode, onDuty, type BarMode } from "@/lib/shifts";
 import { can, useSession } from "@/lib/session";
 import { useShiftNotice } from "@/lib/station";
 import { useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, Field, Modal, Select } from "../ui";
-import { buttonClass } from "../styles";
+import { buttonClass, focusRing } from "../styles";
+import { StationHeaderActions } from "../StationHeaderActions";
 import { DrawerDialog } from "./DrawerDialog";
 import { HandoverPanel } from "./HandoverPanel";
 import { NoteForm } from "./Notes";
@@ -42,8 +44,8 @@ const BADGE: Record<BarMode, { tone: "amber" | "blue" | "brand"; key: string }> 
 
 type ActionName = "start" | "start_carried" | "join" | "leave" | "close" | "cancel";
 
-export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?: "card" | "strip" }) {
-  const strip = look === "strip";
+export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?: "card" | "strip" | "menu" }) {
+  const strip = look !== "card";
   const size = strip ? ("md" as const) : undefined;
   const t = useTranslations("shifts");
   const tc = useTranslations("counts");
@@ -77,6 +79,15 @@ export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?:
   useEffect(() => {
     if (status === "open") useShiftNotice.getState().clear();
   }, [status]);
+
+  // `menu`: the panel opens by itself while the shift needs someone (none running, a count in progress, a refusal to answer) and then
+  // stays open until it is closed; a screen opened on a running shift shows only the menu's button
+  const [expanded, setExpanded] = useState(false);
+  const ownNotice = notice !== null && (notice.stationId === null || notice.stationId === station?.station_id);
+  const needsAction = loaded && ((shift !== undefined && barMode(shift) !== "open") || failure !== null || ownNotice);
+  useEffect(() => {
+    if (needsAction) setExpanded(true);
+  }, [needsAction]);
 
   if (!station || !station.tracks_shifts || !feed) return null;
   // a person who may not read this station's shifts (403) has no bar; a network failure before the first answer shows the stale line
@@ -153,10 +164,11 @@ export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?:
       break;
   }
 
-  return (
-    // `strip` (step 6.3b, the kitchen and bar displays and the till): one line under the screen's title, as the boards show the shift there
-    // ("Morning shift · Chef ..."): no card, the state, the shift and who is on it, the actions at 44 px; the same region, names and actions
-    <section aria-label={t("region")} className={strip ? "space-y-2" : "space-y-3 rounded-2xl border border-neutral-200 bg-white p-4"}>
+  // `strip` and `menu` (step 6.3b, the kitchen and bar displays and the till): the shift's line without a card, the actions at 44 px; in
+  // `menu` that line is the panel of a button in the station top bar (the boards show the shift there: "Morning shift · Chef ..."). The
+  // same region "Shift", text, names, actions and dialogs in every look.
+  const body = (
+    <>
       <div className={`flex flex-wrap items-center justify-between ${strip ? "gap-x-4 gap-y-2" : "gap-4"}`}>
         <div className={`min-w-0 ${strip ? "flex flex-wrap items-center gap-x-3 gap-y-1" : "space-y-2"}`}>
           <div className={`flex flex-wrap items-center ${strip ? "gap-x-2.5 gap-y-1" : "gap-x-3 gap-y-1"}`}>
@@ -316,6 +328,42 @@ export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?:
           </div>
         </Modal>
       ) : null}
+    </>
+  );
+
+  if (look === "menu") {
+    const open = expanded;
+    return (
+      <StationHeaderActions>
+        <section aria-label={t("region")} className="relative">
+          <button
+            type="button"
+            data-shift-toggle=""
+            aria-expanded={open}
+            onClick={() => setExpanded(!open)}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
+          >
+            {loaded ? <Badge tone={BADGE[actions.mode].tone} dot>{t(BADGE[actions.mode].key)}</Badge> : null}
+            {/* what the bar's own line says in short, read in full here: the state, the shift and who is on it */}
+            <span className="sr-only">
+              {loaded ? headline : t("checking")}
+              {loaded && shift ? ` · ${shiftLabel}` : ""}
+              {crew.length > 0 ? ` · ${t("on_duty")}: ${crew.map((row) => row.user?.name ?? "").join(", ")}` : ""}
+            </span>
+            <ChevronDown className={`size-4 text-neutral-500 motion-safe:transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden="true" />
+          </button>
+          {open ? (
+            <div className="absolute right-0 top-full z-30 mt-2 w-[min(44rem,calc(100vw-2rem))] space-y-3 rounded-[20px] border border-neutral-200 bg-white p-4 text-left shadow-float">
+              {body}
+            </div>
+          ) : null}
+        </section>
+      </StationHeaderActions>
+    );
+  }
+  return (
+    <section aria-label={t("region")} className={strip ? "space-y-2" : "space-y-3 rounded-2xl border border-neutral-200 bg-white p-4"}>
+      {body}
     </section>
   );
 }

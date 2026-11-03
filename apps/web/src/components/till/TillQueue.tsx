@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import type { Locale, Order } from "@/lib/api/types";
 import { thumbStack, unitCount, type ProductImages } from "@/lib/images/orderThumbs";
 import { ageOf, secondsSince } from "@/lib/kds";
@@ -151,6 +151,7 @@ export function TillQueue({
   images,
   categoryOf,
   onOpen,
+  head,
 }: {
   orders: Order[];
   loaded: boolean;
@@ -160,6 +161,8 @@ export function TillQueue({
   images: ProductImages;
   categoryOf: (itemId: number) => string | null;
   onOpen: (order: Order) => void;
+  /** what heads the list: the till's views */
+  head?: ReactNode;
 }) {
   const t = useTranslations("till");
   const now = useNow();
@@ -167,6 +170,7 @@ export function TillQueue({
   return (
     // still the region "Orders awaiting payment" (its name is what the specs and a reader find); the board's heading reads "Waiting to pay"
     <section aria-label={t("queue_title")} className="space-y-2.5">
+      {head}
       <div className="flex items-baseline justify-between gap-3 px-1 pb-1">
         <h2 id={titleId} className="text-[17px] font-semibold text-neutral-900">
           {t("queue_heading")}

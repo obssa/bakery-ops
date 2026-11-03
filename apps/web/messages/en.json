@@ -305,7 +305,6 @@
     "kitchen_title": "Kitchen",
     "bar_title": "Bar",
     "station": "Station",
-    "station_name": "Station: {name}",
     "loading": "Loading tickets…",
     "no_kitchen_station": "No kitchen station is assigned to you. Ask an admin.",
     "no_bar_station": "No bar station is assigned to you. Ask an admin.",

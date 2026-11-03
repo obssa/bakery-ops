@@ -290,7 +290,6 @@ web:till.refund_aria,/till,Refund order {no},የትዕዛዝ {no} ገንዘብ �
 web:kds.kitchen_title,"/kds/kitchen, /kds/bar",Kitchen,ወጥ ቤት,,
 web:kds.bar_title,"/kds/kitchen, /kds/bar",Bar,ባር,,
 web:kds.station,"/kds/kitchen, /kds/bar",Station,ጣቢያ,,
-web:kds.station_name,"/kds/kitchen, /kds/bar",Station: {name},ጣቢያ፦ {name},,
 web:kds.loading,"/kds/kitchen, /kds/bar",Loading tickets…,ትኬቶችን በመጫን ላይ…,,
 web:kds.no_kitchen_station,"/kds/kitchen, /kds/bar",No kitchen station is assigned to you. Ask an admin.,ምንም የወጥ ቤት ጣቢያ አልተመደበልዎትም። አስተዳዳሪውን ይጠይቁ።,,
 web:kds.no_bar_station,"/kds/kitchen, /kds/bar",No bar station is assigned to you. Ask an admin.,ምንም የባር ጣቢያ አልተመደበልዎትም። አስተዳዳሪውን ይጠይቁ።,,

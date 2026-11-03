@@ -857,6 +857,19 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       lines and payments (`ReceiptActions layout="stack"`; the order record keeps the row). Pay waits for the till's shift on the sheet,
       which says why; a payment saved offline and not sent keeps its card shut. The display case shows in the centre while no order is
       open. The void and refund dialogs, the closed orders and the display case are on the new radii.
+    - **One header (with 6.3a's station top bar, merged from `phase-6/web-pad`).** Each screen names itself in the shell's one 68 px bar
+      (`useStationHeader`): the KDS with its title, its Amharic name and `night: true`; the till with its title and Amharic name; the bar's
+      line under them is the shift and the person, from the shift feed. Their own buttons are portalled into the bar
+      (`StationHeaderActions`): on the KDS the shift's menu, Live, the wall clock and the chime; on the till the shift's menu and the drawer's
+      figure ("Cash in the drawer", which opens the cash widget). The page keeps its `h1` for a reader (visually hidden: the bar shows the
+      name). The shift bar's new `look="menu"` is a button in the bar (its state as a chip, the state, the shift and who is on it read in
+      full) whose panel holds the same region "Shift", text, buttons and dialogs; the panel opens by itself while the shift needs someone (no
+      shift, a count in progress, a refusal) and stays open until it is closed, so a screen opened on a running shift shows only its button.
+      The till's views are compact tabs at the head of the waiting list (and in the same place in the other two views), the same tablist
+      "Till views" and tab names. The columns and the list start right under the bar. Specs: `p3 handover-shift-bar` (its `bar()` helper and
+      the Amharic case) and `p3 handover` (the kitchen's and the till's Close shift) open the shift's menu first through
+      `e2e/support/shiftBar.ts` `openShiftBar`, a no-op where the bar is the card it was; `p3 handover` closes the cash widget's panel again
+      before the shift's menu. `kds.station_name` is gone with the page header.
     - **Names and visible words (axe `label-content-name-mismatch`, found by the first e2e-p6 run).** A waiting card's button is its
       title "Order N" (named "Take payment for order N" or "Open order N", whose words contain it), with its tap area stretched over the
       card; the rest of the card is its text. Three Amharic names now contain the words their buttons show: `kds.reject_line`

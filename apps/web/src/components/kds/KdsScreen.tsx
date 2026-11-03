@@ -12,8 +12,10 @@ import { createTicketsFeed, lineIdsOf, railOf } from "@/lib/live/tickets";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { onOutboxApplied } from "@/lib/outbox/store";
 import { addisClock } from "@/lib/shifts";
+import { useStationHeader } from "@/lib/topBar";
 import { useNow } from "@/lib/useNow";
-import { Alert, Chip, Field, IconButton, Select } from "../ui";
+import { Alert, Chip, IconButton, Select } from "../ui";
+import { StationHeaderActions } from "../StationHeaderActions";
 import { ICON_STROKE } from "../icons";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
@@ -153,60 +155,45 @@ export function KdsScreen({ kind, twins }: { kind: "kitchen" | "bar"; /** the Am
     storeMuted(next);
   }
 
-  const station = stations.find((s) => s.id === stationId);
   const title = kind === "kitchen" ? t("kitchen_title") : t("bar_title");
   const loaded = !!snapshot?.loaded;
   const MuteIcon = muted ? BellOff : Bell;
   const twin: Record<KdsColumn, string | undefined> = { new: twins?.new, cooking: twins?.cooking, ready: twins?.ready };
+  // the top bar names the display, in its night look; its line is the shift and who is on it (the shift feed's, as on every station)
+  useStationHeader({ title, titleAm: twins?.title, night: true });
 
   return (
     // the first tap on the screen unlocks audio, as browsers require
     <div className="flex flex-col gap-5" onPointerDown={unlockAudio} onKeyDown={unlockAudio}>
-      {/* the Kitchen board's header: the display's name (with its Amharic name on the English page) and its shift on the left; the feed's
-          state, the wall clock and the chime on the right */}
-      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-night-divider pb-4">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
-            <h1 className="text-2xl font-bold tracking-tight text-night-text">{title}</h1>
-            {twins ? (
-              <span lang="am" className="text-xl font-medium text-night-text-muted">
-                {twins.title}
-              </span>
-            ) : null}
-            {stations.length <= 1 && station ? (
-              <span className="text-sm text-night-text-muted">{t("station_name", { name: locale === "am" ? station.name_am : station.name_en })}</span>
-            ) : null}
-          </div>
-          <ShiftBar model={shiftStation} look="strip" />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {stations.length > 1 ? (
-            <div className="w-56">
-              <Field label={t("station")}>
-                {(props) => (
-                  <Select {...props} controlSize="md" value={stationId ?? ""} onChange={(e) => setChosen(Number(e.target.value))}>
-                    {stations.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {locale === "am" ? s.name_am : s.name_en}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-            </div>
-          ) : null}
-          {stationId !== null && loaded ? (
-            // the rail's own state: live, or showing what was last read (the stale line below says why)
-            <Chip tone={snapshot?.error ? "amber" : "brand"} dot className="min-h-[34px] px-3.5 text-sm">
-              {snapshot?.error ? t("feed_stale") : t("feed_live")}
-            </Chip>
-          ) : null}
-          <WallClock />
-          <IconButton label={muted ? t("unmute") : t("mute")} title={muted ? t("unmute") : t("mute")} aria-pressed={muted} variant={muted ? "dark" : "ghost"} onClick={toggleMute}>
-            <MuteIcon className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
-          </IconButton>
-        </div>
-      </header>
+      {/* the Kitchen board's header is the one station top bar (lib/topBar.ts): the display's name, its Amharic name and the shift's line
+          there, in its night look; the shift's menu, the feed's state, the wall clock and the chime on its right. The page's heading is the
+          same name, for a reader */}
+      <h1 className="sr-only">{title}</h1>
+      <StationHeaderActions>
+        {stations.length > 1 ? (
+          <label className="flex items-center gap-2 text-sm font-semibold text-night-text-muted">
+            <span className="sr-only">{t("station")}</span>
+            <Select controlSize="md" value={stationId ?? ""} onChange={(e) => setChosen(Number(e.target.value))} className="w-48">
+              {stations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {locale === "am" ? s.name_am : s.name_en}
+                </option>
+              ))}
+            </Select>
+          </label>
+        ) : null}
+        {stationId !== null && loaded ? (
+          // the rail's own state: live, or showing what was last read (the stale line below says why)
+          <Chip tone={snapshot?.error ? "amber" : "brand"} dot className="min-h-[34px] px-3.5 text-sm">
+            {snapshot?.error ? t("feed_stale") : t("feed_live")}
+          </Chip>
+        ) : null}
+        <WallClock />
+        <IconButton label={muted ? t("unmute") : t("mute")} title={muted ? t("unmute") : t("mute")} aria-pressed={muted} variant={muted ? "dark" : "ghost"} onClick={toggleMute}>
+          <MuteIcon className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </IconButton>
+      </StationHeaderActions>
+      <ShiftBar model={shiftStation} look="menu" />
 
       {loading ? (
         <p role="status" className="text-base text-night-text-muted">
