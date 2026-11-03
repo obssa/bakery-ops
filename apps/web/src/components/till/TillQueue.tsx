@@ -10,7 +10,6 @@ import { visibleLines } from "@/lib/live/pad";
 import { useOrderNo } from "@/lib/orderNo";
 import { useNow } from "@/lib/useNow";
 import { useWaiting } from "@/lib/outbox/store";
-import { focusRing } from "../styles";
 import { Badge, EmptyState, ProductImage } from "../ui";
 
 // The list of orders awaiting payment (step 6.3b, fresh-counter.md 3.4): the till's left zone, oldest first. Each card shows the order's
@@ -83,64 +82,66 @@ function QueueCard({
   const late = !settled && age !== "fresh";
 
   return (
-    <>
-      {/* the Till board's card: the whole card is the one control. It opens the order on the sheet beside the list, where it is paid or voided */}
-      <button
-        type="button"
-        aria-label={settled ? t("open_order_aria", { no }) : t("take_payment_aria", { no })}
-        aria-describedby={waiting ? `${detailsId} ${blockedId}` : detailsId}
-        aria-current={selected ? "true" : undefined}
-        disabled={waiting}
-        onClick={() => onOpen(order)}
-        className={`flex w-full flex-col gap-1.5 rounded-2xl border bg-white px-4 py-3.5 text-left text-neutral-900 motion-safe:transition-colors motion-safe:duration-150 hover:border-neutral-300 disabled:cursor-not-allowed disabled:opacity-70 ${
-          selected ? "border-brand-600 ring-1 ring-inset ring-brand-600 hover:border-brand-600" : "border-neutral-200"
-        } ${focusRing}`}
-      >
-        <span id={detailsId} className="flex w-full flex-col gap-1.5">
-          <span className="flex w-full items-baseline justify-between gap-3">
-            <span className={`min-w-0 truncate text-base ${selected ? "font-bold" : "font-semibold"}`}>
-              {t("order_heading", { no })}
-              {where ? <span> · {where}</span> : null}
-            </span>
-            <span className={`shrink-0 text-base tabular-nums ${selected ? "font-bold" : "font-semibold"}`}>
-              {order.totals.balance} {order.currency}
-            </span>
-          </span>
-          <span className="flex w-full items-center justify-between gap-3 text-[13px] text-neutral-600">
-            <span className="flex min-w-0 items-center gap-2.5">
-              <ThumbStack order={order} images={images} categoryOf={categoryOf} />
-              <span className="min-w-0 truncate">
-                {items}
-                {waiter ? (
-                  <>
-                    <span aria-hidden="true"> · </span>
-                    {waiter}
-                  </>
-                ) : null}
-              </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5">
-              {settled ? <Badge tone="green">{t("settled")}</Badge> : null}
-              {late ? <Badge tone={age === "red" ? "red" : "amber"}>{k(age === "red" ? "late" : "slow")}</Badge> : null}
-              <time
-                dateTime={order.sent_at ?? undefined}
-                aria-label={t("waiting", { time: minutes })}
-                className={late ? (age === "red" ? "font-semibold text-red-700" : "font-semibold text-amber-800") : ""}
-              >
-                {minutes}
-              </time>
-            </span>
+    // the Till board's card, one control: its title "Order N" is the button ("Take payment for order N", "Open order N" once paid), and its
+    // tap area covers the card; the rest is read as the card's text. The button's visible words are part of its name (WCAG 2.5.3)
+    <div
+      className={`relative flex flex-col gap-1.5 rounded-2xl border bg-white px-4 py-3.5 text-neutral-900 motion-safe:transition-colors motion-safe:duration-150 has-[button:focus-visible]:ring-4 has-[button:focus-visible]:ring-brand-600/35 has-[button:focus-visible]:ring-offset-1 ${
+        selected ? "border-brand-600 ring-1 ring-inset ring-brand-600" : "border-neutral-200 has-[button:enabled:hover]:border-neutral-300"
+      } ${waiting ? "opacity-70" : ""}`}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <p className={`min-w-0 truncate text-base ${selected ? "font-bold" : "font-semibold"}`}>
+          <button
+            type="button"
+            aria-label={settled ? t("open_order_aria", { no }) : t("take_payment_aria", { no })}
+            aria-describedby={waiting ? `${detailsId} ${blockedId}` : detailsId}
+            aria-current={selected ? "true" : undefined}
+            disabled={waiting}
+            onClick={() => onOpen(order)}
+            className="text-left outline-none after:absolute after:inset-0 after:rounded-2xl after:content-[''] disabled:cursor-not-allowed"
+          >
+            {t("order_heading", { no })}
+          </button>
+          {where ? <span> · {where}</span> : null}
+        </p>
+        <p className={`shrink-0 text-base tabular-nums ${selected ? "font-bold" : "font-semibold"}`}>
+          {order.totals.balance} {order.currency}
+        </p>
+      </div>
+      <div id={detailsId} className="flex items-center justify-between gap-3 text-[13px] text-neutral-600">
+        <span className="flex min-w-0 items-center gap-2.5">
+          <ThumbStack order={order} images={images} categoryOf={categoryOf} />
+          <span className="min-w-0 truncate">
+            {items}
+            {waiter ? (
+              <>
+                <span aria-hidden="true"> · </span>
+                {waiter}
+              </>
+            ) : null}
           </span>
         </span>
-      </button>
+        <span className="flex shrink-0 items-center gap-1.5">
+          {settled ? <Badge tone="green">{t("settled")}</Badge> : null}
+          {late ? <Badge tone={age === "red" ? "red" : "amber"}>{k(age === "red" ? "late" : "slow")}</Badge> : null}
+          <time
+            dateTime={order.sent_at ?? undefined}
+            aria-label={t("waiting", { time: minutes })}
+            className={late ? (age === "red" ? "font-semibold text-red-700" : "font-semibold text-amber-800") : ""}
+          >
+            {minutes}
+          </time>
+        </span>
+      </div>
       {waiting ? (
-        <p id={blockedId} className="px-4 pt-1.5 text-sm font-medium text-amber-900">
+        <p id={blockedId} className="text-sm font-medium text-amber-900">
           {t("payment_waiting")}
         </p>
       ) : null}
-    </>
+    </div>
   );
 }
+
 
 export function TillQueue({
   orders,
