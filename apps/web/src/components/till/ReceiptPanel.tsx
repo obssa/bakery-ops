@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy } from "lucide-react";
+import { Copy, QrCode } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
 import { uuid } from "@/lib/api/idempotency";
@@ -59,8 +59,11 @@ export function ReceiptPanel({
   const footer = settings.data ? (locale === "am" ? settings.data.footer_am : settings.data.footer_en) : null;
 
   return (
+    // the Till board's receipt panel once the bill is paid: the title, the code, the link and Print on top, the receipt's lines under them
     <div className="space-y-4">
-      <section aria-labelledby={titleId} className="space-y-3 rounded-[14px] border border-neutral-200 bg-neutral-50 p-3.5 text-sm text-neutral-900">
+      <h3 className="text-base font-semibold text-neutral-900">{t("receipt_title")}</h3>
+      <ReceiptActions order={order} layout="stack" />
+      <section aria-labelledby={titleId} className="space-y-3 border-t border-neutral-100 pt-3 text-[13px] text-neutral-700">
         <h3 id={titleId} className="text-[13px] font-semibold uppercase tracking-[0.08em] text-neutral-600">
           {t("receipt_preview")}
         </h3>
@@ -94,8 +97,6 @@ export function ReceiptPanel({
         </ul>
         {footer ? <p className="text-center text-[13px] text-neutral-600">{footer}</p> : null}
       </section>
-
-      <ReceiptActions order={order} layout="stack" />
     </div>
   );
 }
@@ -122,21 +123,48 @@ function ReceiptLines({ order }: { order: Order }) {
  * total, and how it will reach the customer: printed, or (printing off in the receipt settings) the code the customer scans. The receipt
  * link and its code exist only once the order is paid (the API answers payments.receipt.unpaid before), so they come with the payment.
  */
-export function ReceiptPending({ order }: { order: Order }) {
+export function ReceiptPending({ order, paid = false }: { order: Order; /** paid in full already (not served yet): the receipt can be had now */ paid?: boolean }) {
   const t = useTranslations("till");
   const titleId = useId();
   const mayPrint = useSession((s) => can(s.me, "print.create"));
+  const canLink = useSession((s) => can(s.me, "payments.take"));
   const settings = useReceiptSettings(mayPrint);
   const printingOff = mayPrint && settings.data?.printing_enabled === false;
   return (
-    <section aria-labelledby={titleId} className="space-y-3 text-sm text-neutral-900">
+    // the Till board's receipt panel: its title and how the receipt reaches the customer, the code's place, the link and Print, then the
+    // lines at the bottom; before the payment the code and the buttons wait for it
+    <section aria-labelledby={titleId} className="flex flex-col gap-3.5 text-sm text-neutral-900">
       <div className="space-y-0.5">
         <h3 id={titleId} className="text-base font-semibold text-neutral-900">
           {t("receipt_title")}
         </h3>
         <p className="text-[13px] text-neutral-600">{printingOff ? t("receipt_printing_off") : t("receipt_after_payment")}</p>
       </div>
-      {printingOff ? <PrintOffButton className="w-full" /> : null}
+      {paid ? (
+        <ReceiptActions order={order} layout="stack" />
+      ) : (
+        <>
+          <div
+            aria-hidden="true"
+            className="flex size-42 items-center justify-center self-center rounded-[14px] border border-dashed border-neutral-300 bg-neutral-50 text-neutral-400"
+          >
+            <QrCode className="size-12" strokeWidth={1.5} aria-hidden="true" />
+          </div>
+          {canLink ? (
+            <Button type="button" variant="secondary" className="w-full" disabled>
+              <Copy className="size-5" strokeWidth={1.75} aria-hidden="true" />
+              {t("receipt_link")}
+            </Button>
+          ) : null}
+          {printingOff ? (
+            <PrintOffButton className="w-full" />
+          ) : mayPrint ? (
+            <Button type="button" variant="secondary" className="w-full" disabled>
+              {t("print")}
+            </Button>
+          ) : null}
+        </>
+      )}
       <div className="space-y-2 border-t border-neutral-100 pt-3 text-[13px] text-neutral-600">
         <ReceiptLines order={order} />
         <p className="flex justify-between gap-3 border-t border-neutral-100 pt-2 text-sm font-semibold text-neutral-900">
@@ -256,7 +284,7 @@ export function ReceiptActions({ order, layout = "row" }: { order: Pick<Order, "
       <div className="space-y-3">
         {error ? <Alert>{errorText.message(error)}</Alert> : null}
         <PrintStatus state={printing} />
-        {link ? <ReceiptQr url={link.url} size={196} /> : null}
+        {link ? <ReceiptQr url={link.url} size={168} /> : null}
         {copyButton}
         {linkField}
         {printButton}

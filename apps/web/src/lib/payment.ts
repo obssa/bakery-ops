@@ -23,6 +23,15 @@ export function pressKey(entry: string, key: KeypadKey): string {
   return next;
 }
 
+/** Cash typed into the "Cash received" field, kept to what the keypad allows: digits, one point, two decimals, eight whole digits. */
+export function typedCash(text: string): string {
+  const cleaned = text.replace(/[^\d.]/g, "");
+  const point = cleaned.indexOf(".");
+  const whole = (point === -1 ? cleaned : cleaned.slice(0, point)).slice(0, MAX_WHOLE_DIGITS);
+  if (point === -1) return whole;
+  return `${whole === "" ? "0" : whole}.${cleaned.slice(point + 1).replace(/\./g, "").slice(0, 2)}`;
+}
+
 /** The entry as a money string with two decimals ("400" -> "400.00"), or null when nothing was typed. */
 export function tenderedOf(entry: string): string | null {
   const text = entry.endsWith(".") ? entry.slice(0, -1) : entry;

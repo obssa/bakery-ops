@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { Check, CircleCheck, Split } from "lucide-react";
+import { Check, CircleCheck, Split, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
@@ -33,7 +33,8 @@ import {
 import type { PayBlock } from "@/lib/shifts";
 import { useOnline } from "@/lib/useOnline";
 import { visibleLines } from "@/lib/live/pad";
-import { Alert, Button, Chip, Modal } from "../ui";
+import { isSettled } from "@/lib/live/orders";
+import { Alert, Button, Chip, IconButton, Modal } from "../ui";
 import { PayRowEditor, type PhotoFailure } from "./PayRowEditor";
 import { ReceiptPanel, ReceiptPending } from "./ReceiptPanel";
 
@@ -136,6 +137,7 @@ export function PaySheet({
   onClose,
   onChanged,
   onPendingChange,
+  onVoid,
 }: {
   order: Order;
   shift: PayBlock | null;
@@ -145,6 +147,8 @@ export function PaySheet({
   onChanged: () => void;
   /** told while a Complete is on its way, so the till keeps the sheet on this order until it is answered */
   onPendingChange?: (pending: boolean) => void;
+  /** opens the void (or, for an order paid in full, the void of one payment) for this order */
+  onVoid?: () => void;
 }) {
   const t = useTranslations("till");
   const o = useTranslations("outbox");
@@ -156,7 +160,6 @@ export function PaySheet({
   const blockId = useId();
   const dueId = useId();
   const leftId = useId();
-  const k = useTranslations("kds");
   const heading = useRef<HTMLHeadingElement>(null);
   // the sheet opened (or turned to another order): the focus goes to its title, so a keyboard or a screen reader starts there and the
   // browser brings it into view
@@ -187,7 +190,8 @@ export function PaySheet({
 
   // a sheet starts with one row, cash for the whole balance, once the channels are known
   useEffect(() => {
-    if (!draft && channels.data && !completed && !finished.current) {
+    // nothing is owed on an order paid in full (it waits to be served): it opens without a payment
+    if (!draft && channels.data && !completed && !finished.current && compareDecimal(balance, "0", 2) > 0) {
       drafts().put(order.id, { batchUuid: uuid(), rows: [newRow(uuid(), balance, [], available)], attempt: null });
     }
   }, [draft, channels.data, completed, order.id, balance, available, drafts]);
@@ -337,29 +341,31 @@ export function PaySheet({
   // no answer at all (a refusal made on the tablet has no status either, but says what it is)
   const network = error instanceof ApiError && error.isNetwork && !error.messages.en;
   const shown = completed ? completed.order : order;
-  const where = shown.type === "takeaway" ? k("takeaway") : shown.dining_table ? k("table", { code: shown.dining_table.code }) : "";
   const lines = visibleLines(shown);
   const allServed = lines.length > 0 && lines.every((line) => line.status === "served");
+  // paid in full, not served yet: nothing to take; a wrong payment can still be voided from here (step 4.3c)
+  const settled = !completed && !queued && isSettled(order);
+  const single = rows.length === 1;
+  const settledLeft = compareDecimal(left, "0", 2) === 0;
   // while the batch is on its way the sheet stays open: the cashier must see whether it was taken and the change to give
   const close = pending ? () => {} : onClose;
 
-  const title = (
-    <div className="min-w-0 space-y-0.5">
-      <h2 ref={heading} tabIndex={-1} className="text-lg font-semibold text-neutral-900 outline-none">
-        {t("pay_title", { no })}
-      </h2>
-      <p className="text-sm text-neutral-600">
-        {where}
-        {where && shown.owner.name ? <span aria-hidden="true"> · </span> : null}
-        {shown.owner.name ? t("waiter", { name: shown.owner.name }) : null}
-      </p>
-    </div>
+  const addPayment = (
+    // a bill split over channels ("Split payment" on the board): one more payment for what is left
+    <Button type="button" variant="ghost" size="md" className="text-brand-700" disabled={rows.length >= MAX_ROWS || pending} onClick={addRow}>
+      <Split className="size-5" strokeWidth={1.75} aria-hidden="true" />
+      {t("add_payment")}
+    </Button>
   );
 
-  // the amount due at 48 / 700, and what is left to cover while the sheet is open (fresh-counter.md 3.4)
+  // the Till board's top line: "Amount due" in caps over the amount at 48 / 700; on the right "All lines served", Void and the way out
   const due = (
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0 space-y-1">
+        {/* the sheet's title, read first: the chosen card on the left says the same on screen */}
+        <h2 ref={heading} tabIndex={-1} className="sr-only">
+          {t("pay_title", { no })}
+        </h2>
         <p id={dueId} className="text-[13px] font-semibold uppercase tracking-[0.08em] text-neutral-600">
           {t("amount_due")}
         </p>
@@ -368,23 +374,39 @@ export function PaySheet({
           <span className="text-3xl font-semibold text-neutral-600"> {currency}</span>
         </output>
       </div>
-      <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {allServed && !completed ? <Chip tone="brand">{t("all_served")}</Chip> : null}
+        {settled ? <Chip tone="green">{t("settled")}</Chip> : null}
+        {onVoid && !completed && !queued ? (
+          <Button type="button" variant="ghost" size="md" disabled={pending} aria-label={settled ? t("void_payment_aria", { no }) : t("void_aria", { no })} onClick={onVoid}>
+            {settled ? t("void_payment") : t("void")}
+          </Button>
+        ) : null}
         {completed || queued ? null : (
-          <p
-            className={`flex items-baseline gap-3 rounded-xl px-3.5 py-2 text-base font-semibold ${
-              compareDecimal(left, "0", 2) === 0 ? "bg-brand-50 text-brand-700" : "bg-amber-50 text-amber-900"
-            }`}
-          >
-            <span id={leftId}>{t("left_to_pay")}</span>
-            <output aria-labelledby={leftId} className="tabular-nums">
-              {left} {currency}
-            </output>
-          </p>
+          <IconButton label={t("close")} title={t("close")} variant="ghost" size="md" disabled={pending} onClick={onClose}>
+            <X className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          </IconButton>
         )}
       </div>
     </div>
   );
+
+  // what is left to cover: a line of its own while the bill is split (or the one payment no longer covers it), read only otherwise
+  const leftToPay =
+    completed || queued || settled ? null : (
+      <p
+        className={
+          single && settledLeft
+            ? "sr-only"
+            : `flex w-fit items-baseline gap-3 rounded-xl px-3.5 py-2 text-base font-semibold ${settledLeft ? "bg-brand-50 text-brand-700" : "bg-amber-50 text-amber-900"}`
+        }
+      >
+        <span id={leftId}>{t("left_to_pay")}</span>
+        <output aria-labelledby={leftId} className="tabular-nums">
+          {left} {currency}
+        </output>
+      </p>
+    );
 
   let body: ReactNode;
   if (completed) {
@@ -425,6 +447,8 @@ export function PaySheet({
         </Button>
       </div>
     );
+  } else if (settled) {
+    body = <p className="rounded-xl bg-neutral-100 px-4 py-3 text-base text-neutral-700">{t("settled_hint")}</p>;
   } else if (!draft) {
     body = channels.error ? (
       <Alert>{errorText.message(channels.error)}</Alert>
@@ -454,14 +478,11 @@ export function PaySheet({
               onChange={(patch) => change(row.id, patch)}
               onRemove={rows.length > 1 ? () => removeRow(row.id) : null}
               onPhoto={(file) => void takePhoto(row.id, file)}
+              extra={single ? addPayment : undefined}
             />
           ))}
         </div>
-        {/* a bill split over channels ("Split payment" in the design): one more payment for what is left */}
-        <Button type="button" variant="ghost" size="lg" className="text-brand-700" disabled={rows.length >= MAX_ROWS} onClick={addRow}>
-          <Split className="size-5" strokeWidth={1.75} aria-hidden="true" />
-          {t("add_payment")}
-        </Button>
+        {single ? null : addPayment}
 
         {!online ? <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">{t("offline_notice")}</p> : null}
         {error ? (
@@ -473,41 +494,36 @@ export function PaySheet({
         <p id={blockId} role="status" aria-label={t("block_label")} className={block ? "text-base font-medium text-amber-900" : "sr-only"}>
           {block ? issueText(t, block, currency) : ""}
         </p>
-        <div className="flex flex-wrap gap-2.5">
-          <Button
-            type="button"
-            size="xl"
-            className="min-w-56 flex-1"
-            disabled={block !== null || pending}
-            aria-describedby={block ? blockId : undefined}
-            onClick={() => void complete()}
-          >
-            <Check className="size-[22px]" strokeWidth={2.2} aria-hidden="true" />
-            {pending ? t("paying") : t("complete")}
-          </Button>
-          <Button type="button" variant="secondary" size="xl" disabled={pending} onClick={onClose}>
-            {t("close")}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          size="xl"
+          className="w-full"
+          disabled={block !== null || pending}
+          aria-describedby={block ? blockId : undefined}
+          onClick={() => void complete()}
+        >
+          <Check className="size-[22px]" strokeWidth={2.2} aria-hidden="true" />
+          {pending ? t("paying") : t("complete")}
+        </Button>
       </div>
     );
   }
 
   const content = (
-    // the centre (the amount due, how it is paid, Complete) and the receipt zone at 236 px beside it once there is room (a container query:
+    // the centre (the amount due, how it is paid, Complete) and the 236 px receipt zone beside it once there is room (a container query:
     // the sheet's own width, inline or in a dialog)
     <div className="@container">
       <div className="grid gap-6 @[44rem]:grid-cols-[minmax(0,1fr)_236px]">
         <div className="min-w-0 space-y-5">
-          {title}
           {due}
+          {leftToPay}
           {body}
         </div>
         <div className="self-start rounded-[20px] border border-neutral-200 bg-white p-[18px]">
           {completed ? (
             <ReceiptPanel order={completed.order} payments={completed.result.payments} channels={available} references={completed.references} />
           ) : (
-            <ReceiptPending order={order} />
+            <ReceiptPending order={order} paid={settled} />
           )}
         </div>
       </div>

@@ -13,7 +13,7 @@ import { useSession } from "@/lib/session";
 import { useWide } from "@/lib/useWide";
 import { OrderingSurface } from "../pad/OrderingSurface";
 import { usePadOutcomes, useReleaseStaleSends } from "../pad/outcomes";
-import { EmptyState, PageHeader, SegmentedControl } from "../ui";
+import { EmptyState, SegmentedControl } from "../ui";
 import { CashWidget } from "../shifts/CashWidget";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
@@ -38,7 +38,7 @@ type View = "queue" | "order" | "closed";
 const TILL_KINDS = ["till"] as const;
 const NOTICE_MS = 8000;
 
-export function TillScreen() {
+export function TillScreen({ titleTwin }: { /** the Amharic title beside the English one (the English page) */ titleTwin?: string }) {
   const t = useTranslations("till");
   const me = useSession((s) => s.me);
   const userId = me?.user.id ?? 0;
@@ -53,7 +53,6 @@ export function TillScreen() {
   const shiftStation = useShiftStation({ kinds: TILL_KINDS });
   const cashNeedsShift = useShiftNotice((s) => s.cashNeedsShift) || CASH_NEEDS_SHIFT_BUILD;
   const block = payBlockReason({ shift: shiftStation.shift, tracked: shiftStation.station?.tracks_shifts === true, loaded: shiftStation.loaded, enforced: cashNeedsShift });
-  const payBlocked = block === null ? null : t(block === "no_shift" ? "pay_blocked_no_shift" : "pay_blocked_not_open");
 
   const queueFeed = useMemo(() => createQueueFeed(branchId), [branchId]);
   // reconnect reconcile (step 5.2c): back online, or visible again after a gap, the queue is read again from the start
@@ -110,6 +109,7 @@ export function TillScreen() {
       onClose={() => setPaying(null)}
       onChanged={refresh}
       onPendingChange={setSheetBusy}
+      onVoid={() => setVoiding(open)}
     />
   ) : null;
 
@@ -137,10 +137,26 @@ export function TillScreen() {
   ];
 
   return (
-    <div className="space-y-4">
-      <PageHeader title={t("title")} actions={<SegmentedControl label={t("views")} tabs tone="station" options={tabs} value={view} onChange={switchView} />} />
-      <ShiftBar model={shiftStation} />
-      <CashWidget shift={shiftStation.shift} />
+    <div className="space-y-5">
+      {/* the Till board's title row: the till's name (with its Amharic name on the English page) over its shift; on the right the drawer's
+          figure and the till's views */}
+      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 border-b border-neutral-200 pb-4">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h1 className="text-2xl font-bold tracking-tight text-neutral-900">{t("title")}</h1>
+            {titleTwin ? (
+              <span lang="am" className="text-lg font-medium text-neutral-600">
+                {titleTwin}
+              </span>
+            ) : null}
+          </div>
+          <ShiftBar model={shiftStation} look="strip" />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <CashWidget shift={shiftStation.shift} look="summary" />
+          <SegmentedControl label={t("views")} tabs tone="station" options={tabs} value={view} onChange={switchView} />
+        </div>
+      </header>
 
       <p role="status" className={notice ? "rounded-xl bg-brand-50 px-4 py-3 text-base font-medium text-brand-700" : "sr-only"}>
         {notice ? t("sent") : ""}
@@ -153,12 +169,10 @@ export function TillScreen() {
             orders={orders}
             loaded={!!queue?.loaded}
             stale={queue?.error ? t("stale") : null}
-            payBlocked={payBlocked}
             selectedId={open?.id ?? null}
             images={images}
             categoryOf={categoryOf}
-            onPay={choose}
-            onVoid={setVoiding}
+            onOpen={choose}
           />
           {wide && sheet ? (
             sheet
@@ -181,7 +195,17 @@ export function TillScreen() {
       )}
 
       {sheet && !(wide && view === "queue") ? sheet : null}
-      {voiding ? <VoidDialog order={voiding} onClose={() => setVoiding(null)} onVoided={refresh} /> : null}
+      {voiding ? (
+        <VoidDialog
+          order={voiding}
+          onClose={() => setVoiding(null)}
+          onVoided={() => {
+            refresh();
+            // the order the sheet showed is voided, or owes again: it is opened afresh from its card
+            setPaying(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

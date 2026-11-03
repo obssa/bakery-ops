@@ -10,15 +10,18 @@ import { visibleLines } from "@/lib/live/pad";
 import { useOrderNo } from "@/lib/orderNo";
 import { useNow } from "@/lib/useNow";
 import { useWaiting } from "@/lib/outbox/store";
-import { Badge, Button, EmptyState, ProductImage } from "../ui";
+import { focusRing } from "../styles";
+import { Badge, EmptyState, ProductImage } from "../ui";
 
 // The list of orders awaiting payment (step 6.3b, fresh-counter.md 3.4): the till's left zone, oldest first. Each card shows the order's
 // number and table, its balance, a stack of up to three round product thumbs (+N) so the cashier knows an order by its food, how many items
 // it holds and its waiter, and how long it has waited (minutes; the kitchen display's thresholds turn it amber and red, with the words "Slow"
-// and "Late" so colour is not the only signal). A tap anywhere on the card takes its payment (the card's "Take payment" covers it), and
-// "Void" sits above that. The card whose payment is open has the brand border. A paid order that is not served yet stays, marked settled,
-// until it closes; one of its payments can still be voided (step 4.5b, the void of step 4.3c). The thumbs are joined from the catalog
-// (useProductImages, phase-6 plan 10.2 Q7); offline they are the placeholders.
+// and "Late" so colour is not the only signal). As on the Till board, the whole card is one button, "Take payment for order N": it opens the
+// order on the sheet beside the list, where it is paid, or voided ("Void" moved there from the card in 6.3b). The card open on the sheet has
+// the 2 px brand border. A paid order that is not served yet stays, marked settled, until it closes; its card ("Open order N") opens it on the
+// sheet, where one of its payments can still be voided (step 4.5b, the void of step 4.3c). The thumbs are joined from the catalog
+// (useProductImages, phase-6 plan 10.2 Q7); offline they are the placeholders. Pay itself waits for the till's shift on the sheet, which
+// says why (step 3.7d); only a payment saved offline and not sent yet keeps the card shut.
 
 /** The stack of round thumbs beside the item count; hidden from readers, the lines are read on the pay sheet. */
 function ThumbStack({ order, images, categoryOf }: { order: Order; images: ProductImages; categoryOf: (itemId: number) => string | null }) {
@@ -50,24 +53,21 @@ function QueueCard({
   order,
   now,
   selected,
-  payBlocked: blockedBy,
   images,
   categoryOf,
-  onPay,
-  onVoid,
+  onOpen,
 }: {
   order: Order;
   now: number;
   selected: boolean;
-  payBlocked: string | null;
   images: ProductImages;
   categoryOf: (itemId: number) => string | null;
-  onPay: (order: Order) => void;
-  onVoid: (order: Order) => void;
+  onOpen: (order: Order) => void;
 }) {
   const t = useTranslations("till");
   const k = useTranslations("kds");
-  const headingId = useId();
+  const detailsId = useId();
+  const blockedId = useId();
   const settled = isSettled(order);
   const seconds = secondsSince(order.sent_at, now);
   const age = ageOf(seconds);
@@ -75,7 +75,6 @@ function QueueCard({
   const no = useOrderNo(order);
   // a payment completed offline waits in the outbox (step 5.2a): no second sheet for this order until it was sent
   const waiting = useWaiting((item) => item.kind === "pay_batch" && item.subjectId === order.id);
-  const payBlocked = waiting ? t("payment_waiting") : blockedBy;
   const where = order.type === "takeaway" ? k("takeaway") : order.dining_table ? k("table", { code: order.dining_table.code }) : "";
   const lines = visibleLines(order);
   const units = unitCount(lines);
@@ -84,81 +83,62 @@ function QueueCard({
   const late = !settled && age !== "fresh";
 
   return (
-    <article
-      aria-labelledby={headingId}
-      className={`relative rounded-2xl border bg-white ${selected ? "border-brand-600 ring-1 ring-brand-600" : "border-neutral-200"}`}
-    >
-      <div className="space-y-1.5 px-4 pb-2.5 pt-3.5">
-        <div className="flex items-baseline justify-between gap-3">
-          <h3 id={headingId} className="min-w-0 truncate text-base font-bold text-neutral-900">
-            {t("order_heading", { no })}
-            {where ? <span className="font-semibold text-neutral-600"> · {where}</span> : null}
-          </h3>
-          <p className="shrink-0 text-base font-bold tabular-nums text-neutral-900">
-            {order.totals.balance} {order.currency}
-          </p>
-        </div>
-        <div className="flex items-center justify-between gap-3 text-[13px] text-neutral-600">
-          <span className="flex min-w-0 items-center gap-2.5">
-            <ThumbStack order={order} images={images} categoryOf={categoryOf} />
-            <span className="min-w-0 truncate">
-              {items}
-              {waiter ? (
-                <>
-                  <span aria-hidden="true"> · </span>
-                  {waiter}
-                </>
-              ) : null}
+    <>
+      {/* the Till board's card: the whole card is the one control. It opens the order on the sheet beside the list, where it is paid or voided */}
+      <button
+        type="button"
+        aria-label={settled ? t("open_order_aria", { no }) : t("take_payment_aria", { no })}
+        aria-describedby={waiting ? `${detailsId} ${blockedId}` : detailsId}
+        aria-current={selected ? "true" : undefined}
+        disabled={waiting}
+        onClick={() => onOpen(order)}
+        className={`flex w-full flex-col gap-1.5 rounded-2xl border bg-white px-4 py-3.5 text-left text-neutral-900 motion-safe:transition-colors motion-safe:duration-150 hover:border-neutral-300 disabled:cursor-not-allowed disabled:opacity-70 ${
+          selected ? "border-brand-600 ring-1 ring-inset ring-brand-600 hover:border-brand-600" : "border-neutral-200"
+        } ${focusRing}`}
+      >
+        <span id={detailsId} className="flex w-full flex-col gap-1.5">
+          <span className="flex w-full items-baseline justify-between gap-3">
+            <span className={`min-w-0 truncate text-base ${selected ? "font-bold" : "font-semibold"}`}>
+              {t("order_heading", { no })}
+              {where ? <span> · {where}</span> : null}
+            </span>
+            <span className={`shrink-0 text-base tabular-nums ${selected ? "font-bold" : "font-semibold"}`}>
+              {order.totals.balance} {order.currency}
             </span>
           </span>
-          <span className="flex shrink-0 items-center gap-1.5">
-            <time
-              dateTime={order.sent_at ?? undefined}
-              aria-label={t("waiting", { time: minutes })}
-              className={late ? (age === "red" ? "font-semibold text-red-700" : "font-semibold text-amber-800") : ""}
-            >
-              {minutes}
-            </time>
-            {late ? <Badge tone={age === "red" ? "red" : "amber"}>{k(age === "red" ? "late" : "slow")}</Badge> : null}
+          <span className="flex w-full items-center justify-between gap-3 text-[13px] text-neutral-600">
+            <span className="flex min-w-0 items-center gap-2.5">
+              <ThumbStack order={order} images={images} categoryOf={categoryOf} />
+              <span className="min-w-0 truncate">
+                {items}
+                {waiter ? (
+                  <>
+                    <span aria-hidden="true"> · </span>
+                    {waiter}
+                  </>
+                ) : null}
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {settled ? <Badge tone="green">{t("settled")}</Badge> : null}
+              {late ? <Badge tone={age === "red" ? "red" : "amber"}>{k(age === "red" ? "late" : "slow")}</Badge> : null}
+              <time
+                dateTime={order.sent_at ?? undefined}
+                aria-label={t("waiting", { time: minutes })}
+                className={late ? (age === "red" ? "font-semibold text-red-700" : "font-semibold text-amber-800") : ""}
+              >
+                {minutes}
+              </time>
+            </span>
           </span>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 px-2.5 py-2">
-        {settled ? (
-          <>
-            <Badge tone="green">{t("settled")}</Badge>
-            {/* paid in full, not served yet: a wrong payment can still be voided (step 4.3c); once the order closes it is a refund */}
-            <Button type="button" variant="secondary" size="md" aria-label={t("void_payment_aria", { no })} onClick={() => onVoid(order)}>
-              {t("void_payment")}
-            </Button>
-          </>
-        ) : (
-          <>
-            {/* above the card's tap area, so it is never a payment by mistake */}
-            <Button type="button" variant="ghost" size="md" className="relative z-10" aria-label={t("void_aria", { no })} onClick={() => onVoid(order)}>
-              {t("void")}
-            </Button>
-            <Button
-              type="button"
-              size="md"
-              // the whole card is this button's tap area
-              className="static! after:absolute after:inset-0 after:rounded-2xl after:content-['']"
-              aria-label={t("take_payment_aria", { no })}
-              aria-describedby={payBlocked ? `pay-blocked-${order.id}` : undefined}
-              disabled={payBlocked !== null}
-              onClick={() => onPay(order)}
-            >
-              {t("take_payment")}
-            </Button>
-          </>
-        )}
-      </div>
-      {payBlocked && !settled ? (
-        <p id={`pay-blocked-${order.id}`} className="px-4 pb-3 text-[15px] font-medium text-amber-900">
-          {payBlocked}
+        </span>
+      </button>
+      {waiting ? (
+        <p id={blockedId} className="px-4 pt-1.5 text-sm font-medium text-amber-900">
+          {t("payment_waiting")}
         </p>
       ) : null}
-    </article>
+    </>
   );
 }
 
@@ -166,33 +146,29 @@ export function TillQueue({
   orders,
   loaded,
   stale,
-  payBlocked,
   selectedId,
   images,
   categoryOf,
-  onPay,
-  onVoid,
+  onOpen,
 }: {
   orders: Order[];
   loaded: boolean;
   stale: string | null;
-  /** why Pay is disabled (no shift is running at the till), or null */
-  payBlocked: string | null;
-  /** the order whose payment is open on the sheet */
+  /** the order open on the sheet */
   selectedId: number | null;
   images: ProductImages;
   categoryOf: (itemId: number) => string | null;
-  onPay: (order: Order) => void;
-  onVoid: (order: Order) => void;
+  onOpen: (order: Order) => void;
 }) {
   const t = useTranslations("till");
   const now = useNow();
   const titleId = useId();
   return (
-    <section aria-labelledby={titleId} className="space-y-3">
-      <div className="flex items-baseline justify-between gap-3 px-1">
+    // still the region "Orders awaiting payment" (its name is what the specs and a reader find); the board's heading reads "Waiting to pay"
+    <section aria-label={t("queue_title")} className="space-y-2.5">
+      <div className="flex items-baseline justify-between gap-3 px-1 pb-1">
         <h2 id={titleId} className="text-[17px] font-semibold text-neutral-900">
-          {t("queue_title")}
+          {t("queue_heading")}
         </h2>
         {loaded ? <p className="text-sm text-neutral-600">{t("queue_count", { count: orders.length })}</p> : null}
       </div>
@@ -213,16 +189,7 @@ export function TillQueue({
         <ul aria-label={t("queue_list")} className="flex flex-col gap-2.5">
           {orders.map((order) => (
             <li key={order.id}>
-              <QueueCard
-                order={order}
-                now={now}
-                selected={order.id === selectedId}
-                payBlocked={payBlocked}
-                images={images}
-                categoryOf={categoryOf}
-                onPay={onPay}
-                onVoid={onVoid}
-              />
+              <QueueCard order={order} now={now} selected={order.id === selectedId} images={images} categoryOf={categoryOf} onOpen={onOpen} />
             </li>
           ))}
         </ul>

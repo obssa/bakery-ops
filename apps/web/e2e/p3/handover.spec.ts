@@ -279,6 +279,8 @@ test.describe("p3 handover", () => {
       await page.goto("en/till/");
       await expect(bar).toContainText("Shift open", { timeout: 30_000 });
       const widget = page.getByRole("region", { name: "Cash in the drawer" });
+      // step 6.3b: the Till board puts the drawer's figure in the title row; its details open from it, one tap away
+      await widget.getByRole("button", { name: /^Cash in the drawer/ }).click({ timeout: 30_000 });
       await expect(widget).toContainText(openingTotal, { timeout: 30_000 });
       const order = await sendOrder(fixture);
       await cashier.api.post(`/orders/${order.id}/payments`, { client_uuid: uuid(), channel_code: "cash", amount: "60.00", tendered_amount: "100.00" });
