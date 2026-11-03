@@ -248,7 +248,8 @@ function Kpis({ answer, before, weekday }: { answer: Answer<Overview> | undefine
     if (previous === undefined || then === null) return { text: t("delta_none", { weekday }), bad: false };
     const pct = percentChange(current, previous);
     if (pct === null) return { text: t("delta_none", { weekday }), bad: false };
-    const sign = compareDecimal(pct, "0");
+    // a rise comes signed ("+12.3"): the sign is told apart before the figure is compared
+    const sign = compareDecimal(pct.replace(/^\+/, ""), "0");
     if (sign === 0) return { text: t("delta_same", { weekday }), bad: false };
     return { text: t(sign > 0 ? "delta_up" : "delta_down", { pct: pct.replace(/^[+-]/, ""), weekday }), bad: sign < 0 };
   }
@@ -258,7 +259,7 @@ function Kpis({ answer, before, weekday }: { answer: Answer<Overview> | undefine
     if (before === undefined) return undefined;
     if (previous === undefined || then === null) return { text: t("delta_none", { weekday }), bad: false };
     const difference = differenceOf(current, previous, 2);
-    const sign = compareDecimal(difference, "0");
+    const sign = compareDecimal(difference.replace(/^\+/, ""), "0");
     if (sign === 0) return { text: t("delta_same", { weekday }), bad: false };
     return { text: t(sign > 0 ? "delta_money_up" : "delta_money_down", { amount: amountText(difference.replace(/^[+-]/, "")), weekday }), bad: sign < 0 };
   }

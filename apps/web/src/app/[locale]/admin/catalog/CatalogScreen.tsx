@@ -236,12 +236,12 @@ function Toolbar({
               key={value}
               href={{ pathname: "/admin/catalog", query: { kind: value } }}
               aria-current={current ? "page" : undefined}
-              className={`inline-flex h-9 items-center rounded-[9px] px-3.5 text-sm font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
+              className={`inline-flex h-9 items-center gap-1 rounded-[9px] px-3.5 text-sm font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
                 current ? "bg-brand-50 text-brand-700" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
               } ${focusRing}`}
             >
               {label}
-              {current && count !== null ? <span aria-hidden="true" className="tabular-nums">{` · ${count}`}</span> : null}
+              {current && count !== null ? <span aria-hidden="true" className="tabular-nums">{`· ${count}`}</span> : null}
             </Link>
           );
         })}
@@ -368,13 +368,20 @@ function PriceCell({ id }: { id: number }) {
   );
 }
 
-/** "Add photo": the product's page at its Photo card (step 6.4b), for the admin, on a product without one. */
-function AddPhotoLink({ item, name }: { item: Item; name: string }) {
+/**
+ * "Add photo": the product's page at its Photo card (step 6.4b), for the admin, on a product without one. In a row it is a link under the
+ * names; over a pad card (`chip`) it is a white chip on the placeholder's corner, beside the card's own link, never inside it.
+ */
+function AddPhotoLink({ item, name, chip = false }: { item: Item; name: string; chip?: boolean }) {
   const t = useTranslations("catalog");
   return (
     <Link
       href={{ pathname: "/admin/catalog", query: { item: item.id }, hash: "photo" }}
-      className={`self-start rounded-md text-[13px] font-semibold text-brand-600 hover:text-brand-700 hover:underline ${focusRing}`}
+      className={
+        chip
+          ? `absolute left-2 top-2 inline-flex min-h-8 items-center rounded-full border border-neutral-200 bg-white px-3 text-[13px] font-semibold text-brand-700 shadow-xs hover:bg-brand-50 ${focusRing}`
+          : `self-start rounded-md text-[13px] font-semibold text-brand-600 hover:text-brand-700 hover:underline ${focusRing}`
+      }
     >
       {t("add_photo")}
       <span className="sr-only">{`: ${name}`}</span>
@@ -522,7 +529,6 @@ function IngredientTable({ rows, categoryOf }: { rows: Item[]; categoryOf: (id: 
 // --- the grid ----------------------------------------------------------------------------------------------------------------------------------
 
 function GridCard({ item, manage, category, locale }: { item: Item; manage: boolean; category: Category | undefined; locale: Locale }) {
-  const t = useTranslations("catalog");
   const [ref, seen] = useSeen<HTMLLIElement>();
   const prices = useItemPrices(seen ? item.id : null);
   const current = prices.data?.find((price) => price.is_current) ?? null;
@@ -540,11 +546,12 @@ function GridCard({ item, manage, category, locale }: { item: Item; manage: bool
     image: item.image ?? null,
   };
   return (
-    <li ref={ref} className="flex flex-col gap-1.5">
-      <Link href={{ pathname: "/admin/catalog", query: { item: item.id } }} aria-label={t("open_item", { name })} className={`block flex-1 rounded-2xl ${focusRing}`}>
+    <li ref={ref} className="relative">
+      {/* named by what it shows (the photo's alt, the names and the price), so the link's name holds its visible text */}
+      <Link href={{ pathname: "/admin/catalog", query: { item: item.id } }} className={`block h-full rounded-2xl ${focusRing}`}>
         <ProductCard item={card} locale={locale} category={category ? category.name_en : null} preview />
       </Link>
-      {manage && !item.image ? <AddPhotoLink item={item} name={name} /> : null}
+      {manage && !item.image ? <AddPhotoLink item={item} name={name} chip /> : null}
     </li>
   );
 }
