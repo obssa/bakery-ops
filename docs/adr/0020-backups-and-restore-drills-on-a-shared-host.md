@@ -139,3 +139,13 @@ made concrete in, the decision:
 
 The rest (the dump and its options, the folder and the names, the manifest, the hard-link snapshots, retention and the cap, the
 schedule, the off-site hook left off, no HTTP route) is as proposed.
+
+## Note, 2026-11-03 (phase 6, step 6.1b): the media folder in the nightly snapshot
+
+Phase 6 stores product photos on their own disk, `media` (`storage/app/private/media`, ADR 0022). From step 6.1b a night is four entries:
+the dump, its manifest, `.files/` and `.media/`. `FilesSnapshot::take($target, $disk)` takes a disk's name, and `backup:run` takes the files
+disk into `.files/` and the media disk (`catalog.images.disk`) into `.media/`, both as hard links (a rendition is written once under its
+sha256 and never changed, like a receipt photo). The manifest and the run's detail gain `media` with the same figures as `files`; a
+manifest written before reads it as empty, so its format version stays 1. Retention deletes `.media/` with its night, and the off-site copy
+(still off) copies it. A media disk that is not local records `not_local`, as the files disk does. The restore runbook restores the media
+folder with the database and the files folder of the same night. The drill is unchanged: it checks the restored database, not the files.

@@ -90,3 +90,22 @@ uses `Files`, `StoredFile` or signed URLs; the pipeline uses `ImageProcessor`; n
 - **Resizing on request** (a `?w=` parameter). Every size would be a CPU cost on the shared host and a cache key per size; three fixed
   renditions cover the pad, the till and the admin.
 - **Keeping the original upload.** It doubles the storage and keeps exactly the metadata the re-encode removes; `large` is the master.
+
+## Note, 2026-11-03 (step 6.1b): the menu, the prune and the backup
+
+- **The menu.** `GET /menu` gives every entry `image: null | {thumb, card, large, width, height}`. Orders' `MenuBuilder` reads it through
+  `ItemImages::for` once per build (one query, whatever the number of products; `MenuImageTest`). The menu's ETag already reads
+  `catalog_version`, so a photo set, replaced or removed answers a poll with a 200 and the new photo, and a poll with nothing changed still
+  gets a 304.
+- **The prune** (decision 8, plan 10.2 Q19). `bakery:prune-product-images {--days=30} {--dry-run}`, daily at 03:50 Africa/Addis_Ababa,
+  deletes the three files of a photo (one sha256 on one disk) once **every** row of every branch that names it was soft-deleted more than
+  `--days` ago. A live row keeps the files, as the plan says, and so does a row removed inside the window (a tablet may still show the
+  menu that had it). Rows are never deleted, so a later run counts a pruned photo as "already pruned". It runs after the backup of 02:30,
+  so a pruned photo stays in the hard-linked media folders of the nights before. One window stays open: an upload of exactly the same
+  bytes as a photo past the window, between its "files already there" check and its commit, while the prune deletes them. At 03:50, for a
+  photo nobody has shown for 30 days, the cost is a placeholder until the photo is uploaded again, which rewrites the missing files.
+- **The backup** (the note on ADR 0020). The nightly `backup:run` hard-links the `media` disk into the night's `.media/` folder, beside
+  `.files/`; the manifest gains `media`, and retention and the off-site copy take the folder with its night.
+- **The System page.** `GET /system/status`'s `files` gains `media_used_mb`: the live photos of every branch, a photo two products share
+  once (`ItemImages::liveBytes`, a Catalog contract, because `App\Ops` uses the modules through their contracts only). A replaced photo's
+  files, waiting for the prune, are not counted.
