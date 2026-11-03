@@ -1,7 +1,8 @@
 // Generates the shell cache (out/sw.js) after a static export (NEXT_OUTPUT=export). It precaches the shell of the
-// export (HTML, JS, CSS, fonts) so a tablet that loses Wi-Fi still opens the app, and never touches /api/: there is no
-// runtime caching at all, and the worker only answers URLs of its own precache list. Served from /app/sw.js, so its
-// scope is /app/. Without out/ (a plain `next build` for `next start`) there is nothing to do.
+// export (HTML, JS, CSS, fonts, and the shell's own pictures: the sign-in screen's photo, public/images/, step 6.2b) so a
+// tablet that loses Wi-Fi still opens the app, and never touches /api/: there is no runtime caching at all, and the worker
+// only answers URLs of its own precache list. Served from /app/sw.js, so its scope is /app/. Without out/ (a plain
+// `next build` for `next start`) there is nothing to do.
 import { existsSync } from "node:fs";
 import { generateSW } from "workbox-build";
 
@@ -13,7 +14,7 @@ if (process.env.NEXT_OUTPUT !== "export" || !existsSync("out/index.html")) {
 const { count, size, warnings } = await generateSW({
   globDirectory: "out",
   swDest: "out/sw.js",
-  globPatterns: ["**/*.{html,js,css,woff2,woff,svg,ico,png,webmanifest}"],
+  globPatterns: ["**/*.{html,js,css,woff2,woff,svg,ico,png,webp,jpg,webmanifest}"],
   globIgnores: ["sw.js", "workbox-*.js", "push-sw.js", "**/*.map"],
   // the push and notification-click handlers of the inbox (public/push-sw.js); the worker still caches nothing at runtime
   importScripts: ["push-sw.js"],
