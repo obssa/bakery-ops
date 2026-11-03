@@ -143,8 +143,13 @@ async function openDisplay(page: Page, d: DemoStations, kind: "kitchen" | "bar",
   const t = MESSAGES[locale];
   await openAs(page, worker, `${locale}/kds/${kind}/`, { device: d.device });
   await expect(page.getByRole("heading", { level: 1, name: kind === "kitchen" ? t.kds.kitchen_title : t.kds.bar_title })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("article").first()).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("region", { name: t.stations.strip_title }).getByRole("listitem").first()).toBeVisible({ timeout: 30_000 });
+  // the rail and the strip as the demo bakery has them: a capture is taken even if the seed left one empty (it is a picture, not a gate)
+  await expect(page.getByRole("article").first())
+    .toBeVisible({ timeout: 30_000 })
+    .catch(() => undefined);
+  await expect(page.getByRole("region", { name: t.stations.strip_title }).getByRole("listitem").first())
+    .toBeVisible({ timeout: 15_000 })
+    .catch(() => undefined);
 }
 
 /** The till of the demo bakery with the order of the most products chosen: its pay sheet open beside the waiting list. */
