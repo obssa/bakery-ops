@@ -26,7 +26,8 @@ import { Avatar, Chip, IconButton, type Tone } from "./ui";
 // the bell and the person (initials, name and role) with "Sign out". The "Screens" navigation keeps its name and its link names, visible
 // under the bar: at 1280 px there is no room for it beside the bar's own contents in either language. The admin console draws its sidebar
 // frame and its own `main` (AdminFrame); the sign-in screen is a split of its own, without the bar, and carries "Screens" itself. A page
-// whose calls are refused because this device is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate).
+// whose calls are refused because this device is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate). On the
+// kitchen and bar displays the whole frame, this bar included, is kitchen night (step 6.3b: `.kitchen-night`, globals.css), and only there.
 
 /** The app's mark: a brand-teal square with the line icon, hidden from readers (the name beside it, or the link around it, says it). */
 export function AppMark({ size = "md" }: { size?: "md" | "lg" }) {
