@@ -24,8 +24,8 @@ ADRs this phase writes (section 9):
 - **0022** product photos: storage and serving;
 - **0023** the design system and its tokens.
 
-The manifest's `phases.6.adrs` stays empty until step 6.5 lists both, as the brief for this step asks. `gate_check --mode done` then
-requires the files.
+The manifest's `phases.6.adrs` stays empty until step 6.5 lists both (decided for step 6.0). `gate_check --mode done` then requires the
+files.
 
 What the phase delivers, in one paragraph. Every screen moves onto one design system, "Fresh Counter":
 - a neutral ground with white surfaces and a hairline border;
@@ -178,7 +178,7 @@ The conventions are Phase 5's:
   `station_routes.php` or its `non_station_routes` list.
 
 The catalog's routes have no `/catalog` prefix (`/items`, `/items/{item}/prices`, ...). So the photo routes sit beside them as
-`/items/{item}/image`, and the brief's `/catalog/items/{item}/image` becomes that path (10.5).
+`/items/{item}/image`, and D4's `/catalog/items/{item}/image` becomes that path (10.5).
 
 ### 4.1 The photo of a product (Catalog, step 6.1a)
 
@@ -695,7 +695,7 @@ takes. Part A of 10.2 needs Ramin, part B is decided by the default unless he ob
 | Q5 | The production card's "22 of 35 min" progress bar needs a planned duration. | Shown only where the batch payload already carries one (6.3c reads it). There is no API change: the bar is simply absent otherwise. |
 | Q6 | The till's quick cash keys. | Fixed 300, 500, 1,000 and Exact, filling Received; no setting. |
 | Q7 | Thumbs on the till, the production board and Today. | Joined in the web from `GET /items?kind=product` (every role holds `catalog.view`), so no change to Orders' till list, Production or Analytics, and no new contract. |
-| Q8 | The route path. | `/api/v1/items/{item}/image`, beside the other item routes; the brief's `/catalog/...` prefix does not exist in this API. |
+| Q8 | The route path. | `/api/v1/items/{item}/image`, beside the other item routes; D4's `/catalog/...` prefix does not exist in this API. |
 | Q9 | How `--force` knows which photos the command attached. | `item_images.origin` (`upload` or `demo`). This adds one column to D1's list. |
 | Q10 | What `width`, `height` and `bytes` mean. | `width` and `height` are the `large` rendition's size, which the `srcSet` needs. `bytes` is the three files together, which the System page sums. |
 | Q11 | May an ingredient have a photo? | No: 422 `catalog.image.not_a_product`. Only products are sold from a picture. |
@@ -733,11 +733,11 @@ The live host is a shared, CPU-limited cPanel account behind Cloudflare.
 - The demo photos arrive by rsync with `apps/api/resources/`, about 10 MB once.
 - No agent runs anything against the live host. The coordinator runs the one demo-photo command (8).
 
-### 10.5 Where the brief, the spec and the code differ
+### 10.5 Where the decisions, the spec and the code differ
 
-1. The brief's `/api/v1/catalog/items/{item}/image` becomes `/api/v1/items/{item}/image` (Q8).
+1. D4's `/api/v1/catalog/items/{item}/image` becomes `/api/v1/items/{item}/image` (Q8).
 2. The spec's "Staff code" login tab and "Refunds" sidebar row wait (Q1, Q2). The branch switcher shows the name only (Q3).
-3. The coordinator's change of 2026-11-03: the server refuses below 800 × 600 after framing, and 1200 × 900 or more is only "recommended"
+3. The clarification of 2026-11-03: the server refuses below 800 × 600 after framing, and 1200 × 900 or more is only "recommended"
    in the UI. This matches D2 and spec 4.3.
 4. D1's column list gains `origin` (Q9) and `client_uuid` (rule 7: every write carries one).
 5. The spec puts the design tokens and primitives in one place (`ui.tsx`); the shared class names that server components need stay in
