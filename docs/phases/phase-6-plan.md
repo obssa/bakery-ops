@@ -441,7 +441,44 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
     - `BackupRunTest` extended (group `ops`, run by `backup-drill`).
     - `SystemStatusTest`: the new figure, and no path in it.
   - Done when `mod-orders`, `mod-catalog`, `backup-drill` and every e2e job are green.
-  - As built: (to be written by 6.1b)
+  - As built (branch `phase-6/menu-images`, 2026-11-03):
+    - **Order kept.** The tests were committed red first (`MenuImageTest`, `PruneProductImagesTest`, `BackupRunTest` and `OpsFixture`
+      with the media folder, `SystemStatusTest`), then `MenuBuilder` (the consumer, after `contract:orders->catalog` ran its image cases
+      green on `main` in 6.1a and again locally on this branch before Orders changed), the prune, the backup, the System figure, the
+      runbooks, the ADR notes, the manifest and this note.
+    - **The menu.** `MenuBuilder` takes `ItemImages` and calls `for(ids)` once per build, with the ids of the products that have a price;
+      each entry gains `image` (`null` or `ItemImageView::toArray()`). There is no `MenuItem` class: the entry is the builder's array, and
+      the web's `MenuItem` type already had `image?` from 6.2a, so `apps/web` is unchanged. `docs/openapi.json` is unchanged too: the menu's
+      200 is documented as an object.
+    - **The prune.** `Catalog\Console\PruneProductImagesCommand`, registered by `CatalogServiceProvider` and scheduled in
+      `routes/console.php` at 03:50 Addis Ababa time (`withoutOverlapping`). Decisions worth a look:
+      - a photo is one sha256 on one disk; its files go only when **every** row naming it, in any branch, was soft-deleted more than
+        `--days` ago. The plan names only "no live row"; a row removed inside the window keeps them too, which is the safer reading (a
+        tablet may still show a menu that had it). `PruneProductImagesTest` covers both;
+      - the empty folder `items/<ab>/<sha>` goes with its files; the `items/<ab>` level stays (other photos share it);
+      - output: one line, `N removed photos older than D days; P pruned (F files, B bytes), K kept (still in use), G already pruned`
+        (`would be pruned` and `(dry run, nothing deleted)` with `--dry-run`), never a path, prefix or sha. `--days` must be 1 to 99999,
+        else exit 2 (`INVALID`, as `inventory:sweep-alerts`); a file that cannot be deleted is reported and the run exits 1;
+      - the one race it cannot close (an upload of the same bytes between its "files already there" check and its commit, while the prune
+        deletes them) is written in the command and in the ADR 0022 note: at 03:50, for a photo unseen for 30 days, the cost is a
+        placeholder until the photo is uploaded again.
+    - **The backup.** `FilesSnapshot::take($target, $disk)` takes the disk's name; `BackupRunner` snapshots the files disk into `.files/`
+      and the media disk (`catalog.images.disk`) into `.media/`, both as hard links through one `snapshot()` step. `BackupFolder` gained
+      `mediaPath()` and removes `.media/` with its night; `Manifest` gained `media` (a manifest without it reads `[]`, so the format stays
+      version 1); the run's detail gained `media`; `Offsite` copies `.media/` when it exists. The drill is unchanged.
+    - **The System figure.** `files.media_used_mb` comes from `Catalog\Contracts\ItemImages::liveBytes()` (one query: the live rows of
+      every branch grouped by sha256, so a photo two products share counts once), because `App\Ops` may use the modules through their
+      contracts only (`ModuleBoundariesTest`). The web's System page (`lib/system.ts`, `SystemScreen`) does not show it yet: this step
+      does not touch `apps/web` beyond `types.ts`, so the figure waits for 6.4d, which restyles that screen.
+    - **Tests added.** Feature: `MenuImageTest` (4 cases: the payload and `include_unavailable`, no disk or prefix in the body, one
+      `item_images` read and the same query count for 2 or 8 photos, the ETag on set, replace, remove and a remove without a photo),
+      `PruneProductImagesTest` (6 cases). Extended: `BackupRunTest` (group `ops`: the media folder as hard links, 4 entries a night,
+      retention, the off-site copy, an empty media folder and a media disk that is not local), `SystemStatusTest` (the figure, a shared
+      photo once, no sha, prefix or media path in the body). Run locally: the four feature files (42 tests) and `PruneProductImagesTest`
+      with `BackupRunTest` (14 tests) green; `contract:orders->catalog` green before Orders changed.
+    - **Docs.** `docs/runbook/server.md` "Product photos" (where they live, the prune, the backup, the restore);
+      `docs/runbook/backup-restore.md` (four entries a night, the media folder in the restore, the disk and the download sections); the
+      notes on ADR 0022 and ADR 0020.
 
 - **6.1c `phase-6/demo-photos`** (API and resources; STATUS `catalog.images` `done` after it merges).
   - `apps/api/resources/demo/product-images/`: one 1600 × 1200 WebP per demo product, 4:3, under 350 KB each and 10 MB in all, supplied

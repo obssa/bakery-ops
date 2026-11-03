@@ -43,6 +43,11 @@ Schedule::command('queue:prune-failed --hours=720')->dailyAt('04:10')->timezone(
 Schedule::command('backup:run')->dailyAt('02:30')->timezone('Africa/Addis_Ababa')->withoutOverlapping(120);
 Schedule::command('backup:drill')->weeklyOn(0, '03:30')->timezone('Africa/Addis_Ababa')->withoutOverlapping(120);
 
+// Product photos (phase-6 plan 4.4 and 10.2 Q19, step 6.1b; ADR 0022): the files of a photo every row of which was replaced or removed more
+// than 30 days ago go, unless another product still shows the same photo. Daily at 03:50 in the shop's time, after the backup of 02:30 has
+// hard-linked them into the night's media folder (and after Sunday's drill); rows are never deleted. A few indexed reads when nothing is due.
+Schedule::command('bakery:prune-product-images')->dailyAt('03:50')->timezone('Africa/Addis_Ababa')->withoutOverlapping(30);
+
 // The print jobs (phase-5 plan 4.3, step 5.3a, ADR 0019): every minute, a claim the bridge did not acknowledge within a minute goes back to the
 // queue (failed after the third claim) and a receipt waiting longer than 15 minutes is expired. A few indexed reads when nothing waits.
 Schedule::command('print:sweep')->everyMinute()->withoutOverlapping(5);

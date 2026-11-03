@@ -19,7 +19,8 @@ use Throwable;
  *   1. an ops_runs row `running`; the folder resolved (BACKUP_PATH, outside the app) and what a killed run left there removed;
  *   2. the row counts of the main tables and the triggers, read just before the dump;
  *   3. mysqldump of the app's database, gzipped as it streams, as `.partial`, the credentials in a 0600 option file (MysqlClient);
- *   4. the counts again (a table that changed during the dump gets a range in the manifest), then the files folder as hard links;
+ *   4. the counts again (a table that changed during the dump gets a range in the manifest), then the files folder and (step 6.1b) the
+ *      media folder of the product photos as hard links, each in its own folder beside the dump;
  *   5. the dump renamed into place, its sha256 and size, the manifest written last (from then on it is a good backup);
  *   6. retention (30 dumps, the cap, never the newest good one), then the off-site copy when BACKUP_REMOTE is set (off by default);
  *   7. the row `ok` with its size, checksum, file name and detail.
@@ -59,11 +60,8 @@ final class BackupRunner
             $this->client->dump($connection, $partial, $folder->path);
             $after = $this->counts($connection, $tables);
 
-            $filesPartial = $folder->filesPath($dumpName).'.partial';
-            $files = $this->files->take($filesPartial);
-            if (is_dir($filesPartial) && ! rename($filesPartial, $folder->filesPath($dumpName))) {
-                throw OpsFailure::because('backup.files_failed');
-            }
+            $files = $this->snapshot($folder->filesPath($dumpName), (string) config('files.disk', 'files'));
+            $media = $this->snapshot($folder->mediaPath($dumpName), (string) config('catalog.images.disk', 'media'));
             if (! rename($partial, $folder->dumpPath($dumpName))) {
                 throw OpsFailure::because('backup.write_failed');
             }
@@ -71,7 +69,7 @@ final class BackupRunner
             $bytes = (int) filesize($folder->dumpPath($dumpName));
             $manifest = new Manifest(
                 $dumpName, $sha256, $bytes, $run->started_at->toIso8601ZuluString(), $this->commit(), $migrations,
-                $before, array_diff_assoc($after, $before), $triggers, $files,
+                $before, array_diff_assoc($after, $before), $triggers, $files, $media,
             );
             if (! $manifest->write($folder->manifestPath($dumpName))) {
                 throw OpsFailure::because('backup.write_failed');
@@ -89,6 +87,7 @@ final class BackupRunner
                 'rows' => $before,
                 'triggers' => count($triggers),
                 'files' => $files,
+                'media' => $media,
                 'kept' => $retention['kept'],
                 'kept_bytes' => $retention['kept_bytes'],
                 'deleted' => count($retention['delete']),
@@ -109,6 +108,24 @@ final class BackupRunner
 
             return $run;
         }
+    }
+
+    /**
+     * One disk's folder as hard links at $path (taken as `.partial`, renamed once whole), and its figures for the manifest.
+     *
+     * @return array{status: string, count: int, bytes: int, linked: int, copied: int}
+     *
+     * @throws OpsFailure backup.files_failed
+     */
+    private function snapshot(string $path, string $disk): array
+    {
+        $partial = $path.'.partial';
+        $taken = $this->files->take($partial, $disk);
+        if (is_dir($partial) && ! rename($partial, $path)) {
+            throw OpsFailure::because('backup.files_failed');
+        }
+
+        return $taken;
     }
 
     /** @return list<string> the main tables (config backup.main_tables) that exist in this database */

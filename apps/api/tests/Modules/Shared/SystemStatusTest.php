@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Enums\Fulfilment;
+use App\Modules\Catalog\Models\Item;
+use App\Modules\Catalog\Services\ProductPhotos;
 use App\Modules\Identity\Models\Device;
 use App\Ops\Backup\BackupFolder;
 use App\Ops\Backup\Manifest;
@@ -13,14 +16,15 @@ use Illuminate\Console\Scheduling\CallbackEvent;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /*
  * GET /system/status (step 5.5c, phase-5 plan 4.4; system.view, the admin): what the System page shows, as one conditional read.
  *   {app: {commit, released_at, migrations}, scheduler: {last_tick_at, ok}, queue: {pending, oldest_age_s, failed_24h, failed_total},
- *    backups: {last_ok_at, last_status, bytes, age_h, kept, disk_used_mb, drill: {last_at, status}}, files: {used_mb},
+ *    backups: {last_ok_at, last_status, bytes, age_h, kept, disk_used_mb, drill: {last_at, status}}, files: {used_mb, media_used_mb},
  *    devices: {enrolled, seen_15m, revoked}, flags: {...}, error_tracking: {enabled}}
- * Never a path, a key, a password or a host name. The scheduler writes `ops.scheduler.tick` in the cache every minute; the heartbeat is ok
+ * files.media_used_mb (step 6.1b) is what the live product photos take, from item_images.bytes. Never a path, a key, a password or a host name. The scheduler writes `ops.scheduler.tick` in the cache every minute; the heartbeat is ok
  * when it is at most 3 minutes old. The ETag is taken over the body, so an unchanged status answers 304 and a new backup a new tag.
  */
 
@@ -71,7 +75,7 @@ it('answers the admin with the whole shape of plan 4.4', function () {
         'scheduler' => ['last_tick_at', 'ok'],
         'queue' => ['pending', 'oldest_age_s', 'failed_24h', 'failed_total'],
         'backups' => ['last_ok_at', 'last_status', 'bytes', 'age_h', 'kept', 'disk_used_mb', 'drill' => ['last_at', 'status']],
-        'files' => ['used_mb'],
+        'files' => ['used_mb', 'media_used_mb'],
         'devices' => ['enrolled', 'seen_15m', 'revoked'],
         'flags' => ['require_enrolled_device', 'require_shift_for_cash', 'require_shift_for_station_locations', 'open_ad_hoc_on_accept'],
         'error_tracking' => ['enabled'],
@@ -181,6 +185,26 @@ it('adds up the stored files of the host in whole MiB, without the deleted ones 
     expect(($this->status)()->json('files.used_mb'))->toBe(5);
 });
 
+it('adds up the live product photos of the host in whole MiB: every branch, a photo two products share once, never a removed one', function () {
+    $other = Branch::factory()->create();
+    $item = fn (Branch $branch): int => Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $branch->id])->id;
+    $photo = fn (Branch $branch, string $sha, int $bytes, array $over = []): array => $over + [
+        'branch_id' => $branch->id, 'item_id' => $item($branch), 'sha256' => $sha, 'width' => 1600, 'height' => 1200, 'mime' => 'image/webp',
+        'bytes' => $bytes, 'disk' => 'media', 'key_prefix' => 'items/'.substr($sha, 0, 2).'/'.$sha, 'origin' => 'upload',
+        'uploaded_by_user_id' => null, 'client_uuid' => (string) Str::uuid(), 'created_at' => now(), 'updated_at' => now(), 'deleted_at' => null,
+    ];
+    expect(($this->status)()->json('files.media_used_mb'))->toBe(0, 'no photo yet');
+
+    DB::table('item_images')->insert([
+        $photo($this->branch, str_repeat('1', 64), 3 * 1048576),
+        $photo($this->branch, str_repeat('1', 64), 3 * 1048576), // a second product with the same photo: the same files
+        $photo($other, str_repeat('2', 64), 1048576 + 600000),
+        $photo($this->branch, str_repeat('3', 64), 50 * 1048576, ['deleted_at' => now()]), // replaced or removed: not shown any more
+    ]);
+
+    expect(($this->status)()->json('files'))->toBe(['used_mb' => 0, 'media_used_mb' => 5]);
+});
+
 it('shows the rollout flags and whether error tracking is on, never the DSN', function () {
     config([
         'identity.require_enrolled_device' => true,
@@ -209,6 +233,10 @@ it('never puts a path, a key, a password or a host name in the body', function (
     ]);
     statusRun('backup', 'failed', '2026-11-20 05:00:00', '2026-11-20 05:00:10', ['detail' => ['failure_key' => 'backup.dump_failed']]);
     statusDump($this->folder, '20261120-023000Z', 1);
+    Storage::fake(config('catalog.images.disk'));
+    config(['catalog.images.format' => 'jpeg']);
+    withActor($this->admin->id);
+    $photo = app(ProductPhotos::class)->set(Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $this->branch->id]), imgJpeg(1200, 900), null, (string) Str::uuid());
     config([
         'sentry.dsn' => 'https://feedfacefeedfacefeedfacefeedface@o7.ingest.sentry.example.test/77',
         'backup.drill_database' => 'bakery_drill_scratch',
@@ -224,6 +252,7 @@ it('never puts a path, a key, a password or a host name in the body', function (
         'feedfacefeed', 'sentry.example.test', 'bakery_drill_scratch', 'offsite-remote', 'telegram-token-value', 'status-host.example.test',
         (string) ($connection['host'] ?? ''), (string) ($connection['password'] ?? ''), (string) ($connection['database'] ?? ''),
         (string) ($connection['username'] ?? ''), (string) config('app.key'), '/home/', '/tmp/', '/var/',
+        $photo->sha256, $photo->key_prefix, 'items/', 'media/', '"media"',
     ], fn (string $s): bool => strlen($s) >= 3);
 
     foreach ($forbidden as $needle) {

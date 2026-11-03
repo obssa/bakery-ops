@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Support;
 
+use App\Modules\Catalog\Contracts\ItemImages;
 use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Catalog\Contracts\ModifierOffer;
 use App\Modules\Catalog\Contracts\Modifiers;
@@ -26,12 +27,15 @@ use Carbon\CarbonImmutable;
  * polling): the live, active products with a price in force (Prices::atMany), each routed to a station
  * (Routing::stationsForMany) and so to the location its stock is at (Locations::idsForProducts: the station's, else the
  * display case; ?location= overrides it for every product), the stock there from one Availability::bulk call per
- * location, the modifiers (Modifiers::offeredFor), is_new from Catalog. Ingredients are never listed.
+ * location, the modifiers (Modifiers::offeredFor), is_new from Catalog, and (step 6.1b, phase-6 plan 4.3) the display photo from one
+ * ItemImages::for call (contract orders->catalog). Ingredients are never listed.
  *
  *   available      units that can be sold now, a 4 dp decimal string, 0 at a location the branch has not set up
  *   low            1 to 3 units left (LOW_AT); a product with none is not "low", it is unavailable
  *   unavailable_reason  only on an unavailable product, which is listed only with include_unavailable:
  *                  out_of_stock, or no_location (its station has no stock location yet)
+ *   image          null, or {thumb, card, large, width, height}: the public media route's absolute paths and the large rendition's size
+ *                  (Catalog\Contracts\ItemImageView); a photo set, replaced or removed moves catalog_version, so the ETag moves with it
  *
  * etag() is the cheap read behind the 304: the fingerprints of Catalog's tables and of the ledger plus what the request
  * asked for, so the body is built only when something the menu shows has moved.
@@ -48,6 +52,7 @@ final class MenuBuilder
         private readonly Prices $prices,
         private readonly Routing $routing,
         private readonly Modifiers $modifiers,
+        private readonly ItemImages $images,
         private readonly Locations $locations,
         private readonly Availability $availability,
         private readonly Stock $stock,
@@ -101,7 +106,9 @@ final class MenuBuilder
             $available += $this->availability->bulk($group, $at);
         }
 
-        $offers = $this->modifiers->offeredFor(array_map(static fn (Item $item): int => $item->id, $list));
+        $ids = array_map(static fn (Item $item): int => $item->id, $list);
+        $offers = $this->modifiers->offeredFor($ids);
+        $images = $this->images->for($ids);
 
         $entries = [];
         foreach ($list as $item) {
@@ -122,6 +129,7 @@ final class MenuBuilder
                 'available' => $units->toString(),
                 'low' => $isAvailable && $units->isLessThanOrEqualTo(self::LOW_AT),
                 'is_new' => $this->items->isNew($item, $now),
+                'image' => ($images[$item->id] ?? null)?->toArray(),
                 'station_id' => $stations[$item->id]?->id,
                 'location_id' => $at,
                 'modifiers' => array_map(static fn (ModifierOffer $o): array => [

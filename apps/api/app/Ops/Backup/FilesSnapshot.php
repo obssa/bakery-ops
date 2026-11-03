@@ -11,10 +11,12 @@ use RecursiveIteratorIterator;
 use SplFileInfo;
 
 /**
- * The files folder beside the dump (ADR 0020): every file of the private files disk (config files.disk, ADR 0015) as a hard link in
- * the night's `.files` folder. A receipt photo is written once and never changed, so a link costs no space while the app keeps the
- * file, and still keeps a photo the app later purges. A link that cannot be made (another file system) falls back to a copy, counted
- * apart. A disk that is not local (FILES_DISK=files_s3) has no folder to snapshot: the bucket keeps its own versions.
+ * A disk's folder beside the dump (ADR 0020): every file of a local disk as a hard link in a folder of the night. BackupRunner takes
+ * two: the private files disk (config files.disk, ADR 0015) into `.files`, and since step 6.1b the product photos' media disk (config
+ * catalog.images.disk, ADR 0022) into `.media`. Both hold files written once and never changed (a receipt photo; a rendition named by
+ * its sha256), so a link costs no space while the app keeps the file, and still keeps a file the app later purges (the orphan sweep, the
+ * photo prune). A link that cannot be made (another file system) falls back to a copy, counted apart. A disk that is not local
+ * (FILES_DISK=files_s3, or a bucket for the photos) has no folder to snapshot: the bucket keeps its own versions.
  */
 final class FilesSnapshot
 {
@@ -23,9 +25,8 @@ final class FilesSnapshot
      *
      * @throws OpsFailure backup.files_failed
      */
-    public function take(string $target): array
+    public function take(string $target, string $disk): array
     {
-        $disk = (string) config('files.disk', 'files');
         $root = (string) config("filesystems.disks.{$disk}.root");
         if ((string) config("filesystems.disks.{$disk}.driver") !== 'local' || $root === '') {
             return ['status' => 'not_local', 'count' => 0, 'bytes' => 0, 'linked' => 0, 'copied' => 0];

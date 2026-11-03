@@ -10,7 +10,8 @@ use JsonException;
  * The JSON beside a dump (ADR 0020): what the restore drill checks the restored database against. `rows` holds the row count of each
  * main table read just before the dump started and `rows_after` the count read just after it ended, for the tables that changed
  * meanwhile (the dump is one consistent snapshot taken in between, so a restored count lies between the two). `triggers` names every
- * trigger the database had; `files` describes the snapshot of the files folder. A dump without its manifest is not a good backup.
+ * trigger the database had; `files` describes the snapshot of the files folder and `media` (step 6.1b) the snapshot of the media folder,
+ * the product photos (read as [] from a manifest written before it). A dump without its manifest is not a good backup.
  */
 final readonly class Manifest
 {
@@ -23,6 +24,7 @@ final readonly class Manifest
      * @param  array<string, int>  $rowsAfter
      * @param  list<string>  $triggers
      * @param  array<array-key, mixed>  $files
+     * @param  array<array-key, mixed>  $media
      */
     public function __construct(
         public string $dump,
@@ -35,6 +37,7 @@ final readonly class Manifest
         public array $rowsAfter,
         public array $triggers,
         public array $files,
+        public array $media = [],
     ) {}
 
     /**
@@ -69,6 +72,7 @@ final readonly class Manifest
             'rows_after' => $this->rowsAfter === [] ? (object) [] : $this->rowsAfter,
             'triggers' => $this->triggers,
             'files' => $this->files,
+            'media' => $this->media,
         ];
     }
 
@@ -114,6 +118,7 @@ final readonly class Manifest
             self::counts($data['rows_after'] ?? []),
             array_values(array_map('strval', is_array($data['triggers'] ?? null) ? $data['triggers'] : [])),
             is_array($data['files'] ?? null) ? $data['files'] : [],
+            is_array($data['media'] ?? null) ? $data['media'] : [],
         );
     }
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Ops\Backup\BackupFolder;
 use App\Ops\Backup\Manifest;
 use App\Ops\Models\OpsRun;
 use App\Shared\Events\BackupFailed;
@@ -17,7 +18,8 @@ use Tests\Support\OpsFixture;
 /*
  * `backup:run` (phase-5 plan 5.5b and section 7; ADR 0020) against the test server with the real mysqldump of the API image (the MariaDB
  * 10.11 client the live host has): the rows are committed (CommitsForConcurrency) so the dump's own connection sees them. The backup
- * folder and the files folder are temporary folders outside the app (OpsFixture). Only the backup-drill CI job runs this group.
+ * folder, the files folder and the media folder (the product photos, step 6.1b) are temporary folders outside the app (OpsFixture). Only
+ * the backup-drill CI job runs this group.
  */
 
 pest()->group('ops');
@@ -32,9 +34,14 @@ afterEach(function () {
     $this->ops->tearDown();
 });
 
-it('writes a gzipped dump, its manifest and the files folder as hard links, and records an ok run without a path', function () {
+it('writes a gzipped dump, its manifest, the files folder and the media folder as hard links, and records an ok run without a path', function () {
     $this->ops->ledger();
     file_put_contents($this->ops->files.'/receipts/photo.jpg', 'a receipt photo');
+    $sha = str_repeat('ab', 32);
+    mkdir($this->ops->media.'/items/ab/'.$sha, 0700, true);
+    foreach (['thumb', 'card', 'large'] as $rendition) {
+        file_put_contents($this->ops->media.'/items/ab/'.$sha.'/'.$rendition.'.webp', "a product photo, {$rendition}");
+    }
 
     expect(Artisan::call('backup:run'))->toBe(0, Artisan::output());
 
@@ -62,10 +69,16 @@ it('writes a gzipped dump, its manifest and the files folder as hard links, and 
         ->and($manifest->rows['stock_movements'])->toBe(DB::table('stock_movements')->count())
         ->and($manifest->rows['stock_movements'])->toBeGreaterThan(0)
         ->and($manifest->triggers)->toContain('stock_movements_forbid_update_delete_update', 'audit_log_forbid_update_delete_delete')
-        ->and($manifest->files)->toMatchArray(['status' => 'ok', 'count' => 1, 'linked' => 1, 'copied' => 0]);
+        ->and($manifest->files)->toMatchArray(['status' => 'ok', 'count' => 1, 'linked' => 1, 'copied' => 0])
+        ->and($manifest->media)->toMatchArray(['status' => 'ok', 'count' => 3, 'linked' => 3, 'copied' => 0])
+        ->and($manifest->media['bytes'])->toBe(strlen('a product photo, thumb') + strlen('a product photo, card') + strlen('a product photo, large'))
+        ->and($run->detail['media'] ?? null)->toBe($manifest->media);
 
     $snapshot = $this->ops->folder.'/'.OpsFixture::base($name).'.files/receipts/photo.jpg';
     expect(fileinode($snapshot))->toBe(fileinode($this->ops->files.'/receipts/photo.jpg'), 'a hard link, not a copy');
+    $photo = $this->ops->folder.'/'.OpsFixture::base($name).'.media/items/ab/'.$sha.'/card.webp';
+    expect(fileinode($photo))->toBe(fileinode($this->ops->media.'/items/ab/'.$sha.'/card.webp'), 'the media folder beside the files folder, hard links too')
+        ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($name).'.files/items'))->toBeFalse('the two folders are kept apart');
 
     $stored = (string) json_encode([$run->detail, $run->path_hint]);
     expect($stored)->not->toContain($this->ops->folder)->not->toContain(sys_get_temp_dir().'/')
@@ -116,7 +129,7 @@ it('fails with a key, raises BackupFailed, leaves nothing of the night and keeps
     $failed = OpsRun::query()->where('status', 'failed')->sole();
     expect($failed->detail)->toMatchArray(['failure_key' => 'backup.dump_failed', 'exit_code' => 1])
         ->and($failed->path_hint)->toBeNull()
-        ->and(glob($this->ops->folder.'/bakery-ops-*') ?: [])->toHaveCount(3, 'the first night only: dump, manifest and files folder')
+        ->and(glob($this->ops->folder.'/bakery-ops-*') ?: [])->toHaveCount(4, 'the first night only: dump, manifest, files folder and media folder')
         ->and(file_exists($this->ops->folder.'/'.$first))->toBeTrue();
     Event::assertDispatched(BackupFailed::class, fn (BackupFailed $e): bool => $e->runId === $failed->id && $e->failureKey === 'backup.dump_failed'
         && $e->kind === 'backup' && $e->ageH === 0);
@@ -138,6 +151,7 @@ it('keeps 30 dumps by default and BACKUP_KEEP when set: the oldest go with their
         file_put_contents($this->ops->folder.'/'.$name, 'x');
         (new Manifest($name, hash('sha256', 'x'), 1, '2026-01-01T00:30:00Z', null, 1, [], [], [], []))->write($this->ops->folder.'/'.OpsFixture::base($name).'.json');
         mkdir($this->ops->folder.'/'.OpsFixture::base($name).'.files');
+        mkdir($this->ops->folder.'/'.OpsFixture::base($name).'.media');
     }
     file_put_contents($this->ops->folder.'/bakery-ops-20260104-003000Z.sql.gz', 'no manifest');
     config(['backup.keep' => 2]);
@@ -150,10 +164,12 @@ it('keeps 30 dumps by default and BACKUP_KEEP when set: the oldest go with their
     expect($left)->toBe([$old[2], $new])
         ->and(file_exists($this->ops->folder.'/'.OpsFixture::base($old[0]).'.json'))->toBeFalse()
         ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($old[0]).'.files'))->toBeFalse()
+        ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($old[0]).'.media'))->toBeFalse('the media folder goes with its night')
+        ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($old[2]).'.media'))->toBeTrue()
         ->and(OpsRun::query()->where('status', 'ok')->sole()->detail)->toMatchArray(['kept' => 2, 'deleted' => 3, 'over_cap' => false]);
 });
 
-it('copies nothing off site while BACKUP_REMOTE is unset, and the dump, manifest and files through rclone when it is set', function () {
+it('copies nothing off site while BACKUP_REMOTE is unset, and the dump, manifest, files and media through rclone when it is set', function () {
     Process::fake();
     expect(Artisan::call('backup:run'))->toBe(0)
         ->and(OpsRun::query()->where('kind', 'offsite')->count())->toBe(0);
@@ -170,6 +186,25 @@ it('copies nothing off site while BACKUP_REMOTE is unset, and the dump, manifest
         ->and(OpsRun::query()->where('kind', 'backup')->orderByDesc('id')->value('detail'))->toMatchArray(['offsite' => 'ok']);
     Process::assertRan(fn (PendingProcess $p): bool => $p->command === ['rclone', 'copyto', $this->ops->folder.'/'.$name, "offsite:bakery-ops/{$name}"]);
     Process::assertRan(fn (PendingProcess $p): bool => is_array($p->command) && $p->command[1] === 'copy' && $p->command[3] === 'offsite:bakery-ops/'.OpsFixture::base($name).'.files');
+    Process::assertRan(fn (PendingProcess $p): bool => is_array($p->command) && $p->command[1] === 'copy' && $p->command[3] === 'offsite:bakery-ops/'.OpsFixture::base($name).'.media');
+    expect($offsite->detail)->toBe(['copies' => 4]);
+});
+
+it('snapshots an empty media folder on a host with no product photo yet, and says not_local for a media disk that is not a folder', function () {
+    BackupFolder::removeTree($this->ops->media);
+
+    expect(Artisan::call('backup:run'))->toBe(0, Artisan::output());
+    $name = (string) OpsRun::query()->where('status', 'ok')->value('path_hint');
+    $manifest = Manifest::read($this->ops->folder.'/'.OpsFixture::base($name).'.json');
+    expect($manifest?->media)->toBe(['status' => 'ok', 'count' => 0, 'bytes' => 0, 'linked' => 0, 'copied' => 0])
+        ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($name).'.media'))->toBeTrue();
+
+    $this->travel(1)->minutes();
+    config(['filesystems.disks.media' => ['driver' => 's3', 'bucket' => 'photos']]);
+    expect(Artisan::call('backup:run'))->toBe(0, Artisan::output());
+    $name = (string) OpsRun::query()->where('status', 'ok')->orderByDesc('id')->value('path_hint');
+    expect(Manifest::read($this->ops->folder.'/'.OpsFixture::base($name).'.json')?->media)->toMatchArray(['status' => 'not_local', 'count' => 0])
+        ->and(is_dir($this->ops->folder.'/'.OpsFixture::base($name).'.media'))->toBeFalse('a bucket keeps its own versions');
 });
 
 it('is scheduled every night at 02:30 Addis Ababa time and never twice at once', function () {

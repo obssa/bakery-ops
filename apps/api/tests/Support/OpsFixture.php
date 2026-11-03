@@ -16,9 +16,9 @@ use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * The backup and drill tests of tests/Ops (step 5.5b): a backup folder and a files folder of their own under the system's temporary
- * folder (outside the app, as on the host), a small committed ledger and a chain of two links, and the drill's scratch database
- * (SCRATCH_DB_DATABASE, default bakery_scratch) read through a probe connection of its own.
+ * The backup and drill tests of tests/Ops (step 5.5b): a backup folder, a files folder and (step 6.1b) a media folder of their own under
+ * the system's temporary folder (outside the app, as on the host), a small committed ledger and a chain of two links, and the drill's
+ * scratch database (SCRATCH_DB_DATABASE, default bakery_scratch) read through a probe connection of its own.
  */
 final class OpsFixture
 {
@@ -26,12 +26,17 @@ final class OpsFixture
 
     public string $files;
 
+    /** The root of the media disk: the product photos (step 6.1b, ADR 0022). */
+    public string $media;
+
     public function __construct()
     {
         $base = sys_get_temp_dir().'/bakery-ops-test-'.bin2hex(random_bytes(6));
         $this->folder = $base.'/backups';
         $this->files = $base.'/files';
+        $this->media = $base.'/media';
         mkdir($this->files.'/receipts', 0700, true);
+        mkdir($this->media.'/items', 0700, true);
         config([
             'backup.path' => $this->folder,
             'backup.keep' => 30,
@@ -40,6 +45,8 @@ final class OpsFixture
             'backup.drill_database' => ScratchCopy::database(),
             'files.disk' => 'files',
             'filesystems.disks.files.root' => $this->files,
+            'catalog.images.disk' => 'media',
+            'filesystems.disks.media.root' => $this->media,
         ]);
     }
 
@@ -95,7 +102,7 @@ final class OpsFixture
         $schema->dropAllTables();
     }
 
-    /** The night's name without `.sql.gz`, for its manifest and files folder. */
+    /** The night's name without `.sql.gz`, for its manifest, files folder and media folder. */
     public static function base(string $dumpName): string
     {
         return substr($dumpName, 0, -strlen('.sql.gz'));

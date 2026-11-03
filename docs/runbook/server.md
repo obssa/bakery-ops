@@ -624,6 +624,29 @@ figures describe the code under load, not this host.
   to the queue (failed after the third claim) and a receipt waiting longer than 15 minutes is expired. A few indexed reads when nothing
   waits. A till sees "no printer" (409 `payments.print.no_bridge`) when no bridge was seen for two minutes.
 
+## Product photos (Phase 6, steps 6.1a and 6.1b; ADR 0022)
+
+- **Where they live.** The `media` disk (`CATALOG_IMAGES_DISK`, default `media`): `storage/app/private/media/items/<ab>/<sha256>/` under
+  the app folder, one folder per photo with its three renditions (`thumb`, `card`, `large`, WebP on this host's `gd`, JPEG elsewhere). It
+  is under `storage/`, never `public/`, so the deploy's `rsync --delete` never touches it, and the web server does not serve it: the public
+  `GET /api/v1/media/items/<sha256>/<rendition>.<ext>` streams a file while a live `item_images` row names it (no sign-in, cached for a
+  year as immutable, so tablets, browsers and Cloudflare ask once). A photo is about 200 to 400 KB for its three files; two products with
+  the same photo share one folder. The System page shows what the live photos take (`files.media_used_mb`).
+- **Who.** The admin sets, replaces and removes a product's photo from the product page (`catalog.manage`). A replace or a remove keeps the
+  old row (who did it is in the audit log) and its files, until the prune.
+- **The prune.** `bakery:prune-product-images` runs daily at 03:50 Addis Ababa time on the existing `schedule:run` cron line (no new cron
+  line). It deletes the files of a photo whose rows were all replaced or removed more than 30 days ago, unless a live row of any branch
+  uses the same photo. Rows are never deleted. It prints how many photos it pruned and the bytes, never a path. To see what it would do:
+  `php artisan bakery:prune-product-images --dry-run`; `--days=60` keeps removed photos longer. It runs after the nightly backup, so the
+  files of a pruned photo are still in the backups of the nights before.
+- **The backup.** Since step 6.1b the nightly `backup:run` hard-links the `media` folder into the night's `bakery-ops-<night>.media/`
+  folder, beside `.files/` (docs/runbook/backup-restore.md, "Where the dumps are"). The manifest's `media` figures count its files. The
+  weekly drill is unchanged: it checks the database, not the photos.
+- **The restore.** Restore the `media` folder with the database and the files folder of the same night: `rsync -a --delete
+  <folder>/bakery-ops-<night>.media/ <app>/storage/app/private/media/` (docs/runbook/backup-restore.md, "A full restore by hand", step 5).
+  A database restored without it has photo rows whose URLs answer 404: the products show their placeholder until the folder is back.
+  Nothing else breaks, and uploading the photo again rewrites a missing file.
+
 ## Manual operations
 
 - Deploy without a new commit: GitHub → Actions → deploy → Run workflow.
