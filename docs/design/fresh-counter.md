@@ -258,7 +258,10 @@ Three zones from left to right.
     - Team: People, Shifts, Devices;
     - Insight: Analytics, Audit log;
     - System.
-  - The user card sits at the bottom.
+  - The user card sits at the bottom: initials, name and role, with the bell beside it and the sync chip above it. The card opens the
+    account menu: the calendar ("Dates"), the language and "Sign out".
+  - Last, "Stations": the station screens (the "Screens" navigation).
+- An admin page has no station top bar and no "Screens" strip: it is the sidebar and the content (step 6.4a).
 - Below 1024 px the sidebar becomes a drawer behind a menu button in a 60 px top bar.
 - **Content:** max width 1160 px, 32 px padding (16 on a phone). Each page has a title row: the page title (30 / 700) with the Amharic
   title in `neutral-600` beside it, a one-line intro, and the page actions on the right.
@@ -267,15 +270,16 @@ Three zones from left to right.
 
 - KPI row of four Stats: Sales, Orders, Average ticket, Refunds.
 - Then "Sales by hour" (bars, the current hour `brand-600`, the others `brand-100`) and "Payments by channel" (share bars).
-- Then "Top sellers today": the 5 best products, each with a 44 px thumb, name, units and amount.
+- Then "Top sellers today": the 5 best products, each with a 52 × 39 thumb (4:3, as the Admin board draws it), name, units and amount.
 - Then "Stock alerts", "Shifts" and "System" cards.
 
 ### 4.3 Catalog
 
 - **List.**
   - A toolbar with search, a kind filter (Products, Ingredients), a category filter and "Add product".
-  - The default view is a table: a 48 px thumb, the name (English over Amharic), category, price, station, a status chip
-    (Active, Hidden, New) and a chevron.
+  - The default view is a table: a 64 × 48 thumb, the name (English over Amharic), category, where it is sold from, price, a status
+    chip (On the menu, Hidden, New) and a chevron.
+  - "Add product" opens the new item form (and the categories) in a drawer.
   - A grid toggle shows the products as pad cards, as a waiter would see them.
   - Products without a photo show the placeholder plus an "Add photo" link in the row.
 - **Product page.** Two columns: the form on the left (names, category, price, station, refund settings, all as now) and a sticky

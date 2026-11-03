@@ -810,7 +810,79 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
     `SegmentedControl` for table or grid (the 6.3a `ProductCard`); "Add photo" on a product without one, which opens the product page at
     its Photo card.
   - `p6-a11y`: admin Today and the catalog list in `en` and `am`.
-  - As built: (to be written by 6.4a)
+  - **As built (step 6.4a, `phase-6/web-admin-today`).** Branched from 6.3a's `phase-6/web-pad` (its `ProductCard` and frame), with
+    `lib/productImages.ts` and `lib/images/orderThumbs.ts` copied unchanged from 6.3b's branch. Web only, plus the review sheet's screen
+    names (`scripts/i18n_export.py`: `admin` is every admin screen's sidebar now, `today` is `/admin`) and the spec's lines in
+    fresh-counter.md 4.1 to 4.3. No API, route, registry, OpenAPI or ERD change. Where the code chose what the plan left open:
+    - **The frame, as the board draws it** (Ramin saw it wrong on live: every admin page showed the station top bar and the "Screens"
+      strip above the sidebar). An admin page is now the sidebar and the content: `AppShell` draws neither the top bar nor the outbox band
+      in the `admin` frame, and `AdminFrame` draws the band above its `main`. The 264 px sidebar holds the mark and the name (the way
+      home); the sections, Today first (no group), then Sell, Make, Team, Insight and System, still the `navigation` "Admin sections" with
+      the same link names, permission filters and `aria-current` (Today is current on `/admin` only); "Stations", the `navigation`
+      "Screens" with the station screens' link names (the console itself is the page); and at its foot the sync chip and the person's card
+      (initials, name, role) with the bell beside it. The card opens the account menu above it (a labelled group): "Dates" (the
+      calendar select, `DateDisplaySwitch look="field"`), the language button and "Sign out", with their names. From 1024 px the sidebar
+      holds the window's height (sticky, `z-20` so the bell's panel and the menu float over the content) and its sections scroll between
+      the mark and the card; below 1024 px it is the drawer of the 60 px bar's menu button, as in 6.2b. The bell opens its panel above it
+      (`NotificationBell placement="above"`, 44 px). The content is at most 1160 px, left-aligned as on the board, 32 px down and 40 px
+      across from 1280 px. The branch's name is still not shown: no endpoint every role may read names it (Q3), and this step is web only.
+      `PermittedCard` is gone with the old overview's cards.
+    - **Today** (`components/today/TodayScreen.tsx`): the title row "Today · ዛሬ" (the Amharic twin on the English page); the intro is the
+      day in both calendars, whatever the person's "Dates" choice (the board's line), then "updated … ago" from the freshness feed for the
+      dashboards' readers; "Compare with last <weekday>" (the Sales page by day over the eight days) and "Export day" (the day's sales
+      report as Excel, `GET /analytics/exports/sales`). For `analytics.view`: the KPI row (Sales, Orders, Average ticket, Refunds) from
+      `GET /analytics/overview` for today, each against the same weekday a week before (a second overview of that one day; "Up 12.3 % on
+      last Tuesday", red when down; Refunds with its count); "Sales by hour" (`/analytics/sales/hourly`, 06:00 to 17:00 widened to any hour
+      that sold and to the hour it is now, the current hour `brand-600`, the others `brand-100`, a `role="img"` named by its highest hour);
+      "Top sellers today" and "Payments by channel" read the five best sellers and the channels' shares **the overview already carries**,
+      rather than `/analytics/items` and `/analytics/channels` (the same figures, one read fewer). The sellers carry a 52 × 39 thumb (the
+      board's size; the plan said 44 px) through `useProductImages`. For `inventory.view`: "Stock alerts", the reorder list, out before
+      low, four rows and "N more", with "Plan a purchase" to the reorder page. For `stations.all`: "Shifts · ፈረቃዎች", the stations from
+      `GET /me` work_stations (the shifts screens' query, every 15 s) with since when and the state chip, "Roster" to the roster. For
+      `system.view`: "System" in four lines from the System page's feed. A person without `analytics.view` gets "My figures" (their own,
+      `analytics.view_own`) in the dashboards' place, so Today is never empty. Cards are the board's: white, 18 px radius, 20 px padding;
+      a figure of a day not built is "—" with "Not built yet". Whole amounts drop their ".00" ("ETB 18,420") as the board writes them.
+    - **The catalog list** (`admin/catalog/CatalogScreen.tsx`): one kind at a time, products by default. The title row counts the active
+      products and those still without a photo, with "Add product" ("Add ingredient" under Ingredients) for `catalog.manage`. The toolbar:
+      Products and Ingredients as two links in a segment track (the `navigation` "Show", `?kind=`, the current one `brand-50`, its count
+      `aria-hidden`); the search (either name, any case, in the browser; Escape or X clears it); "Filter by category" (a select over the
+      kind's categories); for products the table or pad-card toggle (two pressed icon buttons, the current one ink; `?view=grid`). The
+      product table (the board's columns): the 64 × 48 thumb or its category's placeholder; the name in the page's language over the other
+      one (in its own `lang`), and "Add photo" for the admin on a product without one, the product page at `#photo` (6.4b's Photo card); the
+      category; where it is sold from (the stations its lines go to, or "Display case" for one sold from stock) over how it is made; the
+      current price; the status chip (New in brand teal, On the menu, Hidden); the chevron "Open <name>". The list carries no price, so a
+      row asks for its own (`GET /items/{item}/prices`, the product page's query) once it comes into view (`lib/useSeen.ts`, one shared
+      IntersectionObserver): the live E2E branch holds thousands of items. The ingredient table: name, category, unit, SKU, status (In use,
+      Hidden). The grid: the active products as 6.3a's `ProductCard` in preview mode (its price read the same way, no stock shown: the
+      catalog does not know it), each card a link to its page, "Add photo" as a chip on the placeholder's corner. "Add product" opens a
+      `Drawer` (the dialog "New item") with the new item form and the categories (the list and "Add category"); they no longer sit in a
+      column beside the list. The table no longer shows the kind, the unit, the SKU or the refund settings of a product: the board's
+      columns; the product page shows them.
+    - **Specs changed, in the same commits as the screens** (old selector, new selector, why):
+      - p0 admin-smoke `signIn`: h1 "Admin console" → h1 "Today": the console's first page is Today.
+      - p0 admin-smoke, p1 order-flow-board: the top bar's links "አማርኛ" and "English" → `openAccountMenu` (`e2e/support/admin.ts`), then
+        the same links; p4 dashboards-audit-live: the top bar's "Dates" → `openAccountMenu`, then the same label: an admin page has no top
+        bar.
+      - p0 admin-smoke: the link "የአስተዳዳሪ ኮንሶል" on the Amharic catalog → the "Today" link (ዛሬ) of "Admin sections": "Admin console" is no
+        longer a link on an admin page.
+      - p0 admin-smoke, p4 pay-refund: the regions and form "New item" and "Categories" of the page → the same, in the dialog "New item"
+        that "Add product" opens: the form is a drawer. p0 closes it before reading the table.
+      - p0 admin-smoke: the link "All" and a row's kind ("Ingredient", "Product", "ግብዓት", "ምርት") → the ingredient under "Ingredients",
+        the product under "Products", and a row's fulfilment ("Made in batches", "Made to order"): the list shows one kind at a time.
+      - p4 pay-refund (CI only): the list's "Back to stock" → removed: the board's table has no Refunds column; the API read and the
+        product page still check both settings.
+      - p3 handover-admin: h1 "Admin console" and the region "Stations and shifts" → h1 "Today" and the region "Shifts": Today's card
+        replaces the old panel (it reads the same `GET /me`).
+    - Messages, both languages: `admin.today`, `group_stations`, `account_menu`; the `today` namespace (61 keys); `catalog.intro`
+      reworded and `intro_products`, `intro_ingredients`, `add_product`, `add_ingredient`, `search`, `search_label`, `clear_search`,
+      `no_match`, `filter_category`, `all_categories`, `view`, `view_table`, `view_grid`, `grid`, `col_product`, `col_ingredient`,
+      `col_sold_from`, `col_price`, `col_status`, `col_open`, `sold_display`, `status_*` (4), `price_none`, `add_photo`, `open_item`,
+      `close`, `categories_intro`; removed `admin.title`, `admin.intro`, the ten `admin.*_desc`, `catalog.filter_all`, `col_name`,
+      `col_kind`, `col_fulfilment`. `docs/i18n/am-review.csv` regenerated.
+    - Tests: `e2e/p6/screens.spec.ts` gains Today at 1440 × 900 in `en` and `am`, the catalog list as a table, as pad cards and with the
+      new item drawer, the Orders board in the new frame, and Today with the sidebar's drawer at 820 × 1180, as the demo bakery's admin;
+      `p6-a11y` gains Today with its account menu open and the catalog list's table (a product with a photo), grid and drawer, in `en` and
+      `am`. STATUS `web.admin` `in_progress` (done after 6.4d).
 
 - **6.4b `phase-6/web-photo-manager`** (needs 6.3a).
   - The product page in two columns, with a sticky Photo card (spec 4.3): `components/catalog/PhotoCard.tsx` and `PhotoFramer.tsx`.
