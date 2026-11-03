@@ -17,7 +17,7 @@ use Illuminate\Database\Seeder;
  */
 final class DemoSeeder extends Seeder
 {
-    public const int LAST_PHASE = 5;
+    public const int LAST_PHASE = 6;
 
     public function run(): void
     {
