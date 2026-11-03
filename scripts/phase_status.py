@@ -5,6 +5,8 @@ Stdlib only. Run from anywhere inside the repo.
 
   phase_status.py show
   phase_status.py init                      # create STATUS.json from the manifest (phase 0 in_progress)
+  phase_status.py add-phase N               # add the STATUS entry of a phase the manifest gained after init (step 6.0):
+                                            # planning, and current_phase N, when phase N-1 is done (as claim-done does)
   phase_status.py set-phase-status N STATUS # todo|planning|plan_approved|in_progress|gate_pending|done
   phase_status.py module NAME STATUS        # todo|in_progress|done   (within the module's phase)
   phase_status.py module-stable NAME        # top-level module status -> stable (after gate_check --mode module)
@@ -85,26 +87,39 @@ def gate_refusal(p: dict, phase: str) -> list[str] | None:
     return rows or ((proc.stdout or "") + (proc.stderr or "")).strip().splitlines()[-8:] or ["gate_check failed with no output"]
 
 
+def phase_entry(manifest: dict, n: str, phase_status: str) -> dict:
+    """The STATUS entry of manifest phase n, as `init` writes it: nothing approved, nothing claimed."""
+    ph = manifest["phases"][n]
+    return {
+        "status": phase_status,
+        "plan": f"docs/phases/phase-{n}-plan.md",
+        "plan_approved": False,
+        "plan_approved_by": None,
+        "report": None,
+        "gate_job": ph["gate"]["ci_job"],
+        "gate_run_url": None,
+        "done_commit": None,
+        "done_at": None,
+        "adrs": [],
+        "adr_waiver": None,
+        "contracts_required": list(ph["contracts_required"]),
+        "modules": {s["module"]: "todo" for s in ph["steps"]},
+        "playwright_projects": list(ph["gate"]["playwright_projects"]),
+    }
+
+
+def add_missing_modules(status: dict, manifest: dict) -> list[str]:
+    """Top-level manifest modules that STATUS does not list yet, added as todo; returns their names."""
+    added = []
+    for name, m in manifest["modules"].items():
+        if name not in status["modules"]:
+            status["modules"][name] = {"phase": m["phase"], "status": "todo", "stable_since": None}
+            added.append(name)
+    return added
+
+
 def build_initial_status(manifest: dict) -> dict:
-    phases = {}
-    for n, ph in manifest["phases"].items():
-        step_modules = {s["module"]: "todo" for s in ph["steps"]}
-        phases[n] = {
-            "status": "in_progress" if n == "0" else "todo",
-            "plan": f"docs/phases/phase-{n}-plan.md",
-            "plan_approved": False,
-            "plan_approved_by": None,
-            "report": None,
-            "gate_job": ph["gate"]["ci_job"],
-            "gate_run_url": None,
-            "done_commit": None,
-            "done_at": None,
-            "adrs": [],
-            "adr_waiver": None,
-            "contracts_required": ph["contracts_required"],
-            "modules": step_modules,
-            "playwright_projects": ph["gate"]["playwright_projects"],
-        }
+    phases = {n: phase_entry(manifest, n, "in_progress" if n == "0" else "todo") for n in manifest["phases"]}
     modules = {name: {"phase": m["phase"], "status": "todo", "stable_since": None}
                for name, m in manifest["modules"].items()}
     return {"schema_version": 1, "current_phase": 0, "invariants_version": 1,
@@ -135,6 +150,9 @@ def cmd_show(p: dict, status: dict, manifest: dict) -> None:
     for n in sorted(status["phases"], key=int):
         if n != cur:
             print(f"  phase {n}: {status['phases'][n]['status']}")
+    nxt = str(int(cur) + 1)
+    if ph["status"] == "done" and nxt in manifest["phases"] and nxt not in status["phases"]:
+        print(f"  phase {nxt} ({manifest['phases'][nxt]['name']}) is in the manifest, not in STATUS: phase_status.py add-phase {nxt}")
 
 
 def main(argv: list[str]) -> int:
@@ -144,6 +162,7 @@ def main(argv: list[str]) -> int:
     sub.add_parser("show")
     sub.add_parser("init")
     sub.add_parser("validate")
+    s = sub.add_parser("add-phase"); s.add_argument("phase")
     s = sub.add_parser("set-phase-status"); s.add_argument("phase"); s.add_argument("status", choices=PHASE_STATUSES)
     s = sub.add_parser("module"); s.add_argument("name"); s.add_argument("status", choices=MODULE_PHASE_STATUSES)
     s = sub.add_parser("module-stable"); s.add_argument("name")
@@ -175,6 +194,25 @@ def main(argv: list[str]) -> int:
             print("INVALID:", e)
         print("STATUS.json valid" if not errs else f"{len(errs)} problem(s)")
         return 1 if errs else 0
+
+    if a.cmd == "add-phase":
+        if a.phase not in manifest["phases"]:
+            sys.exit(f"phase {a.phase} is not in the manifest: add phases[\"{a.phase}\"] to assets/dependency-manifest.json first")
+        if a.phase in status["phases"]:
+            sys.exit(f"phase {a.phase} is already in STATUS.json")
+        prev = str(int(a.phase) - 1)
+        if prev not in status["phases"]:
+            sys.exit(f"phase {prev} is not in STATUS.json: phases are added in order")
+        prev_done = status["phases"][prev]["status"] == "done"
+        status["phases"][a.phase] = phase_entry(manifest, a.phase, "planning" if prev_done else "todo")
+        if prev_done and status["current_phase"] == int(prev):
+            # what claim-done does when the next phase is already listed: the closed phase hands over to the next one
+            status["current_phase"] = int(a.phase)
+        added = add_missing_modules(status, manifest)
+        save_json(p["status"], status)
+        print(f"phase {a.phase} added as {status['phases'][a.phase]['status']}; current phase {status['current_phase']}"
+              + (f"; modules added: {', '.join(added)}" if added else ""))
+        return 0
 
     if a.cmd == "set-phase-status":
         ph = status["phases"][a.phase]
@@ -227,6 +265,10 @@ def main(argv: list[str]) -> int:
         if a.run_url:
             ph["gate_run_url"] = a.run_url
         nxt = str(int(a.phase) + 1)
+        if nxt not in status["phases"] and nxt in manifest["phases"]:
+            # a phase the manifest gained after init (step 6.0) gets its entry here, as add-phase writes it
+            status["phases"][nxt] = phase_entry(manifest, nxt, "todo")
+            add_missing_modules(status, manifest)
         if nxt in status["phases"]:
             status["current_phase"] = int(nxt)
             if status["phases"][nxt]["status"] == "todo":
@@ -248,12 +290,18 @@ def validate(status: dict, manifest: dict) -> list[str]:
     errs = []
     if status.get("schema_version") != 1:
         errs.append("schema_version must be 1")
+    last = max((int(n) for n in manifest["phases"]), default=0)
     cur = status.get("current_phase")
-    if not isinstance(cur, int) or not 0 <= cur <= 5:
-        errs.append("current_phase must be 0..5")
+    if not isinstance(cur, int) or isinstance(cur, bool) or not 0 <= cur <= last:
+        errs.append(f"current_phase must be 0..{last} (the manifest's phases)")
+    elif str(cur) not in status.get("phases", {}):
+        errs.append(f"current_phase {cur} has no entry in phases (phase_status.py add-phase {cur})")
     for n, ph in status.get("phases", {}).items():
         if n not in manifest["phases"]:
             errs.append(f"phase {n} not in manifest")
+            continue
+        if ph.get("gate_job") != manifest["phases"][n]["gate"]["ci_job"]:
+            errs.append(f"phase {n}: gate_job {ph.get('gate_job')} is not the manifest's {manifest['phases'][n]['gate']['ci_job']}")
         if ph.get("status") not in PHASE_STATUSES:
             errs.append(f"phase {n}: bad status {ph.get('status')}")
         if ph.get("status") == "done" and not ph.get("done_commit"):
