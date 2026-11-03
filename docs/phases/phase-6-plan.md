@@ -760,6 +760,12 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       lines and payments (`ReceiptActions layout="stack"`; the order record keeps the row). Pay waits for the till's shift on the sheet,
       which says why; a payment saved offline and not sent keeps its card shut. The display case shows in the centre while no order is
       open. The void and refund dialogs, the closed orders and the display case are on the new radii.
+    - **Names and visible words (axe `label-content-name-mismatch`, found by the first e2e-p6 run).** A waiting card's button is its
+      title "Order N" (named "Take payment for order N" or "Open order N", whose words contain it), with its tap area stretched over the
+      card; the rest of the card is its text. Three Amharic names now contain the words their buttons show: `kds.reject_line`
+      "{name}ን ሰርዝ" (the button reads ሰርዝ), `till.void_payment` "ክፍያ ውድቅ አድርግ" (inside "…አንድ ክፍያ ውድቅ አድርግ") and
+      `stations.request_production_of` "የ{name} ምርት ጠይቅ". No spec selects on them. `screens.spec.ts` runs in `p6-a11y` (testMatch
+      `a11y|screens`, as 6.3a's) and saves every capture even when a step cannot be done.
     - **Selectors that changed (6.0.2), each in the commit of its screen:**
       - `p1 order-flow-till`: `queue.getByRole("button", { name: "Void order N" })` became a tap on the card
         (`"Take payment for order N"`) and `sheet.getByRole("button", { name: "Void order N" })`: a card is one control on the board, so Void
