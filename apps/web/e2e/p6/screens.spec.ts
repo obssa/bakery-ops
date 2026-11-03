@@ -1,0 +1,225 @@
+import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+import { expect, test, type Page } from "@playwright/test";
+import am from "../../messages/am.json";
+import en from "../../messages/en.json";
+import type { Api } from "../support/api";
+import { fontsReady } from "../support/a11y";
+import { freshDevice } from "../support/devices";
+import { live } from "../support/env";
+import { loginOnce } from "../support/fixture";
+import { openAs } from "../support/pad";
+import { ensureOpenShift } from "../support/shifts";
+
+// Screenshots for review (brief "Design fidelity"; phase-6 plan section 7), in project p6-a11y, so they run in e2e-p6 on the demo bakery
+// that SEED_PHASE=6 gives its demo photos. Each Phase 6 step that rebuilds a screen captures it here, at 1180 x 820 for a station screen
+// (the tablet the design boards are drawn for) and 1440 x 900 for an admin page, in English and once in Amharic, under
+// test-results/screens/<screen>-<size>-<locale>.png. e2e-p6 uploads the folder as the artifact "screens" on every run; the coordinator
+// compares each picture with its board before the merge. Nothing is asserted about pixels (no golden images, plan 10.2 Q18): the specs
+// only bring each screen to the state its board shows.
+//
+// Step 6.3b: the kitchen and bar displays (Kitchen.dc.html) with a ticket in each column, and the till (Till.dc.html) with an order chosen,
+// its pay sheet beside the list, the cash received typed and the change shown. The tickets and the orders are sent here, in the demo
+// bakery, by its waiter; the kitchen and the bar make some of them, so New, Cooking and Ready each hold one.
+
+const SHOTS = path.join("test-results", "screens");
+const TABLET = { width: 1180, height: 820 };
+const MESSAGES = { en, am } as const;
+
+/** Saves the page as it is now, once its fonts and the photos in view have loaded. */
+async function capture(page: Page, name: string): Promise<void> {
+  await fontsReady(page);
+  await page
+    .waitForFunction(
+      () =>
+        Array.from(document.images).every((img) => {
+          const box = img.getBoundingClientRect();
+          const inView = box.bottom > 0 && box.top < window.innerHeight && box.right > 0 && box.left < window.innerWidth;
+          return !inView || img.complete;
+        }),
+      null,
+      { timeout: 15_000 },
+    )
+    .catch(() => undefined);
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
+}
+
+interface DemoUser {
+  id: number;
+  phone: string;
+  roles: string[];
+}
+
+interface MenuEntry {
+  item_id: number;
+  station_id: number | null;
+  available: string;
+}
+
+interface Stations {
+  kitchen: number | null;
+  bar: number | null;
+  till: number | null;
+}
+
+interface DemoStations {
+  device: string;
+  /** a signed-in account of each role, on the capture tablet; the admin when the demo bakery has no one of that role */
+  as: (role: "waiter" | "chef" | "barista" | "cashier") => Promise<Api>;
+  admin: Api;
+  stations: Stations;
+  menu: MenuEntry[];
+  tableIds: number[];
+}
+
+let demo: Promise<DemoStations> | null = null;
+
+/** The demo bakery's accounts and stations, on a tablet enrolled for these captures; each station with a shift running. Once per worker. */
+function demoStations(): Promise<DemoStations> {
+  demo ??= (async () => {
+    const phone = process.env.DEMO_ADMIN_PHONE ?? "";
+    const password = process.env.DEMO_ADMIN_PASSWORD ?? "";
+    if (!phone || !password) throw new Error("DEMO_ADMIN_PHONE and DEMO_ADMIN_PASSWORD must be set (e2e.yml): the e2e job seeds the demo bakery.");
+    const { api: signedIn } = await loginOnce(phone, password);
+    const device = await freshDevice(signedIn, "screens-stations");
+    const admin = signedIn.onDevice(device);
+    const users = (await admin.get<{ data: DemoUser[] }>("/users")).data;
+    const as = async (role: "waiter" | "chef" | "barista" | "cashier") => {
+      const user = users.find((u) => u.roles.includes(role));
+      if (!user) return admin;
+      return (await loginOnce(user.phone, password)).api.onDevice(device);
+    };
+    const all = (await admin.get<{ data: { id: number; code: string }[] }>("/stations")).data;
+    const first = (code: string) => all.filter((s) => s.code === code).sort((a, b) => a.id - b.id)[0]?.id ?? null;
+    const stations = { kitchen: first("kitchen"), bar: first("bar"), till: first("till") };
+    for (const id of [stations.kitchen, stations.bar, stations.till]) if (id !== null) await ensureOpenShift(admin, { id }).catch(() => undefined);
+    const waiter = await as("waiter");
+    const menu = (await waiter.get<{ items: MenuEntry[] }>("/menu")).items.filter((item) => !/^0(\.0+)?$/.test(item.available));
+    const tables = await waiter.get<{ data: { id: number }[] } | { id: number }[]>("/dining-tables");
+    const tableIds = (Array.isArray(tables) ? tables : tables.data).map((t) => t.id);
+    return { device, as, admin, stations, menu, tableIds };
+  })();
+  demo.catch(() => (demo = null));
+  return demo;
+}
+
+interface Sent {
+  id: number;
+  lines: { id: number }[];
+}
+
+/** The demo waiter sends an order of `count` different products made at `station` (any station when null), at the n-th table. */
+async function send(d: DemoStations, station: number | null, count: number, table: number): Promise<Sent | null> {
+  const items = d.menu.filter((item) => (station === null ? item.station_id !== null : item.station_id === station)).slice(0, count);
+  if (items.length === 0) return null;
+  const waiter = await d.as("waiter");
+  const tableId = d.tableIds[table % Math.max(1, d.tableIds.length)];
+  return waiter
+    .post<Sent>("/orders", {
+      client_uuid: randomUUID(),
+      ...(tableId !== undefined ? { type: "dine_in", dining_table_id: tableId } : { type: "takeaway" }),
+      send: true,
+      lines: items.map((item) => ({ client_uuid: randomUUID(), item_id: item.item_id, qty: "1" })),
+    })
+    .catch(() => null);
+}
+
+/** A ticket in each column of a display: one new, one being made, one waiting for pickup. */
+async function fillRail(d: DemoStations, station: number | null, worker: Api): Promise<void> {
+  if (station === null) return;
+  const sent = [await send(d, station, 2, 1), await send(d, station, 1, 2), await send(d, station, 1, 3)];
+  for (const [index, order] of sent.entries()) {
+    if (!order || index === 0) continue;
+    for (const line of order.lines) {
+      await worker.post(`/order-lines/${line.id}/accept`, {}).catch(() => undefined);
+      if (index === 2) await worker.post(`/order-lines/${line.id}/ready`, {}).catch(() => undefined);
+    }
+  }
+}
+
+async function openDisplay(page: Page, d: DemoStations, kind: "kitchen" | "bar", locale: keyof typeof MESSAGES, worker: Api): Promise<void> {
+  const t = MESSAGES[locale];
+  await openAs(page, worker, `${locale}/kds/${kind}/`, { device: d.device });
+  await expect(page.getByRole("heading", { level: 1, name: kind === "kitchen" ? t.kds.kitchen_title : t.kds.bar_title })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("article").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("region", { name: t.stations.strip_title }).getByRole("listitem").first()).toBeVisible({ timeout: 30_000 });
+}
+
+/** The till of the demo bakery with the order of the most products chosen: its pay sheet open beside the waiting list. */
+async function openTill(page: Page, d: DemoStations, locale: keyof typeof MESSAGES, cashier: Api): Promise<void> {
+  const t = MESSAGES[locale];
+  await openAs(page, cashier, `${locale}/till/`, { device: d.device });
+  await expect(page.getByRole("heading", { level: 1, name: t.till.title })).toBeVisible({ timeout: 30_000 });
+  const queue = page.getByRole("region", { name: t.till.queue_title });
+  const cards = queue.getByRole("listitem");
+  await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+  // the card whose stack shows the most thumbs, as the board's chosen one
+  let best = 0;
+  let most = -1;
+  const count = await cards.count();
+  for (let i = 0; i < count; i += 1) {
+    const thumbs = await cards.nth(i).locator("img").count();
+    if (thumbs > most) {
+      most = thumbs;
+      best = i;
+    }
+  }
+  await cards.nth(best).getByRole("button").click();
+  await expect(page.getByRole("dialog").getByRole("status", { name: t.till.amount_due })).toBeVisible({ timeout: 30_000 });
+}
+
+test.describe("screens", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: TABLET });
+
+  test("the kitchen and bar displays (Kitchen board): New, Cooking and Ready, in en and am", async ({ page }) => {
+    test.setTimeout(180_000);
+    const d = await demoStations();
+    const chef = await d.as("chef");
+    const barista = await d.as("barista");
+    await fillRail(d, d.stations.kitchen, chef);
+    await fillRail(d, d.stations.bar, barista);
+
+    await openDisplay(page, d, "kitchen", "en", chef);
+    await capture(page, "kds-kitchen-1180x820-en");
+    await openDisplay(page, d, "kitchen", "am", chef);
+    await capture(page, "kds-kitchen-1180x820-am");
+    await openDisplay(page, d, "bar", "en", barista);
+    await capture(page, "kds-bar-1180x820-en");
+  });
+
+  test("the till (Till board): an order chosen with its pay sheet, the cash received and the change, in en and am", async ({ page }) => {
+    test.setTimeout(180_000);
+    const d = await demoStations();
+    // the board's list: a few orders waiting, the chosen one with four products (three thumbs and +1)
+    await send(d, null, 4, 4);
+    await send(d, null, 2, 5);
+    await send(d, null, 3, 6);
+    const cashier = await d.as("cashier");
+    const t = MESSAGES.en;
+
+    await openTill(page, d, "en", cashier);
+    await capture(page, "till-1180x820-en");
+    const sheet = page.getByRole("dialog");
+    const row = sheet.getByRole("group").first();
+    // the board's Received and Change: the smallest quick key that covers the bill, else the exact amount
+    const keys = ["300", "500", "1,000"];
+    let pressed = false;
+    for (const key of keys) {
+      const button = row.getByRole("button", { name: key, exact: true });
+      if ((await button.count()) > 0 && (await button.isEnabled())) {
+        await button.click();
+        pressed = true;
+        break;
+      }
+    }
+    if (!pressed) await row.getByRole("button", { name: t.till.exact }).click();
+    await expect(row).toContainText(t.till.change_label);
+    await capture(page, "till-cash-1180x820-en");
+
+    await openTill(page, d, "am", cashier);
+    await capture(page, "till-1180x820-am");
+  });
+});

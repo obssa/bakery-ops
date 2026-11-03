@@ -134,6 +134,15 @@ jobs:
           for p in ${{ inputs.projects }}; do args="$args --project=$p"; done
           pnpm exec playwright test $args ${{ steps.pw.outputs.allow }}
 
+      # Phase 6 (brief "Design fidelity"): the screenshots of e2e/p6/screens.spec.ts, on every run, for the review against the design boards
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.phase == 6
+        with:
+          name: screens
+          path: apps/web/test-results/screens/
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Stack logs on failure
         if: failure()
         run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=200
