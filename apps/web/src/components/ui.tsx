@@ -1,42 +1,142 @@
 "use client";
 
-import { focusRing } from "./styles";
+import {
+  CakeSlice,
+  CircleAlert,
+  Coffee,
+  GlassWater,
+  Inbox,
+  LoaderCircle,
+  Pizza,
+  Sandwich,
+  UtensilsCrossed,
+  Wheat,
+  type LucideIcon,
+} from "lucide-react";
 import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
+  type TableHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import type { ProductImageView } from "@/lib/api/types";
+import {
+  frameSize,
+  initialsOf,
+  mediaUrl,
+  placeholderIcon,
+  sizesFor,
+  srcSetOf,
+  type PlaceholderIcon,
+  type ProductImageSize,
+} from "@/lib/images/productImage";
+import {
+  buttonClass,
+  CONTROL_HEIGHT,
+  controlClass,
+  focusRing,
+  surface,
+  type ButtonSize,
+  type ButtonVariant,
+  type ControlSize,
+} from "./styles";
 
-// The few building blocks every Phase 0 screen uses. Tablet-first (workflows-and-screens.md): every control is at
-// least 48 px tall, focus is always visible, text stays legible at arm's length. Plain and quiet on purpose.
+// The building blocks of every screen, in the Fresh Counter look (docs/design/fresh-counter.md section 2, ADR 0023). The primitives
+// of Phase 0 keep their names and props, so a screen restyles without an edit; the ones Phase 6 adds sit beside them. Station targets
+// are at least 48 px tall and admin ones 44 px, focus is always visible, every icon-only control has an aria-label, and every word comes
+// from the caller (messages/{en,am}.json).
 
+const ICON_STROKE = 1.75;
+
+// ------------------------------------------------------------------ buttons
+
+/**
+ * A button. Variants primary (brand teal), secondary (white, hairline), ghost, danger (red-50) and dark (ink); sizes md 44 px (admin),
+ * lg 52 px (station) and xl 64 px (the one main action of a station screen), or the 48 px of Phase 0 without a size. `loading` shows a
+ * spinner in place of the label and keeps the width; the label stays in the accessible name.
+ */
 export function Button({
   variant = "primary",
+  size,
   compact = false,
+  loading = false,
   className = "",
+  disabled,
+  children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary"; /** less side padding, for a row of actions in a table (still 48 px tall) */ compact?: boolean }) {
-  const look =
-    variant === "primary"
-      ? "bg-blue-700 text-white hover:bg-blue-800 disabled:bg-blue-700/60"
-      : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100 disabled:text-neutral-400";
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** less side padding, for a row of actions in a table (still as tall) */
+  compact?: boolean;
+  /** busy: disabled, with a spinner over the label */
+  loading?: boolean;
+}) {
   return (
     <button
-      className={`inline-flex min-h-12 items-center justify-center rounded-md ${compact ? "px-3" : "px-5"} text-base font-medium transition-colors disabled:cursor-not-allowed ${look} ${focusRing} ${className}`}
+      className={`${buttonClass({ variant, size, compact, loading })} ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
-    />
+    >
+      {loading ? (
+        <>
+          <span className="inline-flex items-center gap-2 opacity-0">{children}</span>
+          <Spinner />
+        </>
+      ) : (
+        children
+      )}
+    </button>
   );
 }
 
-const control =
-  "block min-h-12 w-full rounded-md border border-neutral-300 bg-white px-3 text-base text-neutral-900 " +
-  "placeholder:text-neutral-400 aria-[invalid=true]:border-red-600 " +
-  focusRing;
+/** A square button holding one icon, in the same variants and sizes; `label` is its accessible name (and the only one). */
+export function IconButton({
+  label,
+  variant = "ghost",
+  size,
+  loading = false,
+  className = "",
+  disabled,
+  children,
+  type = "button",
+  ...props
+}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> & {
+  label: string;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  loading?: boolean;
+}) {
+  return (
+    <button
+      type={type}
+      aria-label={label}
+      className={`${buttonClass({ variant, size, loading, square: true })} ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading ? <Spinner /> : children}
+    </button>
+  );
+}
+
+function Spinner() {
+  return (
+    <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
+      <LoaderCircle className="size-5 motion-safe:animate-spin" strokeWidth={2} aria-hidden="true" />
+    </span>
+  );
+}
+
+// ------------------------------------------------------------------ form controls
 
 interface FieldProps {
   label: string;
@@ -54,9 +154,9 @@ export function Field({ label, hint, error, optionalLabel, children }: FieldProp
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium text-neutral-800">
+      <label htmlFor={id} className="block text-sm font-semibold text-neutral-900">
         {label}
-        {optionalLabel ? <span className="font-normal text-neutral-500"> ({optionalLabel})</span> : null}
+        {optionalLabel ? <span className="font-normal text-neutral-600"> ({optionalLabel})</span> : null}
       </label>
       {children({ id, "aria-describedby": describedBy, "aria-invalid": error ? true : undefined })}
       {hint ? (
@@ -73,22 +173,165 @@ export function Field({ label, hint, error, optionalLabel, children }: FieldProp
   );
 }
 
-export function TextInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={`${control} ${className}`} {...props} />;
+type ControlProps = { /** 44 px (admin) or 52 px (station); 48 px without one */ controlSize?: ControlSize };
+
+export function TextInput({ className = "", controlSize, ...props }: InputHTMLAttributes<HTMLInputElement> & ControlProps) {
+  return <input className={`${controlClass(controlSize)} ${className}`} {...props} />;
 }
 
 export function Textarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={`${control} min-h-24 py-2 ${className}`} {...props} />;
+  return <textarea className={`${controlClass()} min-h-24 py-2 ${className}`} {...props} />;
 }
 
-export function Select({ className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={`${control} pr-8 ${className}`} {...props} />;
+export function Select({ className = "", controlSize, ...props }: SelectHTMLAttributes<HTMLSelectElement> & ControlProps) {
+  return <select className={`${controlClass(controlSize)} pr-8 ${className}`} {...props} />;
 }
+
+/**
+ * An amount: the currency code before the figure in neutral-600, the figure in tabular numbers. The props go to the <input> (so Field
+ * wires it as any input); `className` goes to the box around it.
+ */
+export function MoneyInput({
+  currency = "ETB",
+  controlSize,
+  className = "",
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & ControlProps & { currency?: string }) {
+  return (
+    <div
+      className={
+        `flex w-full items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3 ${CONTROL_HEIGHT[controlSize ?? "base"]} ` +
+        "focus-within:border-brand-600 focus-within:inset-ring-1 focus-within:inset-ring-brand-600 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1 " +
+        "has-[[aria-invalid=true]]:border-red-700 has-[:disabled]:bg-neutral-50 " +
+        className
+      }
+    >
+      <span className="shrink-0 text-[15px] text-neutral-600">{currency}</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        className="min-w-0 flex-1 self-stretch bg-transparent font-semibold tabular-nums text-neutral-900 outline-none placeholder:font-normal placeholder:text-neutral-500 disabled:cursor-not-allowed disabled:text-neutral-500"
+        {...props}
+      />
+    </div>
+  );
+}
+
+/**
+ * An on/off setting: a real <button role="switch" aria-checked> (52 × 32, brand teal when on) with its visible label beside it; the
+ * label names the switch and a tap on it toggles too.
+ */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled,
+  className = "",
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  hint?: ReactNode;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const id = useId();
+  const hintId = hint ? `${id}-hint` : undefined;
+  return (
+    <div className={`flex items-center justify-between gap-4 ${className}`}>
+      <div className="min-w-0">
+        <label htmlFor={id} className="block text-[15px] font-semibold text-neutral-900">
+          {label}
+        </label>
+        {hint ? (
+          <p id={hintId} className="text-[13px] text-neutral-600">
+            {hint}
+          </p>
+        ) : null}
+      </div>
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-describedby={hintId}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`inline-flex h-8 w-13 shrink-0 items-center rounded-full p-1 motion-safe:transition-colors motion-safe:duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${checked ? "bg-brand-600" : "bg-neutral-300"} ${focusRing}`}
+      >
+        <span
+          aria-hidden="true"
+          className={`size-6 rounded-full bg-white shadow-xs motion-safe:transition-transform motion-safe:duration-150 ${checked ? "translate-x-5" : "translate-x-0"}`}
+        />
+      </button>
+    </div>
+  );
+}
+
+export interface SegmentOption<T extends string> {
+  value: T;
+  label: ReactNode;
+}
+
+const SEGMENT_SELECTED = {
+  station: "bg-neutral-900 text-white",
+  admin: "bg-brand-50 text-brand-700",
+} as const;
+
+/**
+ * One choice among a few, on a white track: the selected segment is ink with white text on a station, brand-50 with brand-700 text on
+ * admin. A group of pressed buttons by default; `tabs` makes it a tablist of tabs (aria-selected), as the pad's and the till's views are.
+ */
+export function SegmentedControl<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  tone = "admin",
+  tabs = false,
+  className = "",
+}: {
+  label: string;
+  options: readonly SegmentOption<T>[];
+  value: T;
+  onChange: (value: T) => void;
+  tone?: keyof typeof SEGMENT_SELECTED;
+  tabs?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      role={tabs ? "tablist" : "group"}
+      aria-label={label}
+      className={`inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-neutral-200 bg-white p-1 ${className}`}
+    >
+      {options.map((option) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            {...(tabs ? { role: "tab", "aria-selected": selected } : { "aria-pressed": selected })}
+            onClick={() => onChange(option.value)}
+            className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 font-semibold motion-safe:transition-colors motion-safe:duration-150 ${tone === "station" ? "min-h-12 text-base" : "min-h-11 text-[15px]"} ${selected ? SEGMENT_SELECTED[tone] : "text-neutral-700 hover:bg-neutral-100"} ${focusRing}`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ messages
 
 export function Alert({ children }: { children: ReactNode }) {
   return (
-    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base text-red-800">
-      {children}
+    <div role="alert" className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-base text-red-800">
+      <CircleAlert className="mt-0.5 size-5 shrink-0" strokeWidth={2} aria-hidden="true" />
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
@@ -96,46 +339,259 @@ export function Alert({ children }: { children: ReactNode }) {
 /** A polite live region; renders even when empty so screen readers pick up the first message. */
 export function Status({ children }: { children?: ReactNode }) {
   return (
-    <p role="status" aria-live="polite" className={children ? "rounded-md bg-green-50 px-4 py-3 text-base text-green-800" : "sr-only"}>
+    <p role="status" aria-live="polite" className={children ? "rounded-xl bg-brand-50 px-4 py-3 text-base font-medium text-brand-700" : "sr-only"}>
       {children}
     </p>
   );
 }
 
-/** A titled section: a landmark region named by its heading. */
-export function Panel({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
+// ------------------------------------------------------------------ surfaces
+
+/**
+ * A white surface with a hairline border. With a `title` it is a region named by its heading (17 / 600), with an optional `action`
+ * (a link or a button) on the right of the title.
+ */
+export function Card({ title, action, children, className = "" }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   const id = useId();
+  if (!title) return <div className={`${surface} ${className}`}>{children}</div>;
   return (
-    <section aria-labelledby={id} className={`rounded-lg border border-neutral-200 bg-white p-5 ${className}`}>
-      <h2 id={id} className="mb-4 text-lg font-semibold text-neutral-900">
-        {title}
-      </h2>
+    <section aria-labelledby={id} className={`${surface} ${className}`}>
+      <CardTitle id={id} title={title} action={action} />
       {children}
     </section>
   );
 }
 
-export function PageHeader({ title, intro }: { title: string; intro?: string }) {
+function CardTitle({ id, title, action }: { id: string; title: string; action?: ReactNode }) {
+  const heading = (
+    <h2 id={id} className={`text-[17px] font-semibold text-neutral-900 ${action ? "" : "mb-4"}`}>
+      {title}
+    </h2>
+  );
+  if (!action) return heading;
   return (
-    <header className="mb-6 space-y-1">
-      <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">{title}</h1>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      {heading}
+      <div className="shrink-0">{action}</div>
+    </div>
+  );
+}
+
+/** A titled section: a landmark region named by its heading (a Card that always has a title). */
+export function Panel({ title, action, children, className = "" }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <Card title={title} action={action} className={className}>
+      {children}
+    </Card>
+  );
+}
+
+/** A page's title row: the title (30 / 700), a one-line intro in neutral-600, and the page's actions on the right. */
+export function PageHeader({ title, intro, actions }: { title: string; intro?: string; actions?: ReactNode }) {
+  const text = (
+    <div className="min-w-0 space-y-1">
+      <h1 className="text-3xl font-bold tracking-tight text-neutral-900">{title}</h1>
       {intro ? <p className="text-base text-neutral-600">{intro}</p> : null}
+    </div>
+  );
+  return (
+    <header className={`mb-6 ${actions ? "flex flex-wrap items-start justify-between gap-4" : ""}`}>
+      {text}
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   );
 }
 
-const BADGE_TONES = {
-  neutral: "bg-neutral-100 text-neutral-800",
-  blue: "bg-blue-100 text-blue-900",
-  green: "bg-green-100 text-green-900",
-  amber: "bg-amber-100 text-amber-900",
-  red: "bg-red-100 text-red-900",
+/** A KPI: a label (14, neutral-600), the value (30 / 700, tabular) and a delta (brand-700, or red-700 when it is bad). */
+export function Stat({ label, value, delta, bad = false, className = "" }: { label: string; value: ReactNode; delta?: ReactNode; bad?: boolean; className?: string }) {
+  return (
+    <div className={`${surface} ${className}`}>
+      <p className="text-sm text-neutral-600">{label}</p>
+      <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums text-neutral-900">{value}</p>
+      {delta ? <p className={`mt-1 text-[13px] font-semibold tabular-nums ${bad ? "text-red-700" : "text-brand-700"}`}>{delta}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * Nothing to show yet: a 48 px circle with a line icon, a title, one line of help and at most one action. `level` is the title's
+ * heading level (2 by default; 1 when the empty state is the whole page, as the device gate is).
+ */
+export function EmptyState({
+  icon: Icon = Inbox,
+  title,
+  body,
+  action,
+  level = 2,
+  className = "",
+}: {
+  icon?: LucideIcon;
+  title: string;
+  body?: ReactNode;
+  action?: ReactNode;
+  level?: 1 | 2 | 3;
+  className?: string;
+}) {
+  const Heading = (["h1", "h2", "h3"] as const)[level - 1];
+  return (
+    <div className={`flex flex-col items-center gap-3 px-6 py-10 text-center ${className}`}>
+      <span aria-hidden="true" className="inline-flex size-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+        <Icon className="size-6" strokeWidth={ICON_STROKE} aria-hidden="true" />
+      </span>
+      <Heading className="text-lg font-semibold text-neutral-900">{title}</Heading>
+      {body ? <p className="max-w-md text-[15px] text-neutral-600">{body}</p> : null}
+      {action ? <div className="pt-1">{action}</div> : null}
+    </div>
+  );
+}
+
+/** A grey block standing in for content while a first load is pending; size it with `className`. */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div aria-hidden="true" className={`rounded-xl bg-neutral-100 motion-safe:animate-skeleton ${className}`} />;
+}
+
+// The admin table: 48 px rows on neutral-200 dividers, no vertical rules, a caps header in neutral-600, row hover in neutral-50. A number
+// cell takes `tableNum` (styles.ts) to sit right-aligned in tabular figures.
+const TABLE =
+  "w-full border-collapse text-left text-[15px] text-neutral-900 " +
+  "[&_thead_th]:h-11 [&_thead_th]:border-b [&_thead_th]:border-neutral-200 [&_thead_th]:px-3 [&_thead_th]:text-[13px] [&_thead_th]:font-semibold [&_thead_th]:uppercase [&_thead_th]:tracking-[0.08em] [&_thead_th]:text-neutral-600 " +
+  "[&_tbody_tr]:border-b [&_tbody_tr]:border-neutral-200 [&_tbody_tr:hover]:bg-neutral-50 " +
+  "[&_tbody_td]:h-12 [&_tbody_td]:px-3 [&_tbody_th]:h-12 [&_tbody_th]:px-3 [&_tbody_th]:font-medium";
+
+export function Table({ className = "", children, ...props }: TableHTMLAttributes<HTMLTableElement>) {
+  return (
+    <table className={`${TABLE} ${className}`} {...props}>
+      {children}
+    </table>
+  );
+}
+
+// ------------------------------------------------------------------ labels
+
+const TONES = {
+  neutral: { fill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-500" },
+  brand: { fill: "bg-brand-50 text-brand-700", dot: "bg-brand-600" },
+  amber: { fill: "bg-amber-50 text-amber-800", dot: "bg-amber-700" },
+  red: { fill: "bg-red-50 text-red-700", dot: "bg-red-700" },
+  blue: { fill: "bg-blue-50 text-blue-700", dot: "bg-blue-700" },
+  /** money confirmed, and only that (fresh-counter.md 1.3) */
+  green: { fill: "bg-green-50 text-green-800", dot: "bg-green-700" },
 } as const;
 
-/** A small status label. The words carry the meaning; the tone only adds to it. */
-export function Badge({ tone = "neutral", children, className = "" }: { tone?: keyof typeof BADGE_TONES; children: ReactNode; className?: string }) {
-  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${BADGE_TONES[tone]} ${className}`}>{children}</span>;
+export type Tone = keyof typeof TONES;
+
+/**
+ * A pill with an optional 8 px dot. Amber means low or waiting, red out, void, late or an error, blue information or in progress, brand
+ * the current or good state, green money confirmed. The words carry the meaning; the tone only adds to it.
+ */
+export function Chip({ tone = "neutral", dot = false, children, className = "" }: { tone?: Tone; dot?: boolean; children: ReactNode; className?: string }) {
+  return (
+    <span className={`inline-flex min-h-7 items-center gap-1.5 rounded-full px-3 py-0.5 text-[13px] font-semibold ${TONES[tone].fill} ${className}`}>
+      {dot ? <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${TONES[tone].dot}`} /> : null}
+      {children}
+    </span>
+  );
 }
+
+/** A small status label (Phase 0's name for a Chip). */
+export function Badge({ tone = "neutral", dot = false, children, className = "" }: { tone?: Tone; dot?: boolean; children: ReactNode; className?: string }) {
+  return (
+    <Chip tone={tone} dot={dot} className={className}>
+      {children}
+    </Chip>
+  );
+}
+
+/** A person: their initials in a circle on ink (no user photos yet, phase-6 plan 10.2 Q15). Beside the name, so hidden from readers. */
+export function Avatar({ name, size = "md", className = "" }: { name: string; size?: "sm" | "md" | "lg"; className?: string }) {
+  const box = size === "sm" ? "size-7 text-[11px]" : size === "lg" ? "size-12 text-base" : "size-9 text-[13px]";
+  return (
+    <span aria-hidden="true" translate="no" className={`inline-flex shrink-0 items-center justify-center rounded-full bg-neutral-900 font-semibold text-white ${box} ${className}`}>
+      {initialsOf(name)}
+    </span>
+  );
+}
+
+// ------------------------------------------------------------------ product photos
+
+const PLACEHOLDER_ICONS: Record<PlaceholderIcon, LucideIcon> = {
+  bread: Wheat,
+  cake: CakeSlice,
+  sandwich: Sandwich,
+  pizza: Pizza,
+  cup: Coffee,
+  glass: GlassWater,
+  plate: UtensilsCrossed,
+};
+
+/**
+ * A product's photo in a 4:3 frame, or a placeholder that never looks broken (fresh-counter.md section 2). `image` is the API's
+ * `{thumb, card, large, width, height}` or null; `name` is the product's name in the current language (the photo's alt); `category` is
+ * its category's name in either language (the placeholder's icon); `size` picks the rendition and the `sizes` hint. A photo that fails
+ * to load falls back to the placeholder.
+ */
+export function ProductImage({
+  image,
+  name,
+  category,
+  size = "card",
+  className = "",
+}: {
+  image: ProductImageView | null | undefined;
+  name: string;
+  category?: string | null;
+  size?: ProductImageSize;
+  className?: string;
+}) {
+  const src = image ? mediaUrl(image[size]) : null;
+  // the URL that failed, so a new photo (a new content-addressed URL) is tried again
+  const [failed, setFailed] = useState<string | null>(null);
+  const frame = `relative block aspect-[4/3] overflow-hidden bg-neutral-100 ${className}`;
+  if (!image || !src || failed === src) {
+    return (
+      <span className={frame}>
+        <ProductPlaceholder name={name} category={category} size={size} />
+      </span>
+    );
+  }
+  const { width, height } = frameSize(image, size);
+  return (
+    <span className={frame}>
+      {/* a static export serves no image optimiser (next.config images.unoptimized); the renditions are already the right sizes */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        srcSet={srcSetOf(image)}
+        sizes={sizesFor(size)}
+        width={width}
+        height={height}
+        alt={name}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(src)}
+        className="absolute inset-0 size-full object-cover"
+      />
+    </span>
+  );
+}
+
+/** The category's line icon in neutral-400 on the neutral-100 well, with the initials under it where there is room; hidden from readers. */
+function ProductPlaceholder({ name, category, size }: { name: string; category?: string | null; size: ProductImageSize }) {
+  const Icon = PLACEHOLDER_ICONS[placeholderIcon(category)];
+  const initials = size === "thumb" ? "" : initialsOf(name);
+  return (
+    <span aria-hidden="true" className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-neutral-400">
+      <Icon className={size === "thumb" ? "size-1/2" : size === "large" ? "size-14" : "size-9"} strokeWidth={ICON_STROKE} aria-hidden="true" />
+      {initials ? (
+        <span translate="no" className={`font-bold text-neutral-500 ${size === "large" ? "text-base" : "text-[13px]"}`}>
+          {initials}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+// ------------------------------------------------------------------ layers
 
 /**
  * A dialog over the screen (the till's pay sheet and void form): named for screen readers, closed by Escape or a tap on
@@ -151,12 +607,12 @@ export function Modal({ label, onClose, size = "md", children }: { label: string
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-900/50 p-4 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-900/40 p-4 sm:items-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className={`max-h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-lg"} space-y-4 overflow-y-auto rounded-lg bg-white p-5 shadow-xl`}
+        className={`max-h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-lg"} space-y-4 overflow-y-auto rounded-[20px] bg-white p-6 shadow-float`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}
@@ -167,10 +623,10 @@ export function Modal({ label, onClose, size = "md", children }: { label: string
 
 /**
  * A panel from the side of the screen (step 4.5f: the audit log's entry): a dialog named for screen readers that takes the focus when it
- * opens, closed by Escape or a tap on the backdrop, the list behind it kept as it was. Wide enough on a 1280 px tablet for a table of
- * before and after; the whole width on a phone.
+ * opens, closed by Escape or a tap on the backdrop, the list behind it kept as it was. 480 px wide from the right (`lg`: 768 px, for a
+ * table of before and after on a tablet); the whole width on a phone.
  */
-export function Drawer({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+export function Drawer({ label, onClose, size = "md", children }: { label: string; onClose: () => void; size?: "md" | "lg"; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     panel.current?.focus();
@@ -184,14 +640,14 @@ export function Drawer({ label, onClose, children }: { label: string; onClose: (
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-neutral-900/50" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex justify-end bg-neutral-900/40" onClick={onClose}>
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-label={label}
         tabIndex={-1}
-        className="h-full w-full max-w-3xl space-y-5 overflow-y-auto bg-white p-5 shadow-xl outline-none"
+        className={`h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-[480px]"} space-y-5 overflow-y-auto bg-white p-6 shadow-float outline-none motion-safe:animate-drawer-in`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}
