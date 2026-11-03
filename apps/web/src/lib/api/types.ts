@@ -162,6 +162,22 @@ export interface Item {
   created_at: string | null;
   updated_at: string | null;
   deleted_at: string | null;
+  /** step 6.1a (ADR 0022): the product's display photo, null without one (always null for an ingredient); absent from an API before 6.1a */
+  image?: ProductImageView | null;
+}
+
+/**
+ * Step 6.1a (ADR 0022, phase-6 plan 4.3): a product's display photo as item payloads and the menu carry it. `thumb` (320 × 240), `card`
+ * (800 × 600) and `large` are absolute paths without a host under the public, content-addressed `/api/v1/media/items/{sha}/...`; the web
+ * puts them on the API origin like every call (lib/images/productImage.ts). `width` and `height` are the `large` rendition's size: 1600 ×
+ * 1200, or the crop's own size when it was smaller, because the server never upscales (at least 800 × 600). Always 4:3.
+ */
+export interface ProductImageView {
+  thumb: string;
+  card: string;
+  large: string;
+  width: number;
+  height: number;
 }
 
 /** Laravel resource collections */
@@ -389,6 +405,8 @@ export interface MenuItem {
   location_id: number | null;
   modifiers: MenuModifier[];
   unavailable_reason?: "out_of_stock" | "no_location";
+  /** step 6.1b (phase-6 plan 4.3): the product's display photo, null without one; absent from an API before 6.1b */
+  image?: ProductImageView | null;
 }
 
 /** GET /menu */
