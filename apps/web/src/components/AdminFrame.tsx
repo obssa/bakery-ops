@@ -126,17 +126,17 @@ function SectionsNav({ onFollow }: { onFollow?: () => void }) {
   );
 }
 
-/** "Stations": the station screens, the same "Screens" navigation and link names the station top bar and the sign-in screen carry. */
+/**
+ * "Stations": the station screens, the same "Screens" navigation and link names the station top bar and the sign-in screen carry. The
+ * navigation's name is "Screens"; its list is not labelled "Stations" as well, since a page's getByLabel("Station") would find it.
+ */
 function StationsNav({ onFollow }: { onFollow?: () => void }) {
   const t = useTranslations();
-  const id = useId();
   return (
     <div className="mt-1.5 flex flex-col gap-0.5">
-      <p id={id} className={GROUP_LABEL}>
-        {t("admin.group_stations")}
-      </p>
+      <p className={GROUP_LABEL}>{t("admin.group_stations")}</p>
       <nav aria-label={t("nav.main")}>
-        <ul aria-labelledby={id} className="flex flex-col gap-0.5">
+        <ul className="flex flex-col gap-0.5">
           {STATION_SCREENS.map(({ href, key }) => {
             const Icon = SCREEN_ICONS[key];
             return (
