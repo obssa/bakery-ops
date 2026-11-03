@@ -49,14 +49,16 @@ export function LoginForm() {
     }
   }
 
+  // step 6.2b (fresh-counter.md 3.1): 52 px fields and the 64 px button; a refusal shows in the form, a field's own error under the field
   return (
-    <form onSubmit={onSubmit} className="space-y-5 rounded-lg border border-neutral-200 bg-white p-5">
+    <form onSubmit={onSubmit} className="space-y-5">
       {expired && !error ? <Alert>{t("errors.session_expired")}</Alert> : null}
       {error ? <Alert>{errorText.message(error)}</Alert> : null}
       <Field label={t("login.phone")} error={errorText.field(error, "phone")}>
         {(props) => (
           <TextInput
             {...props}
+            controlSize="lg"
             type="tel"
             inputMode="tel"
             autoComplete="username"
@@ -70,6 +72,7 @@ export function LoginForm() {
         {(props) => (
           <TextInput
             {...props}
+            controlSize="lg"
             type="password"
             autoComplete="current-password"
             required
@@ -78,7 +81,7 @@ export function LoginForm() {
           />
         )}
       </Field>
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" size="xl" className="w-full" disabled={pending}>
         {pending ? t("login.submitting") : t("login.submit")}
       </Button>
     </form>
