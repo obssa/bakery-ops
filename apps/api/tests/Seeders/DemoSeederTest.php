@@ -37,14 +37,16 @@ it('lists the phase seeders that exist, in phase order, up to the requested phas
         ->and(DemoSeeder::seedersUpTo(3))->toBe([Phase0Seeder::class, Phase1Seeder::class, Phase2Seeder::class, Phase3Seeder::class])
         ->and(DemoSeeder::seedersUpTo(4))->toBe([Phase0Seeder::class, Phase1Seeder::class, Phase2Seeder::class, Phase3Seeder::class, Phase4Seeder::class])
         ->and(DemoSeeder::seedersUpTo(5)[0])->toBe(Phase0Seeder::class)
+        ->and(DemoSeeder::seedersUpTo(6))->toHaveCount(7)
+        ->and(DemoSeeder::seedersUpTo(7))->toBe(DemoSeeder::seedersUpTo(6))
         ->and(DemoSeeder::seedersUpTo(-1))->toBe([]);
-    foreach (DemoSeeder::seedersUpTo(5) as $class) {
-        expect(class_exists($class))->toBeTrue()->and($class)->toMatch('/\\\\Phase[0-5]Seeder$/');
+    foreach (DemoSeeder::seedersUpTo(6) as $class) {
+        expect(class_exists($class))->toBeTrue()->and($class)->toMatch('/\\\\Phase[0-6]Seeder$/');
     }
 })->group('feature', 'seeds');
 
 it('reads the last phase from SEED_PHASE, every phase when it is not set', function () {
-    expect(DemoSeeder::maxPhase())->toBe(5);
+    expect(DemoSeeder::maxPhase())->toBe(6);
     putenv('SEED_PHASE=0');
     expect(DemoSeeder::maxPhase())->toBe(0);
 })->group('feature', 'seeds');
