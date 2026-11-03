@@ -99,7 +99,7 @@ export function ProductCard<T extends ProductCardItem>({ item, locale, category,
         ) : null}
         {unavailable ? (
           <span
-            className={`absolute left-1/2 top-1/2 inline-flex min-h-7.5 max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 items-center rounded-full bg-white px-3 text-center text-[13px] font-bold text-red-700 shadow-xs motion-safe:transition-shadow motion-safe:duration-150 ${nudged ? "ring-4 ring-red-200" : ""}`}
+            className={`absolute left-1/2 top-1/2 inline-flex min-h-7.5 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white px-3 py-0.5 text-center text-[13px] font-bold leading-tight text-red-700 shadow-xs motion-safe:transition-shadow motion-safe:duration-150 ${nudged ? "ring-4 ring-red-200" : ""}`}
           >
             {reason}
           </span>
@@ -169,8 +169,8 @@ export function ProductCard<T extends ProductCardItem>({ item, locale, category,
       {unavailable || !onMore ? null : (
         // beside the price, over the card's corner (a sibling of the add button, never inside it)
         <span className="absolute bottom-1 right-1">
-          <IconButton label={t("more_options", { name })} size="md" variant="ghost" className="text-neutral-600" onClick={() => onMore(item)}>
-            <Ellipsis className="size-5" strokeWidth={2} aria-hidden="true" />
+          <IconButton label={t("more_options", { name })} size="md" variant="ghost" onClick={() => onMore(item)}>
+            <Ellipsis className="size-5 text-neutral-600" strokeWidth={2} aria-hidden="true" />
           </IconButton>
         </span>
       )}

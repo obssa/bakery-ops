@@ -218,7 +218,8 @@ function TopBar() {
           </Link>
           <StationContext />
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {/* on a phone the right-hand group wraps inside the window rather than pushing past it */}
+        <div className="flex max-w-full flex-wrap items-center gap-2 md:shrink-0">
           {signedIn ? <SyncChip /> : null}
           {signedIn ? <DateDisplaySwitch /> : null}
           <Suspense fallback={<LanguageSwitcher look="toggle" />}>

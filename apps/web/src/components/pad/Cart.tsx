@@ -87,12 +87,12 @@ function LineRow({
           </button>
         </div>
         {noteOpen ? null : (
-          <IconButton label={t("note_add", { name })} size="md" disabled={busy} className="text-neutral-600" aria-expanded={false} onClick={() => setWriting(true)}>
-            <NotebookPen className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          <IconButton label={t("note_add", { name })} size="md" disabled={busy} aria-expanded={false} onClick={() => setWriting(true)}>
+            <NotebookPen className="size-5 text-neutral-600" strokeWidth={1.75} aria-hidden="true" />
           </IconButton>
         )}
-        <IconButton label={t("remove", { name })} size="md" disabled={busy} className="ml-auto text-red-700 hover:bg-red-50" onClick={() => onChange((c) => removeLine(c, line.uuid))}>
-          <Trash className="size-5" strokeWidth={1.75} aria-hidden="true" />
+        <IconButton label={t("remove", { name })} size="md" disabled={busy} className="ml-auto" onClick={() => onChange((c) => removeLine(c, line.uuid))}>
+          <Trash className={`size-5 ${busy ? "" : "text-red-700"}`} strokeWidth={1.75} aria-hidden="true" />
         </IconButton>
       </div>
       {noteOpen ? (

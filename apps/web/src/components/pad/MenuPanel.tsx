@@ -261,9 +261,12 @@ export function MenuPanel({
             className={`${controlClass("lg")} pl-12 ${query ? "pr-14" : ""} [&::-webkit-search-cancel-button]:appearance-none`}
           />
           {query ? (
-            <IconButton label={t("search_clear")} size="md" className="absolute right-1 top-1/2 -translate-y-1/2" onClick={() => setQuery("")}>
-              <X className="size-5" strokeWidth={2} aria-hidden="true" />
-            </IconButton>
+            // positioned by its wrapper: a button's own classes keep it `relative`
+            <span className="absolute right-1 top-1/2 -translate-y-1/2">
+              <IconButton label={t("search_clear")} size="md" onClick={() => setQuery("")}>
+                <X className="size-5" strokeWidth={2} aria-hidden="true" />
+              </IconButton>
+            </span>
           ) : null}
         </div>
         {tabs.length > 0 ? (
