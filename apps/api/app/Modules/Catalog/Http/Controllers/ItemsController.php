@@ -46,7 +46,7 @@ final class ItemsController
 
         return ItemResource::collection(
             Item::query()
-                ->with(['unit.baseUnit', 'stationAssignments.station'])
+                ->with(['unit.baseUnit', 'stationAssignments.station', 'image'])
                 ->when($kind !== null, fn (Builder $q) => $q->where('kind', $kind))
                 ->when($categoryId !== null, fn (Builder $q) => $q->where('category_id', $categoryId))
                 ->when($active !== null, fn (Builder $q) => $q->where('is_active', $active))
@@ -75,7 +75,7 @@ final class ItemsController
 
     public function show(Request $request, Item $item): JsonResponse
     {
-        return response()->json((new ItemResource($item))->resolve($request));
+        return response()->json((new ItemResource($item))->withImageDetail()->resolve($request));
     }
 
     public function update(UpdateItemRequest $request, Item $item): JsonResponse

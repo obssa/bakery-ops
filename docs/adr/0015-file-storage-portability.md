@@ -65,6 +65,14 @@ database this way: MariaDB on the host now, PostgreSQL later, portable code. Fil
   PHP extension.
 - The first live host move must re-run `files:doctor` with both PHPs (the runbook's extension checklist).
 
+## Note, 2026-11-03 (step 6.1a): product photos are not files
+
+Product photos (phase 6, ADR 0022) do not use this store: no purpose, no `stored_files` row, no signed URL, no orphan purge. A receipt is
+evidence with personal data, kept private and shown through a URL that expires; a product photo is shown to every customer, must be cached
+for good by every pad, and must survive a pad going offline, which an expiring URL cannot give. They share only the image code:
+`ImageProcessor` gains public `load()`, `resample()` and `encodeScrubbed()` (JPEG or WebP), and `process()` is those steps for a receipt,
+unchanged in what it does and tested as before. `ModuleBoundariesTest` keeps Catalog away from `Files`, `StoredFile` and signed URLs.
+
 ## Enforcement
 
 `contract:payments->files` (`tests/Contract/Payments/FilesContractTest.php`, in `mod-payments`), `ImageProcessorTest`,

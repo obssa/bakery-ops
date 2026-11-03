@@ -29,6 +29,7 @@ use App\Modules\Catalog\Models\Item;
 use App\Modules\Catalog\Models\Recipe;
 use App\Modules\Catalog\Models\RecipeLine;
 use App\Modules\Catalog\Services\PriceHistory;
+use App\Modules\Catalog\Services\ProductPhotos;
 use App\Modules\Identity\Contracts\ShortCodes;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
@@ -456,6 +457,39 @@ return [
             return ['{item}' => (string) $latte->id];
         },
         'payload' => fn (): array => ['name_en' => 'Large', 'name_am' => 'ትልቅ', 'price_delta' => '10.00'],
+    ],
+    // the product photo (step 6.1a): the multipart upload (the fingerprint is the fields plus the sha256 of the photo) and its removal,
+    // whose one new row is its audit row
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/items/{item}/image',
+        'module' => 'catalog',
+        'table' => 'item_images',
+        'setup' => function (TestCase $t) use ($admin): array {
+            Storage::fake(config('catalog.images.disk'));
+            $me = $admin();
+            $cake = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+
+            return ['{item}' => (string) $cake->id];
+        },
+        'payload' => fn (): array => ['client_uuid' => '3b9d6f2a-8c41-4e57-a0d2-6f1e9c7b5a24', 'crop_x' => 0, 'crop_y' => 0, 'crop_width' => 800, 'crop_height' => 600],
+        'files' => fn (): array => ['photo' => UploadedFile::fake()->createWithContent('cake.jpg', imgJpeg(1000, 750))],
+    ],
+    [
+        'method' => 'DELETE',
+        'uri' => '/api/v1/items/{item}/image',
+        'module' => 'catalog',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            Storage::fake(config('catalog.images.disk'));
+            $me = $admin();
+            withActor($me->id);
+            $cake = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $me->branch_id, 'created_by_user_id' => $me->id]);
+            app(ProductPhotos::class)->set($cake, imgJpeg(800, 600), null, (string) Str::uuid());
+
+            return ['{item}' => (string) $cake->id];
+        },
+        'payload' => fn (): array => [],
     ],
 
     // Inventory (step 0.6)

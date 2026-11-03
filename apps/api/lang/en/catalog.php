@@ -31,6 +31,17 @@ return [
         'published' => 'This recipe already has published versions; publish a new version instead of replacing it.',
         'publish_conflict' => 'Another version was published at the same moment; open the recipe again and retry.',
     ],
+    // step 6.1a: the display photo of a product (POST /items/{item}/image)
+    'image' => [
+        'not_a_product' => 'Only a product can have a photo; an ingredient is not sold from a picture.',
+        'not_an_image' => 'No picture was sent, or this file is not a picture. Choose a JPG, PNG or WebP photo.',
+        'unsupported_type' => 'This kind of picture is not accepted. Use JPG, PNG or WebP.',
+        'too_large' => 'This photo is too big to upload. Choose a smaller file.',
+        'crop_invalid' => 'The framing does not fit the photo. Frame it again in the 4:3 box.',
+        'too_small' => 'This photo is too small for the 4:3 frame. It needs at least 800 × 600 pixels: choose a bigger photo or zoom out.',
+        'unavailable' => 'Product photos cannot be prepared on this server right now. Ask an administrator to check it.',
+        'processing_failed' => 'The photo could not be prepared. Try again.',
+    ],
     'validation' => [
         'decimal' => 'The :attribute must be a decimal number written as text, with at most :scale decimals.',
         'positive' => 'The :attribute must be greater than zero.',

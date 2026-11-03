@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Modules\Catalog\Http\Controllers\CategoriesController;
+use App\Modules\Catalog\Http\Controllers\ItemImagesController;
 use App\Modules\Catalog\Http\Controllers\ItemPricesController;
 use App\Modules\Catalog\Http\Controllers\ItemsController;
 use App\Modules\Catalog\Http\Controllers\ItemStationsController;
+use App\Modules\Catalog\Http\Controllers\MediaController;
 use App\Modules\Catalog\Http\Controllers\ModifiersController;
 use App\Modules\Catalog\Http\Controllers\RecipesController;
 use App\Modules\Catalog\Http\Controllers\RecipeVersionsController;
@@ -18,7 +20,19 @@ use Illuminate\Support\Facades\Route;
  * permission (rule 6): catalog.view (every role) to read, catalog.manage (admin) to write; every write also carries
  * idempotency (rule 7). {item} and {category} bind through the BranchScoped models, so another branch's row is 404.
  * Every route is listed in tests/Support/route_permissions.php and every write in tests/Support/write_endpoints.php.
+ *
+ * Step 6.1a (phase-6 plan 4.1 and 4.2, ADR 0022): the product photo. POST and DELETE /items/{item}/image sit with the other writes
+ * (catalog.manage, idempotency). The photo's renditions, GET /media/items/{sha}/{rendition}.{ext}, are public by design and sit outside
+ * auth: no bearer token, no actor, no session (only the `api` group's bindings), listed in tests/Support/public_routes.php and in
+ * PUBLIC_ROUTES of scripts/check_invariants.py with the reason. The pattern admits a 64-hex sha, the three renditions and the two
+ * extensions only; anything else is a 404 before the controller runs.
  */
+Route::prefix('api/v1')->middleware(['api'])->group(function (): void {
+    Route::get('/media/items/{sha}/{rendition}.{ext}', [MediaController::class, 'show'])
+        ->where(['sha' => '[0-9a-f]{64}', 'rendition' => 'thumb|card|large', 'ext' => 'webp|jpg'])
+        ->name('catalog.media.show');
+});
+
 Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(function (): void {
     Route::middleware('permission:catalog.view')->group(function (): void {
         Route::get('/units', [UnitsController::class, 'index'])->name('catalog.units.index');
@@ -45,5 +59,7 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::post('/items/{item}/recipe/versions', [RecipeVersionsController::class, 'store'])->whereNumber('item')->name('catalog.items.recipe.versions.store');
         Route::put('/items/{item}/stations', [ItemStationsController::class, 'update'])->whereNumber('item')->name('catalog.items.stations.update');
         Route::post('/items/{item}/modifiers', [ModifiersController::class, 'store'])->whereNumber('item')->name('catalog.items.modifiers.store');
+        Route::post('/items/{item}/image', [ItemImagesController::class, 'store'])->whereNumber('item')->name('catalog.items.image.store');
+        Route::delete('/items/{item}/image', [ItemImagesController::class, 'destroy'])->whereNumber('item')->name('catalog.items.image.destroy');
     });
 });

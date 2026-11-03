@@ -69,6 +69,17 @@ return [
             'throw' => true,
             'report' => false,
         ],
+        // Product photos (phase 6, step 6.1a, ADR 0022): the renditions of item_images, content-addressed (items/<sha[0..1]>/<sha>/<rendition>.<ext>).
+        // Under storage/, never public/: a deploy rsyncs public/ and would delete them. Not served by the web server either: the public
+        // GET /api/v1/media/items/{sha}/{rendition}.{ext} streams them, only while a live item_images row names the sha.
+        'media' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/media'),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+            'report' => false,
+        ],
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

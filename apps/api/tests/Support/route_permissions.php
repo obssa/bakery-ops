@@ -65,6 +65,9 @@ return [
     'PUT /api/v1/items/{item}/stations' => ['permission' => 'catalog.manage', 'roles' => ['admin'], 'module' => 'catalog'],
     'GET /api/v1/items/{item}/modifiers' => ['permission' => 'catalog.view', 'roles' => $all, 'module' => 'catalog'],
     'POST /api/v1/items/{item}/modifiers' => ['permission' => 'catalog.manage', 'roles' => ['admin'], 'module' => 'catalog'],
+    // step 6.1a: the product photo is edited like the item (catalog.manage); its renditions are public (tests/Support/public_routes.php)
+    'POST /api/v1/items/{item}/image' => ['permission' => 'catalog.manage', 'roles' => ['admin'], 'module' => 'catalog'],
+    'DELETE /api/v1/items/{item}/image' => ['permission' => 'catalog.manage', 'roles' => ['admin'], 'module' => 'catalog'],
 
     // Inventory (step 0.6): the floor reads stock and the ledger (not the waiter); admin configures locations and
     // records the Phase 0 manual movements

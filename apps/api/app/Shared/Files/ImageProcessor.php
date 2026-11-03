@@ -12,6 +12,11 @@ use Throwable;
  * (never enlarging), flatten transparency onto white, encode as JPEG at $quality. GD's encoder writes no metadata, so EXIF, GPS, ICC
  * and comments are gone by construction; the result is re-read to prove it. Needs only gd (JPEG, PNG; WebP when gd has it); exif is optional.
  * No container, no config: Files builds it from config/files.php.
+ *
+ * Step 6.1a (phase-6 plan 4.1, ADR 0022) splits process() into public steps, so the product photo pipeline (Catalog) crops and makes its
+ * renditions with the same checks: load() (the refusals, the decode and the orientation), resample() (a rectangle drawn once onto a white
+ * canvas) and encodeScrubbed() (JPEG or WebP, re-read and checked for metadata). process() is load, resample to the edge, encode as JPEG,
+ * as before.
  */
 final class ImageProcessor
 {
@@ -25,6 +30,20 @@ final class ImageProcessor
 
     public function process(string $bytes): ProcessedImage
     {
+        $image = $this->flattenAndScale($this->load($bytes));
+
+        return $this->encodeScrubbed($image, 'jpeg');
+    }
+
+    /**
+     * Checks and decodes an upload: the type from its header (JPEG, PNG, WebP when gd has it), the pixel cap, then the byte cap, before
+     * anything is decoded; then that the file is whole (nothing cut off, nothing appended); then the decode and the EXIF orientation of a
+     * JPEG. The answer is a truecolor image the right way up, with any transparency still in it (resample() flattens it).
+     *
+     * @throws FilesError a refusal: not_an_image, unsupported_type, too_many_pixels, too_large, truncated, unavailable (no gd)
+     */
+    public function load(string $bytes): GdImage
+    {
         if (! extension_loaded('gd')) {
             throw FilesError::unavailable();
         }
@@ -34,7 +53,7 @@ final class ImageProcessor
             throw FilesError::notAnImage();
         }
         $mime = (string) $info['mime'];
-        if (! in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) || ($mime === 'image/webp' && ! (gd_info()['WebP Support'] ?? false))) {
+        if (! in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) || ($mime === 'image/webp' && ! self::canWebp())) {
             throw FilesError::unsupportedType();
         }
         if ($info[0] < 1 || $info[1] < 1) {
@@ -51,11 +70,55 @@ final class ImageProcessor
 
         $image = $this->decode($bytes);
         $orientation = $mime === 'image/jpeg' ? $this->orientation($bytes) : 1;
-        $image = $this->orient($image, $orientation);
-        $image = $this->flattenAndScale($image);
-        $out = $this->scrub($this->encode($image));
 
-        return $this->verify($out, imagesx($image), imagesy($image));
+        return $this->orient($image, $orientation);
+    }
+
+    /** Whether this host's gd encodes and decodes WebP (the live host does; a CI image may not). */
+    public static function canWebp(): bool
+    {
+        return function_exists('imagewebp') && (bool) (gd_info()['WebP Support'] ?? false);
+    }
+
+    /**
+     * The rectangle ($x, $y, $width, $height) of $image drawn onto a white canvas of $toWidth x $toHeight in one resample, so
+     * transparency can never turn black. The caller picks the sizes: this never refuses an enlargement, and no caller asks for one.
+     */
+    public function resample(GdImage $image, int $x, int $y, int $width, int $height, int $toWidth, int $toHeight): GdImage
+    {
+        $toWidth = max(1, $toWidth);
+        $toHeight = max(1, $toHeight);
+        $canvas = imagecreatetruecolor($toWidth, $toHeight);
+        imagefill($canvas, 0, 0, (int) imagecolorallocate($canvas, 255, 255, 255));
+        imagealphablending($canvas, true);
+        imagecopyresampled($canvas, $image, 0, 0, $x, $y, $toWidth, $toHeight, $width, $height);
+
+        return $canvas;
+    }
+
+    /**
+     * Encodes as JPEG ($format 'jpeg') or WebP ('webp') at $quality (the constructor's when null), then proves the result: it decodes,
+     * has the image's size and type, and carries no metadata (a JPEG keeps only its JFIF header: every comment and APP1 to APP15
+     * segment is dropped before the scan; a WebP may hold no EXIF, XMP or ICC chunk). GD writes none of them; the re-read makes sure.
+     *
+     * @throws FilesError unavailable (WebP asked of a gd without it), processing_failed (an unknown format, or the re-read did not pass)
+     */
+    public function encodeScrubbed(GdImage $image, string $format = 'jpeg', ?int $quality = null): ProcessedImage
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+        if ($format === 'webp') {
+            if (! self::canWebp()) {
+                throw FilesError::unavailable();
+            }
+
+            return $this->verifyWebp($this->encodeWebp($image, $quality ?? $this->quality), $width, $height);
+        }
+        if ($format !== 'jpeg') {
+            throw FilesError::processingFailed();
+        }
+
+        return $this->verify($this->scrub($this->encode($image, $quality ?? $this->quality)), $width, $height);
     }
 
     /** Refuses a cut file and a file with something appended after the image (a polyglot), by the format's own end marker. */
@@ -182,24 +245,59 @@ final class ImageProcessor
         $nw = max(1, (int) round($w * $scale));
         $nh = max(1, (int) round($h * $scale));
 
-        $canvas = imagecreatetruecolor($nw, $nh);
-        imagefill($canvas, 0, 0, (int) imagecolorallocate($canvas, 255, 255, 255));
-        imagealphablending($canvas, true);
-        imagecopyresampled($canvas, $image, 0, 0, 0, 0, $nw, $nh, $w, $h);
-
-        return $canvas;
+        return $this->resample($image, 0, 0, $w, $h, $nw, $nh);
     }
 
-    private function encode(GdImage $image): string
+    private function encode(GdImage $image, int $quality): string
     {
         ob_start();
-        $ok = imagejpeg($image, null, $this->quality);
+        $ok = imagejpeg($image, null, $quality);
         $out = (string) ob_get_clean();
         if (! $ok || $out === '') {
             throw FilesError::processingFailed();
         }
 
         return $out;
+    }
+
+    private function encodeWebp(GdImage $image, int $quality): string
+    {
+        ob_start();
+        $ok = imagewebp($image, null, $quality);
+        $out = (string) ob_get_clean();
+        if (! $ok || $out === '') {
+            throw FilesError::processingFailed();
+        }
+
+        return $out;
+    }
+
+    /** Re-reads an encoded WebP: a RIFF/WEBP file of the expected size that decodes, whose chunks hold no EXIF, XMP or ICC profile. */
+    private function verifyWebp(string $bytes, int $width, int $height): ProcessedImage
+    {
+        try {
+            $info = getimagesizefromstring($bytes);
+            $decoded = imagecreatefromstring($bytes);
+        } catch (Throwable) {
+            throw FilesError::processingFailed();
+        }
+        if ($info === false || $decoded === false || $info['mime'] !== 'image/webp' || [$info[0], $info[1]] !== [$width, $height]) {
+            throw FilesError::processingFailed();
+        }
+        if (substr($bytes, 0, 4) !== 'RIFF' || substr($bytes, 8, 4) !== 'WEBP') {
+            throw FilesError::processingFailed();
+        }
+        $i = 12;
+        $length = strlen($bytes);
+        while ($i + 8 <= $length) {
+            if (in_array(substr($bytes, $i, 4), ['EXIF', 'XMP ', 'ICCP'], true)) {
+                throw FilesError::processingFailed();
+            }
+            $size = ExifOrientation::number('V', substr($bytes, $i + 4, 4));
+            $i += 8 + $size + ($size % 2);
+        }
+
+        return new ProcessedImage($bytes, $width, $height, 'image/webp');
     }
 
     /**

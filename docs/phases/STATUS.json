@@ -231,7 +231,7 @@
         "orders->catalog"
       ],
       "modules": {
-        "catalog.images": "todo",
+        "catalog.images": "in_progress",
         "web.design-system": "done",
         "web.stations": "todo",
         "web.admin": "todo",

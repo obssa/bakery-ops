@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Exceptions;
 
 use App\Shared\DomainRefusal;
+use App\Shared\Files\FilesError;
 use App\Shared\Http\ApiError;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -107,6 +108,77 @@ final class CatalogError extends RuntimeException implements DomainRefusal
     public static function recipePublishConflict(): self
     {
         return new self('catalog.recipe.publish_conflict', 409);
+    }
+
+    /*
+     * Step 6.1a (phase-6 plan 4.1): the refusals of a product photo, the eight catalog.image.* keys. The upload's own refusals
+     * (Shared\Files\ImageProcessor's FilesError) are told in Catalog's words through fromFilesError(), so the admin screen reads one
+     * dictionary.
+     */
+
+    /** Only a product is sold from a picture (plan 10.2 Q11): an ingredient has no photo. */
+    public static function imageNotAProduct(): self
+    {
+        return new self('catalog.image.not_a_product', 422);
+    }
+
+    /** No file part, an unreadable one, a cut file, or a file that is not a picture. */
+    public static function imageNotAnImage(): self
+    {
+        return new self('catalog.image.not_an_image', 422, ['field' => 'photo']);
+    }
+
+    /** JPEG, PNG and WebP only (a HEIC photo the browser could not turn into a JPEG first, a GIF). */
+    public static function imageUnsupportedType(): self
+    {
+        return new self('catalog.image.unsupported_type', 422, ['field' => 'photo', 'accepted' => ['image/jpeg', 'image/png', 'image/webp']]);
+    }
+
+    /**
+     * Over catalog.images.max_upload_bytes, or over max_pixels from the header.
+     *
+     * @param  array<string, int>  $limits  max_bytes and/or max_pixels
+     */
+    public static function imageTooLarge(array $limits): self
+    {
+        return new self('catalog.image.too_large', 422, ['field' => 'photo'] + $limits);
+    }
+
+    /** The rectangle lies outside the image, or is not within 1 px of 4:3. */
+    public static function imageCropInvalid(): self
+    {
+        return new self('catalog.image.crop_invalid', 422, ['field' => 'crop']);
+    }
+
+    /** The crop, in source pixels, is narrower than min_width or shorter than min_height. */
+    public static function imageTooSmall(int $minWidth, int $minHeight, int $width, int $height): self
+    {
+        return new self('catalog.image.too_small', 422, ['min_width' => $minWidth, 'min_height' => $minHeight, 'width' => $width, 'height' => $height]);
+    }
+
+    /** gd is missing, or WebP was asked of a gd without it: photos cannot be made on this host. */
+    public static function imageUnavailable(): self
+    {
+        return new self('catalog.image.unavailable', 503);
+    }
+
+    /** An encoded rendition did not pass its re-read. */
+    public static function imageProcessingFailed(): self
+    {
+        return new self('catalog.image.processing_failed', 500);
+    }
+
+    /** A refusal of Shared\Files\ImageProcessor in Catalog's words (its extra, max_bytes or max_pixels, is kept). */
+    public static function fromFilesError(FilesError $e): self
+    {
+        return match ($e->messageKey) {
+            'files.unsupported_type' => self::imageUnsupportedType(),
+            'files.too_large' => self::imageTooLarge(['max_bytes' => (int) ($e->extra['max_bytes'] ?? 0)]),
+            'files.too_many_pixels' => self::imageTooLarge(['max_pixels' => (int) ($e->extra['max_pixels'] ?? 0)]),
+            'files.unavailable' => self::imageUnavailable(),
+            'files.processing_failed' => self::imageProcessingFailed(),
+            default => self::imageNotAnImage(),
+        };
     }
 
     /** DomainRefusal (step 5.5a): the key the info line carries instead of a stack trace. */

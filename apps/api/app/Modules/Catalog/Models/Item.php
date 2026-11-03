@@ -32,6 +32,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * by the API, a seeder or a factory starts the same way the live rows were backfilled; and a save that leaves an item unable to restock
  * (made to order now) turns refund_restock off with it. Catalog\Contracts\RefundPolicy is how Orders reads them.
  *
+ * Step 6.1a: image_id is the product's current display photo (ItemImage), set and cleared only by Services\ProductPhotos (never fillable,
+ * never a field of PATCH /items/{item}); other modules read it through Contracts\ItemImages.
+ *
  * @property int $id
  * @property int $branch_id
  * @property ItemKind $kind
@@ -48,6 +51,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int|null $production_station_id
  * @property bool $refundable
  * @property bool $refund_restock
+ * @property int|null $image_id
  * @property int $created_by_user_id
  * @property int|null $acting_user_id
  * @property int|null $shift_instance_id
@@ -59,6 +63,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Unit $unit
  * @property-read Category|null $category
  * @property-read Station|null $productionStation
+ * @property-read ItemImage|null $image
  * @property-read Collection<int, ItemStationAssignment> $stationAssignments
  */
 final class Item extends Model
@@ -102,6 +107,7 @@ final class Item extends Model
             'production_station_id' => 'integer',
             'refundable' => 'boolean',
             'refund_restock' => 'boolean',
+            'image_id' => 'integer',
             'created_by_user_id' => 'integer',
             'acting_user_id' => 'integer',
             'shift_instance_id' => 'integer',
@@ -186,6 +192,16 @@ final class Item extends Model
     public function stationAssignments(): HasMany
     {
         return $this->hasMany(ItemStationAssignment::class, 'item_id');
+    }
+
+    /**
+     * The current display photo (step 6.1a): the item_images row image_id names, set only by Services\ProductPhotos.
+     *
+     * @return BelongsTo<ItemImage, $this>
+     */
+    public function image(): BelongsTo
+    {
+        return $this->belongsTo(ItemImage::class, 'image_id');
     }
 
     /**

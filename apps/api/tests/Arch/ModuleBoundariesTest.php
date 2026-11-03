@@ -283,3 +283,23 @@ arch('App\Ops declares strict types')
     ->expect('App\Ops')
     ->toUseStrictTypes()
     ->group('arch');
+
+/*
+ * Step 6.1a (phase-6 plan 7, ADR 0022 and the notes on ADR 0015 and ADR 0006): product photos are made with Shared\Files\ImageProcessor and
+ * stored on their own content-addressed disk. They are not receipt evidence, so Catalog never touches the receipt store (Files: purposes,
+ * stored_files, signed URLs); and nothing in the application writes under public/, which a deploy rsyncs (the media disk is under storage/).
+ */
+arch('Catalog makes product photos with Shared\Files\ImageProcessor and never through the receipt store: no Files, no StoredFile, no signed URL')
+    ->expect('App\Modules\Catalog')
+    ->not->toUse(['App\Shared\Files\Files', 'App\Shared\Files\StoredFile', 'App\Shared\Files\Http\ServeFile', 'Illuminate\Support\Facades\URL'])
+    ->group('arch', 'module:catalog');
+
+arch('the product photo pipeline is built on Shared\Files\ImageProcessor')
+    ->expect('App\Modules\Catalog\Support\ProductPhotoPipeline')
+    ->toUse('App\Shared\Files\ImageProcessor')
+    ->group('arch', 'module:catalog');
+
+arch('nothing in the modules or Shared names public/: a deploy rsyncs it, so a file written there would be deleted (product photos live under storage/)')
+    ->expect('public_path')
+    ->not->toBeUsedIn(['App\Modules', 'App\Shared'])
+    ->group('arch', 'module:catalog');

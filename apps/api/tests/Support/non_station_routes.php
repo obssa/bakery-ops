@@ -50,6 +50,9 @@ return [
     'POST /api/v1/items/{item}/recipe/versions' => 'catalog',
     'GET /api/v1/items/{item}/recipe/versions/{version}' => 'catalog',
     'PUT /api/v1/items/{item}/stations' => 'catalog',
+    'POST /api/v1/items/{item}/image' => 'catalog',
+    'DELETE /api/v1/items/{item}/image' => 'catalog',
+    'GET /api/v1/media/items/{sha}/{rendition}.{ext}' => 'catalog',
     'GET /api/v1/units' => 'catalog',
     'POST /api/v1/units' => 'catalog',
     // inventory
