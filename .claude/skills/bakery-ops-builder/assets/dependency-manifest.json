@@ -165,7 +165,7 @@
         "Items::isNew(item)",
         "Items::activeAtLocationType(type)",
         "Phase 4 (step 4.1b, Ramin's answer to R-C): items.refundable and items.refund_restock, the admin's refund settings per product (refund_restock refused for a product made to order or an ingredient), and RefundPolicy::for(ids) -> {item_id, refundable, restock}, which Orders reads at the moment of a refund",
-        "Phase 6 (step 6.1a, planned): one display photo per product, ItemImages::for(ids) -> item id => ?ItemImageView {thumb, card, large, width, height} with absolute-path URLs (null without a current photo, another branch's ids left out); POST and DELETE /items/{item}/image (catalog.manage, idempotent, audited with the before and after image ids); the public content-addressed GET /media/items/{sha}/{rendition}.{ext}; a photo change bumps catalog_version, so the menu's ETag moves"
+        "Phase 6 (step 6.1a): one display photo per product (item_images, items.image_id), ItemImages::for(ids) -> item id => ?ItemImageView {thumb, card, large, width, height} with absolute-path URLs /api/v1/media/items/<sha>/<rendition>.<ext> (null without a current photo, another branch's ids left out, one query); POST and DELETE /items/{item}/image (catalog.manage, idempotent, audited catalog.item.image_set and image_removed with the before and after image ids); the public content-addressed GET /media/items/{sha}/{rendition}.{ext} (immutable); a photo change bumps catalog_version, so the menu's ETag moves"
       ],
       "tables": [
         "categories",
@@ -176,12 +176,9 @@
         "recipes",
         "recipe_lines",
         "recipe_steps",
-        "modifiers"
-      ],
-      "tables_phase_6": [
+        "modifiers",
         "item_images"
-      ],
-      "tables_phase_6_note": "step 6.1a migrates item_images and items.image_id and moves item_images under tables in the same PR as the ERD; listed here until then because gate_check's ERD row reads tables for every phase up to the one it checks, so gate-p0 would fail on a planned table"
+      ]
     },
     "inventory": {
       "layer": 4,
@@ -755,7 +752,10 @@
         "Modifiers::for returns price and recipe deltas in base units",
         "Recipes::activeFor gives the version a line snapshots; Recipes::version(product, n) still answers an older version after a newer one is active",
         "Items::isNew through is_new_until in the branch's local date; Items::fulfilment tells a station line from a counter line",
-        "Phase 4 (4.1b): RefundPolicy::for(ids) answers each product's refundable and restock as they stand now (deleted products too, another branch's left out)"
+        "Phase 4 (4.1b): RefundPolicy::for(ids) answers each product's refundable and restock as they stand now (deleted products too, another branch's left out)",
+        "Phase 6 (6.1a): ItemImages::for(ids) answers item id => {thumb, card, large, width, height} with absolute-path URLs for a product with a current photo, null for one without or whose photo was removed; another branch's ids left out",
+        "Phase 6 (6.1a): a photo set, replaced or removed moves Items::menuFingerprint()['catalog_version'] (the menu's ETag); a remove without a photo moves nothing",
+        "Phase 6 (6.1a): ItemImages::for is one query whatever the number of ids, and its answer holds no disk path or key prefix"
       ]
     },
     "orders->identity": {
