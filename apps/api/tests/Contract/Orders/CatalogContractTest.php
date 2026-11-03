@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Catalog\Contracts\ItemImages;
+use App\Modules\Catalog\Contracts\ItemImageView;
 use App\Modules\Catalog\Contracts\Items;
 use App\Modules\Catalog\Contracts\Modifiers;
 use App\Modules\Catalog\Contracts\ModifierView;
@@ -17,11 +19,15 @@ use App\Modules\Catalog\Models\Recipe;
 use App\Modules\Catalog\Models\RecipeLine;
 use App\Modules\Catalog\Services\ItemStations;
 use App\Modules\Catalog\Services\PriceHistory;
+use App\Modules\Catalog\Services\ProductPhotos;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /*
  * Contract: orders -> catalog (manifest contracts["orders->catalog"]).
@@ -30,7 +36,8 @@ use Carbon\CarbonImmutable;
  * Orders' side: "when I, Orders, put a product on an order line, I rely on Catalog for the price in force when the
  * order was sent, the station the line goes to (none for the display case), the modifiers with their price and recipe
  * deltas, the recipe version I snapshot, and whether the product is new"; since step 4.1b also "whether a product may be refunded and
- * whether a refunded unit goes back into stock" (RefundPolicy). It runs in Catalog's CI job (mod-catalog).
+ * whether a refunded unit goes back into stock" (RefundPolicy); since step 6.1a also "the product's display photo, as three URLs I can put on
+ * the menu" (ItemImages, written red before Catalog had it). It runs in Catalog's CI job (mod-catalog).
  */
 
 beforeEach(function () {
@@ -197,4 +204,113 @@ it('answers RefundPolicy::for(ids) with each product\'s two refund settings as t
         ->and($after[$this->cake->id]->refundable)->toBeTrue()
         ->and($after[$this->cake->id]->restock)->toBeFalse()
         ->and($policy->for([]))->toBe([]);
+})->group('contract:orders->catalog', 'contract');
+
+// Phase 6 (step 6.1a, phase-6 plan section 2): the product's display photo. MenuBuilder (6.1b) puts it on every menu item and reads it
+// only through ItemImages::for, so these cases say what Orders relies on: one URL per rendition, as an absolute path on the API's own
+// origin; the large rendition's size for the srcSet; null for a product without a current photo; one query however many products; a
+// photo change moves the catalog_version the menu's ETag reads; and nothing in the answer about where the files live.
+
+it('answers ItemImages::for(ids) with item id => {thumb, card, large, width, height} for a product with a current photo and null for one without or whose photo was removed; another branch\'s ids are left out', function () {
+    Storage::fake(config('catalog.images.disk'));
+    $photos = app(ProductPhotos::class);
+    $photos->set($this->sandwich, imgJpeg(2000, 1500), null, (string) Str::uuid());
+    $photos->set($this->latte, imgJpeg(1000, 750), null, (string) Str::uuid());
+    $photos->set($this->cake, imgJpeg(1200, 900), null, (string) Str::uuid());
+    $photos->remove($this->cake->fresh() ?? $this->cake);
+
+    $mine = $this->branch;
+    $theirs = actInBranch(Branch::factory()->create());
+    withActor(makeUser($theirs, 'admin')->id);
+    $theirCake = Item::factory()->product(Fulfilment::ToStock)->create(['branch_id' => $theirs->id]);
+    $photos->set($theirCake, imgJpeg(1600, 1200), null, (string) Str::uuid());
+    actInBranch($mine);
+    withActor(makeUser($mine, 'admin')->id);
+
+    $ids = [$this->water->id, $this->latte->id, $this->sandwich->id, $this->cake->id, $theirCake->id, 987654];
+    $images = app(ItemImages::class)->for($ids);
+    $url = '#^/api/v1/media/items/([0-9a-f]{64})/(thumb|card|large)\.(webp|jpg)$#';
+
+    $ours = [$this->sandwich->id, $this->latte->id, $this->cake->id, $this->water->id];
+    sort($ours);
+    expect(array_keys($images))->toBe($ours, 'in id order; another branch\'s ids and unknown ids are left out')
+        ->and($images[$this->water->id])->toBeNull('no photo yet')
+        ->and($images[$this->cake->id])->toBeNull('its photo was removed')
+        ->and($images[$this->sandwich->id])->toBeInstanceOf(ItemImageView::class)
+        ->and(array_keys($images[$this->sandwich->id]->toArray()))->toBe(['thumb', 'card', 'large', 'width', 'height'])
+        ->and([$images[$this->sandwich->id]->width, $images[$this->sandwich->id]->height])->toBe([1600, 1200], 'the large rendition: 2000 x 1500 shrunk to 1600 x 1200')
+        ->and([$images[$this->latte->id]->width, $images[$this->latte->id]->height])->toBe([1000, 750], 'never upscaled: a 1000 x 750 photo stays 1000 x 750')
+        ->and(app(ItemImages::class)->for([]))->toBe([]);
+
+    foreach ([$this->sandwich->id, $this->latte->id] as $id) {
+        $view = $images[$id];
+        $shas = [];
+        $exts = [];
+        foreach (['thumb' => $view->thumb, 'card' => $view->card, 'large' => $view->large] as $rendition => $value) {
+            expect(preg_match($url, $value, $m))->toBe(1, "{$rendition}: an absolute path on the API's origin, no host: {$value}")
+                ->and($m[2])->toBe($rendition);
+            $shas[] = $m[1];
+            $exts[] = $m[3];
+        }
+        expect(array_unique($shas))->toHaveCount(1, 'the three renditions are named by one sha256')
+            ->and(array_unique($exts))->toHaveCount(1, 'and share one format');
+    }
+    expect($images[$this->sandwich->id]->thumb)->not->toBe($images[$this->latte->id]->thumb, 'two photos, two names');
+})->group('contract:orders->catalog', 'contract');
+
+it('moves Items::menuFingerprint()[catalog_version] when a photo is set, replaced or removed, so the menu\'s ETag moves; a remove without a photo moves nothing', function () {
+    Storage::fake(config('catalog.images.disk'));
+    $photos = app(ProductPhotos::class);
+    $version = fn (): int => (int) app(Items::class)->menuFingerprint()['catalog_version'];
+
+    $start = $version();
+    $photos->set($this->sandwich, imgJpeg(1200, 900), null, (string) Str::uuid());
+    $afterSet = $version();
+    $photos->set($this->sandwich->fresh() ?? $this->sandwich, imgJpeg(1400, 1050), null, (string) Str::uuid());
+    $afterReplace = $version();
+    $photos->remove($this->sandwich->fresh() ?? $this->sandwich);
+    $afterRemove = $version();
+    $photos->remove($this->sandwich->fresh() ?? $this->sandwich);
+
+    expect($afterSet)->toBeGreaterThan($start)
+        ->and($afterReplace)->toBeGreaterThan($afterSet)
+        ->and($afterRemove)->toBeGreaterThan($afterReplace)
+        ->and($version())->toBe($afterRemove, 'nothing to remove: no write, no new ETag')
+        ->and(app(ItemImages::class)->for([$this->sandwich->id])[$this->sandwich->id])->toBeNull();
+})->group('contract:orders->catalog', 'contract');
+
+it('reads the photos of any number of products in one query, and the answer never holds a disk path or a key prefix', function () {
+    Storage::fake(config('catalog.images.disk'));
+    $photos = app(ProductPhotos::class);
+    $products = [$this->sandwich, $this->latte, $this->cake, $this->water];
+    foreach ($products as $i => $product) {
+        $photos->set($product, imgJpeg(800 + 4 * $i, 600 + 3 * $i), null, (string) Str::uuid());
+    }
+    $more = Item::factory()->count(6)->product(Fulfilment::ToStock)->create(['branch_id' => $this->branch->id]);
+
+    $selects = function (array $ids): array {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        app(ItemImages::class)->for($ids);
+        $log = array_column(DB::getQueryLog(), 'query');
+        DB::disableQueryLog();
+
+        return $log;
+    };
+    $two = $selects([$this->sandwich->id, $this->latte->id]);
+    $all = $selects(array_merge(array_map(fn (Item $p): int => $p->id, $products), $more->modelKeys()));
+
+    expect($two)->toHaveCount(1)
+        ->and($all)->toHaveCount(1, 'ten ids, still one query')
+        ->and($all[0])->toContain('item_images');
+
+    $json = (string) json_encode(array_map(fn (?ItemImageView $v): ?array => $v?->toArray(), app(ItemImages::class)->for([$this->sandwich->id, $this->latte->id])), JSON_UNESCAPED_SLASHES);
+    $prefixes = DB::table('item_images')->pluck('key_prefix')->all();
+    expect($prefixes)->not->toBeEmpty();
+    foreach ($prefixes as $prefix) {
+        expect($json)->not->toContain((string) $prefix);
+    }
+    expect($json)->not->toContain(storage_path())
+        ->and($json)->not->toContain('private')
+        ->and($json)->not->toContain('"disk"');
 })->group('contract:orders->catalog', 'contract');
