@@ -36,7 +36,7 @@ function Both({ text }: { text: Bilingual }) {
   );
 }
 
-const button = `min-h-12 rounded-md border px-4 font-medium ${focusRing}`;
+const button = `min-h-12 rounded-xl border px-4 font-semibold motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`;
 
 /** The pad's (or till's) cart of a refused send, asked for from the cart store; the screen that opens next puts it in its cart. */
 async function askForCart(entry: TrayEntry): Promise<void> {
@@ -77,7 +77,7 @@ function Entry({ entry }: { entry: TrayEntry }) {
   }
 
   return (
-    <li className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base text-red-900">
+    <li className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-base text-red-900">
       <div role="alert" className="space-y-2">
         <p className="font-semibold">{t("tray_what", { what: t(`kind_${item.kind}`) })}</p>
         <div className="space-y-1">{said ? <Both text={entry.message} /> : <span>{errorText.message(new ApiError(entry.status, item.conflict?.body ?? {}))}</span>}</div>
@@ -125,7 +125,7 @@ export function ConflictTray() {
     <section role="region" aria-label={t("tray_region")}>
       <ul className="flex flex-col gap-2">
         {kept ? (
-          <li className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
+          <li className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
             <div role="alert" className="space-y-1">
               <p className="font-semibold">{t("tray_device", { count: waiting })}</p>
               <Both text={{ en: held.en, am: held.am }} />

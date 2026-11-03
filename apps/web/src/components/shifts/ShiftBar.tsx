@@ -13,7 +13,7 @@ import { can, useSession } from "@/lib/session";
 import { useShiftNotice } from "@/lib/station";
 import { useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, Field, Modal, Select } from "../ui";
-import { focusRing } from "../styles";
+import { buttonClass } from "../styles";
 import { DrawerDialog } from "./DrawerDialog";
 import { HandoverPanel } from "./HandoverPanel";
 import { NoteForm } from "./Notes";
@@ -31,10 +31,12 @@ import type { ShiftStation } from "./useShiftStation";
 // When the API refuses something because no shift is open (409 inventory.shift.required, payments.shift.required) the refusal is
 // shown here in both languages, above the same Start buttons.
 
-const BADGE: Record<BarMode, { tone: "amber" | "blue" | "green"; key: string }> = {
+// open is brand teal since step 6.2b: green means money confirmed and nothing else (fresh-counter.md 1.3); the station top bar's chip uses
+// the same tones (AppShell.tsx)
+const BADGE: Record<BarMode, { tone: "amber" | "blue" | "brand"; key: string }> = {
   idle: { tone: "amber", key: "badge_none" },
   opening: { tone: "blue", key: "badge_opening" },
-  open: { tone: "green", key: "badge_open" },
+  open: { tone: "brand", key: "badge_open" },
   counting: { tone: "blue", key: "badge_counting" },
 };
 
@@ -123,7 +125,7 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   const count = (
     <Link
       href={{ pathname: "/shifts/count", query: { shift: shift?.id ?? "" } }}
-      className={`inline-flex min-h-12 items-center justify-center rounded-md bg-blue-700 px-5 text-base font-medium text-white hover:bg-blue-800 ${focusRing}`}
+      className={buttonClass({ variant: "primary" })}
     >
       {t("open_count")}
     </Link>
@@ -150,7 +152,7 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
   }
 
   return (
-    <section aria-label={t("region")} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4">
+    <section aria-label={t("region")} className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -249,14 +251,14 @@ export function ShiftBar({ model }: { model: ShiftStation }) {
       </div>
 
       {showNotice ? (
-        <div role="alert" className="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+        <div role="alert" className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
           <p className="font-semibold">{t("needed", { station: stationName })}</p>
           {noticeText ? <p>{noticeText}</p> : null}
         </div>
       ) : null}
       {failure ? <Alert>{errorText.message(failure)}</Alert> : null}
       {snapshot?.error && loaded ? (
-        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
           {t("stale")}
         </p>
       ) : null}
