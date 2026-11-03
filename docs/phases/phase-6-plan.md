@@ -521,7 +521,56 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
     `wcag21a` and `wcag21aa` tags; fails on `serious` or `critical`; waits for `document.fonts.ready` so contrast reads the real font).
     It checks login in `en` and `am`.
   - Done when every p0 to p5 project and `p6-a11y` are green.
-  - As built: (to be written by 6.2b)
+  - **As built (step 6.2b, `phase-6/web-shell`).** The `p6-a11y` spec first, then the photo, then the shell. Web only, plus the review
+    sheet's screen name for the new `shell` messages (`scripts/i18n_export.py`): no API, route, registry, OpenAPI or ERD change, and **no
+    Playwright selector changed**. Where the code chose what the plan left open:
+    - **The station top bar** (`AppShell`): 68 px, white, a bottom hairline. On the left, the mark (a 36 px brand-600 square with a line
+      croissant), a link home named after the app; on a station screen the station's name takes the app name's place, with the shift
+      chip. `useShiftStation` publishes the station and its live shift (`lib/station.ts` `useStationChrome`), so the chip reads the shift
+      bar's own feed and polls nothing more: "No shift" amber, "Opening" and "Closing" blue, "Open" brand teal, with the template and the
+      day. On the right, in the spec's order: the sync chip; the person's calendar (it was in the header, and `p4-dashboards` selects it
+      there); the language button, one link that names the other language (the same names and `lang` as before); the bell (a line icon,
+      the count as a red pill); the person (initials, with the name and role from 1280 px) and "Sign out", an icon button of that name.
+    - **"Screens"** is a strip of tabs under the bar (48 px, the current one underlined in brand teal, an 18 px icon beside each name,
+      hidden from readers): beside the bar's own contents it does not fit at 1280 px (about 690 px of links in English, more in Amharic).
+      Its name, link names and `aria-current` are as before.
+    - **The sync chip** sums up what the outbox band says (`useSyncState`, shared with `PendingIndicator`): "Online · all sent"
+      (brand-50); "Offline", "Offline · N waiting" and "Online · N waiting" (neutral, amber while a device refusal holds the queue);
+      "Conflicts · N" (amber). It is plain text, not a second live region, so the band's status line stays the one the offline specs
+      filter. The band and the conflict tray keep every role, name and button, on the new radii (the waiting line blue, with its icon).
+    - **The admin frame** (`AdminFrame`), under the top bar: a 264 px white sidebar with a right hairline, in the spec's groups, Sell
+      (Orders, Payments), Make (Catalog, Inventory, Planner), Team (People, Shifts), Insight (Analytics, Audit log) and System; 44 px
+      rows with 18 px icons, the current one brand-50 with brand-700 text. Still the `navigation` "Admin sections" with the same ten links,
+      permission filters and `aria-current`. Left out: Refunds (Q2); Today, since the overview is still the "Admin console" page and link
+      until 6.4a makes it Today; Production, the station screen, which "Screens" carries; Devices, People's own "Devices" link (a second
+      one would make `p5-device`'s link ambiguous). The branch's name (Q3) waits too: no endpoint every role may read names the branch
+      (`/me` carries `branch_id` only, `/receipt-settings` needs `payments.take` and an enrolled device). The mark and the person are the
+      top bar's, so the sidebar holds the sections only. Below 1024 px a 60 px bar's menu button opens the sidebar as a drawer from the
+      left (a dialog, closed by Escape, a tap beside it, a link or a window that grows past 1024 px). The frame draws its own `main`
+      (at most 1160 px, 32 px of padding, 16 on a phone), so the sidebar is outside it, and the not-enrolled screen replaces the content
+      only. The offline notice and the disabled fieldset are as they were.
+    - **The title row**: `PageHeader` gains `twin`, the title in the other language beside it in neutral-600, outside the h1 in its own
+      `lang`, so no heading's name changes. The catalog list passes the Amharic title on the English page: it is the one screen of this
+      step that names everything in both languages (spec 5). The admin screen steps add it where their screens do the same.
+    - **Sign-in** (spec 3.1): a full-bleed split without the top bar. On the left 45 %, the photo `object-cover` (a 160 px header on a
+      phone) with the mark, the name and the tagline over a `neutral-900/60` band. On the right, a white column: the language pair at the
+      top right, `h1` "Sign in", 52 px fields, the `xl` button, the refusal in the form (never a toast), a line on how staff unlock a
+      station tablet, and a footer with "Forgot your password? Ask your admin." and the "Screens" navigation (`p0-admin-smoke` reads its
+      "Admin console" link on this page). No staff-code tab (Q1). No eye button on the password field: its name, "Show password", would
+      also answer `getByLabel("Password")`.
+    - **The start page**: the title row and a card per screen, its icon on a brand-50 tile, "Open" in brand teal; the Phase 0 notice
+      (`app.phase_notice`) is gone. **Not found**: an empty state on a white card. **`DeviceGate`**: `EmptyState` (level 1, with the new
+      `headingId`) on a white card, then the reason, the device's code, the enrol box or the line asking for an admin, and "Try again".
+    - **Small things**: the shift bar's "Open" badge is brand teal (green means money confirmed only) and its count link the primary
+      button; `OnlineOnlyButton` shows a wifi-off icon beside "Needs a connection"; the calendar switch, the bell's panel (the float
+      shadow, the unread dot in brand teal) and the tray on the new radii. The sidebar drawer slides in from the left
+      (`animate-sidebar-in`, beside 6.2a's `animate-drawer-in`).
+    - **The photo**: `public/images/login-counter.webp` (960 × 1500, 157 KB, free licence, no person) with its source page and licence in
+      `public/images/LICENSES.json`. `build-sw.mjs` precaches `webp` and `jpg` too, so the sign-in screen opens offline with its photo.
+    - Messages, both languages: `shell.sync_*` (5), `login.station_hint`, `login.forgot`, `admin.group_*` (4), `admin.open_sections` and
+      `admin.close_sections`; `app.phase_notice` and `nav.signed_in_as` removed. `docs/i18n/am-review.csv` regenerated.
+    - Tests: `e2e/p6/a11y.spec.ts` (4 cases in `p6-a11y`, the placeholder and its to-do marker gone): the sign-in screen drawn with its
+      photo, and after a refused sign-in, in `en` and `am`, through `e2e/support/a11y.ts`. STATUS `web.design-system` `done`.
 
 ### 6.3 web.stations (STATUS `web.stations`), three PRs
 
