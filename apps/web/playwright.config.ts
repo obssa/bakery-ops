@@ -62,5 +62,10 @@ export default defineConfig({
     // made with the made-up DSN in E2E_SENTRY_DSN (an error reaches a page.route sink, scrubbed). Neither needs the API (its answers are stubbed).
     { name: "p5-errors-off", testDir: "./e2e/p5", testMatch: /errors-(off|logic)\.spec/, use: tablet },
     { name: "p5-errors-on", testDir: "./e2e/p5", testMatch: /errors-on\.spec/, use: tablet },
+    // Phase 6 (docs/phases/phase-6-plan.md section 7): the product photo flow (admin frames and saves a photo, the pad shows it, replace,
+    // remove) and the axe sweep of the main screens in en and am. testMatch is matched against the absolute path, and CI checks out into
+    // .../bakery-ops/bakery-ops/, so both are anchored on the folder and the file name, never on a bare word.
+    { name: "p6-product-photo", testDir: "./e2e/p6", testMatch: /[\\/]p6[\\/]product-photo[^\\/]*\.spec\.ts$/, use: tablet },
+    { name: "p6-a11y", testDir: "./e2e/p6", testMatch: /[\\/]p6[\\/]a11y[^\\/]*\.spec\.ts$/, use: tablet },
   ],
 });
