@@ -29,6 +29,17 @@ export function tenderedOf(entry: string): string | null {
   return text === "" ? null : addDecimal(text, "0.00");
 }
 
+/**
+ * The till's quick cash keys (phase-6 plan 10.2 Q6, fresh-counter.md 3.4): the notes a customer most often hands over, fixed, with no
+ * setting. A key fills the cash received with its amount; "Exact" (the keypad's own key) fills in the payment's amount. `label` is how the
+ * key reads, grouped as the shop writes a thousand.
+ */
+export const QUICK_CASH: readonly { amount: string; label: string }[] = [
+  { amount: "300", label: "300" },
+  { amount: "500", label: "500" },
+  { amount: "1000", label: "1,000" },
+];
+
 /** Change to give back for cash handed over against an amount due; null while the cash does not cover it. */
 export function changeDue(tendered: string | null, due: string): string | null {
   if (tendered === null || compareDecimal(tendered, due, 2) < 0) return null;
