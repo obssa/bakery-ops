@@ -704,68 +704,88 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   - `p6-a11y`: the pad in `en` and `am`.
   - **As built (step 6.3a, `phase-6/web-pad`).** The two specs first (red: `product-photo-pad.spec.ts` and the pad's `p6-a11y` cases, with
     the fixture and `e2e/support/productPhoto.ts`, and STATUS `web.stations` `in_progress`), then the shell's frame, the pad, its strings, the
-    service worker and the notes. Web only, plus the ADR notes, the runbook and `web-build`'s check: no API, route, registry, OpenAPI or ERD
-    change, and **no Playwright selector changed**. Where the code chose what the plan left open:
+    service worker and the notes; then, after Ramin compared the live pad with the canvas, the pad rebuilt region by region to the Pad board
+    (brief "Design fidelity"), with the specs it moved in the same commit and `e2e/p6/screens.spec.ts`. Web only, plus the ADR notes, the
+    runbook and the CI checks: no API, route, registry, OpenAPI or ERD change. Where the code chose what the plan left open:
     - **The frame.** `frameOf` gives `/pad` a new `fill` frame (`lib/screens.ts`): its `main` has no padding around the screen (it keeps
       it around anything else, the sign-in check, a refusal or the not-enrolled screen, through `has-[[data-shell-fill]]`) and, from 1024 px,
-      holds the rest of the window, so the menu scrolls under its search and chips and the order panel's lines scroll above its footer: Send
-      is always in reach. Below 1024 px the page flows: the panel follows the menu, and a white bar at the bottom of the window keeps the
-      item count and the total in sight with "View order", a link down to the panel. The till keeps its padded frame; its "New order" tab
-      draws the same restyled surface, with the panel sticking beside the menu as before (6.3b rebuilds the till). One fix to 6.2b's top bar:
-      on a phone its right-hand group wraps inside the window (it ran past a 390 px one).
-    - **The pad's bar.** Under the station top bar, a white bar holds the "Pad views" tabs (a station `SegmentedControl` in tab mode, the
-      ready count a brand-teal pill inside "My orders") and, on the right, the waiter's initials with "Acting: <name>", the chime button
-      (same names and `aria-pressed`) and "Lock pad". The page's `h1` "Waiter pad" is for readers only: the top bar and the "Screens" tab
-      already say where the screen is. "Order sent" is a toast over the menu (the same `status` region), so nothing moves under the waiter's
-      finger while it shows.
+      holds the rest of the window, so the menu scrolls under its search and chips and the order panel's lines scroll above its totals:
+      Send is always in reach. The main is never shorter than 34rem: a tall band above it (the conflict tray) makes the page scroll instead
+      of crushing the panel, which is what failed `p1-shortfall` once. Below 1024 px the page flows: the panel follows the menu, and a bar at
+      the bottom of the window keeps the item count and the total in sight with "View order", a link down to the panel. One fix to 6.2b's
+      top bar: on a phone its right-hand group wraps inside the window (it ran past a 390 px one).
+    - **The top bar, as the board has it** (`lib/topBar.ts`: two places the shell draws in the `fill` frame, filled by the pad through a
+      portal, so the buttons keep the pad's state). Beside the mark, "Waiter pad" (the board's station name; the app name stays the link's
+      name). On the right: the sync chip; while a waiter has the pad, "Tables" (the tables sheet), "My orders · N" (N open orders, with the
+      ready count as a brand pill; it opens a drawer with the waiter's open orders) and the chime as an icon button ("Mute chime" / "Unmute
+      chime", `aria-pressed`); the language button; then the waiter who has the pad: their initials, their name ("Acting: <name>" to
+      readers, through a visually hidden prefix, so `getByText("Acting: …")` still finds it) with "On the pad" under it, and "Lock pad". The
+      pad account and "Sign out" come back when it locks. No calendar switch and no bell on the pad (the board has neither). The strip that
+      held the views, the waiter and the lock under the bar is gone. "Order sent" is a toast over the menu.
     - **`ProductCard`** (`components/pad/ProductCard.tsx`): props `item` (a `ProductCardItem`, the menu entry's fields a card shows, so a
       catalog row can be put in the same shape), `locale`, `category` (for the placeholder's icon), `onAdd`, `onMore`, `onUnavailable` and
-      `preview` (no button, no handlers: for 6.4a's grid view and 6.4b's live preview); generic over the item type, so the menu gets its
-      `MenuItem` back. The whole card is the add button, named `add_item` / `unavailable_item` as before; the "More" button is now an
-      ellipsis icon named `more_options` ("Options for …"), a sibling over the card's corner, never inside the add button. Over the photo:
-      "3 left" in amber only when the API says low (nothing when there is plenty, as the canvas has it; the button's name still carries the
-      count), "New" in brand teal, and for a product that cannot be sold the photo in grey at 60 % with the reason ("Out of stock", "Not
-      stocked here") in a red chip (a placeholder is grey already and keeps its contrast). That card is `aria-disabled`, not `disabled`: it stays focusable, and a tap outlines the reason and says
-      it in a polite status ("… is not available: …"). The name is the page language's only (Q13), two lines at most.
+      `preview` (no button, no handlers: for 6.4a's grid view and 6.4b's live preview); generic over the item type. As the board: the 4:3
+      `card` photo, the name on one line (15 / 600) with the Amharic name under it on the English page (Amharic only in Amharic, Q13), and
+      "ETB 65.00" with the "More" ellipsis button (named `more_options`, a sibling over the card's corner, never inside the add button).
+      Over the photo: "3 left" in amber only when the API says low (the button's name still carries the count), "New" in brand teal, and for
+      a product that cannot be sold the photo in grey at 60 % with the reason ("Out of stock", "Not stocked here") in a red chip (a
+      placeholder is grey already and keeps its contrast). The whole card is the add button, named `add_item` / `unavailable_item` as
+      before; an unavailable card is `aria-disabled`, not `disabled`: it stays focusable, and a tap outlines the reason and says it in a
+      polite status ("… is not available: …").
     - **The menu.** The 52 px search matches either name, ignoring case, in the browser; while it holds text the chips and their counts are
-      those of the matches (a chip without one leaves), and the tab chosen before comes back when it is cleared. Escape or the X button
-      clears it; nothing matching says so, with a "Clear the search" button. The chips are the same "Menu categories" tablist, 44 px, the
-      current one ink, the counts `aria-hidden`, scrolling sideways, with the arrow keys, Home and End. The grid is 2 columns, 3 from 640 px
-      and 4 from 1152 px (`min-[72rem]`: the 1180 px tablet; a px breakpoint sorts before `sm` in Tailwind 4 and lost to it; 3 at 1024 px
-      beside the panel and on an 820 px tablet held upright). Skeleton cards while the
-      menu first loads. The options sheet shows the product's thumb and price, and selects the quantity once (not again on the menu's next
-      answer, which re-drew it before).
-    - **The order panel** (368 px, white, left hairline). Its head is `TablesPanel`: "New order" in caps ("Not sent yet" for an order the
-      API already holds), the table ("Table T3", "No table yet" or "Takeaway") and "Change". The picker (the order type as a station
-      `SegmentedControl`, the same `group` "Order type" of pressed buttons, and the 4-column table grid with each state in a word) is open
-      while a dine-in order has no table and whenever "Change" asks; choosing a table closes it, so after a send the next order opens on it
-      again. The table buttons keep their names ("Table T3, free"); the states keep their words, on status colours that mean what spec 1.3
-      says (free neutral, ordering blue, waiting amber, served brand teal, the bill grey; green is money only). An order the API holds shows
-      its table without "Change", as the disabled grid did. A long table list scrolls inside the head (at most half the panel). Then the
-      "Cart" region: each line with the 48 px `thumb` (the menu's photo of the product as it is now, the line's own copy only when the menu
-      no longer lists it), the name, the unit price with the modifiers, the line total, a 44 px stepper around the same "Quantity of …"
-      textbox, a note opened on demand ("Add a note for …"; a line with a note shows its field) and remove; the order note; then "Items: N"
-      with the subtotal, the total at 30 / 700, the `xl` "Send order" with an arrow, and "Clear cart" or "Cancel this order" under it. The
-      spec's "Send to kitchen" and "Save draft" are not used: "Send order" is the copy the specs read, and the pad has no draft to save (a
-      waiter's cart is kept for them while the pad is locked). The stepper keys are 44 px, not the spec's 40: the admin floor.
+      those of the matches, and the tab chosen before comes back when it is cleared (Escape or the X clears it; nothing matching says so).
+      The chips are the same "Menu categories" tablist: "All" first and chosen at first, as the board has it, then "New", the categories
+      and "Other"; 44 px, the current one ink, the counts `aria-hidden`, scrolling sideways, with the arrow keys, Home and End. The grid is
+      2 columns, 3 from 640 px and 4 from 1152 px (`min-[72rem]`: a px breakpoint sorts before `sm` in Tailwind 4 and lost to it). Skeleton
+      cards while the menu first loads. The options sheet shows the product's thumb and price and selects the quantity once.
+    - **The order panel** (368 px, white, left hairline, 20 px padding). Its head, as the board: "New order" in caps ("Not sent yet" for an
+      order the API already holds), the table ("Table T7" with the table's Amharic name beside it on the English page, "No table yet" or
+      "Takeaway") and "Change". "Change", or the top bar's "Tables", opens the **"Tables" sheet** (a drawer): the order type as a station
+      `SegmentedControl` (the same `group` "Order type" of pressed buttons) and the table grid with each state in a word, on status colours
+      that mean what spec 1.3 says (free neutral, ordering blue, waiting amber, served brand teal, the bill grey; green is money only).
+      Choosing a table or takeaway closes it; an order the API holds has no "Change". Then the "Cart" region: each line on one row as the
+      board draws it, the 48 px `thumb` (the menu's photo of the product as it is now, the line's own copy only when the menu no longer
+      lists it), the name with its note or modifiers under it, the stepper (36 × 40 keys around the same "Quantity of …" textbox) and the
+      line total. A tap on the name ("Change <name>") opens the line: its note ("Note for …") and "Remove …". "Add an order note" opens the
+      order's note. Then "4 items" and "Subtotal ETB 460.00", "Total" with "ETB 460.00" at 30 / 700, the `xl` "Send order" with its arrow,
+      and "Clear cart" or "Cancel this order" under it. Not taken from the board: "Send to kitchen" and "Save draft" ("Send order" is the
+      copy the specs read, and the pad has no draft: a waiter's cart is kept for them while the pad is locked), and the Amharic twins on
+      "Total" and Send (they would need English and Amharic strings on one page; the twins that are data, the table's and the products'
+      names, are shown).
     - **The lock screen** (Q1): a white card with a lock icon, "Enter your short code", the idle or expired line, dots for the digits (empty
       ones up to four; the count is told to readers by `code_entered`), and the 3 × 4 keypad of 72 px keys: 1 to 9, Clear, 0 and Unlock,
       with the same names.
-    - **My orders**: the cards on the new radii; "ready" is brand teal (a ring on the card, a brand chip), since green means money only.
+    - **My orders** (the drawer): the cards on the new radii; "ready" is brand teal (a ring on the card, a brand chip), since green means
+      money only.
+    - **Selectors changed** (each in the commit that moved the control, `e2e/support/pad.ts`):
+      - the table buttons: `getByRole("button", { name: "Table <code>" })` on the page became `chooseTable(page, code)`, which presses
+        "Change the table or the order type" and the same button inside `getByRole("dialog", { name: "Tables" })`, because the board has no
+        table grid on the pad: it sits behind "Change" and "Tables" (order-flow, order-flow-till, shortfall, stockout-production, offline,
+        offline-conflicts, a11y);
+      - "My orders": `getByRole("tab", { name: /My orders/ })` became `openMyOrders(page)` (the top bar's button `/^My orders/`, then the
+        dialog "My orders"), and the pad lock test's "My orders" then "New order" tabs became `openMyOrders` and `closeMyOrders`, because the
+        board has a "My orders · N" button and no views strip (order-flow, shortfall, pad-order-flow);
+      - the cart's total: `toContainText("330.00 ETB")` became `toContainText("ETB 330.00")`, the board's money format (order-flow).
+      Every other name the specs read is as it was: the product buttons, "Options for …", the "Menu categories" tablist, "Order type", the
+      "Cart" region and its line controls, "Send order", "Clear cart", "Acting: <name>", the chime, "Lock pad" and the lock screen's keys.
     - **The service worker** (`scripts/build-sw.mjs`): `CacheFirst` for `GET` on its own origin under `/api/v1/media/`, cache
       `product-images`, 400 entries, 30 days, statuses `[200]`, `purgeOnQuotaError`; no other runtime route. `web-build` greps the export's
       `sw.js` for `"/api/v1/media/"`, `"product-images"` and `CacheFirst`. Checked locally against a stub of the API: the photos the pad
       showed are in `product-images` and are served from it with the network off, and `/api/v1/menu` is not. ADR 0018 and ADR 0022 notes;
       the runbook's "On the tablets" line.
     - **Messages**, both languages: `pad.search`, `search_clear`, `search_none`, `unavailable_said`, `table_title`, `no_table`,
-      `change_table`, `change_table_aria`, `items_count`, `subtotal`, `note_add`, `view_order` and `code_entered`; `pad.more` removed.
-      `docs/i18n/am-review.csv` regenerated.
+      `change_table`, `change_table_aria`, `items_count`, `subtotal`, `view_order`, `code_entered`, `acting_prefix`, `acting_role`,
+      `orders_button`, `close`, `tables_title`, `tab_all`, `line_edit`, `done` and `order_note_add`; `pad.more`, `acting`, `views` and
+      `tab_my_orders` removed. `docs/i18n/am-review.csv` regenerated.
     - **Tests.** `e2e/p6/product-photo-pad.spec.ts` (in `p6-product-photo`, CI only: it writes a photo): the fixture photo through the API,
       the pad card's `img` on the `card` URL with the three widths in its `srcSet` and the product's name as its `alt`, the order line's on
       the `thumb`, both drawn; after the remove, the placeholder on both and no broken image on the page. `p6-a11y` gains the pad in `en`
-      and `am`: locked, with the menu, and with an order line, a photo on the product. The fixture is
+      and `am`: locked, with the menu, with the tables sheet open and with an order line, a photo on the product. The fixture is
       `e2e/fixtures/product-photo-1600x1200.jpg`, a generated test card (shapes and text, no people, 93 KB, no EXIF), which 6.4b's admin
-      flow drops too.
+      flow drops too. **Screenshots for review**: `e2e/p6/screens.spec.ts` (in `p6-a11y`, whose `testMatch` now takes `a11y` and `screens`)
+      captures the demo bakery's pad at 1180 × 820: `pad-locked-1180x820-en`, `pad-tables-1180x820-en`, `pad-1180x820-en`,
+      `pad-orders-1180x820-en` and `pad-1180x820-am`, under `test-results/screens/`; `e2e.yml` uploads the folder as the artifact `screens`
+      on every phase-6 run.
 
 - **6.3b `phase-6/web-kds-till`**.
   - The KDS, kitchen and bar (spec 3.3): kitchen night on the `night-*` tokens; New, Cooking and Ready columns with counts; ticket
