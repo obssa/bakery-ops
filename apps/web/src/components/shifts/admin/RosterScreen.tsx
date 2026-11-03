@@ -144,7 +144,7 @@ function StationWeek({
                   {days.map((date) => (
                     <td key={date} className="py-3 pr-3 align-top">
                       {templatesOn([template], station.station_id, date).length === 0 ? (
-                        <span className="text-neutral-400" aria-hidden="true">—</span>
+                        <span className="text-neutral-600" aria-hidden="true">—</span>
                       ) : (
                         <Cell station={station} template={template} date={date} shifts={cells.get(cellKey(station.station_id, template.id, date)) ?? []} manage={manage} onAction={onAction} />
                       )}
