@@ -1,8 +1,8 @@
 "use client";
 
-import { Croissant, Lock, LogOut } from "lucide-react";
+import { ChevronDown, Croissant, LayoutGrid, LogOut } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActing } from "@/lib/acting";
 import type { Locale } from "@/lib/api/types";
@@ -22,14 +22,15 @@ import { PendingIndicator, useSyncState } from "./PendingIndicator";
 import { buttonClass, focusRing } from "./styles";
 import { Avatar, Chip, IconButton, type Tone } from "./ui";
 
-// The frame around every page (step 6.2b, fresh-counter.md 3): the 68 px station top bar, then the "Screens" navigation, the outbox's band
-// and the page. The bar holds, on the left, the app's mark (the way home) and, on a station screen, the station's name and a chip with its
-// shift; on the right, in this order, the sync chip, the person's calendar (step 4.5f), the language button (the other language's name),
-// the bell and the person (initials, name and role) with "Sign out". The "Screens" navigation keeps its name and its link names, visible
-// under the bar: at 1280 px there is no room for it beside the bar's own contents in either language. The admin console draws its sidebar
-// frame and its own `main` (AdminFrame); the sign-in screen is a split of its own, without the bar, and carries "Screens" itself; the waiter
-// pad (the `fill` frame, step 6.3a) draws its zones edge to edge and, from 1024 px, in the window's height. A page
-// whose calls are refused because this device is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate).
+// The frame around every page (steps 6.2b and 6.3a, fresh-counter.md 3): a top bar, the outbox's band and the page. A station screen (the
+// pad, the till, the kitchen and bar displays, the production board, the count, and the start page) has exactly one 68 px bar, as its
+// design board does (StationBar): the station mark, the screen's title with its Amharic name and a line with the shift and the person; on
+// the right the screen's own buttons (lib/topBar.ts), the sync chip, the language button, the bell, the "Screens" menu and the person's
+// menu (the dates' calendar and "Sign out" are in it). The admin console keeps the 6.2b bar with the "Screens" tabs under it until step
+// 6.4a rebuilds its frame (AdminTopBar), and draws its sidebar and its own `main` (AdminFrame). The sign-in screen is a split of its own,
+// without a bar, and carries "Screens" itself. The waiter pad (the `fill` frame) draws its zones edge to edge and, from 1024 px, in the
+// window's height. A page whose calls are refused because this device is not enrolled shows the "not enrolled" screen instead (step
+// 5.1b, DeviceGate).
 
 /** The app's mark: a brand-teal square with the line icon, hidden from readers (the name beside it, or the link around it, says it). */
 export function AppMark({ size = "md" }: { size?: "md" | "lg" }) {
@@ -97,7 +98,7 @@ export function ScreensNav({ look = "tabs" }: { look?: "tabs" | "links" }) {
   );
 }
 
-// The shift chip's tone and word in each state of the shift bar (the shift bar's own badge, ShiftBar.tsx): amber while none runs, blue for a
+// The shift's tone and word in each state of the shift bar (the shift bar's own badge, ShiftBar.tsx): amber while none runs, blue for a
 // count in progress, brand teal while open.
 const SHIFT_CHIP: Record<BarMode, { tone: Tone; key: string }> = {
   idle: { tone: "amber", key: "badge_none" },
@@ -106,13 +107,22 @@ const SHIFT_CHIP: Record<BarMode, { tone: Tone; key: string }> = {
   counting: { tone: "blue", key: "badge_counting" },
 };
 
+const SHIFT_DOT: Record<Tone, string> = {
+  neutral: "bg-neutral-500",
+  brand: "bg-brand-600",
+  amber: "bg-amber-700",
+  red: "bg-red-700",
+  blue: "bg-blue-700",
+  green: "bg-green-700",
+};
+
 /** The station the screen works at and its shift, as the screen's shift feed read it (lib/station.ts useStationChrome). */
-function StationContext() {
+function useStationShift(): { name: string | null; nameAm: string | null; shift: { tone: Tone; text: string } | null } {
   const t = useTranslations("shifts");
   const locale = useLocale() as Locale;
   const isoDay = useIsoDay();
   const chrome = useStationChrome((s) => s.chrome);
-  if (!chrome) return null;
+  if (!chrome) return { name: null, nameAm: null, shift: null };
 
   const { station, shift } = chrome;
   let chip: { tone: Tone; text: string } | null = null;
@@ -123,17 +133,7 @@ function StationContext() {
       : null;
     chip = { tone, text: label ? `${t(key)} · ${label}` : t(key) };
   }
-
-  return (
-    <>
-      <span className="min-w-0 truncate text-lg font-semibold text-neutral-900">{locale === "am" ? station.name_am : station.name_en}</span>
-      {chip ? (
-        <Chip tone={chip.tone} dot className="min-w-0 shrink">
-          <span className="min-w-0 truncate">{chip.text}</span>
-        </Chip>
-      ) : null}
-    </>
-  );
+  return { name: locale === "am" ? station.name_am : station.name_en, nameAm: station.name_am, shift: chip };
 }
 
 /** Whether this tablet's writes reached the server, in a word: online and sent, waiting (offline or not), or refused writes to look at. */
@@ -163,46 +163,237 @@ function SyncChip() {
   );
 }
 
+/** A menu that opens under its button: closed by Escape, a tap beside it, or a move to another page. */
+function useMenu() {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    function onPointer(event: PointerEvent) {
+      if (box.current && !box.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [open]);
+  return { open, setOpen, box };
+}
+
+const MENU_PANEL = "absolute right-0 top-full z-40 mt-2 rounded-2xl border border-neutral-200 bg-white p-2 text-neutral-900 shadow-float";
+
+/** The bar's own buttons (the menus), on white or, at night, on the kitchen display's dark ground. */
+function barButton(night: boolean): string {
+  return `inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border text-sm font-semibold ${
+    night ? "border-night-border bg-night-ground text-night-text hover:bg-night-divider" : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-100"
+  } ${focusRing}`;
+}
+
 /**
- * The waiter who has the pad (the `fill` frame, step 6.3a, fresh-counter.md 3.2): their initials, their name and "On the pad", and "Lock
- * pad", in the place of the signed-in pad account and its "Sign out" (which come back when the pad locks). The name line reads
- * "Acting: <name>" to readers, as the pad always said it.
+ * The "Screens" menu (step 6.3a): a grid button in the bar; open, it holds the "Screens" navigation with the same link names (phase-6 plan
+ * 6.0.2), the current one in brand teal.
  */
-function ActingPerson({ name }: { name: string }) {
-  const t = useTranslations("pad");
+function ScreensMenu({ night }: { night: boolean }) {
+  const t = useTranslations("nav");
+  const pathname = usePathname();
+  const id = useId();
+  const { open, setOpen, box } = useMenu();
   return (
-    <div className="flex items-center gap-2.5 pl-1">
-      <Avatar name={name} />
-      <span className="flex min-w-0 max-w-44 flex-col leading-tight">
-        <span className="truncate text-sm font-semibold text-neutral-900">
-          <span className="sr-only">{t("acting_prefix")} </span>
-          {name}
-        </span>
-        <span className="truncate text-xs text-neutral-600">{t("acting_role")}</span>
-      </span>
+    <div ref={box} className="relative">
       <button
         type="button"
-        onClick={() => useActing.getState().lock("manual")}
-        className={`ml-1 inline-flex h-10 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 ${focusRing}`}
+        aria-label={t("main")}
+        title={t("main")}
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        onClick={() => setOpen((now) => !now)}
+        className={`${barButton(night)} w-10`}
       >
-        <Lock className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
-        {t("lock")}
+        <LayoutGrid className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
       </button>
+      {open ? (
+        <nav id={id} aria-label={t("main")} className={`${MENU_PANEL} w-64`}>
+          <ul className="space-y-0.5">
+            {SCREENS.map(({ href, key }) => {
+              const current = isCurrent(pathname, href);
+              const Icon = SCREEN_ICONS[key];
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    aria-current={current ? "page" : undefined}
+                    onClick={() => setOpen(false)}
+                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-semibold ${current ? "bg-brand-50 text-brand-700" : "text-neutral-800 hover:bg-neutral-100"} ${focusRing}`}
+                  >
+                    <Icon className="size-[18px] shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />
+                    {t(key)}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      ) : null}
     </div>
   );
 }
 
-/** The person signed in on this device: initials, name and role (the name and role from 1280 px), and "Sign out"; or "Sign in". */
-function Account({ fill }: { fill: boolean }) {
+/**
+ * The person (step 6.3a): initials, name and role, as the boards have them; on the pad, while a waiter has it, the waiter ("Acting:
+ * <name>" to readers, as the pad always said it) and "On the pad". A tap opens the menu with the dates' calendar (step 4.5f) and "Sign
+ * out"; signed out, "Sign in".
+ */
+function AccountMenu({ fill, night }: { fill: boolean; night: boolean }) {
   const t = useTranslations();
   const router = useRouter();
   const status = useSession((s) => s.status);
   const me = useSession((s) => s.me);
   const signOut = useSession((s) => s.signOut);
   const acting = useActing((s) => s.user);
+  const id = useId();
+  const { open, setOpen, box } = useMenu();
+
+  if (status === "unknown") return <span className="inline-block h-10 w-24" aria-hidden="true" />;
+  if (status !== "signed-in" || !me) {
+    return (
+      <Link href="/login" className={buttonClass({ variant: "secondary", size: "md" })}>
+        {t("nav.login")}
+      </Link>
+    );
+  }
+
+  const waiter = fill && acting ? acting : null;
+  const name = waiter ? waiter.name : me.user.name;
+  const role = me.user.roles?.[0];
+  const roleText = waiter ? t("pad.acting_role") : role ? t(`people.roles.${role}`) : null;
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        onClick={() => setOpen((now) => !now)}
+        className={`flex items-center gap-2.5 rounded-xl py-1 pl-1 pr-2 ${night ? "hover:bg-night-divider" : "hover:bg-neutral-100"} ${focusRing}`}
+      >
+        <Avatar name={name} />
+        <span className="hidden min-w-0 max-w-40 flex-col text-left leading-tight lg:flex">
+          <span className={`truncate text-sm font-semibold ${night ? "text-night-text" : "text-neutral-900"}`}>
+            {waiter ? <span className="sr-only">{t("pad.acting_prefix")} </span> : null}
+            {name}
+          </span>
+          {roleText ? <span className={`truncate text-xs ${night ? "text-night-text-muted" : "text-neutral-600"}`}>{roleText}</span> : null}
+        </span>
+        {/* below 1024 px the name is not shown: readers still hear whose menu it is */}
+        <span className="sr-only lg:hidden">{name}</span>
+        <ChevronDown className={`size-4 ${night ? "text-night-text-muted" : "text-neutral-500"}`} strokeWidth={2} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div id={id} className={`${MENU_PANEL} w-72 space-y-3 p-4`}>
+          <div className="leading-tight">
+            <p className="truncate text-[15px] font-semibold">{me.user.name}</p>
+            {role ? <p className="truncate text-[13px] text-neutral-600">{t(`people.roles.${role}`)}</p> : null}
+          </div>
+          <DateDisplaySwitch />
+          <button
+            type="button"
+            onClick={async () => {
+              setOpen(false);
+              await signOut();
+              router.replace("/login");
+            }}
+            className={`${buttonClass({ variant: "secondary", size: "md" })} w-full`}
+          >
+            <LogOut className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+            {t("nav.sign_out")}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The one top bar of a station screen (step 6.3a; fresh-counter.md 3 and the Pad, Kitchen, Till and Production boards), 68 px: on the left
+ * the station mark (the way home), the screen's title with its Amharic name beside it on the English page, and a line under it with the
+ * shift and the person; on the right the screen's extras (lib/topBar.ts), the sync chip, the language button, the bell, the "Screens" menu
+ * and the person's menu. A screen names itself with `useStationHeader`; without it the bar shows the station its shift feed published, or
+ * the app's name. `night` is the kitchen display's look.
+ */
+function StationBar({ fill }: { fill: boolean }) {
+  const t = useTranslations();
+  const locale = useLocale() as Locale;
+  const signedIn = useSession((s) => s.status === "signed-in");
+  const me = useSession((s) => s.me);
+  const acting = useActing((s) => s.user);
+  const header = useTopBarSlots((s) => s.header);
+  const setActions = useTopBarSlots((s) => s.setActions);
+  const station = useStationShift();
+
+  const night = header?.night === true;
+  const title = header?.title ?? station.name ?? t("app.name");
+  const titleAm = locale === "en" ? (header?.titleAm ?? station.nameAm) : null;
+  const person = fill && acting ? acting.name : me?.user.name;
+  const subtitle = header?.subtitle ?? ([station.shift?.text, person].filter(Boolean).join(" · ") || null);
+  const bell = header?.bell !== false;
+
+  return (
+    <header className={`border-b ${night ? "border-night-border bg-night-surface" : "border-neutral-200 bg-white"}`}>
+      <div className="flex min-h-17 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-6 md:h-17 md:flex-nowrap md:py-0">
+        <div className="flex min-w-0 flex-1 items-center gap-3.5">
+          <Link href="/" className={`flex shrink-0 items-center rounded-xl ${focusRing}`}>
+            <AppMark />
+            <span className="sr-only">{t("app.name")}</span>
+          </Link>
+          <div className="flex min-w-0 flex-col">
+            <p className="flex min-w-0 items-baseline gap-2">
+              <span className={`truncate text-lg font-semibold leading-tight ${night ? "text-night-text" : "text-neutral-900"}`}>{title}</span>
+              {titleAm && titleAm !== title ? (
+                <span lang="am" className={`truncate text-[15px] font-medium ${night ? "text-night-text-muted" : "text-neutral-600"}`}>
+                  <span aria-hidden="true">· </span>
+                  {titleAm}
+                </span>
+              ) : null}
+            </p>
+            {subtitle ? (
+              <p className={`flex min-w-0 items-center gap-1.5 text-[13px] ${night ? "text-night-text-muted" : "text-neutral-600"}`}>
+                {station.shift && !header?.subtitle ? <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${SHIFT_DOT[station.shift.tone]}`} /> : null}
+                <span className="truncate">{subtitle}</span>
+              </p>
+            ) : null}
+          </div>
+        </div>
+        {/* on a phone the right-hand group wraps inside the window rather than pushing past it */}
+        <div className="flex max-w-full flex-wrap items-center gap-2 md:shrink-0">
+          <div ref={setActions} className="contents" />
+          {signedIn ? <SyncChip /> : null}
+          <Suspense fallback={<LanguageSwitcher look="toggle" />}>
+            <LanguageSwitcherWithQuery look="toggle" />
+          </Suspense>
+          {signedIn && bell ? <NotificationBell /> : null}
+          <ScreensMenu night={night} />
+          <AccountMenu fill={fill} night={night} />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/** The person signed in on this device on an admin page: initials, name and role (from 1280 px), and "Sign out"; or "Sign in". */
+function Account() {
+  const t = useTranslations();
+  const router = useRouter();
+  const status = useSession((s) => s.status);
+  const me = useSession((s) => s.me);
+  const signOut = useSession((s) => s.signOut);
 
   if (status === "unknown") return <span className="inline-block h-12 w-24" aria-hidden="true" />;
-  if (fill && status === "signed-in" && acting) return <ActingPerson name={acting.name} />;
 
   if (status !== "signed-in" || !me) {
     return (
@@ -235,14 +426,13 @@ function Account({ fill }: { fill: boolean }) {
   );
 }
 
-function TopBar({ fill }: { fill: boolean }) {
+/**
+ * The admin console's bar (step 6.2b; step 6.4a rebuilds the admin frame): the mark and the app's name, the sync chip, the calendar, the
+ * language, the bell and the person, then the "Screens" tabs under it.
+ */
+function AdminTopBar() {
   const t = useTranslations("app");
   const signedIn = useSession((s) => s.status === "signed-in");
-  const atStation = useStationChrome((s) => s.chrome !== null);
-  const setTitle = useTopBarSlots((s) => s.setTitle);
-  const setActions = useTopBarSlots((s) => s.setActions);
-  // the pad's own name (its title slot) takes the app name's place, as a station's name does
-  const named = atStation || fill;
 
   return (
     <header className="border-b border-neutral-200 bg-white">
@@ -250,22 +440,17 @@ function TopBar({ fill }: { fill: boolean }) {
         <div className="flex min-w-0 flex-1 items-center gap-3.5">
           <Link href="/" className={`flex shrink-0 items-center gap-3 rounded-xl ${focusRing}`}>
             <AppMark />
-            {/* on a station screen the station's name takes the place; the link is still named after the app */}
-            <span className={named ? "sr-only" : "text-lg font-bold tracking-tight text-neutral-900"}>{t("name")}</span>
+            <span className="text-lg font-bold tracking-tight text-neutral-900">{t("name")}</span>
           </Link>
-          {fill ? <div ref={setTitle} className="contents" /> : <StationContext />}
         </div>
-        {/* on a phone the right-hand group wraps inside the window rather than pushing past it */}
         <div className="flex max-w-full flex-wrap items-center gap-2 md:shrink-0">
           {signedIn ? <SyncChip /> : null}
-          {/* the pad's board (fresh-counter.md 3.2): its own buttons, the language and the person; no calendar switch and no bell */}
-          {fill ? <div ref={setActions} className="contents" /> : null}
-          {signedIn && !fill ? <DateDisplaySwitch /> : null}
+          {signedIn ? <DateDisplaySwitch /> : null}
           <Suspense fallback={<LanguageSwitcher look="toggle" />}>
             <LanguageSwitcherWithQuery look="toggle" />
           </Suspense>
-          {signedIn && !fill ? <NotificationBell /> : null}
-          <Account fill={fill} />
+          {signedIn ? <NotificationBell /> : null}
+          <Account />
         </div>
       </div>
       <ScreensNav />
@@ -290,7 +475,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {t("skip_to_content")}
       </a>
-      {frame === "login" ? null : <TopBar fill={fill} />}
+      {frame === "login" ? null : frame === "admin" ? <AdminTopBar /> : <StationBar fill={fill} />}
       <PendingIndicator />
       {frame === "admin" ? (
         children

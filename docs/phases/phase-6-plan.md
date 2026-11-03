@@ -714,14 +714,27 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       of crushing the panel, which is what failed `p1-shortfall` once. Below 1024 px the page flows: the panel follows the menu, and a bar at
       the bottom of the window keeps the item count and the total in sight with "View order", a link down to the panel. One fix to 6.2b's
       top bar: on a phone its right-hand group wraps inside the window (it ran past a 390 px one).
-    - **The top bar, as the board has it** (`lib/topBar.ts`: two places the shell draws in the `fill` frame, filled by the pad through a
-      portal, so the buttons keep the pad's state). Beside the mark, "Waiter pad" (the board's station name; the app name stays the link's
-      name). On the right: the sync chip; while a waiter has the pad, "Tables" (the tables sheet), "My orders · N" (N open orders, with the
-      ready count as a brand pill; it opens a drawer with the waiter's open orders) and the chime as an icon button ("Mute chime" / "Unmute
-      chime", `aria-pressed`); the language button; then the waiter who has the pad: their initials, their name ("Acting: <name>" to
-      readers, through a visually hidden prefix, so `getByText("Acting: …")` still finds it) with "On the pad" under it, and "Lock pad". The
-      pad account and "Sign out" come back when it locks. No calendar switch and no bell on the pad (the board has neither). The strip that
-      held the views, the waiter and the lock under the bar is gone. "Order sent" is a toast over the menu.
+    - **One station top bar** (the Pad, Kitchen, Till and Production boards: each station has exactly one 68 px bar). `AppShell` draws
+      `StationBar` on every station route (the pad, the till, the kitchen and bar displays, the production board, the count, and the start
+      page): on the left the station mark (the way home, named after the app), the screen's title with its Amharic name beside it on the
+      English page, and one line under it with the shift (a dot in the shift's tone and its words) and the person; on the right the screen's
+      extras, the sync chip, the language button, the bell, a "Screens" menu button (a grid icon; open, it holds the `navigation` "Screens"
+      with the same link names) and the person's menu (initials, name and role; open, the dates' calendar "Dates" and "Sign out"). The
+      strip of "Screens" tabs and the calendar select are gone from station screens. The admin console keeps the 6.2b bar
+      (`AdminTopBar`, with the "Screens" tabs, the calendar and "Sign out" in sight) for step 6.4a to rebuild with its frame, so nothing
+      changes there. The API for the screens is `lib/topBar.ts`:
+      - `useStationHeader({ title, titleAm, subtitle, night, bell })` names the screen while it is mounted. Without it the bar shows the
+        station the screen's shift feed publishes (`useStationChrome`: its name, its Amharic name, its shift) and the signed-in person, or
+        the app's name. `night: true` draws the bar on the kitchen night tokens (`bg-night-surface`, `border-night-border`,
+        `text-night-text`), for 6.3b's display; `bell: false` leaves the bell out;
+      - `<StationHeaderActions>` (`components/StationHeaderActions.tsx`) portals the screen's own buttons into the extras place, before the
+        sync chip; a portal keeps them in the screen's React tree and state.
+      The pad uses both: `useStationHeader({ title: "Waiter pad", bell: false })` (its board has no bell) and, while a waiter has the pad,
+      "Tables" (the tables sheet), "My orders · N" (N open orders, the ready count as a brand pill; a drawer with the waiter's open
+      orders), the chime as an icon button ("Mute chime" / "Unmute chime", `aria-pressed`) and "Lock pad". The person's menu then shows the
+      waiter: "Acting: <name>" to readers (a visually hidden prefix, so `getByText("Acting: …")` still finds it) and "On the pad"; the pad
+      account comes back when it locks. No spec read the "Screens" tabs, the calendar select or "Sign out" on a station screen, so none had
+      to open the new menus (the audit spec's "Dates" is on an admin page). "Order sent" is a toast over the menu.
     - **`ProductCard`** (`components/pad/ProductCard.tsx`): props `item` (a `ProductCardItem`, the menu entry's fields a card shows, so a
       catalog row can be put in the same shape), `locale`, `category` (for the placeholder's icon), `onAdd`, `onMore`, `onUnavailable` and
       `preview` (no button, no handlers: for 6.4a's grid view and 6.4b's live preview); generic over the item type. As the board: the 4:3
@@ -783,9 +796,10 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       and `am`: locked, with the menu, with the tables sheet open and with an order line, a photo on the product. The fixture is
       `e2e/fixtures/product-photo-1600x1200.jpg`, a generated test card (shapes and text, no people, 93 KB, no EXIF), which 6.4b's admin
       flow drops too. **Screenshots for review**: `e2e/p6/screens.spec.ts` (in `p6-a11y`, whose `testMatch` now takes `a11y` and `screens`)
-      captures the demo bakery's pad at 1180 × 820: `pad-locked-1180x820-en`, `pad-tables-1180x820-en`, `pad-1180x820-en`,
-      `pad-orders-1180x820-en` and `pad-1180x820-am`, under `test-results/screens/`; `e2e.yml` uploads the folder as the artifact `screens`
-      on every phase-6 run.
+      captures the demo bakery at 1180 × 820: `pad-locked-1180x820-en`, `pad-tables-1180x820-en`, `pad-1180x820-en`,
+      `pad-orders-1180x820-en`, `pad-1180x820-am`, and the station bar on the kitchen display, `kds-kitchen-1180x820-en` and
+      `kds-kitchen-screens-menu-1180x820-en`, under `test-results/screens/`; `e2e.yml` uploads the folder as the artifact `screens` on every
+      phase-6 run.
 
 - **6.3b `phase-6/web-kds-till`**.
   - The KDS, kitchen and bar (spec 3.3): kitchen night on the `night-*` tokens; New, Cooking and Ready columns with counts; ticket
