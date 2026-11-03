@@ -14,6 +14,14 @@ export function isOnDuty(shift: Shift | null, userId: number): boolean {
 
 export type BarMode = "idle" | "opening" | "open" | "counting";
 
+/** The state a shift is named by (the mode of barActions): none running, its opening count, open, or its closing count. */
+export function barMode(shift: Shift | null): BarMode {
+  if (shift === null) return "idle";
+  if (shift.status === "opening") return "opening";
+  if (shift.status === "open") return "open";
+  return "counting";
+}
+
 export interface BarActions {
   mode: BarMode;
   /** start with an opening count (the shift is `opening` when the station has anything to count) */
