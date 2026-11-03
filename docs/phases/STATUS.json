@@ -234,7 +234,7 @@
         "catalog.images": "done",
         "web.design-system": "done",
         "web.stations": "in_progress",
-        "web.admin": "todo",
+        "web.admin": "in_progress",
         "docs": "todo"
       },
       "playwright_projects": [
