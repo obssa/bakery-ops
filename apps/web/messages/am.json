@@ -2,7 +2,6 @@
   "app": {
     "name": "ቤከሪ ኦፕስ",
     "tagline": "ትዕዛዞች፣ ወጥ ቤት፣ ዳቦ ቤት፣ ክምችት እና ፈረቃዎች በአንድ ቦታ",
-    "phase_notice": "ምዕራፍ 0፦ መግቢያ፣ ካታሎግ እና ሰዎች ዛሬ ይሰራሉ። ሌሎቹ ገጾች በየምዕራፉ ይመጣሉ።",
     "opening": "ቤከሪ ኦፕስ በመክፈት ላይ…",
     "skip_to_content": "ወደ ይዘቱ ዝለል"
   },
@@ -16,8 +15,14 @@
     "admin": "የአስተዳዳሪ ኮንሶል",
     "home": "መነሻ",
     "main": "ገጾች",
-    "sign_out": "ውጣ",
-    "signed_in_as": "የገቡት፦ {name}"
+    "sign_out": "ውጣ"
+  },
+  "shell": {
+    "sync_online": "በመስመር ላይ · ሁሉም ተልኳል",
+    "sync_sending": "በመስመር ላይ · {count} በመጠባበቅ ላይ",
+    "sync_offline": "ከመስመር ውጭ",
+    "sync_offline_waiting": "ከመስመር ውጭ · {count} በመጠባበቅ ላይ",
+    "sync_conflicts": "ያልተቀመጡ · {count}"
   },
   "home": {
     "screens": "ገጾች",
@@ -29,7 +34,9 @@
     "phone": "ስልክ ቁጥር",
     "password": "የይለፍ ቃል",
     "submit": "ግባ",
-    "submitting": "በመግባት ላይ…"
+    "submitting": "በመግባት ላይ…",
+    "station_hint": "በጣቢያ ታብሌት ላይ፣ መሣሪያው ከገባ በኋላ ሠራተኞች በአጭር ኮዳቸው ይከፍታሉ።",
+    "forgot": "የይለፍ ቃልዎን ረሱት? አስተዳዳሪዎን ይጠይቁ።"
   },
   "pad": {
     "title": "የአስተናጋጅ ፓድ",
@@ -431,6 +438,12 @@
     "people": "ሰዎች",
     "inventory": "ክምችት",
     "sections": "የአስተዳዳሪ ክፍሎች",
+    "group_sell": "ሽያጭ",
+    "group_make": "ምርት",
+    "group_team": "ቡድን",
+    "group_insight": "ግንዛቤ",
+    "open_sections": "የአስተዳዳሪ ክፍሎችን ክፈት",
+    "close_sections": "የአስተዳዳሪ ክፍሎችን ዝጋ",
     "intro": "ዳቦ ቤቱ የሚገዛውን እና የሚሸጠውን፣ እንዲሁም እዚህ የሚሰሩትን ያዘጋጁ።",
     "catalog_desc": "ግብዓቶች እና ምርቶች ከምድቦቻቸው እና ከመለኪያዎቻቸው ጋር።",
     "people_desc": "የሠራተኞች መለያዎች፣ ሚናዎች እና ቋንቋዎች።",

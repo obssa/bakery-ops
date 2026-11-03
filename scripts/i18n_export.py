@@ -28,6 +28,7 @@ HEADER = ["key", "screen", "english", "amharic", "correction", "comment"]
 SCREENS = {
     "app": "every screen",
     "nav": "every screen (menu)",
+    "shell": "every screen (top bar)",
     "common": "every screen",
     "errors": "every screen (errors)",
     "locale": "every screen (language)",
