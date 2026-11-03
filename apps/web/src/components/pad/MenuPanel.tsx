@@ -12,7 +12,7 @@ import { isUnavailable, ProductCard } from "./ProductCard";
 // The menu (fresh-counter.md 3.2, step 6.3a): a 52 px search that filters the menu in the browser, by either name; the category chips in
 // the "Menu categories" tablist ("New" first for products marked new, then the categories in their order, then "Other" for products
 // without one), each with its count, hidden from readers so a tab is named by its label alone; and the grid of product cards, 2 columns
-// on a phone, 3 from 640 px and 4 from 1150 px (the 1180 px tablet). While a search is typed, the chips and their counts follow what
+// on a phone, 3 from 640 px and 4 from 1152 px (72rem: the 1180 px tablet). While a search is typed, the chips and their counts follow what
 // matches. Tap adds one; long-press, or the card's "More" button, opens the sheet with quantity, modifiers and a note.
 
 export { isUnavailable };
@@ -174,7 +174,8 @@ export function MenuPanel({
   loading: boolean;
   error: string | null;
   onAdd: (item: MenuItem, extra?: { qty: string; modifierIds: number[]; notes: string }) => void;
-  /** the search and the chips stay at the top while the grid scrolls under them (the pad's menu zone scrolls on its own) */
+  /** the search and the chips stay at the top while the grid scrolls under them (the pad's menu zone scrolls on its own); the zone then
+   * leaves its top padding to them */
   sticky?: boolean;
 }) {
   const t = useTranslations("pad");
@@ -223,7 +224,7 @@ export function MenuPanel({
           {loading ? t("loading_menu") : null}
         </p>
         {loading ? (
-          <ul aria-hidden="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3 min-[1150px]:grid-cols-4">
+          <ul aria-hidden="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3 min-[72rem]:grid-cols-4">
             {Array.from({ length: SKELETON_CARDS }, (_, index) => (
               <li key={index} className="space-y-3 rounded-2xl border border-neutral-200 bg-white pb-3">
                 <Skeleton className="aspect-[4/3] rounded-b-none rounded-t-[15px]" />
@@ -239,7 +240,7 @@ export function MenuPanel({
 
   return (
     <section className="space-y-3">
-      <div className={`space-y-3 ${sticky ? "sticky top-0 z-10 -mt-5 bg-ground pb-1 pt-5" : ""}`}>
+      <div className={`space-y-3 ${sticky ? "sticky top-0 z-10 bg-ground pb-1 pt-5" : ""}`}>
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-neutral-500" strokeWidth={2} aria-hidden="true" />
           <input
@@ -308,7 +309,7 @@ export function MenuPanel({
       </p>
       <div role="tabpanel" id={panelId} aria-labelledby={current ? tabId(current.id) : undefined}>
         {current && current.items.length > 0 ? (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 min-[1150px]:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 min-[72rem]:grid-cols-4">
             {current.items.map((item) => (
               <li key={item.item_id}>
                 <ProductCard

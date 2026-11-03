@@ -127,7 +127,8 @@ export function OrderingSurface({
 
   return (
     <div className="flex flex-col lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_368px]">
-      <div className="min-w-0 px-4 py-5 sm:px-6 lg:min-h-0 lg:overflow-y-auto">{menuPanel}</div>
+      {/* the menu's search and chips stick to the top of this zone and bring their own top padding */}
+      <div className="min-w-0 px-4 pb-5 sm:px-6 lg:min-h-0 lg:overflow-y-auto">{menuPanel}</div>
       <div id={ORDER_PANEL_ID} className="flex scroll-mt-4 flex-col border-t border-neutral-200 bg-white lg:min-h-0 lg:border-l lg:border-t-0">
         {panel}
       </div>

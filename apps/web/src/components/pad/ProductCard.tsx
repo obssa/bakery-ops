@@ -83,7 +83,8 @@ export function ProductCard<T extends ProductCardItem>({ item, locale, category,
           name={name}
           category={category}
           size="card"
-          className={unavailable ? "opacity-60 grayscale" : ""}
+          // the photo in grey at 60 %; a placeholder is grey already and keeps its contrast
+          className={unavailable ? "[&_img]:opacity-60 [&_img]:grayscale" : ""}
         />
         {!unavailable && item.low ? (
           <span className="absolute left-2 top-2 inline-flex min-h-6.5 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold tabular-nums text-amber-800">
