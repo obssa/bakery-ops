@@ -1,28 +1,41 @@
 "use client";
 
+import { Camera, Delete } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useRef, type ChangeEvent } from "react";
 import type { Locale, PaymentChannel } from "@/lib/api/types";
+import { compareDecimal } from "@/lib/decimal";
 import { pictureOf } from "@/lib/payDrafts";
-import { CASH, pressKey, tenderedOf, type KeypadKey } from "@/lib/payment";
+import { CASH, pressKey, QUICK_CASH, tenderedOf, type KeypadKey } from "@/lib/payment";
 import { canUseChannel, changeDue, checkReference, moneyOf, restOf, rowAmount, type PayRow } from "@/lib/paySheet";
-import { focusRing } from "../styles";
-import { Alert, Button, Field, TextInput } from "../ui";
+import { ICON_STROKE } from "../icons";
+import { buttonClass, focusRing } from "../styles";
+import { Alert, Button, Field, MoneyInput, TextInput } from "../ui";
 
-// One payment of the pay sheet (step 4.5b): the channel, the amount, and what the channel asks for. Cash shows the keypad for the cash
-// handed over and the change; a channel with requires_reference a reference field with the channel's hint, checked against its pattern as
-// it is typed (the API's ReferencePattern decides); a channel with requires_photo the camera button. The camera button is a plain file
-// input (accept="image/*", capture="environment"): a phone opens its camera, a device without one opens the file chooser instead. A photo
-// taken offline, or whose upload failed on the network, is kept on the tablet (step 5.2b): the row says so, and the photo goes up before
-// the payment.
+// One payment of the pay sheet (step 4.5b; step 6.3b, fresh-counter.md 3.4): "Pay with" as a grid of 64 px channel buttons, three to a row,
+// each with the channel's name and what it needs ("Photo of the slip", "Reference number"); the amount; and what the channel asks for. Cash
+// shows the cash received and the change (the change in an ink block), the quick cash keys (300, 500, 1,000 and "Exact amount", phase-6
+// plan 10.2 Q6) and the keypad for any other figure. A channel with requires_reference shows a reference field with the channel's hint,
+// checked against its pattern as it is typed (the API's ReferencePattern decides); a channel with requires_photo the camera button. The
+// camera button is a plain file input (accept="image/*", capture="environment"): a phone opens its camera, a device without one opens the
+// file chooser instead. A photo taken offline, or whose upload failed on the network, is kept on the tablet (step 5.2b): the row says so,
+// and the photo goes up before the payment. With one payment the row's title is read, not shown: the sheet is the payment.
 
 const KEYS: KeypadKey[] = ["7", "8", "9", "4", "5", "6", "1", "2", "3", "00", "0", "."];
 
-const keyClass = `inline-flex min-h-14 items-center justify-center rounded-md border border-neutral-300 bg-white text-2xl font-semibold text-neutral-900 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:text-neutral-300 ${focusRing}`;
+const keyClass = `inline-flex min-h-13 items-center justify-center rounded-xl border border-neutral-300 bg-white text-xl font-semibold tabular-nums text-neutral-900 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:text-neutral-400 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`;
 
 /** What the row shows of a photo it cannot use: the API's refusal of the upload, or the quota of photos waiting on the tablet. */
 export interface PhotoFailure {
   message: string;
+}
+
+/** What a channel needs besides the amount, in a few words under its name (hidden from readers: the fields below say it). */
+function needsOf(t: ReturnType<typeof useTranslations>, channel: PaymentChannel): string | null {
+  if (channel.requires_photo && channel.requires_reference) return t("channel_needs_both");
+  if (channel.requires_photo) return t("channel_needs_photo");
+  if (channel.requires_reference) return t("channel_needs_reference");
+  return null;
 }
 
 export function PayRowEditor({
@@ -54,7 +67,10 @@ export function PayRowEditor({
   const t = useTranslations("till");
   const locale = useLocale() as Locale;
   const n = index + 1;
+  const single = rows.length === 1;
   const titleId = useId();
+  const methodId = useId();
+  const receivedId = useId();
   const fileInput = useRef<HTMLInputElement>(null);
   const channel = channels.find((c) => c.code === row.channel);
   const name = (c: PaymentChannel) => (locale === "am" ? c.name_am : c.name_en);
@@ -62,6 +78,7 @@ export function PayRowEditor({
   const amountText = row.amount.trim();
   const amountError =
     amountText !== "" && !/^\d+\.$/.test(amountText) && rowAmount(row) === null ? (moneyOf(amountText) === null ? t("amount_invalid") : t("amount_zero")) : undefined;
+  const amount = rowAmount(row);
   const rest = restOf(balance, rows, index);
   const isCash = row.channel === CASH;
   const tendered = tenderedOf(row.tendered);
@@ -79,71 +96,118 @@ export function PayRowEditor({
   }
 
   return (
-    <fieldset aria-labelledby={titleId} className="space-y-4 rounded-lg border border-neutral-200 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <fieldset aria-labelledby={titleId} className={`space-y-4 ${single ? "" : "rounded-2xl border border-neutral-200 bg-white p-4"}`}>
+      <div className={single ? "sr-only" : "flex flex-wrap items-center justify-between gap-2"}>
         <h3 id={titleId} className="text-base font-semibold text-neutral-900">
           {t("row_title", { n })}
         </h3>
         {onRemove ? (
-          <Button type="button" variant="secondary" aria-label={t("row_remove_aria", { n })} onClick={onRemove}>
+          <Button type="button" variant="ghost" size="md" aria-label={t("row_remove_aria", { n })} onClick={onRemove}>
             {t("row_remove")}
           </Button>
         ) : null}
       </div>
 
-      <div role="group" aria-label={t("method")} className="flex flex-wrap gap-2">
-        {channels.map((c) => {
-          const selected = row.channel === c.code;
-          const usable = canUseChannel(rows, index, c);
-          return (
-            <button
-              key={c.code}
-              type="button"
-              aria-pressed={selected}
-              disabled={!usable}
-              onClick={() => onChange({ channel: c.code })}
-              className={`flex min-h-14 flex-col items-start justify-center rounded-md border px-4 text-left text-base font-medium ${
-                selected ? "border-blue-700 bg-blue-700 text-white" : "border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
-              } disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-400 ${focusRing}`}
-            >
-              <span>{name(c)}</span>
-              {c.requires_photo || c.requires_reference ? (
-                <span aria-hidden="true" className={`text-sm font-normal ${selected ? "text-blue-100" : "text-neutral-600"}`}>
-                  {[c.requires_photo ? t("needs_photo") : null, c.requires_reference ? t("needs_reference") : null].filter(Boolean).join(" · ")}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
+      <div className="space-y-2.5">
+        <p id={methodId} className="text-[15px] font-semibold text-neutral-900">
+          {t("method")}
+        </p>
+        <div role="group" aria-labelledby={methodId} className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {channels.map((c) => {
+            const selected = row.channel === c.code;
+            const usable = canUseChannel(rows, index, c);
+            const needs = needsOf(t, c);
+            return (
+              <button
+                key={c.code}
+                type="button"
+                aria-pressed={selected}
+                disabled={!usable}
+                onClick={() => onChange({ channel: c.code })}
+                className={`flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[14px] px-3 py-2 text-center text-base font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
+                  selected ? "border-2 border-brand-600 bg-brand-50 text-brand-700" : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
+                } disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-50 disabled:text-neutral-400 ${focusRing}`}
+              >
+                <span>{name(c)}</span>
+                {needs ? (
+                  <span aria-hidden="true" className={`text-xs font-medium ${selected ? "text-brand-700" : "text-neutral-600"}`}>
+                    {needs}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1">
           <Field label={t("amount")} error={amountError}>
             {(props) => (
-              <TextInput
+              <MoneyInput
                 {...props}
-                inputMode="decimal"
-                autoComplete="off"
+                currency={currency}
+                controlSize="lg"
                 value={row.amount}
                 onChange={(event) => onChange({ amount: event.target.value.replace(/[^\d.]/g, "") })}
               />
             )}
           </Field>
         </div>
-        <Button type="button" variant="secondary" disabled={rest === null || rest === rowAmount(row)} onClick={() => rest !== null && onChange({ amount: rest })}>
+        <Button type="button" variant="secondary" size="lg" disabled={rest === null || rest === amount} onClick={() => rest !== null && onChange({ amount: rest })}>
           {t("rest_of_balance")}
         </Button>
       </div>
 
       {isCash ? (
-        <div className="space-y-2">
-          <p className="flex items-baseline justify-between text-base text-neutral-700">
-            <span>{t("cash_received")}</span>
-            <output aria-live="polite" className="text-2xl font-semibold text-neutral-900">
-              {row.tendered === "" ? "0" : row.tendered} {currency}
-            </output>
-          </p>
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <p className="flex min-h-19 flex-col justify-center rounded-[14px] border-2 border-brand-600 bg-white px-4 py-2">
+                <span id={receivedId} className="text-[13px] font-semibold text-neutral-600">
+                  {t("cash_received")}
+                </span>
+                <output aria-labelledby={receivedId} aria-live="polite" className="text-2xl font-semibold tabular-nums text-neutral-900">
+                  {row.tendered === "" ? "0" : row.tendered}
+                  <span className="text-base font-medium text-neutral-600"> {currency}</span>
+                </output>
+              </p>
+              {change !== null ? (
+                <p className="flex min-h-19 flex-col justify-center rounded-[14px] bg-neutral-900 px-4 py-2 text-[13px] font-semibold text-white">
+                  {t.rich("change_due", {
+                    amount: change,
+                    currency,
+                    em: (chunks) => <span className="block text-2xl font-bold tabular-nums">{chunks}</span>,
+                  })}
+                </p>
+              ) : (
+                <p
+                  className={`flex min-h-19 items-center rounded-[14px] px-4 py-2 text-[15px] font-medium ${
+                    tendered !== null ? "bg-amber-50 text-amber-900" : "bg-neutral-100 text-neutral-700"
+                  }`}
+                >
+                  {tendered !== null ? t("cash_short") : t("cash_hint")}
+                </p>
+              )}
+            </div>
+            <div role="group" aria-label={t("quick_cash")} className="flex flex-wrap gap-2">
+              {QUICK_CASH.map((key) => (
+                <button
+                  key={key.amount}
+                  type="button"
+                  // a note that does not cover the payment is no quick answer
+                  disabled={amount === null || compareDecimal(key.amount, amount, 2) < 0}
+                  onClick={() => onChange({ tendered: key.amount })}
+                  className={`${buttonClass({ variant: "secondary", size: "md" })} tabular-nums`}
+                >
+                  {key.label}
+                </button>
+              ))}
+              <Button type="button" variant="secondary" size="md" disabled={amount === null} onClick={() => onChange({ tendered: amount ?? "" })}>
+                {t("exact")}
+              </Button>
+            </div>
+          </div>
           <div role="group" aria-label={t("keypad")} className="grid grid-cols-3 gap-2">
             {KEYS.map((key) => (
               <button key={key} type="button" className={keyClass} onClick={() => onChange({ tendered: pressKey(row.tendered, key) })}>
@@ -151,18 +215,12 @@ export function PayRowEditor({
               </button>
             ))}
             <button type="button" aria-label={t("key_back")} className={keyClass} onClick={() => onChange({ tendered: pressKey(row.tendered, "back") })}>
-              ⌫
+              <Delete className="size-6" strokeWidth={ICON_STROKE} aria-hidden="true" />
             </button>
-            <button type="button" className={`${keyClass} text-base`} onClick={() => onChange({ tendered: "" })}>
+            <button type="button" className={`${keyClass} col-span-2 text-base`} onClick={() => onChange({ tendered: "" })}>
               {t("key_clear")}
             </button>
-            <button type="button" className={`${keyClass} text-base`} disabled={rowAmount(row) === null} onClick={() => onChange({ tendered: rowAmount(row) ?? "" })}>
-              {t("exact")}
-            </button>
           </div>
-          <p className={`text-xl font-semibold ${change === null ? "text-neutral-600" : "text-green-800"}`}>
-            {change !== null ? t("change_due", { amount: change, currency }) : tendered !== null ? t("cash_short") : ""}
-          </p>
         </div>
       ) : null}
 
@@ -175,6 +233,7 @@ export function PayRowEditor({
           {(props) => (
             <TextInput
               {...props}
+              controlSize="lg"
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
@@ -188,7 +247,7 @@ export function PayRowEditor({
 
       {channel?.requires_photo ? (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-neutral-800">{t("photo")}</p>
+          <p className="text-sm font-semibold text-neutral-900">{t("photo")}</p>
           {photoHint ? <p className="text-sm text-neutral-600">{photoHint}</p> : null}
           <input
             ref={fileInput}
@@ -205,14 +264,14 @@ export function PayRowEditor({
               {picture?.url ? (
                 // a local object URL of the shrunk picture: next/image has nothing to optimise in a static export
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={picture.url} alt={t("photo_thumb_alt", { n })} className="h-24 w-24 rounded-md border border-neutral-200 object-cover" />
+                <img src={picture.url} alt={t("photo_thumb_alt", { n })} className="size-24 rounded-xl border border-neutral-200 object-cover" />
               ) : null}
               {row.photo.status === "kept" ? (
-                <p className="text-base font-medium text-blue-900">{t("photo_kept")}</p>
+                <p className="text-base font-medium text-blue-800">{t("photo_kept")}</p>
               ) : (
                 <p className="text-base font-medium text-green-800">{t("photo_attached")}</p>
               )}
-              <Button type="button" variant="secondary" onClick={() => fileInput.current?.click()}>
+              <Button type="button" variant="secondary" size="lg" onClick={() => fileInput.current?.click()}>
                 {t("photo_replace")}
               </Button>
             </div>
@@ -223,7 +282,8 @@ export function PayRowEditor({
           ) : (
             <div className="space-y-2">
               {row.photo.status === "failed" ? <Alert>{photoFailure?.message ?? t("photo_failed")}</Alert> : null}
-              <Button type="button" className="min-h-14" onClick={() => fileInput.current?.click()}>
+              <Button type="button" size="lg" onClick={() => fileInput.current?.click()}>
+                <Camera className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
                 {t("photo_take")}
               </Button>
             </div>
