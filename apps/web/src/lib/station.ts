@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { Shift } from "./api/types";
 import { shiftRequiredNotice, type ShiftRequiredKind } from "./shifts";
 
 // Two small pieces of state the station screens share with the API client, kept in a module of their own so the client can
@@ -20,6 +21,27 @@ export const useActiveStation = create<ActiveStation>()((set) => ({
 }));
 
 export const STATION_HEADER = "X-Station-Id";
+
+/**
+ * What the station top bar shows of the screen it frames (step 6.2b, fresh-counter.md 3): the station the screen works at and its shift,
+ * as the screen's shift feed last read it. The station screens set it (useShiftStation) and clear it when they go; a page without a
+ * station leaves it empty, and the bar shows the app's name alone.
+ */
+export interface StationChrome {
+  station: { id: number; name_en: string; name_am: string };
+  /** the running shift, or null when none runs; undefined while unknown, refused, or at a station that tracks no shifts (no chip) */
+  shift: Shift | null | undefined;
+}
+
+interface StationChromeState {
+  chrome: StationChrome | null;
+  set: (chrome: StationChrome | null) => void;
+}
+
+export const useStationChrome = create<StationChromeState>()((set) => ({
+  chrome: null,
+  set: (chrome) => set({ chrome }),
+}));
 
 /** The header of a call made now, or none. */
 export function stationHeaders(): Record<string, string> {

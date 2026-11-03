@@ -62,9 +62,11 @@
   /* Depth: surfaces sit flat on a hairline border; only floating layers (dialogs, drawers, menus, toasts) cast this one shadow. */
   --shadow-float: 0 12px 32px -8px rgb(14 23 38 / 0.18);
 
-  /* Motion, used only under motion-safe: a slow pulse for skeletons, 200 ms for a drawer coming in. */
+  /* Motion, used only under motion-safe: a slow pulse for skeletons, 200 ms for a drawer coming in (from the right; the admin sidebar's
+     drawer below 1024 px comes in from the left). */
   --animate-skeleton: skeleton 2.4s ease-in-out infinite;
   --animate-drawer-in: drawer-in 200ms ease-out;
+  --animate-sidebar-in: sidebar-in 200ms ease-out;
 
   @keyframes skeleton {
     50% {
@@ -75,6 +77,12 @@
   @keyframes drawer-in {
     from {
       transform: translateX(100%);
+    }
+  }
+
+  @keyframes sidebar-in {
+    from {
+      transform: translateX(-100%);
     }
   }
 }

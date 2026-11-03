@@ -7,12 +7,13 @@ import { createShiftFeed, type ShiftState } from "@/lib/live/shifts";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useSession } from "@/lib/session";
 import { chooseStation, stationsFor } from "@/lib/shifts";
-import { useActiveStation } from "@/lib/station";
+import { useActiveStation, useStationChrome } from "@/lib/station";
 import type { Shift, ShiftCurrentPage } from "@/lib/api/types";
 
 // The station a screen works at and the shift running there (step 3.7a). A screen names the station it already chose (the kitchen
 // display's picker) or the kinds of station it serves (the till; production: cake room and bakery) and gets the station, the
-// choices when there are several, and the live shift. It also makes the station the one the API client sends as X-Station-Id.
+// choices when there are several, and the live shift. It also makes the station the one the API client sends as X-Station-Id, and the one
+// the station top bar names with its shift (step 6.2b).
 
 export interface ShiftStation {
   /** the station the screen works at, or null when this person works at none of the kind */
@@ -49,13 +50,24 @@ export function useShiftStation(options: { kinds?: readonly StationCode[]; stati
     return () => useActiveStation.getState().set(null);
   }, [stationId]);
 
+  const shift = snapshot?.state.shift ?? null;
+  const loaded = !!snapshot?.loaded;
+
+  // the station top bar names the station and its shift (step 6.2b): known once the feed answered, none for a station without shifts
+  useEffect(() => {
+    useStationChrome
+      .getState()
+      .set(station ? { station: { id: station.station_id, name_en: station.name_en, name_am: station.name_am }, shift: tracks && loaded ? shift : undefined } : null);
+  }, [station, tracks, loaded, shift]);
+  useEffect(() => () => useStationChrome.getState().set(null), []);
+
   return {
     station,
     choices,
     choose: setChosen,
     feed,
     snapshot,
-    shift: snapshot?.state.shift ?? null,
-    loaded: !!snapshot?.loaded,
+    shift,
+    loaded,
   };
 }

@@ -386,18 +386,40 @@ export function Panel({ title, action, children, className = "" }: { title: stri
   );
 }
 
-/** A page's title row: the title (30 / 700), a one-line intro in neutral-600, and the page's actions on the right. */
-export function PageHeader({ title, intro, actions }: { title: string; intro?: string; actions?: ReactNode }) {
+/**
+ * A page's title row (fresh-counter.md 4.1): the title (30 / 700), a one-line intro in neutral-600, and the page's actions on the right,
+ * at the bottom of the row. `twin` is the title in the other language, set beside it in neutral-600 on a page that already shows both
+ * languages (spec 5); it sits outside the h1 in its own `lang`, so the heading's name stays the title.
+ */
+export function PageHeader({
+  title,
+  intro,
+  actions,
+  twin,
+}: {
+  title: string;
+  intro?: string;
+  actions?: ReactNode;
+  twin?: { text: string; lang: "en" | "am" };
+}) {
   const text = (
     <div className="min-w-0 space-y-1">
-      <h1 className="text-3xl font-bold tracking-tight text-neutral-900">{title}</h1>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h1 className="text-3xl font-bold tracking-tight text-neutral-900">{title}</h1>
+        {twin ? (
+          <span lang={twin.lang} className="text-2xl font-semibold text-neutral-600">
+            <span aria-hidden="true">· </span>
+            {twin.text}
+          </span>
+        ) : null}
+      </div>
       {intro ? <p className="text-base text-neutral-600">{intro}</p> : null}
     </div>
   );
   return (
-    <header className={`mb-6 ${actions ? "flex flex-wrap items-start justify-between gap-4" : ""}`}>
+    <header className={`mb-6 ${actions ? "flex flex-wrap items-end justify-between gap-4" : ""}`}>
       {text}
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2.5">{actions}</div> : null}
     </header>
   );
 }
@@ -423,6 +445,7 @@ export function EmptyState({
   body,
   action,
   level = 2,
+  headingId,
   className = "",
 }: {
   icon?: LucideIcon;
@@ -430,6 +453,8 @@ export function EmptyState({
   body?: ReactNode;
   action?: ReactNode;
   level?: 1 | 2 | 3;
+  /** the heading's id, for a region named by it */
+  headingId?: string;
   className?: string;
 }) {
   const Heading = (["h1", "h2", "h3"] as const)[level - 1];
@@ -438,7 +463,9 @@ export function EmptyState({
       <span aria-hidden="true" className="inline-flex size-12 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
         <Icon className="size-6" strokeWidth={ICON_STROKE} aria-hidden="true" />
       </span>
-      <Heading className="text-lg font-semibold text-neutral-900">{title}</Heading>
+      <Heading id={headingId} className={`font-semibold text-neutral-900 ${level === 1 ? "text-2xl tracking-tight" : "text-lg"}`}>
+        {title}
+      </Heading>
       {body ? <p className="max-w-md text-[15px] text-neutral-600">{body}</p> : null}
       {action ? <div className="pt-1">{action}</div> : null}
     </div>

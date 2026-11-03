@@ -1,8 +1,10 @@
 "use client";
 
+import { WifiOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ComponentProps } from "react";
 import { useOnline } from "@/lib/useOnline";
+import { ICON_STROKE } from "./icons";
 import { Button } from "./ui";
 
 // The writes that never join the outbox (step 5.2a, plan 10.2 D10): one that needs a PIN or a second person (a void, a refund, a count's
@@ -16,7 +18,11 @@ export function OnlineOnlyButton({ disabled, children, ...props }: ComponentProp
   return (
     <Button {...props} disabled={disabled || !online}>
       {children}
-      {online ? null : <span className="ml-2 text-sm font-normal">({t("online_only")})</span>}
+      {online ? null : (
+        <span className="inline-flex items-center gap-1 text-sm font-medium">
+          <WifiOff className="size-4" strokeWidth={ICON_STROKE} aria-hidden="true" />({t("online_only")})
+        </span>
+      )}
     </Button>
   );
 }

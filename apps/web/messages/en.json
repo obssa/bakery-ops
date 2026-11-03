@@ -2,7 +2,6 @@
   "app": {
     "name": "Bakery Ops",
     "tagline": "Orders, kitchen, bakery, stock and shifts in one place",
-    "phase_notice": "Phase 0: sign-in, the catalog and people work today. The other screens arrive phase by phase.",
     "opening": "Opening Bakery Ops…",
     "skip_to_content": "Skip to content"
   },
@@ -16,8 +15,14 @@
     "admin": "Admin console",
     "home": "Home",
     "main": "Screens",
-    "sign_out": "Sign out",
-    "signed_in_as": "Signed in: {name}"
+    "sign_out": "Sign out"
+  },
+  "shell": {
+    "sync_online": "Online · all sent",
+    "sync_sending": "Online · {count} waiting",
+    "sync_offline": "Offline",
+    "sync_offline_waiting": "Offline · {count} waiting",
+    "sync_conflicts": "Conflicts · {count}"
   },
   "home": {
     "screens": "Screens",
@@ -29,7 +34,9 @@
     "phone": "Phone number",
     "password": "Password",
     "submit": "Sign in",
-    "submitting": "Signing in…"
+    "submitting": "Signing in…",
+    "station_hint": "On a station tablet, staff unlock with their short code after the device is signed in.",
+    "forgot": "Forgot your password? Ask your admin."
   },
   "pad": {
     "title": "Waiter pad",
@@ -431,6 +438,12 @@
     "people": "People",
     "inventory": "Inventory",
     "sections": "Admin sections",
+    "group_sell": "Sell",
+    "group_make": "Make",
+    "group_team": "Team",
+    "group_insight": "Insight",
+    "open_sections": "Open the admin sections",
+    "close_sections": "Close the admin sections",
     "intro": "Set up what the bakery buys and sells, and who works here.",
     "catalog_desc": "Ingredients and products with their categories and units.",
     "people_desc": "Staff accounts, roles and languages.",

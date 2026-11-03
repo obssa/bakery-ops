@@ -8,3 +8,24 @@ export const SCREENS = [
   { href: "/production", key: "production" },
   { href: "/admin", key: "admin" },
 ] as const;
+
+export type ScreenNavKey = (typeof SCREENS)[number]["key"];
+
+/** Whether `href` is the page at `pathname` or one of its pages ("/admin" is current on /admin/catalog/). */
+export function isCurrent(pathname: string, href: string): boolean {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  return path === href || path.startsWith(`${href}/`);
+}
+
+/**
+ * The frame the shell draws around a page (step 6.2b, fresh-counter.md 3, 3.1 and 4.1). `admin`: the admin console, under the station top
+ * bar, draws its own sidebar frame and its `main` (AdminFrame). `login`: the sign-in screen is a full-bleed split of its own, without the
+ * top bar. `station`: every other page sits under the station top bar in the shell's `main`.
+ */
+export type ShellFrame = "admin" | "login" | "station";
+
+export function frameOf(pathname: string): ShellFrame {
+  if (isCurrent(pathname, "/admin")) return "admin";
+  if (isCurrent(pathname, "/login")) return "login";
+  return "station";
+}

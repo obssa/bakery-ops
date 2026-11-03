@@ -14,8 +14,10 @@ import { enablePush, type PushOutcome } from "@/lib/push";
 import { useSession } from "@/lib/session";
 import { whenText } from "@/lib/dates";
 import { useDateFormat } from "@/lib/useDates";
+import { Bell } from "lucide-react";
 import { Alert, Badge, Button } from "./ui";
-import { focusRing } from "./styles";
+import { ICON_STROKE } from "./icons";
+import { buttonClass, focusRing } from "./styles";
 
 // The shell bell: the unread count and the inbox of the signed-in person, a LiveFeed over GET /notifications?since= (15 s
 // while the tab is visible, 60 s hidden, ETag / 304). Lines are read one at a time or all at once through the API. A line
@@ -32,7 +34,7 @@ function Line({ line, locale, onRead, onFollow }: { line: AppNotification; local
   const content = (
     <>
       <span className="flex flex-wrap items-center gap-2">
-        {unread ? <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-full bg-blue-700" /> : null}
+        {unread ? <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-full bg-brand-600" /> : null}
         <span className={`text-base text-neutral-900 ${unread ? "font-semibold" : "font-normal"}`}>{title}</span>
         {line.severity === "warning" ? <Badge tone="amber">{t("severity_warning")}</Badge> : null}
         {line.severity === "critical" ? <Badge tone="red">{t("severity_critical")}</Badge> : null}
@@ -46,18 +48,18 @@ function Line({ line, locale, onRead, onFollow }: { line: AppNotification; local
   return (
     <li className="flex items-start gap-2 py-3">
       {target ? (
-        <Link href={{ pathname: target.pathname, query: target.query }} onClick={() => onFollow(line)} className={`min-w-0 flex-1 rounded-md px-1 py-1 hover:bg-neutral-100 ${focusRing}`}>
+        <Link href={{ pathname: target.pathname, query: target.query }} onClick={() => onFollow(line)} className={`min-w-0 flex-1 rounded-xl px-2 py-1 hover:bg-neutral-50 ${focusRing}`}>
           {content}
         </Link>
       ) : (
-        <div className="min-w-0 flex-1 px-1 py-1">{content}</div>
+        <div className="min-w-0 flex-1 px-2 py-1">{content}</div>
       )}
       {unread ? (
         <button
           type="button"
           aria-label={t("mark_read", { title })}
           onClick={() => onRead(line)}
-          className={`min-h-12 shrink-0 rounded-md border border-neutral-300 px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-100 ${focusRing}`}
+          className={`${buttonClass({ variant: "secondary", compact: true })} shrink-0`}
         >
           {t("mark_read_short")}
         </button>
@@ -160,21 +162,23 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((v) => !v)}
-        className={`relative inline-flex min-h-12 min-w-12 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-neutral-800 hover:bg-neutral-100 ${focusRing}`}
+        className={`relative inline-flex size-12 items-center justify-center rounded-xl border border-neutral-200 text-neutral-700 hover:bg-neutral-100 motion-safe:transition-colors motion-safe:duration-150 ${
+          open ? "bg-neutral-100" : "bg-white"
+        } ${focusRing}`}
       >
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9a6 6 0 1 1 12 0c0 5 2 6.5 2 6.5H4S6 14 6 9Z" />
-          <path d="M10 19a2 2 0 0 0 4 0" />
-        </svg>
+        <Bell className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
         {unread > 0 ? (
-          <span aria-hidden="true" className="ml-1.5 inline-flex min-w-6 items-center justify-center rounded-full bg-red-700 px-1.5 text-sm font-semibold leading-6 text-white">
+          <span
+            aria-hidden="true"
+            className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-700 px-1 text-[11px] font-bold tabular-nums leading-none text-white ring-2 ring-white"
+          >
             {unread > 99 ? "99+" : unread}
           </span>
         ) : null}
       </button>
 
       {open ? (
-        <section id={panelId} aria-label={t("title")} className="absolute right-0 z-30 mt-2 w-[min(26rem,calc(100vw-2rem))] rounded-lg border border-neutral-200 bg-white p-4 shadow-xl">
+        <section id={panelId} aria-label={t("title")} className="absolute right-0 z-30 mt-2 w-[min(26rem,calc(100vw-2rem))] rounded-2xl border border-neutral-200 bg-white p-4 shadow-float">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-lg font-semibold text-neutral-900">{t("title")}</h2>
             <div className="flex gap-2">
@@ -195,7 +199,7 @@ export function NotificationBell() {
             </div>
           ) : null}
           {snapshot?.error ? (
-            <p role="status" className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-base text-amber-900">
+            <p role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-base text-amber-900">
               {t("stale")}
             </p>
           ) : null}
