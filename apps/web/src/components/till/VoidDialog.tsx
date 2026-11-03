@@ -113,14 +113,14 @@ export function VoidDialog({
                 <Alert>{errorText.message(payments.error)}</Alert>
               ) : null}
               {wholeAllowed ? (
-                <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-neutral-300 px-4">
-                  <input type="radio" name="void-target" className="h-5 w-5" checked={target === "order"} onChange={() => setTarget("order")} />
+                <label className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                  <input type="radio" name="void-target" className="size-5 accent-brand-600" checked={target === "order"} onChange={() => setTarget("order")} />
                   <span className="text-base">{t("void_whole_order")}</span>
                 </label>
               ) : null}
               {voidable.map((payment) => (
-                <label key={payment.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-neutral-300 px-4">
-                  <input type="radio" name="void-target" className="h-5 w-5" checked={target === payment.id} onChange={() => setTarget(payment.id)} />
+                <label key={payment.id} className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                  <input type="radio" name="void-target" className="size-5 accent-brand-600" checked={target === payment.id} onChange={() => setTarget(payment.id)} />
                   <span className="text-base">{paymentLabel(payment, locale)}</span>
                 </label>
               ))}
