@@ -100,21 +100,24 @@ it('gives every demo product its photo, keeps an uploaded one, touches no other 
 
     $all = $products();
     $images = ItemImage::query()->withoutGlobalScope(BranchScope::class)->whereIn('id', $all->pluck('image_id')->filter())->get()->keyBy('item_id');
+    // (reject, not except: an Eloquent collection's except() drops models by their own key, the image id, not by item_id)
+    $demo = $images->reject(fn (ItemImage $image): bool => $image->item_id === $croissant->id);
     expect($all->whereNull('image_id'))->toBeEmpty()
         ->and($images)->toHaveCount(29)
+        ->and($demo)->toHaveCount(28)
         ->and($images[$croissant->id]->id)->toBe($uploaded->id)
         ->and($images[$croissant->id]->origin)->toBe('upload')
-        ->and($images->except([$croissant->id])->pluck('origin')->unique()->all())->toBe(['demo'])
+        ->and($demo->pluck('origin')->unique()->all())->toBe(['demo'])
         ->and($images->pluck('branch_id')->unique()->all())->toBe([$branch->id])
-        ->and($images->except([$croissant->id])->pluck('uploaded_by_user_id')->unique()->all())->toBe([null])
-        ->and([$images->first()->width, $images->first()->height])->toBe([1600, 1200])
+        ->and($demo->pluck('uploaded_by_user_id')->unique()->all())->toBe([null])
+        ->and($demo->map(fn (ItemImage $image): array => [$image->width, $image->height])->unique()->values()->all())->toBe([[1600, 1200]])
         ->and($shopRoll->fresh()?->image_id)->toBeNull()
         ->and(ItemImage::query()->withoutGlobalScope(BranchScope::class)->where('branch_id', $shop->id)->count())->toBe(0)
         ->and($untouched())->toBe($ledger)
         ->and($printed)->toBe('');
     // every demo photo through the pipeline (three files under its sha256) and audited as the demo admin
     $disk = Storage::disk(config('catalog.images.disk'));
-    foreach ($images->except([$croissant->id]) as $image) {
+    foreach ($demo as $image) {
         expect($disk->exists($image->path('thumb')) && $disk->exists($image->path('card')) && $disk->exists($image->path('large')))->toBeTrue();
     }
     $audits = DB::table('audit_log')->where('action', 'catalog.item.image_set')->where('branch_id', $branch->id)->get()
