@@ -29,7 +29,8 @@ function kindFrom(raw: string | null): ItemKind | null {
   return raw === "ingredient" || raw === "product" ? raw : null;
 }
 
-export function CatalogScreen() {
+/** `titleAm`: the Amharic title, set beside the English one on the English page (the page server-renders it from am.json). */
+export function CatalogScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("catalog");
   const me = useSession((s) => s.me);
   const manage = can(me, "catalog.manage");
@@ -42,7 +43,7 @@ export function CatalogScreen() {
 
   return (
     <>
-      <PageHeader title={t("title")} intro={t("intro")} />
+      <PageHeader title={t("title")} intro={t("intro")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
         <ItemsPanel kind={kind} />
         <div className="space-y-6">
