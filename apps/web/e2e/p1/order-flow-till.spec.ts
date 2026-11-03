@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { requireAdmin } from "../support/env";
 import { buildStationFixture, buildTillStaff, clearStaleOrders, ledgerReasons, orderLabel } from "../support/fixture";
-import { openAs } from "../support/pad";
+import { chooseTable, openAs } from "../support/pad";
 
 // Phase 1 gate project p1-order-flow, the till's void (step 1.6c). The cashier is signed in on the till (no short code),
 // takes an order on the same ordering surface the pad uses (so the API stamps it created_via = till), sees it in the
@@ -25,7 +25,7 @@ test.describe("p1 order flow: till void", () => {
 
     // the till takes an order itself
     await page.getByRole("tab", { name: "New order" }).click();
-    await page.getByRole("button", { name: `Table ${fixture.table.code}` }).click();
+    await chooseTable(page, fixture.table.code);
     await page.getByRole("tab", { name: "Other" }).click();
     await page.getByRole("button", { name: `Add ${product}` }).click();
     await page.getByRole("button", { name: "Send order" }).click();
