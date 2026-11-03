@@ -25,7 +25,8 @@ import { Avatar, Chip, IconButton, type Tone } from "./ui";
 // shift; on the right, in this order, the sync chip, the person's calendar (step 4.5f), the language button (the other language's name),
 // the bell and the person (initials, name and role) with "Sign out". The "Screens" navigation keeps its name and its link names, visible
 // under the bar: at 1280 px there is no room for it beside the bar's own contents in either language. The admin console draws its sidebar
-// frame and its own `main` (AdminFrame); the sign-in screen is a split of its own, without the bar, and carries "Screens" itself. A page
+// frame and its own `main` (AdminFrame); the sign-in screen is a split of its own, without the bar, and carries "Screens" itself; the waiter
+// pad (the `fill` frame, step 6.3a) draws its zones edge to edge and, from 1024 px, in the window's height. A page
 // whose calls are refused because this device is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate).
 
 /** The app's mark: a brand-teal square with the line icon, hidden from readers (the name beside it, or the link around it, says it). */
@@ -236,8 +237,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations("app");
   const frame = frameOf(usePathname());
 
+  // `fill` (the waiter pad): from 1024 px the frame is the window's height, so the page's zones scroll on their own under the bar; below
+  // it the page flows and scrolls as any other. Its main has no padding: the screen draws its zones edge to edge. A screen that is not
+  // drawn yet there (the sign-in check, a refusal, the not-enrolled screen) keeps the padding of every other station page.
+  const fill = frame === "fill";
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className={`flex min-h-screen flex-col ${fill ? "lg:h-dvh lg:min-h-0" : ""}`}>
       <a
         href="#content"
         className={`sr-only rounded-xl bg-white px-4 py-3 text-base font-semibold focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 ${focusRing}`}
@@ -249,7 +254,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       {frame === "admin" ? (
         children
       ) : (
-        <main id="content" className={frame === "login" ? "flex flex-1 flex-col" : "w-full flex-1 px-4 py-6 sm:px-6"}>
+        <main
+          id="content"
+          className={
+            frame === "login"
+              ? "flex flex-1 flex-col"
+              : fill
+                ? "flex w-full flex-1 flex-col px-4 py-6 sm:px-6 has-[[data-shell-fill]]:p-0 lg:min-h-0 lg:overflow-y-auto"
+                : "w-full flex-1 px-4 py-6 sm:px-6"
+          }
+        >
           <DeviceGate>{children}</DeviceGate>
         </main>
       )}
