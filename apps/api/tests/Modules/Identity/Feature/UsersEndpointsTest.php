@@ -9,6 +9,7 @@ use App\Modules\Identity\Models\User;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -223,6 +224,22 @@ it('stores the answer of a short-code reset encrypted: the new code is not in th
     $second = $this->withHeaders(['Idempotency-Key' => $key])->postJson("/api/v1/users/{$user->id}/short-code/reset");
 
     $second->assertOk()->assertHeader('Idempotency-Replayed', 'true')->assertJsonPath('short_code', $code);
-    expect(json_encode(DB::table('idempotency_keys')->get()))->not->toContain($code)
-        ->and(app(ShortCodes::class)->verify($this->branch->id, $code, 'test')->id)->toBe($user->id);
+    // what it means: no stored answer holds the code in clear. Not "the code's digits appear nowhere in the table": a random 4-digit code
+    // turns up by chance in a hash, a ciphertext or a timestamp (it once did, as 9936)
+    $stored = json_decode((string) DB::table('idempotency_keys')->where('key', $key)->value('response_body'), true, 512, JSON_THROW_ON_ERROR);
+    expect($stored['kind'])->toBe('encrypted')
+        ->and($stored['data'])->toBeString()
+        ->and(json_decode(Crypt::decryptString($stored['data']), true, 512, JSON_THROW_ON_ERROR)['short_code'])->toBe($code);
+    // and no field of any stored answer is a short_code or holds the code as its whole value (the ciphertext is one opaque string)
+    foreach (DB::table('idempotency_keys')->whereNotNull('response_body')->pluck('response_body') as $body) {
+        $answer = json_decode((string) $body, true, 512, JSON_THROW_ON_ERROR);
+        $fields = [];
+        array_walk_recursive($answer, function (mixed $value, int|string $field) use (&$fields): void {
+            $fields[] = [(string) $field, is_scalar($value) ? (string) $value : ''];
+        });
+        foreach ($fields as [$field, $value]) {
+            expect($field)->not->toBe('short_code')->and($value)->not->toBe($code);
+        }
+    }
+    expect(app(ShortCodes::class)->verify($this->branch->id, $code, 'test')->id)->toBe($user->id);
 })->group('module:identity', 'feature');

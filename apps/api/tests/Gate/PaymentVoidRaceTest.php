@@ -18,7 +18,8 @@ use Tests\Support\OrderFloor;
  * payment of 10.00; one till voids that part payment (with the admin's PIN) while another takes the 20.00 left. Each is a real request through
  * the whole HTTP stack in its own forked process; the payment starts 0 to 580 ms after the void (20 ms more each round), so the rounds sweep
  * across the moment the void, done with its PIN, reaches the order's lock. Both lock the order row first (Orders::forPayment, FOR UPDATE), so
- * they run one after the other and the second sees what the first did (both orders must be seen):
+ * they run one after the other and the second sees what the first did (both orders must be seen; when 30 rounds have not shown both, extra
+ * rounds lean towards the missing one, up to 90 in all):
  *   - the void goes first: the order is back to 30.00 to pay, and the 20.00 is taken as a part payment (the order stays open);
  *   - the payment goes first: the bill is paid, the order closes, and the void is refused (409 payments.void.order_closed: refund it instead).
  * Either way paid_total equals the sum of the order's payments that are not voided, the order is never closed with a voided payment in its
@@ -54,13 +55,15 @@ beforeEach(function () {
     };
 });
 
-it('serialises a void and the last payment of one bill on the order lock: one of the two valid outcomes, never a wrong total (30 rounds)', function () {
+it('serialises a void and the last payment of one bill on the order lock: one of the two valid outcomes, never a wrong total (30 rounds, up to 90)', function () {
     $f = $this->f;
     $deadlocksBefore = paymentVoidRaceDeadlocks();
     $failures = [];
     $seen = [];
 
-    foreach (range(1, 30) as $round) {
+    // 30 rounds, then more (at most 90 in all) while one of the two orders has not been seen yet and nothing has failed: which side wins a
+    // round depends on the runner's speed, and one runner saw only "void first" in 30. Every round is checked the same way
+    for ($round = 1; $round <= 30 || ($round <= 90 && $failures === [] && ! isset($seen['void first'], $seen['pay first'])); $round++) {
         stockIn($f->menu->water, $f->menu->display, '1');
         $order = $f->send([$f->menu->line($f->menu->water)]); // 30.00
         $f->act('served', $order['lines'][0]['id'], $f->waiter)->assertOk();
@@ -74,10 +77,13 @@ it('serialises a void and the last payment of one bill on the order lock: one of
         $sales = DB::table('stock_movements')->where('reason', 'sale')->count();
 
         // the void checks a PIN before it takes the order's lock, so the payment starts later and later (0 to 580 ms): the early rounds race the
-        // payment's lock against the void's checks, the middle ones meet at the lock, the late ones let the void lock first
+        // payment's lock against the void's checks, the middle ones meet at the lock, the late ones let the void lock first. An extra round
+        // (past 30) sweeps the same steps again, leaning towards the order not seen yet: without "pay first" it is the void that starts later
+        $step = (($round - 1) % 30) * 20;
+        $voidLater = $round > 30 && ! isset($seen['pay first']);
         $results = Forks::together([
-            ($this->post)($f->cashier, "/api/v1/payments/{$partId}/void", ['reason' => 'Keyed on the wrong bill', 'pin' => '864209']),
-            ($this->post)($f->manager, "/api/v1/orders/{$order['id']}/payments", ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '20.00'], ($round - 1) * 20),
+            ($this->post)($f->cashier, "/api/v1/payments/{$partId}/void", ['reason' => 'Keyed on the wrong bill', 'pin' => '864209'], $voidLater ? $step : 0),
+            ($this->post)($f->manager, "/api/v1/orders/{$order['id']}/payments", ['client_uuid' => (string) Str::uuid(), 'channel_code' => 'cash', 'amount' => '20.00'], $voidLater ? 0 : $step),
         ]);
 
         $outcomes = array_map(fn (array $r): string => ($r['ok'] ?? false) ? $r['value']['status'].' '.$r['value']['message_key'] : 'error '.($r['error'] ?? '?'), $results);
@@ -99,9 +105,9 @@ it('serialises a void and the last payment of one bill on the order lock: one of
         $seen[$outcome] = ($seen[$outcome] ?? 0) + 1;
     }
 
-    fwrite(STDERR, 'PaymentVoidRaceTest outcomes seen: '.json_encode($seen).PHP_EOL);
+    fwrite(STDERR, 'PaymentVoidRaceTest outcomes seen in '.($round - 1).' rounds: '.json_encode($seen).PHP_EOL);
     expect($failures)->toBe([])->and(paymentVoidRaceDeadlocks())->toBe($deadlocksBefore, 'the engine detected no deadlock at all')
-        ->and(array_keys($seen))->toEqualCanonicalizing(['void first', 'pay first'], 'both orders of the race happened');
+        ->and(array_keys($seen))->toEqualCanonicalizing(['void first', 'pay first'], 'both orders of the race happened within 90 rounds');
     $oracle = ledgerOracle($f->branch->id);
     expect($oracle['movements'])->toBe($oracle['balances'])->and($oracle['balances'])->toBe($oracle['view']);
 })->group('concurrency', 'module:payments', 'feature', 'gate:p4');
