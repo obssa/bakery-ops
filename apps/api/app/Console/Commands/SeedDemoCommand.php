@@ -29,7 +29,7 @@ final class SeedDemoCommand extends Command
     /** @var string */
     protected $signature = 'bakery:seed-demo
         {--branch= : the demo branch\'s name (default: BAKERY_DEMO_BRANCH, else "Demo Bakery"); created when missing}
-        {--phase= : seed up to this phase, 0 to 5 (default: every phase seeder that exists)}
+        {--phase= : seed up to this phase, 0 to 6 (default: every phase seeder that exists)}
         {--force : allow seeding in production (BAKERY_DEMO_PASSWORD must be set)}';
 
     /** @var string */
@@ -44,7 +44,7 @@ final class SeedDemoCommand extends Command
 
             return self::FAILURE;
         }
-        if ($phase !== null && (! is_string($phase) || preg_match('/^[0-5]$/', $phase) !== 1)) {
+        if ($phase !== null && (! is_string($phase) || preg_match('/^\d$/', $phase) !== 1 || (int) $phase > DemoSeeder::LAST_PHASE)) {
             $this->error('--phase is a phase number from 0 to '.DemoSeeder::LAST_PHASE.'.');
 
             return self::FAILURE;

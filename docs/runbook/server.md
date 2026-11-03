@@ -209,6 +209,37 @@ and nothing in it holds a secret: the same `BAKERY_DEMO_PASSWORD` as before is a
   need a **new** demo branch (`--branch="Demo History"`) and is not done unless the owner asks; it would add about 2 300 receipt photos to the disk quota.
 - A second run writes nothing either way.
 
+**Phase 6 (demo product photos, step 6.1c).** The live demo bakery gets its product photos from **one run of
+`bakery:demo-product-images` by the coordinator**, after the release that ships step 6.1c. A deploy never runs it. The photos ship with
+the release (`resources/demo/product-images/`, 29 stock photos with their source page and licence in `manifest.json`). Run it from the
+site folder with the PHP 8.3 binary, as above:
+
+1. Find the demo branch's id. `bakery:seed-demo` printed it (`Demo bakery "Demo Bakery" (branch #<id>)`), or read it:
+   `php artisan tinker --execute="echo App\Shared\Models\Branch::query()->where('name', 'Demo Bakery')->value('id');"`
+2. **Dry run first:** `php artisan bakery:demo-product-images --branch=<id> --dry-run`. It writes nothing, not even a file. Per product it
+   prints one of these:
+   - "would attach";
+   - "skipped: has a photo" (a demo one);
+   - "skipped: has an uploaded photo, never touched";
+   - "skipped: no manifest entry".
+
+   Then it prints the counts, the products no entry matched and the entries no product matched. On the untouched demo branch expect
+   `matched: 29, would attach: 29, ... unmatched: 0`. A product renamed or added since the seed shows as unmatched and keeps its
+   placeholder.
+3. **The run:** the same command without `--dry-run`. Each photo goes through the same code as an upload from the product page: the
+   centre crop, three renditions on the `media` disk (a few MB for the 29), `catalog_version` (the pads pick the photos up on their next
+   menu poll) and one `catalog.item.image_set` audit row each, with origin `demo`. The audit rows name the branch's first active admin. To
+   name another person, pass `--as=<user id>` (an active user of the branch who may manage the catalog). With neither, it refuses.
+4. A second run writes nothing. If a run stops halfway, run it again: it fills in only what is missing.
+
+What it never does:
+- It never touches a photo an admin uploaded. `--force` replaces only the photos it attached itself, which is only needed after the photos in
+  the repository change.
+- It refuses a branch that is not a demo branch, a branch without an active admin, and a manifest entry without a source or a licence
+  or with a photo that is not 4:3 or is under 800 x 600, and it writes nothing when it refuses.
+
+A new demo branch loaded with `bakery:seed-demo --force` gets the same photos from `Phase6Seeder`, the last phase seeder.
+
 Nothing secret is printed or stored: the password is never shown, and the sample orders carry made-up tables and
 products only. Never run it with `--branch` pointing at the "E2E Test Branch" or at shop data (a branch that is not a
 demo branch is refused anyway). `--branch="<name>"` loads a second, separate demo

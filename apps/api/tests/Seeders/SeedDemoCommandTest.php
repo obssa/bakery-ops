@@ -9,6 +9,7 @@ use App\Shared\Tenancy\BranchScope;
 use Database\Seeders\Demo\DemoBakery;
 use Database\Seeders\Demo\DemoCredentials;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Storage;
 
 /*
  * `bakery:seed-demo {--branch=} {--phase=} {--force}`: loads the demo bakery (DemoSeeder's phase seeders up to --phase)
@@ -16,6 +17,12 @@ use Illuminate\Support\Facades\Artisan;
  * BAKERY_DEMO_PASSWORD; nothing is written when either is missing. It prints what the branch holds and the short
  * codes of the accounts it created (once), never the password.
  */
+
+beforeEach(function () {
+    // every phase includes Phase 6's demo product photos (step 6.1c): onto a fake media disk, as JPEG to keep the run quick
+    Storage::fake(config('catalog.images.disk'));
+    config(['catalog.images.format' => 'jpeg']);
+});
 
 function demoUsersOf(string $branchName): int
 {
@@ -33,6 +40,7 @@ it('loads the demo bakery into "Demo Bakery" and reports what it holds, short co
         ->and($output)->toContain(DemoBakery::DEFAULT_BRANCH)
         ->and($output)->toContain('ingredients')
         ->and($output)->toContain('stock_movements')
+        ->and($output)->toMatch('/item_images\D+29\b/')
         ->and($output)->toContain(DemoBakery::ADMIN_PHONE)
         ->and($output)->not->toContain(DemoCredentials::LOCAL_PASSWORD);
 
@@ -60,12 +68,12 @@ it('seeds into the branch named by --branch, up to --phase', function () {
         ->and(Branch::query()->where('name', DemoBakery::DEFAULT_BRANCH)->exists())->toBeFalse();
 })->group('feature', 'seeds');
 
-it('rejects a phase outside 0 to 5 or an empty branch name, and writes nothing', function (array $options) {
+it('rejects a phase outside 0 to 6 or an empty branch name, and writes nothing', function (array $options) {
     $this->artisan('bakery:seed-demo', $options)->assertFailed();
 
     expect(Branch::query()->count())->toBe(0);
 })->with([
-    'phase 6' => [['--phase' => '6']],
+    'phase 7' => [['--phase' => '7']],
     'phase "one"' => [['--phase' => 'one']],
     'blank branch' => [['--branch' => '   ']],
 ])->group('feature', 'seeds');
