@@ -113,6 +113,16 @@ Never tell two states apart by hue alone. Each one also carries a word ("Low", "
 
 Define these as `--color-night-*` tokens.
 
+The night is scoped to the kitchen and bar routes (step 6.3b): the shell's frame carries the class `kitchen-night` there, and inside it the
+light scale is remapped onto the night tokens, so the top bar, the shift strip, the stock strip's sheet and every shared primitive are
+drawn dark with the classes they already have, and no other screen changes. `white` is the ticket surface, `ground` the night ground,
+`neutral-100` the divider, `neutral-200` the ticket border, `neutral-600` the secondary text, `neutral-900` the text; `brand-50`/`brand-700`
+the fresh fill and text, `brand-600` the accent; `amber-50`/`amber-800` the waiting pair, `red-50`/`red-700` the late pair. The shades the
+table above does not name are, in the same spirit: `neutral-50` `#161F33`, `neutral-300` `#3A4866` (the outline of Reject), `neutral-400`
+`#5B6882`, `neutral-500` `#8794AB`, `neutral-700` `#B8C2D3`, `neutral-800` `#D3DAE6`, `amber-900` `#FCD34D`, `red-800` `#FECACA`, blue `50`
+`#0E2A47` with `700` `#93C5FD`, green `50` `#0F3D24` with `800` `#86EFAC`. Text on a filled control becomes the dark surface (9.2:1 on the
+accent). The dialog scrim is black at 60 % at night.
+
 ## 2. Components (`apps/web/src/components/ui.tsx`)
 
 The primitives keep their current names and props, so that existing screens restyle without edits. New ones are added beside them.

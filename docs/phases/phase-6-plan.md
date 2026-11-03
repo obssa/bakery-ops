@@ -718,7 +718,70 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   - `lib/productImages.ts` `useProductImages()`: `GET /items?kind=product` under one query key (trap "One query key, one shape"), a map
     by item id. Offline it is empty and the placeholders show; the photos themselves come from the worker's cache.
   - `p6-a11y`: KDS and till in `en` and `am`.
-  - As built: (to be written by 6.3b)
+  - **As built (step 6.3b, `phase-6/web-kds-till`).** The thumbs logic spec first (red), then `useProductImages`, kitchen night, the
+    displays, the till, and with the brief's "Design fidelity" rule both screens rebuilt region by region from `Kitchen.dc.html` and
+    `Till.dc.html`. Web only (no API, route, registry, OpenAPI or ERD change); `e2e.yml` gains the `screens` artifact upload (as 6.3a's).
+    - **`useProductImages()`** (`lib/productImages.ts`) reads the catalog through `useItems("product")`, so the key `["items", "product"]`
+      keeps the one `Item[]` shape the planner and the refund dialog already cache there, and derives a `ReadonlyMap<itemId,
+      ProductImageView>` (`lib/images/orderThumbs.ts` `imagesById`, beside `thumbStack` and `unitCount`). Offline or before the read the map
+      is empty and the placeholders show. 6.4a can call it as it is. A thumb's placeholder icon takes the category from the menu the till
+      already reads.
+    - **Kitchen night, scoped.** `lib/screens.ts` `isNightScreen` (`/kds/...`); the shell puts `kitchen-night` on its frame there, and
+      `globals.css` remaps `white`, `ground`, `neutral`, `brand` and the status scales onto the night tokens inside that class only. So the
+      top bar, the Screens strip, the outbox band, the shift bar and the transfer sheet are dark on the displays with the classes they
+      already have, and no other screen changes (`a11y-stations.spec.ts` checks that the till has no night frame and a light ground). Every
+      text pair is 4.5:1 or more (computed: neutral-600 on white 6.9:1, brand-700 on brand-50 8.2:1, amber-800 on amber-50 8.2:1, red-700 on
+      red-50 7.9:1, text on the accent 9.2:1). The scrim of `Modal` and `Drawer` became a token (`bg-scrim`), black at 60 % at night; the
+      focus ring's offset is the night ground there. The extra shades are in spec 1.6.
+    - **The displays (Kitchen board).** The board's header: the title at 24 px with its Amharic name on the English page (read from am.json
+      by the page, as the catalog's twin), the shift as one line under it (`ShiftBar look="strip"`: the same region "Shift", text, buttons and
+      dialogs, at 44 px, no card), and on the right the feed's "Live" chip, the wall clock and the chime as an icon button (the same names
+      "Mute chime"/"Unmute chime" and `aria-pressed`). Then New, Cooking (Making at the bar) and Ready with their Amharic names and counts; a
+      ticket stands in the column of its least advanced line (`lib/kds.ts columnOf`). Tickets as the board draws them: number, "Table ·
+      waiter", the timer chip (fresh, slow and late each with its own icon, the last two with their word), "2×" in the accent, the note in
+      the note colour; New lines have Accept and Reject at 52 px, Cooking lines "Ready" across the card with the reject behind a small
+      button, ready lines the "Ready for pickup" strip with the waiter. A line's state ("New", "Accepted") is read by a screen reader, not
+      drawn (the column and the line's button show it). Decision worth a look: "Ready" is no longer offered on a line still new (the board
+      has Accept there); one more tap for a barista. The stock strip runs along the bottom of the window (sticky from 1024 px) as chips,
+      amber with "Low", red with "Out"; each chip's "Request transfer of <name>" is a 44 px icon button. No photos (Q17).
+    - **The till (Till board).** The title row: the 24 px title with its Amharic name, the shift strip, the drawer's figure ("Cash in the
+      drawer 4,815.00 ETB", the cash widget's `look="summary"`, which opens the old widget under it) and the views as station tabs. The
+      waiting list (360 px, "Waiting to pay" over the region still named "Orders awaiting payment"): each card is one button, "Take payment
+      for order N" ("Open order N" when it is paid and waits to be served), with the number and table, the balance, up to three 28 px round
+      thumbs and +N, the items, the waiter and the minutes; the open one has the 2 px brand border. From 1024 px (`lib/useWide.ts`) the pay
+      sheet is the centre beside it, a dialog (`role="dialog"`, same name "Payment for order N") that leaves the page in view; below 1024 px it
+      opens over the screen as before. The sheet: "Amount due" at 48 / 700 with "All lines served", Void and Close; the method line with the
+      amount beside it; the 64 px channel grid with what each channel needs; "Cash received" (typed) and the change in an ink block; the
+      quick cash keys 300, 500, 1,000 (each disabled below the amount) and "Exact amount", with "Add a payment" at the end of the line; the
+      keypad behind its "Keypad" button; the xl "Complete payment". A split shows each payment as a card with its amount and "Rest of the
+      balance", and "Left to pay" as a line (read only with one payment). The receipt panel (236 px): its title and how the receipt reaches
+      the customer, the code's place, "Copy receipt link" and Print (disabled until the payment; "Print · off in Admin" when printing is
+      off, never named "Print receipt"), the lines at the bottom; after the payment the code, the link, Print and the PDF, then the receipt's
+      lines and payments (`ReceiptActions layout="stack"`; the order record keeps the row). Pay waits for the till's shift on the sheet,
+      which says why; a payment saved offline and not sent keeps its card shut. The display case shows in the centre while no order is
+      open. The void and refund dialogs, the closed orders and the display case are on the new radii.
+    - **Selectors that changed (6.0.2), each in the commit of its screen:**
+      - `p1 order-flow-till`: `queue.getByRole("button", { name: "Void order N" })` became a tap on the card
+        (`"Take payment for order N"`) and `sheet.getByRole("button", { name: "Void order N" })`: a card is one control on the board, so Void
+        moved to the sheet.
+      - `p4 pay-void`: `queue.getByRole("button", { name: "Void a payment of order N" })` became the card `"Open order N"` and the sheet's
+        `"Void a payment of order N"`, for the same reason.
+      - `p1 order-flow` and `p4 pay-photo-split`: the digit buttons ("4", "0", "0") became `getByLabel("Cash received").fill(...)`: the
+        board has a typed field, and the keypad is behind its button.
+      - `p3 handover`: the region "Cash in the drawer" is opened from its button (`/^Cash in the drawer/`) before its figures are read: the
+        board puts the drawer's figure in the title row.
+    - **Where the screens still differ from the boards** (for the review): the shell's own top bar and Screens strip sit above each
+      board's header (the boards draw only the screen's header; 6.2b's shell is unchanged here); the shift shows as the strip with its
+      buttons, where the board has a one-line subtitle; on the KDS the timer chip carries an icon (the brief asks for a word or an icon);
+      the chips of the stock strip carry a 44 px button; the till's sheet keeps the amount on the method line and a Close and Void at the
+      top right, which the board does not draw; the receipt's code and link come only with the payment (the API has no receipt before it),
+      so the board's code is a dashed place until then.
+    - **Tests added.** `e2e/p6/product-photo-thumbs-logic.spec.ts` (10 cases, `p6-product-photo`); `e2e/p6/a11y-stations.spec.ts` (7
+      cases, `p6-a11y`: kitchen and bar in en and am with a ticket new then ready, the till in en and am through the list, the sheet and the
+      receipt, and night kept to the displays); `e2e/p6/screens.spec.ts` (step 6.3b's part: `kds-kitchen-1180x820-en`, `-am`,
+      `kds-bar-1180x820-en`, `till-1180x820-en`, `-am`, `till-cash-1180x820-en`, on the demo bakery). Messages in both languages (`kds.*`
+      columns and feed, `till.*` list, sheet and receipt; `till.change_due` carries an `<em>` for the ink block); `docs/i18n/am-review.csv`
+      regenerated. STATUS `web.stations` `in_progress`.
 
 - **6.3c `phase-6/web-production`**.
   - The production board (spec 3.5): four columns; cards with a 56 × 42 `thumb`, the Amharic name and the quantity; reason chips; the
