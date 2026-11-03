@@ -1,6 +1,11 @@
 <?php
 
 declare(strict_types=1);
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
+use Tests\TestCase;
 
 /*
  * Image fixtures for the Files tests (step 4.2a). Everything is generated with GD and hand-built byte blocks, so no binary fixture is
@@ -112,5 +117,64 @@ if (! function_exists('imgIsRed')) {
     function imgIsRed(array $rgb): bool
     {
         return $rgb[0] > 150 && $rgb[1] < 90 && $rgb[2] < 90;
+    }
+}
+
+/*
+ * Step 6.1a: the product photo tests (tests/Modules/Catalog/Feature/ItemImage*Test.php, MediaRouteTest, ItemImageRaceTest).
+ */
+
+if (! function_exists('photoPost')) {
+    /**
+     * POST /api/v1/items/{item}/image as whoever is signed in: multipart with a fresh UploadedFile of $bytes (so a replay sends the same
+     * bytes again), a new client_uuid unless $fields names one, and the Idempotency-Key given or a new one.
+     *
+     * @param  array<string, mixed>  $fields
+     */
+    function photoPost(TestCase $test, int $itemId, string $bytes, array $fields = [], ?string $key = null, string $name = 'photo.jpg'): TestResponse
+    {
+        return $test->withHeaders(['Idempotency-Key' => $key ?? (string) Str::uuid(), 'Accept' => 'application/json'])
+            ->post("/api/v1/items/{$itemId}/image", $fields + [
+                'client_uuid' => (string) Str::uuid(),
+                'photo' => UploadedFile::fake()->createWithContent($name, $bytes),
+            ]);
+    }
+}
+
+if (! function_exists('photoCrop')) {
+    /** @return array{crop_x: int, crop_y: int, crop_width: int, crop_height: int} the four crop fields of a photo upload */
+    function photoCrop(int $x, int $y, int $width, int $height): array
+    {
+        return ['crop_x' => $x, 'crop_y' => $y, 'crop_width' => $width, 'crop_height' => $height];
+    }
+}
+
+if (! function_exists('photoFile')) {
+    /** The bytes of a rendition behind one of the API's media URLs, read from the media disk (the tests fake it). */
+    function photoFile(string $url): ?string
+    {
+        if (preg_match('#^/api/v1/media/items/([0-9a-f]{64})/(thumb|card|large)\.(webp|jpg)$#', $url, $m) !== 1) {
+            return null;
+        }
+        $disk = Storage::disk((string) config('catalog.images.disk'));
+        $path = 'items/'.substr($m[1], 0, 2).'/'.$m[1].'/'.$m[2].'.'.$m[3];
+
+        return $disk->exists($path) ? $disk->get($path) : null;
+    }
+}
+
+if (! function_exists('photoWebpChunks')) {
+    /** @return list<string> the four-character ids of a RIFF/WEBP file's chunks, in order */
+    function photoWebpChunks(string $bytes): array
+    {
+        $chunks = [];
+        $i = 12;
+        while ($i + 8 <= strlen($bytes)) {
+            $chunks[] = substr($bytes, $i, 4);
+            $size = unpack('V', substr($bytes, $i + 4, 4))[1];
+            $i += 8 + $size + ($size % 2);
+        }
+
+        return $chunks;
     }
 }

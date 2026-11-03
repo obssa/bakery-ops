@@ -180,3 +180,35 @@ it('caches the backup config with the BACKUP_ variables unset and set', function
         ['backup.path' => '/home/someone/backups/bakery-ops', 'backup.keep' => 14, 'backup.max_mb' => 512, 'backup.drill_database' => 'someone_drill', 'backup.remote' => 'offsite:bakery'],
     ],
 ])->group('invariants');
+
+/*
+ * Step 6.1a (phase-6 plan 4.1, ADR 0022): product photos live on the `media` disk under storage/, never under public/ (a deploy rsyncs
+ * public/ and would delete them). The catalog and filesystems config must cache with CATALOG_IMAGES_DISK and CATALOG_IMAGES_FORMAT unset
+ * (the live host: the media disk, WebP where gd has it) and set, and the cache must carry what the environment says.
+ */
+it('caches the catalog.images config and the media disk, under storage/ and never under public/', function (array $vars, string $disk, string $format) {
+    $cache = app()->getCachedConfigPath();
+    $env = ['APP_CONFIG_CACHE' => $cache] + $vars + ['CATALOG_IMAGES_DISK' => false, 'CATALOG_IMAGES_FORMAT' => false];
+    try {
+        $process = new Process([PHP_BINARY, 'artisan', 'config:cache'], base_path(), $env);
+        $process->run();
+        expect($process->getExitCode())->toBe(0, $process->getErrorOutput().$process->getOutput());
+
+        $cached = require $cache;
+        $root = (string) data_get($cached, 'filesystems.disks.media.root');
+        expect(data_get($cached, 'catalog.images.disk'))->toBe($disk)
+            ->and(data_get($cached, 'catalog.images.format'))->toBe($format)
+            ->and(data_get($cached, 'catalog.images.min_width'))->toBe(800)
+            ->and(data_get($cached, 'catalog.images.min_height'))->toBe(600)
+            ->and(data_get($cached, 'catalog.images.max_upload_bytes'))->toBe(20971520)
+            ->and($root)->toBe(storage_path('app/private/media'))
+            ->and(str_starts_with($root, public_path()))->toBeFalse()
+            ->and(data_get($cached, 'filesystems.disks.media.driver'))->toBe('local')
+            ->and(data_get($cached, 'filesystems.disks.media.serve'))->toBeFalse();
+    } finally {
+        @unlink($cache);
+    }
+})->with([
+    'unset' => [[], 'media', 'auto'],
+    'set' => [['CATALOG_IMAGES_DISK' => 'media', 'CATALOG_IMAGES_FORMAT' => 'jpeg'], 'media', 'jpeg'],
+])->group('invariants', 'module:catalog');

@@ -24,20 +24,6 @@ function stepRefusal(Closure $call): ?string
     return null;
 }
 
-/** @return list<string> the four-character ids of a RIFF/WEBP file's chunks, in order */
-function stepWebpChunks(string $bytes): array
-{
-    $chunks = [];
-    $i = 12;
-    while ($i + 8 <= strlen($bytes)) {
-        $chunks[] = substr($bytes, $i, 4);
-        $size = unpack('V', substr($bytes, $i + 4, 4))[1];
-        $i += 8 + $size + ($size % 2);
-    }
-
-    return $chunks;
-}
-
 it('load() decodes and turns the image the right way up (EXIF orientation 6), with the extension and with the pure-PHP reader', function () {
     $input = imgInject(imgJpeg(60, 40), imgExifApp1(6));
 
@@ -128,7 +114,7 @@ it('encodeScrubbed() writes a WebP without EXIF, XMP or ICC chunks when gd has W
         ->and([$out->width, $out->height])->toBe([320, 240])
         ->and(substr($out->bytes, 0, 4))->toBe('RIFF')
         ->and(substr($out->bytes, 8, 4))->toBe('WEBP')
-        ->and(array_intersect(stepWebpChunks($out->bytes), ['EXIF', 'XMP ', 'ICCP']))->toBe([])
+        ->and(array_intersect(photoWebpChunks($out->bytes), ['EXIF', 'XMP ', 'ICCP']))->toBe([])
         ->and(getimagesizefromstring($out->bytes)['mime'])->toBe('image/webp');
 })->group('unit', 'module:shared');
 
