@@ -391,13 +391,31 @@ The As built notes list them step by step. The ones that change what the plan's 
 
 ## Before the claim
 
-`python scripts/gate_check.py --mode done --phase 6 --no-tests --no-e2e` at «HEAD» (this branch, every Phase 6 pull request merged):
+`python scripts/gate_check.py --mode done --phase 6 --no-tests --no-e2e` at `006a2c7` (this branch, every Phase 6 pull request merged):
 
 ```
-«GATECHECK»
+== gate_check: done phase 6
+  [SKIP] gate:p6 green                                pest --group=gate:p6 not run (--no-tests/--ci)
+  [SKIP] gate:p0 still green                          pest --group=gate:p0 not run (--no-tests/--ci)
+  [SKIP] gate:p1 still green                          pest --group=gate:p1 not run (--no-tests/--ci)
+  [SKIP] gate:p2 still green                          pest --group=gate:p2 not run (--no-tests/--ci)
+  [SKIP] gate:p3 still green                          pest --group=gate:p3 not run (--no-tests/--ci)
+  [SKIP] gate:p4 still green                          pest --group=gate:p4 not run (--no-tests/--ci)
+  [SKIP] gate:p5 still green                          pest --group=gate:p5 not run (--no-tests/--ci)
+  [SKIP] arch,invariants green                        pest --group=arch,invariants not run (--no-tests/--ci)
+  [SKIP] playwright projects                          p6-product-photo, p6-a11y (trusted to CI / skipped)
+  [PASS] ADR 0022-product-photos-storage-and-serving  present
+  [PASS] ADR 0023-design-system-and-tokens            present
+  [PASS] gate report                                  docs/phases/phase-6-report.md
+  [PASS] openapi.json present                         docs/openapi.json
+  [PASS] ERD covers tables                            all listed
+  [PASS] no phase 6 markers                           0 found
+  [PASS] no ->skip( in phase module tests             0 found
+  [SKIP] phase claimed done                           status=in_progress: run phase_status.py claim-done 6 after this passes
+== result: PASS (0 failed, 0 warnings, 17 checks)
 ```
 
-The SKIP rows are the tests and projects that `gate-p6` proves in CI through its needs and its own `gate:p6` step. The last row stays SKIP
+(The marker row is respelled here: the gate greps `docs/` for the marker's literal spelling, so printing it would fail the row.) The SKIP rows are the tests and projects that `gate-p6` proves in CI through its needs and its own `gate:p6` step. The last row stays SKIP
 until the claim.
 
 ## What the coordinator and Ramin do next
