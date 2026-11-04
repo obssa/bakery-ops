@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
-import { EmptyRow, TableCard } from "@/components/admin/kit";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ACTIONS_CELL, EmptyRow, FORM_GRID, TableCard } from "@/components/admin/kit";
 import { Alert, Button, Chip, Field, Modal, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
 import { useItems } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
@@ -27,7 +27,8 @@ import { InventoryNav, QueryBox, qty, useNamer } from "./shared";
 // inventory (admin); everyone who sees stock sees the list.
 //
 // Step 6.4c (fresh-counter.md 4.4): the title row with its Amharic twin, the section's tabs, the reorder list a table card (Out red, Low
-// amber, the suggested order in bold), then the rules a table card with the form beside it from 1024 px, a white card.
+// amber, the suggested order in bold), then the rules a table card, and under it the form, a white card in two columns from 1024 px,
+// brought into view by Edit.
 
 export function ReorderScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("inventory");
@@ -35,6 +36,11 @@ export function ReorderScreen({ titleAm }: { titleAm?: string }) {
   const manage = can(me, "inventory.manage");
   const rules = useReorderRules();
   const [editing, setEditing] = useState<ReorderRule | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editing) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [editing]);
 
   return (
     <>
@@ -42,10 +48,12 @@ export function ReorderScreen({ titleAm }: { titleAm?: string }) {
       <div className="flex flex-col gap-6">
         <InventoryNav />
         <ReorderListPanel />
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
-          <QueryBox query={rules}>{(rows) => <RulesTable rows={rows} manage={manage} onEdit={setEditing} />}</QueryBox>
-          {manage ? <RuleForm key={editing?.id ?? "new"} editing={editing} onDone={() => setEditing(null)} /> : null}
-        </div>
+        <QueryBox query={rules}>{(rows) => <RulesTable rows={rows} manage={manage} onEdit={setEditing} />}</QueryBox>
+        {manage ? (
+          <div ref={formRef} className="scroll-mt-8">
+            <RuleForm key={editing?.id ?? "new"} editing={editing} onDone={() => setEditing(null)} />
+          </div>
+        ) : null}
       </div>
     </>
   );
@@ -189,8 +197,8 @@ function RulesTable({ rows, manage, onEdit }: { rows: ReorderRule[]; manage: boo
                     )}
                   </td>
                   {manage ? (
-                    <td className="text-right">
-                      <div className="flex flex-wrap justify-end gap-2">
+                    <td className={ACTIONS_CELL}>
+                      <div className="flex justify-end gap-2">
                         <Button variant="secondary" size="md" compact aria-label={t("reorder.edit_named", { item: itemName })} onClick={() => onEdit(rule)}>
                           {t("edit")}
                         </Button>
@@ -289,6 +297,7 @@ function RuleForm({ editing, onDone }: { editing: ReorderRule | null; onDone: ()
   return (
     <Panel title={editing ? ti("reorder.edit") : ti("reorder.new")}>
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        <div className={FORM_GRID}>
         <Field label={ti("reorder.item")} error={fieldError("item_id")}>
           {(props) => (
             <Select {...props} controlSize="md" value={itemId} disabled={!!editing} onChange={(event) => setItemId(event.target.value)}>
@@ -313,18 +322,17 @@ function RuleForm({ editing, onDone }: { editing: ReorderRule | null; onDone: ()
             </Select>
           )}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-          <Field label={ti("reorder.min")} hint={unit ? ti("reorder.in_unit", { unit }) : undefined} error={fieldError("min_qty")}>
-            {(props) => <TextInput {...props} controlSize="md" inputMode="decimal" value={min} onChange={(event) => setMin(event.target.value)} />}
-          </Field>
-          <Field label={ti("reorder.order_qty")} hint={unit ? ti("reorder.in_unit", { unit }) : undefined} error={fieldError("reorder_qty")}>
-            {(props) => <TextInput {...props} controlSize="md" inputMode="decimal" value={order} onChange={(event) => setOrder(event.target.value)} />}
-          </Field>
+        <Field label={ti("reorder.min")} hint={unit ? ti("reorder.in_unit", { unit }) : undefined} error={fieldError("min_qty")}>
+          {(props) => <TextInput {...props} controlSize="md" inputMode="decimal" value={min} onChange={(event) => setMin(event.target.value)} />}
+        </Field>
+        <Field label={ti("reorder.order_qty")} hint={unit ? ti("reorder.in_unit", { unit }) : undefined} error={fieldError("reorder_qty")}>
+          {(props) => <TextInput {...props} controlSize="md" inputMode="decimal" value={order} onChange={(event) => setOrder(event.target.value)} />}
+        </Field>
         </div>
         <fieldset className="space-y-1 border-t border-neutral-200 pt-4">
           <legend className="float-left w-full text-sm font-semibold text-neutral-900">{ti("reorder.notify")}</legend>
           <p className="clear-both text-[13px] text-neutral-600">{ti("reorder.notify_hint")}</p>
-          <div className="grid grid-cols-2 gap-x-3">
+          <div className="grid grid-cols-2 gap-x-3 sm:grid-cols-3 xl:grid-cols-5">
             {[...ROLES, "station"].map((role) => (
               <label key={role} className="flex min-h-11 items-center gap-3 text-[15px] text-neutral-900">
                 <input

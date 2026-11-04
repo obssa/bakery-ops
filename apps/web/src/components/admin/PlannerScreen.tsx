@@ -12,7 +12,7 @@ import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { formatWhen } from "../production/RequestCard";
 import { Alert, Button, Chip, Field, PageHeader, Panel, Select, Skeleton, Status, TextInput, type Tone } from "../ui";
-import { EmptyRow, Notice, ProductThumb, TableCard, useProductLook, type ProductLook } from "./kit";
+import { ACTIONS_CELL, EmptyRow, FORM_GRID, Notice, ProductThumb, TableCard, useProductLook, type ProductLook } from "./kit";
 
 // Admin > Planner (Phase 2, step 2.8d; docs/architecture.md section 6): the production requests still open, with their due
 // times and priorities, a form that schedules one for a night's work (a product made in batches, a quantity in its base
@@ -22,7 +22,7 @@ import { EmptyRow, Notice, ProductThumb, TableCard, useProductLook, type Product
 //
 // Step 6.4c (fresh-counter.md 4.4, the CatalogList board): the title row with its Amharic twin; the open requests a table card, each
 // product with its 52 x 39 photo (the Admin board's top sellers) and the other language under its name, the priority and the state as
-// chips, the baker picked in the row; the schedule form a white card beside it from 1280 px.
+// chips, the baker picked in the row; under it the schedule form, a white card in two columns from 1024 px.
 
 const PRIORITY_RANK: Record<RequestPriority, number> = { urgent: 0, high: 1, normal: 2 };
 const PRIORITY_TONE: Record<RequestPriority, Tone> = { urgent: "red", high: "amber", normal: "neutral" };
@@ -40,7 +40,7 @@ export function PlannerScreen({ titleAm }: { titleAm?: string }) {
   return (
     <>
       <PageHeader title={t("title")} intro={t("intro")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="flex flex-col gap-6">
         <OpenRequests />
         <ScheduleForm />
       </div>
@@ -105,6 +105,7 @@ function ScheduleForm() {
   return (
     <Panel title={t("schedule_title")}>
       <form onSubmit={onSubmit} className="space-y-4">
+        <div className={FORM_GRID}>
         <Field label={t("field_product")} error={errorText.field(schedule.error, "product_item_id")}>
           {(props) => (
             <Select {...props} controlSize="md" required value={productId} onChange={(e) => setProductId(e.target.value)}>
@@ -127,29 +128,30 @@ function ScheduleForm() {
         >
           {(props) => <TextInput {...props} controlSize="md" className="tabular-nums" inputMode="decimal" autoComplete="off" value={qty} onChange={(e) => setQty(e.target.value)} />}
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <Field label={t("field_due")} error={errorText.field(schedule.error, "due_at")}>
-            {(props) => <TextInput {...props} controlSize="md" type="datetime-local" required value={due} onChange={(e) => setDue(e.target.value)} />}
-          </Field>
-          <Field label={t("field_priority")}>
-            {(props) => (
-              <Select {...props} controlSize="md" value={priority} onChange={(e) => setPriority(e.target.value as RequestPriority)}>
-                {REQUEST_PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {t(`priority_${p}`)}
-                  </option>
-                ))}
-              </Select>
-            )}
+        <Field label={t("field_due")} error={errorText.field(schedule.error, "due_at")}>
+          {(props) => <TextInput {...props} controlSize="md" type="datetime-local" required value={due} onChange={(e) => setDue(e.target.value)} />}
+        </Field>
+        <Field label={t("field_priority")}>
+          {(props) => (
+            <Select {...props} controlSize="md" value={priority} onChange={(e) => setPriority(e.target.value as RequestPriority)}>
+              {REQUEST_PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {t(`priority_${p}`)}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <div className="lg:col-span-2">
+          <Field label={t("field_note")} optionalLabel={t("optional")} error={errorText.field(schedule.error, "note")}>
+            {(props) => <TextInput {...props} controlSize="md" maxLength={500} autoComplete="off" value={note} onChange={(e) => setNote(e.target.value)} />}
           </Field>
         </div>
-        <Field label={t("field_note")} optionalLabel={t("optional")} error={errorText.field(schedule.error, "note")}>
-          {(props) => <TextInput {...props} controlSize="md" maxLength={500} autoComplete="off" value={note} onChange={(e) => setNote(e.target.value)} />}
-        </Field>
+        </div>
         {problem ? <Alert>{problem}</Alert> : null}
         {schedule.isError ? <Alert>{errorText.message(schedule.error)}</Alert> : null}
         <Status>{done}</Status>
-        <Button type="submit" size="md" disabled={schedule.isPending} className="w-full">
+        <Button type="submit" size="md" disabled={schedule.isPending}>
           {schedule.isPending ? tc("saving") : t("schedule")}
         </Button>
       </form>
@@ -277,25 +279,27 @@ function RequestRow({ request, locale, look, people }: { request: ProductionRequ
         <Chip tone={STATUS_TONE[request.status]}>{tp(`status_${request.status}` as "status_requested")}</Chip>
       </td>
       <td className="text-neutral-700">{request.assigned_to?.name ?? "—"}</td>
-      <td>
+      <td className={ACTIONS_CELL}>
         {waiting && people !== null ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Select controlSize="md" aria-label={t("baker_for", { name })} value={userId} onChange={(e) => setUserId(e.target.value)} className="w-44">
-              <option value="" disabled>
-                {t("choose_baker")}
-              </option>
-              {candidates.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
+          <div className="flex items-center justify-end gap-2">
+            <div className="w-44">
+              <Select controlSize="md" aria-label={t("baker_for", { name })} value={userId} onChange={(e) => setUserId(e.target.value)}>
+                <option value="" disabled>
+                  {t("choose_baker")}
                 </option>
-              ))}
-            </Select>
+                {candidates.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <Button type="button" variant="secondary" size="md" compact aria-label={t("assign", { name })} disabled={!userId || assign.isPending} onClick={onAssign}>
               {t("assign_short")}
             </Button>
           </div>
         ) : null}
-        {assign.isError ? <p role="alert" className="mt-1 text-[13px] font-medium text-red-700">{errorText.message(assign.error)}</p> : null}
+        {assign.isError ? <p role="alert" className="mt-1 whitespace-normal text-left text-[13px] font-medium text-red-700">{errorText.message(assign.error)}</p> : null}
       </td>
     </tr>
   );

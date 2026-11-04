@@ -22,7 +22,6 @@ import { RecordLink } from "./RecordLink";
 import { VoidDialog } from "../till/VoidDialog";
 import { Alert, Button, Chip, IconButton, PageHeader, ProductImage, Skeleton, type Tone } from "../ui";
 import { ICON_STROKE } from "../icons";
-import { focusRing } from "../styles";
 import { CARD, Notice, Toolbar, ToolbarSelect, useProductLook, type ProductLook } from "./kit";
 
 // The admin Orders live board (/admin/orders): every active order of the branch through a LiveFeed over GET /orders,
@@ -115,23 +114,26 @@ function OrderCard({ order, now, selected, look, onOpen }: { order: Order; now: 
         selected ? "border-brand-600 inset-ring-1 inset-ring-brand-600" : "border-neutral-200"
       }`}
     >
-      <button
-        type="button"
-        aria-label={t("open_order", { no })}
-        aria-pressed={selected}
-        onClick={() => onOpen(order)}
-        className={`-m-1 flex items-start justify-between gap-3 rounded-xl p-1 text-left hover:bg-neutral-50 ${focusRing}`}
-      >
+      {/* the whole head opens the timeline, but the button holds only the order's name, so its name ("Open order 12") holds what it shows */}
+      <div className="relative -m-1 flex items-start justify-between gap-3 rounded-xl p-1 hover:bg-neutral-50">
         <span className="min-w-0">
-          <span className="block text-base font-semibold text-neutral-900">
-            {k("order_no", { no })}
-            {where ? <span className="font-normal text-neutral-600"> · {where}</span> : null}
+          <span className="block text-base text-neutral-900">
+            <button
+              type="button"
+              aria-label={t("open_order", { no })}
+              aria-pressed={selected}
+              onClick={() => onOpen(order)}
+              className="text-left font-semibold outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-4 focus-visible:after:ring-brand-600/35"
+            >
+              {k("order_no", { no })}
+            </button>
+            {where ? <span className="text-neutral-600"> · {where}</span> : null}
           </span>
           <span className="block text-[13px] text-neutral-600">{t("owner", { name: order.owner.name ?? "" })}</span>
           <span className="block text-[13px] tabular-nums text-neutral-600">{t("age", { time: clock(seconds) })}</span>
         </span>
         <ThumbStack order={order} look={look} />
-      </button>
+      </div>
       {unsent || settled ? (
         <div className="flex flex-wrap gap-1.5">
           {unsent ? (

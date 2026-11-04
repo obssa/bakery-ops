@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { EmptyRow, TableCard, ToolbarSegments, Toolbar } from "@/components/admin/kit";
+import { ACTIONS_CELL, EmptyRow, TableCard, ToolbarSegments, Toolbar } from "@/components/admin/kit";
 import { Alert, Button, Chip, Field, Modal, PageHeader, TextInput, type Tone } from "@/components/ui";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { useConfirmTransfer, useRejectTransfer, useTransfers, type Transfer, type TransferStatus } from "@/lib/api/inventory";
@@ -135,7 +135,7 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
                   </td>
                   <td>
                     {transfer.requested_by.name}
-                    <span className="block text-[13px] tabular-nums text-neutral-600">{stamp(transfer.requested_at)}</span>
+                    <span className="block whitespace-nowrap text-[13px] tabular-nums text-neutral-600">{stamp(transfer.requested_at)}</span>
                   </td>
                   <td>
                     <Chip tone={STATUS_TONE[transfer.status]} dot>
@@ -143,9 +143,9 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
                     </Chip>
                     {transfer.reject_reason ? <span className="block pt-1 text-[13px] text-neutral-600">{transfer.reject_reason}</span> : null}
                   </td>
-                  <td className="text-right">
+                  <td className={ACTIONS_CELL}>
                     {transfer.status === "requested" && decide ? (
-                      <div className="flex flex-wrap justify-end gap-2">
+                      <div className="flex justify-end gap-2">
                         <Button size="md" compact disabled={busy} aria-label={t("transfers.confirm_named", { item: itemName })} onClick={() => confirmTransfer(transfer)}>
                           {t("transfers.confirm")}
                         </Button>

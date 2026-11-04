@@ -7,6 +7,7 @@ import { useAllChannels } from "@/lib/api/adminPayments";
 import { usePaymentChannels } from "@/lib/api/till";
 import type { ReconciliationCell, ReconciliationChannelRow } from "@/lib/api/types";
 import { canDrill, dayTotals, listedChannels, missingPhotoDrill, rangeIssue, shiftDate } from "@/lib/adminPayments";
+import { groupDigits } from "@/lib/analytics";
 import { useErrorText } from "@/lib/errors";
 import { createReconciliationFeed } from "@/lib/live/payments";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
@@ -102,7 +103,8 @@ export function ReconciliationScreen({ titleAm }: { titleAm?: string }) {
 /** The range at a glance, the Admin board's KPI row: receipts, the amount taken, what was paid back and the net, from the range's totals. */
 function RangeStats({ total }: { total: ReconciliationCell }) {
   const t = useTranslations("adminPayments");
-  const money = (amount: string) => t("money", { amount, currency: "ETB" });
+  // the report carries no currency: every payment of a branch is in its one currency, the birr
+  const money = (amount: string) => t("money", { amount: groupDigits(amount), currency: "ETB" });
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Stat label={t("reconciliation.col_receipts")} value={total.receipts} />
@@ -219,7 +221,7 @@ function DayTable({ day, rows }: { day: string; rows: ReconciliationChannelRow[]
   const total = dayTotals(rows);
   const title = t("reconciliation.day", { day });
   return (
-    <TableCard caption={title} title={title} minWidth="min-w-[1040px]">
+    <TableCard caption={title} title={title} minWidth="min-w-[960px]" compact>
       <Head first={t("reconciliation.col_channel")} />
       <tbody>
         {rows.map((row) => {
@@ -251,7 +253,7 @@ function TotalsTable({ rows, total }: { rows: ReconciliationChannelRow[]; total:
   const t = useTranslations("adminPayments");
   const channelName = useChannelName();
   return (
-    <TableCard caption={t("reconciliation.totals")} title={t("reconciliation.totals")} minWidth="min-w-[1040px]">
+    <TableCard caption={t("reconciliation.totals")} title={t("reconciliation.totals")} minWidth="min-w-[960px]" compact>
       <Head first={t("reconciliation.col_channel")} />
       <tbody>
         {rows.length === 0 ? (

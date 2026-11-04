@@ -29,7 +29,7 @@ import {
 import { useErrorText } from "@/lib/errors";
 import { keepsKey } from "@/lib/paySheet";
 import { useDateFormat } from "@/lib/useDates";
-import { CARD, FORM_GRID, TableCard } from "../admin/kit";
+import { ACTIONS_CELL, CARD, FORM_GRID, TableCard } from "../admin/kit";
 import { Alert, Button, Chip, Field, IconButton, PageHeader, Panel, Status, TextInput } from "../ui";
 import { QueryBox } from "../inventory/shared";
 import { addisStamp, PaymentsNav, useChannelName } from "./shared";
@@ -175,7 +175,9 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
             <th scope="col">{t("channels.col_code")}</th>
             <th scope="col">{t("channels.col_rules")}</th>
             <th scope="col">{t("channels.col_status")}</th>
-            <th scope="col">{t("channels.col_actions")}</th>
+            <th scope="col">
+              <span className="sr-only">{t("channels.col_actions")}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -208,9 +210,9 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                     </Chip>
                   )}
                 </td>
-                <td>
+                <td className={ACTIONS_CELL}>
                   {confirming === row.id ? (
-                    <div className="max-w-sm space-y-2 py-1">
+                    <div className="ml-auto w-80 space-y-2 whitespace-normal py-1 text-left">
                       <p className="text-[15px] text-neutral-800">{t("channels.remove_ask", { name: label })}</p>
                       <div className="flex flex-wrap gap-2">
                         <Button variant="danger" size="md" compact disabled={busy} onClick={() => confirmRemove(row)} aria-label={t("channels.remove_confirm_named", { name: label })}>
@@ -222,7 +224,7 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex items-center justify-end gap-1.5">
                       {controls.move ? (
                         <>
                           <IconButton label={t("channels.move_up_named", { name: label })} size="md" disabled={busy || at <= 0} onClick={() => move(row, -1)}>
@@ -256,8 +258,8 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                         </Button>
                       ) : null}
                       {isCash(row) && !row.deleted_at ? (
-                        <span className="inline-flex items-center gap-1.5 pl-1 text-[13px] text-neutral-600">
-                          <Lock className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
+                        <span className="inline-flex max-w-52 items-start gap-1.5 whitespace-normal pl-1 text-left text-[13px] text-neutral-600">
+                          <Lock className="mt-0.5 size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
                           {t("channels.cash_locked")}
                         </span>
                       ) : null}

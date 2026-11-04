@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
-import { EmptyRow, TableCard } from "@/components/admin/kit";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ACTIONS_CELL, EmptyRow, FORM_GRID, TableCard } from "@/components/admin/kit";
 import { Alert, Button, Chip, Field, PageHeader, Panel, Status, TextInput } from "@/components/ui";
 import { useCreateSupplier, useSuppliers, useUpdateSupplier, type Supplier } from "@/lib/api/inventory";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
@@ -13,20 +13,25 @@ import { InventoryNav, QueryBox } from "./shared";
 // it); switching one off keeps its history and takes it out of the choice on a new purchase.
 //
 // Step 6.4c (fresh-counter.md 4.4): the title row with its Amharic twin, the section's tabs, the suppliers a table card (Active a brand
-// chip, Off a neutral one) and beside it, from 1024 px, the form a white card.
+// chip, Off a neutral one), and under it the form, a white card in two columns from 1024 px, brought into view by Edit.
 
 export function SuppliersScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("inventory");
   const suppliers = useSuppliers();
   const [editing, setEditing] = useState<Supplier | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editing) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [editing]);
 
   return (
     <>
       <PageHeader title={t("suppliers.title")} intro={t("suppliers.intro")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
       <div className="flex flex-col gap-6">
         <InventoryNav />
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
-          <QueryBox query={suppliers}>{(rows) => <SupplierTable rows={rows} onEdit={setEditing} />}</QueryBox>
+        <QueryBox query={suppliers}>{(rows) => <SupplierTable rows={rows} onEdit={setEditing} />}</QueryBox>
+        <div ref={formRef} className="scroll-mt-8">
           <SupplierForm key={editing?.id ?? "new"} editing={editing} onDone={() => setEditing(null)} />
         </div>
       </div>
@@ -48,7 +53,7 @@ function SupplierTable({ rows, onEdit }: { rows: Supplier[]; onEdit: (supplier: 
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {update.isError ? <Alert>{errorText.message(update.error)}</Alert> : null}
-      <TableCard caption={t("suppliers.list")} minWidth="min-w-[600px]">
+      <TableCard caption={t("suppliers.list")} minWidth="min-w-[720px]">
         <thead>
           <tr>
             <th scope="col">{t("suppliers.col_name")}</th>
@@ -81,8 +86,8 @@ function SupplierTable({ rows, onEdit }: { rows: Supplier[]; onEdit: (supplier: 
                     <Chip dot>{t("suppliers.off")}</Chip>
                   )}
                 </td>
-                <td className="text-right">
-                  <div className="flex flex-wrap justify-end gap-2">
+                <td className={ACTIONS_CELL}>
+                  <div className="flex justify-end gap-2">
                     <Button variant="secondary" size="md" compact onClick={() => onEdit(supplier)} aria-label={t("suppliers.edit_named", { name: supplier.name })}>
                       {t("edit")}
                     </Button>
@@ -145,10 +150,13 @@ function SupplierForm({ editing, onDone }: { editing: Supplier | null; onDone: (
   return (
     <Panel title={editing ? t("suppliers.edit") : t("suppliers.new")}>
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
-        <Field label={t("suppliers.name")} error={fieldError("name")}>
-          {(props) => <TextInput {...props} controlSize="md" value={name} onChange={(event) => setName(event.target.value)} required maxLength={160} />}
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+        <div className={FORM_GRID}>
+          <Field label={t("suppliers.name")} error={fieldError("name")}>
+            {(props) => <TextInput {...props} controlSize="md" value={name} onChange={(event) => setName(event.target.value)} required maxLength={160} />}
+          </Field>
+          <Field label={t("suppliers.notes")} optionalLabel={t("optional")} error={fieldError("notes")}>
+            {(props) => <TextInput {...props} controlSize="md" value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />}
+          </Field>
           <Field label={t("suppliers.phone")} optionalLabel={t("optional")} error={fieldError("phone")}>
             {(props) => <TextInput {...props} controlSize="md" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} maxLength={32} />}
           </Field>
@@ -156,9 +164,6 @@ function SupplierForm({ editing, onDone }: { editing: Supplier | null; onDone: (
             {(props) => <TextInput {...props} controlSize="md" value={tin} onChange={(event) => setTin(event.target.value)} maxLength={32} />}
           </Field>
         </div>
-        <Field label={t("suppliers.notes")} optionalLabel={t("optional")} error={fieldError("notes")}>
-          {(props) => <TextInput {...props} controlSize="md" value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />}
-        </Field>
         {mutation.isError && !Object.keys((mutation.error as { fieldErrors?: object }).fieldErrors ?? {}).length ? <Alert>{errorText.message(mutation.error)}</Alert> : null}
         <Status>{saved ? t("suppliers.saved", { name: saved }) : null}</Status>
         <div className="flex gap-2.5">

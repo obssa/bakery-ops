@@ -67,7 +67,7 @@ export function LedgerScreen({ titleAm }: { titleAm?: string }) {
         <InventoryNav />
         <div className="space-y-2">
           <Toolbar>
-            <ToolbarSelect label={t("ledger.item")} value={filters.item ?? ""} onChange={(event) => change({ item: idParam(event.target.value) })}>
+            <ToolbarSelect label={t("ledger.item")} className="w-52" value={filters.item ?? ""} onChange={(event) => change({ item: idParam(event.target.value) })}>
               <option value="">{t("ledger.all_items")}</option>
               {(items.data ?? []).map((item) => (
                 <option key={item.id} value={item.id}>
@@ -75,7 +75,7 @@ export function LedgerScreen({ titleAm }: { titleAm?: string }) {
                 </option>
               ))}
             </ToolbarSelect>
-            <ToolbarSelect label={t("ledger.place")} value={filters.location ?? ""} onChange={(event) => change({ location: idParam(event.target.value) })}>
+            <ToolbarSelect label={t("ledger.place")} className="w-44" value={filters.location ?? ""} onChange={(event) => change({ location: idParam(event.target.value) })}>
               <option value="">{t("ledger.all_places")}</option>
               {(locations.data ?? []).map((place) => (
                 <option key={place.id} value={place.id}>
@@ -83,7 +83,7 @@ export function LedgerScreen({ titleAm }: { titleAm?: string }) {
                 </option>
               ))}
             </ToolbarSelect>
-            <ToolbarSelect label={t("ledger.reason")} aria-describedby={reasonHint} value={reason} onChange={(event) => setReason(event.target.value)}>
+            <ToolbarSelect label={t("ledger.reason")} className="w-48" aria-describedby={reasonHint} value={reason} onChange={(event) => setReason(event.target.value)}>
               <option value="">{t("ledger.all_reasons")}</option>
               {REASONS.map((value) => (
                 <option key={value} value={value}>

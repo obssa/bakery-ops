@@ -241,11 +241,18 @@ export function ToolbarCheck({ label, ...props }: Omit<InputHTMLAttributes<HTMLI
 // ------------------------------------------------------------------ tables
 
 // The Table primitive's rows and header, with the board's edges: the first and last columns 20 px in, no divider under the last row, a
-// little air above and below a cell that wraps.
+// little air above and below a cell that wraps, the header on one line.
 const ROWS =
   "[&_tbody_tr:last-child]:border-b-0 [&_tbody_td]:py-2.5 [&_tbody_th]:py-2.5 " +
   "[&_tfoot_td]:h-12 [&_tfoot_td]:px-3 [&_tfoot_th]:h-12 [&_tfoot_th]:px-3 [&_tfoot_tr]:border-t [&_tfoot_tr]:border-neutral-200 [&_tfoot_tr]:bg-neutral-50";
 const EDGES = `[&_tr>*:first-child]:pl-5 [&_tr>*:last-child]:pr-5 ${ROWS}`;
+const ONE_LINE_HEAD = "[&_thead_th]:whitespace-nowrap";
+// A wide table of figures (the reconciliation's twelve columns): 8 px between columns and a header that may take two lines, so it fits the
+// 1160 px content without scrolling.
+const COMPACT = "[&_thead_tr>th]:px-2 [&_tbody_tr>td]:px-2 [&_tbody_tr>th]:px-2 [&_tfoot_tr>*]:px-2 [&_thead_th]:py-2 [&_thead_th]:leading-tight";
+
+/** A table cell that holds a row's actions: as narrow as its buttons, which stay on one line. */
+export const ACTIONS_CELL = "w-px whitespace-nowrap text-right";
 
 /**
  * A table on a white card (the CatalogList board). `caption` names the table for readers (getByRole("table", { name })); with a `title` the
@@ -259,6 +266,7 @@ export function TableCard({
   action,
   footer,
   minWidth = "min-w-[640px]",
+  compact = false,
   className = "",
   children,
 }: {
@@ -268,13 +276,15 @@ export function TableCard({
   action?: ReactNode;
   footer?: ReactNode;
   minWidth?: string;
+  /** many columns of figures: tighter columns, a header that may wrap */
+  compact?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   const id = useId();
   const table = (
     <div className="overflow-x-auto">
-      <Table className={`${minWidth} ${EDGES}`}>
+      <Table className={`${minWidth} ${compact ? `${COMPACT} [&_tr>*:first-child]:pl-5 [&_tr>*:last-child]:pr-5 ${ROWS}` : `${EDGES} ${ONE_LINE_HEAD}`}`}>
         <caption className="sr-only">{caption}</caption>
         {children}
       </Table>

@@ -389,7 +389,7 @@ function PaymentsTable({
                 {row.received_by.name ? <span className="block text-[13px] text-neutral-600">{t("list.by", { name: row.received_by.name })}</span> : null}
               </td>
               <td>
-                <span className="font-semibold">{t("list.order_label", { no: orderLabel(row.order) })}</span>
+                <span className="whitespace-nowrap font-semibold">{t("list.order_label", { no: orderLabel(row.order) })}</span>
                 {row.order?.table_code ? <span className="block text-[13px] text-neutral-600">{t("list.table_code", { table: row.order.table_code })}</span> : null}
               </td>
               <td className="text-neutral-700">{channelName(row.channel)}</td>
