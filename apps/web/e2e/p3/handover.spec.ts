@@ -91,7 +91,7 @@ test.describe("p3 handover", () => {
       await openAs(chef, chefSession.api, "en/kds/kitchen/");
       const bar = chef.getByRole("region", { name: "Shift", exact: true });
       await expect(bar).toContainText("Shift open", { timeout: 30_000 });
-      // step 6.3b: on the kitchen display the shift bar is a menu in the station top bar, closed while the shift simply runs
+      // step 6.3b: on the kitchen display the shift bar is a menu in the station top bar, closed until it is tapped
       await openShiftBar(bar);
       await bar.getByRole("button", { name: "Close shift", exact: true }).click();
       await chef.getByRole("dialog", { name: "Close the shift" }).getByRole("button", { name: "Close shift", exact: true }).click();
@@ -184,6 +184,8 @@ test.describe("p3 handover", () => {
       expect(await currentShift(admin, station)).toBeNull();
       await chef.goto("en/kds/kitchen/");
       await expect(bar).toContainText("No shift is running", { timeout: 30_000 });
+      // the panel opens only on a tap: the page starts with the chip and the strip under the bar
+      await openShiftBar(bar);
       await bar.getByRole("button", { name: "Start shift", exact: true }).click();
       await expect(bar).toContainText("Opening count in progress", { timeout: 15_000 });
       await bar.getByRole("link", { name: "Open the count" }).click();
@@ -242,6 +244,8 @@ test.describe("p3 handover", () => {
       await openAs(page, cashier.api, "en/till/");
       const bar = page.getByRole("region", { name: "Shift", exact: true });
       await expect(bar).toContainText("No shift is running", { timeout: 30_000 });
+      // the panel opens only on a tap: the page starts with the chip and the strip under the bar
+      await openShiftBar(bar);
       await bar.getByRole("button", { name: "Start shift", exact: true }).click();
       await expect(bar).toContainText("Opening count in progress", { timeout: 15_000 });
 
@@ -298,7 +302,7 @@ test.describe("p3 handover", () => {
       // --- closing: the drawer is short by 20.00 and the cash slips are 10.00 short ----------------------------------------------
       const expectedClosing = sold.expected_total;
       const target = tallyFor(minus(expectedClosing, "20.00"), keys);
-      // step 6.3b: on the till too the shift bar is a menu in the station top bar, closed while the shift simply runs
+      // step 6.3b: on the till too the shift bar is a menu in the station top bar, closed until it is tapped
       await openShiftBar(bar);
       await bar.getByRole("button", { name: "Close shift", exact: true }).click();
       await page.getByRole("dialog", { name: "Close the shift" }).getByRole("button", { name: "Close shift", exact: true }).click();
@@ -386,6 +390,8 @@ test.describe("p3 handover", () => {
       expect(await currentShift(admin, till)).toBeNull();
       await page.goto("en/till/");
       await expect(bar).toContainText("No shift is running", { timeout: 30_000 });
+      // the panel opens only on a tap: the page starts with the chip and the strip under the bar
+      await openShiftBar(bar);
       await bar.getByRole("button", { name: "Show handover", exact: true }).click();
       await expect(page.getByRole("region", { name: "Handover from the last shift" })).toContainText("Float left in the drawer: 10.00", { timeout: 30_000 });
       await bar.getByRole("button", { name: "Start shift", exact: true }).click();

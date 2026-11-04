@@ -2,23 +2,24 @@
 
 import { ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import { ApiError } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
 import { closeShift, joinShift, leaveShift, cancelShift, startShift } from "@/lib/api/shifts";
 import type { Locale, Shift } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
-import { addisClock, barActions, barMode, onDuty, type BarMode } from "@/lib/shifts";
+import { addisClock, barActions, onDuty, stripAction, stripShown, type BarMode } from "@/lib/shifts";
 import { can, useSession } from "@/lib/session";
 import { useShiftNotice } from "@/lib/station";
 import { useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, Field, Modal, Select } from "../ui";
 import { buttonClass, focusRing } from "../styles";
-import { StationHeaderActions } from "../StationHeaderActions";
+import { StationHeaderActions, StationHeaderNotice } from "../StationHeaderActions";
 import { DrawerDialog } from "./DrawerDialog";
 import { HandoverPanel } from "./HandoverPanel";
 import { NoteForm } from "./Notes";
+import { useBarPanel } from "./useBarPanel";
 import type { ShiftStation } from "./useShiftStation";
 
 // The shift bar (step 3.7a, phase-3 plan section 6 item 7): the strip at the top of every station screen (kitchen and bar displays,
@@ -32,6 +33,12 @@ import type { ShiftStation } from "./useShiftStation";
 //
 // When the API refuses something because no shift is open (409 inventory.shift.required, payments.shift.required) the refusal is
 // shown here in both languages, above the same Start buttons.
+//
+// `menu` (the station screens) has two parts, and neither covers the work unasked. In the top bar, the region "Shift": the state's chip and,
+// only on a tap of the chip or of the strip's "More", the floating panel with all of the above (useBarPanel: closed by the chip, a tap outside
+// it, or Escape). Under the bar, in the page's flow, the attention strip while the shift needs someone: the state, or what was refused in
+// amber, and the one main action of that state. So an important prompt pushes the page down instead of hiding it. While the panel is open the
+// strip keeps its words and hides its controls, in place: a name never matches two visible controls, and the page does not jump.
 
 // open is brand teal since step 6.2b: green means money confirmed and nothing else (fresh-counter.md 1.3); the station top bar's chip uses
 // the same tones (AppShell.tsx)
@@ -44,7 +51,7 @@ const BADGE: Record<BarMode, { tone: "amber" | "blue" | "brand"; key: string }> 
 
 type ActionName = "start" | "start_carried" | "join" | "leave" | "close" | "cancel";
 
-export function ShiftBar({ model, look = "card", quiet = false }: { model: ShiftStation; look?: "card" | "strip" | "menu"; /** `menu` only: no opening by itself for a count in progress */ quiet?: boolean }) {
+export function ShiftBar({ model, look = "card", quiet = false }: { model: ShiftStation; look?: "card" | "strip" | "menu"; /** `menu` only: no attention strip for a count in progress, as the count is this screen */ quiet?: boolean }) {
   const strip = look !== "card";
   const size = strip ? ("md" as const) : undefined;
   const t = useTranslations("shifts");
@@ -80,15 +87,8 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
     if (status === "open") useShiftNotice.getState().clear();
   }, [status]);
 
-  // `menu`: the panel opens by itself while the shift needs someone (none running, a count in progress, a refusal to answer) and then
-  // stays open until it is closed; a screen opened on a running shift shows only the menu's button. The count screen (step 6.3c) is where
-  // a count in progress is done, so there it opens only on a refusal or a tap (`quiet`).
-  const [expanded, setExpanded] = useState(false);
-  const ownNotice = notice !== null && (notice.stationId === null || notice.stationId === station?.station_id);
-  const needsAction = loaded && ((!quiet && shift !== undefined && barMode(shift) !== "open") || failure !== null || ownNotice);
-  useEffect(() => {
-    if (needsAction) setExpanded(true);
-  }, [needsAction]);
+  const panel = useBarPanel();
+  const panelId = useId();
 
   if (!station || !station.tracks_shifts || !feed) return null;
   // a person who may not read this station's shifts (403) has no bar; a network failure before the first answer shows the stale line
@@ -166,8 +166,8 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
   }
 
   // `strip` and `menu` (step 6.3b, the kitchen and bar displays and the till): the shift's line without a card, the actions at 44 px; in
-  // `menu` that line is the panel of a button in the station top bar (the boards show the shift there: "Morning shift · Chef ..."). The
-  // same region "Shift", text, names, actions and dialogs in every look.
+  // `menu` that line is the panel of a button in the station top bar (the boards show the shift there: "Morning shift · Chef ..."), opened
+  // on a tap. The same region "Shift", text, names, actions and dialogs in every look.
   const body = (
     <>
       <div className={`flex flex-wrap items-center justify-between ${strip ? "gap-x-4 gap-y-2" : "gap-4"}`}>
@@ -333,33 +333,117 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
   );
 
   if (look === "menu") {
-    const open = expanded;
+    const open = panel.open;
+    const refusal = failure ? errorText.message(failure) : showNotice ? noticeText || t("needed", { station: stationName }) : null;
+    const attention = loaded && stripShown(actions.mode, quiet, refusal !== null);
+    const main = stripAction(actions, quiet);
+    // on a phone the action has the whole second row and "More" ends the first; on a wider screen both end the one row, in reading order
+    const actionPlace = "order-3 w-full sm:order-2 sm:w-auto";
     return (
-      <StationHeaderActions>
-        <section aria-label={t("region")} className="relative">
-          <button
-            type="button"
-            data-shift-toggle=""
-            aria-expanded={open}
-            onClick={() => setExpanded(!open)}
-            className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
-          >
-            {loaded ? <Badge tone={BADGE[actions.mode].tone} dot>{t(BADGE[actions.mode].key)}</Badge> : null}
-            {/* what the bar's own line says in short, read in full here: the state, the shift and who is on it */}
-            <span className="sr-only">
-              {loaded ? headline : t("checking")}
-              {loaded && shift ? ` · ${shiftLabel}` : ""}
-              {crew.length > 0 ? ` · ${t("on_duty")}: ${crew.map((row) => row.user?.name ?? "").join(", ")}` : ""}
-            </span>
-            <ChevronDown className={`size-4 text-neutral-500 motion-safe:transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden="true" />
-          </button>
-          {open ? (
-            <div className="fixed right-4 top-[4.5rem] z-30 max-h-[calc(100dvh-5.5rem)] w-[min(44rem,calc(100vw-2rem))] space-y-3 overflow-y-auto rounded-[20px] border border-neutral-200 bg-white p-4 text-left shadow-float sm:right-6">
-              {body}
-            </div>
-          ) : null}
-        </section>
-      </StationHeaderActions>
+      <>
+        <StationHeaderActions>
+          <section aria-label={t("region")} className="relative">
+            <button
+              ref={panel.toggleRef}
+              type="button"
+              data-shift-toggle=""
+              aria-expanded={open}
+              aria-controls={panelId}
+              onClick={panel.toggle}
+              className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-100 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
+            >
+              {loaded ? (
+                <span className="relative inline-flex">
+                  <Badge tone={BADGE[actions.mode].tone} dot>{t(BADGE[actions.mode].key)}</Badge>
+                  {/* the strip under the bar has something to say: seen at a glance from the chip */}
+                  {attention ? <span aria-hidden="true" data-shift-attention="" className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-amber-700 ring-2 ring-white" /> : null}
+                </span>
+              ) : null}
+              {/* what the bar's own line says in short, read in full here: the state, the shift and who is on it */}
+              <span className="sr-only">
+                {loaded ? headline : t("checking")}
+                {loaded && shift ? ` · ${shiftLabel}` : ""}
+                {crew.length > 0 ? ` · ${t("on_duty")}: ${crew.map((row) => row.user?.name ?? "").join(", ")}` : ""}
+              </span>
+              <ChevronDown className={`size-4 text-neutral-500 motion-safe:transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden="true" />
+            </button>
+            {open ? (
+              <div
+                ref={panel.panelRef}
+                id={panelId}
+                tabIndex={-1}
+                data-shift-panel=""
+                style={panel.panelStyle}
+                className="fixed right-4 z-30 w-[min(44rem,calc(100vw-2rem))] space-y-3 overflow-y-auto rounded-[20px] border border-neutral-200 bg-white p-4 text-left shadow-float outline-none sm:right-6"
+              >
+                {body}
+              </div>
+            ) : null}
+          </section>
+        </StationHeaderActions>
+        <StationHeaderNotice>
+          {/* always there, empty and without height while the shift needs nobody, so a reader hears the state change; it never takes the focus */}
+          <div role="status" data-testid="shift-strip">
+            {attention ? (
+              <div className={`border-b ${refusal !== null ? "border-amber-200 bg-amber-50" : "border-neutral-200 bg-white"}`}>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 sm:min-h-13 sm:flex-nowrap sm:px-6 sm:py-1">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    {/* the bar's chip right above it says the state on a phone, where the message has the row to itself */}
+                    <span className="hidden shrink-0 sm:inline">
+                      <Badge tone={BADGE[actions.mode].tone} dot className={refusal !== null ? "border border-amber-300" : ""}>
+                        {t(BADGE[actions.mode].key)}
+                      </Badge>
+                    </span>
+                    {refusal !== null ? (
+                      <p className="min-w-0 text-[15px] font-medium text-amber-900">{refusal}</p>
+                    ) : (
+                      <p className="min-w-0 truncate text-[15px] font-semibold text-neutral-900">{headline}</p>
+                    )}
+                  </div>
+                  {/* hidden in place while the panel is open: the same names are in the panel, and the page keeps its height */}
+                  {main === "start" ? (
+                    <Button type="button" size="md" disabled={busy !== null} onClick={() => void start(false)} className={`${actionPlace} ${open ? "invisible" : ""}`}>
+                      {busy === "start" ? t("working") : t("start")}
+                    </Button>
+                  ) : main === "count" ? (
+                    <Link
+                      href={{ pathname: "/shifts/count", query: { shift: shift?.id ?? "" } }}
+                      className={`${buttonClass({ variant: "primary", size: "md" })} ${actionPlace} ${open ? "invisible" : ""}`}
+                    >
+                      {t("open_count")}
+                    </Link>
+                  ) : refusal !== null ? (
+                    // nothing here answers it (the shift is open, or the count is this screen): it goes once it has been read
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="md"
+                      className={`${actionPlace} ${open ? "invisible" : ""}`}
+                      onClick={() => {
+                        setFailure(null);
+                        useShiftNotice.getState().clear();
+                      }}
+                    >
+                      {t("strip_dismiss")}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="md"
+                    aria-expanded={open}
+                    aria-controls={panelId}
+                    onClick={panel.openWithFocus}
+                    className={`order-2 shrink-0 sm:order-3 ${open ? "invisible" : ""}`}
+                  >
+                    {t("strip_more")}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </StationHeaderNotice>
+      </>
     );
   }
   return (

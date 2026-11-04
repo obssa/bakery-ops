@@ -112,8 +112,9 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
     <div className="flex flex-col gap-5">
       {/* the page's heading; the station top bar shows the name */}
       <h1 className="sr-only">{t("title")}</h1>
-      {/* the shift is a menu in the station top bar (its state as a chip; the panel holds the region "Shift" with its words and actions,
-          and opens by itself while the shift needs someone), so the columns start right under the bar */}
+      {/* the shift is a menu in the station top bar (its state as a chip; the panel holds the region "Shift" with its words and actions, and
+          opens on a tap). While the shift needs someone its strip sits under the bar and pushes the columns down; otherwise they start right
+          under the bar */}
       <ShiftBar model={strip} look="menu" />
 
       {/* the board's buttons in the station top bar, after the shift's chip and before the sync chip. "Display case stock" shows its

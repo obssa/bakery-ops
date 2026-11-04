@@ -150,7 +150,7 @@ export function TillScreen({ titleTwin }: { /** the Amharic title beside the Eng
   );
 
   // the Till board's header is the one station top bar (lib/topBar.ts): the till's name and its Amharic name there, the shift's line under
-  // them; the shift's menu and the drawer's figure on its right
+  // them; the shift's menu and the drawer's figure on its right, and the shift's strip under it while the shift needs someone
   useStationHeader({ title: t("title"), titleAm: titleTwin });
 
   return (

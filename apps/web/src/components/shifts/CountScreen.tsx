@@ -103,7 +103,7 @@ function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
   }, [stationId]);
 
   // the station's shift as the menu in the station top bar (ShiftBar look="menu", as on every station screen): its state as a chip, its
-  // actions in the panel; `quiet`, because the count in progress that would open it by itself is the one on this screen
+  // actions in the panel on a tap; `quiet`, because the count in progress its strip would point to is the one on this screen
   const shiftStation = useShiftStation({ stationId });
 
   const all = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);

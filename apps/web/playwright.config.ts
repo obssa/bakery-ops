@@ -66,7 +66,8 @@ export default defineConfig({
     // remove) and the axe sweep of the main screens in en and am. testMatch is matched against the absolute path, and CI checks out into
     // .../bakery-ops/bakery-ops/, so both are anchored on the folder and the file name, never on a bare word.
     { name: "p6-product-photo", testDir: "./e2e/p6", testMatch: /[\\/]p6[\\/]product-photo[^\\/]*\.spec\.ts$/, use: tablet },
-    // p6-a11y also carries the screenshots for review (screens.spec.ts, brief "Design fidelity"), uploaded by e2e-p6 as the artifact "screens"
-    { name: "p6-a11y", testDir: "./e2e/p6", testMatch: /[\\/]p6[\\/](a11y|screens)[^\\/]*\.spec\.ts$/, use: tablet },
+    // p6-a11y also carries the screenshots for review (screens.spec.ts, brief "Design fidelity"), uploaded by e2e-p6 as the artifact "screens",
+    // and the shift's strip that covers nothing (shift-strip.spec.ts)
+    { name: "p6-a11y", testDir: "./e2e/p6", testMatch: /[\\/]p6[\\/](a11y|screens|shift-strip)[^\\/]*\.spec\.ts$/, use: tablet },
   ],
 });

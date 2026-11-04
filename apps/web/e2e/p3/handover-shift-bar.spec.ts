@@ -18,7 +18,8 @@ import { openShiftBar } from "../support/shiftBar";
 // that other fixtures opened, so the flow settles the station first (cancels or closes and submits it) and opens a carried shift again
 // at the end, which is what every other fixture expects to find.
 
-// step 6.3b: on the kitchen display the bar is a menu in the station top bar (closed while the shift simply runs), so it is opened first
+// step 6.3b: on the kitchen display the bar is a menu in the station top bar, closed until it is tapped whatever the shift's state, so it is
+// opened first; once open it stays open through the changes this flow makes
 async function bar(page: Page) {
   return openShiftBar(page.getByRole("region", { name: "Shift", exact: true }));
 }

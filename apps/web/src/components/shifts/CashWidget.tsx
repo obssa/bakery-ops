@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { ChevronDown } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo } from "react";
 import { ApiError } from "@/lib/api/client";
 import { getShiftCounts } from "@/lib/api/counts";
 import type { Locale, Shift } from "@/lib/api/types";
@@ -13,6 +13,7 @@ import { createCashFeed } from "@/lib/live/cash";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useSession } from "@/lib/session";
 import { focusRing } from "../styles";
+import { useBarPanel } from "./useBarPanel";
 
 // The till's cash so far (step 3.7d), beside the shift bar: the opening float by denomination, the cash taken in the shift by channel
 // (GET /shifts/{shift}/cash, polled with an ETag like the other feeds), what the drawer should hold now, and the float the last closing
@@ -30,8 +31,9 @@ function Loaded({ shift, look }: { shift: Shift; look: "panel" | "summary" }) {
   const feed = useMemo(() => createCashFeed(shift.id), [shift.id]);
   const snapshot = useLiveFeed(feed);
   const counts = useQuery({ queryKey: ["shift-counts", shift.id], queryFn: () => getShiftCounts(shift.id), enabled: signedIn, refetchInterval: 15_000 });
-  // the till board puts the drawer's figure in the title row: the rest opens under it (step 6.3b)
-  const [open, setOpen] = useState(false);
+  // the till board puts the drawer's figure in the title row: the rest opens under it on a tap (step 6.3b), and closes like the shift's panel
+  const panel = useBarPanel();
+  const panelId = useId();
 
   const summary = snapshot?.state.summary ?? null;
   // the shift has no drawer, or this person may not read it: nothing to show
@@ -117,19 +119,28 @@ function Loaded({ shift, look }: { shift: Shift; look: "panel" | "summary" }) {
   return (
     <section aria-label={t("cash_title")} className="relative">
       <button
+        ref={panel.toggleRef}
         type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((shown) => !shown)}
+        aria-expanded={panel.open}
+        aria-controls={panelId}
+        onClick={panel.toggle}
         className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-neutral-600 hover:bg-neutral-100 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
       >
         {t("cash_title")}
         <span className="font-semibold tabular-nums text-neutral-900">
           {summary.expected_total} {currency}
         </span>
-        <ChevronDown className={`size-4 motion-safe:transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden="true" />
+        <ChevronDown className={`size-4 motion-safe:transition-transform ${panel.open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden="true" />
       </button>
-      {open ? (
-        <div className="fixed right-4 top-[4.5rem] z-20 max-h-[calc(100dvh-5.5rem)] w-[min(44rem,calc(100vw-2rem))] overflow-y-auto rounded-[20px] border border-neutral-200 bg-white p-5 shadow-float sm:right-6">
+      {panel.open ? (
+        <div
+          ref={panel.panelRef}
+          id={panelId}
+          tabIndex={-1}
+          data-cash-panel=""
+          style={panel.panelStyle}
+          className="fixed right-4 z-20 w-[min(44rem,calc(100vw-2rem))] overflow-y-auto rounded-[20px] border border-neutral-200 bg-white p-5 shadow-float outline-none sm:right-6"
+        >
           {details}
         </div>
       ) : null}

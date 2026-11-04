@@ -87,6 +87,8 @@ test.describe("p3 opening prefill", () => {
       const bar = page.getByRole("region", { name: "Shift", exact: true });
       await expect(bar).toContainText("Opening count in progress", { timeout: 30_000 });
       await expect(bar).toContainText(label);
+      // the panel opens only on a tap: the page starts with the chip and the strip under the bar
+      await openShiftBar(bar);
       await bar.getByRole("link", { name: "Open the count" }).click();
       await expect(page.getByRole("heading", { name: "Shift count", level: 1 })).toBeVisible({ timeout: 30_000 });
       const row = page.getByRole("row").filter({ hasText: ingredient.name_en });
@@ -102,7 +104,7 @@ test.describe("p3 opening prefill", () => {
       await page.goto("en/production/");
       await expect(bar).toContainText("Shift open", { timeout: 30_000 });
       await expect(bar).toContainText(label);
-      // step 6.3c: on the production board the shift is a menu in the station top bar, closed while the shift is open
+      // step 6.3c: on the production board the shift is a menu in the station top bar, closed until it is tapped
       await openShiftBar(bar);
       await bar.getByRole("button", { name: "Close shift", exact: true }).click();
       await page.getByRole("dialog", { name: "Close the shift" }).getByRole("button", { name: "Close shift", exact: true }).click();
@@ -129,6 +131,8 @@ test.describe("p3 opening prefill", () => {
       expect(await currentShift(admin, station)).toBeNull();
       await page.goto("en/production/");
       await expect(bar).toContainText("No shift is running", { timeout: 30_000 });
+      // the panel opens only on a tap: the page starts with the chip and the strip under the bar
+      await openShiftBar(bar);
       await bar.getByRole("button", { name: "Start shift", exact: true }).click();
       await expect(bar).toContainText("Opening count in progress", { timeout: 15_000 });
       await bar.getByRole("link", { name: "Open the count" }).click();

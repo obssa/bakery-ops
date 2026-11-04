@@ -1362,6 +1362,8 @@ web:shifts.drawer_title,/shifts,Declare the drawer,መሳቢያውን ይግለ�
 web:shifts.drawer_intro,/shifts,Count the notes and coins in the drawer before the shift opens.,ፈረቃው ከመከፈቱ በፊት በመሳቢያው ውስጥ ያሉትን ኖቶችና ሳንቲሞች ይቁጠሩ።,,
 web:shifts.drawer_none,/shifts,This shift has no drawer count to declare.,ይህ ፈረቃ የሚገለጽ የመሳቢያ ቆጠራ የለውም።,,
 web:shifts.drawer_done,/shifts,Done,ተጠናቀቀ,,
+web:shifts.strip_more,/shifts,More,ተጨማሪ,,
+web:shifts.strip_dismiss,/shifts,Dismiss,ዝጋ,,
 web:counts.title,/shifts/count,Shift count,የፈረቃ ቆጠራ,,
 web:counts.intro,/shifts/count,"Count what is on the shelves, place by place. Anything that differs from what is expected needs a reason.",በመደርደሪያዎች ላይ ያለውን በቦታ በቦታ ይቁጠሩ። ከሚጠበቀው የተለየ ማንኛውም ነገር ምክንያት ያስፈልገዋል።,,
 web:counts.loading,/shifts/count,Loading the count…,ቆጠራውን በመጫን ላይ…,,

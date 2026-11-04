@@ -67,6 +67,26 @@ export function barActions(shift: Shift | null, userId: number, powers: Powers):
 }
 
 /**
+ * Whether the shift's attention strip shows under the station top bar: when the shift needs someone (none running, a count in progress) or
+ * something was refused. Once the shift is open there is none and the page has its full height. On the count screen (`quiet`) a count in
+ * progress is the screen itself, so only a refusal shows it.
+ */
+export function stripShown(mode: BarMode, quiet: boolean, refused: boolean): boolean {
+  return refused || (!quiet && mode !== "open");
+}
+
+export type StripAction = "start" | "count" | null;
+
+/**
+ * The one main action of the strip, the same control the shift's panel has for that state: "Start shift" with none running, "Open the count"
+ * while a count is in progress. On the count screen the count is already open, and a person who may do neither gets none.
+ */
+export function stripAction(actions: BarActions, quiet: boolean): StripAction {
+  if (actions.start) return "start";
+  return actions.continueCount && !quiet ? "count" : null;
+}
+
+/**
  * Build-time switch for the till: NEXT_PUBLIC_REQUIRE_SHIFT_FOR_CASH=true makes Pay wait for a running shift from the first screen,
  * without waiting to be told by a refusal. Off everywhere until step 3.7e flips payments.require_shift_for_cash.
  */

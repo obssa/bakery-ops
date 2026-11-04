@@ -1462,7 +1462,9 @@
     "drawer_title": "መሳቢያውን ይግለጹ",
     "drawer_intro": "ፈረቃው ከመከፈቱ በፊት በመሳቢያው ውስጥ ያሉትን ኖቶችና ሳንቲሞች ይቁጠሩ።",
     "drawer_none": "ይህ ፈረቃ የሚገለጽ የመሳቢያ ቆጠራ የለውም።",
-    "drawer_done": "ተጠናቀቀ"
+    "drawer_done": "ተጠናቀቀ",
+    "strip_more": "ተጨማሪ",
+    "strip_dismiss": "ዝጋ"
   },
   "counts": {
     "title": "የፈረቃ ቆጠራ",

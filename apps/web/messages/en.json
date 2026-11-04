@@ -1462,7 +1462,9 @@
     "drawer_title": "Declare the drawer",
     "drawer_intro": "Count the notes and coins in the drawer before the shift opens.",
     "drawer_none": "This shift has no drawer count to declare.",
-    "drawer_done": "Done"
+    "drawer_done": "Done",
+    "strip_more": "More",
+    "strip_dismiss": "Dismiss"
   },
   "counts": {
     "title": "Shift count",
