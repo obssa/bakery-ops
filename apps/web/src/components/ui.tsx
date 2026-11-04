@@ -648,7 +648,7 @@ export function Modal({ label, onClose, size = "md", children }: { label: string
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-neutral-900/40 p-4 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-scrim p-4 sm:items-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
@@ -681,7 +681,7 @@ export function Drawer({ label, onClose, size = "md", children }: { label: strin
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-neutral-900/40" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex justify-end bg-scrim" onClick={onClose}>
       <div
         ref={panel}
         role="dialog"

@@ -22,6 +22,30 @@ export function clock(seconds: number): string {
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+// --- the three columns (step 6.3b, fresh-counter.md 3.3) ---------------------------------------------------------
+
+/** New (a line still to accept), Cooking (accepted, being made) and Ready (waiting for pickup), left to right. */
+export const KDS_COLUMNS = ["new", "cooking", "ready"] as const;
+
+export type KdsColumn = (typeof KDS_COLUMNS)[number];
+
+/**
+ * The column a ticket stands in: that of its least advanced line, so a ticket with one line still new waits in New, one being made in
+ * Cooking, and only a ticket whose every line is ready shows in Ready. Each line keeps its own status and actions on the card.
+ */
+export function columnOf(lines: readonly { status: string }[]): KdsColumn {
+  if (lines.some((line) => line.status === "queued")) return "new";
+  if (lines.some((line) => line.status === "accepted")) return "cooking";
+  return "ready";
+}
+
+/** The rail split into the three columns, each in the rail's order (oldest sent first). */
+export function columnsOf<T extends { lines: readonly { status: string }[] }>(rail: readonly T[]): Record<KdsColumn, T[]> {
+  const columns: Record<KdsColumn, T[]> = { new: [], cooking: [], ready: [] };
+  for (const ticket of rail) columns[columnOf(ticket.lines)].push(ticket);
+  return columns;
+}
+
 // --- the chime: a generated tone (Web Audio), no audio file; muted or not is remembered per device ---------------
 
 const MUTE_KEY = "bakery-ops.kds.muted";

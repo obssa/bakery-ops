@@ -103,7 +103,8 @@ async function runFlow(f: FlowFixture, pages: { pad: Page; kitchen: Page; bar: P
   await expect(sheet).toContainText("330.00 ETB");
   // step 4.5b: the full pay sheet starts with one payment, cash for the whole balance (splits and photos are p4-pay-photo-split's)
   await sheet.getByRole("button", { name: "Cash", exact: true }).click();
-  for (const digit of "400") await sheet.getByRole("button", { name: digit, exact: true }).click();
+  // step 6.3b: the cash received is typed into its field, as on the Till board (the keypad of 4.5b is behind its "Keypad" button)
+  await sheet.getByLabel("Cash received").fill("400");
   await expect(sheet).toContainText("Change due: 70.00 ETB");
   await sheet.getByRole("button", { name: "Complete payment" }).click();
   await expect(sheet).toContainText("Payment recorded", { timeout: 30_000 });

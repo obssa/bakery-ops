@@ -66,7 +66,8 @@ test.describe("p4 pay sheet: photo and split", () => {
       await expect(complete).toBeDisabled();
       // cash: what was handed over, and the change
       await expect(sheet.getByRole("status", { name: "Why the payment cannot be completed yet" })).toContainText("Payment 1");
-      for (const digit of "100") await first.getByRole("button", { name: digit, exact: true }).click();
+      // step 6.3b: typed into the "Cash received" field as on the Till board (the 4.5b keypad is behind its "Keypad" button)
+      await first.getByLabel("Cash received").fill("100");
       await expect(first).toContainText("Change due: 30.00 ETB");
 
       // the reference: the channel's hint, and the pattern checked as it is typed

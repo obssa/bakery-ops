@@ -6,7 +6,7 @@ import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "re
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActing } from "@/lib/acting";
 import type { Locale } from "@/lib/api/types";
-import { frameOf, isCurrent, SCREENS } from "@/lib/screens";
+import { frameOf, isCurrent, isNightScreen, SCREENS } from "@/lib/screens";
 import { useSession } from "@/lib/session";
 import { barMode, type BarMode } from "@/lib/shifts";
 import { useStationChrome } from "@/lib/station";
@@ -30,7 +30,8 @@ import { Avatar, Chip, type Tone } from "./ui";
 // sidebar and the content, and AdminFrame draws both, its `main`, the outbox's band and, in the sidebar, the sync chip, the bell, the
 // account menu and "Screens". The sign-in screen is a split of its own, without a bar, and carries "Screens" itself. The waiter pad (the
 // `fill` frame) draws its zones edge to edge and, from 1024 px, in the window's height. A page whose calls are refused because this device
-// is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate).
+// is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate). On the kitchen and bar displays the whole frame, the bar
+// included, is kitchen night (step 6.3b: `.kitchen-night`, globals.css), and only there.
 
 /** The app's mark: a brand-teal square with the line icon, hidden from readers (the name beside it, or the link around it, says it). */
 export function AppMark({ size = "md" }: { size?: "md" | "lg" }) {
@@ -387,7 +388,10 @@ function StationBar({ fill }: { fill: boolean }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations("app");
-  const frame = frameOf(usePathname());
+  const pathname = usePathname();
+  const frame = frameOf(pathname);
+  // the kitchen and bar displays are kitchen night from the top bar down (step 6.3b): the palette is remapped inside this frame only
+  const night = isNightScreen(pathname);
 
   // `fill` (the waiter pad): from 1024 px the frame is the window's height, so the page's zones scroll on their own under the bar; below
   // it the page flows and scrolls as any other. Its main has no padding: the screen draws its zones edge to edge. A screen that is not
@@ -395,7 +399,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // gets shorter than 34rem: a tall band above it (the conflict tray) makes the page scroll instead of crushing the order panel.
   const fill = frame === "fill";
   return (
-    <div className={`flex min-h-screen flex-col ${fill ? "lg:h-dvh lg:min-h-0" : ""}`}>
+    <div className={`flex min-h-screen flex-col ${fill ? "lg:h-dvh lg:min-h-0" : ""} ${night ? "kitchen-night" : ""}`}>
       <a
         href="#content"
         className={`sr-only rounded-xl bg-white px-4 py-3 text-base font-semibold focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 ${focusRing}`}

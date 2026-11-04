@@ -56,7 +56,7 @@ function ClosedCard({ order, onRefund }: { order: Order; onRefund: () => void })
   const headingId = useId();
   const refunded = order.refunded_total ?? "0.00";
   return (
-    <article aria-labelledby={headingId} className="space-y-2 rounded-lg border border-neutral-200 bg-white p-4">
+    <article aria-labelledby={headingId} className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <h3 id={headingId} className="text-base font-semibold text-neutral-900">
           {t("closed_order", { no })}
@@ -65,7 +65,7 @@ function ClosedCard({ order, onRefund }: { order: Order; onRefund: () => void })
       </div>
       <p className="text-base text-neutral-900 tabular-nums">{t("closed_total", { amount: order.totals.total, currency: order.currency })}</p>
       {order.closed_at ? <p className="text-sm text-neutral-600">{t("closed_at", { time: addisStamp(order.closed_at, dates) })}</p> : null}
-      <Button type="button" variant="secondary" compact aria-label={t("refund_aria", { no })} onClick={onRefund}>
+      <Button type="button" variant="secondary" size="md" aria-label={t("refund_aria", { no })} onClick={onRefund}>
         {t("refund_button")}
       </Button>
     </article>

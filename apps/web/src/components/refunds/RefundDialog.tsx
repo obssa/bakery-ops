@@ -208,7 +208,7 @@ export function RefundDialog({ order, onClose, onRefunded }: { order: Order; onC
         ) : null}
         {payments.error ? <Alert>{errorText.message(payments.error)}</Alert> : null}
 
-        <fieldset className={`space-y-2 rounded-lg ${field === "lines" ? "border-2 border-red-300 p-3" : ""}`}>
+        <fieldset className={`space-y-2 rounded-xl ${field === "lines" ? "border-2 border-red-300 p-3" : ""}`}>
           <legend className="mb-1 text-base font-semibold text-neutral-900">{t("lines")}</legend>
           {whole ? <p className="text-sm text-neutral-700">{t("whole_only")}</p> : null}
           {openLines.length === 0 && !loading ? <p className="text-base text-neutral-700">{t("nothing_left")}</p> : null}
@@ -220,14 +220,14 @@ export function RefundDialog({ order, onClose, onRefunded }: { order: Order; onC
           </ul>
         </fieldset>
 
-        <div className="flex items-baseline justify-between gap-4 rounded-md bg-neutral-100 px-4 py-3 text-xl font-semibold text-neutral-900">
+        <div className="flex items-baseline justify-between gap-4 rounded-xl bg-neutral-100 px-4 py-3 text-xl font-semibold text-neutral-900">
           <span id={amountId}>{t("amount")}</span>
           <output aria-labelledby={amountId} className="tabular-nums">
             {amount} {order.currency}
           </output>
         </div>
 
-        <section className={`space-y-2 ${field === "allocation" ? "rounded-lg border-2 border-red-300 p-3" : ""}`}>
+        <section className={`space-y-2 ${field === "allocation" ? "rounded-xl border-2 border-red-300 p-3" : ""}`}>
           <h3 id={sharesId} className="text-base font-semibold text-neutral-900">
             {t("paid_back_from")}
           </h3>
@@ -257,7 +257,7 @@ export function RefundDialog({ order, onClose, onRefunded }: { order: Order; onC
                 {shares.map((share) => {
                   const payment = list.find((p) => p.id === share.paymentId);
                   return (
-                    <li key={share.paymentId} className="flex justify-between gap-3 rounded-md border border-neutral-200 px-4 py-2 text-base">
+                    <li key={share.paymentId} className="flex justify-between gap-3 rounded-xl border border-neutral-200 px-4 py-2 text-base">
                       <span>{payment ? channelName(payment.channel) : `#${share.paymentId}`}</span>
                       <span className="tabular-nums">
                         {share.amount} {order.currency}
@@ -289,7 +289,7 @@ export function RefundDialog({ order, onClose, onRefunded }: { order: Order; onC
                 <div className="flex flex-wrap items-center gap-4">
                   {/* a local object URL of the shrunk picture: next/image has nothing to optimise in a static export */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.url} alt={t("photo_thumb_alt")} className="h-24 w-24 rounded-md border border-neutral-200 object-cover" />
+                  <img src={photo.url} alt={t("photo_thumb_alt")} className="h-24 w-24 rounded-xl border border-neutral-200 object-cover" />
                   <p className="text-base font-medium text-green-800">{t("photo_attached")}</p>
                   <Button type="button" variant="secondary" onClick={() => fileInput.current?.click()}>
                     {t("photo_replace")}
@@ -365,8 +365,8 @@ function RefundLineRow({ line, view, checked, currency, onToggle }: { line: Line
   const disabled = view.state !== "open";
   return (
     <li>
-      <label className={`flex min-h-14 items-center gap-3 rounded-md border px-4 py-2 ${disabled ? "border-neutral-200 bg-neutral-50" : "cursor-pointer border-neutral-300"}`}>
-        <input type="checkbox" className="h-5 w-5 shrink-0" checked={checked} disabled={disabled} aria-labelledby={nameId} aria-describedby={noteId} onChange={onToggle} />
+      <label className={`flex min-h-14 items-center gap-3 rounded-xl border px-4 py-2 ${disabled ? "border-neutral-200 bg-neutral-50" : "cursor-pointer border-neutral-300"}`}>
+        <input type="checkbox" className="size-5 shrink-0 accent-brand-600" checked={checked} disabled={disabled} aria-labelledby={nameId} aria-describedby={noteId} onChange={onToggle} />
         <span className="min-w-0 flex-1">
           <span id={nameId} className={`block text-base font-medium ${disabled ? "text-neutral-600" : "text-neutral-900"}`}>
             {lineName(line, locale)}
@@ -396,7 +396,7 @@ function RefundDone({ order, title, result, onClose }: { order: Order; title: st
   return (
     <Modal label={title} onClose={onClose} size="lg">
       <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>
-      <section aria-labelledby={headingId} className="space-y-4 rounded-lg border border-green-300 bg-green-50 p-4">
+      <section aria-labelledby={headingId} className="space-y-4 rounded-[20px] border border-green-200 bg-green-50 p-5">
         <h3 id={headingId} className="text-lg font-semibold text-green-900">
           {t("done")}
         </h3>

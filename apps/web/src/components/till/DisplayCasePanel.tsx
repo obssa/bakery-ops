@@ -115,7 +115,7 @@ export function DisplayCasePanel() {
       ) : (
         <div className="space-y-3">
           {snapshot.error ? (
-            <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+            <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
               {t("case_stale")}
             </p>
           ) : null}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Check, CircleCheck, Split, X } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
 import { uploadReceiptPhoto, usePaymentChannels } from "@/lib/api/till";
@@ -31,9 +32,11 @@ import {
 } from "@/lib/paySheet";
 import type { PayBlock } from "@/lib/shifts";
 import { useOnline } from "@/lib/useOnline";
-import { Alert, Button, Modal } from "../ui";
+import { visibleLines } from "@/lib/live/pad";
+import { isSettled } from "@/lib/live/orders";
+import { Alert, Button, Chip, IconButton, Modal } from "../ui";
 import { PayRowEditor, type PhotoFailure } from "./PayRowEditor";
-import { ReceiptPanel } from "./ReceiptPanel";
+import { ReceiptPanel, ReceiptPending } from "./ReceiptPanel";
 
 // The till's pay sheet (step 4.5b, docs/phases/phase-4-plan.md section 6 item 5): the amount due and what is left to cover at the top, then
 // one row per payment (PayRowEditor), so a bill can be split over channels down to exactly the balance. Complete stays disabled until every
@@ -54,6 +57,12 @@ import { ReceiptPanel } from "./ReceiptPanel";
 // with how much waits). Online it is uploaded at once as before; offline, or when its upload fails on the network, it stays kept and the row
 // is complete all the same: Complete queues one upload of the kept photos, then the batch, which waits for it and takes each file id from
 // its answer. A photo replaced, removed or paid for is let go of; the outbox drops it once nothing needs it.
+//
+// Step 6.3b (fresh-counter.md 3.4): from 1024 px the sheet is the till's centre, beside the waiting list (`inline`: a dialog that leaves the
+// page in view, so the cashier can turn to another order), and a dialog over the screen below that. The amount due at 48 / 700 with what is
+// left to pay and "All lines served"; "Pay with" as a grid of channel buttons; the cash received and the change; the quick cash keys and
+// "Add a payment" for a split; the xl "Complete payment"; and at its right the 236 px receipt zone: what the receipt will hold before the
+// bill is paid, the preview with Print, the link and its code after.
 
 /** The change of the sheet's cash rows, which the cashier hands back now; null when no row is cash. */
 /** The photos the sheet's rows hold (by client_uuid). */
@@ -121,7 +130,26 @@ interface Completed {
   references: Record<string, string>;
 }
 
-export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; shift: PayBlock | null; onClose: () => void; onChanged: () => void }) {
+export function PaySheet({
+  order,
+  shift,
+  inline = false,
+  onClose,
+  onChanged,
+  onPendingChange,
+  onVoid,
+}: {
+  order: Order;
+  shift: PayBlock | null;
+  /** the till's centre from 1024 px (beside the waiting list), else a dialog over the screen */
+  inline?: boolean;
+  onClose: () => void;
+  onChanged: () => void;
+  /** told while a Complete is on its way, so the till keeps the sheet on this order until it is answered */
+  onPendingChange?: (pending: boolean) => void;
+  /** opens the void (or, for an order paid in full, the void of one payment) for this order */
+  onVoid?: () => void;
+}) {
   const t = useTranslations("till");
   const o = useTranslations("outbox");
   const no = useOrderNo(order);
@@ -132,6 +160,12 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
   const blockId = useId();
   const dueId = useId();
   const leftId = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+  // the sheet opened (or turned to another order): the focus goes to its title, so a keyboard or a screen reader starts there and the
+  // browser brings it into view
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: false });
+  }, [order.id]);
 
   const available = useMemo(() => sheetChannels(channels.data ?? []), [channels.data]);
   const draft = usePayDrafts((s) => s.drafts[order.id]);
@@ -149,9 +183,15 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
   // set before the completed sheet's draft is dropped, so no new sheet starts behind the receipt
   const finished = useRef(false);
 
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
+  useEffect(() => () => onPendingChange?.(false), [onPendingChange]);
+
   // a sheet starts with one row, cash for the whole balance, once the channels are known
   useEffect(() => {
-    if (!draft && channels.data && !completed && !finished.current) {
+    // nothing is owed on an order paid in full (it waits to be served): it opens without a payment
+    if (!draft && channels.data && !completed && !finished.current && compareDecimal(balance, "0", 2) > 0) {
       drafts().put(order.id, { batchUuid: uuid(), rows: [newRow(uuid(), balance, [], available)], attempt: null });
     }
   }, [draft, channels.data, completed, order.id, balance, available, drafts]);
@@ -300,126 +340,215 @@ export function PaySheet({ order, shift, onClose, onChanged }: { order: Order; s
     : null;
   // no answer at all (a refusal made on the tablet has no status either, but says what it is)
   const network = error instanceof ApiError && error.isNetwork && !error.messages.en;
+  const shown = completed ? completed.order : order;
+  const lines = visibleLines(shown);
+  const allServed = lines.length > 0 && lines.every((line) => line.status === "served");
+  // paid in full, not served yet: nothing to take; a wrong payment can still be voided from here (step 4.3c)
+  const settled = !completed && !queued && isSettled(order);
+  const single = rows.length === 1;
+  const settledLeft = compareDecimal(left, "0", 2) === 0;
+  // while the batch is on its way the sheet stays open: the cashier must see whether it was taken and the change to give
+  const close = pending ? () => {} : onClose;
 
-  return (
-    // while the batch is on its way the sheet stays open: the cashier must see whether it was taken and the change to give
-    <Modal label={t("pay_title", { no })} onClose={pending ? () => {} : onClose} size="lg">
-      <h2 className="text-lg font-semibold text-neutral-900">{t("pay_title", { no })}</h2>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <p className="flex items-baseline justify-between gap-4 rounded-md bg-neutral-100 px-4 py-3 text-xl font-semibold text-neutral-900">
-          <span id={dueId}>{t("amount_due")}</span>
-          <output aria-labelledby={dueId}>
-            {completed ? completed.order.totals.balance : balance} {currency}
-          </output>
+  const addPayment = (
+    // a bill split over channels ("Split payment" on the board): one more payment for what is left
+    <Button type="button" variant="ghost" size="md" className="text-brand-700" disabled={rows.length >= MAX_ROWS || pending} onClick={addRow}>
+      <Split className="size-5" strokeWidth={1.75} aria-hidden="true" />
+      {t("add_payment")}
+    </Button>
+  );
+
+  // the Till board's top line: "Amount due" in caps over the amount at 48 / 700; on the right "All lines served", Void and the way out
+  const due = (
+    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0 space-y-1">
+        {/* the sheet's title, read first: the chosen card on the left says the same on screen */}
+        <h2 ref={heading} tabIndex={-1} className="sr-only">
+          {t("pay_title", { no })}
+        </h2>
+        <p id={dueId} className="text-[13px] font-semibold uppercase tracking-[0.08em] text-neutral-600">
+          {t("amount_due")}
         </p>
+        <output aria-labelledby={dueId} className="block text-5xl font-bold tracking-tight tabular-nums text-neutral-900">
+          {completed ? completed.order.totals.balance : balance}
+          <span className="text-3xl font-semibold text-neutral-600"> {currency}</span>
+        </output>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {allServed && !completed ? <Chip tone="brand">{t("all_served")}</Chip> : null}
+        {settled ? <Chip tone="green">{t("settled")}</Chip> : null}
+        {onVoid && !completed && !queued ? (
+          <Button type="button" variant="ghost" size="md" disabled={pending} aria-label={settled ? t("void_payment_aria", { no }) : t("void_aria", { no })} onClick={onVoid}>
+            {settled ? t("void_payment") : t("void")}
+          </Button>
+        ) : null}
         {completed || queued ? null : (
-          <p
-            className={`flex items-baseline justify-between gap-4 rounded-md px-4 py-3 text-xl font-semibold ${
-              compareDecimal(left, "0", 2) === 0 ? "bg-green-50 text-green-900" : "bg-amber-50 text-amber-900"
-            }`}
-          >
-            <span id={leftId}>{t("left_to_pay")}</span>
-            <output aria-labelledby={leftId}>
-              {left} {currency}
-            </output>
-          </p>
+          <IconButton label={t("close")} title={t("close")} variant="ghost" size="md" disabled={pending} onClick={onClose}>
+            <X className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          </IconButton>
         )}
       </div>
-      {!completed && !queued && compareDecimal(order.totals.paid, "0", 2) > 0 ? (
-        <p className="text-base text-neutral-700">{t("already_paid", { amount: order.totals.paid, total: order.totals.total, currency })}</p>
-      ) : null}
+    </div>
+  );
 
-      {completed ? (
-        <div className="space-y-4">
-          <p role="status" className="space-y-1 rounded-md bg-green-50 px-4 py-3 text-green-900">
-            <span className="block text-lg font-semibold">{t("paid")}</span>
-            {changeTotal !== null ? <span className="block text-xl font-semibold">{t("give_change", { amount: changeTotal, currency })}</span> : null}
-          </p>
-          {completed.result.warnings.length > 0 ? (
-            <div role="note" aria-label={t("warnings_title")} className="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
-              <p className="font-semibold">{t("warnings_title")}</p>
-              <ul className="list-disc space-y-1 pl-5">
-                {completed.result.warnings.map((w, i) => (
-                  <li key={`${w.code}-${w.payment_id}-${i}`}>{locale === "am" ? w.message_am : w.message_en}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          <ReceiptPanel order={completed.order} payments={completed.result.payments} channels={available} references={completed.references} />
-          <Button type="button" className="min-h-14 w-full text-lg" onClick={onClose}>
-            {t("done")}
-          </Button>
-        </div>
-      ) : queued ? (
-        <div className="space-y-4">
-          <p role="status" className="space-y-1 rounded-md bg-blue-50 px-4 py-3 text-blue-900">
-            <span className="block text-lg font-semibold">{o("queued")}</span>
-            {queued.change !== null ? <span className="block text-xl font-semibold">{t("give_change", { amount: queued.change, currency })}</span> : null}
-          </p>
-          <Button type="button" className="min-h-14 w-full text-lg" onClick={onClose}>
-            {t("done")}
-          </Button>
-        </div>
-      ) : !draft ? (
-        channels.error ? (
-          <Alert>{errorText.message(channels.error)}</Alert>
-        ) : (
-          <p role="status" className="text-base text-neutral-600">
-            {t("channels_loading")}
-          </p>
-        )
-      ) : (
-        <>
-          <div className="space-y-3">
-            {rows.map((row, index) => (
-              <PayRowEditor
-                key={row.id}
-                index={index}
-                row={row}
-                rows={rows}
-                channels={available}
-                balance={balance}
-                currency={currency}
-                error={rowErrors[row.id] ?? null}
-                photoFailure={photoFailures[row.id] ?? null}
-                onChange={(patch) => change(row.id, patch)}
-                onRemove={rows.length > 1 ? () => removeRow(row.id) : null}
-                onPhoto={(file) => void takePhoto(row.id, file)}
-              />
-            ))}
-          </div>
-          <Button type="button" variant="secondary" className="min-h-14" disabled={rows.length >= MAX_ROWS} onClick={addRow}>
-            {t("add_payment")}
-          </Button>
+  // what is left to cover: a line of its own while the bill is split (or the one payment no longer covers it), read only otherwise
+  const leftToPay =
+    completed || queued || settled ? null : (
+      <p
+        className={
+          single && settledLeft
+            ? "sr-only"
+            : `flex w-fit items-baseline gap-3 rounded-xl px-3.5 py-2 text-base font-semibold ${settledLeft ? "bg-brand-50 text-brand-700" : "bg-amber-50 text-amber-900"}`
+        }
+      >
+        <span id={leftId}>{t("left_to_pay")}</span>
+        <output aria-labelledby={leftId} className="tabular-nums">
+          {left} {currency}
+        </output>
+      </p>
+    );
 
-          {!online ? (
-            <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">{t("offline_notice")}</p>
-          ) : null}
-          {error ? (
-            <Alert>
-              {errorText.message(error)}
-              {network ? <span className="mt-1 block">{t("network_kept")}</span> : null}
-            </Alert>
-          ) : null}
-          <p id={blockId} role="status" aria-label={t("block_label")} className={block ? "text-base font-medium text-amber-900" : "sr-only"}>
-            {block ? issueText(t, block, currency) : ""}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              className="min-h-14 flex-1 text-lg"
-              disabled={block !== null || pending}
-              aria-describedby={block ? blockId : undefined}
-              onClick={() => void complete()}
-            >
-              {pending ? t("paying") : t("complete")}
-            </Button>
-            <Button type="button" variant="secondary" className="min-h-14" disabled={pending} onClick={onClose}>
-              {t("close")}
-            </Button>
+  let body: ReactNode;
+  if (completed) {
+    body = (
+      <div className="space-y-4">
+        {/* money taken: green, the one place it means "confirmed" (fresh-counter.md 1.3) */}
+        <p role="status" className="space-y-1 rounded-[20px] bg-green-50 px-5 py-4 text-green-900">
+          <span className="flex items-center gap-2 text-lg font-semibold">
+            <CircleCheck className="size-6" strokeWidth={2} aria-hidden="true" />
+            {t("paid")}
+          </span>
+          {changeTotal !== null ? <span className="block text-3xl font-bold tabular-nums">{t("give_change", { amount: changeTotal, currency })}</span> : null}
+        </p>
+        {completed.result.warnings.length > 0 ? (
+          <div role="note" aria-label={t("warnings_title")} className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+            <p className="font-semibold">{t("warnings_title")}</p>
+            <ul className="list-disc space-y-1 pl-5">
+              {completed.result.warnings.map((w, i) => (
+                <li key={`${w.code}-${w.payment_id}-${i}`}>{locale === "am" ? w.message_am : w.message_en}</li>
+              ))}
+            </ul>
           </div>
-        </>
-      )}
-    </Modal>
+        ) : null}
+        <Button type="button" size="xl" className="w-full" onClick={onClose}>
+          {t("done")}
+        </Button>
+      </div>
+    );
+  } else if (queued) {
+    body = (
+      <div className="space-y-4">
+        <p role="status" className="space-y-1 rounded-[20px] bg-blue-50 px-5 py-4 text-blue-900">
+          <span className="block text-lg font-semibold">{o("queued")}</span>
+          {queued.change !== null ? <span className="block text-3xl font-bold tabular-nums">{t("give_change", { amount: queued.change, currency })}</span> : null}
+        </p>
+        <Button type="button" size="xl" className="w-full" onClick={onClose}>
+          {t("done")}
+        </Button>
+      </div>
+    );
+  } else if (settled) {
+    body = <p className="rounded-xl bg-neutral-100 px-4 py-3 text-base text-neutral-700">{t("settled_hint")}</p>;
+  } else if (!draft) {
+    body = channels.error ? (
+      <Alert>{errorText.message(channels.error)}</Alert>
+    ) : (
+      <p role="status" className="text-base text-neutral-600">
+        {t("channels_loading")}
+      </p>
+    );
+  } else {
+    body = (
+      <div className="space-y-5">
+        {compareDecimal(order.totals.paid, "0", 2) > 0 ? (
+          <p className="text-base text-neutral-700">{t("already_paid", { amount: order.totals.paid, total: order.totals.total, currency })}</p>
+        ) : null}
+        <div className="space-y-3">
+          {rows.map((row, index) => (
+            <PayRowEditor
+              key={row.id}
+              index={index}
+              row={row}
+              rows={rows}
+              channels={available}
+              balance={balance}
+              currency={currency}
+              error={rowErrors[row.id] ?? null}
+              photoFailure={photoFailures[row.id] ?? null}
+              onChange={(patch) => change(row.id, patch)}
+              onRemove={rows.length > 1 ? () => removeRow(row.id) : null}
+              onPhoto={(file) => void takePhoto(row.id, file)}
+              extra={single ? addPayment : undefined}
+            />
+          ))}
+        </div>
+        {single ? null : addPayment}
+
+        {!online ? <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">{t("offline_notice")}</p> : null}
+        {error ? (
+          <Alert>
+            {errorText.message(error)}
+            {network ? <span className="mt-1 block">{t("network_kept")}</span> : null}
+          </Alert>
+        ) : null}
+        <p id={blockId} role="status" aria-label={t("block_label")} className={block ? "text-base font-medium text-amber-900" : "sr-only"}>
+          {block ? issueText(t, block, currency) : ""}
+        </p>
+        <Button
+          type="button"
+          size="xl"
+          className="w-full"
+          disabled={block !== null || pending}
+          aria-describedby={block ? blockId : undefined}
+          onClick={() => void complete()}
+        >
+          <Check className="size-[22px]" strokeWidth={2.2} aria-hidden="true" />
+          {pending ? t("paying") : t("complete")}
+        </Button>
+      </div>
+    );
+  }
+
+  const content = (
+    // the centre (the amount due, how it is paid, Complete) and the 236 px receipt zone beside it once there is room (a container query:
+    // the sheet's own width, inline or in a dialog)
+    <div className="@container">
+      <div className="grid gap-6 @[44rem]:grid-cols-[minmax(0,1fr)_236px]">
+        <div className="min-w-0 space-y-5">
+          {due}
+          {leftToPay}
+          {body}
+        </div>
+        <div className="self-start rounded-[20px] border border-neutral-200 bg-white p-[18px]">
+          {completed ? (
+            <ReceiptPanel order={completed.order} payments={completed.result.payments} channels={available} references={completed.references} />
+          ) : (
+            <ReceiptPending order={order} paid={settled} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!inline) {
+    return (
+      <Modal label={t("pay_title", { no })} onClose={close} size="lg">
+        {content}
+      </Modal>
+    );
+  }
+  // from 1024 px the sheet is the till's centre, beside the waiting list (fresh-counter.md 3.4): a dialog that does not hide the page, so
+  // the cashier can turn to another order; Escape inside it closes it as the dialog's Escape does
+  return (
+    <section
+      role="dialog"
+      aria-label={t("pay_title", { no })}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") close();
+      }}
+      className="min-w-0"
+    >
+      {content}
+    </section>
   );
 }

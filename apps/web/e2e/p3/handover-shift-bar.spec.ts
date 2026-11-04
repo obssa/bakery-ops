@@ -3,6 +3,7 @@ import { requireAdmin } from "../support/env";
 import { buildStationFixture, ensureStaff, loginOnce } from "../support/fixture";
 import { openAs } from "../support/pad";
 import { currentShift, ensureOpenShift, finishClosingCounts, settleStation } from "../support/shifts";
+import { openShiftBar } from "../support/shiftBar";
 
 // Phase 3 gate project p3-handover, the shift bar (step 3.7a; the count screens of 3.7b and the cash of 3.7d come later and extend this
 // project). docs/phases/phase-3-plan.md section 6 item 7 and section 4 (the shift endpoints).
@@ -17,10 +18,9 @@ import { currentShift, ensureOpenShift, finishClosingCounts, settleStation } fro
 // that other fixtures opened, so the flow settles the station first (cancels or closes and submits it) and opens a carried shift again
 // at the end, which is what every other fixture expects to find.
 
+// step 6.3b: on the kitchen display the bar is a menu in the station top bar (closed while the shift simply runs), so it is opened first
 async function bar(page: Page) {
-  const region = page.getByRole("region", { name: "Shift", exact: true });
-  await expect(region).toBeVisible({ timeout: 30_000 });
-  return region;
+  return openShiftBar(page.getByRole("region", { name: "Shift", exact: true }));
 }
 
 test.describe("p3 handover: the shift bar", () => {
@@ -141,6 +141,7 @@ test.describe("p3 handover: the shift bar", () => {
       const region = page.getByRole("region", { name: "ፈረቃ", exact: true });
       await expect(region).toBeVisible({ timeout: 30_000 });
       await expect(region).toContainText("ፈረቃ ክፍት ነው");
+      await openShiftBar(region);
       await expect(region.getByRole("button", { name: "ፈረቃውን ዝጋ", exact: true })).toBeVisible();
     } finally {
       await context.close();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { PrinterX } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo, useRef, useState } from "react";
 import { ApiError } from "@/lib/api/client";
@@ -12,6 +13,7 @@ import { keepsKey } from "@/lib/paySheet";
 import { failureReason, inFlight, latestJob, PRINT_FALLBACK_REFUSALS, PRINTING_DISABLED, printPhase, qrModules, showsLink } from "@/lib/print";
 import { can, useSession } from "@/lib/session";
 import { OnlineOnlyButton } from "../OnlineOnly";
+import { buttonClass } from "../styles";
 
 // The till's Print (step 5.3c, phase-5 plan 4.3, ADR 0019): POST /orders/{order}/print makes a job for the branch's print bridge, and the
 // screen says what became of it from GET /print-jobs?order_id= (polled with its ETag while the job waits or prints): waiting for the
@@ -78,16 +80,16 @@ export function usePrintReceipt(orderId: number) {
     }
   }
 
-  return { canPrint, busy, error, latest, fallback, inFlight: inFlight(latest), print };
+  return { canPrint, printingOff: mayPrint && printingOff, busy, error, latest, fallback, inFlight: inFlight(latest), print };
 }
 
 export type PrintState = ReturnType<typeof usePrintReceipt>;
 
 /** The Print button, beside the receipt's other actions. */
-export function PrintButton({ state, disabled }: { state: PrintState; disabled: boolean }) {
+export function PrintButton({ state, disabled, className = "min-h-14" }: { state: PrintState; disabled: boolean; className?: string }) {
   const t = useTranslations("till");
   return (
-    <OnlineOnlyButton type="button" variant="secondary" className="min-h-14" disabled={disabled || state.busy || state.inFlight} onClick={() => void state.print()}>
+    <OnlineOnlyButton type="button" variant="secondary" className={className} disabled={disabled || state.busy || state.inFlight} onClick={() => void state.print()}>
       {state.busy ? t("print_busy") : state.latest ? t("print_again") : t("print")}
     </OnlineOnlyButton>
   );
@@ -108,12 +110,12 @@ export function PrintStatus({ state }: { state: PrintState }) {
   return (
     <>
       {state.error ? (
-        <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base text-red-800">
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-base text-red-800">
           {errorText.message(state.error)}
         </div>
       ) : null}
       {text ? (
-        <p role="status" aria-live="polite" aria-label={t("print_status")} className={`rounded-md px-4 py-3 text-base ${tone}`}>
+        <p role="status" aria-live="polite" aria-label={t("print_status")} className={`rounded-xl px-4 py-3 text-base ${tone}`}>
           {text}
         </p>
       ) : null}
@@ -121,16 +123,30 @@ export function PrintStatus({ state }: { state: PrintState }) {
   );
 }
 
+/**
+ * Where Print would be when the admin turned printing off in the receipt settings (fresh-counter.md 3.4): disabled, saying so, so the
+ * cashier knows why there is no print and that the code is the receipt. Its name never reads "Print receipt".
+ */
+export function PrintOffButton({ className = "" }: { className?: string }) {
+  const t = useTranslations("till");
+  return (
+    <button type="button" disabled className={`${buttonClass({ variant: "secondary" })} border-dashed ${className}`}>
+      <PrinterX className="size-5" strokeWidth={1.75} aria-hidden="true" />
+      {t("print_off")}
+    </button>
+  );
+}
+
 /** The QR code of the receipt link, for the customer to scan with a phone (a quiet zone of four modules around it). */
-export function ReceiptQr({ url }: { url: string }) {
+export function ReceiptQr({ url, size: drawn = 232 }: { url: string; size?: number }) {
   const t = useTranslations("till");
   const { size, dark } = useMemo(() => qrModules(url), [url]);
   const quiet = 4;
   const view = size + quiet * 2;
   const path = useMemo(() => dark.map(([x, y]) => `M${x + quiet} ${y + quiet}h1v1h-1z`).join(""), [dark]);
   return (
-    <figure className="space-y-1">
-      <svg role="img" aria-label={t("receipt_qr")} viewBox={`0 0 ${view} ${view}`} width={232} height={232} shapeRendering="crispEdges" className="rounded-md border border-neutral-200">
+    <figure className="space-y-1.5">
+      <svg role="img" aria-label={t("receipt_qr")} viewBox={`0 0 ${view} ${view}`} width={drawn} height={drawn} shapeRendering="crispEdges" className="rounded-xl border border-neutral-200">
         <rect width={view} height={view} fill="#ffffff" />
         <path d={path} fill="#000000" />
       </svg>
