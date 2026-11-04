@@ -742,16 +742,41 @@ jobs:
         run: docker compose -f compose.yml -f compose.ci.yml down -v
 
   # The Phase 6 gate (phase-6 plan 7.1 and 10.3): the needs of the phase (gate-p5, the Catalog and Orders module jobs the photos change, e2e-p6,
-  # the strict i18n check of the new strings), then gate_check. Informational while the phase is open, as every gate job is (gate_check --ci
-  # turns a FAIL into a WARN until STATUS claims the phase done); step 6.5 adds the gate:p6 Pest step on the compose stack, as gate-p5 has.
+  # the strict i18n check of the new strings), then the gate:p6 Pest group on the compose stack (step 6.5, tests/Gate/Phase6GateTest.php: the
+  # renditions, the 1000 x 750 crop, too_small, the media route's headers, 304 and 404, every demo product with a photo after Phase6Seeder,
+  # nothing under public/), in the API image, whose gd has WebP as the live host's has, then gate_check. Informational while the phase is
+  # open, as every gate job is (gate_check --ci turns a FAIL into a WARN until STATUS claims the phase done); the Pest step fails either way.
   gate-p6:
     needs: [status, gate-p5, mod-catalog, mod-orders, e2e-p6, i18n-check]
     if: fromJSON(needs.status.outputs.phase) >= 6
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer
         with: { fetch-depth: 0 }
-      - run: python3 scripts/gate_check.py --mode done --phase 6 --ci
+      - uses: actions/download-artifact@v4
+        with: { name: api-image, path: /tmp }
+      - run: docker load -i /tmp/api.tar
+      - name: Start the stack (the API, the database, Redis)
+        run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180 app
+      - name: Pest group gate:p6
+        run: |
+          set -o pipefail
+          dc="docker compose -f compose.yml -f compose.ci.yml"
+          # the image has no .env (the variables come from compose): an empty one keeps phpdotenv's read from warning on every test
+          $dc exec -T app touch .env
+          # the stack enforces enrolled devices (compose.ci.yml); the tests keep the code default (off), as every Pest run on the stack does
+          $dc exec -T -e IDENTITY_REQUIRE_DEVICE=false app             vendor/bin/pest --group=gate:p6 --colors=never 2>&1 | grep -v ' DEBUG: ' | tee /tmp/gate-p6.txt
+          if grep -Eq "No tests (found|executed)" /tmp/gate-p6.txt; then echo "::error::the gate:p6 group ran nothing"; exit 1; fi
+          if grep -Eiq "Tests:.*(skipped|todo|incomplete|risky|warning|deprecat|notice)" /tmp/gate-p6.txt; then echo "::error::a gate:p6 test was skipped or warned: the gate fails, it never skips"; exit 1; fi
+          grep -E "^ +Tests:" /tmp/gate-p6.txt | sed 's/^ */gate:p6 /' >> "$GITHUB_STEP_SUMMARY" || true
+      - name: gate_check
+        run: python3 scripts/gate_check.py --mode done --phase 6 --ci
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=120 app
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f compose.yml -f compose.ci.yml down -v
