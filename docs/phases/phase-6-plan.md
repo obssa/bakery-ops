@@ -1098,7 +1098,7 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
         never goes through the outbox (admin screens are online only). One Idempotency-Key and one `client_uuid` per photo and crop, so
         pressing "Use this photo" again after a failure is the same write. The bar fills to 90 % with the bytes sent and the rest is the
         server making the three sizes. A refused upload goes back to the frame as it was, with the reason under the card.
-      - `?item=<id>#photo` (6.4a's "Add photo") scrolls the page to the card once it is drawn. A file dropped beside the card is ignored
+      - `?item=<id>#photo` (6.4a's "Add photo" in the list and on a grid card) scrolls the page to the card (`id="photo"`) once it is drawn. A file dropped beside the card is ignored
         instead of opening in the tab.
     - **Selectors that changed (6.0.2), each in the commit of its screen:**
       - `p2 stockout-catalog-planning`: after the `h1`, `getByRole("button", { name: "Recipe and cost" })` is pressed and the dialog
@@ -1112,8 +1112,8 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
         `refund_settings_intro` are no longer shown and are left in the dictionaries for now, because 6.4a's open PR changes the lines
         beside them. The English `recipe.preview_note` says "the draft above" (it said "on the left"; the spec reads "computed in this
         browser").
-    - **Where the page still differs from the boards** (for the review): the shell's top bar and "Screens" strip sit above the frame until
-      6.4a's frame lands (the boards draw the sidebar alone); "Recipe and cost" is a button the board does not have; the fulfilment has
+    - **Where the page still differs from the boards** (for the review), now inside 6.4a's sidebar frame (merged from `main`):
+      "Recipe and cost" is a button the board does not have; the fulfilment has
       three choices at 44 px (the board's two at 36 px); the card's buttons are 48 px with 16 px text (15 on the board); the preview is the
       real pad card, so its price reads "ETB 65.00" with the "More" dots and its stock chip shows only when the API says low; the drag-over
       line says "JPG, PNG or WebP" where the board names the file and its size (a browser hides both until the drop); the upload's line
