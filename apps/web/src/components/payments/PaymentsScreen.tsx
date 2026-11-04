@@ -396,7 +396,7 @@ function PaymentsTable({
               <td className="whitespace-nowrap text-right font-semibold tabular-nums">
                 <Money amount={row.amount} currency={row.currency} />
               </td>
-              <td className="font-mono text-sm text-neutral-700">{row.reference_no ?? "—"}</td>
+              <td className="whitespace-nowrap font-mono text-sm text-neutral-700">{row.reference_no ?? "—"}</td>
               <td>
                 {row.receipt ? (
                   <PhotoThumb key={row.receipt.url ?? "none"} label={t("list.photo_open", { id: row.id })} fileId={row.receipt.file_id} url={row.receipt.url} onOpen={() => onPhoto(row)} />

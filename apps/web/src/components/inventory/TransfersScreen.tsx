@@ -118,7 +118,7 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
               const itemName = name(transfer.item);
               const cells = (
                 <tr key={transfer.id} className={linked === transfer.id ? "bg-brand-50 hover:bg-brand-50" : ""}>
-                  <th scope="row" className="font-semibold text-neutral-900">
+                  <th scope="row" className="min-w-44 font-semibold text-neutral-900">
                     {itemName}
                     {transfer.note ? <span className="block text-[13px] font-normal text-neutral-600">{transfer.note}</span> : null}
                   </th>
@@ -133,7 +133,7 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
                   <td className="text-neutral-700">
                     {name(transfer.from_location)} → {name(transfer.to_location)}
                   </td>
-                  <td>
+                  <td className="min-w-52">
                     {transfer.requested_by.name}
                     <span className="block whitespace-nowrap text-[13px] tabular-nums text-neutral-600">{stamp(transfer.requested_at)}</span>
                   </td>
@@ -141,7 +141,7 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
                     <Chip tone={STATUS_TONE[transfer.status]} dot>
                       {t(`transfer_status.${transfer.status}`)}
                     </Chip>
-                    {transfer.reject_reason ? <span className="block pt-1 text-[13px] text-neutral-600">{transfer.reject_reason}</span> : null}
+                    {transfer.reject_reason ? <span className="block max-w-56 pt-1 text-[13px] text-neutral-600">{transfer.reject_reason}</span> : null}
                   </td>
                   <td className={ACTIONS_CELL}>
                     {transfer.status === "requested" && decide ? (
