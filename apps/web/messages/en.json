@@ -2178,7 +2178,7 @@
       "totals": "Totals for the range",
       "range_total": "Range total",
       "range_empty": "No payment in this range.",
-      "drill": "Show the payments without a photo: {channel}, {day}"
+      "drill": "Show the payments without a photo: {channel}, {day} · {count}"
     },
     "receipts": {
       "title": "Receipt settings",

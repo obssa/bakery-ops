@@ -697,7 +697,7 @@
     "unsent": "ገና አልተላከም",
     "settled": "ሙሉ በሙሉ ተከፍሏል",
     "total": "ድምር {total} {currency}",
-    "open_order": "ትዕዛዝ {no}ን ክፈት",
+    "open_order": "ትዕዛዝ {no}፦ ክፈት",
     "timeline": "የትዕዛዝ {no} የጊዜ ሰሌዳ",
     "timeline_loading": "የጊዜ ሰሌዳውን በመጫን ላይ…",
     "close_timeline": "የጊዜ ሰሌዳውን ዝጋ",
@@ -706,7 +706,7 @@
     "via_till": "ካሽ ጣቢያ",
     "via_admin": "አስተዳዳሪ",
     "void": "ትዕዛዙን ውድቅ አድርግ",
-    "void_aria": "ትዕዛዝ {no}ን ውድቅ አድርግ",
+    "void_aria": "ትዕዛዙን ውድቅ አድርግ · {no}",
     "line_voided": "ተወግዷል",
     "ev_order_created": "ትዕዛዝ ተፈጥሯል",
     "ev_order_lines_replaced": "ዝርዝሩ ተቀይሯል",
@@ -2178,7 +2178,7 @@
       "totals": "የጊዜ ክልሉ ድምሮች",
       "range_total": "የክልሉ ድምር",
       "range_empty": "በዚህ የጊዜ ክልል ምንም ክፍያ የለም።",
-      "drill": "ፎቶ የሌላቸውን ክፍያዎች አሳይ፦ {channel}፣ {day}"
+      "drill": "ፎቶ የሌላቸውን ክፍያዎች አሳይ፦ {channel}፣ {day} · {count}"
     },
     "receipts": {
       "title": "የደረሰኝ ቅንብሮች",

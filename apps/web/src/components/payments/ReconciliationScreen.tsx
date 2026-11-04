@@ -233,7 +233,7 @@ function DayTable({ day, rows }: { day: string; rows: ReconciliationChannelRow[]
               </th>
               <Cells
                 cell={row}
-                drill={canDrill(row) ? { href: { pathname: "/admin/payments", query: missingPhotoDrill(day, row.channel.id) }, label: t("reconciliation.drill", { channel: name, day }) } : undefined}
+                drill={canDrill(row) ? { href: { pathname: "/admin/payments", query: missingPhotoDrill(day, row.channel.id) }, label: t("reconciliation.drill", { channel: name, day, count: String(row.without_photo) }) } : undefined}
               />
             </tr>
           );
