@@ -729,6 +729,7 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
         `text-night-text`), for 6.3b's display; `bell: false` leaves the bell out;
       - `<StationHeaderActions>` (`components/StationHeaderActions.tsx`) portals the screen's own buttons into the extras place, before the
         sync chip; a portal keeps them in the screen's React tree and state.
+      Steps 6.3b and 6.3c build on these two names, so they stay as they are.
       The pad uses both: `useStationHeader({ title: "Waiter pad", bell: false })` (its board has no bell) and, while a waiter has the pad,
       "Tables" (the tables sheet), "My orders · N" (N open orders, the ready count as a brand pill; a drawer with the waiter's open
       orders), the chime as an icon button ("Mute chime" / "Unmute chime", `aria-pressed`) and "Lock pad". The person's menu then shows the
@@ -744,7 +745,12 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       a product that cannot be sold the photo in grey at 60 % with the reason ("Out of stock", "Not stocked here") in a red chip (a
       placeholder is grey already and keeps its contrast). The whole card is the add button, named `add_item` / `unavailable_item` as
       before; an unavailable card is `aria-disabled`, not `disabled`: it stays focusable, and a tap outlines the reason and says it in a
-      polite status ("… is not available: …").
+      polite status ("… is not available: …"). **Names and label in name** (axe's `label-content-name-mismatch`, WCAG 2.5.3, which
+      `p6-a11y` failed with an `aria-label` over the board's text): the card, the order line's button and the sheet's table buttons have no
+      `aria-label`; each is named by its own content, the name the specs read ("Add Croissant, 65.00 ETB, 3 left", "Change Croissant",
+      "Table T1, free") in a visually hidden span, and what it draws, in the board's order, is hidden from readers. Checked with axe
+      (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`) against a stub of the API on the pad locked, its menu, lines, the tables sheet, My orders,
+      the Screens and person menus and an empty search, in `en` and `am`: no serious or critical finding.
     - **The menu.** The 52 px search matches either name, ignoring case, in the browser; while it holds text the chips and their counts are
       those of the matches, and the tab chosen before comes back when it is cleared (Escape or the X clears it; nothing matching says so).
       The chips are the same "Menu categories" tablist: "All" first and chosen at first, as the board has it, then "New", the categories
@@ -754,7 +760,8 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
     - **The order panel** (368 px, white, left hairline, 20 px padding). Its head, as the board: "New order" in caps ("Not sent yet" for an
       order the API already holds), the table ("Table T7" with the table's Amharic name beside it on the English page, "No table yet" or
       "Takeaway") and "Change". "Change", or the top bar's "Tables", opens the **"Tables" sheet** (a drawer): the order type as a station
-      `SegmentedControl` (the same `group` "Order type" of pressed buttons) and the table grid with each state in a word, on status colours
+      `SegmentedControl` (the same `group` "Order type" of pressed buttons) and the table grid, 3 columns of 72 px buttons, with each
+      state in a word, on status colours
       that mean what spec 1.3 says (free neutral, ordering blue, waiting amber, served brand teal, the bill grey; green is money only).
       Choosing a table or takeaway closes it; an order the API holds has no "Change". Then the "Cart" region: each line on one row as the
       board draws it, the 48 px `thumb` (the menu's photo of the product as it is now, the line's own copy only when the menu no longer
@@ -799,7 +806,9 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       captures the demo bakery at 1180 × 820: `pad-locked-1180x820-en`, `pad-tables-1180x820-en`, `pad-1180x820-en`,
       `pad-orders-1180x820-en`, `pad-1180x820-am`, and the station bar on the kitchen display, `kds-kitchen-1180x820-en` and
       `kds-kitchen-screens-menu-1180x820-en`, under `test-results/screens/`; `e2e.yml` uploads the folder as the artifact `screens` on every
-      phase-6 run.
+      phase-6 run. A capture waits for its screen's loaded state: none of its loading lines on the page ("Loading the menu…", "Loading
+      your orders…", "Loading tickets…", "Checking the shift…"), its fonts and the photos in view loaded, and every animation that ends
+      ended (the first sheet capture caught the drawer sliding in, which looked like a clipped sheet).
 
 - **6.3b `phase-6/web-kds-till`**.
   - The KDS, kitchen and bar (spec 3.3): kitchen night on the `night-*` tokens; New, Cooking and Ready columns with counts; ticket

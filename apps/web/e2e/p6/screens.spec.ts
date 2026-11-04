@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
 import en from "../../messages/en.json";
-import { fontsReady } from "../support/a11y";
+import { fontsReady, settledAnimations } from "../support/a11y";
 import type { Api } from "../support/api";
 import { freshDevice } from "../support/devices";
 import { live } from "../support/env";
@@ -68,8 +68,13 @@ async function demoAccount(role: string): Promise<DemoAccount> {
   return { api, device: demo.device, code };
 }
 
-/** Saves the page as it is now, once its fonts and the photos in view have loaded. */
-async function capture(page: Page, name: string): Promise<void> {
+/**
+ * Saves the page as it is now, once it shows its loaded state: none of the `loading` texts is on it any more (a screen's "Loading…" and
+ * "Checking the shift…" lines), its fonts and the photos in view have loaded, and every animation that ends has ended (a sheet sliding in
+ * would be caught half way; the skeletons' endless pulse is not waited for).
+ */
+async function capture(page: Page, name: string, loading: string[] = []): Promise<void> {
+  for (const text of loading) await expect(page.getByText(text, { exact: true })).toHaveCount(0, { timeout: 30_000 });
   await fontsReady(page);
   await page
     .waitForFunction(
@@ -83,6 +88,7 @@ async function capture(page: Page, name: string): Promise<void> {
       { timeout: 15_000 },
     )
     .catch(() => undefined);
+  await settledAnimations(page);
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
 }
@@ -113,19 +119,19 @@ test.describe("screens", () => {
     await page.getByRole("button", { name: t.pad.change_table_aria }).click();
     const sheet = page.getByRole("dialog", { name: t.pad.tables });
     await expect(sheet.getByRole("button", { name: /^Table / }).first()).toBeVisible({ timeout: 30_000 });
-    await capture(page, "pad-tables-1180x820-en");
+    await capture(page, "pad-tables-1180x820-en", [t.pad.loading_menu]);
     await sheet.getByRole("button", { name: /^Table / }).first().click();
     await expect(sheet).toHaveCount(0);
-    await capture(page, "pad-1180x820-en");
+    await capture(page, "pad-1180x820-en", [t.pad.loading_menu]);
     await page.getByRole("button", { name: /^My orders/ }).click();
     await expect(page.getByRole("dialog", { name: t.pad.orders_title })).toBeVisible();
-    await capture(page, "pad-orders-1180x820-en");
+    await capture(page, "pad-orders-1180x820-en", [t.pad.orders_loading]);
   });
 
   test("the waiter pad (Pad board) with an order, in am", async ({ page }) => {
     test.setTimeout(120_000);
     await padWithOrder(page, "am");
-    await capture(page, "pad-1180x820-am");
+    await capture(page, "pad-1180x820-am", [MESSAGES.am.pad.loading_menu]);
   });
 
   test("the station top bar on the kitchen display, in en", async ({ page }) => {
@@ -133,11 +139,13 @@ test.describe("screens", () => {
     const chef = await demoAccount("chef");
     await openAs(page, chef.api, "en/kds/kitchen/", { device: chef.device });
     await expect(page.getByRole("heading", { level: 1, name: "Kitchen" })).toBeVisible({ timeout: 30_000 });
-    await capture(page, "kds-kitchen-1180x820-en");
+    // the display loaded: its shift checked and its tickets read
+    const loaded = [en.kds.loading, en.shifts.checking];
+    await capture(page, "kds-kitchen-1180x820-en", loaded);
     // the bar's menus open: the screens and the person's (the dates' calendar and Sign out)
     await page.getByRole("button", { name: en.nav.main, exact: true }).click();
     await expect(page.getByRole("navigation", { name: en.nav.main })).toBeVisible();
-    await capture(page, "kds-kitchen-screens-menu-1180x820-en");
+    await capture(page, "kds-kitchen-screens-menu-1180x820-en", loaded);
   });
 });
 
