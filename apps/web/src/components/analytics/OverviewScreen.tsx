@@ -38,7 +38,7 @@ import {
 // figure at all (R-U: not built is never zero).
 //
 // Step 6.4d (fresh-counter.md 4.2 and 4.4, the Admin board): the title row with its Amharic twin and the exports, the Analytics sections,
-// the range and "Compare" as the toolbar with the freshness chip; the headline figures as the board's KPI row (a change down in red);
+// the freshness pill in the title row, the range and "Compare" as the toolbar; the headline figures as the board's KPI row (a change down in red);
 // revenue by order type and the payment methods' shares as Today's share bars side by side; the best sellers a table card with each
 // product's photo, as Today's "Top sellers".
 

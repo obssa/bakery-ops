@@ -33,8 +33,9 @@ import {
 // hours summed over the range (GET /analytics/sales/hourly). The grouping is kept in the address with the range; the export is the sales
 // report (its days and its hours).
 //
-// Step 6.4d (fresh-counter.md 4.4): the title row with its twin and the exports; the range and the grouping as the toolbar; the line in
-// brand-600 on a white card, its figures a table card under it; the hours as Today's bars (the busiest hour brand-600), their figures folded.
+// Step 6.4d (fresh-counter.md 4.4): the title row with its twin, the freshness pill and the exports; the range and the grouping as the
+// toolbar; the line in brand-600 on a white card, then the hours as Today's bars (the busiest hour brand-600, every hour labelled, their
+// figures folded), then the figures of the line as a table card.
 
 const GROUPS: readonly SeriesGroup[] = ["day", "week", "month"];
 

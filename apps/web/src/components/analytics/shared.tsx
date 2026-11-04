@@ -49,7 +49,7 @@ import { Alert, Button, PageHeader, Skeleton, Status } from "../ui";
 import { focusRing } from "../styles";
 
 // Step 6.4d (fresh-counter.md 4.4, the Admin and CatalogList boards): the title row with its Amharic twin and the exports as its actions,
-// the sections as segmented tabs under it, the range and the page's options as the toolbar with the freshness chip at its right, the KPI
+// the sections as segmented tabs under it, the range and the page's options as the toolbar (the freshness pill in the title row), the KPI
 // tiles as the board's Stats, the sections as white 18 px cards; the tables are the kit's TableCard (NUM for a figure's cell).
 //
 // Pieces the analytics screens share (step 4.5e): the section's pills, the date range kept in the page's address, the freshness badge and

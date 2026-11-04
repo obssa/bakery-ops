@@ -323,8 +323,8 @@ As built for Team, Insight and System (step 6.4d, on 6.4c's `components/admin/ki
 - the title row: the title with its Amharic name on the English page, the intro, the page's actions at the right (a page's exports as a
   group "Export", the way back from a record as a ghost button with an arrow);
 - "Shifts sections" and "Analytics sections" as the kit's segmented tabs under each page's title row (the analytics ones keep the range);
-- the toolbar: the analytics range as a segment track (Today, 7, 30, 90 days, Custom range) with the page's options after it and the
-  freshness chip at its right; a list's filters as 44 px selects and boxed fields;
+- the toolbar: the analytics range as a segment track (Today, 7, 30, 90 days, Custom range) with the page's options after it (how fresh
+  the figures are is a white pill in the title row, beside the exports); a list's filters as 44 px selects and boxed fields;
 - tables on the kit's table card, figures right-aligned in tabular numbers, a row's actions at its end; a product beside its 52 × 39 photo;
 - a form on a white card under its list in two columns, brought into view by Edit;
 - charts in the style of Today's "Sales by hour": the highlighted bar (the latest point, or the busiest hour) `brand-600`, the others

@@ -1075,16 +1075,18 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       table card, the open orders and the counts two cards side by side. Roster: the week as the toolbar (the date box and a segment track
       of Previous, This and Next week), a table card per station, today's column brand teal (`aria-current="date"` on its header). An open
       shift is brand, never green; the overview's intro now says the tabs are below (en and am).
-    - **Analytics**: the exports are the title row's actions (a group "Export" described by what the file holds; the outcome in one line
-      under them); the range is the toolbar's segment track (the same pressed buttons, "Custom range" with its two dates under it), with the
-      grouping, the kind of work or "Compare with the previous period" (a 44 px pill checkbox) after it and the freshness chip at its right;
-      a rebuild running and the days not built are notices under it (the region "Days not built" and "Rebuild these days" as they were). The
+    - **Analytics**: the title row's actions are how fresh the figures are (a white pill, "Updated … ago" with a brand dot, as Today's
+      intro says it) and the exports (a group "Export" described by what the file holds; the outcome in one line under them); the range is
+      the toolbar's segment track (the same pressed buttons, "Custom range" with its two dates under it), with the grouping, the kind of work
+      or "Compare with the previous period" (a 44 px pill checkbox) after it on the same row; a rebuild running and the days not built are
+      notices under it (the region "Days not built" and "Rebuild these days" as they were). The
       headline figures are the board's KPI row (still each a group named by its label, money as "1,234.50 ETB"; a change for the worse in
       red: a fall in takings, a rise in refunds, voids or cancelled orders); revenue by order type and the payment methods' shares are Today's
       share bars side by side; the best sellers and the products table carry each product's photo (`useProductImages`, an ingredient none);
       the product page's title row is its photo, its name, its other name in its own `lang` and its chips, "Back to Products" its action;
-      stations, staff and the payment methods are compact table cards that fit the page. The staff table keeps the row header to the name
-      alone (`p4-dashboards` reads its text).
+      stations, staff and the payment methods are compact table cards that fit the page; Sales shows its line and its hours (06:00 to
+      17:00 widened to any hour that sold, every hour labelled, as Today's) before the table of its days. The staff table keeps the row
+      header to the name alone (`p4-dashboards` reads its text).
     - **Charts** (`components/charts/*`), in Today's dataviz style: vertical bars laid out in percent on plain boxes (so a round end stays
       round at any width), the highlighted bar brand-600 (the latest point; the busiest hour on Sales by hour) and the others brand-100,
       rounded at the data end, square on the zero line, a shortage red under it, each bar's label and figure on hover; horizontal bars are
