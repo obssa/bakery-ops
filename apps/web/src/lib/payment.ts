@@ -23,11 +23,31 @@ export function pressKey(entry: string, key: KeypadKey): string {
   return next;
 }
 
+/** Cash typed into the "Cash received" field, kept to what the keypad allows: digits, one point, two decimals, eight whole digits. */
+export function typedCash(text: string): string {
+  const cleaned = text.replace(/[^\d.]/g, "");
+  const point = cleaned.indexOf(".");
+  const whole = (point === -1 ? cleaned : cleaned.slice(0, point)).slice(0, MAX_WHOLE_DIGITS);
+  if (point === -1) return whole;
+  return `${whole === "" ? "0" : whole}.${cleaned.slice(point + 1).replace(/\./g, "").slice(0, 2)}`;
+}
+
 /** The entry as a money string with two decimals ("400" -> "400.00"), or null when nothing was typed. */
 export function tenderedOf(entry: string): string | null {
   const text = entry.endsWith(".") ? entry.slice(0, -1) : entry;
   return text === "" ? null : addDecimal(text, "0.00");
 }
+
+/**
+ * The till's quick cash keys (phase-6 plan 10.2 Q6, fresh-counter.md 3.4): the notes a customer most often hands over, fixed, with no
+ * setting. A key fills the cash received with its amount; "Exact" (the keypad's own key) fills in the payment's amount. `label` is how the
+ * key reads, grouped as the shop writes a thousand.
+ */
+export const QUICK_CASH: readonly { amount: string; label: string }[] = [
+  { amount: "300", label: "300" },
+  { amount: "500", label: "500" },
+  { amount: "1000", label: "1,000" },
+];
 
 /** Change to give back for cash handed over against an amount due; null while the cash does not cover it. */
 export function changeDue(tendered: string | null, due: string): string | null {

@@ -38,11 +38,14 @@ test.describe("p1 order flow: till void", () => {
     // an order is named by its number, and by its date too when it is not of today (numbers restart each business day)
     const label = orderLabel(order);
 
-    // it is in the queue; the void asks for a reason and a manager's PIN
+    // it is in the queue; its card opens it on the pay sheet, where the void is (step 6.3b: on the Till board a card is one control, so
+    // "Void" moved from the card to the sheet, one tap away); the void asks for a reason and a manager's PIN
     await page.getByRole("tab", { name: /Unpaid orders/ }).click();
     const queue = page.getByRole("region", { name: "Orders awaiting payment" });
-    await expect(queue.getByRole("button", { name: `Void order ${label}`, exact: true })).toBeVisible({ timeout: 15_000 });
-    await queue.getByRole("button", { name: `Void order ${label}`, exact: true }).click();
+    await queue.getByRole("button", { name: `Take payment for order ${label}`, exact: true }).click({ timeout: 15_000 });
+    const sheet = page.getByRole("dialog", { name: `Payment for order ${label}` });
+    await expect(sheet.getByRole("button", { name: `Void order ${label}`, exact: true })).toBeVisible({ timeout: 15_000 });
+    await sheet.getByRole("button", { name: `Void order ${label}`, exact: true }).click();
     const dialog = page.getByRole("dialog", { name: `Void order ${label}` });
     await dialog.getByLabel("Reason").fill("Customer left before it was made");
 
@@ -50,13 +53,14 @@ test.describe("p1 order flow: till void", () => {
     await dialog.getByLabel("Manager PIN").fill("000000");
     await dialog.getByRole("button", { name: "Void this order" }).click();
     await expect(dialog.getByRole("alert")).toContainText("That PIN does not belong to someone allowed to approve this.", { timeout: 30_000 });
-    await expect(queue.getByRole("button", { name: `Void order ${label}`, exact: true })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: `Void order ${label}`, exact: true })).toBeVisible();
 
     // the manager's PIN approves it
     await dialog.getByLabel("Manager PIN").fill(staff.manager.pin);
     await dialog.getByRole("button", { name: "Void this order" }).click();
     await expect(dialog).toHaveCount(0, { timeout: 30_000 });
-    await expect(queue.getByRole("button", { name: `Void order ${label}`, exact: true })).toHaveCount(0, { timeout: 15_000 });
+    await expect(queue.getByRole("button", { name: `Take payment for order ${label}`, exact: true })).toHaveCount(0, { timeout: 15_000 });
+    await expect(sheet).toHaveCount(0);
 
     // through the API: voided with the reason, and the stock reserved at send is released
     const voided = await staff.cashier.api.get<{ status: string; voided: { reason: string; approved_by: number | null } | null }>(`/orders/${order.id}`);

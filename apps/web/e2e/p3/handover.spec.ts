@@ -5,6 +5,7 @@ import { buildStationFixture, buildTillStaff, findOrCreateStation, loginOnce, se
 import { ledgerOf } from "../support/inventory";
 import { openAs } from "../support/pad";
 import { currentShift, ensureDrawer, ensureOpenShift, settleStation, tallyFor, tallyTotalOf } from "../support/shifts";
+import { openShiftBar } from "../support/shiftBar";
 
 // Phase 3 gate project p3-handover, test 1 (docs/phases/phase-3-plan.md section 7; the screens are step 3.7b): a closing count with one
 // variance is explained, handed in and approved side by side, the adjustment lands in the ledger, the count locks and shows its hash,
@@ -90,6 +91,8 @@ test.describe("p3 handover", () => {
       await openAs(chef, chefSession.api, "en/kds/kitchen/");
       const bar = chef.getByRole("region", { name: "Shift", exact: true });
       await expect(bar).toContainText("Shift open", { timeout: 30_000 });
+      // step 6.3b: on the kitchen display the shift bar is a menu in the station top bar, closed while the shift simply runs
+      await openShiftBar(bar);
       await bar.getByRole("button", { name: "Close shift", exact: true }).click();
       await chef.getByRole("dialog", { name: "Close the shift" }).getByRole("button", { name: "Close shift", exact: true }).click();
       await expect(bar).toContainText("Closing count in progress", { timeout: 15_000 });
@@ -279,18 +282,24 @@ test.describe("p3 handover", () => {
       await page.goto("en/till/");
       await expect(bar).toContainText("Shift open", { timeout: 30_000 });
       const widget = page.getByRole("region", { name: "Cash in the drawer" });
+      // step 6.3b: the Till board puts the drawer's figure in the title row; its details open from it, one tap away
+      await widget.getByRole("button", { name: /^Cash in the drawer/ }).click({ timeout: 30_000 });
       await expect(widget).toContainText(openingTotal, { timeout: 30_000 });
       const order = await sendOrder(fixture);
       await cashier.api.post(`/orders/${order.id}/payments`, { client_uuid: uuid(), channel_code: "cash", amount: "60.00", tendered_amount: "100.00" });
       const channels = widget.getByRole("list", { name: "Taken by channel" });
       await expect(channels).toContainText("Cash", { timeout: 30_000 });
       await expect(channels).toContainText("60.00");
+      // closed again, so the shift's menu beside it is not under its panel
+      await widget.getByRole("button", { name: /^Cash in the drawer/ }).click();
       const sold = await admin.get<{ cash_sales_total: string; expected_total: string }>(`/shifts/${shiftId}/cash`);
       expect(sold.cash_sales_total).toBe("60.00");
 
       // --- closing: the drawer is short by 20.00 and the cash slips are 10.00 short ----------------------------------------------
       const expectedClosing = sold.expected_total;
       const target = tallyFor(minus(expectedClosing, "20.00"), keys);
+      // step 6.3b: on the till too the shift bar is a menu in the station top bar, closed while the shift simply runs
+      await openShiftBar(bar);
       await bar.getByRole("button", { name: "Close shift", exact: true }).click();
       await page.getByRole("dialog", { name: "Close the shift" }).getByRole("button", { name: "Close shift", exact: true }).click();
       await expect(bar).toContainText("Closing count in progress", { timeout: 15_000 });

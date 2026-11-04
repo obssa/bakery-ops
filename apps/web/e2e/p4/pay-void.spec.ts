@@ -45,8 +45,11 @@ test.describe("p4 pay sheet: void a payment", () => {
       await expect(sheet.getByRole("status").filter({ hasText: "Payment recorded" })).toBeVisible({ timeout: 30_000 });
       await sheet.getByRole("button", { name: "Done" }).click();
 
-      // paid in full but not served: it waits, settled, and offers to void a payment
-      const voidPayment = queue.getByRole("button", { name: `Void a payment of order ${label}`, exact: true });
+      // paid in full but not served: it waits, settled, and offers to void a payment. Step 6.3b: on the Till board a card is one control,
+      // so the settled card ("Open order N") opens the order on the sheet, and "Void a payment" is there, one tap away
+      await queue.getByRole("button", { name: `Open order ${label}`, exact: true }).click({ timeout: 15_000 });
+      const settledSheet = page.getByRole("dialog", { name: `Payment for order ${label}` });
+      const voidPayment = settledSheet.getByRole("button", { name: `Void a payment of order ${label}`, exact: true });
       await expect(voidPayment).toBeVisible({ timeout: 15_000 });
       await voidPayment.click();
       const dialog = page.getByRole("dialog", { name: `Void a payment of order ${label}` });
