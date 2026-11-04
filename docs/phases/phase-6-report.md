@@ -290,8 +290,13 @@ Not fixed in Phase 6; none blocks the claim:
   nobody showed for 30 days.
 - **Files of a failed write** (6.1a): files are written before the photo's transaction, so a transaction that then fails leaves
   content-addressed files no row names; a retry reuses them, and the prune (which sweeps rows) never removes them.
-- **The live Demo Bakery's photos** come from one run of `bakery:demo-product-images --branch=<id>` by the coordinator (`--dry-run`
-  first, `docs/runbook/server.md`), never from a deploy; the repository does not record whether it was run.
+- **The live Demo Bakery's photos** went up through the app's own upload API as the demo admin, not through
+  `bakery:demo-product-images`: the host refused SSH from the coordinator's PC at the time. All 29 are attached, but their rows read
+  `origin = upload`, so the command's `--force` does not replace them; the product page's Replace does.
+- **Verifying a long hash chain is slow**: `GET /locations/{location}/chain/verify` rebuilds every link from the live rows, 35 s for 328
+  links on the live host (0 failures). That passed PHP's 30 s limit and answered a 500 on the E2E branch, whose chains grow with every
+  `@live` run; the Demo Bakery has one link. This read now gets 90 s, under Cloudflare's 100 s, which holds about 850 links at that
+  speed. The hash logic is unchanged. The lasting fix is to verify in pages or in a background job.
 - **Phase 5's open items are unchanged**: device enforcement stays off on the live host until Ramin's word; the live restore drill waits
   for its scratch database; the off-site hook stays off; the display-case COGS gap and the other Phase 4 gaps (`phase-5-report.md`, "What
   is open").
