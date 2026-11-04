@@ -143,13 +143,16 @@ in, the decision:
   half way through a transition is neither the one before nor after. Its `label-content-name-mismatch` rule (WCAG 2.5.3) compares whole
   words, so a control is named by its own text (an sr-only span holding the name the specs read, what it draws hidden from readers) instead
   of an `aria-label` over different words, and an Amharic name must contain the visible word whole (a prefix such as `ለ` or a suffix such
-  as `ን` glued to it breaks the match). A few names on screens `p6-a11y` does not cover still break the rule and are left, because fixing
-  them changes names the specs read (6.4c, 6.4d).
+  as `ን` glued to it breaks the match). Step 6.5 took the five names 6.4c and 6.4d had left (the shift notes, the running shifts' count,
+  the admin's Amharic order card and Void order, the reconciliation's drill) to this rule, and gave `p6-a11y` a light pass over those
+  screens; a few names on sub-pages the pass does not open are listed in `docs/phases/phase-6-report.md`.
 - **The login photo** is self-hosted too (`apps/web/public/images/login-counter.webp`, its licence in `LICENSES.json`), precached by the
   service worker with the shell.
 
 Enforcement, added to the list above: `p6-a11y` (login, the pad, the KDS and bar, the till, production, Today, the catalog list and the
-product page, in `en` and `am`); `e2e/p6/screens.spec.ts` and the `screens` artifact; `product-photo-thumbs-logic.spec.ts` and
+product page, in `en` and `am`, and a light pass over the admin's Orders, Payments, Stock, People, Shifts, Analytics, Audit log and System,
+`a11y-admin.spec.ts`); `a11y-names-logic.spec.ts` (the five names, from the dictionaries, for the states the seed does not draw);
+`e2e/p6/screens.spec.ts` and the `screens` artifact; `product-photo-thumbs-logic.spec.ts` and
 `screens-durations-logic.spec.ts`; every p0 to p5 project, unchanged but for the selectors the As built notes name.
 
 The rest (the tokens in `@theme` with the `neutral` remap, what a colour may mean, the self-hosted fonts, the primitives keeping their

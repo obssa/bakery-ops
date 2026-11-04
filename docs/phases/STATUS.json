@@ -235,7 +235,7 @@
         "web.design-system": "done",
         "web.stations": "done",
         "web.admin": "done",
-        "docs": "in_progress"
+        "docs": "done"
       },
       "playwright_projects": [
         "p6-product-photo",

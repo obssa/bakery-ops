@@ -1394,6 +1394,25 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
     - **`scripts/gate_check.py`** (both copies, still identical): the Pest runner is looked for only when the run runs tests, and the
       Docker probe has 60 s. Locally with `--no-tests`, on this PC with its Docker engine stopped, the probe never returned and the gate
       hung before its first row.
+    - **Added by the coordinator while the step was open.**
+      - `e2e/p6/a11y-admin.spec.ts` (`p6-a11y`): a light pass over Orders with a card's timeline, Payments with its Reconciliation, Stock,
+        People, Shifts with its Handover notes, Analytics, the Audit log and System, in `en` and `am`, as the demo bakery's admin at
+        1440 × 900; a pass reads every screen and fails once, naming every finding. It was green on its first run, with the names below
+        already changed, and never ran red.
+      - Five names now hold the words their controls show, under axe's `label-content-name-mismatch`. English: "Show notes · …", "Hide
+        notes · …", "Open the count · {station}". Amharic: those three, the order card "ትዕዛዝ {no}፦ ክፈት" and Void order "ትዕዛዙን ውድቅ አድርግ ·
+        {no}". The reconciliation's drill ends in " · {count}". **No spec changed**: none selects the old shift names (p3 reads the
+        station shift bar's "Open the count", which is another control), p1 and p4 read the English order names, which did not change, and
+        `p4 pay-admin` and `dashboards-live` match the drill's opening words as a substring.
+      - `e2e/p6/a11y-names-logic.spec.ts` (`p6-a11y`, 13 cases, no page): the seed does not draw all of those controls (with every shift
+        open there is no "Open the count", and the seeded drill has nothing to open), so the names are checked from the dictionaries,
+        with axe's own reading of words and one case that must fail.
+      - The admin's stock screens group a figure's thousands ("25,000 g") on Stock, the Ledger, Purchases, Transfers and Reorder, through
+        `qtyFigure` (`trimDecimal` and `groupDigits` on the decimal string). **Selectors changed**: `p2-purchase-transfer`'s fixture
+        (`e2e/support/inventory.ts`) reads `after.onHandText` "20,000 g", `rule.reorderText` "50,000 g" and `ask.text` "5,000 g", because
+        those are the figures on the screens it reads; its `kitchenStart.onHandText` "1000 g" is the KDS strip's and did not change.
+      - The Payments chevron was fixed here too, then reverted (`9e6a5a1`), because PR #121 fixes it.
+    - **`mod-shifts` 30 minutes**: it took 18 m 16 s on this PR's run, against the reusable job's 20.
     - **The report** `docs/phases/phase-6-report.md`, with the local `gate_check --mode done --phase 6 --no-tests --no-e2e` "before the
       claim". No phase 6 to-do marker is left once 6.4b replaced the last placeholder.
 
