@@ -384,8 +384,8 @@ function PaymentsTable({
           rows.map((row) => (
             <tr key={row.id}>
               <td className="tabular-nums text-neutral-600">{row.id}</td>
-              <td className="whitespace-nowrap tabular-nums">
-                {addisStamp(row.received_at, dates)}
+              <td className="min-w-40">
+                <span className="block whitespace-nowrap tabular-nums">{addisStamp(row.received_at, dates)}</span>
                 {row.received_by.name ? <span className="block text-[13px] text-neutral-600">{t("list.by", { name: row.received_by.name })}</span> : null}
               </td>
               <td>

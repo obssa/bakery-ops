@@ -213,12 +213,11 @@ function OpenRequests() {
             <th scope="col">{t("col_priority")}</th>
             <th scope="col">{t("col_status")}</th>
             <th scope="col">{t("col_baker")}</th>
-            <th scope="col">{t("col_assign")}</th>
           </tr>
         </thead>
         <tbody>
           {sorted.length === 0 ? (
-            <EmptyRow span={7}>{t("none_open")}</EmptyRow>
+            <EmptyRow span={6}>{t("none_open")}</EmptyRow>
           ) : (
             sorted.map((request) => <RequestRow key={request.id} request={request} locale={locale} look={look} people={canAssign ? (bakers.data ?? []) : null} />)
           )}
@@ -278,10 +277,11 @@ function RequestRow({ request, locale, look, people }: { request: ProductionRequ
       <td>
         <Chip tone={STATUS_TONE[request.status]}>{tp(`status_${request.status}` as "status_requested")}</Chip>
       </td>
-      <td className="text-neutral-700">{request.assigned_to?.name ?? "—"}</td>
-      <td className={ACTIONS_CELL}>
+      {/* the baker: picked here while the request waits (the one already named is the choice shown), named once it is under way */}
+      <td className={waiting && people !== null ? ACTIONS_CELL : "min-w-44 text-neutral-700"}>
+        {!(waiting && people !== null) ? (request.assigned_to?.name ?? "—") : null}
         {waiting && people !== null ? (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center gap-2">
             <div className="w-44">
               <Select controlSize="md" aria-label={t("baker_for", { name })} value={userId} onChange={(e) => setUserId(e.target.value)}>
                 <option value="" disabled>
