@@ -71,6 +71,21 @@ it('verifies the chain: ok, how many links, the head hash', function () {
     ]);
 });
 
+it('gives verifying more time where the server limits a request, and sets no limit where there is none', function () {
+    $before = (int) ini_get('max_execution_time');
+    try {
+        set_time_limit(0);
+        ($this->get)($this->f->admin, '/verify')->assertOk();
+        expect(ini_get('max_execution_time'))->toBe('0');
+
+        set_time_limit(30);
+        ($this->get)($this->f->admin, '/verify')->assertOk();
+        expect(ini_get('max_execution_time'))->toBe('90');
+    } finally {
+        set_time_limit($before);
+    }
+});
+
 it('is for the people who may replay: the admin and the manager', function (string $who, int $status) {
     $this->chain->chain($this->place, 1);
 

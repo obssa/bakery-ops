@@ -22,9 +22,14 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *                                            at most 200), ?before_seq= pages back; the head is the newest link whatever the page
  *   GET /locations/{location}/chain/verify   200 {ok, checked, head_hash, failures: [{chain_seq, count_id, kind}]}, kind gap | previous_mismatch |
  *                                            hash_mismatch | payload_mismatch (HashChain::verify)
+ *
+ * Verifying rebuilds every link's payload from the live rows, so it takes time in step with the chain: 35 s for 328 links on the live host,
+ * past PHP's 30 s there, which answered a 500. Only this read gets longer, under Cloudflare's 100 s; a process with no limit keeps none.
  */
 final class ChainController
 {
+    private const int VERIFY_SECONDS = 90;
+
     public function index(ListChainRequest $input, int $location, Locations $locations): JsonResponse
     {
         $this->assertPlace($location, $locations);
@@ -55,6 +60,9 @@ final class ChainController
     public function verify(Request $input, int $location, Locations $locations, HashChain $chain): JsonResponse
     {
         $this->assertPlace($location, $locations);
+        if ((int) ini_get('max_execution_time') > 0) {
+            set_time_limit(self::VERIFY_SECONDS);
+        }
 
         return response()->json($chain->verify($location)->toArray());
     }
