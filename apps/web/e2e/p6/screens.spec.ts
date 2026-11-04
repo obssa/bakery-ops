@@ -11,6 +11,7 @@ import { freshDevice } from "../support/devices";
 import { live } from "../support/env";
 import { loginOnce } from "../support/fixture";
 import { openAs, typeCode } from "../support/pad";
+import { dropFile, FIXTURE_PHOTO } from "../support/productPhoto";
 import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCounts } from "../support/shifts";
 
 // Screenshots for review (brief "Design fidelity"; phase-6 plan section 7), in project p6-a11y, so they run in e2e-p6 on the demo bakery
@@ -34,6 +35,9 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 // Step 6.4a: the admin frame and its first pages, as the demo bakery's admin, at 1440 x 900: Today (Admin.dc.html) in English and in
 // Amharic, the catalog list as a table and as pad cards (CatalogList.dc.html), the Orders board in the new frame, and the sidebar as the
 // drawer of an 820 px tablet held upright.
+//
+// Step 6.4b: the admin's product page at 1440 x 900 (ProductPhoto.dc.html, PhotoStates.dc.html): with a photo (en, am), the framing step,
+// no photo yet and a refusal (the describe at the end).
 //
 // Step 6.4c: the Sell and Make screens on the admin primitives, at 1440 x 900 as the demo bakery's admin, each brought to the state the
 // catalog list's board would draw it in (loaded, its first rows in view): the Orders board with a card's timeline open, an order's record,
@@ -88,7 +92,8 @@ async function demoAccount(role: string): Promise<DemoAccount> {
  * "Checking the shift…" lines), its fonts and the photos in view have loaded, and every animation that ends has ended (a sheet sliding in
  * would be caught half way; the skeletons' endless pulse is not waited for).
  */
-async function capture(page: Page, name: string, loading: string[] = []): Promise<void> {
+/** `fullPage`: the whole page, for a screen taller than the window (6.4b's framing step, drawn on a 1180 px tall board). */
+async function capture(page: Page, name: string, loading: string[] = [], fullPage = false): Promise<void> {
   for (const text of loading) await expect(page.getByText(text, { exact: true })).toHaveCount(0, { timeout: 30_000 });
   await fontsReady(page);
   await page
@@ -105,7 +110,7 @@ async function capture(page: Page, name: string, loading: string[] = []): Promis
     .catch(() => undefined);
   await settledAnimations(page);
   mkdirSync(SHOTS, { recursive: true });
-  await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
+  await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage });
 }
 
 /** The pad of the demo waiter in `locale`, unlocked, with the first three products that can be sold in the order. */
@@ -631,5 +636,102 @@ test.describe("screens: sell and make", () => {
     const t = MESSAGES.en;
     await openAdmin(page, "en/admin/planner/", t.planner.title);
     await capture(page, "planner-1440x900-en", [t.common.loading]);
+  });
+});
+
+// Step 6.4b: the product page (ProductPhoto.dc.html and PhotoStates.dc.html) at 1440 x 900, an admin's size. A demo product with its demo
+// photo, in en and am; the framing step, the fixture chosen through "Replace", zoomed to 1.2x and dragged, then cancelled so the demo photo
+// stays; and a second demo product without its photo (removed here, put back after from its own large rendition): the empty dropzone, and
+// a refusal under the card (a GIF dropped on it).
+interface DemoProduct {
+  id: number;
+  name_en: string;
+  name_am: string;
+  image: { large: string } | null;
+}
+
+async function demoProduct(name: string): Promise<{ demo: DemoBakery; product: DemoProduct }> {
+  const demo = await demoBakery();
+  const products = (await demo.admin.get<{ data: DemoProduct[] }>("/items", { kind: "product" })).data;
+  const product = products.find((p) => p.name_en === name) ?? products.find((p) => p.image !== null) ?? products[0];
+  if (!product) throw new Error("the demo bakery has no product");
+  return { demo, product };
+}
+
+async function openProduct(page: Page, demo: DemoBakery, product: DemoProduct, locale: keyof typeof MESSAGES): Promise<void> {
+  const t = MESSAGES[locale];
+  // the stock chip and the preview's card come from the pad's menu: the capture waits for its answer
+  const menu = page.waitForResponse((response) => response.url().includes("/api/v1/menu"), { timeout: 30_000 }).catch(() => undefined);
+  await openAs(page, demo.admin, `${locale}/admin/catalog/?item=${product.id}`, { device: demo.device });
+  await expect(page.getByRole("heading", { level: 1, name: locale === "am" ? product.name_am : product.name_en })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(t.common.loading, { exact: true })).toHaveCount(0, { timeout: 30_000 });
+  await menu;
+}
+
+test.describe("screens: the product page", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  test("the product page (ProductPhoto board): with its photo in en and am, and the framing step", async ({ page }) => {
+    test.setTimeout(180_000);
+    const { demo, product } = await demoProduct("Croissant");
+    const card = page.getByRole("region", { name: en.photo.title, exact: true });
+    await shoot(page, "product-photo-1440x900-en", async () => {
+      await openProduct(page, demo, product, "en");
+      await expect(card.getByRole("img", { name: product.name_en })).toBeVisible({ timeout: 15_000 });
+    });
+    await shoot(page, "product-photo-1440x900-am", async () => {
+      await openProduct(page, demo, product, "am");
+      await expect(page.getByRole("region", { name: am.photo.title, exact: true }).getByRole("img", { name: product.name_am })).toBeVisible({ timeout: 15_000 });
+    });
+    await shoot(page, "product-framing-1440x900-en", async () => {
+      await openProduct(page, demo, product, "en");
+      const chooser = page.waitForEvent("filechooser");
+      await card.getByRole("button", { name: en.photo.replace }).click();
+      await (await chooser).setFiles(FIXTURE_PHOTO);
+      const slider = card.getByRole("slider", { name: en.photo.zoom });
+      await expect(slider).toBeVisible({ timeout: 15_000 });
+      await slider.focus();
+      for (let i = 0; i < 20; i += 1) await slider.press("ArrowRight");
+      const frame = card.getByRole("group", { name: en.photo.frame_label });
+      const box = await frame.boundingBox();
+      if (box) {
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width / 2 - 40, box.y + box.height / 2 - 30, { steps: 5 });
+        await page.mouse.up();
+      }
+      await frame.focus();
+    });
+    // the whole framing step, as the board draws it: the preview and the buttons under the frame
+    await capture(page, "product-framing-page-1440x900-en", [], true).catch(() => undefined);
+    // cancelled: the demo photo stays as it was
+    await card.getByRole("button", { name: en.photo.cancel }).click().catch(() => undefined);
+  });
+
+  test("the product page (PhotoStates board): no photo yet, and a refusal under the card", async ({ page }) => {
+    test.setTimeout(180_000);
+    const { demo, product } = await demoProduct("Bottled water 0.5 L");
+    const large = product.image ? Buffer.from(await (await fetch(`${demo.admin.origin}${product.image.large}`)).arrayBuffer()) : null;
+    await demo.admin.delete(`/items/${product.id}/image`);
+    try {
+      const card = page.getByRole("region", { name: en.photo.title, exact: true });
+      const zone = card.getByTestId("photo-dropzone");
+      await shoot(page, "product-empty-1440x900-en", async () => {
+        await openProduct(page, demo, product, "en");
+        await expect(zone).toBeVisible({ timeout: 15_000 });
+      });
+      await shoot(page, "product-refusal-1440x900-en", async () => {
+        await dropFile(zone, { name: "counter.gif", mimeType: "image/gif", buffer: Buffer.from("GIF89a", "binary") });
+        await expect(card.getByRole("alert")).toBeVisible();
+      });
+    } finally {
+      if (large) {
+        const form = new FormData();
+        form.append("photo", new Blob([large], { type: "image/webp" }), "large.webp");
+        form.append("client_uuid", randomUUID());
+        await demo.admin.postForm(`/items/${product.id}/image`, form).catch(() => undefined);
+      }
+    }
   });
 });

@@ -1124,7 +1124,106 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   - `p6-a11y`: the product page in `en` and `am`.
   - `docs/handbook/product-photos.md`: spec section 6, what a good photo is, how to frame, replace and remove, and that demo photos are
     for the demo branch only.
-  - As built: (to be written by 6.4b)
+  - **As built (step 6.4b, `phase-6/web-photo-manager`).** The specs first (red: the framing maths in `product-photo-logic.spec.ts` and the
+    full `product-photo.spec.ts`, which replaced the placeholder and its to-do marker; STATUS `web.admin` `in_progress`), then
+    `lib/images/frame.ts` and downscale's presets, then the page and its card with the specs they moved, then `p6-a11y` and the captures,
+    the handbook and this note. Web only, plus the handbook, the review sheet's screen names and this note: no API, route, registry,
+    OpenAPI or ERD change. Built region by region from `ProductPhoto.dc.html` and `PhotoStates.dc.html`, and looked at against a stub of
+    the API at 1440 x 900 in both languages (axe, with the gate's tags, found nothing serious there in any state).
+    - **The page** (`components/catalog/ItemPage.tsx`): the breadcrumb ("Catalog / Croissant"), the title row (the name at 30 / 700 with
+      its Amharic name beside it at 24 / 600 on the English page, outside the `h1`; the chips "On the menu" or "Off the menu" and where it
+      is sold with what is left, "Display case · 3 left"; on the right "Recipe and cost", "Take off the menu" or "Put back on the menu",
+      and "Save changes"), then the board's two columns: Details and Refunds (white, 18 px corners, 20 px padding) at `flex: 1 1 380px`, and
+      the Photo card at `flex: 1 1 420px`, at most 520 px, sticky from 1024 px. Decisions worth a look:
+      - **One save.** "Save changes" saves both cards: PATCH `/items/{item}` with only what changed (the names, the category, the
+        fulfilment, the two refund settings, normalised by `refundSettingsBody`), then POST `/items/{item}/prices` when the price changed
+        (a new price starts on the next order; the field's line is "Since 19 Oct 2026 ..."), each with its own Idempotency-Key. It says
+        "Saved." in the page's status, or "Nothing has changed yet."; a refusal is the server's words in an alert under the title row, a
+        field's under the field.
+      - **The recipe** (price and cost, the versions, publishing, the scaled preview, comparing) is not on the board, so it moved
+        unchanged into `RecipePanels.tsx`, behind "Recipe and cost": a drawer (768 px) from the title row, for a product made to order or
+        in batches (a bought-in product has none). In the drawer the publish form stacks its scaled preview under it.
+      - **The fulfilment** is the API's three choices ("Made to order", "Made in batches", "Bought in", under "Fulfilment", the new item
+        form's words) as an admin `SegmentedControl` (44 px targets, the admin minimum): the board's "Sold from" with "Display case" and
+        "Made to order" has no place for a product bought in. The new fields take the board's labels ("Name in English", "Name in
+        Amharic", "Category", "Price"); no spec reads them.
+      - **The stock chip** comes from the pad's own menu (`GET /menu` with the unavailable products, `useProductPageMenu`, key
+        `["menu", "product-page"]`, for whoever holds `orders.create`, kept 15 s): "Display case" or "Made to order", with "· N left" or "·
+        none left". Without the menu the chip names the place only. The menu asks for an enrolled device and the catalog's own reads do not,
+        so this read is sent with the client's new `deviceGate: false`: on a computer that is not enrolled its refusal stays its own and the
+        page goes on without the chip, instead of turning into the "not enrolled" screen.
+      - **"Take off the menu"** is PATCH `is_active: false` (the list's "Hidden"), at once and without a dialog, because "Put back on the
+        menu" undoes it.
+      - **Refunds**: the two settings as the board's rows, their name over their hint and a 52 x 32 switch at the right; the switch is the
+        same checkbox as before drawn as a track and a knob, so its role, names and descriptions are unchanged (`RefundToggles`, also the
+        new item form's). The card is titled "Refunds" and is still the form named "Refund settings".
+    - **The Photo card** (`PhotoCard.tsx`, `PhotoFramer.tsx`), in the boards' states: the dashed 4:3 dropzone ("Drop a photo here", "or
+      browse your files", a label around the file input, so the keyboard reaches it and a tablet offers its camera), the rules line and the
+      placeholder the pad shows meanwhile; a file dragged over the card (the whole card takes the drop): solid brand border on brand-50,
+      "Drop to upload", "Let go to add it"; the framing step; the upload; the saved photo with "Added by <name> · 3 Nov 2026 · 1600 × 1200"
+      ("Demo photo · ..." for the demo branch's), "Replace" and "Remove" (a small dialog, "Remove the photo"); the refusal in a red-50 box
+      under the card. Decisions worth a look:
+      - **The file** is checked first (JPEG, PNG or WebP; by its name when the system gives no type), then decoded and shrunk in the
+        browser (`downscaleSized(file, PRODUCT_PHOTO)`: 2400 px on the long side, JPEG 0.9, the EXIF orientation applied, on white, no
+        metadata); receipts keep `RECEIPT_PHOTO` (1600 px, 0.82) and their callers are unchanged. A file the card refuses itself (another
+        type, or one the browser cannot decode) is told in the server's own words (`photo.refused_type`, `photo.refused_unreadable` copy
+        `catalog.image.unsupported_type` and `not_an_image`); everything else in the box is the server's message.
+      - **The framing maths** (`lib/images/frame.ts`): the view is the zoom (1x to 3x) and the centre of the shown rectangle in the
+        uploaded file's pixels; at 1x the frame shows the largest centred 4:3 rectangle. A drag moves it by the frame's pixels turned into
+        the photo's, a pinch or a trackpad's pinch (a wheel with ctrlKey) zooms at the fingers, and the rectangle never leaves the photo.
+        What is sent is `sourceRect`: whole pixels, exactly 4k x 3k, centred in the shown rectangle and inside the photo, so the server's
+        snap keeps it (1.2x of the 1600 x 1200 fixture is 1332 x 999). The quality line reads it: sharp from 1200 x 900, "may look soft"
+        from 800 x 600, "Too small for the pad" below, with "Use this photo" off.
+      - **The frame** is a focusable `group` ("Photo in the 4:3 frame", with how to move it in its description): the arrow keys move the
+        photo (Shift for more), plus and minus zoom. The zoom is a range input named "Zoom" (one step is 0.01x), with "1.2×" beside it.
+      - **The live preview** is the real pad card (`ProductCard` gains `photo`, drawn in the photo's place) with the menu's price and stock
+        chip, and the 48 x 36 line thumb, both drawn from the frame as it moves (the same percentages as the frame, `imageStyle`).
+      - **The upload** (`lib/api/upload.ts`): an XMLHttpRequest, because `fetch` reports no upload progress, with what every call carries
+        (`client.ts` now exports `callHeaders` and `refusal`): the bearer token, the Idempotency-Key, X-Device-Id and the station header; a
+        refusal is an `ApiError` from the bilingual body, a time-out (120 s) or a dropped line is status 0, a 401 signs the device out. It
+        never goes through the outbox (admin screens are online only). One Idempotency-Key and one `client_uuid` per photo and crop, so
+        pressing "Use this photo" again after a failure is the same write. The bar fills to 90 % with the bytes sent and the rest is the
+        server making the three sizes. A refused upload goes back to the frame as it was, with the reason under the card.
+      - `?item=<id>#photo` (6.4a's "Add photo" in the list and on a grid card) scrolls the page to the card (`id="photo"`) once it is drawn. A file dropped beside the card is ignored
+        instead of opening in the tab.
+    - **Selectors that changed (6.0.2), each in the commit of its screen:**
+      - `p2 stockout-catalog-planning`: after the `h1`, `getByRole("button", { name: "Recipe and cost" })` is pressed and the dialog
+        "Recipe and cost" awaited; the regions "Price and cost", "Publish a new version", "Scaled preview", "Compare costs" and the table
+        "Version history" are read as before, inside it. Why: the board draws the page without the recipe, so it sits behind a control.
+      - `p4 pay-refund`: `settings.getByRole("button", { name: "Save refund settings" })` became `page.getByRole("button", { name: "Save
+        changes" })`, and `settings.getByRole("status")` "Saved" became `page.getByRole("status").filter({ hasText: /^Saved\.$/ })`. Why:
+        the board saves the page from its title row. The form "Refund settings" and its checkboxes "Refundable" and "Goes back to stock
+        when refunded" are as they were.
+      - `recipe.back` went with its link (the breadcrumb is the way back); `catalog.refund_save`, `refund_saving`, `refund_saved` and
+        `refund_settings_intro` are no longer shown and are left in the dictionaries for now, because 6.4a's open PR changes the lines
+        beside them. The English `recipe.preview_note` says "the draft above" (it said "on the left"; the spec reads "computed in this
+        browser").
+    - **Where the page still differs from the boards** (for the review), now inside 6.4a's sidebar frame (merged from `main`):
+      "Recipe and cost" is a button the board does not have; the fulfilment has
+      three choices at 44 px (the board's two at 36 px); the card's buttons are 48 px with 16 px text (15 on the board); the preview is the
+      real pad card, so its price reads "ETB 65.00" with the "More" dots and its stock chip shows only when the API says low; the drag-over
+      line says "JPG, PNG or WebP" where the board names the file and its size (a browser hides both until the drop); the upload's line
+      leaves out the board's "On a weak line the upload waits in the queue" (an admin upload is never queued); the page's "Saved." status
+      line is not drawn on the board.
+    - **Tests added.** `product-photo-logic.spec.ts` gains 11 framing cases (`p6-product-photo`, no browser): the cover rectangle of 4:3,
+      wide and tall photos, zoom about the centre and at a point, the drag in frame pixels, clamping at every edge, 1200 random views each
+      giving whole, exactly 4:3 rectangles inside the photo, the quality tiers, the crop fields and the two downscale presets.
+      `product-photo.spec.ts` (`p6-product-photo`, CI only): the full flow (the fixture dropped, the drag-over look, framed at 1x then
+      zoomed to 1.2x and dragged, the live preview, saved with "Added by ... · 1332 × 999" and the API's 1332 x 999; the pad card on the
+      `card` URL and the order line on the `thumb`; replaced through the file chooser at 2x, "may look soft", 800 x 600, new URLs and the
+      old ones 404; removed after the dialog, the dropzone back, the pad's placeholder, no broken image; the menu's ETag moving on each of
+      the three changes) and a second case (a GIF refused in the card; a 640 x 480 photo drawn on a canvas, "Too small for the pad",
+      "Use this photo" off). `a11y-product.spec.ts` (`p6-a11y`, its own file beside `a11y.spec.ts`): the page in en and am with a photo,
+      the remove dialog, no photo, a refusal, the framing step and the recipe's drawer. `screens.spec.ts`: `product-photo-1440x900-en`,
+      `-am`, `product-framing-1440x900-en` (and `product-framing-page-1440x900-en`, the whole page, since the step runs below 900 px),
+      `product-empty-1440x900-en` and `product-refusal-1440x900-en` on the demo bakery, each taken once the pad's menu has answered (the
+      stock chip and the preview read it) (Croissant
+      with its demo photo, the framing cancelled; Bottled water without its photo for the empty card and the refusal, its photo put back
+      after). `e2e/support/productPhoto.ts` gains `dropFile`, `fixtureFile`, `menuEtag` and `mediaStatus`.
+    - **Messages**, both languages: the `product` (the page) and `photo` (the card) namespaces; `recipe.back` removed. The review sheet's
+      screen names gained both (`scripts/i18n_export.py`) and `docs/i18n/am-review.csv` is regenerated.
+    - **Docs.** `docs/handbook/product-photos.md` (spec section 6: what a good photo is, adding and framing one, the quality line,
+      replacing and removing, the refusals, demo photos for the demo branch only), linked from the handbook's index.
 
 - **6.4c `phase-6/web-admin-sell-make`** and **6.4d `phase-6/web-admin-team-insight`**: the screens of 6.0.1 on Card/Panel, Table, Chip,
   Stat, the Button sizes and the title row, with no screen keeping its own colours (spec 4.4). The sub-section navigations stay named

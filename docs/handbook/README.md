@@ -19,6 +19,7 @@ and the reviewer (plan 10.2 Q5) may correct them.
 | Backups, and who restores them | [backups.md](backups.md) |
 | Changing a payment channel | [channels.md](channels.md) |
 | Reading the dashboards | [dashboards.md](dashboards.md) |
+| Product photos: adding, framing, replacing, removing | [product-photos.md](product-photos.md) |
 | Training: sessions per role | [training.md](training.md) |
 
 When something breaks, see the [on-call plan](../runbook/on-call.md). Going live is the
