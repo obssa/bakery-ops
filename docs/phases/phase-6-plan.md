@@ -1005,7 +1005,7 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       `en`, the board in `am`, and the count screen in both (the cake room's shift closed or started by its cake baker, one line counted
       short and one as expected; afterwards the counts are handed in, the admin decides what waits and the shift opens again). The file,
       the `p6-a11y` testMatch and the `screens` upload in `e2e.yml` have the shape 6.3a gave them, for the coordinator's merge. STATUS
-      `web.stations` `in_progress` (as 6.3a and 6.3b set it; `done` once all three are in).
+      `web.stations` `done`: 6.3c is the last stations step, after 6.3a (#113) and 6.3b (#114).
 
 ### 6.4 web.admin (STATUS `web.admin`), four PRs
 
