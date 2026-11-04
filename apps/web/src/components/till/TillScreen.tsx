@@ -168,8 +168,9 @@ export function TillScreen({ titleTwin }: { /** the Amharic title beside the Eng
       </p>
 
       {view === "queue" ? (
-        // fresh-counter.md 3.4: the 360 px waiting list on the left, the pay sheet (or, with none open, the display case) beside it
-        <div className="grid items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+        // fresh-counter.md 3.4: the 360 px waiting list on the left, the pay sheet (or, with none open, the display case) beside it. Below 1024 px
+        // one column that may not grow past the window: without `minmax(0, 1fr)` a card's long line widened it and the phone scrolled sideways
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
           <TillQueue
             orders={orders}
             loaded={!!queue?.loaded}

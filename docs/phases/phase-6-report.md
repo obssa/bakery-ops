@@ -239,7 +239,8 @@ and "it's hiding what's under it". 6.3b had moved the shift into a menu in the t
 in view, but over the work. Now the panel opens only on a tap, and the prompt is a strip in the page's flow under the bar with the state and
 its one main action, in amber for a refusal, which covers nothing (fresh-counter.md 3, "The shift's states"). The boards draw no such state,
 so there is no board to match. The till's cash panel closes the same way, and both panels are placed under the bar's real height, which wraps
-on a phone.
+on a phone. The strip's captures at 390 px also showed the till's waiting list scrolling sideways on the demo bakery's order cards; its one
+column may no longer grow past the window, and `screens.spec.ts` now fails if those captures scroll sideways.
 
 ## Added to step 6.5 by the coordinator
 

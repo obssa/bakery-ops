@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
 import en from "../../messages/en.json";
 import { fontsReady, settledAnimations } from "../support/a11y";
@@ -46,7 +46,8 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 //
 // phase-6/shift-strip: the shift's attention strip (the describe at the end): the till with no shift, with a count in progress, with the shift
 // open, and each with the panel open, at 1180 x 820 and at 390 x 844; the kitchen display at night with the strip, a refusal and the panel; the
-// production board with the strip. It settles shifts, so it runs last, and it puts them back.
+// production board with the strip. It settles shifts, so it runs last, and it puts them back. The one thing it asserts about a picture: at the
+// phone's width the page does not scroll sideways, on the demo bakery's real names and order cards, which are longer than the fixtures'.
 
 const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
@@ -843,7 +844,14 @@ test.describe("screens: the shift's strip", () => {
     await capture(page, `${name}-1180x820-${locale}`);
     await page.setViewportSize(PHONE);
     await capture(page, `${name}-390x844-${locale}`);
+    const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+    expect(scroll, `${name} at 390 x 844 scrolls sideways`).toBeLessThanOrEqual(client);
     await page.setViewportSize(TABLET);
+  }
+
+  /** What the page reads after its first paint has come, so the picture is of the screen at work: `what` shows, or the capture goes on without it. */
+  async function settled(what: Locator): Promise<void> {
+    await expect(what).toBeVisible({ timeout: 30_000 }).catch(() => undefined);
   }
 
   test("the till: no shift, a count in progress and the shift open, with the panel closed and open, at 1180 x 820 and 390 x 844", async ({ page }) => {
@@ -860,6 +868,7 @@ test.describe("screens: the shift's strip", () => {
       await resolvePendingCounts(d.admin, till);
       await openAs(page, cashier, "en/till/", { device: d.device });
       await expect(strip).toContainText(t.idle, { timeout: 30_000 });
+      await settled(page.getByRole("region", { name: MESSAGES.en.till.queue_title }).locator("img").first());
       await both(page, "till-no-shift");
       await toggle.click();
       await both(page, "till-no-shift-panel");
@@ -894,6 +903,7 @@ test.describe("screens: the shift's strip", () => {
       await resolvePendingCounts(d.admin, till);
       await openAs(page, cashier, "am/till/", { device: d.device });
       await expect(page.getByTestId("shift-strip")).toContainText(t.idle, { timeout: 30_000 });
+      await settled(page.getByRole("region", { name: MESSAGES.am.till.queue_title }).locator("img").first());
       await both(page, "till-no-shift", "am");
     } finally {
       await ensureOpenShift(d.admin, till);
@@ -928,6 +938,7 @@ test.describe("screens: the shift's strip", () => {
       );
       await page.reload();
       await expect(strip).toContainText(said, { timeout: 30_000 });
+      await settled(page.getByRole("article").first());
       await both(page, "kds-kitchen-strip-refusal");
       await strip.getByRole("button", { name: MESSAGES.en.shifts.strip_more, exact: true }).click();
       await both(page, "kds-kitchen-strip-panel");
@@ -950,6 +961,7 @@ test.describe("screens: the shift's strip", () => {
       await openAs(page, baker.api, "en/production/", { device: demo.device });
       await expect(page.getByRole("heading", { level: 1, name: t.production.title })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId("shift-strip")).toContainText(t.shifts.idle, { timeout: 30_000 });
+      await settled(page.getByRole("article").first().locator("img").first());
       await both(page, "production-strip");
     } finally {
       await ensureOpenShift(demo.admin, cakeRoom);
