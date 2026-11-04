@@ -1,8 +1,9 @@
 "use client";
 
+import { Download, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { auditExport, olderAuditPage, useAuditPage } from "@/lib/api/audit";
 import { useRosterPeople } from "@/lib/api/adminShifts";
@@ -34,8 +35,10 @@ import { useErrorText } from "@/lib/errors";
 import { businessToday } from "@/lib/orderNo";
 import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
-import { addisStamp, saveBlob, TD, TH } from "../payments/shared";
-import { Alert, Button, Field, PageHeader, Select, Status, TextInput } from "../ui";
+import { ACTIONS_CELL, EmptyRow, Notice, TableCard, Toolbar, ToolbarField, ToolbarSelect } from "../admin/kit";
+import { LoadingRows } from "../admin/rows";
+import { addisStamp, saveBlob } from "../payments/shared";
+import { Alert, Button, PageHeader } from "../ui";
 import { EntryDrawer } from "./EntryDrawer";
 import { useNames } from "./names";
 import { SubjectCell } from "./SubjectCell";
@@ -46,10 +49,15 @@ import { SubjectCell } from "./SubjectCell";
 // drawer (its before and after as a diff). The list is not polled: an audit trail does not need a live refresh, so the first page is read
 // when the filters change and again on Refresh, and older pages by cursor (4.5c's foldHead and olderCursor). The admin (audit.export)
 // downloads the same filters as CSV or Excel.
+//
+// Step 6.4d (fresh-counter.md 4.4, the CatalogList board's title row, toolbar and table): the title row with its Amharic twin, the exports
+// as its actions; the filters as the toolbar (still the search landmark "Audit log filters" with the same labels), Apply the primary
+// button; the entries a table card (the time in tabular numbers, the action code in a neutral chip, the subject a brand link, Open at the
+// row's end), Refresh and when it was read on the card's title row, the older entries in its foot.
 
 const PATH = "/admin/audit";
 
-export function AuditScreen() {
+export function AuditScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("audit");
   const params = useSearchParams();
   const router = useRouter();
@@ -65,10 +73,14 @@ export function AuditScreen() {
 
   return (
     <>
-      <PageHeader title={t("title")} intro={t("intro")} />
-      <div className="space-y-6">
+      <PageHeader
+        title={t("title")}
+        intro={t("intro")}
+        twin={titleAm ? { text: titleAm, lang: "am" } : undefined}
+        actions={exporter ? <ExportButtons filters={filters} query={query} /> : undefined}
+      />
+      <div className="flex flex-col gap-6">
         <FilterForm key={queryKey} filters={filters} onApply={(next) => go(auditFilterParams(next))} onClear={() => go({})} />
-        {exporter ? <ExportBar filters={filters} query={query} /> : null}
         <AuditList key={queryKey} query={query} onOpen={(id) => go({ ...query, id: String(id) })} />
       </div>
       {openId !== null ? <EntryDrawer key={openId} id={openId} onClose={() => go(query)} /> : null}
@@ -115,106 +127,101 @@ function AuditList({ query, onOpen }: { query: Record<string, string>; onOpen: (
     }
   }
 
+  const footer = page.data ? (
+    <div className="flex flex-wrap items-center gap-3">
+      {more ? (
+        <Button variant="secondary" size="md" loading={olderBusy} onClick={() => void loadOlder()}>
+          {olderBusy ? t("list.older_loading") : t("list.older")}
+        </Button>
+      ) : rows.length > 0 ? (
+        <p className="text-[13px] text-neutral-600">{t("list.end")}</p>
+      ) : null}
+      {olderError ? <Alert>{errorText.message(olderError)}</Alert> : null}
+    </div>
+  ) : undefined;
+
   return (
-    <section aria-label={t("list.region")} className="space-y-3">
+    <section aria-label={t("list.region")} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="secondary" disabled={page.isFetching} onClick={() => void page.refetch()}>
+        <Button variant="secondary" size="md" disabled={page.isFetching} onClick={() => void page.refetch()}>
+          <RefreshCw className={`size-4 ${page.isFetching && page.data ? "motion-safe:animate-spin" : ""}`} strokeWidth={2} aria-hidden="true" />
           {page.isFetching && page.data ? t("list.refreshing") : t("list.refresh")}
         </Button>
-        <p className="text-sm text-neutral-600">{readAt > 0 ? t("list.read_at", { time: addisStamp(new Date(readAt).toISOString(), dates) }) : t("list.not_polled")}</p>
+        <p className="text-[13px] text-neutral-600">{readAt > 0 ? t("list.read_at", { time: addisStamp(new Date(readAt).toISOString(), dates) }) : t("list.not_polled")}</p>
       </div>
-      {page.isError && page.data ? <Alert>{t("list.stale")}</Alert> : null}
-      {page.data ? (
-        <AuditTable rows={rows} onOpen={onOpen} />
-      ) : page.isError ? (
+      {page.isError && page.data ? <Notice tone="amber">{t("list.stale")}</Notice> : null}
+      {page.isError && !page.data ? (
         <div className="space-y-3">
           <Alert>{errorText.message(page.error)}</Alert>
-          <Button variant="secondary" onClick={() => void page.refetch()}>
+          <Button variant="secondary" size="md" onClick={() => void page.refetch()}>
             {t("retry")}
           </Button>
         </div>
       ) : (
-        <p role="status" className="py-6 text-base text-neutral-600">
-          {t("list.loading")}
-        </p>
+        <AuditTable rows={page.data ? rows : null} onOpen={onOpen} footer={footer} />
       )}
-      {page.data ? (
-        <div className="flex flex-wrap items-center gap-3">
-          {more ? (
-            <Button variant="secondary" disabled={olderBusy} onClick={() => void loadOlder()}>
-              {olderBusy ? t("list.older_loading") : t("list.older")}
-            </Button>
-          ) : rows.length > 0 ? (
-            <p className="text-base text-neutral-600">{t("list.end")}</p>
-          ) : null}
-          {olderError ? <Alert>{errorText.message(olderError)}</Alert> : null}
-        </div>
-      ) : null}
     </section>
   );
 }
 
-function AuditTable({ rows, onOpen }: { rows: AuditEntry[]; onOpen: (id: number) => void }) {
+function AuditTable({ rows, onOpen, footer }: { rows: AuditEntry[] | null; onOpen: (id: number) => void; footer?: ReactNode }) {
   const t = useTranslations("audit");
   const dates = useDateFormat();
   const names = useNames();
   return (
-    <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white px-4">
-      <table className="w-full border-collapse text-left text-base">
-        <caption className="sr-only">{t("list.table")}</caption>
-        <thead>
-          <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-            <th scope="col" className={TH}>{t("list.col_time")}</th>
-            <th scope="col" className={TH}>{t("list.col_who")}</th>
-            <th scope="col" className={TH}>{t("list.col_action")}</th>
-            <th scope="col" className={TH}>{t("list.col_subject")}</th>
-            <th scope="col" className={TH}>{t("list.col_where")}</th>
-            <th scope="col" className={TH}>{t("list.col_summary")}</th>
-            <th scope="col" className="py-2 font-medium">
-              <span className="sr-only">{t("list.col_open")}</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="py-6 text-neutral-600">
-                {t("list.empty")}
+    <TableCard caption={t("list.table")} minWidth="min-w-[980px]" footer={footer}>
+      <thead>
+        <tr>
+          <th scope="col">{t("list.col_time")}</th>
+          <th scope="col">{t("list.col_who")}</th>
+          <th scope="col">{t("list.col_action")}</th>
+          <th scope="col">{t("list.col_subject")}</th>
+          <th scope="col">{t("list.col_where")}</th>
+          <th scope="col">{t("list.col_summary")}</th>
+          <th scope="col">
+            <span className="sr-only">{t("list.col_open")}</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows === null ? (
+          <LoadingRows span={7} rows={6} label={t("list.loading")} />
+        ) : rows.length === 0 ? (
+          <EmptyRow span={7}>{t("list.empty")}</EmptyRow>
+        ) : (
+          rows.map((row) => (
+            <tr key={row.id} className="align-top">
+              <td className="whitespace-nowrap tabular-nums text-neutral-700">{addisStamp(row.at, dates)}</td>
+              <td>
+                <span className="font-semibold text-neutral-900">{names.person(row.actor)}</span>
+                {row.acting_user ? <span className="block text-[13px] text-neutral-600">{t("list.acting", { name: names.person(row.acting_user) })}</span> : null}
+              </td>
+              <td>
+                <span className="inline-flex min-h-7 items-center rounded-full bg-neutral-100 px-2.5 font-mono text-[13px] font-medium text-neutral-800" translate="no">
+                  {row.action}
+                </span>
+              </td>
+              <td>
+                <SubjectCell entry={row} />
+              </td>
+              <td>
+                {row.station_id !== null ? <span className="block">{names.station(row.station_id)}</span> : null}
+                {row.shift_id !== null ? <span className="block text-[13px] text-neutral-600">{t("shift_no", { id: row.shift_id })}</span> : null}
+                {row.station_id === null && row.shift_id === null ? <span className="text-neutral-600">—</span> : null}
+              </td>
+              <td>
+                <Summary entry={row} />
+              </td>
+              <td className={ACTIONS_CELL}>
+                <Button variant="secondary" size="md" compact aria-label={t("list.open_aria", { id: row.id })} onClick={() => onOpen(row.id)}>
+                  {t("list.open")}
+                </Button>
               </td>
             </tr>
-          ) : (
-            rows.map((row) => (
-              <tr key={row.id} className="border-b border-neutral-100 last:border-0">
-                <td className={`${TD} whitespace-nowrap tabular-nums`}>{addisStamp(row.at, dates)}</td>
-                <td className={TD}>
-                  {names.person(row.actor)}
-                  {row.acting_user ? <span className="block text-sm text-neutral-600">{t("list.acting", { name: names.person(row.acting_user) })}</span> : null}
-                </td>
-                <td className={`${TD} font-mono text-sm`} translate="no">
-                  {row.action}
-                </td>
-                <td className={TD}>
-                  <SubjectCell entry={row} />
-                </td>
-                <td className={TD}>
-                  {row.station_id !== null ? <span className="block">{names.station(row.station_id)}</span> : null}
-                  {row.shift_id !== null ? <span className="block text-sm text-neutral-600">{t("shift_no", { id: row.shift_id })}</span> : null}
-                  {row.station_id === null && row.shift_id === null ? "—" : null}
-                </td>
-                <td className={TD}>
-                  <Summary entry={row} />
-                </td>
-                <td className="py-3 align-top">
-                  <Button variant="secondary" compact aria-label={t("list.open_aria", { id: row.id })} onClick={() => onOpen(row.id)}>
-                    {t("list.open")}
-                  </Button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+          ))
+        )}
+      </tbody>
+    </TableCard>
   );
 }
 
@@ -224,14 +231,14 @@ function Summary({ entry }: { entry: AuditEntry }) {
   return (
     <>
       {changed.length > 0 ? (
-        <span className="block font-mono text-sm text-neutral-800">
+        <span className="block font-mono text-[13px] text-neutral-800">
           <span translate="no">{changed.join(", ")}</span>
           {more > 0 ? <span className="font-sans text-neutral-600"> {t("list.more", { count: more })}</span> : null}
         </span>
       ) : (
-        <span className="block text-sm text-neutral-600">{t("list.nothing_changed")}</span>
+        <span className="block text-[13px] text-neutral-600">{t("list.nothing_changed")}</span>
       )}
-      {reason ? <span className="mt-1 block text-sm text-neutral-700">{t("list.reason", { reason })}</span> : null}
+      {reason ? <span className="mt-1 block text-[13px] text-neutral-700">{t("list.reason", { reason })}</span> : null}
     </>
   );
 }
@@ -300,85 +307,90 @@ function FilterForm({ filters, onApply, onClear }: { filters: AuditFilters; onAp
   const stations = [...workStations].sort((a, b) => a.station_id - b.station_id);
   const stationKnown = stations.some((station) => String(station.station_id) === draft.stationId);
   return (
-    <form role="search" aria-label={t("filters.title")} onSubmit={onSubmit} className="space-y-3 rounded-lg border border-neutral-200 bg-white p-4" noValidate>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label={t("filters.from")} error={issue === "dates" ? t("filters.issue_dates") : undefined}>
-          {(props) => <TextInput {...props} type="date" value={draft.from} onChange={(event) => set("from", event.target.value)} />}
-        </Field>
-        <Field label={t("filters.to")}>{(props) => <TextInput {...props} type="date" value={draft.to} onChange={(event) => set("to", event.target.value)} />}</Field>
-        <Field label={t("filters.person")} hint={t("filters.person_hint")}>
-          {(props) => (
-            <Select {...props} value={draft.actorId} onChange={(event) => set("actorId", event.target.value)}>
-              <option value="">{t("filters.anyone")}</option>
-              {people.map((person) => (
-                <option key={person.id} value={String(person.id)}>
-                  {names.person(person)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label={t("filters.station")}>
-          {(props) => (
-            <Select {...props} value={draft.stationId} onChange={(event) => set("stationId", event.target.value)}>
-              <option value="">{t("filters.any_station")}</option>
-              {stations.map((station) => (
-                <option key={station.station_id} value={String(station.station_id)}>
-                  {locale === "am" ? station.name_am || station.name_en : station.name_en || station.name_am}
-                </option>
-              ))}
-              {draft.stationId && !stationKnown ? <option value={draft.stationId}>{t("station_no", { id: draft.stationId })}</option> : null}
-            </Select>
-          )}
-        </Field>
-        <Field label={t("filters.action")}>
-          {(props) => (
-            <Select {...props} value={draft.actionPick} onChange={(event) => set("actionPick", event.target.value)}>
-              <option value="">{t("filters.any_action")}</option>
-              {ACTION_PREFIXES.map((prefix) => (
-                <option key={prefix} value={prefix}>
-                  {t("filters.prefix_option", { name: t(`prefix.${prefix.slice(0, -1)}`), prefix })}
-                </option>
-              ))}
-              <option value={OTHER}>{t("filters.other_action")}</option>
-            </Select>
-          )}
-        </Field>
+    <form role="search" aria-label={t("filters.title")} onSubmit={onSubmit} className="flex flex-col gap-2.5" noValidate>
+      <Toolbar className="items-start">
+        <ToolbarField label={t("filters.from")} type="date" value={draft.from} error={issue === "dates" ? t("filters.issue_dates") : undefined} onChange={(event) => set("from", event.target.value)} />
+        <ToolbarField label={t("filters.to")} type="date" value={draft.to} onChange={(event) => set("to", event.target.value)} />
+        <ToolbarSelect label={t("filters.person")} title={t("filters.person_hint")} value={draft.actorId} onChange={(event) => set("actorId", event.target.value)}>
+          <option value="">{t("filters.anyone")}</option>
+          {people.map((person) => (
+            <option key={person.id} value={String(person.id)}>
+              {names.person(person)}
+            </option>
+          ))}
+        </ToolbarSelect>
+        <ToolbarSelect label={t("filters.station")} value={draft.stationId} onChange={(event) => set("stationId", event.target.value)}>
+          <option value="">{t("filters.any_station")}</option>
+          {stations.map((station) => (
+            <option key={station.station_id} value={String(station.station_id)}>
+              {locale === "am" ? station.name_am || station.name_en : station.name_en || station.name_am}
+            </option>
+          ))}
+          {draft.stationId && !stationKnown ? <option value={draft.stationId}>{t("station_no", { id: draft.stationId })}</option> : null}
+        </ToolbarSelect>
+      </Toolbar>
+      <Toolbar className="items-start">
+        <ToolbarSelect label={t("filters.action")} value={draft.actionPick} onChange={(event) => set("actionPick", event.target.value)}>
+          <option value="">{t("filters.any_action")}</option>
+          {ACTION_PREFIXES.map((prefix) => (
+            <option key={prefix} value={prefix}>
+              {t("filters.prefix_option", { name: t(`prefix.${prefix.slice(0, -1)}`), prefix })}
+            </option>
+          ))}
+          <option value={OTHER}>{t("filters.other_action")}</option>
+        </ToolbarSelect>
         {draft.actionPick === OTHER ? (
-          <Field label={t("filters.action_text")} hint={t("filters.action_text_hint")}>
-            {(props) => <TextInput {...props} value={draft.actionText} maxLength={ACTION_MAX} className="font-mono" onChange={(event) => set("actionText", event.target.value)} />}
-          </Field>
+          <ToolbarField
+            label={t("filters.action_text")}
+            title={t("filters.action_text_hint")}
+            value={draft.actionText}
+            maxLength={ACTION_MAX}
+            onChange={(event) => set("actionText", event.target.value)}
+          />
         ) : null}
-        <Field label={t("filters.subject")}>
-          {(props) => (
-            <Select {...props} value={draft.subjectPick} onChange={(event) => set("subjectPick", event.target.value)}>
-              <option value="">{t("filters.any_subject")}</option>
-              {SUBJECT_CHOICES.map((kind) => (
-                <option key={kind} value={kind}>
-                  {t(`subject.${kind}`)}
-                </option>
-              ))}
-              <option value={OTHER}>{t("filters.other_subject")}</option>
-            </Select>
-          )}
-        </Field>
+        <ToolbarSelect label={t("filters.subject")} value={draft.subjectPick} onChange={(event) => set("subjectPick", event.target.value)}>
+          <option value="">{t("filters.any_subject")}</option>
+          {SUBJECT_CHOICES.map((kind) => (
+            <option key={kind} value={kind}>
+              {t(`subject.${kind}`)}
+            </option>
+          ))}
+          <option value={OTHER}>{t("filters.other_subject")}</option>
+        </ToolbarSelect>
         {draft.subjectPick === OTHER ? (
-          <Field label={t("filters.subject_text")} hint={t("filters.subject_text_hint")}>
-            {(props) => <TextInput {...props} value={draft.subjectText} maxLength={SUBJECT_TYPE_MAX} className="font-mono" onChange={(event) => set("subjectText", event.target.value)} />}
-          </Field>
+          <ToolbarField
+            label={t("filters.subject_text")}
+            title={t("filters.subject_text_hint")}
+            value={draft.subjectText}
+            maxLength={SUBJECT_TYPE_MAX}
+            onChange={(event) => set("subjectText", event.target.value)}
+          />
         ) : null}
-        <Field label={t("filters.subject_id")} error={issue === "subject_id" ? t("filters.issue_id") : undefined}>
-          {(props) => <TextInput {...props} inputMode="numeric" value={draft.subjectId} maxLength={10} onChange={(event) => set("subjectId", event.target.value)} />}
-        </Field>
-        <Field label={t("filters.shift_id")} error={issue === "shift_id" ? t("filters.issue_id") : undefined}>
-          {(props) => <TextInput {...props} inputMode="numeric" value={draft.shiftId} maxLength={10} onChange={(event) => set("shiftId", event.target.value)} />}
-        </Field>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit">{t("filters.apply")}</Button>
+        <ToolbarField
+          label={t("filters.subject_id")}
+          inputMode="numeric"
+          value={draft.subjectId}
+          maxLength={10}
+          size={8}
+          error={issue === "subject_id" ? t("filters.issue_id") : undefined}
+          onChange={(event) => set("subjectId", event.target.value)}
+        />
+        <ToolbarField
+          label={t("filters.shift_id")}
+          inputMode="numeric"
+          value={draft.shiftId}
+          maxLength={10}
+          size={8}
+          error={issue === "shift_id" ? t("filters.issue_id") : undefined}
+          onChange={(event) => set("shiftId", event.target.value)}
+        />
+        <Button type="submit" size="md">
+          {t("filters.apply")}
+        </Button>
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
+          size="md"
           onClick={() => {
             setDraft(draftOf(NO_AUDIT_FILTERS));
             setIssue(null);
@@ -387,17 +399,19 @@ function FilterForm({ filters, onApply, onClear }: { filters: AuditFilters; onAp
         >
           {t("filters.clear")}
         </Button>
-      </div>
+      </Toolbar>
     </form>
   );
 }
 
 // --- the export (audit.export, the admin) ---------------------------------------------------------------------------------------------------
 
-function ExportBar({ filters, query }: { filters: AuditFilters; query: Record<string, string> }) {
+/** CSV and Excel of the list's filters: the title row's actions, a group named "Export" described by what the file holds. */
+function ExportButtons({ filters, query }: { filters: AuditFilters; query: Record<string, string> }) {
   const t = useTranslations("audit");
   const locale = useLocale();
   const errorText = useErrorText();
+  const hintId = useId();
   const [busy, setBusy] = useState<"csv" | "xlsx" | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -424,23 +438,29 @@ function ExportBar({ filters, query }: { filters: AuditFilters; query: Record<st
 
   const tooLarge = tooLargeOf(error);
   return (
-    <section aria-label={t("export.title")} className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button variant="secondary" disabled={busy !== null} onClick={() => void download("csv")}>
+    <div className="flex flex-col items-end gap-1.5">
+      <div role="group" aria-label={t("export.title")} aria-describedby={hintId} className="flex flex-wrap justify-end gap-2">
+        <Button variant="secondary" size="md" compact disabled={busy !== null} onClick={() => void download("csv")}>
+          <Download className="size-4" strokeWidth={2} aria-hidden="true" />
           {busy === "csv" ? t("export.busy") : t("export.csv")}
         </Button>
-        <Button variant="secondary" disabled={busy !== null} onClick={() => void download("xlsx")}>
+        <Button variant="secondary" size="md" compact disabled={busy !== null} onClick={() => void download("xlsx")}>
+          <Download className="size-4" strokeWidth={2} aria-hidden="true" />
           {busy === "xlsx" ? t("export.busy") : t("export.xlsx")}
         </Button>
-        <p className="text-sm text-neutral-600">{t("export.hint")}</p>
       </div>
+      <p id={hintId} className="sr-only">
+        {t("export.hint")}
+      </p>
       {error ? (
-        <Alert>
+        <p role="alert" className="max-w-md text-right text-[13px] font-medium text-red-700">
           {errorText.message(error)}
-          {tooLarge ? <span className="mt-1 block">{t("export.too_large", { rows: tooLarge.rows, max: tooLarge.maxRows })}</span> : null}
-        </Alert>
+          {tooLarge ? <span className="block">{t("export.too_large", { rows: tooLarge.rows, max: tooLarge.maxRows })}</span> : null}
+        </p>
       ) : null}
-      <Status>{saved ? t("export.saved", { name: saved }) : null}</Status>
-    </section>
+      <p role="status" className={saved ? "max-w-md truncate text-right text-[13px] font-medium text-brand-700" : "sr-only"}>
+        {saved ? t("export.saved", { name: saved }) : null}
+      </p>
+    </div>
   );
 }

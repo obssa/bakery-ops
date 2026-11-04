@@ -597,7 +597,8 @@
       "disk": "Disk used by the backups"
     },
     "files": {
-      "used": "Disk used by the receipt photos"
+      "used": "Disk used by the receipt photos",
+      "media": "Product photos"
     },
     "drill": {
       "title": "Restore drill",

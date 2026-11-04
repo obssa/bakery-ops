@@ -22,7 +22,8 @@ export interface SystemStatus {
     disk_used_mb: number;
     drill: { last_at: string | null; status: RunStatus | null };
   };
-  files: { used_mb: number };
+  /** used_mb: the receipt photos; media_used_mb: the live product photos (step 6.1b, ADR 0022) */
+  files: { used_mb: number; media_used_mb?: number };
   devices: { enrolled: number; seen_15m: number; revoked: number };
   flags: Record<string, boolean>;
   error_tracking: { enabled: boolean };
