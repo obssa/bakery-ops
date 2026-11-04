@@ -139,7 +139,8 @@ export function TablesSheet({
       ) : tables.data && tables.data.length === 0 ? (
         <p className="text-[15px] text-neutral-600">{t("no_tables")}</p>
       ) : (
-        <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+        // three columns in the 480 px sheet (the whole width on a phone): 72 px targets with the code and the state's word
+        <ul className="grid grid-cols-3 gap-3">
           {(tables.data ?? []).map((row) => {
             const selected = row.id === tableId;
             const state = t(`state_${row.state}`);
@@ -148,7 +149,6 @@ export function TablesSheet({
                 <button
                   type="button"
                   aria-pressed={selected}
-                  aria-label={t("table_button", { code: row.code, state })}
                   onClick={() => {
                     onTable(row.id);
                     onClose();
@@ -157,8 +157,12 @@ export function TablesSheet({
                     selected ? SELECTED : `${STATE_STYLE[row.state]} hover:border-neutral-500`
                   } ${focusRing}`}
                 >
-                  <span className="max-w-full truncate text-lg font-semibold leading-tight">{row.code}</span>
-                  <span className="max-w-full truncate text-[13px]" title={locale === "am" ? row.name_am : row.name_en}>
+                  {/* named by its own text, "Table T1, free" (the name the specs read); the code and the state it draws are hidden from readers */}
+                  <span className="sr-only">{t("table_button", { code: row.code, state })}</span>
+                  <span aria-hidden="true" className="max-w-full truncate text-lg font-semibold leading-tight">
+                    {row.code}
+                  </span>
+                  <span aria-hidden="true" className="max-w-full truncate text-[13px]" title={locale === "am" ? row.name_am : row.name_en}>
                     {state}
                   </span>
                 </button>

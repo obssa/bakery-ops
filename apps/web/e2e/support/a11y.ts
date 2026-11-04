@@ -29,9 +29,25 @@ export async function fontsReady(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Resolves once every animation and transition that ends has ended (step 6.3a): a colour measured half way through a 150 ms transition (a
+ * button just enabled, a sheet sliding in) is neither the colour before nor after, so axe's contrast check would read a colour the screen
+ * never rests on. Endless ones (a skeleton's pulse) are not waited for.
+ */
+export async function settledAnimations(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const ending = document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity);
+    await Promise.all(ending.map((animation) => animation.finished.catch(() => undefined)));
+  });
+}
+
 /** The serious and critical violations axe finds on the page as it is now; an empty list on a screen that passes. */
 export async function axeFindings(page: Page, options: { exclude?: string[] } = {}): Promise<A11yFinding[]> {
   await fontsReady(page);
+  // the screens' transitions are all written under motion-safe: with reduced motion they are off, so every colour is the one at rest;
+  // anything still running (a transition already started) is waited for
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await settledAnimations(page);
   let builder = new AxeBuilder({ page }).withTags([...A11Y_TAGS]);
   for (const selector of options.exclude ?? []) builder = builder.exclude(selector);
   const { violations } = await builder.analyze();

@@ -107,15 +107,18 @@ function LineRow({
       <div className="flex items-center gap-3">
         <button
           type="button"
-          aria-label={t("line_edit", { name })}
           aria-haspopup="dialog"
           onClick={() => setOpen(true)}
           className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left ${focusRing}`}
         >
-          <ProductImage image={image} name={name} category={category} size="thumb" className="w-12 shrink-0 rounded-lg" />
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate text-[15px] font-semibold text-neutral-900">{name}</span>
-            {meta ? <span className="truncate text-[13px] text-neutral-600">{meta}</span> : null}
+          {/* named by its own text, "Change <name>", which readers hear; the thumb, the name and the note it draws are hidden from them */}
+          <span className="sr-only">{t("line_edit", { name })}</span>
+          <span aria-hidden="true" className="flex min-w-0 flex-1 items-center gap-3">
+            <ProductImage image={image} name={name} category={category} size="thumb" className="w-12 shrink-0 rounded-lg" />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate text-[15px] font-semibold text-neutral-900">{name}</span>
+              {meta ? <span className="truncate text-[13px] text-neutral-600">{meta}</span> : null}
+            </span>
           </span>
         </button>
         <div className="flex shrink-0 items-center gap-0.5 rounded-xl border border-neutral-200 p-0.5">
