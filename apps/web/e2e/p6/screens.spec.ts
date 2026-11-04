@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
 import en from "../../messages/en.json";
-import { fontsReady } from "../support/a11y";
+import { fontsReady, settledAnimations } from "../support/a11y";
 import type { Api } from "../support/api";
 import { freshDevice } from "../support/devices";
 import { live } from "../support/env";
@@ -84,10 +84,7 @@ async function capture(page: Page, name: string, loading: string[] = []): Promis
       { timeout: 15_000 },
     )
     .catch(() => undefined);
-  await page.evaluate(async () => {
-    const ending = document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity);
-    await Promise.all(ending.map((animation) => animation.finished.catch(() => undefined)));
-  });
+  await settledAnimations(page);
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
 }
