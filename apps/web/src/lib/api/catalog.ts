@@ -2,7 +2,25 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authed, can, useSession } from "../session";
-import type { Collection, Item, ItemPrice, ItemRefundSettings, NewScheduledRequest, ProductionBoardPage, ProductionRequest, Recipe, RecipeCost, RecipeSpec, RecipeVersionRow, Station, User } from "./types";
+import type {
+  Collection,
+  Item,
+  ItemChanges,
+  ItemImageAnswer,
+  ItemPrice,
+  Menu,
+  NewScheduledRequest,
+  ProductImageDetail,
+  ProductionBoardPage,
+  ProductionRequest,
+  Recipe,
+  RecipeCost,
+  RecipeSpec,
+  RecipeVersionRow,
+  Station,
+  User,
+} from "./types";
+import { upload } from "./upload";
 
 // The calls of the admin Catalog item page, the planner and the station switch (Phase 2, step 2.8d). Reads run only while
 // signed in; every write carries the Idempotency-Key its form chose and refreshes what it changes.
@@ -16,15 +34,98 @@ export function useItem(id: number | null) {
   return useQuery({ queryKey: ["item", id], queryFn: () => authed<Item>(`/items/${id}`), enabled });
 }
 
-/** PATCH /items/{item} with the two refund settings (step 4.5g); the item and every list of items are read again. */
-export function useSaveRefundSettings(id: number) {
+/** Everything that shows a product reads again after it changed: its page, every list of items (the catalog, the thumbs) and the menu. */
+function refreshProduct(client: ReturnType<typeof useQueryClient>, id: number): void {
+  void client.invalidateQueries({ queryKey: ["items"] });
+  void client.invalidateQueries({ queryKey: ["item-prices", id] });
+  void client.invalidateQueries({ queryKey: ["menu", "product-page"] });
+}
+
+/**
+ * The product page's "Save changes" (step 6.4b): PATCH /items/{item} with the fields that changed (names, category, fulfilment, the two
+ * refund settings), then POST /items/{item}/prices when the price changed (a new price starts on the next order). Each write has its own
+ * Idempotency-Key, chosen by the page for its payload, so a retry after a time-out replays instead of writing twice.
+ */
+export function useSaveProduct(id: number) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ body, idempotencyKey }: { body: ItemRefundSettings; idempotencyKey: string }) => authed<Item>(`/items/${id}`, { method: "PATCH", body, idempotencyKey }),
+    mutationFn: async ({ changes, changesKey, price, priceKey }: { changes: ItemChanges | null; changesKey: string; price: string | null; priceKey: string }) => {
+      const item = changes ? await authed<Item>(`/items/${id}`, { method: "PATCH", body: changes, idempotencyKey: changesKey }) : null;
+      if (item) client.setQueryData(["item", id], item);
+      if (price !== null) {
+        await authed<ItemPrice>(`/items/${id}/prices`, { method: "POST", body: { price }, idempotencyKey: priceKey });
+        // the field shows the new current price as soon as the page's edits are let go
+        await client.invalidateQueries({ queryKey: ["item-prices", id] });
+      }
+      return item;
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ["item", id] });
+      refreshProduct(client, id);
+    },
+  });
+}
+
+/** "Take off the menu" and "Put back on the menu": PATCH /items/{item} with is_active (step 6.4b). */
+export function useSetOnMenu(id: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ active, idempotencyKey }: { active: boolean; idempotencyKey: string }) => authed<Item>(`/items/${id}`, { method: "PATCH", body: { is_active: active }, idempotencyKey }),
     onSuccess: (item) => {
       client.setQueryData(["item", id], item);
-      void client.invalidateQueries({ queryKey: ["items"] });
+      refreshProduct(client, id);
     },
+  });
+}
+
+/** The item as the page holds it, with its photo replaced (the upload's and the remove's answers carry the photo, not the item). */
+function withImage(client: ReturnType<typeof useQueryClient>, id: number, image: ProductImageDetail | null): void {
+  client.setQueryData<Item>(["item", id], (item) => (item ? { ...item, image } : item));
+}
+
+/**
+ * POST /items/{item}/image (step 6.1a, multipart: `photo`, the four crop fields, `client_uuid`) through lib/api/upload.ts, for its
+ * progress. The page's item takes the new photo from the answer; the lists and the menu are read again.
+ */
+export function useUploadProductPhoto(id: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ form, idempotencyKey, onProgress }: { form: FormData; idempotencyKey: string; onProgress?: (sent: number) => void }) =>
+      upload<ItemImageAnswer>(`/items/${id}/image`, { form, idempotencyKey, onProgress }),
+    onSuccess: (answer) => {
+      withImage(client, id, answer.data.image);
+      refreshProduct(client, id);
+    },
+  });
+}
+
+/** DELETE /items/{item}/image: the pad shows the category's placeholder again. */
+export function useRemoveProductPhoto(id: number) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idempotencyKey }: { idempotencyKey: string }) => authed<ItemImageAnswer>(`/items/${id}/image`, { method: "DELETE", idempotencyKey }),
+    onSuccess: () => {
+      withImage(client, id, null);
+      refreshProduct(client, id);
+    },
+  });
+}
+
+/**
+ * The menu as the pad reads it (GET /menu with the unavailable products), for the product page's stock chip and its live pad-card preview
+ * (step 6.4b): only for someone who may read it (orders.create), read once and kept for 15 s. Without it (no permission, or a computer
+ * that is not an enrolled device) the preview shows the product from its own fields, without a stock chip.
+ */
+export function useProductPageMenu() {
+  const me = useSession((s) => s.me);
+  const enabled = useSignedIn() && can(me, "orders.create");
+  return useQuery({
+    queryKey: ["menu", "product-page"],
+    // the menu asks for an enrolled device; on a computer that is not one the page goes on without the chip, never to the gate's screen
+    queryFn: () => authed<Menu>("/menu", { query: { include_unavailable: 1 }, deviceGate: false }),
+    enabled,
+    staleTime: 15_000,
+    retry: false,
   });
 }
 

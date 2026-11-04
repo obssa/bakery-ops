@@ -180,6 +180,34 @@ export interface ProductImageView {
   height: number;
 }
 
+/**
+ * Step 6.1a (phase-6 plan 4.3): the photo as GET /items/{item} and the upload's answer give it, for the photo card's "Added by ... · date ·
+ * W x H" line: the summary plus the row's id, where it came from (an admin's upload, or the demo branch's stock photo, step 6.1c), when and
+ * by whom (null for a demo photo).
+ */
+export interface ProductImageDetail extends ProductImageView {
+  id: number;
+  origin: "upload" | "demo";
+  uploaded_at: string | null;
+  uploaded_by: { id: number; name: string | null } | null;
+}
+
+/** POST /items/{item}/image and DELETE /items/{item}/image (step 6.1a) */
+export interface ItemImageAnswer {
+  data: { item_id: number; image: ProductImageDetail | null };
+}
+
+/** PATCH /items/{item} (UpdateItemRequest): the fields the product page changes (step 6.4b) */
+export interface ItemChanges {
+  name_en?: string;
+  name_am?: string;
+  category_id?: number | null;
+  fulfilment?: Fulfilment;
+  is_active?: boolean;
+  refundable?: boolean;
+  refund_restock?: boolean;
+}
+
 /** Laravel resource collections */
 export interface Collection<T> {
   data: T[];
