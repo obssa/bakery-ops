@@ -26,7 +26,8 @@ import { Avatar, Chip, type Tone } from "./ui";
 // bar displays, the production board, the count, and the start page) has exactly one 68 px bar, as its design board does (StationBar):
 // the station mark, the screen's title with its Amharic name and a line with the shift and the person; on the right the screen's own
 // buttons (lib/topBar.ts), the sync chip, the language button, the bell, the "Screens" menu and the person's menu (the dates' calendar and
-// "Sign out" are in it); then the outbox's band and the page. The admin console has no top bar (step 6.4a, the Admin board): it is its
+// "Sign out" are in it); then the place for a screen's band under the bar (the shift's attention strip, in the page's flow), the outbox's
+// band and the page. The admin console has no top bar (step 6.4a, the Admin board): it is its
 // sidebar and the content, and AdminFrame draws both, its `main`, the outbox's band and, in the sidebar, the sync chip, the bell, the
 // account menu and "Screens". The sign-in screen is a split of its own, without a bar, and carries "Screens" itself. The waiter pad (the
 // `fill` frame) draws its zones edge to edge and, from 1024 px, in the window's height. A page whose calls are refused because this device
@@ -396,6 +397,12 @@ function StationBar({ fill }: { fill: boolean }) {
   );
 }
 
+/** The place for a screen's band under the bar (StationHeaderNotice): in the page's flow, so it pushes the page down; no height while it is empty. */
+function StationNoticePlace() {
+  const setNotice = useTopBarSlots((s) => s.setNotice);
+  return <div ref={setNotice} />;
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations("app");
   const pathname = usePathname();
@@ -417,7 +424,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         {t("skip_to_content")}
       </a>
       {/* the admin console draws its own frame, the band included (AdminFrame) */}
-      {frame === "login" || frame === "admin" ? null : <StationBar fill={fill} />}
+      {frame === "login" || frame === "admin" ? null : (
+        <>
+          <StationBar fill={fill} />
+          <StationNoticePlace />
+        </>
+      )}
       {frame === "admin" ? null : <PendingIndicator />}
       {frame === "admin" ? (
         children
