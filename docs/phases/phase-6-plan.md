@@ -1257,12 +1257,13 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       over the head (the head still opens the timeline; axe's label-content-name-mismatch). The timeline is a white card closed by an X
       ("Close timeline"); Void is the danger button.
     - **The order record**: Back and Refresh in the title row; the details card (the facts in 13 px caps, the balance a 30 px figure with its
-      state chip, History and Void as the card's actions); then, from 1280 px, the lines (a table card with each product's photo) and the
+      state chip, History and Void as the card's actions); then, from 1400 px, the lines (a table card with each product's photo) and the
       timeline on the left, and the payments (one card, each payment a block on a hairline), the receipt (6.3b's stacked actions) and the
       refund on the right.
     - **Payments**: the exports as the title row's actions (a group "Export" described by what the file holds); the filters as the toolbar,
-      still the search landmark "Filters" with the same labels; the list a table card (the photo a 48 px thumb, the status chips with a dot,
-      the chevron "Open payment N"), the older pages and the last read in its foot. The payment dialog closes with an X ("Close"), its facts
+      still the search landmark "Filters" with the same labels; the list a table card (the payment's number under its time rather than a
+      column of its own, so the chevron stays in a 1440 px window; the photo a 48 px thumb, the status chips with a dot, the chevron "Open
+      payment N"), the older pages and the last read in its foot. The payment dialog closes with an X ("Close"), its facts
       over hairlines, the two decisions as two white cards (Verify primary, Dispute the danger button), what came of them in the brand-50
       status line. The photo viewer and its thumbs on the admin radii (a thumb without its picture shows an icon).
     - **Payment methods**: the methods a titled table card, the moves as arrow buttons named "Move up <name>" and "Move down <name>", Edit,
@@ -1275,14 +1276,15 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       filters as the toolbar, the reason a chip; purchases and transfers filtered by status segments; "New purchase" in the title row, the
       new purchase and an open one white cards above the list, brought into view when they open (Close is an X); suppliers and reorder rules
       full width with their forms under them in two columns, brought into view by Edit. **The planner**: the open requests a table card
-      with each product's 52 × 39 photo and its other name, the priority and the state as chips, the baker picked in the row; the schedule
-      form under it in two columns.
+      with each product's 52 × 39 photo and its other name, the priority and the state as chips, one Baker column (the baker picked in the
+      row while the request waits, named once it is under way; it was two columns, Baker and Assign, which did not fit); the schedule form
+      under it in two columns.
     - **Colours**: green is money confirmed only (a verified payment, an order paid in full); a ready line, a confirmed purchase or transfer,
       a method switched on and an active supplier or rule are brand; the open or linked row brand-50; links brand; no blue tab, green
       notice or own border is left on these screens. `HistoryLink`, `RecordLink`, `QueryBox` (grey rows while loading), `Pager` and
       `PaymentStatusCell` take the admin look wherever they are used.
-    - Messages, both languages: `adminPayments.receipts.text_title`, `print_title`, `inventory.stock.clear_search`. `docs/i18n/am-review.csv`
-      regenerated.
+    - Messages, both languages: `adminPayments.receipts.text_title`, `print_title`, `inventory.stock.clear_search`; removed
+      `adminPayments.list.col_payment`, `planner.col_assign`. `docs/i18n/am-review.csv` regenerated.
     - Tests: `e2e/p6/screens.spec.ts` gains, at 1440 × 900 as the demo bakery's admin, the Orders board with a timeline open, an order's
       record, Payments, Payment methods, Reconciliation, Receipt settings, the stock list, the ledger, purchases with one open, suppliers,
       transfers, reorder and the planner in English, and Payments and the stock list in Amharic. Left as they were (p6-a11y does not cover

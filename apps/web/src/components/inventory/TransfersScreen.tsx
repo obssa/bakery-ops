@@ -94,7 +94,7 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
 
   return (
     <>
-      <TableCard caption={t("transfers.list")} minWidth="min-w-[880px]">
+      <TableCard caption={t("transfers.list")} minWidth="min-w-[800px]">
         <thead>
           <tr>
             <th scope="col">{t("transfers.col_item")}</th>
@@ -122,8 +122,8 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
                     {itemName}
                     {transfer.note ? <span className="block text-[13px] font-normal text-neutral-600">{transfer.note}</span> : null}
                   </th>
-                  <td className="whitespace-nowrap text-right">
-                    <span className="font-semibold tabular-nums">{qty(transfer.qty, transfer.item.unit)}</span>
+                  <td className="min-w-36 text-right">
+                    <span className="block whitespace-nowrap font-semibold tabular-nums">{qty(transfer.qty, transfer.item.unit)}</span>
                     {transfer.source_available !== undefined ? (
                       <span className={`block text-[13px] tabular-nums ${short ? "font-semibold text-red-700" : "text-neutral-600"}`}>
                         {t(short ? "transfers.source_short" : "transfers.source_available", { qty: qty(transfer.source_available, transfer.item.unit) })}

@@ -60,7 +60,7 @@ import { CARD, Fact, Notice, ProductThumb, TableCard, useProductLook } from "./k
 // each payment card what was paid back of it (GET /payments/{payment} refunds, 4.5c's ["payment", id]), the header what came back.
 //
 // Step 6.4c (fresh-counter.md 4.4): the title row with its Amharic twin, "Back to the orders board" and Refresh as its actions; the details
-// card (the facts in 13 px caps over their values, the balance as a figure with its state chip); then two columns from 1280 px: the lines
+// card (the facts in 13 px caps over their values, the balance as a figure with its state chip); then two columns from 1400 px: the lines
 // (a table card with each product's photo) and the timeline on the left, the payments, the receipt and the refund on the right.
 
 const STATUS_TONE: Record<OrderStatus, ChipTone> = {
@@ -213,7 +213,7 @@ function RecordBody({ order, detail, titleAm }: { order: OrderDetail; detail: De
 
         <Details order={order} payments={payments.data ?? null} people={people} mayVoid={mayVoid} onVoid={() => setVoiding({})} />
 
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_26rem]">
+        <div className="grid items-start gap-5 min-[87.5rem]:grid-cols-[minmax(0,1fr)_26rem]">
           <div className="flex min-w-0 flex-col gap-5">
             <Lines order={order} />
             <Timeline order={order} payments={payments} people={people} />
