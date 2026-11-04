@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { historyQuery, type SubjectKind } from "@/lib/audit";
 import { can, useSession } from "@/lib/session";
-import { focusRing } from "../styles";
+import { buttonClass } from "../styles";
 
 /**
  * "Audit history": the audit log filtered to one subject (a payment, an order, a count), for the holders of audit.view (step 4.5f). The
@@ -19,7 +19,7 @@ export function HistoryLink({ kind, id, label }: { kind: SubjectKind; id: number
     <Link
       href={{ pathname: "/admin/audit", query: historyQuery(kind, id) }}
       aria-label={label}
-      className={`inline-flex min-h-12 items-center rounded-md border border-neutral-300 bg-white px-4 text-base font-medium text-neutral-900 hover:bg-neutral-100 ${focusRing}`}
+      className={buttonClass({ variant: "secondary", size: "md" })}
     >
       {t("history")}
     </Link>
