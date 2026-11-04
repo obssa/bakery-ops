@@ -1215,7 +1215,9 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       the three changes) and a second case (a GIF refused in the card; a 640 x 480 photo drawn on a canvas, "Too small for the pad",
       "Use this photo" off). `a11y-product.spec.ts` (`p6-a11y`, its own file beside `a11y.spec.ts`): the page in en and am with a photo,
       the remove dialog, no photo, a refusal, the framing step and the recipe's drawer. `screens.spec.ts`: `product-photo-1440x900-en`,
-      `-am`, `product-framing-1440x900-en`, `product-empty-1440x900-en` and `product-refusal-1440x900-en` on the demo bakery (Croissant
+      `-am`, `product-framing-1440x900-en` (and `product-framing-page-1440x900-en`, the whole page, since the step runs below 900 px),
+      `product-empty-1440x900-en` and `product-refusal-1440x900-en` on the demo bakery, each taken once the pad's menu has answered (the
+      stock chip and the preview read it) (Croissant
       with its demo photo, the framing cancelled; Bottled water without its photo for the empty card and the refusal, its photo put back
       after). `e2e/support/productPhoto.ts` gains `dropFile`, `fixtureFile`, `menuEtag` and `mediaStatus`.
     - **Messages**, both languages: the `product` (the page) and `photo` (the card) namespaces; `recipe.back` removed. The review sheet's

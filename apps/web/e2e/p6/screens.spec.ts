@@ -87,7 +87,8 @@ async function demoAccount(role: string): Promise<DemoAccount> {
  * "Checking the shift…" lines), its fonts and the photos in view have loaded, and every animation that ends has ended (a sheet sliding in
  * would be caught half way; the skeletons' endless pulse is not waited for).
  */
-async function capture(page: Page, name: string, loading: string[] = []): Promise<void> {
+/** `fullPage`: the whole page, for a screen taller than the window (6.4b's framing step, drawn on a 1180 px tall board). */
+async function capture(page: Page, name: string, loading: string[] = [], fullPage = false): Promise<void> {
   for (const text of loading) await expect(page.getByText(text, { exact: true })).toHaveCount(0, { timeout: 30_000 });
   await fontsReady(page);
   await page
@@ -104,7 +105,7 @@ async function capture(page: Page, name: string, loading: string[] = []): Promis
     .catch(() => undefined);
   await settledAnimations(page);
   mkdirSync(SHOTS, { recursive: true });
-  await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
+  await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage });
 }
 
 /** The pad of the demo waiter in `locale`, unlocked, with the first three products that can be sold in the order. */
@@ -549,9 +550,12 @@ async function demoProduct(name: string): Promise<{ demo: DemoBakery; product: D
 
 async function openProduct(page: Page, demo: DemoBakery, product: DemoProduct, locale: keyof typeof MESSAGES): Promise<void> {
   const t = MESSAGES[locale];
+  // the stock chip and the preview's card come from the pad's menu: the capture waits for its answer
+  const menu = page.waitForResponse((response) => response.url().includes("/api/v1/menu"), { timeout: 30_000 }).catch(() => undefined);
   await openAs(page, demo.admin, `${locale}/admin/catalog/?item=${product.id}`, { device: demo.device });
   await expect(page.getByRole("heading", { level: 1, name: locale === "am" ? product.name_am : product.name_en })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(t.common.loading, { exact: true })).toHaveCount(0, { timeout: 30_000 });
+  await menu;
 }
 
 test.describe("screens: the product page", () => {
@@ -589,6 +593,8 @@ test.describe("screens: the product page", () => {
       }
       await frame.focus();
     });
+    // the whole framing step, as the board draws it: the preview and the buttons under the frame
+    await capture(page, "product-framing-page-1440x900-en", [], true).catch(() => undefined);
     // cancelled: the demo photo stays as it was
     await card.getByRole("button", { name: en.photo.cancel }).click().catch(() => undefined);
   });
