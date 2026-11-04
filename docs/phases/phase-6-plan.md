@@ -1412,6 +1412,9 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
         (`e2e/support/inventory.ts`) reads `after.onHandText` "20,000 g", `rule.reorderText` "50,000 g" and `ask.text` "5,000 g", because
         those are the figures on the screens it reads; its `kitchenStart.onHandText` "1000 g" is the KDS strip's and did not change.
       - The Payments chevron was fixed here too, then reverted (`9e6a5a1`), because PR #121 fixes it.
+      - Today's words before the first sale, from the live site: `today.updated_never` "no figures yet", `today.not_built` "No figures yet"
+        and `today.not_built_long` "Today's figures appear a few minutes after the first sale.", with their Amharic twins, in place of "not
+        built yet". Analytics' "Days not built" notice is unchanged. No spec read the old Today strings, so only a comment changed.
     - **`mod-shifts` 30 minutes**: it took 18 m 16 s on this PR's run, against the reusable job's 20.
     - **The report** `docs/phases/phase-6-report.md`, with the local `gate_check --mode done --phase 6 --no-tests --no-e2e` "before the
       claim". No phase 6 to-do marker is left once 6.4b replaced the last placeholder.

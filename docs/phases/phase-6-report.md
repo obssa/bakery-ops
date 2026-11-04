@@ -140,7 +140,7 @@ accepted with their dated notes, the manifest's `phases.6.adrs`, the skill's `ci
 | 4 | every p0 to p5 Playwright project and `gate-p0` to `gate-p5` stay green in the same run; selectors move only where the plan names the spec and the reason | `e2e-p0` to `e2e-p5`, `gate-p0` to `gate-p5`; the specs each step changed are listed under "Specs that changed" | green at `213c6a8` |
 | 5 | ADRs 0022 and 0023 accepted; no phase 6 to-do marker left | `gate_check`'s ADR and marker rows, under "Before the claim" | PASS |
 
-These results are from `213c6a8`, the last run read before this report's head; that head adds PR #121, the names' logic spec, `mod-shifts`' timeout and documents. The coordinator's run on the head is the one the claim rests on.
+These results are from `213c6a8`, the last run read before this report's head; that head adds PR #121, the names' logic spec, `mod-shifts`' timeout, Today's words and documents. The coordinator's run on the head is the one the claim rests on.
 
 ## CI evidence
 
@@ -174,7 +174,7 @@ These results are from `213c6a8`, the last run read before this report's head; t
 - **Attempt 1 of that run** failed with no failed job: `mod-orders`, `gate-p0` and `backup-drill` have no job record, and what needs them was skipped. `main`'s run 41815631204 at
   `5fd19f0` ended the same way minutes apart, with `mod-orders` and `backup-drill` missing. It looks like a GitHub fault in creating those jobs, not the code, though that is
   inferred from the timing and the missing records. `gh run rerun --failed` was refused; a full rerun passed.
-- **The run on this report's head has not been read here.** It adds PR #121, `a11y-names-logic.spec.ts`, `mod-shifts`' timeout and documents.
+- **The run on this report's head has not been read here.** It adds PR #121, `a11y-names-logic.spec.ts`, `mod-shifts`' timeout, Today's words and documents.
 
 ## The screens reviewed against the canvas
 
@@ -265,6 +265,12 @@ Stock, the Ledger, Purchases, Transfers and Reorder, through `qtyFigure` (`trimD
 A field a person edits stays ungrouped, and the KDS strip keeps its "1000 g". `p2-purchase-transfer`'s fixture changed with it, because it
 reads the figure on those screens: `after.onHandText` "20,000 g", `rule.reorderText` "50,000 g" and `ask.text` "5,000 g". The Payments table's
 clipped chevron at 1440 × 900 was the review's other item; it is fixed in PR #121, so this step's own fix was reverted (`9e6a5a1`) to leave one.
+
+**From the live site: Today's words before the first sale.** Today said "not built yet", which is an engineer's phrase, on a day with no sale so far; nothing is broken, the
+figures simply follow the first sale. `today.updated_never` is now "no figures yet", `today.not_built` "No figures yet" and `today.not_built_long` "Today's figures appear a
+few minutes after the first sale.", with their Amharic twins ("ገና አሃዝ የለም" and "የዛሬ አሃዞች ከመጀመሪያው ሽያጭ ከጥቂት ደቂቃዎች በኋላ ይታያሉ።", written here and not reviewed by a fluent
+reader). Analytics' "Days not built" notice is another feature and is unchanged. No spec reads the old Today strings: `p4 dashboards-live` reads the analytics notice's "7 days of
+this range are not built yet", and only a comment in `screens.spec.ts` used the words. 6.4a's As built note keeps the old string as what that step built.
 
 ## Known gaps
 

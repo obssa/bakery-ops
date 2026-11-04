@@ -485,7 +485,7 @@ test.describe("screens: admin", () => {
       test.setTimeout(90_000);
       const t = MESSAGES[locale];
       await openAdmin(page, `${locale}/admin/`, t.today.title);
-      // the KPI row and the top sellers have answered (figures, or the line that says they are not built yet), and the shifts card shows
+      // the KPI row and the top sellers have answered (figures, or the line that says there are none yet), and the shifts card shows
       await expect(page.getByRole("group", { name: t.today.kpi_sales, exact: true })).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
       await expect(page.getByRole("region", { name: t.today.top_title }).locator("li, p").first()).toBeVisible({ timeout: 30_000 });
       await expect(page.getByRole("region", { name: t.today.shifts_title, exact: true })).toBeVisible();
