@@ -862,8 +862,12 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       logical write; Start goes through the outbox as before and the card says so while it waits); a refusal shows on the card.
     - **The oven's progress bar is not drawn** (10.2 Q5): no batch payload carries a planned duration (`production_batches` has no such
       column), so the card says the minutes so far instead.
-    - **The request card** (`RequestDetail`) opens in a 480 px drawer from the right instead of beside the board, which leaves the four
-      columns their width on a tablet. Its section keeps the name "Request card: <product>"; inside, the product's photo, the facts in a
+    - **The request card** (`RequestDetail`) opens in a 480 px panel from the right, under the station top bar and over the right-hand
+      columns, instead of in a column beside the board, which leaves the four columns their width on a tablet. The panel is not a
+      dialog and has no scrim: the bar (the bell, New batch) and the cards on its left stay in reach while it is open. A first draft
+      used the modal `Drawer`; its scrim covered the bar, and `p2-stockout-production`'s baker could no longer open the bell with the
+      card still open, so the test timed out. The panel takes the focus when it opens, and Escape or "Close card" closes it (on a phone it
+      covers the window). Its section keeps the name "Request card: <product>"; inside, the product's photo, the facts in a
       `neutral-50` well, the recipe on the `Table` (shortfalls red, with "Request transfer"), the steps, the Done form and the moves at
       52 px. Accept, Start, Done, Confirm, Send back and Cancel request keep their names. "Close card" is an icon button of that name.
     - **The count screen**: the station top bar names it ("Shift count" with its Amharic name, and under it the station, the shift's day

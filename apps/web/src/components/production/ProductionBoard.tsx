@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Plus, Store } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCategories, useItems } from "@/lib/api/hooks";
 import type { Collection, Locale, ProductionRequest, Station } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
@@ -91,8 +91,8 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   const columns = useMemo(() => (snapshot ? boardColumns(snapshot.state, stationId) : null), [snapshot, stationId]);
   const total = columns ? COLUMNS.reduce((n, column) => n + columns[column].length, 0) : 0;
   const openedRequest = opened !== null ? snapshot?.state.requests.find((request) => request.id === opened.id) : undefined;
-  const openedName = openedRequest ? (locale === "am" ? openedRequest.product.name_am : openedRequest.product.name_en) : "";
   const open = useCallback((request: ProductionRequest, focus?: "finish") => setOpened((current) => (current?.id === request.id && !focus ? null : { id: request.id, focus })), []);
+  const close = useCallback(() => setOpened(null), []);
 
   // the station top bar names the board (the Production board's header): its name, its Amharic name on the English page, and the station
   // whose shift the strip follows with that shift ("Bakery oven · Morning shift")
@@ -194,17 +194,16 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
       )}
 
       {openedRequest ? (
-        <Drawer label={t("card_label", { name: openedName })} onClose={() => setOpened(null)}>
+        <CardPanel key={openedRequest.id} onClose={close}>
           <RequestDetail
-            key={openedRequest.id}
             summary={openedRequest}
             image={images.get(openedRequest.product.id) ?? null}
             category={categoryOf.get(openedRequest.product.id) ?? null}
             focus={opened?.focus}
-            onClose={() => setOpened(null)}
+            onClose={close}
             onChanged={refresh}
           />
-        </Drawer>
+        </CardPanel>
       ) : null}
 
       {sheet === "new_batch" ? <NewBatchDialog stationId={stationId} onClose={() => setSheet(null)} onAsked={refresh} /> : null}
@@ -218,6 +217,35 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
           <DisplayCasePanel />
         </Drawer>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The request card beside the board: a 480 px panel from the right, under the station top bar, over the right-hand columns, with no scrim,
+ * so the bar (the bell, the board's buttons) and the cards on the left stay in reach while it is open. The panel takes the focus when it
+ * opens; Escape or the card's own "Close card" closes it. The card inside is the region "Request card: <product>". On a phone it covers
+ * the window.
+ */
+function CardPanel({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    panel.current?.focus();
+  }, []);
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div
+      ref={panel}
+      tabIndex={-1}
+      className="fixed inset-0 z-20 overflow-y-auto border-l border-neutral-200 bg-white p-6 shadow-float outline-none motion-safe:animate-drawer-in md:left-auto md:top-17 md:w-[480px]"
+    >
+      {children}
     </div>
   );
 }

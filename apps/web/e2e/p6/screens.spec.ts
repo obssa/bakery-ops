@@ -179,14 +179,15 @@ test.describe("screens", () => {
     await openBoard(page, "en");
     await capture(page, "production-1180x820-en");
 
-    // the request card in its drawer: the admin's batch in the oven, opened on its Done form by the card's own action
+    // the request card in its panel beside the board: the admin's batch in the oven, opened on its Done form by the card's own action
+    const card = page.getByRole("region", { name: /^Request card: / });
     const finish = demo.inOven ? page.getByRole("button", { name: `${t.action_finish}: ${demo.inOven.name_en}` }) : null;
     if (finish && (await finish.count()) > 0) await finish.click();
     else await page.getByRole("article").first().getByRole("button").first().click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(card).toBeVisible();
     await capture(page, "production-card-1180x820-en");
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(card).toHaveCount(0);
 
     await page.getByRole("button", { name: t.new_batch }).click();
     await expect(page.getByRole("dialog", { name: t.new_batch_title })).toBeVisible();

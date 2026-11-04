@@ -37,6 +37,12 @@ function prefix(message: string, values: Record<string, string>): string {
   return fill(open?.index === undefined ? message : message.slice(0, open.index), values);
 }
 
+/** The name of an open request card on the production board, "Request card: <product>", whatever the product. */
+function requestCard(locale: keyof typeof MESSAGES): RegExp {
+  const start = prefix(MESSAGES[locale].production.card_label, {}).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${start}`);
+}
+
 test.describe("a11y", () => {
   for (const locale of ["en", "am"] as const) {
     test(`the sign-in screen (${locale}) has no serious or critical axe violation`, async ({ page }) => {
@@ -109,7 +115,7 @@ test.describe("a11y", () => {
   }
 
   // Step 6.3c: the production board in the demo bakery (its products carry the demo photos), as its admin sees it: a card in each
-  // column with its thumb and its one action (support/demoProduction.ts), then a request card open in its drawer.
+  // column with its thumb and its one action (support/demoProduction.ts), then a request card open beside it.
   for (const locale of ["en", "am"] as const) {
     test(`the production board (${locale}), and a request card open on it, have no serious or critical axe violation`, async ({ page }) => {
       test.skip(live, "CI only: the sweep reads the seeded demo bakery");
@@ -126,11 +132,9 @@ test.describe("a11y", () => {
       await expect(card).toBeVisible({ timeout: 30_000 });
       await expectAccessible(page, `${locale}/production/`);
 
-      // the card's name opens the request card in a drawer from the right
+      // the card's name opens the request card in a panel from the right, beside the board (no dialog: the bar and the board stay usable)
       await card.getByRole("button").first().click();
-      const drawer = page.getByRole("dialog");
-      await expect(drawer).toBeVisible();
-      await expect(drawer.getByRole("region")).toBeVisible();
+      await expect(page.getByRole("region", { name: requestCard(locale) })).toBeVisible();
       await expectAccessible(page, `${locale}/production/ (a request card open)`);
     });
   }
