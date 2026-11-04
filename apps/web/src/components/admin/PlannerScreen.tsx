@@ -253,7 +253,7 @@ function RequestRow({ request, locale, look, people }: { request: ProductionRequ
 
   return (
     <tr className="align-top">
-      <td className="min-w-60">
+      <td className="min-w-52">
         <span className="flex items-start gap-3">
           <ProductThumb itemId={request.product.id} name={name} look={look} className="w-[52px] rounded-lg" />
           <span className="min-w-0">

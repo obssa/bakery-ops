@@ -43,8 +43,9 @@ import { addisStamp, Money, PaymentsNav, PaymentStatusCell, saveBlob, useChannel
 //
 // Step 6.4c (fresh-counter.md 4.4, the CatalogList board): the title row with its Amharic twin and the two exports as its actions; the
 // section's tabs; the filters as the toolbar (the dates and the order number with their labels in the box, the method and status selects,
-// the two switches, Apply and Clear), still the search landmark "Filters" with the same labels; the list a table card (the photo a 48 px
-// thumb, the status chips, the chevron "Open payment N"), the older pages and the time of the last read in its footer.
+// the two switches, Apply and Clear), still the search landmark "Filters" with the same labels; the list a table card (the payment's number
+// under its time, so the chevron stays in a 1440 px window; the photo a 48 px thumb, the status chips, the chevron "Open payment N"), the
+// older pages and the time of the last read in its footer.
 
 const PATH = "/admin/payments";
 
@@ -362,7 +363,6 @@ function PaymentsTable({
     <TableCard caption={t("list.table")} footer={footer} minWidth="min-w-[960px]">
       <thead>
         <tr>
-          <th scope="col">{t("list.col_payment")}</th>
           <th scope="col">{t("list.col_received")}</th>
           <th scope="col">{t("list.col_order")}</th>
           <th scope="col">{t("list.col_channel")}</th>
@@ -379,14 +379,16 @@ function PaymentsTable({
       </thead>
       <tbody>
         {rows.length === 0 ? (
-          <EmptyRow span={9}>{t("list.empty")}</EmptyRow>
+          <EmptyRow span={8}>{t("list.empty")}</EmptyRow>
         ) : (
           rows.map((row) => (
             <tr key={row.id}>
-              <td className="tabular-nums text-neutral-600">{row.id}</td>
               <td className="min-w-40">
                 <span className="block whitespace-nowrap tabular-nums">{addisStamp(row.received_at, dates)}</span>
-                {row.received_by.name ? <span className="block text-[13px] text-neutral-600">{t("list.by", { name: row.received_by.name })}</span> : null}
+                <span className="block text-[13px] text-neutral-600">
+                  <span className="tabular-nums">{`#${row.id}`}</span>
+                  {row.received_by.name ? ` · ${t("list.by", { name: row.received_by.name })}` : null}
+                </span>
               </td>
               <td>
                 <span className="whitespace-nowrap font-semibold">{t("list.order_label", { no: orderLabel(row.order) })}</span>
