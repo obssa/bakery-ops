@@ -402,8 +402,10 @@ export function PageHeader({
   actions?: ReactNode;
   twin?: { text: string; lang: "en" | "am" };
 }) {
+  // beside actions the title and intro take what the actions leave (at least 24rem before they wrap under), so a long intro wraps in its
+  // column and the actions stay at the right of the row, as the boards draw them
   const text = (
-    <div className="min-w-0 space-y-1">
+    <div className="min-w-0 flex-[1_1_24rem] space-y-1">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h1 className="text-3xl font-bold tracking-tight text-neutral-900">{title}</h1>
         {twin ? (
@@ -419,7 +421,7 @@ export function PageHeader({
   return (
     <header className={`mb-6 ${actions ? "flex flex-wrap items-end justify-between gap-4" : ""}`}>
       {text}
-      {actions ? <div className="flex flex-wrap items-center gap-2.5">{actions}</div> : null}
+      {actions ? <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2.5">{actions}</div> : null}
     </header>
   );
 }
