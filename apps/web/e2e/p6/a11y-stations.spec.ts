@@ -3,9 +3,10 @@ import am from "../../messages/am.json";
 import en from "../../messages/en.json";
 import { expectAccessible } from "../support/a11y";
 import { requireAdmin } from "../support/env";
-import { buildStationFixture, loginOnce, orderLabel, sendOrder, type StationKind } from "../support/fixture";
+import { buildStationFixture, buildTillStaff, findOrCreateStation, loginOnce, orderLabel, sendOrder, type StationKind } from "../support/fixture";
 import { openAs } from "../support/pad";
 import { buildPayFixture, serveAll, takeawayOrder, tidyOrder } from "../support/payments";
+import { ensureDrawer, ensureOpenShift, resolvePendingCounts, settleStation } from "../support/shifts";
 
 // Phase 6 gate project p6-a11y, step 6.3b (docs/phases/phase-6-plan.md 6.3b and D7; fresh-counter.md 3.3, 3.4 and 5): the kitchen and bar
 // displays in kitchen night and the till's pay screen, in English and in Amharic, with no serious or critical axe violation of WCAG 2.0 and
@@ -13,6 +14,8 @@ import { buildPayFixture, serveAll, takeawayOrder, tidyOrder } from "../support/
 // checked as it is drawn with work on it: a display with a ticket new, then made and waiting for pickup, so the timer chip, the accent
 // buttons and the Ready strip are measured on the night ground; the till with an order in the waiting list, its pay sheet open beside it,
 // and the receipt after the payment. Everything is built in the isolated "E2E Test Branch" through the API.
+//
+// phase-6/shift-strip: the shift's attention strip and its open panel, on the till and in kitchen night with a refusal in the strip.
 
 const MESSAGES = { en, am } as const;
 
@@ -112,6 +115,78 @@ test.describe("a11y: the stations of step 6.3b", () => {
         await expect(take).toHaveCount(0, { timeout: 15_000 });
       } finally {
         await tidyOrder(fixture, sent.id);
+      }
+    });
+  }
+
+  for (const locale of ["en", "am"] as const) {
+    test(`the shift's strip and its open panel on the till (${locale}) have no serious or critical axe violation`, async ({ page }) => {
+      test.setTimeout(150_000);
+      const t = MESSAGES[locale];
+      const staff = await buildTillStaff(requireAdmin(test.skip));
+      const till = await findOrCreateStation(staff.admin, "till");
+      await ensureDrawer(staff.admin, till);
+      await settleStation(staff.admin, till);
+      await resolvePendingCounts(staff.admin, till);
+      try {
+        await openAs(page, staff.cashier.api, `${locale}/till/`);
+        const strip = page.getByTestId("shift-strip");
+        const panel = page.getByRole("region", { name: t.shifts.region, exact: true }).locator("[data-shift-panel]");
+        await expect(strip.getByRole("button", { name: t.shifts.start, exact: true })).toBeVisible({ timeout: 30_000 });
+        await expectAccessible(page, `${locale}/till/ (the strip, no shift)`);
+
+        await strip.getByRole("button", { name: t.shifts.strip_more, exact: true }).click();
+        await expect(panel.getByRole("button", { name: t.shifts.start, exact: true })).toBeVisible();
+        await expectAccessible(page, `${locale}/till/ (the panel open, no shift)`);
+        await page.keyboard.press("Escape");
+        await expect(panel).toHaveCount(0);
+
+        // with a count in progress: the strip's action is a link
+        await strip.getByRole("button", { name: t.shifts.start, exact: true }).click();
+        await expect(strip.getByRole("link", { name: t.shifts.open_count, exact: true })).toBeVisible({ timeout: 15_000 });
+        await expectAccessible(page, `${locale}/till/ (the strip, a count in progress)`);
+        await strip.getByRole("button", { name: t.shifts.strip_more, exact: true }).click();
+        await expect(panel.getByRole("link", { name: t.shifts.open_count, exact: true })).toBeVisible();
+        await expectAccessible(page, `${locale}/till/ (the panel open, a count in progress)`);
+      } finally {
+        await ensureOpenShift(staff.admin, till);
+      }
+    });
+
+    test(`the shift's strip, a refusal in it and its open panel in kitchen night (${locale}) have no serious or critical axe violation`, async ({ page }) => {
+      test.setTimeout(150_000);
+      const t = MESSAGES[locale];
+      const fixture = await buildStationFixture(requireAdmin(test.skip), "kitchen");
+      const { admin, station } = fixture;
+      await settleStation(admin, station);
+      await resolvePendingCounts(admin, station);
+      try {
+        const worker = await loginOnce(fixture.worker.phone, fixture.worker.password, fixture.branchId);
+        await openAs(page, worker.api, `${locale}/kds/kitchen/`);
+        const strip = page.getByTestId("shift-strip");
+        const panel = page.getByRole("region", { name: t.shifts.region, exact: true }).locator("[data-shift-panel]");
+        await expect(page.locator(".kitchen-night")).toHaveCount(1);
+        await expect(strip.getByRole("button", { name: t.shifts.start, exact: true })).toBeVisible({ timeout: 30_000 });
+        await expectAccessible(page, `${locale}/kds/kitchen/ (the strip at night)`);
+
+        // the strip in amber on the night ground, as the API refuses a stock read
+        const said = locale === "am" ? "በዚህ ጣቢያ የተከፈተ ፈረቃ የለም።" : "No shift is open at this station.";
+        await page.route("**/stock-strip*", (route) =>
+          route.fulfill({
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify({ message_key: "inventory.shift.required", message_en: "No shift is open at this station.", message_am: "በዚህ ጣቢያ የተከፈተ ፈረቃ የለም።", station_id: station.id, location_id: fixture.location.id }),
+          }),
+        );
+        await page.reload();
+        await expect(strip).toContainText(said, { timeout: 30_000 });
+        await expectAccessible(page, `${locale}/kds/kitchen/ (a refusal in the strip at night)`);
+        await strip.getByRole("button", { name: t.shifts.strip_more, exact: true }).click();
+        await expect(panel.getByRole("alert")).toContainText(said);
+        await expectAccessible(page, `${locale}/kds/kitchen/ (the panel open at night)`);
+      } finally {
+        await page.unroute("**/stock-strip*");
+        await ensureOpenShift(admin, station);
       }
     });
   }

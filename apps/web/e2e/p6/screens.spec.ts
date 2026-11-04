@@ -12,7 +12,7 @@ import { live } from "../support/env";
 import { loginOnce } from "../support/fixture";
 import { openAs, typeCode } from "../support/pad";
 import { dropFile, FIXTURE_PHOTO } from "../support/productPhoto";
-import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCounts } from "../support/shifts";
+import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCounts, settleStation } from "../support/shifts";
 
 // Screenshots for review (brief "Design fidelity"; phase-6 plan section 7), in project p6-a11y, so they run in e2e-p6 on the demo bakery
 // that SEED_PHASE=6 gives its demo photos. Each Phase 6 step that rebuilds a screen captures it here, at 1180 x 820 for a station screen
@@ -43,6 +43,10 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 // catalog list's board would draw it in (loaded, its first rows in view): the Orders board with a card's timeline open, an order's record,
 // Payments, Payment methods, Reconciliation and Receipt settings, the stock list, the ledger, purchases with one open, suppliers,
 // transfers, reorder and the planner, in English, and Payments and the stock list in Amharic.
+//
+// phase-6/shift-strip: the shift's attention strip (the describe at the end): the till with no shift, with a count in progress, with the shift
+// open, and each with the panel open, at 1180 x 820 and at 390 x 844; the kitchen display at night with the strip, a refusal and the panel; the
+// production board with the strip. It settles shifts, so it runs last, and it puts them back.
 
 const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
@@ -821,6 +825,134 @@ test.describe("screens: the product page", () => {
         form.append("client_uuid", randomUUID());
         await demo.admin.postForm(`/items/${product.id}/image`, form).catch(() => undefined);
       }
+    }
+  });
+});
+
+// --- phase-6/shift-strip: the shift's prompt under the bar, covering nothing ---------------------------------------------------------------
+
+const PHONE = { width: 390, height: 844 };
+
+test.describe("screens: the shift's strip", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: TABLET });
+
+  /** The page as it stands, at the tablet's size and at the phone's, as <name>-<size>-<locale>.png. */
+  async function both(page: Page, name: string, locale: keyof typeof MESSAGES = "en"): Promise<void> {
+    await page.setViewportSize(TABLET);
+    await capture(page, `${name}-1180x820-${locale}`);
+    await page.setViewportSize(PHONE);
+    await capture(page, `${name}-390x844-${locale}`);
+    await page.setViewportSize(TABLET);
+  }
+
+  test("the till: no shift, a count in progress and the shift open, with the panel closed and open, at 1180 x 820 and 390 x 844", async ({ page }) => {
+    test.setTimeout(240_000);
+    const t = MESSAGES.en.shifts;
+    const d = await demoStations();
+    if (d.stations.till === null) throw new Error("the demo bakery has no till");
+    const till = { id: d.stations.till };
+    const cashier = await d.as("cashier");
+    const toggle = page.getByRole("region", { name: t.region, exact: true }).locator("button[data-shift-toggle]");
+    const strip = page.getByTestId("shift-strip");
+    try {
+      await settleStation(d.admin, till);
+      await resolvePendingCounts(d.admin, till);
+      await openAs(page, cashier, "en/till/", { device: d.device });
+      await expect(strip).toContainText(t.idle, { timeout: 30_000 });
+      await both(page, "till-no-shift");
+      await toggle.click();
+      await both(page, "till-no-shift-panel");
+      await page.keyboard.press("Escape");
+
+      await strip.getByRole("button", { name: t.start, exact: true }).click();
+      await expect(strip).toContainText(t.opening, { timeout: 15_000 });
+      await both(page, "till-count");
+      await toggle.click();
+      await both(page, "till-count-panel");
+      await page.keyboard.press("Escape");
+
+      await ensureOpenShift(d.admin, till);
+      await expect(strip).toBeHidden({ timeout: 30_000 });
+      await both(page, "till-shift-open");
+      await toggle.click();
+      await both(page, "till-shift-open-panel");
+    } finally {
+      await ensureOpenShift(d.admin, till);
+    }
+  });
+
+  test("the till in Amharic: the strip with no shift, at 1180 x 820 and 390 x 844", async ({ page }) => {
+    test.setTimeout(120_000);
+    const t = MESSAGES.am.shifts;
+    const d = await demoStations();
+    if (d.stations.till === null) throw new Error("the demo bakery has no till");
+    const till = { id: d.stations.till };
+    const cashier = await d.as("cashier");
+    try {
+      await settleStation(d.admin, till);
+      await resolvePendingCounts(d.admin, till);
+      await openAs(page, cashier, "am/till/", { device: d.device });
+      await expect(page.getByTestId("shift-strip")).toContainText(t.idle, { timeout: 30_000 });
+      await both(page, "till-no-shift", "am");
+    } finally {
+      await ensureOpenShift(d.admin, till);
+    }
+  });
+
+  test("the kitchen display at night: the strip, a refusal in it and the panel, in en, and the strip in am", async ({ page }) => {
+    test.setTimeout(240_000);
+    const d = await demoStations();
+    if (d.stations.kitchen === null) throw new Error("the demo bakery has no kitchen");
+    const kitchen = { id: d.stations.kitchen };
+    const chef = await d.as("chef");
+    const strip = page.getByTestId("shift-strip");
+    const said = "No shift is open at this station. Start a shift here before moving its stock.";
+    try {
+      await settleStation(d.admin, kitchen);
+      await resolvePendingCounts(d.admin, kitchen);
+      await openDisplay(page, d, "kitchen", "am", chef);
+      await expect(strip).toContainText(MESSAGES.am.shifts.idle, { timeout: 30_000 });
+      await capture(page, "kds-kitchen-strip-1180x820-am");
+
+      await openDisplay(page, d, "kitchen", "en", chef);
+      await expect(strip).toContainText(MESSAGES.en.shifts.idle, { timeout: 30_000 });
+      await both(page, "kds-kitchen-strip");
+
+      await page.route("**/stock-strip*", (route) =>
+        route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ message_key: "inventory.shift.required", message_en: said, message_am: said, station_id: kitchen.id, location_id: null }),
+        }),
+      );
+      await page.reload();
+      await expect(strip).toContainText(said, { timeout: 30_000 });
+      await both(page, "kds-kitchen-strip-refusal");
+      await strip.getByRole("button", { name: MESSAGES.en.shifts.strip_more, exact: true }).click();
+      await both(page, "kds-kitchen-strip-panel");
+    } finally {
+      await page.unroute("**/stock-strip*");
+      await ensureOpenShift(d.admin, kitchen);
+    }
+  });
+
+  test("the production board: the strip above its columns, as the cake baker with no shift, in en", async ({ page }) => {
+    test.setTimeout(180_000);
+    const t = MESSAGES.en;
+    const demo = await demoProduction();
+    const cakeRoom = demo.stations.find((s) => s.code === "cake_room");
+    if (!cakeRoom) throw new Error("the demo bakery has no cake room");
+    const baker = await demoPerson(demo, "cake_baker");
+    try {
+      await settleStation(demo.admin, cakeRoom);
+      await resolvePendingCounts(demo.admin, cakeRoom);
+      await openAs(page, baker.api, "en/production/", { device: demo.device });
+      await expect(page.getByRole("heading", { level: 1, name: t.production.title })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId("shift-strip")).toContainText(t.shifts.idle, { timeout: 30_000 });
+      await both(page, "production-strip");
+    } finally {
+      await ensureOpenShift(demo.admin, cakeRoom);
     }
   });
 });
