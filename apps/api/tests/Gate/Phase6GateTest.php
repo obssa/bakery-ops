@@ -222,9 +222,10 @@ it('serves each rendition signed out with its type, immutable for a year, an ETa
     phase6Media($this, '/api/v1/media/items/'.str_repeat('0', 64)."/card.{$ext}")->assertNotFound();
     phase6Media($this, "/api/v1/media/items/{$sha}/card.{$other}")->assertNotFound();
 
-    // replaced: the old URLs answer 404 at once, the new ones 200
+    // replaced by another picture: the old URLs answer 404 at once, the new ones 200. (Not imgJpeg(1600, 1200): the same drawing at a
+    // smaller scale gives the very same large rendition, so the same sha and the same URLs, which a shared photo is meant to do.)
     loginAs($admin);
-    $second = photoPost($this, $cake->id, imgJpeg(1600, 1200))->assertCreated()->json('data.image');
+    $second = photoPost($this, $cake->id, imgJpeg(2000, 1200))->assertCreated()->json('data.image');
     expect($second['card'])->not->toBe($first['card']);
     foreach (['thumb', 'card', 'large'] as $rendition) {
         phase6Media($this, $first[$rendition])->assertNotFound();
