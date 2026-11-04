@@ -3,6 +3,7 @@ import { requireAdmin } from "../support/env";
 import { loginOnce } from "../support/fixture";
 import { buildNightFixture, scheduleShift } from "../support/nightshift";
 import { openAs } from "../support/pad";
+import { openShiftBar } from "../support/shiftBar";
 import { currentShift, ensureOpenShift } from "../support/shifts";
 import { addDays, addisDate } from "../../src/lib/shiftsAdmin";
 
@@ -101,6 +102,8 @@ test.describe("p3 opening prefill", () => {
       await page.goto("en/production/");
       await expect(bar).toContainText("Shift open", { timeout: 30_000 });
       await expect(bar).toContainText(label);
+      // step 6.3c: on the production board the shift is a menu in the station top bar, closed while the shift is open
+      await openShiftBar(bar);
       await bar.getByRole("button", { name: "Close shift", exact: true }).click();
       await page.getByRole("dialog", { name: "Close the shift" }).getByRole("button", { name: "Close shift", exact: true }).click();
       await expect(bar).toContainText("Closing count in progress", { timeout: 15_000 });

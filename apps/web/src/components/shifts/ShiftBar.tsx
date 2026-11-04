@@ -44,7 +44,7 @@ const BADGE: Record<BarMode, { tone: "amber" | "blue" | "brand"; key: string }> 
 
 type ActionName = "start" | "start_carried" | "join" | "leave" | "close" | "cancel";
 
-export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?: "card" | "strip" | "menu" }) {
+export function ShiftBar({ model, look = "card", quiet = false }: { model: ShiftStation; look?: "card" | "strip" | "menu"; /** `menu` only: no opening by itself for a count in progress */ quiet?: boolean }) {
   const strip = look !== "card";
   const size = strip ? ("md" as const) : undefined;
   const t = useTranslations("shifts");
@@ -81,10 +81,11 @@ export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?:
   }, [status]);
 
   // `menu`: the panel opens by itself while the shift needs someone (none running, a count in progress, a refusal to answer) and then
-  // stays open until it is closed; a screen opened on a running shift shows only the menu's button
+  // stays open until it is closed; a screen opened on a running shift shows only the menu's button. The count screen (step 6.3c) is where
+  // a count in progress is done, so there it opens only on a refusal or a tap (`quiet`).
   const [expanded, setExpanded] = useState(false);
   const ownNotice = notice !== null && (notice.stationId === null || notice.stationId === station?.station_id);
-  const needsAction = loaded && ((shift !== undefined && barMode(shift) !== "open") || failure !== null || ownNotice);
+  const needsAction = loaded && ((!quiet && shift !== undefined && barMode(shift) !== "open") || failure !== null || ownNotice);
   useEffect(() => {
     if (needsAction) setExpanded(true);
   }, [needsAction]);

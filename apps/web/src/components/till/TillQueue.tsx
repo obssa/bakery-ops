@@ -5,6 +5,7 @@ import { useId, type ReactNode } from "react";
 import type { Locale, Order } from "@/lib/api/types";
 import { thumbStack, unitCount, type ProductImages } from "@/lib/images/orderThumbs";
 import { ageOf, secondsSince } from "@/lib/kds";
+import { useWaitText } from "@/lib/useWaitText";
 import { isSettled } from "@/lib/live/orders";
 import { visibleLines } from "@/lib/live/pad";
 import { useOrderNo } from "@/lib/orderNo";
@@ -70,7 +71,8 @@ function QueueCard({
   const settled = isSettled(order);
   const seconds = secondsSince(order.sent_at, now);
   const age = ageOf(seconds);
-  const minutes = t("queue_age", { minutes: Math.floor(seconds / 60) });
+  // "5:07", "1 h 05" or "3 d" (lib/durations.ts): an order left waiting for days reads in days, never "5709 min"
+  const minutes = useWaitText()(seconds);
   const no = useOrderNo(order);
   // a payment completed offline waits in the outbox (step 5.2a): no second sheet for this order until it was sent
   const waiting = useWaiting((item) => item.kind === "pay_batch" && item.subjectId === order.id);

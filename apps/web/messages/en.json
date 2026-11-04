@@ -22,7 +22,11 @@
     "sync_sending": "Online · {count} waiting",
     "sync_offline": "Offline",
     "sync_offline_waiting": "Offline · {count} waiting",
-    "sync_conflicts": "Conflicts · {count}"
+    "sync_conflicts": "Conflicts · {count}",
+    "sync_online_short": "Online",
+    "sync_sending_short": "{count} waiting",
+    "sync_offline_waiting_short": "Offline · {count}",
+    "sync_conflicts_short": "{count} to check"
   },
   "home": {
     "screens": "Screens",
@@ -156,7 +160,6 @@
     "queue_count": "{count, plural, one {# order} other {# orders}}",
     "queue_items": "{count, plural, one {# item} other {# items}}",
     "queue_items_qty": "{qty} items",
-    "queue_age": "{minutes} min",
     "pick_title": "Choose an order to take its payment",
     "pick_body": "Tap an order in the list. Its payment opens here, with the receipt beside it.",
     "stale": "Cannot reach the server. Showing what was loaded; it may be out of date.",
@@ -377,7 +380,6 @@
   },
   "production": {
     "title": "Production board",
-    "intro": "Requests from stock-outs and the plan, in the order to work them. Open a card to see the recipe and what is on hand.",
     "loading": "Loading the board…",
     "stale": "Cannot reach the server. Showing the last board; it may be out of date.",
     "empty": "No production requests right now.",
@@ -458,7 +460,35 @@
     "optional": "optional",
     "short_line": "{name}: short by {short} {unit}",
     "close": "Close",
-    "transfer_sent": "Transfer requested. The store keeper will confirm it."
+    "transfer_sent": "Transfer requested. The store keeper will confirm it.",
+    "chip_stock_out": "Stock out · asked automatically",
+    "chip_made": "Made {produced} of {asked} asked",
+    "chip_wasted": "{waste} wasted",
+    "meta_started": "{name} · started {time}",
+    "meta_started_anon": "Started {time}",
+    "meta_waited": "{time} so far",
+    "meta_overseer": "{name} · needs an overseer",
+    "meta_confirmed": "Confirmed {time}",
+    "meta_done": "Done {time}",
+    "action_accept": "Accept request",
+    "action_start": "Start batch",
+    "action_finish": "Finish · count made",
+    "action_confirm": "Confirm batch",
+    "action_of": "{action}: {name}",
+    "display_case": "Display case stock",
+    "display_case_short": "Display case",
+    "new_batch": "New batch",
+    "new_batch_title": "Ask for a new batch",
+    "new_batch_product": "Product",
+    "new_batch_choose": "Choose a product",
+    "new_batch_need_product": "Choose the product to make.",
+    "new_batch_none": "No product is made at these stations yet.",
+    "new_batch_qty": "Quantity",
+    "new_batch_qty_in": "Quantity ({unit})",
+    "new_batch_qty_hint": "Leave it empty for the usual batch of {qty} {unit}.",
+    "new_batch_note": "Note for the baker",
+    "new_batch_send": "Ask for this batch",
+    "new_batch_cancel": "Cancel"
   },
   "transfer": {
     "title": "Request transfer: {name}",
@@ -844,7 +874,9 @@
     "loading": "Loading…",
     "saving": "Saving…",
     "retry": "Try again",
-    "order_no_dated": "{no} of {date}"
+    "order_no_dated": "{no} of {date}",
+    "wait_hours": "{hours} h {minutes}",
+    "wait_days": "{days} d"
   },
   "errors": {
     "network": "Cannot reach the server. Check the connection and try again.",

@@ -73,3 +73,35 @@ export function canCancel(me: Me | null, request: ProductionRequest): boolean {
   if (!me) return false;
   return me.permissions.includes("production.plan") || request.requested_by?.id === me.user.id;
 }
+
+/**
+ * The one action a board card offers this person (fresh-counter.md 3.5, step 6.3c), the next move of the request card's own buttons:
+ * accept an open request (a baker, when nobody or they have it), start the batch they accepted, finish the batch they started (the request
+ * card opens on its Done form: produced and waste are counted there), or confirm a finished batch they may sign off and did not make
+ * themselves (the API refuses the one who made it). None otherwise: the card is still opened by its name.
+ */
+export type CardMove = "accept" | "start" | "finish" | "confirm";
+
+export function cardMove(me: Me | null, request: ProductionRequest): CardMove | null {
+  if (!me) return null;
+  const fulfils = me.permissions.includes("production.fulfil");
+  const mine = request.assigned_to?.id === me.user.id;
+  switch (request.status) {
+    case "requested":
+      return fulfils && (request.assigned_to === null || mine) ? "accept" : null;
+    case "accepted":
+      return fulfils && mine ? "start" : null;
+    case "in_progress":
+      return fulfils && mine && request.batch?.status === "started" ? "finish" : null;
+    case "pending_confirmation":
+      return request.batch !== null && request.batch.finished_by?.id !== me.user.id && canSignOff(me, request.station.id) ? "confirm" : null;
+    default:
+      return null;
+  }
+}
+
+/** The quantity a card shows large: what was made once the batch is counted, otherwise what was asked for (in the product's unit). */
+export function cardQty(request: ProductionRequest): string {
+  const made = request.batch?.produced_qty;
+  return (request.status === "pending_confirmation" || request.status === "done") && made != null ? made : request.requested_qty;
+}
