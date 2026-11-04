@@ -1152,7 +1152,8 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       its own title row (the layouts only enter the locale), as the catalog draws Products and Ingredients.
     - **Orders**: the two filters as the toolbar (still labelled "Status" and "Table"); the columns as the production board draws them, a
       title and a count pill over white 16 px cards, no grey track (two columns beside an open timeline from 1280 px, three without it, six
-      from 1536 px); a card is the order and where it is, its waiter and age, a stack of its products' photos (the till's), its lines with
+      from 1536 px); a card is the order and where it is, its waiter and age (in the stations' words for a wait, 6.3c's
+      `lib/durations.ts`: "5:07", "1 h 05", "3 d"), a stack of its products' photos (the till's), its lines with
       their state chips and its total; the opened card held by a brand-600 line. The card's button holds only the order's name and stretches
       over the head (the head still opens the timeline; axe's label-content-name-mismatch). The timeline is a white card closed by an X
       ("Close timeline"); Void is the danger button.
