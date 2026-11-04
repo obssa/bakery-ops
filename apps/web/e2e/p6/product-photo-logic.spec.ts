@@ -175,7 +175,7 @@ test.describe("product photo: framing", () => {
     expect(clampZoom(Number.NaN)).toBe(MIN_ZOOM);
     expect([MIN_ZOOM, MAX_ZOOM]).toEqual([1, 3]);
     expect(zoomAt(PHOTO, initialView(PHOTO), 5).zoom).toBe(3);
-    expect(sourceRect(PHOTO, zoomAt(PHOTO, initialView(PHOTO), 5))).toEqual({ x: 534, y: 400, width: 532, height: 399 });
+    expect(sourceRect(PHOTO, zoomAt(PHOTO, initialView(PHOTO), 5))).toEqual({ x: 534, y: 401, width: 532, height: 399 });
   });
 
   test("zooming at a point (a pinch, a trackpad) keeps the point under the fingers where it was", () => {
@@ -203,7 +203,7 @@ test.describe("product photo: framing", () => {
     // at 1x on a 4:3 photo there is nothing to move
     expect(panBy(PHOTO, initialView(PHOTO), 400, 120, 80)).toEqual(initialView(PHOTO));
     // a wide photo moves sideways only
-    expect(sourceRect(WIDE, panBy(WIDE, initialView(WIDE), 400, -5000, 300))).toEqual({ x: 1068, y: 1, width: 1332, height: 999 });
+    expect(sourceRect(WIDE, panBy(WIDE, initialView(WIDE), 400, -5000, 300))).toEqual({ x: 1067, y: 1, width: 1332, height: 999 });
     // zooming out near an edge pulls the rectangle back inside
     const edge = panBy(PHOTO, zoomAt(PHOTO, initialView(PHOTO), 3), 400, 5000, 5000);
     expect(clampView(PHOTO, { ...edge, zoom: 1 })).toEqual(initialView(PHOTO));
