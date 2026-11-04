@@ -165,9 +165,25 @@ export function SearchBox({
 
 /**
  * A filter of the toolbar as the catalog's category filter: a 44 px select whose first option says what it shows unfiltered ("All
- * statuses"), named for readers by `label` (and so by getByLabel).
+ * statuses"), named for readers by `label` (and so by getByLabel). `showLabel` sets the label in the box, at the left in neutral-600, for
+ * a select that has no "all" choice to say what it is (a place).
  */
-export function ToolbarSelect({ label, className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement> & { label: string }) {
+export function ToolbarSelect({ label, showLabel = false, className = "", ...props }: SelectHTMLAttributes<HTMLSelectElement> & { label: string; showLabel?: boolean }) {
+  const id = useId();
+  if (showLabel) {
+    return (
+      <div className={`${BOX} pr-1 ${className}`}>
+        <label htmlFor={id} className="shrink-0 text-[13px] font-semibold text-neutral-600">
+          {label}
+        </label>
+        <select
+          id={id}
+          className="h-full min-w-0 flex-1 cursor-pointer rounded-lg bg-transparent pr-7 text-sm font-semibold text-neutral-900 outline-none disabled:cursor-not-allowed disabled:text-neutral-500"
+          {...props}
+        />
+      </div>
+    );
+  }
   return (
     <select
       aria-label={label}
@@ -226,9 +242,10 @@ export function ToolbarCheck({ label, ...props }: Omit<InputHTMLAttributes<HTMLI
 
 // The Table primitive's rows and header, with the board's edges: the first and last columns 20 px in, no divider under the last row, a
 // little air above and below a cell that wraps.
-const EDGES =
-  "[&_tr>*:first-child]:pl-5 [&_tr>*:last-child]:pr-5 [&_tbody_tr:last-child]:border-b-0 " +
-  "[&_tbody_td]:py-2.5 [&_tbody_th]:py-2.5 [&_tfoot_td]:h-12 [&_tfoot_td]:px-3 [&_tfoot_th]:h-12 [&_tfoot_th]:px-3 [&_tfoot_tr]:border-t [&_tfoot_tr]:border-neutral-200 [&_tfoot_tr]:bg-neutral-50";
+const ROWS =
+  "[&_tbody_tr:last-child]:border-b-0 [&_tbody_td]:py-2.5 [&_tbody_th]:py-2.5 " +
+  "[&_tfoot_td]:h-12 [&_tfoot_td]:px-3 [&_tfoot_th]:h-12 [&_tfoot_th]:px-3 [&_tfoot_tr]:border-t [&_tfoot_tr]:border-neutral-200 [&_tfoot_tr]:bg-neutral-50";
+const EDGES = `[&_tr>*:first-child]:pl-5 [&_tr>*:last-child]:pr-5 ${ROWS}`;
 
 /**
  * A table on a white card (the CatalogList board). `caption` names the table for readers (getByRole("table", { name })); with a `title` the
@@ -286,6 +303,21 @@ export function TableCard({
       {table}
       {foot}
     </section>
+  );
+}
+
+/**
+ * A table inside a card's body (a purchase's lines, the removed payment methods): the same header and rows as TableCard's, on a
+ * neutral-200 hairline with 12 px corners, so it reads as one part of the card it sits in.
+ */
+export function InnerTable({ caption, minWidth = "min-w-[560px]", children }: { caption: string; minWidth?: string; children: ReactNode }) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-neutral-200">
+      <Table className={`${minWidth} ${ROWS} [&_tr>*:first-child]:pl-4 [&_tr>*:last-child]:pr-4`}>
+        <caption className="sr-only">{caption}</caption>
+        {children}
+      </Table>
+    </div>
   );
 }
 

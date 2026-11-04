@@ -1,18 +1,20 @@
 "use client";
 
 import type { UseQueryResult } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { Link, usePathname } from "@/i18n/navigation";
+import { usePathname } from "@/i18n/navigation";
 import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
 import type { Locale } from "@/lib/api/types";
-import { Alert, Button } from "../ui";
-import { focusRing } from "../styles";
+import { SectionTabs } from "../admin/kit";
+import { Alert, Button, Skeleton } from "../ui";
 
 // Pieces the Inventory screens share: the section tabs, the loading and error states of a read, names in the page's
-// language, quantities with their unit, and a page-by-page control.
+// language, quantities with their unit, and a page-by-page control. Step 6.4c: the tabs are the admin's segmented tabs under each page's
+// title row (components/admin/kit.tsx SectionTabs), a first load shows grey blocks where the content will be, the pager is the admin size.
 
 const SECTIONS = [
   { href: "/admin/inventory", key: "stock", permission: "inventory.view" },
@@ -23,30 +25,13 @@ const SECTIONS = [
   { href: "/admin/inventory/reorder", key: "reorder", permission: "inventory.view" },
 ] as const;
 
-/** The tabs under the admin tabs: the Inventory screens the person may open. */
+/** The Inventory screens the person may open: the navigation "Inventory sections" with the same link names, as segmented tabs. */
 export function InventoryNav() {
   const t = useTranslations("inventory");
   const me = useSession((s) => s.me);
   const pathname = usePathname().replace(/\/+$/, "");
-  return (
-    <nav aria-label={t("sections")} className="mb-6 flex flex-wrap gap-2">
-      {SECTIONS.filter((section) => can(me, section.permission)).map(({ href, key }) => {
-        const current = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={current ? "page" : undefined}
-            className={`inline-flex min-h-12 items-center rounded-full border px-5 text-base ${
-              current ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100"
-            } ${focusRing}`}
-          >
-            {t(`nav.${key}`)}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  const tabs = SECTIONS.filter((section) => can(me, section.permission)).map(({ href, key }) => ({ href, label: t(`nav.${key}`), current: pathname === href }));
+  return <SectionTabs label={t("sections")} tabs={tabs} />;
 }
 
 /** The name of a place or an item in the page's language. */
@@ -69,16 +54,27 @@ export function stamp(iso: string | null): string {
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 
-/** Shows a read's three states: loading, the error with a retry, and its data. */
+/** Shows a read's three states: loading (the line for readers and grey rows), the error with a retry, and its data. */
 export function QueryBox<T>({ query, children }: { query: UseQueryResult<T>; children: (data: T) => ReactNode }) {
   const tc = useTranslations("common");
   const errorText = useErrorText();
-  if (query.isPending) return <p className="py-6 text-base text-neutral-600">{tc("loading")}</p>;
+  if (query.isPending) {
+    return (
+      <div className="space-y-3">
+        <p className="text-[15px] text-neutral-600">{tc("loading")}</p>
+        <div aria-hidden="true" className="space-y-3 rounded-[18px] border border-neutral-200 bg-white p-5">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-10" />
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (query.isError) {
     return (
       <div className="space-y-3">
         <Alert>{errorText.message(query.error)}</Alert>
-        <Button variant="secondary" onClick={() => void query.refetch()}>
+        <Button variant="secondary" size="md" onClick={() => void query.refetch()}>
           {tc("retry")}
         </Button>
       </div>
@@ -91,13 +87,15 @@ export function Pager({ page, lastPage, onPage }: { page: number; lastPage: numb
   const t = useTranslations("inventory");
   if (lastPage <= 1) return null;
   return (
-    <nav aria-label={t("paging")} className="mt-4 flex items-center justify-between gap-3">
-      <Button variant="secondary" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+    <nav aria-label={t("paging")} className="flex items-center justify-between gap-3">
+      <Button variant="secondary" size="md" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        <ChevronLeft className="size-[18px]" strokeWidth={2} aria-hidden="true" />
         {t("previous")}
       </Button>
-      <span className="text-base text-neutral-700">{t("page_of", { page, last: lastPage })}</span>
-      <Button variant="secondary" disabled={page >= lastPage} onClick={() => onPage(page + 1)}>
+      <span className="text-[13px] tabular-nums text-neutral-600">{t("page_of", { page, last: lastPage })}</span>
+      <Button variant="secondary" size="md" disabled={page >= lastPage} onClick={() => onPage(page + 1)}>
         {t("next")}
+        <ChevronRight className="size-[18px]" strokeWidth={2} aria-hidden="true" />
       </Button>
     </nav>
   );

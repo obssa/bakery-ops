@@ -2,7 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
-import { Alert, Badge, Button, Field, Modal, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
+import { EmptyRow, TableCard } from "@/components/admin/kit";
+import { Alert, Button, Chip, Field, Modal, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
 import { useItems } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import {
@@ -18,14 +19,17 @@ import { ROLES } from "@/lib/api/types";
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
-import { QueryBox, qty, TD, TH, useNamer } from "./shared";
+import { InventoryNav, QueryBox, qty, useNamer } from "./shared";
 
 // Admin > Inventory > Reorder (step 2.6a and 2.6b): the rules that say how little of an item is too little (for one place,
 // or for the whole branch) and how much to order then, and the reorder list they produce: what is at or under its minimum,
 // with the days of cover the last 7 days of use leave and the quantity to order. Rules are changed by those who may manage
 // inventory (admin); everyone who sees stock sees the list.
+//
+// Step 6.4c (fresh-counter.md 4.4): the title row with its Amharic twin, the section's tabs, the reorder list a table card (Out red, Low
+// amber, the suggested order in bold), then the rules a table card with the form beside it from 1024 px, a white card.
 
-export function ReorderScreen() {
+export function ReorderScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("inventory");
   const me = useSession((s) => s.me);
   const manage = can(me, "inventory.manage");
@@ -34,13 +38,12 @@ export function ReorderScreen() {
 
   return (
     <>
-      <PageHeader title={t("reorder.title")} intro={t("reorder.intro")} />
-      <div className="space-y-6">
+      <PageHeader title={t("reorder.title")} intro={t("reorder.intro")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
+      <div className="flex flex-col gap-6">
+        <InventoryNav />
         <ReorderListPanel />
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
-          <Panel title={t("reorder.rules")}>
-            <QueryBox query={rules}>{(rows) => <RulesTable rows={rows} manage={manage} onEdit={setEditing} />}</QueryBox>
-          </Panel>
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
+          <QueryBox query={rules}>{(rows) => <RulesTable rows={rows} manage={manage} onEdit={setEditing} />}</QueryBox>
           {manage ? <RuleForm key={editing?.id ?? "new"} editing={editing} onDone={() => setEditing(null)} /> : null}
         </div>
       </div>
@@ -53,47 +56,62 @@ function ReorderListPanel() {
   const name = useNamer();
   const list = useReorderList();
   return (
-    <Panel title={t("reorder.list")}>
-      <QueryBox query={list}>
-        {(rows) => (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-base">
-              <caption className="sr-only">{t("reorder.list")}</caption>
-              <thead>
-                <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-                  <th scope="col" className={TH}>{t("reorder.col_item")}</th>
-                  <th scope="col" className={TH}>{t("reorder.col_place")}</th>
-                  <th scope="col" className={TH}>{t("reorder.col_available")}</th>
-                  <th scope="col" className={TH}>{t("reorder.col_min")}</th>
-                  <th scope="col" className={TH}>{t("reorder.col_cover")}</th>
-                  <th scope="col" className={TH}>{t("reorder.col_suggested")}</th>
-                  <th scope="col" className="py-2 font-medium">{t("reorder.col_state")}</th>
+    <QueryBox query={list}>
+      {(rows) => (
+        <TableCard caption={t("reorder.list")} title={t("reorder.list")} minWidth="min-w-[760px]">
+          <thead>
+            <tr>
+              <th scope="col">{t("reorder.col_item")}</th>
+              <th scope="col">{t("reorder.col_place")}</th>
+              <th scope="col" className="text-right">
+                {t("reorder.col_available")}
+              </th>
+              <th scope="col" className="text-right">
+                {t("reorder.col_min")}
+              </th>
+              <th scope="col" className="text-right">
+                {t("reorder.col_cover")}
+              </th>
+              <th scope="col" className="text-right">
+                {t("reorder.col_suggested")}
+              </th>
+              <th scope="col">{t("reorder.col_state")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <EmptyRow span={7}>{t("reorder.list_empty")}</EmptyRow>
+            ) : (
+              rows.map((row) => (
+                <tr key={`${row.item.id}-${row.location?.id ?? 0}`}>
+                  <th scope="row" className="font-semibold text-neutral-900">
+                    {name(row.item)}
+                  </th>
+                  <td className="text-neutral-700">{row.location ? name(row.location) : t("whole_branch")}</td>
+                  <td className="whitespace-nowrap text-right tabular-nums">{qty(row.available, row.item.unit)}</td>
+                  <td className="whitespace-nowrap text-right tabular-nums text-neutral-700">{qty(row.min_qty, row.item.unit)}</td>
+                  <td className="whitespace-nowrap text-right tabular-nums text-neutral-700">
+                    {row.days_of_cover === null ? t("reorder.no_use") : t("reorder.days", { days: trimDecimal(row.days_of_cover) })}
+                  </td>
+                  <td className="whitespace-nowrap text-right font-semibold tabular-nums">{qty(row.suggested_qty, row.item.unit)}</td>
+                  <td>
+                    {row.state === "out" ? (
+                      <Chip tone="red" dot>
+                        {t("state.out")}
+                      </Chip>
+                    ) : (
+                      <Chip tone="amber" dot>
+                        {t("state.low")}
+                      </Chip>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-6 text-neutral-600">{t("reorder.list_empty")}</td>
-                  </tr>
-                ) : (
-                  rows.map((row) => (
-                    <tr key={`${row.item.id}-${row.location?.id ?? 0}`} className="border-b border-neutral-100 last:border-0">
-                      <th scope="row" className={`${TD} font-medium text-neutral-900`}>{name(row.item)}</th>
-                      <td className={TD}>{row.location ? name(row.location) : t("whole_branch")}</td>
-                      <td className={TD}>{qty(row.available, row.item.unit)}</td>
-                      <td className={TD}>{qty(row.min_qty, row.item.unit)}</td>
-                      <td className={TD}>{row.days_of_cover === null ? t("reorder.no_use") : t("reorder.days", { days: trimDecimal(row.days_of_cover) })}</td>
-                      <td className={`${TD} font-medium`}>{qty(row.suggested_qty, row.item.unit)}</td>
-                      <td className="py-3">{row.state === "out" ? <Badge tone="red">{t("state.out")}</Badge> : <Badge tone="amber">{t("state.low")}</Badge>}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </QueryBox>
-    </Panel>
+              ))
+            )}
+          </tbody>
+        </TableCard>
+      )}
+    </QueryBox>
   );
 }
 
@@ -126,68 +144,88 @@ function RulesTable({ rows, manage, onEdit }: { rows: ReorderRule[]; manage: boo
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex min-w-0 flex-col gap-4">
       {update.isError ? <Alert>{errorText.message(update.error)}</Alert> : null}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left text-base">
-          <caption className="sr-only">{t("reorder.rules")}</caption>
-          <thead>
-            <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-              <th scope="col" className={TH}>{t("reorder.col_item")}</th>
-              <th scope="col" className={TH}>{t("reorder.col_place")}</th>
-              <th scope="col" className={TH}>{t("reorder.col_min")}</th>
-              <th scope="col" className={TH}>{t("reorder.col_order_qty")}</th>
-              <th scope="col" className={TH}>{t("reorder.col_status")}</th>
-              {manage ? <th scope="col" className="py-2 font-medium">{t("reorder.col_actions")}</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={manage ? 6 : 5} className="py-6 text-neutral-600">{t("reorder.none")}</td>
-              </tr>
-            ) : (
-              rows.map((rule) => {
-                const itemName = name(rule.item);
-                return (
-                  <tr key={rule.id} className="border-b border-neutral-100 last:border-0">
-                    <th scope="row" className={`${TD} font-medium text-neutral-900`}>{itemName}</th>
-                    <td className={TD}>{rule.location ? name(rule.location) : t("whole_branch")}</td>
-                    <td className={TD}>{qty(rule.min_qty, rule.item.unit)}</td>
-                    <td className={TD}>{qty(rule.reorder_qty, rule.item.unit)}</td>
-                    <td className={TD}>{rule.is_active ? <Badge tone="green">{t("reorder.active")}</Badge> : <Badge>{t("reorder.off")}</Badge>}</td>
-                    {manage ? (
-                      <td className="py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <Button variant="secondary" aria-label={t("reorder.edit_named", { item: itemName })} onClick={() => onEdit(rule)}>
-                            {t("edit")}
-                          </Button>
-                          <Button variant="secondary" disabled={update.isPending} aria-label={t(rule.is_active ? "reorder.switch_off_named" : "reorder.switch_on_named", { item: itemName })} onClick={() => toggle(rule)}>
-                            {t(rule.is_active ? "switch_off" : "switch_on")}
-                          </Button>
-                          <Button variant="secondary" aria-label={t("reorder.delete_named", { item: itemName })} onClick={() => setDeleting(rule)}>
-                            {t("delete")}
-                          </Button>
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <TableCard caption={t("reorder.rules")} title={t("reorder.rules")} minWidth={manage ? "min-w-[720px]" : "min-w-[520px]"}>
+        <thead>
+          <tr>
+            <th scope="col">{t("reorder.col_item")}</th>
+            <th scope="col">{t("reorder.col_place")}</th>
+            <th scope="col" className="text-right">
+              {t("reorder.col_min")}
+            </th>
+            <th scope="col" className="text-right">
+              {t("reorder.col_order_qty")}
+            </th>
+            <th scope="col">{t("reorder.col_status")}</th>
+            {manage ? (
+              <th scope="col">
+                <span className="sr-only">{t("reorder.col_actions")}</span>
+              </th>
+            ) : null}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <EmptyRow span={manage ? 6 : 5}>{t("reorder.none")}</EmptyRow>
+          ) : (
+            rows.map((rule) => {
+              const itemName = name(rule.item);
+              return (
+                <tr key={rule.id}>
+                  <th scope="row" className="font-semibold text-neutral-900">
+                    {itemName}
+                  </th>
+                  <td className="text-neutral-700">{rule.location ? name(rule.location) : t("whole_branch")}</td>
+                  <td className="whitespace-nowrap text-right tabular-nums">{qty(rule.min_qty, rule.item.unit)}</td>
+                  <td className="whitespace-nowrap text-right tabular-nums">{qty(rule.reorder_qty, rule.item.unit)}</td>
+                  <td>
+                    {rule.is_active ? (
+                      <Chip tone="brand" dot>
+                        {t("reorder.active")}
+                      </Chip>
+                    ) : (
+                      <Chip dot>{t("reorder.off")}</Chip>
+                    )}
+                  </td>
+                  {manage ? (
+                    <td className="text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Button variant="secondary" size="md" compact aria-label={t("reorder.edit_named", { item: itemName })} onClick={() => onEdit(rule)}>
+                          {t("edit")}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="md"
+                          compact
+                          disabled={update.isPending}
+                          aria-label={t(rule.is_active ? "reorder.switch_off_named" : "reorder.switch_on_named", { item: itemName })}
+                          onClick={() => toggle(rule)}
+                        >
+                          {t(rule.is_active ? "switch_off" : "switch_on")}
+                        </Button>
+                        <Button variant="danger" size="md" compact aria-label={t("reorder.delete_named", { item: itemName })} onClick={() => setDeleting(rule)}>
+                          {t("delete")}
+                        </Button>
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </TableCard>
       {deleting ? (
         <Modal label={t("reorder.delete_title")} onClose={() => setDeleting(null)}>
           <h3 className="text-lg font-semibold text-neutral-900">{t("reorder.delete_title")}</h3>
-          <p className="text-base text-neutral-700">{t("reorder.delete_about", { item: name(deleting.item) })}</p>
+          <p className="text-[15px] text-neutral-700">{t("reorder.delete_about", { item: name(deleting.item) })}</p>
           {remove.isError ? <Alert>{errorText.message(remove.error)}</Alert> : null}
-          <div className="flex gap-3">
-            <Button disabled={remove.isPending} onClick={deleteRule}>
+          <div className="flex gap-2.5">
+            <Button variant="danger" size="md" disabled={remove.isPending} onClick={deleteRule}>
               {t("reorder.delete_confirm")}
             </Button>
-            <Button variant="secondary" onClick={() => setDeleting(null)}>
+            <Button variant="secondary" size="md" onClick={() => setDeleting(null)}>
               {t("cancel")}
             </Button>
           </div>
@@ -253,7 +291,7 @@ function RuleForm({ editing, onDone }: { editing: ReorderRule | null; onDone: ()
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <Field label={ti("reorder.item")} error={fieldError("item_id")}>
           {(props) => (
-            <Select {...props} value={itemId} disabled={!!editing} onChange={(event) => setItemId(event.target.value)}>
+            <Select {...props} controlSize="md" value={itemId} disabled={!!editing} onChange={(event) => setItemId(event.target.value)}>
               {editing ? <option value={itemId}>{name(editing.item)}</option> : <option value="">{ti("reorder.pick_item")}</option>}
               {editing ? null : (items.data ?? []).filter((i) => i.is_active && i.fulfilment !== "to_order").map((item) => (
                 <option key={item.id} value={item.id}>
@@ -265,7 +303,7 @@ function RuleForm({ editing, onDone }: { editing: ReorderRule | null; onDone: ()
         </Field>
         <Field label={ti("reorder.place")} hint={ti("reorder.place_hint")} error={fieldError("location_id")}>
           {(props) => (
-            <Select {...props} value={placeId} disabled={!!editing} onChange={(event) => setPlaceId(event.target.value)}>
+            <Select {...props} controlSize="md" value={placeId} disabled={!!editing} onChange={(event) => setPlaceId(event.target.value)}>
               <option value="">{ti("whole_branch")}</option>
               {(locations.data ?? []).filter((place) => place.type !== "cash_drawer").map((place) => (
                 <option key={place.id} value={place.id}>
@@ -275,21 +313,23 @@ function RuleForm({ editing, onDone }: { editing: ReorderRule | null; onDone: ()
             </Select>
           )}
         </Field>
-        <Field label={ti("reorder.min")} hint={unit ? ti("reorder.in_unit", { unit }) : undefined} error={fieldError("min_qty")}>
-          {(props) => <TextInput {...props} inputMode="decimal" value={min} onChange={(event) => setMin(event.target.value)} />}
-        </Field>
-        <Field label={ti("reorder.order_qty")} hint={unit ? ti("reorder.in_unit", { unit }) : undefined} error={fieldError("reorder_qty")}>
-          {(props) => <TextInput {...props} inputMode="decimal" value={order} onChange={(event) => setOrder(event.target.value)} />}
-        </Field>
-        <fieldset className="space-y-1">
-          <legend className="text-sm font-medium text-neutral-800">{ti("reorder.notify")}</legend>
-          <p className="text-sm text-neutral-600">{ti("reorder.notify_hint")}</p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          <Field label={ti("reorder.min")} hint={unit ? ti("reorder.in_unit", { unit }) : undefined} error={fieldError("min_qty")}>
+            {(props) => <TextInput {...props} controlSize="md" inputMode="decimal" value={min} onChange={(event) => setMin(event.target.value)} />}
+          </Field>
+          <Field label={ti("reorder.order_qty")} hint={unit ? ti("reorder.in_unit", { unit }) : undefined} error={fieldError("reorder_qty")}>
+            {(props) => <TextInput {...props} controlSize="md" inputMode="decimal" value={order} onChange={(event) => setOrder(event.target.value)} />}
+          </Field>
+        </div>
+        <fieldset className="space-y-1 border-t border-neutral-200 pt-4">
+          <legend className="float-left w-full text-sm font-semibold text-neutral-900">{ti("reorder.notify")}</legend>
+          <p className="clear-both text-[13px] text-neutral-600">{ti("reorder.notify_hint")}</p>
           <div className="grid grid-cols-2 gap-x-3">
             {[...ROLES, "station"].map((role) => (
-              <label key={role} className="flex min-h-12 items-center gap-3 text-base text-neutral-900">
+              <label key={role} className="flex min-h-11 items-center gap-3 text-[15px] text-neutral-900">
                 <input
                   type="checkbox"
-                  className="size-6"
+                  className="size-5 shrink-0 accent-brand-600"
                   checked={roles.includes(role)}
                   onChange={(event) => setRoles(event.target.checked ? [...roles, role] : roles.filter((r) => r !== role))}
                 />
@@ -301,12 +341,12 @@ function RuleForm({ editing, onDone }: { editing: ReorderRule | null; onDone: ()
         {problem ? <Alert>{problem}</Alert> : null}
         {mutation.isError ? <Alert>{errorText.message(mutation.error)}</Alert> : null}
         <Status>{saved ? ti("reorder.saved", { item: saved }) : null}</Status>
-        <div className="flex gap-3">
-          <Button type="submit" disabled={mutation.isPending}>
+        <div className="flex gap-2.5">
+          <Button type="submit" size="md" disabled={mutation.isPending}>
             {mutation.isPending ? ti("saving") : ti("reorder.save")}
           </Button>
           {editing ? (
-            <Button type="button" variant="secondary" onClick={onDone}>
+            <Button type="button" variant="secondary" size="md" onClick={onDone}>
               {ti("cancel")}
             </Button>
           ) : null}

@@ -3,17 +3,19 @@ import { Suspense } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { StockScreen } from "@/components/inventory/StockScreen";
 import { enterLocale, titledBy, type LocaleProps } from "@/lib/page";
+import { amharicTwin } from "@/lib/twin";
 
 export const generateMetadata = titledBy("inventory", "nav.stock");
 
 export default async function Page(props: LocaleProps) {
-  await enterLocale(props);
+  const locale = await enterLocale(props);
   const t = await getTranslations("common");
+  const titleAm = await amharicTwin(locale, "inventory", "stock.title");
   // the filters a notification link carries are query parameters, read on the client (static export)
   return (
     <RequireAuth permission="inventory.view">
       <Suspense fallback={<p className="text-base text-neutral-600">{t("loading")}</p>}>
-        <StockScreen />
+        <StockScreen titleAm={titleAm} />
       </Suspense>
     </RequireAuth>
   );

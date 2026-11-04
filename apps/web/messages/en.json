@@ -973,6 +973,7 @@
       "table": "Stock at this place",
       "location": "Location",
       "find_item": "Find an item",
+      "clear_search": "Clear the search",
       "one_item": "Showing one item.",
       "show_all": "Show all items",
       "no_places": "No place is set up yet.",
