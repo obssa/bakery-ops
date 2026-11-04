@@ -24,10 +24,10 @@ import {
 } from "@/lib/api/inventory";
 import { ApiError } from "@/lib/api/client";
 import type { Item, Unit } from "@/lib/api/types";
-import { addDecimal, compareDecimal, isQuantityText, multiplyDecimal, trimDecimal } from "@/lib/decimal";
+import { addDecimal, compareDecimal, isQuantityText, multiplyDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
-import { InventoryNav, Pager, QueryBox, stamp, useNamer } from "./shared";
+import { InventoryNav, Pager, QueryBox, qtyFigure, stamp, useNamer } from "./shared";
 
 // Admin > Inventory > Purchases (step 2.2b): a purchase is a draft with lines (item, quantity, unit, unit cost) until it
 // is confirmed, which puts the stock in the receiving place and moves each item's moving average; a draft may be cancelled,
@@ -723,7 +723,7 @@ function PurchaseCard({
                   <th scope="row" className="font-semibold text-neutral-900">
                     {name(line.item)}
                   </th>
-                  <td className="text-right tabular-nums">{trimDecimal(line.qty)}</td>
+                  <td className="text-right tabular-nums">{qtyFigure(line.qty)}</td>
                   <td className="text-neutral-700">{line.unit.code}</td>
                   {costs ? <td className="whitespace-nowrap text-right tabular-nums">{line.unit_cost ?? "—"}</td> : null}
                   {costs ? <td className="whitespace-nowrap text-right font-semibold tabular-nums">{line.line_total ?? "—"}</td> : null}

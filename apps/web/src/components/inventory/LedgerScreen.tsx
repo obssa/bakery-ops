@@ -6,8 +6,7 @@ import { EmptyRow, TableCard, Toolbar, ToolbarField, ToolbarSelect } from "@/com
 import { Chip, PageHeader } from "@/components/ui";
 import { useItems } from "@/lib/api/hooks";
 import { useLedger, useLocations, type LedgerFilters, type Movement } from "@/lib/api/inventory";
-import { trimDecimal } from "@/lib/decimal";
-import { InventoryNav, Pager, QueryBox, stamp, useNamer } from "./shared";
+import { InventoryNav, Pager, QueryBox, qtyFigure, stamp, useNamer } from "./shared";
 
 // Admin > Inventory > Ledger (the endpoint exists since Phase 0): every movement, newest first, filtered by item, place and
 // date range by the API and by reason on the page (the API has no reason filter), 50 to a page. The ledger is append-only;
@@ -30,7 +29,7 @@ export const REASONS = [
 ] as const;
 
 function signed(value: string): string {
-  const text = trimDecimal(value);
+  const text = qtyFigure(value);
   return /^-/.test(text) || text === "0" ? text : `+${text}`;
 }
 

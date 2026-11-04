@@ -167,7 +167,7 @@ export function StockScreen({ titleAm }: { titleAm?: string }) {
                         <StateChip state={alert.type} />
                       </td>
                       <td className="whitespace-nowrap tabular-nums text-neutral-700">{stamp(alert.active_since)}</td>
-                      <td className="whitespace-nowrap text-right tabular-nums">{alert.item ? qty(alert.available_at_start, alert.item.unit) : alert.available_at_start}</td>
+                      <td className="whitespace-nowrap text-right tabular-nums">{qty(alert.available_at_start, alert.item?.unit ?? "")}</td>
                       <td className="whitespace-nowrap text-right tabular-nums">{alert.item && alert.threshold_qty !== null ? qty(alert.threshold_qty, alert.item.unit) : "—"}</td>
                     </tr>
                   ))

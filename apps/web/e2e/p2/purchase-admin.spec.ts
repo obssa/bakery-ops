@@ -10,7 +10,7 @@ import { openAs } from "../support/pad";
 // The admin records a purchase of 10 kg at 50 on the Purchases screen on top of 10 kg at 40 bought through the API: the
 // draft is saved, confirmed, and the screen names the cost change (0.0400 to 0.0450 a gram: the ledger and the costs are
 // kept in the base unit). The same invoice number on a new draft is refused with the duplicate warning. The store balance
-// reads 20000 g on the Stock screen, the moving average is 0.0450 through the API, and a reorder rule above the balance
+// reads 20,000 g on the Stock screen, the moving average is 0.0450 through the API, and a reorder rule above the balance
 // puts the item on the reorder list with its suggested quantity. The fixture lives in the isolated "E2E Test Branch" (e2e/support/inventory.ts), so the flow carries @live.
 
 async function runPurchase(f: InventoryFixture, page: Page) {
@@ -71,7 +71,7 @@ async function runStockAndReorder(f: InventoryFixture, page: Page) {
   const item = f.ingredient.name_en;
   const sections = page.getByRole("navigation", { name: "Inventory sections" });
 
-  // the stock screen: 20 kg (20000 g) at the store
+  // the stock screen: 20 kg (20,000 g, the admin screens group a figure's thousands since step 6.5) at the store
   await sections.getByRole("link", { name: "Stock", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Stock" })).toBeVisible();
   await page.getByLabel("Location", { exact: true }).selectOption({ label: f.store.name_en });

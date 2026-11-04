@@ -78,8 +78,8 @@ export async function buildInventoryFixture(credentials: { phone: string; passwo
     ingredient: { id: ingredient.id, name_en: ingredientEn, name_am: ingredientAm, unitId: unit("kg") },
     first,
     second: { invoice: `E2E-${tag}-B`, qty: "10", unitCost: "50", total: "500.00" },
-    after: { onHand: "20000.0000", onHandText: "20000 g", movingAverage: "0.0450" },
-    rule: { min: "25000", reorder: "50000", reorderText: "50000 g" },
+    after: { onHand: "20000.0000", onHandText: "20,000 g", movingAverage: "0.0450" },
+    rule: { min: "25000", reorder: "50000", reorderText: "50,000 g" },
   };
 }
 
@@ -149,7 +149,7 @@ export async function buildTransferFixture(credentials: { phone: string; passwor
     chef: { ...chefStaff, api: chef.api },
     manager: { ...managerStaff, api: manager.api },
     kitchenStart: { onHand: "1000.0000", onHandText: "1000 g" },
-    ask: { qty: "5000", text: "5000 g", note: `for the lunch rush ${base.ingredient.name_en}` },
+    ask: { qty: "5000", text: "5,000 g", note: `for the lunch rush ${base.ingredient.name_en}` },
   };
 }
 

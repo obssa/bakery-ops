@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { usePathname } from "@/i18n/navigation";
+import { groupDigits } from "@/lib/analytics";
 import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
@@ -40,9 +41,16 @@ export function useNamer(): (row: { name_en: string; name_am: string }) => strin
   return (row) => (locale === "am" ? row.name_am || row.name_en : row.name_en || row.name_am);
 }
 
-/** "2.5000" and "kg" -> "2.5 kg": a quantity as it reads on a screen, never converted. */
+/**
+ * "2.5000" and "kg" -> "2.5 kg", "25000.0000" and "g" -> "25,000 g": a figure as it reads on a screen, grouped by the characters of its
+ * decimal string (groupDigits), never converted and never a float. A field a person edits takes trimDecimal alone.
+ */
+export function qtyFigure(value: string): string {
+  return groupDigits(trimDecimal(value));
+}
+
 export function qty(value: string, unit: string): string {
-  return unit ? `${trimDecimal(value)} ${unit}` : trimDecimal(value);
+  return unit ? `${qtyFigure(value)} ${unit}` : qtyFigure(value);
 }
 
 /** An ISO instant as "2026-10-22 14:05" in the browser's time zone, the same in both languages. */
