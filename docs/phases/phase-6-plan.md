@@ -1142,7 +1142,40 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   - ADRs 0022 and 0023 **accepted** and listed under `phases.6.adrs`.
   - The skill copies (`ci-cd.md`, `traps.md`) get what the phase taught.
   - `docs/phases/phase-6-report.md`. Then `gate_check --mode done --phase 6` and `phase_status.py claim-done 6`.
-  - As built: (to be written by 6.5)
+  - **As built (step 6.5, `phase-6/gate`).** Branched from `origin/main` at `1524ae5` (6.3c merged), with 6.4b, 6.4c and 6.4d merged in
+    as they landed. STATUS `docs` `in_progress`, then `done`. **Not claimed**: Phase 6 is the last phase in the manifest, so the strict
+    gate freezes `apps/` after `done_commit`; the coordinator runs `claim-done 6` and tags `phase-6-complete` once every Phase 6 PR is
+    merged and `gate-p6` is green on `main`.
+    - **`Phase6GateTest`** (`gate:p6`, six cases; each also in `module:catalog`, or `seeds` for the seed, so `mod-catalog` and
+      `mod-shifts` run them first). Every upload goes through `POST /items/{item}/image` as the branch's admin, in the format `auto` picks
+      (the gate runs in the API image, whose `gd` has WebP, as the live host's has). The renditions of a 2400 × 1800 upload; a 1000 × 750
+      crop kept as large and drawn exactly (a red corner in, the blue beyond it); `too_small` for a 799 × 600 crop and a 640 × 480 photo,
+      both languages, nothing stored, and 800 × 600 accepted; the media route signed out (no guard, no header carried over): each
+      rendition's bytes, type, the three `Cache-Control` directives, the ETag, nosniff and no cookie, 304 to the strong and the weak tag,
+      200 to another tag, 404 for an unknown sha, the other extension, a replaced and a removed photo; the demo bakery seeded with every
+      phase (`SEED_PHASE` unset, so `Phase6Seeder` last, as `e2e-p6` seeds it; history from `phpunit.xml`'s one day): every product of the
+      demo branch has a live `demo` photo of 1600 × 1200 in the host's format, its three files, and its card served, and `public/` is as
+      it was; and the `media` disk is the local disk under `storage/`, not under `public/` and not the `public` disk, with an upload, a
+      replace and a remove on the **real** disk (not a fake; its files removed again in a `finally`) leaving every entry under `public/`
+      (path, size and time, links listed, not followed) as it was, and no name there holding the photo's sha. The seed case is a seed of its
+      own in the test, not a database the job seeds first as `gate-p4` does: the products come from Phases 0 and 2 and nothing else reads
+      it.
+    - **`gate-p6`**: the API image loaded, `app` started on the compose stack, an empty `.env`, `pest --group=gate:p6` with
+      `IDENTITY_REQUIRE_DEVICE=false`, failing when it ran nothing or on a skip or a warning, the `Tests:` line in the step summary, then
+      `gate_check.py --mode done --phase 6 --ci`; 25 minutes. No repository files are copied into the container and no token is needed:
+      phase 6 has no checklist. The skill's `assets/ci/ci.yml` is the same.
+    - **ADRs 0022 and 0023 accepted**, each with a dated note of what the build changed from, or made concrete in, the proposal; the
+      manifest lists both under `phases.6.adrs` (and `claim-done` copies them into STATUS).
+    - **The skill's references.** `traps.md`: `testMatch` against the absolute path (widened on purpose as a family grows), axe's
+      whole-word label-in-name and the Amharic affixes, contrast read mid-transition (reduced motion and settled animations), modal scrims
+      over the top bar, Tailwind 4's pixel breakpoints, reading CI from the developer PC (artifacts download where logs hang), the host's
+      request filter (406 or 403 to a bare user agent), the host's SSH firewall; `gate-p6` among the Pest runs on the stack. `ci-cd.md`:
+      `gate-p6` and `e2e-p6` as built, the timeouts, and the screens for review.
+    - **`scripts/gate_check.py`** (both copies, still identical): the Pest runner is looked for only when the run runs tests, and the
+      Docker probe has 60 s. Locally with `--no-tests`, on this PC with its Docker engine stopped, the probe never returned and the gate
+      hung before its first row.
+    - **The report** `docs/phases/phase-6-report.md`, with the local `gate_check --mode done --phase 6 --no-tests --no-e2e` "before the
+      claim". No phase 6 to-do marker is left once 6.4b replaced the last placeholder.
 
 ## 7. Test list and CI
 
