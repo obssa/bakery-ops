@@ -125,19 +125,25 @@ export function RequestCard({
         selected ? "border-brand-600 inset-ring-1 inset-ring-brand-600" : "border-neutral-200"
       }`}
     >
-      <button type="button" aria-label={t("open", { name })} aria-pressed={selected} onClick={() => onOpen(request)} className={`flex w-full items-center gap-3 rounded-xl text-left ${focusRing}`}>
-        <ProductImage image={image} name={name} category={category} size="thumb" className="w-14 shrink-0 rounded-[10px]" />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="line-clamp-2 text-[15px] font-semibold leading-[1.3] text-neutral-900">{name}</span>
-          {other ? (
-            <span lang="am" className="truncate text-[13px] text-neutral-600">
-              {other}
-            </span>
-          ) : null}
-        </span>
-        <span className="flex shrink-0 flex-col items-end leading-tight">
-          <span className="text-[22px] font-bold tabular-nums text-neutral-900">{trimDecimal(cardQty(request))}</span>
-          <span className="text-xs text-neutral-600">{unit}</span>
+      {/* The button is named by its own text, "Open <product>" (the name the p2 specs read), which readers hear; what the card draws (the
+          thumb, both names, the quantity) is hidden from them, so the name holds every word it shows (WCAG 2.5.3, axe's
+          label-content-name-mismatch) without an aria-label. */}
+      <button type="button" aria-pressed={selected} onClick={() => onOpen(request)} className={`flex w-full items-center gap-3 rounded-xl text-left ${focusRing}`}>
+        <span className="sr-only">{t("open", { name })}</span>
+        <span aria-hidden="true" className="flex w-full min-w-0 items-center gap-3">
+          <ProductImage image={image} name={name} category={category} size="thumb" className="w-14 shrink-0 rounded-[10px]" />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="line-clamp-2 text-[15px] font-semibold leading-[1.3] text-neutral-900">{name}</span>
+            {other ? (
+              <span lang="am" className="truncate text-[13px] text-neutral-600">
+                {other}
+              </span>
+            ) : null}
+          </span>
+          <span className="flex shrink-0 flex-col items-end leading-tight">
+            <span className="text-[22px] font-bold tabular-nums text-neutral-900">{trimDecimal(cardQty(request))}</span>
+            <span className="text-xs text-neutral-600">{unit}</span>
+          </span>
         </span>
       </button>
 
@@ -171,11 +177,12 @@ export function RequestCard({
           variant={look.variant}
           loading={busy !== null}
           disabled={waiting}
-          aria-label={t("action_of", { action: t(look.label), name })}
           onClick={() => act(move)}
           className="w-full"
         >
-          {t(look.label)}
+          {/* named by its text, "<action>: <product>", for readers; the action alone is what it shows */}
+          <span aria-hidden="true">{t(look.label)}</span>
+          <span className="sr-only">{t("action_of", { action: t(look.label), name })}</span>
         </Button>
       ) : null}
     </article>

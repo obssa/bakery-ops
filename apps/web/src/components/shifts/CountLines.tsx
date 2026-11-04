@@ -188,8 +188,10 @@ function LineRow({ count, line, reasons, editable, onEdit }: RowProps) {
             {touched ? t("mark_counted") : t("mark_not_counted")}
           </Badge>
           {editable && !touched ? (
-            <Button type="button" variant="secondary" compact aria-label={t("as_expected_for", { item: name })} onClick={() => onEdit([{ item_id: line.item.id, confirm: true }])}>
-              {t("as_expected")}
+            <Button type="button" variant="secondary" compact onClick={() => onEdit([{ item_id: line.item.id, confirm: true }])}>
+              {/* named by its text for readers, "<item>: as expected"; the words alone are what it shows */}
+              <span aria-hidden="true">{t("as_expected")}</span>
+              <span className="sr-only">{t("as_expected_for", { item: name })}</span>
             </Button>
           ) : null}
         </div>

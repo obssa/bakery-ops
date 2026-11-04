@@ -90,8 +90,10 @@ function RecipeTable({ lines, locale, onTransfer, canTransfer }: { lines: CardLi
                     <Badge tone="red">{t("short")}</Badge>
                     <span className="block text-[13px] font-medium">{t("missing", { qty: trimDecimal(line.short_qty ?? "0"), unit: line.ingredient.unit })}</span>
                     {canTransfer && line.transfer_hint ? (
-                      <Button type="button" variant="secondary" size="md" aria-label={t("request_transfer_of", { name })} onClick={() => onTransfer(line)}>
-                        {t("request_transfer")}
+                      <Button type="button" variant="secondary" size="md" onClick={() => onTransfer(line)}>
+                        {/* named by its text for readers, "Request transfer of <ingredient>" (the p2 shortfall spec reads it) */}
+                        <span aria-hidden="true">{t("request_transfer")}</span>
+                        <span className="sr-only">{t("request_transfer_of", { name })}</span>
                       </Button>
                     ) : null}
                   </>
