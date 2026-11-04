@@ -100,6 +100,20 @@ function failed(error: ApiError, device: string, path: string): ApiError {
   return error;
 }
 
+/**
+ * What a call that cannot go through `fetch` sends (the photo upload of step 6.4b, lib/api/upload.ts, an XMLHttpRequest for its progress):
+ * the same headers as every call (Accept, the station picked, this device's id last), with the device id and the page it went out from.
+ */
+export function callHeaders(accept: string, extra?: Record<string, string>): { headers: Record<string, string>; device: string; page: string } {
+  const device = deviceId();
+  return { headers: baseHeaders(accept, extra, device), device, page: currentPath() };
+}
+
+/** A refused call's error, recorded as every call's is (the shift notice, the device gate). */
+export function refusal(status: number, body: Partial<ApiErrorBody>, device: string, page: string): ApiError {
+  return failed(new ApiError(status, body), device, page);
+}
+
 export function apiUrl(path: string, query?: RequestOptions["query"]): string {
   const url = `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
   const params = new URLSearchParams();

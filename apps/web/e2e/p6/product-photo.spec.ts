@@ -64,7 +64,7 @@ test.describe("product photo: the admin's photo manager", () => {
       let card = await openProductPage(page, fixture);
       await expect(card).toContainText("No photo yet");
       await expect(card).toContainText("JPG, PNG or WebP · best at 1200 × 900 px or larger");
-      const zone = card.getByText("Drop a photo here", { exact: true });
+      const zone = card.getByTestId("photo-dropzone");
       await dropFile(zone, fixtureFile(), { hold: true });
       await expect(card).toContainText("Drop to upload");
       await expect(card).toContainText("Let go to add it");
@@ -154,7 +154,7 @@ test.describe("product photo: the admin's photo manager", () => {
     const fixture = await buildStationFixture(credentials, "kitchen");
     await removePhoto(fixture.admin, fixture.product.id);
     const card = await openProductPage(page, fixture);
-    const zone = card.getByText("Drop a photo here", { exact: true });
+    const zone = card.getByTestId("photo-dropzone");
 
     // a GIF: the card says why in its refusal box, in the server's words, and stays empty
     await dropFile(zone, { name: "counter.gif", mimeType: "image/gif", buffer: Buffer.from("GIF89a\x01\x00\x01\x00\x00\x00\x00;", "binary") });

@@ -204,8 +204,9 @@ test.describe("pay-refund", () => {
       const settings = page.getByRole("form", { name: "Refund settings" });
       await expect(settings.getByRole("checkbox", { name: "Refundable" })).toBeChecked({ timeout: 30_000 });
       await settings.getByRole("checkbox", { name: "Refundable" }).uncheck();
-      await settings.getByRole("button", { name: "Save refund settings" }).click();
-      await expect(settings.getByRole("status")).toContainText("Saved", { timeout: 30_000 });
+      // step 6.4b: the page saves its two cards from the title row's "Save changes" (the ProductPhoto board), which says "Saved."
+      await page.getByRole("button", { name: "Save changes" }).click();
+      await expect(page.getByRole("status").filter({ hasText: /^Saved\.$/ })).toBeVisible({ timeout: 30_000 });
       const saved = await admin.get<{ refundable: boolean; refund_restock: boolean }>(`/items/${createdId}`);
       expect(saved.refundable).toBe(false);
       expect(saved.refund_restock).toBe(true);
