@@ -29,7 +29,7 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { businessToday } from "@/lib/orderNo";
 import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
-import { ACTIONS_CELL, EmptyRow, Notice, TableCard, Toolbar, ToolbarCheck, ToolbarField, ToolbarSelect } from "../admin/kit";
+import { EmptyRow, Notice, TableCard, Toolbar, ToolbarCheck, ToolbarField, ToolbarSelect } from "../admin/kit";
 import { Alert, Button, IconButton, PageHeader, Skeleton, Status } from "../ui";
 import { PaymentDialog } from "./PaymentDialog";
 import { PhotoThumb, PhotoViewer } from "./PhotoViewer";
@@ -359,9 +359,7 @@ function PaymentsTable({
   const channelName = useChannelName();
   const orderLabel = useOrderLabel();
   return (
-    // compact (the reconciliation's: 8 px between columns, a header that may take two lines): at the admin's 1440 x 900 the nine columns were
-    // about 40 px too wide for the card, so it scrolled and cut the row's chevron (the coordinator's review, step 6.5)
-    <TableCard caption={t("list.table")} footer={footer} minWidth="min-w-[960px]" compact>
+    <TableCard caption={t("list.table")} footer={footer} minWidth="min-w-[960px]">
       <thead>
         <tr>
           <th scope="col">{t("list.col_payment")}</th>
@@ -409,7 +407,7 @@ function PaymentsTable({
               <td>
                 <PaymentStatusCell payment={row} />
               </td>
-              <td className={ACTIONS_CELL}>
+              <td className="text-right">
                 <IconButton label={t("list.open_aria", { id: row.id })} size="md" onClick={() => onOpen(row.id)}>
                   <ChevronRight className="size-[18px]" strokeWidth={2} aria-hidden="true" />
                 </IconButton>
