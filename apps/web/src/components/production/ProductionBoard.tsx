@@ -112,12 +112,18 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
     <div className="flex flex-col gap-5">
       {/* the page's heading; the station top bar shows the name */}
       <h1 className="sr-only">{t("title")}</h1>
-      {/* the board's buttons in the station top bar, before the sync chip */}
+      {/* the shift is a menu in the station top bar (its state as a chip; the panel holds the region "Shift" with its words and actions,
+          and opens by itself while the shift needs someone), so the columns start right under the bar */}
+      <ShiftBar model={strip} look="menu" />
+
+      {/* the board's buttons in the station top bar, after the shift's chip and before the sync chip. "Display case stock" shows its
+          short words; its name keeps the whole (the drawer it opens has that name) */}
       <StationHeaderActions>
         {can(me, "inventory.view") ? (
           <Button type="button" variant="secondary" size="md" onClick={() => setSheet("display_case")}>
             <Store className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
-            {t("display_case")}
+            <span aria-hidden="true">{t("display_case_short")}</span>
+            <span className="sr-only">{t("display_case")}</span>
           </Button>
         ) : null}
         {can(me, "production.request") ? (
@@ -128,16 +134,13 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
         ) : null}
       </StationHeaderActions>
 
-      {/* the shift as one strip (the state, the shift, who is on it, its actions), with the board's station filter at its end */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
-          <ShiftBar model={strip} look="strip" />
-        </div>
-        {choices.length > 1 ? (
-          <div className="w-52 shrink-0">
-            <label htmlFor="production-station" className="sr-only">
-              {t("station")}
-            </label>
+      {/* the board's station filter, compact, at the right above the column heads (only when there is a choice) */}
+      {choices.length > 1 ? (
+        <div className="-mb-2 flex justify-end">
+          <label htmlFor="production-station" className="sr-only">
+            {t("station")}
+          </label>
+          <div className="w-48">
             <Select id="production-station" controlSize="md" value={String(stationId)} onChange={(event) => setStationId(event.target.value === "all" ? "all" : Number(event.target.value))}>
               <option value="all">{t("all_stations")}</option>
               {choices.map((choice) => (
@@ -147,8 +150,8 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
               ))}
             </Select>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {snapshot?.error && snapshot.loaded ? (
         <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">

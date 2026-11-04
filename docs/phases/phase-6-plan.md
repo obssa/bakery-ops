@@ -921,24 +921,40 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   - STATUS `web.stations` `done` after this merges.
   - **As built (step 6.3c, `phase-6/web-production`).** Built region by region from the Production board (`Production.dc.html`) and, for
     the count screen, from the spec's primitives and the Main board. Web only, plus this note, STATUS and the review sheet: no API,
-    route, registry, OpenAPI or ERD change, and **no Playwright selector changed**. Where the code chose what the plan left open:
+    route, registry, OpenAPI or ERD change. One Playwright step was added, in `p3-opening-prefill` (below). Where the code chose what
+    the plan left open:
     - **The thumbs.** `lib/productImages.ts` and `lib/images/orderThumbs.ts` are 6.3b's files, copied unchanged from
-      `phase-6/web-kds-till`, so the merge keeps them as they are. The board joins the catalog's photos by product id (10.2 Q7) and,
+      `phase-6/web-kds-till`, so the merge kept them as they are. The board joins the catalog's photos by product id (10.2 Q7) and,
       for a product without one, its category's name for the placeholder's icon (`useCategories`).
-    - **The header is the station top bar** (6.3a's one 68 px bar, merged in from `phase-6/web-pad` before #113 landed, as the
-      coordinator asked). `useStationHeader` names the board: "Production board" with its Amharic name beside it on the English page
-      (read from `am.json` at build time, `production/twins.ts`, as 6.2b's catalog twin and 6.3b's KDS twins), and under it the station
-      whose shift the strip follows with that shift ("Bakery oven · Morning shift"). `StationHeaderActions` puts the board's buttons in
-      the bar before the sync chip: **Display case stock** (`inventory.view`: the till's `DisplayCasePanel` in a drawer) and **New
-      batch** (`production.request`: a dialog asking for a product a production station makes, the quantity, its usual batch when empty,
-      and a note, POST `/production/requests` with its client UUID and one Idempotency-Key). The page keeps its h1 ("Production board",
-      `sr-only`, as the pad's), so `p2-stockout-production`'s heading still answers. The board's intro line is gone (`production.intro`
-      removed). A first draft drew this head as a row of the page (`ScreenHead`); it is gone.
-    - **The shift is one strip** under the bar: `ShiftBar` with 6.3b's `look="strip"`. The file is copied unchanged from
-      `phase-6/web-kds-till` (the same blob), so the merge keeps 6.3b's file. The strip keeps the region "Shift", its words and its
-      buttons, which the p3 specs read on `/production`. The board's station filter (a 44 px select, when there is a choice; it was a
-      labelled field above the board) sits at the end of the strip's line. It is the one station picker: choosing a station there also
-      points the strip at it, so the strip gets no picker of its own. The four columns start under that line.
+    - **The header is the station top bar** (6.3a's one 68 px bar). `useStationHeader` names the board: "Production board" with its
+      Amharic name beside it on the English page (read from `am.json` at build time, `production/twins.ts`, as 6.2b's catalog twin and
+      6.3b's KDS twins), and under it the station whose shift the menu follows with that shift ("Bakery oven · Morning shift").
+      `StationHeaderActions` puts the board's buttons in the bar after the shift's chip and before the sync chip: **Display case**
+      (`inventory.view`: the till's `DisplayCasePanel` in a drawer; it shows its short words, its name and the drawer's are "Display case
+      stock") and **New batch** (`production.request`: a dialog asking for a product a production station makes, the quantity, its usual
+      batch when empty, and a note, POST `/production/requests` with its client UUID and one Idempotency-Key). The page keeps its h1
+      ("Production board", `sr-only`, as the pad's), so `p2-stockout-production`'s heading still answers. The board's intro line is gone
+      (`production.intro` removed). Two first drafts drew this head as a row of the page (`ScreenHead`) and the shift as a strip under
+      the bar; both are gone.
+    - **The shift is 6.3b's menu in the bar** (`ShiftBar look="menu"`): its state as a chip, the panel with the region "Shift", its words,
+      actions and dialogs, opening by itself while the shift needs someone, so the columns start right under the bar. Selector change:
+      `p3-opening-prefill` clicked "Close shift" in the region on `/production` while the shift was open, when the card showed its
+      buttons. The menu is closed then, so the spec opens it first (`openShiftBar(bar)`, 6.3b's helper, the same step the p3 KDS and till
+      flows take). The board's station filter is a compact 44 px select at the right above the column heads, only when there is a
+      choice (it was a labelled field above the board). It is the one station picker: choosing a station there also points the shift menu
+      at it, so the menu draws no picker of its own.
+    - **The bar never cuts the screen's title** (all station screens: the pad, the kitchen and bar displays, the till, production and the
+      count): the title does not shrink (its Amharic name and the line under it do), and the bar's right side is compact. The person is
+      the circle alone, with the name and role at the top of its menu (readers hear "Acting: <name>" while a waiter has the pad, which
+      the p1 and p5 pad specs read). The sync chip is its dot and a short word ("Online", "3 waiting", "Offline · 2", "1 to check"), the
+      whole sentence for readers. The admin console's bar is unchanged.
+    - **Waits** have one helper, `lib/durations.ts` (with `useWaitText`): "5:07" under an hour, "1 h 05" under a day, "3 d" beyond.
+      The kitchen and bar timers, the till's waiting orders and the board's batches in the oven use it, so a stale ticket no longer reads
+      "5709:54" nor an order "5709 min". `e2e/p6/screens-durations-logic.spec.ts` (p6-a11y) tests it. The kitchen display's chime is a
+      speaker (`Volume2` / `VolumeX`, as the pad's), not a second bell beside the notifications; its names are unchanged.
+    - **Buttons named by their own text** (axe's label-content-name-mismatch, WCAG 2.5.3, as 6.3a's pad cards): a card's "Open
+      <product>", its action ("<action>: <product>"), "Request transfer of <ingredient>" and "<item>: as expected" are sr-only text in
+      the button, and what the button draws is hidden from readers. No aria-label is left on them, and the names the specs read are the same.
     - **The columns** sit on the ground without a tray: the name (16 / 600) over its Amharic name on the English page, a 30 px count
       pill, and a dashed "Nothing here." when empty. Their region names are kept: Requested, In progress, Pending confirmation and Done
       today (`p2-stockout-production` selects them). The spec's words "In the oven" and "Check and confirm" are not used, because the
@@ -947,7 +963,7 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       (15 / 600, two lines at most) over the Amharic name, and the quantity at 22 / 700 with its unit under it (what was made once the
       batch is counted). One chip: "Stock out · asked automatically" (amber), "Asked by <name>" or "Scheduled" (blue) and the priority
       while it waits; "Made 2 of 2 asked" (blue, with the waste when there is some) while it waits for its overseer. The meta line: the
-      note, the due time and who has it; "<baker> · started 07:58 · 22 min so far" in the oven; "<baker> · needs an overseer";
+      note, the due time and who has it; "<baker> · started 07:58 · 22:14 so far" in the oven; "<baker> · needs an overseer";
       "Confirmed 06:40 · <name>". The name is still the button "Open <product>" (`aria-pressed`), and the card whose request card is
       open has the 2 px brand border.
     - **One action per column** (`cardMove` in `lib/live/production.ts`), at 48 px, only for the person whose move it is: **Accept
@@ -966,9 +982,10 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       covers the window). Its section keeps the name "Request card: <product>"; inside, the product's photo, the facts in a
       `neutral-50` well, the recipe on the `Table` (shortfalls red, with "Request transfer"), the steps, the Done form and the moves at
       52 px. Accept, Start, Done, Confirm, Send back and Cancel request keep their names. "Close card" is an icon button of that name.
-    - **The count screen**: the station top bar names it ("Shift count" with its Amharic name, and under it the station, the shift's day
-      and its open time), with **Back to the station** among the bar's buttons; the page keeps its `sr-only` h1 "Shift count" for the p3
-      specs. Under the bar: the shift's state chip and the intro;
+    - **The count screen**: the station top bar names it ("Shift count" with its Amharic name, and under it the station, this shift's
+      state, its day and its open time), with the station's shift menu (`look="menu"` with a new `quiet` prop: it opens by itself only on
+      a refusal, because the count in progress that would open it is the one on this screen) and **Back to the station** among the bar's
+      buttons; the page keeps its `sr-only` h1 "Shift count" for the p3 specs. Under the bar: the intro;
       the handover panel above an opening count (rows per place with Locked or Waiting for approval chips, the chain link and the start
       of the fingerprint); the places as station segments (ink when chosen) with their stage chip, still the `navigation` "Places to
       count" of `aria-pressed` buttons; the count in a `Panel` named by the place with its kind, stage and attempt beside the name;
@@ -979,8 +996,9 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       in an amber well. Every label, region and button name the p3 specs read is kept.
     - **Colours**: a locked count, a counted line and the chain card are brand teal now (green means money confirmed only, spec 1.3);
       the drawer's "Declared" stays green. Notes, the review list and the cash summary take the new radii.
-    - Messages, both languages: `production.chip_*` (3), `meta_*` (6), `action_*` (5), `display_case`, `new_batch*` (12);
-      `production.intro` removed. `docs/i18n/am-review.csv` regenerated.
+    - Messages, both languages: `production.chip_*` (3), `meta_*` (6, `meta_waited` among them), `action_*` (5), `display_case` and
+      `display_case_short`, `new_batch*` (12); `common.wait_hours` and `wait_days`; `shell.sync_*_short` (4). `production.intro` and
+      `till.queue_age` removed. `docs/i18n/am-review.csv` regenerated.
     - Tests: `p6-a11y` gains the production board in `en` and `am`, with a request card open (`e2e/support/demoProduction.ts`: the demo
       bakery's board with a card in each column; the seed leaves Requested, Pending confirmation and Done today, and the demo admin puts
       a cake-room batch in the oven). `e2e/p6/screens.spec.ts` captures the board, a request card, New batch and the display case in

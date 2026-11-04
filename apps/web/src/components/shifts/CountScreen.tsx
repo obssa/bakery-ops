@@ -17,16 +17,18 @@ import { useIsoDay } from "@/lib/useDates";
 import { ICON_STROKE } from "../icons";
 import { StationHeaderActions } from "../StationHeaderActions";
 import { focusRing } from "../styles";
-import { Alert, Badge, Button, EmptyState, Panel, type Tone } from "../ui";
+import { Alert, Button, EmptyState, Panel } from "../ui";
 import { useRouter } from "@/i18n/navigation";
 import { CountPanel, StageBadge } from "./CountPanel";
 import { HandoverPanel } from "./HandoverPanel";
 import { NoteForm, NotesList } from "./Notes";
+import { ShiftBar } from "./ShiftBar";
+import { useShiftStation } from "./useShiftStation";
 
 // The count screen (step 3.7b; on the Fresh Counter primitives since step 6.3c), /shifts/count?shift=<id>: one component for the opening and
 // the closing count. The station top bar names it (lib/topBar.ts): "Shift count" with its Amharic name on the English page, the station,
-// the shift's day and since when under it, and "Back to the station" among the bar's buttons. Under the bar: the shift's state and the
-// intro, the handover from the last shift above an opening count, the places to count as a row of station segments (each with the stage
+// the shift's state, day and since when under it, and the station's shift menu and "Back to the station" among the bar's buttons. Under
+// the bar: the intro, the handover from the last shift above an opening count, the places to count as a row of station segments (each with the stage
 // it is at), the count of the chosen place, and the handover notes. It shows the counts of the shift for the phase it is in (the opening
 // ones while the shift is being opened, the closing ones from the moment it is closed), one place at a time, and polls the shift and its
 // counts every 6 s so that a hand-in by someone else, an approval or a rejection shows without a reload.
@@ -38,17 +40,6 @@ function Named({ title, titleAm, subtitle }: { title: string; titleAm?: string; 
 }
 
 const POLL_MS = 6000;
-
-// open is brand teal: green means money confirmed and nothing else (fresh-counter.md 1.3)
-const SHIFT_TONE: Record<ShiftStatus, Tone> = {
-  scheduled: "neutral",
-  opening: "blue",
-  open: "brand",
-  counting: "blue",
-  pending_approval: "amber",
-  locked: "neutral",
-  cancelled: "neutral",
-};
 
 const NOTE_STATUSES: readonly ShiftStatus[] = ["opening", "open", "counting", "pending_approval"];
 
@@ -111,6 +102,10 @@ function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
     return () => useActiveStation.getState().set(null);
   }, [stationId]);
 
+  // the station's shift as the menu in the station top bar (ShiftBar look="menu", as on every station screen): its state as a chip, its
+  // actions in the panel; `quiet`, because the count in progress that would open it by itself is the one on this screen
+  const shiftStation = useShiftStation({ stationId });
+
   const all = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);
   const current = useMemo(() => currentCounts(all), [all]);
   const phase = phaseOf(shift?.status ?? "opening", current);
@@ -162,20 +157,24 @@ function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
   }
 
   const stationName = locale === "am" ? shift.station.name_am : shift.station.name_en;
-  const subtitle = [stationName, t("shift_date", { date: isoDay(shift.date) }), shift.opened_at ? ts("open_since", { time: addisClock(shift.opened_at) }) : null].filter(Boolean).join(" · ");
+  // the bar's line: the station, this shift's state (the shift counted here may not be the station's running one), its day and open time
+  const subtitle = [
+    stationName,
+    t(`shift_${shift.status}`),
+    t("shift_date", { date: isoDay(shift.date) }),
+    shift.opened_at ? ts("open_since", { time: addisClock(shift.opened_at) }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const canNote = NOTE_STATUSES.includes(shift.status);
 
   return (
     <div className="flex flex-col gap-5">
       <Named title={t("title")} titleAm={titleAm} subtitle={subtitle} />
+      <ShiftBar model={{ ...shiftStation, choices: [] }} look="menu" quiet />
       {back}
-      {/* the shift's state, then what the screen is for */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Badge tone={SHIFT_TONE[shift.status]} dot>
-          {t(`shift_${shift.status}`)}
-        </Badge>
-        <p className="min-w-0 flex-1 text-[15px] text-neutral-600">{t("intro")}</p>
-      </div>
+      {/* what the screen is for */}
+      <p className="max-w-3xl text-[15px] text-neutral-600">{t("intro")}</p>
 
       {countsQuery.isError && !countsQuery.data ? <Alert>{errorText.message(countsQuery.error)}</Alert> : null}
       {countsQuery.isError && countsQuery.data ? (

@@ -22,7 +22,11 @@
     "sync_sending": "Online · {count} waiting",
     "sync_offline": "Offline",
     "sync_offline_waiting": "Offline · {count} waiting",
-    "sync_conflicts": "Conflicts · {count}"
+    "sync_conflicts": "Conflicts · {count}",
+    "sync_online_short": "Online",
+    "sync_sending_short": "{count} waiting",
+    "sync_offline_waiting_short": "Offline · {count}",
+    "sync_conflicts_short": "{count} to check"
   },
   "home": {
     "screens": "Screens",

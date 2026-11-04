@@ -22,7 +22,11 @@
     "sync_sending": "በመስመር ላይ · {count} በመጠባበቅ ላይ",
     "sync_offline": "ከመስመር ውጭ",
     "sync_offline_waiting": "ከመስመር ውጭ · {count} በመጠባበቅ ላይ",
-    "sync_conflicts": "ያልተቀመጡ · {count}"
+    "sync_conflicts": "ያልተቀመጡ · {count}",
+    "sync_online_short": "በመስመር ላይ",
+    "sync_sending_short": "{count} በመጠባበቅ",
+    "sync_offline_waiting_short": "ከመስመር ውጭ · {count}",
+    "sync_conflicts_short": "{count} ያልተቀመጡ"
   },
   "home": {
     "screens": "ገጾች",
