@@ -232,6 +232,15 @@ From the As built notes, for the review on the live URL:
 - **Sign-in** (6.2b): no "Staff code" tab (Q1) and no eye button on the password field (its name, "Show password", would also answer
   `getByLabel("Password")`).
 
+### After the screens: the shift's panel covered the page (phase-6/shift-strip)
+
+Ramin, with a screenshot of the till, on phone and laptop: the shift's floating panel opened by itself whenever the shift needed someone,
+and "it's hiding what's under it". 6.3b had moved the shift into a menu in the top bar as the boards show it; the auto-open kept the prompt
+in view, but over the work. Now the panel opens only on a tap, and the prompt is a strip in the page's flow under the bar with the state and
+its one main action, in amber for a refusal, which covers nothing (fresh-counter.md 3, "The shift's states"). The boards draw no such state,
+so there is no board to match. The till's cash panel closes the same way, and both panels are placed under the bar's real height, which wraps
+on a phone.
+
 ## Added to step 6.5 by the coordinator
 
 **The admin accessibility pass.** `p6-a11y` had not covered the screens of 6.4c and 6.4d. `e2e/p6/a11y-admin.spec.ts` now reads Orders with a
@@ -376,6 +385,10 @@ Each change is in the commit of its screen, with the reason in the step's As bui
 - **6.4c and 6.4d**: none.
 - **6.5**: `p2-purchase-transfer`'s fixture (`e2e/support/inventory.ts`) reads `after.onHandText` "20,000 g", `rule.reorderText` "50,000 g" and
   `ask.text` "5,000 g", because the admin's stock screens now group thousands; `e2e-p2` was green on them at `213c6a8`.
+- **phase-6/shift-strip**: the panel no longer opens by itself, so the five places that read a panel it had opened now call `openShiftBar`
+  after the page load. No name, role or selector changed: `p3 handover.spec.ts` before "Start shift" on the kitchen display, before "Start
+  shift" and before "Show handover" on the till; `p3 opening-prefill.spec.ts` before "Open the count" and before "Start shift" on the
+  production board. `handover-shift-bar.spec.ts` already opened it through the helper.
 
 ## Deviations from the plan and assumptions taken
 

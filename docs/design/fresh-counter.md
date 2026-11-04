@@ -179,6 +179,24 @@ the app's line icon) and the station name, then a chip with the shift. Right, in
 3. the notification bell where the screen has one;
 4. the user's avatar with name and role.
 
+**The shift's states.** The shift never floats over the work unasked. On the KDS, the till, the production board and the count screen the
+bar holds its chip: amber "No shift", blue "Opening" or "Closing", brand teal "Open". A tap on the chip opens the floating panel with the
+shift's words and every action; the chip, a tap outside it or Escape closes it (the focus returns to the chip), and it fits under the bar
+and within the window, scrolling inside itself. The till's cash panel behaves the same way.
+
+| State | Bar | Under the bar |
+|---|---|---|
+| No shift | the chip with a small attention dot | the strip: the headline, "Start shift", "More" |
+| Opening or closing count in progress | the chip with the dot | the strip: the headline, "Open the count", "More" |
+| A refusal (409 `inventory.shift.required`, `payments.shift.required`, a failed shift action) | the chip with the dot | the strip in amber: the message and the same action; "Dismiss" when no action answers it |
+| Shift open | the chip alone | nothing: the page has its full height |
+| The count screen, its own count in progress | the chip alone | nothing: the count is the screen (a refusal still shows) |
+
+The strip is in the page's flow directly under the bar, so it pushes the page down and covers nothing: one row of about 52 px from 640 px
+up (the state's chip and the headline on the left, the action and a secondary "More" on the right), and on a phone the message on one line
+with "More", and the action the full width under it. It is `role="status"` and never takes the focus. While the panel is open the strip
+keeps its words and its height and hides its controls, so a name never matches two visible controls.
+
 ### 3.1 Login
 
 - Layout: a split screen. The left 45 % is a full-bleed bakery photo with the app name and one line of welcome over a bottom
