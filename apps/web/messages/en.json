@@ -1456,7 +1456,7 @@
     "chain_first": "This is the first link of the place.",
     "locked_at": "locked at {time}",
     "admin_title": "Shifts",
-    "admin_intro": "Where the shifts stand now, the counts waiting for a decision, and a check that everything is set up. Templates, the roster, the history and the replay are in the tabs above.",
+    "admin_intro": "Where the shifts stand now, the counts waiting for a decision, and a check that everything is set up. Templates, the roster, the history and the replay are in the tabs below.",
     "queue_title": "Counts waiting for a decision",
     "queue_intro": "Oldest first. Open a count to see it side by side and approve it or send it back.",
     "queue_total_approval": "{count, plural, one {# waiting for approval} other {# waiting for approval}}",
