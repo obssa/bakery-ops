@@ -1,9 +1,10 @@
 # Phase 6 report — Fresh Counter redesign and product photos (before the claim)
 
-Commit: `main` at «MAIN» with step 6.5's branch `phase-6/gate` (pull request #120) on top · CI runs: «RUNS» · Date: 2026-11-04
+Commit: `main` at `9c854f3` (PR #121, the last screen PR) with step 6.5's branch `phase-6/gate` (pull request #120) on top · CI run: 41816119723, attempt 2, at
+`213c6a8`, every job green; the run on this report's head is the coordinator's to read · Date: 2026-11-04
 
-**This is the report before the claim, not a claim that the phase is done.** All fourteen pull requests of the plan's steps are merged or
-are this one: the plan (#107), 6.1a to 6.1c, 6.2a and 6.2b, 6.3a to 6.3c, 6.4a to 6.4d, and 6.5 (#120). STATUS keeps phase 6
+**This is the report before the claim, not a claim that the phase is done.** All fifteen pull requests of the plan's steps are merged or
+are this one: the plan (#107), 6.1a to 6.1c, 6.2a and 6.2b, 6.3a to 6.3c, 6.4a to 6.4d with 6.4c's follow-up (#121), and 6.5 (#120). STATUS keeps phase 6
 `in_progress`, no `done_commit` is set and no tag is made. Phase 6 is the last phase in the manifest, so once it is claimed the strict gate
 freezes `apps/` after `done_commit`: the coordinator claims (`phase_status.py claim-done 6`) only when every Phase 6 pull request is
 merged and `gate-p6` is green on `main`, then tags `phase-6-complete`.
@@ -12,7 +13,7 @@ merged and `gate-p6` is green on `main`, then tags `phase-6-complete`.
 
 NOT CLAIMED, READY TO CLAIM ONCE `gate-p6` IS GREEN ON `main`. The gate is built: the `gate:p6` tests (`Phase6GateTest`), the `gate-p6`
 job's Pest step on the compose stack, ADRs 0022 and 0023 accepted and listed under `phases.6.adrs`, and this report. The local
-`gate_check --mode done --phase 6 --no-tests --no-e2e` («LOCAL») is under "Before the claim". Phase 6 has no go-live checklist: it changes how
+`gate_check --mode done --phase 6 --no-tests --no-e2e` (PASS, 0 failed) is under "Before the claim". Phase 6 has no go-live checklist: it changes how
 the shop looks, not whether it may run (plan 10.3), so nothing in it waits for a sign-off.
 
 ## What was built, step by step
@@ -104,6 +105,11 @@ the production board draws them, with a stack of each order's photos; the record
 the reconciliation's four Stats and compact tables that fit the page. Green means money confirmed only; no blue tab or green notice is
 left on these screens. Web only, and no Playwright selector changed.
 
+**6.4c follow-up `phase-6/web-admin-sell-make` (PR #121).** From the CI captures and the coordinator's review. The Payments list loses its
+own number column (the number sits under the time, `#88 · by …`), so the chevron shows whole at 1440 × 900. Transfers' source line wraps,
+the order record's two columns start at 1400 px instead of 1280, and the planner's Baker and Assign become one column. `adminPayments.list.col_payment`
+and `planner.col_assign` are removed from both languages.
+
 **6.4d `phase-6/web-admin-team-insight` (PR #119).** People, Devices, the Shifts overview, a count's review, the history, notes, reasons,
 templates, replay and roster, Analytics with its pages, the Audit log and System, on 6.4c's patterns (`components/admin/rows.tsx` adds a
 table card's grey rows while its first read is pending). Analytics has the board's KPI row, Today's share bars, each product's photo and
@@ -128,11 +134,13 @@ accepted with their dated notes, the manifest's `phases.6.adrs`, the skill's `ci
 
 | # | Criterion | Evidence | Result |
 |---|---|---|---|
-| 1 | `p6-product-photo`: an admin drops a photo, frames it to 4:3 and saves it; the pad card and the order line show it; replace changes the URLs; remove brings the placeholder back; the menu's ETag moves each time | `e2e/p6/product-photo.spec.ts` (6.4b), `product-photo-pad.spec.ts` (6.3a), the logic specs, in `e2e-p6` | «C1» |
-| 2 | `p6-a11y`: axe on login, pad, KDS, till, production, admin Today and catalog, in `en` and `am`: no serious or critical violation, contrast included | `a11y.spec.ts`, `a11y-stations.spec.ts`, `a11y-product.spec.ts` (6.4b), in `e2e-p6` | «C2» |
-| 3 | `gate:p6` (`Phase6GateTest`): the three sizes, the 1000 × 750 crop, `too_small`, the media route's headers, 304 and 404, every demo product with a photo after `Phase6Seeder`, no photo under `public/` | `gate-p6`'s Pest step | «C3» |
-| 4 | every p0 to p5 Playwright project and `gate-p0` to `gate-p5` stay green in the same run; selectors move only where the plan names the spec and the reason | `e2e-p0` to `e2e-p5`, `gate-p0` to `gate-p5`; the specs each step changed are listed under "Specs that changed" | «C4» |
-| 5 | ADRs 0022 and 0023 accepted; no phase 6 to-do marker left | `gate_check`'s ADR and marker rows | «C5» |
+| 1 | `p6-product-photo`: an admin drops a photo, frames it to 4:3 and saves it; the pad card and the order line show it; replace changes the URLs; remove brings the placeholder back; the menu's ETag moves each time | `e2e/p6/product-photo.spec.ts` (6.4b), `product-photo-pad.spec.ts` (6.3a), the logic specs, in `e2e-p6` | green at `213c6a8` |
+| 2 | `p6-a11y`: axe on login, pad, KDS, till, production, admin Today and catalog, in `en` and `am`: no serious or critical violation, contrast included | `a11y.spec.ts`, `a11y-stations.spec.ts`, `a11y-product.spec.ts` (6.4b), and `a11y-admin.spec.ts` (6.5), in `e2e-p6` | green at `213c6a8` |
+| 3 | `gate:p6` (`Phase6GateTest`): the three sizes, the 1000 × 750 crop, `too_small`, the media route's headers, 304 and 404, every demo product with a photo after `Phase6Seeder`, no photo under `public/` | `gate-p6`'s Pest step; see "The gate run of step 6.5" | green |
+| 4 | every p0 to p5 Playwright project and `gate-p0` to `gate-p5` stay green in the same run; selectors move only where the plan names the spec and the reason | `e2e-p0` to `e2e-p5`, `gate-p0` to `gate-p5`; the specs each step changed are listed under "Specs that changed" | green at `213c6a8` |
+| 5 | ADRs 0022 and 0023 accepted; no phase 6 to-do marker left | `gate_check`'s ADR and marker rows, under "Before the claim" | PASS |
+
+These results are from `213c6a8`, the last run read before this report's head; that head adds PR #121, the names' logic spec, `mod-shifts`' timeout and documents. The coordinator's run on the head is the one the claim rests on.
 
 ## CI evidence
 
@@ -151,11 +159,22 @@ accepted with their dated notes, the manifest's `phases.6.adrs`, the skill's `ci
 
 ### The last full runs before this step
 
-«RUNS-DETAIL»
+- **Run 41770822752** (`main` after 6.4a, every job green, 87 minutes): `e2e-p6` 54 passed and 1 skipped (the last placeholder, until 6.4b) in 1.7 minutes
+  (job 3 m 55 s); its `DemoSeeder` 48.6 s, three days of history played in 19 s. `gate-p6` 6 s, `gate_check` only.
+- **Run 41792176700** (this PR at `bb9e8e5`, with 6.4b merged, every job green, 83 minutes): `e2e-p6` 81 passed, none skipped, in 1.7 minutes.
 
 ### The gate run of step 6.5
 
-«GATE-RUN»
+- **Run 41816119723, attempt 2** (this PR at `213c6a8`: 6.4b, 6.4c and 6.4d merged, the admin pass and the names in; every one of its 40 jobs green):
+  - `gate-p6`'s Pest step: `gate:p6` **6 passed, 141 assertions, 25 s, no skip or warning**, on the compose stack in the API image; the seed case 18.5 s. Then `gate_check`
+    **PASS (0 failed, 0 warnings, 17 checks)**, informational because the phase is open. The job took 1 m 34 s.
+  - `e2e-p6`: **100 passed, none skipped, in 3.2 minutes** (job 5 m 55 s), both admin passes among them; `DemoSeeder` 48.6 s.
+  - `e2e-p2` green on the grouped figures, and `e2e-p4` green on the reconciliation's longer drill name.
+  - `mod-shifts` 18 m 16 s (12 m 39 s in the run above), which is why it now has 30 minutes.
+- **Attempt 1 of that run** failed with no failed job: `mod-orders`, `gate-p0` and `backup-drill` have no job record, and what needs them was skipped. `main`'s run 41815631204 at
+  `5fd19f0` ended the same way minutes apart, with `mod-orders` and `backup-drill` missing. It looks like a GitHub fault in creating those jobs, not the code, though that is
+  inferred from the timing and the missing records. `gh run rerun --failed` was refused; a full rerun passed.
+- **The run on this report's head has not been read here.** It adds PR #121, `a11y-names-logic.spec.ts`, `mod-shifts`' timeout and documents.
 
 ## The screens reviewed against the canvas
 
@@ -166,9 +185,24 @@ run. The process (the brief's rule of 2026-11-03) has the coordinator compare ea
 `Kitchen`, `Till`, `Production`, `Admin`, `CatalogList`, `ProductPhoto` and `PhotoStates`) before merging it, and Ramin look at the live URL;
 this report lists what was captured and the differences the steps recorded, and does not itself sign the comparison. No capture is compared
 by a machine (ADR 0023, no golden screenshots).
-The run of this step («SCREENS-RUN») holds «SCREENS-COUNT» captures:
+The last run read for this report (run 41816119723, attempt 2, at `213c6a8`, before PR #121) holds 60 captures, all at their step's size (`-1180x820`
+stations, `-1440x900` admin) unless named:
 
-«SCREENS-TABLE»
+| Board | Step | Captures (`en`; "+ am" has an Amharic one too) |
+|---|---|---|
+| Pad | 6.3a | `pad` + am, `pad-locked`, `pad-tables`, `pad-orders` |
+| Kitchen | 6.3a, 6.3b | `kds-kitchen` + am, `kds-bar`, `kds-kitchen-screens-menu` |
+| Till | 6.3b | `till` + am, `till-cash` |
+| Production | 6.3c | `production` + am, `production-card`, `production-new-batch`, `production-display-case` |
+| Main (the spec's primitives) | 6.3c | `count` + am |
+| Admin | 6.4a | `today` + am, `today-820x1180`, `admin-drawer-820x1180` |
+| CatalogList | 6.4a | `catalog`, `catalog-grid`, `catalog-new-item` |
+| ProductPhoto, PhotoStates | 6.4b | `product-photo` + am, `product-framing`, `product-framing-page`, `product-empty`, `product-refusal` |
+| none: built beside CatalogList | 6.4c | `orders`, `orders-timeline`, `order-record`, `payments` + am, `payments-channels`, `payments-reconciliation`, `payments-receipts`, `inventory` + am, `inventory-ledger`, `inventory-purchases`, `inventory-purchase`, `inventory-suppliers`, `inventory-transfers`, `inventory-reorder`, `planner` |
+| none: built beside CatalogList and Admin | 6.4d | `people` + am, `devices`, `shifts`, `shifts-roster`, `shifts-history`, `analytics` + am, `analytics-sales`, `audit`, `system` |
+
+The Login board has no capture, because 6.2b came before the spec; `p6-a11y` opens sign-in but takes no picture. The run on this report's head is the
+one to read for the Payments list, because PR #121 changed it after these captures.
 
 ### Where the screens still differ from the boards
 
@@ -205,7 +239,16 @@ card's timeline open, Payments with its Reconciliation, Stock, People, Shifts wi
 in `en` and in `am`, as the demo bakery's admin at 1440 × 900. It is a light pass: the main page of each section, not every sub-page and not
 every state. A pass reads every screen and fails once at its end, naming every serious or critical finding. What it found:
 
-«A11Y-FINDINGS»
+Nothing serious or critical: both passes were green on their first run (`e2e-p6` of run 41816119723, attempt 2, at `213c6a8`). Two limits on
+what that proves:
+
+- **The pass has never been seen failing.** The names in the table below were changed before it first ran, from the rule and from reading
+  the code, so this run does not show that it would have caught them.
+- **It reads only what the seed draws.** With all four shifts open, the Shifts page has no "Open the count" (capture `shifts-1440x900-en`),
+  and the reconciliation's drill link needs a non-cash channel with a payment lacking its photo (`canDrill`), which the top of the seeded page
+  does not show. `e2e/p6/a11y-names-logic.spec.ts` (13 cases, no page) therefore checks the five names from the dictionaries in both
+  languages, with axe's own reading of words, and has one case that must fail (the old "ትዕዛዝ 22ን ክፈት" does not hold "ትዕዛዝ 22"). It passed
+  locally; its first CI run is the one on this report's head.
 
 **Names that hold the words their controls show** (axe's `label-content-name-mismatch`, WCAG 2.5.3, which compares whole words):
 
@@ -253,7 +296,29 @@ Every new string was written in both languages in the step that added it (strict
 was regenerated each time; a reviewer fills its `correction` column and `scripts/i18n_import.py` applies it in a PR of its own. They do not
 block the gate: the `am-reviewed` sign-off of Phase 5 stands. From Phase 5's `done_commit` to this step:
 
-«AM-KEYS»
+**The web's messages (`apps/web/messages/am.json`): 271 new, 13 reworded, 32 removed.**
+
+| Namespace | New | Keys |
+|---|---|---|
+| `admin` | 9 | `group_sell`, `group_make`, `group_team`, `group_insight`, `open_sections`, `close_sections`, `today`, `group_stations`, `account_menu` |
+| `adminPayments` | 2 | `receipts.text_title`, `receipts.print_title` |
+| `catalog` | 30 | `intro_products`, `intro_ingredients`, `add_product`, `add_ingredient`, `search`, `search_label`, `clear_search`, `no_match`, `filter_category`, `all_categories`, `view`, `view_table`, `view_grid`, `grid`, `col_product`, `col_ingredient`, `col_sold_from`, `col_price`, `col_status`, `col_open`, `sold_display`, `status_active`, `status_in_use`, `status_hidden`, `status_new`, `price_none`, `add_photo`, `open_item`, `close`, `categories_intro` |
+| `common` | 2 | `wait_hours`, `wait_days` |
+| `inventory` | 1 | `stock.clear_search` |
+| `kds` | 10 | `feed_live`, `feed_stale`, `column_new`, `column_cooking`, `column_making`, `column_ready`, `column_new_empty`, `column_cooking_empty`, `column_making_empty`, `column_ready_empty` |
+| `login` | 2 | `station_hint`, `forgot` |
+| `pad` | 21 | `code_entered`, `acting_prefix`, `acting_role`, `close`, `orders_button`, `tables_title`, `table_title`, `no_table`, `change_table`, `change_table_aria`, `tab_all`, `search`, `search_clear`, `search_none`, `unavailable_said`, `line_edit`, `done`, `order_note_add`, `items_count`, `subtotal`, `view_order` |
+| `photo` | 50 | `title`, `meta_empty`, `meta_drag`, `meta_opening`, `meta_framing`, `meta_saving`, `meta_on_menu`, `meta_off_menu`, `drop`, `browse`, `drop_now`, `drop_types`, `rules_empty`, `rules_drag`, `placeholder_note`, `frame_label`, `frame_help`, `frame_alt`, `drag_chip`, `zoom`, `zoom_value`, `quality_sharp`, `quality_soft`, `quality_small`, `preview`, `preview_pad`, `preview_line`, `line_qty`, `use`, `choose_another`, `cancel`, `rules_framing`, `uploading`, `upload_label`, `percent`, `uploading_note`, `added_by`, `added_demo`, `added_on`, `replace`, `remove`, `remove_title`, `remove_body`, `remove_confirm`, `remove_keep`, `refused_type`, `refused_unreadable`, `read_only`, `saved`, `removed` |
+| `product` | 26 | `breadcrumb`, `on_menu`, `off_menu`, `stock_left`, `stock_none`, `place_display`, `place_to_order`, `ingredient`, `take_off`, `put_back`, `taken_off`, `put_back_done`, `recipe`, `save`, `saved`, `nothing_changed`, `read_only`, `details`, `field_name_en`, `field_name_am`, `field_price`, `price_since`, `price_none`, `check_names`, `check_price`, `close` |
+| `production` | 28 | `chip_stock_out`, `chip_made`, `chip_wasted`, `meta_started`, `meta_started_anon`, `meta_waited`, `meta_overseer`, `meta_confirmed`, `meta_done`, `action_accept`, `action_start`, `action_finish`, `action_confirm`, `action_of`, `display_case`, `display_case_short`, `new_batch`, `new_batch_title`, `new_batch_product`, `new_batch_choose`, `new_batch_need_product`, `new_batch_none`, `new_batch_qty`, `new_batch_qty_in`, `new_batch_qty_hint`, `new_batch_note`, `new_batch_send`, `new_batch_cancel` |
+| `shell` | 9 | `sync_online`, `sync_sending`, `sync_offline`, `sync_offline_waiting`, `sync_conflicts`, `sync_online_short`, `sync_sending_short`, `sync_offline_waiting_short`, `sync_conflicts_short` |
+| `system` | 1 | `files.media` |
+| `till` | 19 | `queue_heading`, `queue_count`, `queue_items`, `queue_items_qty`, `pick_title`, `pick_body`, `settled_hint`, `open_order_aria`, `all_served`, `quick_cash`, `change_label`, `cash_hint`, `channel_needs_photo`, `channel_needs_reference`, `channel_needs_both`, `receipt_title`, `receipt_after_payment`, `receipt_printing_off`, `print_off` |
+| `today` | 61 | `title`, `date_line`, `date_line_ago`, `updated_now`, `updated_minutes`, `updated_hours`, `updated_days`, `updated_never`, `compare`, `export`, `export_busy`, `export_saved`, `kpis`, `kpi_sales`, `kpi_orders`, `kpi_avg`, `kpi_refunds`, `money`, `delta_up`, `delta_down`, `delta_money_up`, `delta_money_down`, `delta_same`, `delta_none`, `refunds_line`, `not_built`, `not_built_long`, `hourly_title`, `hourly_meta`, `hourly_label`, `hourly_label_empty`, `hourly_error`, `top_title`, `top_all`, `top_sold`, `top_empty`, `channels_title`, `channels_meta`, `channels_line`, `channels_empty`, `stock_title`, `stock_plan`, `stock_left`, `stock_out_line`, `stock_none`, `stock_more`, `stock_error`, `shifts_title`, `shifts_roster`, `shifts_none_open`, `system_title`, `system_open`, `system_scheduler`, `system_backups`, `system_queue`, `system_failed`, `system_devices`, `system_error`, `own_title`, `own_body`, `own_open` |
+
+Reworded in Amharic (or in both languages), to read again: `till.take_payment_aria`, `till.change_due`, `till.void_payment`, `kds.reject_line`, `stations.request_production_of`, `adminOrders.open_order`, `adminOrders.void_aria`, `catalog.intro`, `counts.admin_intro`, `adminShifts.running.open_count_named`, `adminShifts.notes.show_named`, `adminShifts.notes.hide_named`, `adminPayments.reconciliation.drill`.
+
+**The API's messages (`apps/api/lang/am/catalog.php`): 8 new**, `catalog.image.not_a_product`, `not_an_image`, `unsupported_type`, `too_large`, `crop_invalid`, `too_small`, `unavailable` and `processing_failed`.
 
 ## Open questions and the defaults taken (plan 10.2)
 
@@ -262,7 +327,7 @@ block the gate: the `am-reviewed` sign-off of Phase 5 stands. From Phase 5's `do
 | Q1 | A "Staff code" sign-in tab | Not built: sign-in keeps phone and password; the spec's keypad (72 px keys, dots) is the pad's lock screen (6.3a). Code-only sign-in would be its own step with an ADR. **Ramin's call.** |
 | Q2 | "Refunds" in the sidebar | Left out: refunds live on the order record and the till; a list needs an API read. **Ramin's call.** |
 | Q3 | The branch switcher | Not shown at all, not even the name: no endpoint every role may read names the branch. Multi-branch stays after go-live. **Ramin's call.** |
-| Q4 | The demo and login photos and their licences | Supplied by the coordinator: 29 demo photos (Unsplash and Pexels pages and licences in `manifest.json`) and the login photo (`apps/web/public/images/LICENSES.json`), free to copy, change and redistribute, no person shown. |
+| Q4 | The demo and login photos and their licences | Supplied by the coordinator: 29 demo photos (source pages and licence names in `manifest.json`, Unsplash and Pexels) and the login photo (`apps/web/public/images/LICENSES.json`). The tests check that each has a source and a licence name, not what the licence allows: that the licences meet the plan's rule (free to copy, change and redistribute without attribution) is **Ramin's to confirm**. |
 | Q5 | The production card's progress bar | Not drawn: no batch payload carries a planned duration (`production_batches` has no such column); the card says the minutes so far. |
 | Q6 | The till's quick cash keys | 300, 500, 1,000 (each disabled below the amount) and "Exact amount", filling Cash received; no setting. |
 | Q7 | Thumbs on the till, production, Today and the admin lists | Joined in the web from `GET /items?kind=product` through `useProductImages`; no change to Orders, Production or Analytics payloads and no new contract. |
@@ -276,7 +341,7 @@ block the gate: the `am-reviewed` sign-off of Phase 5 stands. From Phase 5's `do
 | Q15 | User photos | Initials only. |
 | Q16 | A customer-facing menu | Not in Phase 6; the large rendition is there for it. |
 | Q17 | Photos on the KDS | None. |
-| Q18 | How the look is reviewed | Ramin on the live URL after each deploy, and the coordinator from the `screens` artifact before each merge; no golden screenshots. |
+| Q18 | How the look is reviewed | By a person: the coordinator from the `screens` artifact before each merge, and Ramin on the live URL after each deploy; no golden screenshots. |
 | Q19 | How long removed photos' files stay | 30 days, then the prune, unless any row naming the sha was removed inside the window or is live. |
 
 ## Specs that changed (the selector rule, plan 6.0.2)
@@ -298,6 +363,8 @@ Each change is in the commit of its screen, with the reason in the step's As bui
   `p4 pay-refund` presses the page's "Save changes" and reads the page's status "Saved." instead of the form's own button and status (the
   board saves the page from its title row; the form "Refund settings" and its checkboxes are as they were).
 - **6.4c and 6.4d**: none.
+- **6.5**: `p2-purchase-transfer`'s fixture (`e2e/support/inventory.ts`) reads `after.onHandText` "20,000 g", `rule.reorderText` "50,000 g" and
+  `ask.text` "5,000 g", because the admin's stock screens now group thousands; `e2e-p2` was green on them at `213c6a8`.
 
 ## Deviations from the plan and assumptions taken
 
@@ -319,6 +386,8 @@ The As built notes list them step by step. The ones that change what the plan's 
 - **The `gate:p6` seed case** seeds every phase in the test (`SEED_PHASE` unset, as `e2e-p6` seeds), rather than reading a database the job
   seeded first as `gate-p4` does: the products come from Phases 0 and 2, and the test needs no second database.
 - **`scripts/gate_check.py`** finds its Pest runner only when it runs tests (6.5).
+- **`mod-shifts` has 30 minutes**, not the reusable job's 20: it took 18 m 16 s at `213c6a8` (6.5).
+- **`p6-a11y` grew past section 7's list** with the admin pass and the names' logic spec (6.5, the coordinator's addition).
 
 ## Before the claim
 
@@ -338,7 +407,8 @@ until the claim.
       is strict and `apps/` is frozen after `done_commit` (Phase 6 is the last phase in the manifest).
 - [ ] Run `bakery:demo-product-images --branch=<id> --dry-run`, then without `--dry-run`, once on the live Demo Bakery branch, if not
       done yet (`docs/runbook/server.md`).
-- [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher), when
-      convenient; none blocks the claim.
+- [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
+      photos' licences meet the plan's rule), when convenient. The tests do not check Q4's point, and the photos ship in this public
+      repository, so read it before calling that part settled; none blocks the claim's gate.
 - [ ] Ramin: review the restyled screens on the live URL (Q18).
 - [ ] Phase 5's open items, unchanged (`phase-5-report.md`).
