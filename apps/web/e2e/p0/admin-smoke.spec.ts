@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { openAccountMenu } from "../support/admin";
 import { deviceOf, placeDevice } from "../support/devices";
 
 // Phase 0 gate project p0-admin-smoke (manifest phases.0.gate.criteria): an admin signs in, creates an ingredient
@@ -17,6 +18,15 @@ import { deviceOf, placeDevice } from "../support/devices";
 //   the live site the demo bakery is loaded by hand (docs/runbook/server.md) and its password is not a CI secret.
 //
 // Paths are relative to baseURL (".../app/"), so "en/login/" is /app/en/login/.
+//
+// Step 6.4a (the Admin and CatalogList boards) moved what these tests reach on the admin pages, with the same names:
+// - the console's first page is Today: its h1 is "Today" (was "Admin console", the old overview's title);
+// - the language button is in the account menu at the foot of the sidebar (was in the station top bar): openAccountMenu first;
+// - "Admin console" is no longer a link on an admin page (the console is the page; "Screens" there lists the station screens): the
+//   Amharic chrome is checked on the sidebar's "Today" link instead (ዛሬ);
+// - the catalog lists one kind at a time, products by default (was both, with an "All" link and a Kind column): the ingredient is looked
+//   for under "Ingredients", the product under "Products", and a row reads its fulfilment, not its kind;
+// - the new item form and the categories are in the drawer that "Add product" opens (was a column beside the list).
 
 const live = !!process.env.PLAYWRIGHT_BASE_URL;
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -52,7 +62,7 @@ async function signIn(page: Page, account: { phone: string; password: string } =
   await page.getByLabel("Password").fill(account.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/app\/en\/admin\/$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Admin console" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
 }
 
 test.describe("p0 admin smoke", () => {
@@ -106,15 +116,17 @@ test.describe("p0 admin smoke", () => {
     await expect(page).toHaveURL(/\/app\/en\/admin\/catalog\/$/);
     await expect(page.getByRole("heading", { level: 1, name: "Catalog" })).toBeVisible();
 
-    // a category of the ingredient kind, then the ingredient in it
-    const categories = page.getByRole("region", { name: "Categories" });
+    // the drawer of "Add product": a category of the ingredient kind, then the ingredient in it
+    await page.getByRole("button", { name: "Add product" }).click();
+    const drawer = page.getByRole("dialog", { name: "New item" });
+    const categories = drawer.getByRole("region", { name: "Categories" });
     await categories.getByLabel("Kind").selectOption("ingredient");
     await categories.getByLabel("Name (English)").fill(category.en);
     await categories.getByLabel("Name (Amharic)").fill(category.am);
     await categories.getByRole("button", { name: "Add category" }).click();
     await expect(categories.getByRole("listitem").filter({ hasText: category.en })).toBeVisible();
 
-    const form = page.getByRole("region", { name: "New item" });
+    const form = drawer.getByRole("region", { name: "New item" });
     await form.getByLabel("Kind").selectOption("ingredient");
     await expect(form.getByLabel("Fulfilment")).toHaveCount(0);
     await form.getByLabel("Name (English)").fill(flour.en);
@@ -132,36 +144,38 @@ test.describe("p0 admin smoke", () => {
     await form.getByLabel("Unit").selectOption({ label: "Piece (pcs)" });
     await form.getByRole("button", { name: "Create item" }).click();
     await expect(form.getByRole("status")).toContainText(bread.en);
+    await drawer.getByRole("button", { name: "Close" }).click();
+    await expect(drawer).toHaveCount(0);
 
+    // the products, the default: the product with how it is made, not the ingredient
     const items = page.getByRole("table", { name: "Items" });
-    await expect(items.getByRole("row").filter({ hasText: flour.en })).toContainText("Ingredient");
-    await expect(items.getByRole("row").filter({ hasText: flour.en })).toContainText(category.en);
-    await expect(items.getByRole("row").filter({ hasText: bread.en })).toContainText("Product");
+    await expect(items.getByRole("row").filter({ hasText: bread.en })).toContainText("Made in batches");
+    await expect(items.getByRole("row").filter({ hasText: flour.en })).toHaveCount(0);
 
     // the kind filter
     await page.getByRole("link", { name: "Ingredients", exact: true }).click();
     await expect(page).toHaveURL(/[?&]kind=ingredient/);
-    await expect(items.getByRole("row").filter({ hasText: flour.en })).toBeVisible();
+    await expect(items.getByRole("row").filter({ hasText: flour.en })).toContainText(category.en);
     await expect(items.getByRole("row").filter({ hasText: bread.en })).toHaveCount(0);
     await page.getByRole("link", { name: "Products", exact: true }).click();
     await expect(page).toHaveURL(/[?&]kind=product/);
     await expect(items.getByRole("row").filter({ hasText: bread.en })).toBeVisible();
     await expect(items.getByRole("row").filter({ hasText: flour.en })).toHaveCount(0);
-    await page.getByRole("link", { name: "All", exact: true }).click();
-    await expect(items.getByRole("row").filter({ hasText: flour.en })).toBeVisible();
 
     // Amharic: the same page in Amharic chrome, Amharic names first
+    await openAccountMenu(page, "en");
     await page.getByRole("link", { name: "አማርኛ" }).click();
     await expect(page).toHaveURL(/\/app\/am\/admin\/catalog\//);
     await expect(page.locator("html")).toHaveAttribute("lang", "am");
     await expect(page.getByRole("heading", { level: 1, name: "ካታሎግ" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "የአስተዳዳሪ ኮንሶል" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "የአስተዳዳሪ ክፍሎች" }).getByRole("link", { name: "ዛሬ", exact: true })).toBeVisible();
     const itemsAm = page.getByRole("table", { name: "ዕቃዎች" });
-    await expect(itemsAm.getByRole("row").filter({ hasText: flour.am })).toContainText("ግብዓት");
+    await expect(itemsAm.getByRole("row").filter({ hasText: bread.am })).toContainText("በጅምላ ተዘጋጅቶ የሚቀመጥ");
+    await page.getByRole("link", { name: "ግብዓቶች", exact: true }).click();
     await expect(itemsAm.getByRole("row").filter({ hasText: flour.am })).toContainText(category.am);
-    await expect(itemsAm.getByRole("row").filter({ hasText: bread.am })).toContainText("ምርት");
 
     // and back
+    await openAccountMenu(page, "am");
     await page.getByRole("link", { name: "English" }).click();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByRole("heading", { level: 1, name: "Catalog" })).toBeVisible();
@@ -201,15 +215,18 @@ test.describe("p0 admin smoke", () => {
     await expect(items.getByRole("row").filter({ hasText: "Macchiato" })).toContainText("Made to order");
     await expect(items.getByRole("row").filter({ hasText: "Black forest cake (slice)" })).toContainText("Made in batches");
     await expect(items.getByRole("row").filter({ hasText: "Bottled water 0.5 L" })).toContainText("Bought in");
+    await page.getByRole("link", { name: "Ingredients", exact: true }).click();
     await expect(items.getByRole("row").filter({ hasText: "Wheat flour" })).toContainText("Flour & grains");
-    await expect(items.getByRole("row").filter({ hasText: "Wheat flour" })).toContainText("Ingredient");
 
+    await openAccountMenu(page, "en");
     await page.getByRole("link", { name: "አማርኛ" }).click();
     await expect(page.locator("html")).toHaveAttribute("lang", "am");
     const itemsAm = page.getByRole("table", { name: "ዕቃዎች" });
-    await expect(itemsAm.getByRole("row").filter({ hasText: "ማኪያቶ" })).toContainText("ምርት");
     await expect(itemsAm.getByRole("row").filter({ hasText: "የስንዴ ዱቄት" })).toContainText("ዱቄትና እህል");
+    await page.getByRole("link", { name: "ምርቶች", exact: true }).click();
+    await expect(itemsAm.getByRole("row").filter({ hasText: "ማኪያቶ" })).toContainText("በትዕዛዝ የሚዘጋጅ");
 
+    await openAccountMenu(page, "am");
     await page.getByRole("link", { name: "English" }).click();
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await page.getByRole("link", { name: "People" }).first().click();
