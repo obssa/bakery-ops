@@ -1,5 +1,5 @@
 import { expect, test, type Request } from "@playwright/test";
-import { live, requireAdmin, run } from "../support/env";
+import { requireAdmin, run } from "../support/env";
 import { loginOnce, orderLabel, unitLookup } from "../support/fixture";
 import { openAs } from "../support/pad";
 import { buildRefundFixture, closedCashOrder, ledgerOf, retireRefundProducts, tillExpectedCash } from "../support/refunds";
@@ -164,6 +164,8 @@ test.describe("pay-refund", () => {
     expect(madeToOrder.refund_restock).toBe(false);
     try {
       await openAs(page, admin, "en/admin/catalog/");
+      // step 6.4a: the new item form is in the drawer "Add product" opens (it was a column beside the list)
+      await page.getByRole("button", { name: "Add product" }).click({ timeout: 30_000 });
       const form = page.getByRole("form", { name: "New item" });
       await form.getByLabel("Kind").selectOption("product");
       await form.getByLabel("Fulfilment").selectOption("to_order");
@@ -191,13 +193,9 @@ test.describe("pay-refund", () => {
       createdId = created?.id ?? null;
       expect(created?.refundable).toBe(true);
       expect(created?.refund_restock).toBe(true);
-      // the list shows the two settings beside the other flags. Checked in CI only: on the live E2E branch the list holds every
-      // item earlier runs left (over two thousand, unpaged), and on the busy host its reload after the create missed even a 60 s
-      // wait. The API read above already proves both settings were saved, and the product page below is checked everywhere.
-      if (!live) {
-        const list = page.getByRole("table", { name: "Items" });
-        await expect(list.getByRole("row").filter({ hasText: nameEn })).toContainText("Back to stock", { timeout: 30_000 });
-      }
+      // step 6.4a: the list no longer shows the two settings (its columns are the CatalogList board's: product, category, sold from,
+      // price, status); it showed "Back to stock" in a Refunds column, checked here in CI only. The API read above proves both settings
+      // were saved, and the product's page below shows them, everywhere.
 
       // the product's page: refundable switched off and saved
       await openAs(page, admin, `en/admin/catalog/?item=${createdId}`);

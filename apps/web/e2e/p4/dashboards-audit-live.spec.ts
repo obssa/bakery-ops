@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { openAccountMenu } from "../support/admin";
 import { ApiFailure } from "../support/api";
 import { live, requireAdmin, run } from "../support/env";
 import { buildTillStaff, businessToday, loginOnce } from "../support/fixture";
@@ -136,7 +137,9 @@ test.describe("p4 audit log", () => {
       expect(csv).toContain(reason);
       expect(csv).not.toContain(reference);
 
-      // the Ethiopian calendar: a label only, the filters keep their Gregorian dates
+      // the Ethiopian calendar: a label only, the filters keep their Gregorian dates (step 6.4a: "Dates" is in the account menu at the
+      // foot of the admin sidebar, since an admin page has no top bar; it was the top bar's select)
+      await openAccountMenu(page, "en");
       await page.getByLabel("Dates", { exact: true }).selectOption("ethiopian");
       await expect(entry).toContainText(ethiopianLabel(day, "en"));
       await page.goto(`am/admin/audit/?subject_type=${encodeURIComponent(PAYMENT)}&subject_id=${transfer.id}&action=payment.`);
@@ -144,6 +147,7 @@ test.describe("p4 audit log", () => {
       await expect(amLog.getByRole("row").filter({ hasText: "payment.void" })).toContainText(ethiopianLabel(day, "am"), { timeout: 30_000 });
       await page.goto(`en/admin/audit/?subject_type=${encodeURIComponent(PAYMENT)}&subject_id=${transfer.id}&action=payment.`);
       await expect(entry).toContainText(ethiopianLabel(day, "en"), { timeout: 30_000 });
+      await openAccountMenu(page, "en");
       await page.getByLabel("Dates", { exact: true }).selectOption("both");
       await expect(entry).toContainText(day);
       await expect(entry).toContainText(ethiopianLabel(day, "en"));

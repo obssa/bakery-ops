@@ -27,6 +27,10 @@ import { ensureOpenShift } from "../support/shifts";
 // its pay sheet beside the list, the cash received typed and the change shown. The tickets and the orders are sent here, in the demo
 // bakery, by its waiter; the kitchen and the bar make some of them, so New, Cooking and Ready each hold one.
 //
+// Step 6.4a: the admin frame and its first pages, as the demo bakery's admin, at 1440 x 900: Today (Admin.dc.html) in English and in
+// Amharic, the catalog list as a table and as pad cards (CatalogList.dc.html), the Orders board in the new frame, and the sidebar as the
+// drawer of an 820 px tablet held upright.
+//
 // Step 6.4b: the admin's product page at 1440 x 900 (ProductPhoto.dc.html, PhotoStates.dc.html): with a photo (en, am), the framing step,
 // no photo yet and a refusal (the describe at the end).
 
@@ -338,12 +342,80 @@ test.describe("screens", () => {
   });
 });
 
+// --- step 6.4a: the admin frame, Today, the catalog list --------------------------------------------------------------------------------
+
+const DESKTOP = { width: 1440, height: 900 };
+const PORTRAIT = { width: 820, height: 1180 };
+
+/** An admin page of the demo bakery as its admin sees it, on the captures' tablet, once its h1 shows. */
+async function openAdmin(page: Page, path: string, heading: string): Promise<void> {
+  const demo = await demoBakery();
+  await openAs(page, demo.admin, path, { device: demo.device });
+  await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible({ timeout: 30_000 });
+}
+
+test.describe("screens: admin", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  for (const locale of ["en", "am"] as const) {
+    test(`admin Today (Admin board), in ${locale}`, async ({ page }) => {
+      test.setTimeout(90_000);
+      const t = MESSAGES[locale];
+      await openAdmin(page, `${locale}/admin/`, t.today.title);
+      // the KPI row and the top sellers have answered (figures, or the line that says they are not built yet), and the shifts card shows
+      await expect(page.getByRole("group", { name: t.today.kpi_sales, exact: true })).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
+      await expect(page.getByRole("region", { name: t.today.top_title }).locator("li, p").first()).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("region", { name: t.today.shifts_title, exact: true })).toBeVisible();
+      await capture(page, `today-1440x900-${locale}`);
+    });
+  }
+
+  test("the catalog list (CatalogList board) as a table and as pad cards, in en", async ({ page }) => {
+    test.setTimeout(90_000);
+    const t = MESSAGES.en;
+    await openAdmin(page, "en/admin/catalog/", t.catalog.title);
+    const table = page.getByRole("table", { name: t.catalog.items });
+    // the first product's price has been read (the rows in view ask for theirs)
+    await expect(table.getByRole("row").nth(1)).toContainText(/ETB|No price/, { timeout: 30_000 });
+    await capture(page, "catalog-1440x900-en");
+
+    await page.getByRole("button", { name: t.catalog.view_grid }).click();
+    await expect(page).toHaveURL(/[?&]view=grid/);
+    const grid = page.getByRole("region", { name: t.catalog.grid });
+    await expect(grid.getByRole("listitem").first()).toContainText(/ETB/, { timeout: 30_000 });
+    await capture(page, "catalog-grid-1440x900-en");
+
+    // the drawer "Add product" opens: the new item form and the categories
+    await page.getByRole("button", { name: t.catalog.add_product }).click();
+    await expect(page.getByRole("dialog", { name: t.catalog.new_item })).toBeVisible();
+    await capture(page, "catalog-new-item-1440x900-en");
+  });
+
+  test("the Orders board in the admin frame, in en", async ({ page }) => {
+    test.setTimeout(90_000);
+    const t = MESSAGES.en;
+    await openAdmin(page, "en/admin/orders/", t.adminOrders.title);
+    await expect(page.getByText(t.adminOrders.loading)).toHaveCount(0, { timeout: 30_000 });
+    await capture(page, "orders-1440x900-en");
+  });
+
+  test("the admin sidebar as the drawer of an 820 px tablet held upright, in en", async ({ page }) => {
+    test.setTimeout(90_000);
+    const t = MESSAGES.en;
+    await page.setViewportSize(PORTRAIT);
+    await openAdmin(page, "en/admin/", t.today.title);
+    await capture(page, "today-820x1180-en");
+    await page.getByRole("button", { name: t.admin.open_sections }).click();
+    await expect(page.getByRole("dialog", { name: t.admin.sections })).toBeVisible();
+    await capture(page, "admin-drawer-820x1180-en");
+  });
+});
+
 // Step 6.4b: the product page (ProductPhoto.dc.html and PhotoStates.dc.html) at 1440 x 900, an admin's size. A demo product with its demo
 // photo, in en and am; the framing step, the fixture chosen through "Replace", zoomed to 1.2x and dragged, then cancelled so the demo photo
 // stays; and a second demo product without its photo (removed here, put back after from its own large rendition): the empty dropzone, and
 // a refusal under the card (a GIF dropped on it).
-const ADMIN = { width: 1440, height: 900 };
-
 interface DemoProduct {
   id: number;
   name_en: string;
@@ -368,7 +440,7 @@ async function openProduct(page: Page, demo: DemoBakery, product: DemoProduct, l
 
 test.describe("screens: the product page", () => {
   test.skip(live, "CI only: the captures read the seeded demo bakery");
-  test.use({ viewport: ADMIN });
+  test.use({ viewport: DESKTOP });
 
   test("the product page (ProductPhoto board): with its photo in en and am, and the framing step", async ({ page }) => {
     test.setTimeout(180_000);

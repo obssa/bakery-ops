@@ -18,8 +18,8 @@ export function isCurrent(pathname: string, href: string): boolean {
 }
 
 /**
- * The frame the shell draws around a page (step 6.2b, fresh-counter.md 3, 3.1 and 4.1). `admin`: the admin console, under the station top
- * bar, draws its own sidebar frame and its `main` (AdminFrame). `login`: the sign-in screen is a full-bleed split of its own, without the
+ * The frame the shell draws around a page (step 6.2b, fresh-counter.md 3, 3.1 and 4.1). `admin`: the admin console, without the station top
+ * bar (step 6.4a), draws its own sidebar frame, its `main` and the outbox's band (AdminFrame). `login`: the sign-in screen is a full-bleed split of its own, without the
  * top bar. `fill` (step 6.3a): a station screen that draws its own zones edge to edge under the top bar, the waiter pad's menu and order
  * panel (fresh-counter.md 3.2); from 1024 px it holds the rest of the window, and each zone scrolls on its own. `station`: every other page
  * sits under the station top bar in the shell's padded `main`.

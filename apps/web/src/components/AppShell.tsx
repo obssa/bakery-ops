@@ -20,18 +20,18 @@ import { LanguageSwitcher, LanguageSwitcherWithQuery } from "./LanguageSwitcher"
 import { NotificationBell } from "./NotificationBell";
 import { PendingIndicator, useSyncState } from "./PendingIndicator";
 import { buttonClass, focusRing } from "./styles";
-import { Avatar, Chip, IconButton, type Tone } from "./ui";
+import { Avatar, Chip, type Tone } from "./ui";
 
-// The frame around every page (steps 6.2b and 6.3a, fresh-counter.md 3): a top bar, the outbox's band and the page. A station screen (the
-// pad, the till, the kitchen and bar displays, the production board, the count, and the start page) has exactly one 68 px bar, as its
-// design board does (StationBar): the station mark, the screen's title with its Amharic name and a line with the shift and the person; on
-// the right the screen's own buttons (lib/topBar.ts), the sync chip, the language button, the bell, the "Screens" menu and the person's
-// menu (the dates' calendar and "Sign out" are in it). The admin console keeps the 6.2b bar with the "Screens" tabs under it until step
-// 6.4a rebuilds its frame (AdminTopBar), and draws its sidebar and its own `main` (AdminFrame). The sign-in screen is a split of its own,
-// without a bar, and carries "Screens" itself. The waiter pad (the `fill` frame) draws its zones edge to edge and, from 1024 px, in the
-// window's height. A page whose calls are refused because this device is not enrolled shows the "not enrolled" screen instead (step
-// 5.1b, DeviceGate). On the kitchen and bar displays the whole frame, the bar included, is kitchen night (step 6.3b: `.kitchen-night`,
-// globals.css), and only there.
+// The frame around every page (steps 6.2b, 6.3a and 6.4a, fresh-counter.md 3 and 4.1). A station screen (the pad, the till, the kitchen and
+// bar displays, the production board, the count, and the start page) has exactly one 68 px bar, as its design board does (StationBar):
+// the station mark, the screen's title with its Amharic name and a line with the shift and the person; on the right the screen's own
+// buttons (lib/topBar.ts), the sync chip, the language button, the bell, the "Screens" menu and the person's menu (the dates' calendar and
+// "Sign out" are in it); then the outbox's band and the page. The admin console has no top bar (step 6.4a, the Admin board): it is its
+// sidebar and the content, and AdminFrame draws both, its `main`, the outbox's band and, in the sidebar, the sync chip, the bell, the
+// account menu and "Screens". The sign-in screen is a split of its own, without a bar, and carries "Screens" itself. The waiter pad (the
+// `fill` frame) draws its zones edge to edge and, from 1024 px, in the window's height. A page whose calls are refused because this device
+// is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate). On the kitchen and bar displays the whole frame, the bar
+// included, is kitchen night (step 6.3b: `.kitchen-night`, globals.css), and only there.
 
 /** The app's mark: a brand-teal square with the line icon, hidden from readers (the name beside it, or the link around it, says it). */
 export function AppMark({ size = "md" }: { size?: "md" | "lg" }) {
@@ -138,7 +138,7 @@ function useStationShift(): { name: string | null; nameAm: string | null; shift:
 }
 
 /** Whether this tablet's writes reached the server, in a word: online and sent, waiting (offline or not), or refused writes to look at. */
-function SyncChip() {
+export function SyncChip() {
   const t = useTranslations("shell");
   const online = useOnline();
   const { here, elsewhere, conflicts, held } = useSyncState();
@@ -386,79 +386,6 @@ function StationBar({ fill }: { fill: boolean }) {
   );
 }
 
-/** The person signed in on this device on an admin page: initials, name and role (from 1280 px), and "Sign out"; or "Sign in". */
-function Account() {
-  const t = useTranslations();
-  const router = useRouter();
-  const status = useSession((s) => s.status);
-  const me = useSession((s) => s.me);
-  const signOut = useSession((s) => s.signOut);
-
-  if (status === "unknown") return <span className="inline-block h-12 w-24" aria-hidden="true" />;
-
-  if (status !== "signed-in" || !me) {
-    return (
-      <Link href="/login" className={buttonClass({ variant: "secondary" })}>
-        {t("nav.login")}
-      </Link>
-    );
-  }
-
-  const role = me.user.roles?.[0];
-  return (
-    <div className="flex items-center gap-2.5 pl-1">
-      <Avatar name={me.user.name} />
-      <span className="hidden min-w-0 max-w-40 flex-col leading-tight xl:flex">
-        <span className="truncate text-sm font-semibold text-neutral-900">{me.user.name}</span>
-        {role ? <span className="truncate text-xs text-neutral-600">{t(`people.roles.${role}`)}</span> : null}
-      </span>
-      <IconButton
-        label={t("nav.sign_out")}
-        title={t("nav.sign_out")}
-        variant="ghost"
-        onClick={async () => {
-          await signOut();
-          router.replace("/login");
-        }}
-      >
-        <LogOut className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
-      </IconButton>
-    </div>
-  );
-}
-
-/**
- * The admin console's bar (step 6.2b; step 6.4a rebuilds the admin frame): the mark and the app's name, the sync chip, the calendar, the
- * language, the bell and the person, then the "Screens" tabs under it.
- */
-function AdminTopBar() {
-  const t = useTranslations("app");
-  const signedIn = useSession((s) => s.status === "signed-in");
-
-  return (
-    <header className="border-b border-neutral-200 bg-white">
-      <div className="flex min-h-17 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-6 md:h-17 md:flex-nowrap md:py-0">
-        <div className="flex min-w-0 flex-1 items-center gap-3.5">
-          <Link href="/" className={`flex shrink-0 items-center gap-3 rounded-xl ${focusRing}`}>
-            <AppMark />
-            <span className="text-lg font-bold tracking-tight text-neutral-900">{t("name")}</span>
-          </Link>
-        </div>
-        <div className="flex max-w-full flex-wrap items-center gap-2 md:shrink-0">
-          {signedIn ? <SyncChip /> : null}
-          {signedIn ? <DateDisplaySwitch /> : null}
-          <Suspense fallback={<LanguageSwitcher look="toggle" />}>
-            <LanguageSwitcherWithQuery look="toggle" />
-          </Suspense>
-          {signedIn ? <NotificationBell /> : null}
-          <Account />
-        </div>
-      </div>
-      <ScreensNav />
-    </header>
-  );
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations("app");
   const pathname = usePathname();
@@ -479,8 +406,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {t("skip_to_content")}
       </a>
-      {frame === "login" ? null : frame === "admin" ? <AdminTopBar /> : <StationBar fill={fill} />}
-      <PendingIndicator />
+      {/* the admin console draws its own frame, the band included (AdminFrame) */}
+      {frame === "login" || frame === "admin" ? null : <StationBar fill={fill} />}
+      {frame === "admin" ? null : <PendingIndicator />}
       {frame === "admin" ? (
         children
       ) : (
