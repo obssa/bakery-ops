@@ -96,7 +96,13 @@ the server's words. `lib/images/frame.ts` sends whole pixels, exactly 4k × 3k i
 photos 2400 px and JPEG 0.9, receipts unchanged). `product-photo.spec.ts` replaced the last placeholder and its to-do marker; the product
 page in `p6-a11y` (`a11y-product.spec.ts`); `docs/handbook/product-photos.md`.
 
-**6.4c `phase-6/web-admin-sell-make` (PR #117).** «6.4c»
+**6.4c `phase-6/web-admin-sell-make` (PR #117).** Orders, the order record, Payments with its methods, reconciliation and receipt settings,
+Stock, the Ledger, Purchases, Suppliers, Transfers, Reorder and the Planner, each beside the catalog list on the canvas, through shared
+patterns (`components/admin/kit.tsx`: `SectionTabs`, `Toolbar` and its segments, selects, fields and checks, `SearchBox`, `TableCard`,
+`InnerTable`, `Notice`, `FORM_GRID`, `Fact`, `ProductThumb`) and the title row's Amharic twin (`lib/twin.ts`). The Orders board's columns as
+the production board draws them, with a stack of each order's photos; the record's details, lines, timeline, payments, receipt and refund;
+the reconciliation's four Stats and compact tables that fit the page. Green means money confirmed only; no blue tab or green notice is
+left on these screens. Web only, and no Playwright selector changed.
 
 **6.4d `phase-6/web-admin-team-insight` (PR #119).** «6.4d»
 
