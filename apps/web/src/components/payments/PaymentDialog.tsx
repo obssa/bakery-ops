@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useDecision, usePayment } from "@/lib/api/adminPayments";
@@ -12,7 +13,8 @@ import { keepsKey } from "@/lib/paySheet";
 import { useDateFormat } from "@/lib/useDates";
 import { RecordLink } from "../admin/RecordLink";
 import { HistoryLink } from "../audit/HistoryLink";
-import { Alert, Button, Field, Modal, Textarea, TextInput } from "../ui";
+import { ICON_STROKE } from "../icons";
+import { Alert, Button, Field, IconButton, Modal, Status, Textarea, TextInput } from "../ui";
 import { PhotoThumb, PhotoViewer } from "./PhotoViewer";
 import { addisStamp, Money, PaymentStatusCell, useChannelName, useOrderLabel } from "./shared";
 
@@ -21,12 +23,14 @@ import { addisStamp, Money, PaymentStatusCell, useChannelName, useOrderLabel } f
 // trail) and dispute (recorded -> disputed, a reason of 3 to 255 characters; the admins and managers are told). Each decision carries its
 // own Idempotency-Key: the same one when the answer was lost (the retry replays it), a new one after a refusal (the API would replay the
 // refusal under the old key). It opens from a row and from the address (?payment={id}, the payment_disputed notification's link).
+// Step 6.4c: the title row closes with an X ("Close"); the facts in 13 px labels over hairlines; the two decisions as two white cards side
+// by side, Verify the primary button and Dispute the danger one; what came of a decision in the brand-50 status line.
 
 function Row({ term, children }: { term: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[10rem_minmax(0,1fr)] gap-3 py-1.5">
-      <dt className="text-sm font-medium text-neutral-600">{term}</dt>
-      <dd className="text-base text-neutral-900">{children}</dd>
+    <div className="grid grid-cols-[9.5rem_minmax(0,1fr)] gap-3 py-2">
+      <dt className="text-[13px] font-semibold text-neutral-600">{term}</dt>
+      <dd className="text-[15px] text-neutral-900">{children}</dd>
     </div>
   );
 }
@@ -56,7 +60,7 @@ export function PaymentDialog({
   let body: ReactNode;
   if (payment.isPending) {
     body = (
-      <p role="status" className="py-6 text-base text-neutral-600">
+      <p role="status" className="py-6 text-[15px] text-neutral-600">
         {t("detail.loading")}
       </p>
     );
@@ -66,7 +70,7 @@ export function PaymentDialog({
       <div className="space-y-3">
         <Alert>{missing ? t("detail.not_found") : errorText.message(payment.error)}</Alert>
         {missing ? null : (
-          <Button variant="secondary" onClick={() => void payment.refetch()}>
+          <Button variant="secondary" size="md" onClick={() => void payment.refetch()}>
             {t("viewer.retry")}
           </Button>
         )}
@@ -79,10 +83,10 @@ export function PaymentDialog({
   return (
     <Modal label={title} size="lg" onClose={close}>
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-xl font-semibold text-neutral-900">{title}</h2>
-        <Button variant="secondary" onClick={onClose}>
-          {t("close")}
-        </Button>
+        <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{title}</h2>
+        <IconButton label={t("close")} size="md" onClick={onClose} className="-mr-2 -mt-2">
+          <X className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </IconButton>
       </div>
       {body}
       {viewing && payment.data?.receipt ? <PhotoViewer paymentId={id} fileId={payment.data.receipt.file_id} onClose={() => setViewing(false)} /> : null}
@@ -99,15 +103,17 @@ function Details({ payment, canDecide, onPhoto, onChanged }: { payment: PaymentD
   return (
     <div className="space-y-5">
       <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto]">
-        <dl className="divide-y divide-neutral-100">
+        <dl className="divide-y divide-neutral-200 border-y border-neutral-200">
           <Row term={t("detail.status")}>
             <PaymentStatusCell payment={payment} />
           </Row>
           <Row term={t("detail.amount")}>
-            <Money amount={payment.amount} currency={payment.currency} />
+            <span className="font-semibold">
+              <Money amount={payment.amount} currency={payment.currency} />
+            </span>
           </Row>
           <Row term={t("detail.channel")}>{channelName(payment.channel)}</Row>
-          <Row term={t("detail.reference")}>{payment.reference_no ? <span className="font-mono">{payment.reference_no}</span> : t("list.no_reference")}</Row>
+          <Row term={t("detail.reference")}>{payment.reference_no ? <span className="font-mono text-sm">{payment.reference_no}</span> : t("list.no_reference")}</Row>
           {payment.tendered_amount !== null ? (
             <Row term={t("detail.tendered")}>
               <Money amount={payment.tendered_amount} currency={payment.currency} />
@@ -153,11 +159,11 @@ function Details({ payment, canDecide, onPhoto, onChanged }: { payment: PaymentD
           ) : null}
         </dl>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-neutral-600">{t("detail.photo")}</p>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-neutral-600">{t("detail.photo")}</p>
           {payment.receipt ? (
             <PhotoThumb key={payment.receipt.url ?? "none"} large label={t("detail.photo_open")} fileId={payment.receipt.file_id} url={payment.receipt.url} onOpen={onPhoto} />
           ) : (
-            <p className="text-base text-neutral-700">{t("detail.photo_none")}</p>
+            <p className="text-[15px] text-neutral-700">{t("detail.photo_none")}</p>
           )}
           <div className="flex flex-col items-start gap-2 pt-2">
             <HistoryLink kind="payment" id={payment.id} />
@@ -165,7 +171,7 @@ function Details({ payment, canDecide, onPhoto, onChanged }: { payment: PaymentD
           </div>
         </div>
       </div>
-      {canDecide ? <Decisions payment={payment} onChanged={onChanged} /> : <p className="text-base text-neutral-600">{t("detail.view_only")}</p>}
+      {canDecide ? <Decisions payment={payment} onChanged={onChanged} /> : <p className="text-[15px] text-neutral-600">{t("detail.view_only")}</p>}
     </div>
   );
 }
@@ -233,34 +239,32 @@ function Decisions({ payment, onChanged }: { payment: PaymentDetail; onChanged: 
   const disputable = canDispute(payment);
   const pending = decision.isPending;
   return (
-    <div className="space-y-4 border-t border-neutral-200 pt-4">
-      <p role="status" aria-live="polite" className={done ? "rounded-md bg-green-50 px-4 py-3 text-base text-green-800" : "sr-only"}>
-        {done === "verify" ? t("detail.verified") : done === "dispute" ? t("detail.disputed") : null}
-      </p>
-      {!verifiable && !disputable ? <p className="text-base text-neutral-700">{t("detail.settled", { status: t(`status.${payment.status}`) })}</p> : null}
-      <div className="grid gap-5 md:grid-cols-2">
+    <div className="space-y-4">
+      <Status>{done === "verify" ? t("detail.verified") : done === "dispute" ? t("detail.disputed") : null}</Status>
+      {!verifiable && !disputable ? <p className="text-[15px] text-neutral-700">{t("detail.settled", { status: t(`status.${payment.status}`) })}</p> : null}
+      <div className="grid gap-4 md:grid-cols-2">
         {verifiable ? (
-          <form onSubmit={onVerify} className="space-y-3 rounded-lg border border-neutral-200 p-4" noValidate>
-            <h3 className="text-lg font-semibold text-neutral-900">{t("detail.verify_title")}</h3>
-            <p className="text-base text-neutral-600">{t("detail.verify_intro")}</p>
+          <form onSubmit={onVerify} className="flex flex-col gap-3 rounded-2xl border border-neutral-200 p-4" noValidate>
+            <h3 className="text-[17px] font-semibold text-neutral-900">{t("detail.verify_title")}</h3>
+            <p className="text-[15px] text-neutral-600">{t("detail.verify_intro")}</p>
             <Field label={t("detail.note")} optionalLabel={t("optional")} hint={t("detail.note_hint")}>
-              {(props) => <TextInput {...props} value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
+              {(props) => <TextInput {...props} controlSize="md" value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
             </Field>
             {failureText("verify") ? <Alert>{failureText("verify")}</Alert> : null}
-            <Button type="submit" disabled={pending} className="min-h-14 w-full">
+            <Button type="submit" size="md" disabled={pending} className="mt-auto w-full">
               {pending && decision.variables?.kind === "verify" ? t("working") : t("detail.verify")}
             </Button>
           </form>
         ) : null}
         {disputable ? (
-          <form onSubmit={onDispute} className="space-y-3 rounded-lg border border-neutral-200 p-4" noValidate>
-            <h3 className="text-lg font-semibold text-neutral-900">{t("detail.dispute_title")}</h3>
-            <p className="text-base text-neutral-600">{t("detail.dispute_intro")}</p>
+          <form onSubmit={onDispute} className="flex flex-col gap-3 rounded-2xl border border-neutral-200 p-4" noValidate>
+            <h3 className="text-[17px] font-semibold text-neutral-900">{t("detail.dispute_title")}</h3>
+            <p className="text-[15px] text-neutral-600">{t("detail.dispute_intro")}</p>
             <Field label={t("detail.reason")} error={reasonError ? t("detail.reason_short") : undefined}>
               {(props) => <Textarea {...props} value={reason} maxLength={REASON_MAX} onChange={(event) => setReason(event.target.value)} />}
             </Field>
             {failureText("dispute") ? <Alert>{failureText("dispute")}</Alert> : null}
-            <Button type="submit" variant="secondary" disabled={pending} className="min-h-14 w-full border-red-300 text-red-800 hover:bg-red-50">
+            <Button type="submit" variant="danger" size="md" disabled={pending} className="mt-auto w-full">
               {pending && decision.variables?.kind === "dispute" ? t("working") : t("detail.dispute")}
             </Button>
           </form>

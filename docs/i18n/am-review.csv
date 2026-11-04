@@ -1920,6 +1920,8 @@ web:adminPayments.reconciliation.drill,/admin/payments/reconciliation,"Show the 
 web:adminPayments.receipts.title,/admin/payments/receipts,Receipt settings,የደረሰኝ ቅንብሮች,,
 web:adminPayments.receipts.intro,/admin/payments/receipts,What the printed and the shared receipt carry at the top and at the bottom.,የሚታተመውና የሚላከው ደረሰኝ ከላይና ከታች የሚይዛቸው።,,
 web:adminPayments.receipts.form,/admin/payments/receipts,Receipt settings,የደረሰኝ ቅንብሮች,,
+web:adminPayments.receipts.text_title,/admin/payments/receipts,On the receipt,በደረሰኙ ላይ,,
+web:adminPayments.receipts.print_title,/admin/payments/receipts,Printing,ህትመት,,
 web:adminPayments.receipts.loading,/admin/payments/receipts,Loading the receipt settings…,የደረሰኝ ቅንብሮችን በመጫን ላይ…,,
 web:adminPayments.receipts.default_note,/admin/payments/receipts,Not saved yet: the receipt prints the branch's name until these settings are saved.,ገና አልተቀመጠም፤ እነዚህ ቅንብሮች እስኪቀመጡ ድረስ ደረሰኙ የቅርንጫፉን ስም ያትማል።,,
 web:adminPayments.receipts.business_name_en,/admin/payments/receipts,Business name (English),የድርጅቱ ስም (እንግሊዝኛ),,

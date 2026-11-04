@@ -2072,6 +2072,8 @@
       "title": "Receipt settings",
       "intro": "What the printed and the shared receipt carry at the top and at the bottom.",
       "form": "Receipt settings",
+      "text_title": "On the receipt",
+      "print_title": "Printing",
       "loading": "Loading the receipt settings…",
       "default_note": "Not saved yet: the receipt prints the branch's name until these settings are saved.",
       "business_name_en": "Business name (English)",
