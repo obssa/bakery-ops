@@ -7,7 +7,8 @@ import { useOrderDetail } from "@/lib/api/till";
 import type { Line, LineStatus, Locale, Order, OrderStatus } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
 import { thumbStack } from "@/lib/images/orderThumbs";
-import { clock, secondsSince } from "@/lib/kds";
+import { secondsSince } from "@/lib/kds";
+import { useWaitText } from "@/lib/useWaitText";
 import { useErrorText } from "@/lib/errors";
 import { useOrderNo } from "@/lib/orderNo";
 import { BOARD_STATUSES, boardOf, createBoardFeed, isPayable, isSettled, type BoardFilters } from "@/lib/live/orders";
@@ -106,6 +107,8 @@ function OrderCard({ order, now, selected, look, onOpen }: { order: Order; now: 
   const no = useOrderNo(order);
   const where = order.type === "takeaway" ? k("takeaway") : order.dining_table ? k("table", { code: order.dining_table.code }) : "";
   const seconds = secondsSince(order.sent_at ?? order.created_at, now);
+  // the stations' way of saying a wait (lib/durations.ts): "5:07", "1 h 05", "3 d", so an order open for days does not read "5926:26"
+  const age = useWaitText()(seconds);
   const unsent = order.status === "open";
   const settled = isSettled(order) && order.status !== "open";
   return (
@@ -130,7 +133,7 @@ function OrderCard({ order, now, selected, look, onOpen }: { order: Order; now: 
             {where ? <span className="text-neutral-600"> · {where}</span> : null}
           </span>
           <span className="block text-[13px] text-neutral-600">{t("owner", { name: order.owner.name ?? "" })}</span>
-          <span className="block text-[13px] tabular-nums text-neutral-600">{t("age", { time: clock(seconds) })}</span>
+          <span className="block text-[13px] tabular-nums text-neutral-600">{t("age", { time: age })}</span>
         </span>
         <ThumbStack order={order} look={look} />
       </div>
