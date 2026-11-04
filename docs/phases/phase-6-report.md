@@ -1,0 +1,283 @@
+# Phase 6 report — Fresh Counter redesign and product photos (before the claim)
+
+Commit: `main` at «MAIN» with step 6.5's branch `phase-6/gate` (pull request #120) on top · CI runs: «RUNS» · Date: 2026-11-04
+
+**This is the report before the claim, not a claim that the phase is done.** All fourteen pull requests of the plan's steps are merged or
+are this one: the plan (#107), 6.1a to 6.1c, 6.2a and 6.2b, 6.3a to 6.3c, 6.4a to 6.4d, and 6.5 (#120). STATUS keeps phase 6
+`in_progress`, no `done_commit` is set and no tag is made. Phase 6 is the last phase in the manifest, so once it is claimed the strict gate
+freezes `apps/` after `done_commit`: the coordinator claims (`phase_status.py claim-done 6`) only when every Phase 6 pull request is
+merged and `gate-p6` is green on `main`, then tags `phase-6-complete`.
+
+## Verdict
+
+NOT CLAIMED, READY TO CLAIM ONCE `gate-p6` IS GREEN ON `main`. The gate is built: the `gate:p6` tests (`Phase6GateTest`), the `gate-p6`
+job's Pest step on the compose stack, ADRs 0022 and 0023 accepted and listed under `phases.6.adrs`, and this report. The local
+`gate_check --mode done --phase 6 --no-tests --no-e2e` («LOCAL») is under "Before the claim". Phase 6 has no go-live checklist: it changes how
+the shop looks, not whether it may run (plan 10.3), so nothing in it waits for a sign-off.
+
+## What was built, step by step
+
+Each paragraph says what the step built as built (the As built notes under section 6 of `docs/phases/phase-6-plan.md`), not what the
+plan intended. The steps ran two at a time on parallel branches, as the plan's waves give them.
+
+**6.0 `phase-6/plan` (PR #107).** The plan, the design spec `docs/design/fresh-counter.md` (unchanged in its own commit), the manifest's
+phase 6 with its CI jobs, the STATUS schema and `phase_status.py add-phase` with its tests, the skill's phase reference, `e2e-p6` and
+`gate-p6` (informational until the claim), and the two Playwright projects `p6-product-photo` and `p6-a11y` with a `test.fixme`
+placeholder each, carrying the phase's to-do marker so the phase could not close while one was left. Approved by Ramin on 2026-11-03
+("check and then implement").
+
+**6.1a `phase-6/item-images-api` (PR #109).** The three `orders->catalog` image cases committed red first, then `item_images` (M1) and
+`items.image_id` (M2), and `ImageProcessor` split into public `load()`, `resample()` (onto white), `encodeScrubbed()` and `canWebp()`,
+with `process()` built from them and its tests unchanged. Catalog: `ItemImage`, `CropRect` (a crop within 1 px of 4:3 snapped to the
+largest exact 4:3 inside it; the 800 × 600 minimum checked on the snapped crop), `ProductPhotoPipeline` (thumb 320 × 240, card 800 × 600,
+large 1600 × 1200 or the crop's size, never upscaled; WebP q82 or JPEG q85 by `catalog.images.format`), `ProductPhotos` (set and remove
+in one transaction under the item's row lock, files written first under a temporary name), the `ItemImages` contract,
+`POST`/`DELETE /items/{item}/image` (`catalog.manage`, idempotent, audited with the before and after ids) and the public
+`GET /media/items/{sha}/{rendition}.{ext}` (one indexed select, `public, max-age=31536000, immutable`, a weak `If-None-Match`, 404 for an
+unknown or soft-deleted sha). Eight `catalog.image.*` keys in both languages; `image` on the item payloads; OpenAPI and the ERD. ADR 0022
+proposed, with notes on ADR 0015 and ADR 0006. `app/Modules/Orders` unchanged; the contract cases went green through Catalog alone.
+
+**6.1b `phase-6/menu-images` (PR #111).** `MenuBuilder` reads `ItemImages::for` once per build and every menu entry gains `image`; the
+menu's ETag moves with `catalog_version`. `bakery:prune-product-images {--days=30} {--dry-run}` (03:50 Addis Ababa time) deletes a
+photo's files only when every row naming its sha, in any branch, was soft-deleted more than `--days` ago. The nightly backup hard-links
+the `media` disk into `.media/` beside `.files/` (the manifest gained `media`), and `GET /system/status` gained `files.media_used_mb`
+(a photo two products share counted once). The runbooks and the notes on ADR 0022 and ADR 0020.
+
+**6.1c `phase-6/demo-photos` (PR #112).** 29 WebP demo photos of 1600 × 1200 (3.1 MB in all, no metadata) with `manifest.json` (five keys
+an entry, Unsplash and Pexels pages and licences, no person named), `bakery:demo-product-images --branch= [--dry-run] [--force] [--as=]`
+and `Phase6Seeder`, all through `ProductPhotos::set(..., 'demo')` with a centre crop. Only a demo branch, an uploaded photo never touched,
+`--force` only on demo photos. `DemoSeeder::LAST_PHASE` is 6. STATUS `catalog.images` done.
+
+**6.2a `phase-6/web-tokens` (PR #108).** The tokens in `globals.css` `@theme` (the `neutral` remap, `ground`, `brand`, the `night-*`
+tokens, Inter first, the floating shadow and the motion tokens under `motion-safe:`), `@fontsource-variable/inter` 5.3.0, `lucide-react`
+1.59.0 and `@axe-core/playwright` 4.14.0. The primitives restyled in place with their names and props, and `IconButton`, `Chip`,
+`MoneyInput`, `Switch`, `SegmentedControl`, `Card`, `Stat`, `Avatar`, `EmptyState`, `Skeleton`, `Table` and `ProductImage` added (its
+`srcSet` never lists an upscaled width; its placeholder an icon chosen from the category's name and the product's initials). `web-build`
+fails an export that names a Google Fonts host or lacks either font. ADR 0023 proposed. No selector changed.
+
+**6.2b `phase-6/web-shell` (PR #110).** The 68 px station top bar, the 264 px admin sidebar (a drawer below 1024 px), `PageHeader`'s
+Amharic twin, the split sign-in screen with its self-hosted photo, the start page, not-found and `DeviceGate` on `EmptyState`.
+`e2e/support/a11y.ts` and `a11y.spec.ts` replaced the first placeholder (sign-in in `en` and `am`). STATUS `web.design-system` done. No
+selector changed.
+
+**6.3a `phase-6/web-pad` (PR #113).** The pad rebuilt region by region from the Pad board after Ramin compared the live screen with the
+canvas: one station top bar for every station screen (`useStationHeader`, `StationHeaderActions`), the search, the category chips, the
+photo grid of `ProductCard`, the 368 px order panel with thumbs and the "Tables" sheet, the lock screen's 72 px keypad. The service
+worker's `CacheFirst` route for `/api/v1/media/` (`product-images`, 400 entries, 30 days), grepped by `web-build`. `product-photo-pad.spec.ts`
+and the pad in `p6-a11y`; `e2e/p6/screens.spec.ts` and the `screens` artifact. Specs moved with the screen: the tables behind "Change",
+"My orders" behind its bar button, the cart total as "ETB 330.00".
+
+**6.3b `phase-6/web-kds-till` (PR #114).** Kitchen night scoped to the displays (the `kitchen-night` class remaps the scales onto the night
+tokens), the Kitchen board's columns, tickets and stock strip, no photos; the Till board's waiting list with thumbs, the pay sheet beside
+it from 1024 px, the 64 px channel grid, typed cash received with the change, quick cash keys and the receipt panel. `useProductImages`
+(the catalog's one query key). The shift as a menu in the bar (`ShiftBar look="menu"`). Specs moved with the screen: Void from the card to
+the sheet, typed cash instead of the keypad, the shift's menu opened first, the drawer's figure opened from its button.
+
+**6.3c `phase-6/web-production` (PR #115).** The production board's four columns of cards with thumbs, one 48 px action per column, the
+request card as a non-modal panel over the right-hand columns, "Display case" and "New batch" in the bar, waits printed one way
+(`lib/durations.ts`), and the count screen on the primitives. One spec step added (`p3-opening-prefill` opens the shift's menu). STATUS
+`web.stations` done.
+
+**6.4a `phase-6/web-admin-today` (PR #116).** The admin frame as the board draws it (no station bar on an admin page; the sidebar holds
+the mark, the sections, the stations, the sync chip, the bell and the account menu), Today (KPIs against the same weekday a week before,
+sales by hour, top sellers with thumbs, channels, stock alerts, shifts, system; "My figures" for a person without `analytics.view`), and
+the catalog list (one kind at a time, the board's columns, the table or pad-card grid, "Add product" in a drawer). Specs moved with the
+screen: h1 "Today", the account menu for the language and the dates, the new item drawer, one kind at a time.
+
+**6.4b `phase-6/web-photo-manager` (PR #118).** «6.4b»
+
+**6.4c `phase-6/web-admin-sell-make` (PR #117).** «6.4c»
+
+**6.4d `phase-6/web-admin-team-insight` (PR #119).** «6.4d»
+
+**6.5 `phase-6/gate` (PR #120), this step.** `Phase6GateTest` (`gate:p6`, six cases): a 2400 × 1800 upload through the API gives the three
+sizes in the format `auto` picks on the host; a 1000 × 750 crop keeps 1000 × 750 as large and draws exactly that rectangle; a 799 × 600
+crop and a 640 × 480 photo are `too_small` in both languages and store nothing, 800 × 600 passes; signed out, each rendition answers with
+its type, `public, max-age=31536000, immutable`, its ETag and nosniff and no cookie, 304 to a strong or weak `If-None-Match`, 404 for an
+unknown sha, the other extension, a replaced and a removed photo; the demo bakery seeded as `e2e-p6` seeds it (every phase,
+`Phase6Seeder` last) has a live demo photo on every product, its files on the media disk and its card served; and the `media` disk is the
+local disk under `storage/`, with `public/` unchanged by an upload, a replace and a remove on the real disk and by the whole seed. The
+`gate-p6` job loads the API image, starts `app` on the compose stack, puts an empty `.env` in it and runs `pest --group=gate:p6` with
+`IDENTITY_REQUIRE_DEVICE=false`, failing when it ran nothing or on a skip or a warning, then `gate_check` (25 minutes). ADRs 0022 and 0023
+accepted with their dated notes, the manifest's `phases.6.adrs`, the skill's `ci-cd.md` and `traps.md`, and this report. One fix to
+`scripts/gate_check.py` (both copies): it looks for a Pest runner only when it runs tests, and gives the Docker probe 60 s, because with
+`--no-tests` on a PC whose Docker engine was stopped the probe never returned and the gate hung before its first row.
+
+## Gate criteria (from the manifest `phases.6.gate.criteria`)
+
+| # | Criterion | Evidence | Result |
+|---|---|---|---|
+| 1 | `p6-product-photo`: an admin drops a photo, frames it to 4:3 and saves it; the pad card and the order line show it; replace changes the URLs; remove brings the placeholder back; the menu's ETag moves each time | `e2e/p6/product-photo.spec.ts` (6.4b), `product-photo-pad.spec.ts` (6.3a), the logic specs, in `e2e-p6` | «C1» |
+| 2 | `p6-a11y`: axe on login, pad, KDS, till, production, admin Today and catalog, in `en` and `am`: no serious or critical violation, contrast included | `a11y.spec.ts`, `a11y-stations.spec.ts`, `a11y-product.spec.ts` (6.4b), in `e2e-p6` | «C2» |
+| 3 | `gate:p6` (`Phase6GateTest`): the three sizes, the 1000 × 750 crop, `too_small`, the media route's headers, 304 and 404, every demo product with a photo after `Phase6Seeder`, no photo under `public/` | `gate-p6`'s Pest step | «C3» |
+| 4 | every p0 to p5 Playwright project and `gate-p0` to `gate-p5` stay green in the same run; selectors move only where the plan names the spec and the reason | `e2e-p0` to `e2e-p5`, `gate-p0` to `gate-p5`; the specs each step changed are listed under "Specs that changed" | «C4» |
+| 5 | ADRs 0022 and 0023 accepted; no phase 6 to-do marker left | `gate_check`'s ADR and marker rows | «C5» |
+
+## CI evidence
+
+### Figures recorded in the As built notes
+
+| What | Figure | Where |
+|---|---|---|
+| Upload race | 30 forked rounds each for one `client_uuid` twice and for two photos on one product; locally 27 of 30 rounds raced on the unique index | `ItemImageRaceTest` (6.1a) |
+| Menu reads | one `item_images` read and the same query count for 2 or 8 photos | `MenuImageTest` (6.1b) |
+| Demo photos | 29 files, 38 to 197 KB each, 3.1 MB in all, 1600 × 1200, one VP8 chunk, no EXIF, XMP or ICC | `DemoPhotoManifestTest` (6.1c) |
+| Fonts | Inter's seven subsets add about 220 KB to the shell cache; the export names no Google Fonts host | `web-build` (6.2a) |
+| Login photo | 960 × 1500, 157 KB, precached with the shell | 6.2b |
+| Kitchen night contrast | every text pair 4.5:1 or more: neutral-600 on white 6.9:1, brand-700 on brand-50 8.2:1, amber-800 on amber-50 8.2:1, red-700 on red-50 7.9:1, text on the accent 9.2:1 | 6.3b |
+| Framing maths | 1200 random views, each a whole, exactly 4:3 rectangle inside the photo; 1.2× of 1600 × 1200 is 1332 × 999, which the server keeps | `product-photo-logic.spec.ts` (6.4b) |
+| Logic specs | `product-photo-logic` 18 cases (6.2a) and 11 framing cases (6.4b); `product-photo-thumbs-logic` 10 (6.3b); `screens-durations-logic` (6.3c) | `p6-product-photo`, `p6-a11y` |
+
+### The last full runs before this step
+
+«RUNS-DETAIL»
+
+### The gate run of step 6.5
+
+«GATE-RUN»
+
+## The screens reviewed against the canvas
+
+Every step that rebuilt a screen captured it in `e2e/p6/screens.spec.ts` (in `p6-a11y`, on the demo bakery seeded with `SEED_PHASE=6`,
+so with its demo photos): stations at 1180 × 820, admin pages at 1440 × 900, in `en` with one `am` capture per screen, after the screen's
+loading lines were gone, its fonts and photos drawn and its animations ended. `e2e-p6` uploads them as the artifact `screens` on every
+run. The coordinator reviewed each step's captures against its board (`Main`, `Login`, `Pad`, `Kitchen`, `Till`, `Production`, `Admin`,
+`CatalogList`, `ProductPhoto` and `PhotoStates`) before merging it; no capture is compared by a machine (ADR 0023, no golden screenshots).
+The run of this step («SCREENS-RUN») holds «SCREENS-COUNT» captures:
+
+«SCREENS-TABLE»
+
+### Where the screens still differ from the boards
+
+From the As built notes, for the review on the live URL:
+
+- **The station screens** (6.3a to 6.3c): the pad keeps "Send order" and has no "Save draft" (the specs read "Send order", and a waiter's
+  cart is kept while the pad is locked, so there is no draft); "Total" and Send carry no Amharic twin (the twins shown are data: table and
+  product names). On the KDS the timer chip carries an icon as well as its word, the stock strip's chips carry a 44 px "Request transfer"
+  button, and "Ready" is no longer offered on a line still new (the board has Accept there). The till's sheet keeps the amount on the
+  method line and Close and Void at its top right, which the board does not draw; the receipt's code and link come only with the payment
+  (the API has no receipt before it), so the board's code is a dashed place until then. The production board's columns keep the names the
+  specs read (Requested, In progress, Pending confirmation, Done today), not the spec's "In the oven" and "Check and confirm"; its oven
+  progress bar is not drawn (Q5); its request card opens as a panel over the right-hand columns, not as a column beside the board.
+- **The admin frame and Today** (6.2b, 6.4a): no "Refunds" row (Q2) and no branch name or switcher (Q3: no endpoint every role may read
+  names the branch); Today's top sellers carry 52 × 39 thumbs (the board's size; the plan said 44 px) and read the overview's figures
+  instead of `/analytics/items` and `/analytics/channels`; the catalog table no longer shows the kind, unit, SKU or refund settings of a
+  product (the product page does).
+- **The product page** (6.4b): «6.4b-DIFF»
+- **Sell, Make, Team, Insight and System** (6.4c, 6.4d): «6.4cd-DIFF»
+- **Sign-in** (6.2b): no "Staff code" tab (Q1) and no eye button on the password field (its name, "Show password", would also answer
+  `getByLabel("Password")`).
+
+## Known gaps
+
+Not fixed in Phase 6; none blocks the claim:
+
+- **axe names left on screens `p6-a11y` does not cover** (6.4c, 6.4d): the Amharic order card names ("ትዕዛዝ {no}ን ክፈት" beside
+  "ትዕዛዝ {no}"), the Amharic "Void order", the reconciliation's drill link (named by its sentence, showing the count), the shift notes'
+  "Show notes" buttons named "Show the notes of …" and the running shifts' "Open the count" named by its station break
+  `label-content-name-mismatch`. Changing them changes names the p0 to p5 specs read, so they wait for a step that moves both.
+- **The service worker's photo cache is not proved in CI**: CI serves `next start`, which has no `sw.js`. `web-build` greps the export's
+  `sw.js` for the route, and the server runbook's tablet check ("On the tablets") covers it on the live host.
+- **The prune's one race** (6.1b): an upload of exactly the same bytes as a photo past its 30 days, between the upload's "files already
+  there" check and its commit, while the prune deletes them, leaves a placeholder until the photo is uploaded again. At 03:50, for a photo
+  nobody showed for 30 days.
+- **Files of a failed write** (6.1a): files are written before the photo's transaction, so a transaction that then fails leaves
+  content-addressed files no row names; a retry reuses them, and the prune (which sweeps rows) never removes them.
+- **The live Demo Bakery's photos** come from one run of `bakery:demo-product-images --branch=<id>` by the coordinator (`--dry-run`
+  first, `docs/runbook/server.md`), never from a deploy; the repository does not record whether it was run.
+- **Phase 5's open items are unchanged**: device enforcement stays off on the live host until Ramin's word; the live restore drill waits
+  for its scratch database; the off-site hook stays off; the display-case COGS gap and the other Phase 4 gaps (`phase-5-report.md`, "What
+  is open").
+
+## New Amharic keys for the reviewer (plan 10.2 Q14)
+
+Every new string was written in both languages in the step that added it (strict parity in `i18n-check`), and `docs/i18n/am-review.csv`
+was regenerated each time; a reviewer fills its `correction` column and `scripts/i18n_import.py` applies it in a PR of its own. They do not
+block the gate: the `am-reviewed` sign-off of Phase 5 stands. From Phase 5's `done_commit` to this step:
+
+«AM-KEYS»
+
+## Open questions and the defaults taken (plan 10.2)
+
+| # | Question | Default taken, as built |
+|---|---|---|
+| Q1 | A "Staff code" sign-in tab | Not built: sign-in keeps phone and password; the spec's keypad (72 px keys, dots) is the pad's lock screen (6.3a). Code-only sign-in would be its own step with an ADR. **Ramin's call.** |
+| Q2 | "Refunds" in the sidebar | Left out: refunds live on the order record and the till; a list needs an API read. **Ramin's call.** |
+| Q3 | The branch switcher | Not shown at all, not even the name: no endpoint every role may read names the branch. Multi-branch stays after go-live. **Ramin's call.** |
+| Q4 | The demo and login photos and their licences | Supplied by the coordinator: 29 demo photos (Unsplash and Pexels pages and licences in `manifest.json`) and the login photo (`apps/web/public/images/LICENSES.json`), free to copy, change and redistribute, no person shown. |
+| Q5 | The production card's progress bar | Not drawn: no batch payload carries a planned duration (`production_batches` has no such column); the card says the minutes so far. |
+| Q6 | The till's quick cash keys | 300, 500, 1,000 (each disabled below the amount) and "Exact amount", filling Cash received; no setting. |
+| Q7 | Thumbs on the till, production, Today and the admin lists | Joined in the web from `GET /items?kind=product` through `useProductImages`; no change to Orders, Production or Analytics payloads and no new contract. |
+| Q8 | The route path | `/api/v1/items/{item}/image`, beside the other item routes. |
+| Q9 | How `--force` knows the demo photos | `item_images.origin` (`upload` or `demo`). |
+| Q10 | What `width`, `height` and `bytes` mean | The large rendition's size (the `srcSet` needs it); the three files together (the System page sums the live photos, a shared one once). |
+| Q11 | A photo on an ingredient | Refused, 422 `catalog.image.not_a_product`; a `DELETE` on an ingredient answers 200 and writes nothing. |
+| Q12 | HEIC photos from phones | Not accepted. The photo card checks the type first (JPEG, PNG or WebP, by the file's name when the system gives none) and refuses another in the server's own words (`unsupported_type`), before any upload; the plan expected the browser's downscale to convert what it could decode. |
+| Q13 | A pad card's name in `am` | The Amharic name only; English beside Amharic only where a screen already shows both. |
+| Q14 | New strings in Amharic | Written with each step, strict parity; listed above for the reviewer. |
+| Q15 | User photos | Initials only. |
+| Q16 | A customer-facing menu | Not in Phase 6; the large rendition is there for it. |
+| Q17 | Photos on the KDS | None. |
+| Q18 | How the look is reviewed | Ramin on the live URL after each deploy, and the coordinator from the `screens` artifact before each merge; no golden screenshots. |
+| Q19 | How long removed photos' files stay | 30 days, then the prune, unless any row naming the sha was removed inside the window or is live. |
+
+## Specs that changed (the selector rule, plan 6.0.2)
+
+Each change is in the commit of its screen, with the reason in the step's As built note and PR:
+
+- **6.3a**: the table buttons behind "Change the table or the order type" and the "Tables" dialog (`chooseTable`); "My orders" behind its
+  bar button and dialog (`openMyOrders`, `closeMyOrders`); the cart's total "ETB 330.00".
+- **6.3b**: Void order and "Void a payment of order N" from the waiting card to the sheet (a card is one control); the digit buttons
+  replaced by `getByLabel("Cash received").fill(...)`; the shift's menu opened first (`openShiftBar`); the drawer's figure opened from its
+  button.
+- **6.3c**: `p3-opening-prefill` opens the shift's menu before "Close shift".
+- **6.4a**: h1 "Admin console" became "Today"; the language links and "Dates" behind the account menu (`openAccountMenu`); the console's
+  link on the Amharic catalog became the "Today" link; the new item and categories form in the "New item" drawer; one kind at a time in
+  the catalog list; the list's "Back to stock" column removed (the product page still checks both settings); the region "Stations and
+  shifts" became Today's "Shifts".
+- **6.4b**: «6.4b-SPECS»
+- **6.4c and 6.4d**: none.
+
+## Deviations from the plan and assumptions taken
+
+The As built notes list them step by step. The ones that change what the plan's text says:
+
+- **Design fidelity** (Ramin, 2026-11-03): after the first screens went live, a screen step was done only when its screen looked like its
+  board, region by region; screens were rebuilt from the boards, and controls the boards do not show moved behind one-step controls, with
+  their specs (ADR 0023's note). The plan's "restyle on the primitives" for 6.4c and 6.4d became the same board-by-board rebuild.
+- **One station top bar** (6.3a): every station screen names itself in the shell's bar (`useStationHeader`) instead of drawing its own
+  header under 6.2b's bar; the admin console has no top bar at all (6.4a).
+- **Kitchen night** is the night tokens plus a scoped remap of the scales inside `kitchen-night` (6.3b), not only components on `night-*`
+  classes.
+- **`ProductPhotoPipeline`'s eighth key** `processing_failed` (6.1a); `DELETE` on an ingredient answers 200 (6.1a).
+- **The prune** keeps a photo while any row naming it was removed inside the window, not only while a live row has it (6.1b).
+- **The demo photos' code** lives beside `SeedDemoCommand` (`App\Console\Support\DemoProductImages`), outside the modules, because the demo
+  spans them (6.1c).
+- **Today** reads the overview's top sellers and channel shares instead of `/analytics/items` and `/analytics/channels` (6.4a).
+- **The product page** saves both of its cards with one "Save changes" (6.4b); the recipe moved behind "Recipe and cost".
+- **The `gate:p6` seed case** seeds every phase in the test (`SEED_PHASE` unset, as `e2e-p6` seeds), rather than reading a database the job
+  seeded first as `gate-p4` does: the products come from Phases 0 and 2, and the test needs no second database.
+- **`scripts/gate_check.py`** finds its Pest runner only when it runs tests (6.5).
+
+## Before the claim
+
+`python scripts/gate_check.py --mode done --phase 6 --no-tests --no-e2e` at «HEAD» (this branch, every Phase 6 pull request merged):
+
+```
+«GATECHECK»
+```
+
+The SKIP rows are the tests and projects that `gate-p6` proves in CI through its needs and its own `gate:p6` step. The last row stays SKIP
+until the claim.
+
+## What the coordinator and Ramin do next
+
+- [ ] When this pull request is merged and `gate-p6` is green on `main`: `python scripts/phase_status.py claim-done 6 --commit <sha>
+      --run-url <run>`, commit and push STATUS, wait for `gate-p6` green on that commit, tag `phase-6-complete`. From then on `gate-p6`
+      is strict and `apps/` is frozen after `done_commit` (Phase 6 is the last phase in the manifest).
+- [ ] Run `bakery:demo-product-images --branch=<id> --dry-run`, then without `--dry-run`, once on the live Demo Bakery branch, if not
+      done yet (`docs/runbook/server.md`).
+- [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher), when
+      convenient; none blocks the claim.
+- [ ] Ramin: review the restyled screens on the live URL (Q18).
+- [ ] Phase 5's open items, unchanged (`phase-5-report.md`).
