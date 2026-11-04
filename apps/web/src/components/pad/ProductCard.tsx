@@ -140,7 +140,6 @@ export function ProductCard<T extends ProductCardItem>({ item, locale, category,
     <div className="relative h-full">
       <button
         type="button"
-        aria-label={label}
         aria-disabled={unavailable || undefined}
         onPointerDown={() => {
           pressed.current = false;
@@ -171,7 +170,13 @@ export function ProductCard<T extends ProductCardItem>({ item, locale, category,
           unavailable ? "cursor-not-allowed" : "hover:border-neutral-300 motion-safe:active:scale-[0.98]"
         } ${focusRing}`}
       >
-        {face}
+        {/* The button is named by its text, which readers hear: "Add Croissant, 65.00 ETB, 3 left" (the name the specs read). What the card
+            draws, in the board's order and with the Amharic name and the chips, is hidden from them. No aria-label, so the name is the
+            button's own content (WCAG 2.5.3, label in name). */}
+        <span className="sr-only">{label}</span>
+        <span aria-hidden="true" className="flex w-full flex-1 flex-col">
+          {face}
+        </span>
       </button>
       {unavailable || !onMore ? null : (
         // beside the price, over the card's corner (a sibling of the add button, never inside it)
