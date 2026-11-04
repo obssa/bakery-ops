@@ -113,15 +113,16 @@ export function useRemoveProductPhoto(id: number) {
 
 /**
  * The menu as the pad reads it (GET /menu with the unavailable products), for the product page's stock chip and its live pad-card preview
- * (step 6.4b): only for someone who may read it (orders.create), read once and kept for 15 s. Without it the preview shows the product
- * from its own fields, without a stock chip.
+ * (step 6.4b): only for someone who may read it (orders.create), read once and kept for 15 s. Without it (no permission, or a computer
+ * that is not an enrolled device) the preview shows the product from its own fields, without a stock chip.
  */
 export function useProductPageMenu() {
   const me = useSession((s) => s.me);
   const enabled = useSignedIn() && can(me, "orders.create");
   return useQuery({
     queryKey: ["menu", "product-page"],
-    queryFn: () => authed<Menu>("/menu", { query: { include_unavailable: 1 } }),
+    // the menu asks for an enrolled device; on a computer that is not one the page goes on without the chip, never to the gate's screen
+    queryFn: () => authed<Menu>("/menu", { query: { include_unavailable: 1 }, deviceGate: false }),
     enabled,
     staleTime: 15_000,
     retry: false,

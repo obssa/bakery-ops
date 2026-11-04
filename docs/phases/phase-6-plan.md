@@ -991,7 +991,9 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
         Amharic", "Category", "Price"); no spec reads them.
       - **The stock chip** comes from the pad's own menu (`GET /menu` with the unavailable products, `useProductPageMenu`, key
         `["menu", "product-page"]`, for whoever holds `orders.create`, kept 15 s): "Display case" or "Made to order", with "· N left" or "·
-        none left". Without the menu the chip names the place only.
+        none left". Without the menu the chip names the place only. The menu asks for an enrolled device and the catalog's own reads do not,
+        so this read is sent with the client's new `deviceGate: false`: on a computer that is not enrolled its refusal stays its own and the
+        page goes on without the chip, instead of turning into the "not enrolled" screen.
       - **"Take off the menu"** is PATCH `is_active: false` (the list's "Hidden"), at once and without a dialog, because "Put back on the
         menu" undoes it.
       - **Refunds**: the two settings as the board's rows, their name over their hint and a 52 x 32 switch at the right; the switch is the

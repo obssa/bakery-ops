@@ -139,11 +139,11 @@ export function PhotoCard({ product, menuEntry, price, category, canManage, clas
       setRefusal(t("refused_type"));
       return;
     }
-    const before = stage;
     setStage({ kind: "opening" });
     const shrunk = await downscaleSized(file, PRODUCT_PHOTO);
     if (!shrunk) {
-      setStage(before);
+      // back to the card at rest (a photo being framed before has let its URL go)
+      setStage({ kind: "idle" });
       setRefusal(t("refused_unreadable"));
       return;
     }

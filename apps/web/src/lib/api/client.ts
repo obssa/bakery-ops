@@ -54,6 +54,11 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   /** Give up after this long (default WRITE_TIMEOUT_MS for writes, READ_TIMEOUT_MS for reads): a network failure. */
   timeoutMs?: number;
+  /**
+   * false: a device refusal of this call is its own and does not take the page to the "not enrolled" screen (step 6.4b: the product
+   * page's read of the pad's menu, an extra the page does without on a computer that is not enrolled).
+   */
+  deviceGate?: boolean;
 }
 
 /** How long a call may wait for an answer before it counts as a network failure (a hung connection must not freeze a feed). */
@@ -94,9 +99,9 @@ function baseHeaders(accept: string, extra: Record<string, string> | undefined, 
  * Records the refusals that mean "start a shift first" so the shift bar can say so (step 3.7a), and the device refusals for the "not
  * enrolled" screen (step 5.1b, with the id the call went out with and the page it was for), and returns the error.
  */
-function failed(error: ApiError, device: string, path: string): ApiError {
+function failed(error: ApiError, device: string, path: string, deviceGate = true): ApiError {
   if (error.status === 409) useShiftNotice.getState().report(error);
-  if (isDeviceRefusal(error)) useDeviceGate.getState().report(error, device, path);
+  if (deviceGate && isDeviceRefusal(error)) useDeviceGate.getState().report(error, device, path);
   return error;
 }
 
@@ -170,7 +175,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
   if (!response.ok) {
     const body = json && typeof json === "object" ? (json as Partial<ApiErrorBody>) : {};
-    throw failed(new ApiError(response.status, body), device, page);
+    throw failed(new ApiError(response.status, body), device, page, options.deviceGate !== false);
   }
   return json as T;
 }
