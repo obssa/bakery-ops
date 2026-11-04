@@ -122,7 +122,9 @@ class PestRunner:
     def __init__(self, root: str, runner: str | None, enabled: bool) -> None:
         self.root = root
         self.enabled = enabled
-        self.cmd = self._resolve(runner)
+        # only a run that runs tests looks for a runner: with --no-tests or --ci nothing asks Docker (step 6.5: on a PC whose
+        # Docker engine is stopped the CLI's probe never returned, and the gate hung before printing a row)
+        self.cmd = self._resolve(runner) if enabled else None
 
     def _resolve(self, runner: str | None) -> list[str] | None:
         if runner:
@@ -130,9 +132,12 @@ class PestRunner:
         # Prefer the compose service directly: on Windows `bash` may resolve to WSL's stub, so never
         # go through the scripts/pest wrapper here. Host PHP (8.0) is never used.
         if shutil.which("docker") and os.path.exists(os.path.join(self.root, "compose.yml")):
-            probe = subprocess.run(["docker", "compose", "-f", "compose.yml", "-f", "compose.dev.yml", "ps", "-q", "app"],
-                                   cwd=self.root, text=True, capture_output=True)
-            if probe.returncode == 0 and probe.stdout.strip():
+            try:
+                probe = subprocess.run(["docker", "compose", "-f", "compose.yml", "-f", "compose.dev.yml", "ps", "-q", "app"],
+                                       cwd=self.root, text=True, capture_output=True, timeout=60)
+            except subprocess.TimeoutExpired:
+                probe = None
+            if probe is not None and probe.returncode == 0 and probe.stdout.strip():
                 return ["docker", "compose", "-f", "compose.yml", "-f", "compose.dev.yml", "exec", "-T", "app", "vendor/bin/pest"]
         direct = os.path.join(self.root, "apps", "api", "vendor", "bin", "pest")
         if os.path.exists(direct) and os.name != "nt":
