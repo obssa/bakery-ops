@@ -44,6 +44,9 @@ export async function settledAnimations(page: Page): Promise<void> {
 /** The serious and critical violations axe finds on the page as it is now; an empty list on a screen that passes. */
 export async function axeFindings(page: Page, options: { exclude?: string[] } = {}): Promise<A11yFinding[]> {
   await fontsReady(page);
+  // the screens' transitions are all written under motion-safe: with reduced motion they are off, so every colour is the one at rest;
+  // anything still running (a transition already started) is waited for
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await settledAnimations(page);
   let builder = new AxeBuilder({ page }).withTags([...A11Y_TAGS]);
   for (const selector of options.exclude ?? []) builder = builder.exclude(selector);
