@@ -472,7 +472,7 @@ web:today.delta_down,/admin,Down {pct}% on last {weekday},ካለፈው {weekday}
 web:today.delta_money_up,/admin,Up ETB {amount} on last {weekday},ካለፈው {weekday} በ{amount} ብር ጨምሯል,,
 web:today.delta_money_down,/admin,Down ETB {amount} on last {weekday},ካለፈው {weekday} በ{amount} ብር ቀንሷል,,
 web:today.delta_same,/admin,The same as last {weekday},ካለፈው {weekday} ጋር እኩል,,
-web:today.delta_none,/admin,Nothing to compare on last {weekday},ባለፈው {weekday} የሚወዳደር የለም,,
+web:today.delta_none,/admin,No figures for last {weekday},ያለፈው {weekday} አሃዝ የለውም,,
 web:today.refunds_line,/admin,"{count, plural, =0 {No refunds} one {# refund} other {# refunds}}","{count, plural, =0 {ተመላሽ የለም} one {# ተመላሽ} other {# ተመላሾች}}",,
 web:today.not_built,/admin,Not built yet,ገና አልተሰላም,,
 web:today.not_built_long,/admin,Today's figures are not built yet.,የዛሬ አሃዞች ገና አልተሰሉም።,,

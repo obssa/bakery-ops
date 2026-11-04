@@ -497,7 +497,7 @@
     "delta_money_up": "ካለፈው {weekday} በ{amount} ብር ጨምሯል",
     "delta_money_down": "ካለፈው {weekday} በ{amount} ብር ቀንሷል",
     "delta_same": "ካለፈው {weekday} ጋር እኩል",
-    "delta_none": "ባለፈው {weekday} የሚወዳደር የለም",
+    "delta_none": "ያለፈው {weekday} አሃዝ የለውም",
     "refunds_line": "{count, plural, =0 {ተመላሽ የለም} one {# ተመላሽ} other {# ተመላሾች}}",
     "not_built": "ገና አልተሰላም",
     "not_built_long": "የዛሬ አሃዞች ገና አልተሰሉም።",
