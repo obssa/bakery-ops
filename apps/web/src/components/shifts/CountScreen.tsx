@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -11,49 +12,53 @@ import { useErrorText } from "@/lib/errors";
 import { authed, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
+import { useStationHeader } from "@/lib/topBar";
 import { useIsoDay } from "@/lib/useDates";
+import { ICON_STROKE } from "../icons";
+import { StationHeaderActions } from "../StationHeaderActions";
 import { focusRing } from "../styles";
-import { Alert, Badge, Button, PageHeader, Panel } from "../ui";
+import { Alert, Button, EmptyState, Panel } from "../ui";
 import { useRouter } from "@/i18n/navigation";
 import { CountPanel, StageBadge } from "./CountPanel";
 import { HandoverPanel } from "./HandoverPanel";
 import { NoteForm, NotesList } from "./Notes";
+import { ShiftBar } from "./ShiftBar";
+import { useShiftStation } from "./useShiftStation";
 
-// The count screen (step 3.7b), /shifts/count?shift=<id>: one component for the opening and the closing count. It shows the counts of the
-// shift for the phase it is in (the opening ones while the shift is being opened, the closing ones from the moment it is closed), one
-// place at a time, with the handover panel above an opening count and the handover notes below. It polls the shift and its counts every
-// 6 s so that a hand-in by someone else, an approval or a rejection shows without a reload.
+// The count screen (step 3.7b; on the Fresh Counter primitives since step 6.3c), /shifts/count?shift=<id>: one component for the opening and
+// the closing count. The station top bar names it (lib/topBar.ts): "Shift count" with its Amharic name on the English page, the station,
+// the shift's state, day and since when under it, and the station's shift menu and "Back to the station" among the bar's buttons. Under
+// the bar: the intro, the handover from the last shift above an opening count, the places to count as a row of station segments (each with the stage
+// it is at), the count of the chosen place, and the handover notes. It shows the counts of the shift for the phase it is in (the opening
+// ones while the shift is being opened, the closing ones from the moment it is closed), one place at a time, and polls the shift and its
+// counts every 6 s so that a hand-in by someone else, an approval or a rejection shows without a reload.
+
+/** Names the screen in the station top bar and is the page's h1 (read by screen readers and the specs; the bar shows the name). */
+function Named({ title, titleAm, subtitle }: { title: string; titleAm?: string; subtitle?: string }) {
+  useStationHeader({ title, titleAm, subtitle });
+  return <h1 className="sr-only">{title}</h1>;
+}
 
 const POLL_MS = 6000;
 
-const SHIFT_TONE: Record<ShiftStatus, "neutral" | "blue" | "green" | "amber"> = {
-  scheduled: "neutral",
-  opening: "blue",
-  open: "green",
-  counting: "blue",
-  pending_approval: "amber",
-  locked: "neutral",
-  cancelled: "neutral",
-};
-
 const NOTE_STATUSES: readonly ShiftStatus[] = ["opening", "open", "counting", "pending_approval"];
 
-export function CountScreen() {
+export function CountScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("counts");
   const params = useSearchParams();
   const raw = params.get("shift") ?? "";
   if (!/^\d+$/.test(raw)) {
     return (
-      <div className="max-w-xl space-y-4">
-        <PageHeader title={t("title")} />
+      <div className="max-w-xl space-y-5">
+        <Named title={t("title")} titleAm={titleAm} />
         <Alert>{t("no_shift")}</Alert>
       </div>
     );
   }
-  return <Loaded shiftId={Number(raw)} />;
+  return <Loaded shiftId={Number(raw)} titleAm={titleAm} />;
 }
 
-function Loaded({ shiftId }: { shiftId: number }) {
+function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
   const isoDay = useIsoDay();
   const t = useTranslations("counts");
   const ts = useTranslations("shifts");
@@ -97,6 +102,10 @@ function Loaded({ shiftId }: { shiftId: number }) {
     return () => useActiveStation.getState().set(null);
   }, [stationId]);
 
+  // the station's shift as the menu in the station top bar (ShiftBar look="menu", as on every station screen): its state as a chip, its
+  // actions in the panel; `quiet`, because the count in progress that would open it by itself is the one on this screen
+  const shiftStation = useShiftStation({ stationId });
+
   const all = useMemo(() => countsQuery.data ?? [], [countsQuery.data]);
   const current = useMemo(() => currentCounts(all), [all]);
   const phase = phaseOf(shift?.status ?? "opening", current);
@@ -117,47 +126,59 @@ function Loaded({ shiftId }: { shiftId: number }) {
     return locale === "am" ? place.name_am || place.name_en : place.name_en;
   }
 
+  // "Back to the station", in the station top bar before the sync chip
+  const back = (
+    <StationHeaderActions>
+      <Button type="button" variant="secondary" size="md" onClick={() => router.back()}>
+        <ArrowLeft className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        {ts("count_back")}
+      </Button>
+    </StationHeaderActions>
+  );
+
   if (shiftQuery.isError && !shift) {
     return (
-      <div className="max-w-xl space-y-4">
-        <PageHeader title={t("title")} />
+      <div className="max-w-xl space-y-5">
+        <Named title={t("title")} titleAm={titleAm} />
+        {back}
         <Alert>{errorText.message(shiftQuery.error)}</Alert>
-        <Button type="button" variant="secondary" onClick={() => router.back()}>
-          {ts("count_back")}
-        </Button>
       </div>
     );
   }
   if (!shift) {
     return (
-      <p role="status" className="text-base text-neutral-600">
-        {t("loading")}
-      </p>
+      <>
+        <Named title={t("title")} titleAm={titleAm} />
+        <p role="status" className="text-base text-neutral-600">
+          {t("loading")}
+        </p>
+      </>
     );
   }
 
   const stationName = locale === "am" ? shift.station.name_am : shift.station.name_en;
+  // the bar's line: the station, this shift's state (the shift counted here may not be the station's running one), its day and open time
+  const subtitle = [
+    stationName,
+    t(`shift_${shift.status}`),
+    t("shift_date", { date: isoDay(shift.date) }),
+    shift.opened_at ? ts("open_since", { time: addisClock(shift.opened_at) }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const canNote = NOTE_STATUSES.includes(shift.status);
 
   return (
-    <div className="space-y-6">
-      <PageHeader title={t("title")} intro={t("intro")} />
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-neutral-200 bg-white px-5 py-4">
-        <p className="text-lg font-semibold text-neutral-900">{stationName}</p>
-        <p className="text-base text-neutral-700">{t("shift_date", { date: isoDay(shift.date) })}</p>
-        <Badge tone={SHIFT_TONE[shift.status]}>{t(`shift_${shift.status}`)}</Badge>
-        {shift.opened_at ? <p className="text-base text-neutral-600">{ts("open_since", { time: addisClock(shift.opened_at) })}</p> : null}
-        <div className="ml-auto">
-          <Button type="button" variant="secondary" onClick={() => router.back()}>
-            {ts("count_back")}
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-5">
+      <Named title={t("title")} titleAm={titleAm} subtitle={subtitle} />
+      <ShiftBar model={{ ...shiftStation, choices: [] }} look="menu" quiet />
+      {back}
+      {/* what the screen is for */}
+      <p className="max-w-3xl text-[15px] text-neutral-600">{t("intro")}</p>
 
       {countsQuery.isError && !countsQuery.data ? <Alert>{errorText.message(countsQuery.error)}</Alert> : null}
       {countsQuery.isError && countsQuery.data ? (
-        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
+        <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
           {ts("stale")}
         </p>
       ) : null}
@@ -165,7 +186,7 @@ function Loaded({ shiftId }: { shiftId: number }) {
       {phase === "opening" && shift.status === "opening" ? <HandoverPanel stationId={shift.station.id} /> : null}
 
       {shown.length > 1 ? (
-        <nav aria-label={t("places")} className="flex flex-wrap gap-3">
+        <nav aria-label={t("places")} className="flex max-w-full flex-wrap gap-1 self-start rounded-2xl border border-neutral-200 bg-white p-1">
           {shown.map((count) => {
             const active = selected?.id === count.id;
             return (
@@ -174,8 +195,8 @@ function Loaded({ shiftId }: { shiftId: number }) {
                 type="button"
                 aria-pressed={active}
                 onClick={() => setChosen(count.location?.id ?? null)}
-                className={`flex min-h-12 items-center gap-3 rounded-md border px-4 text-base font-medium ${focusRing} ${
-                  active ? "border-blue-700 bg-blue-50 text-blue-900" : "border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
+                className={`inline-flex min-h-12 items-center gap-2.5 rounded-xl px-4 text-base font-semibold motion-safe:transition-colors motion-safe:duration-150 ${focusRing} ${
+                  active ? "bg-neutral-900 text-white" : "text-neutral-700 hover:bg-neutral-100"
                 }`}
               >
                 {placeName(count)}
@@ -198,7 +219,7 @@ function Loaded({ shiftId }: { shiftId: number }) {
         />
       ) : countsQuery.isSuccess ? (
         <Panel title={t("nothing_title")}>
-          <p className="text-base text-neutral-700">{t("nothing_to_count")}</p>
+          <EmptyState title={t("nothing_title")} body={t("nothing_to_count")} level={3} className="py-6" />
         </Panel>
       ) : null}
 

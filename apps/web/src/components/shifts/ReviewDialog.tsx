@@ -40,7 +40,7 @@ export function ReviewDialog({
       <p className="text-base text-neutral-700">{t("review_summary", { total: review.total, same: asExpected, differ: review.changed.length })}</p>
 
       {review.changed.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 rounded-md border border-neutral-200">
+        <ul className="divide-y divide-neutral-200 rounded-xl border border-neutral-200">
           {review.changed.map((line) => (
             <li key={line.id} className="flex flex-wrap items-baseline justify-between gap-x-4 px-3 py-2 text-base">
               <span className="font-medium text-neutral-900">{itemName(line, locale)}</span>

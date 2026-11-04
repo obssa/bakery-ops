@@ -19,8 +19,8 @@ export function NotesList({ notes }: { notes: HandoverNote[] }) {
   return (
     <ul className="space-y-3">
       {notes.map((note) => (
-        <li key={note.id} className="rounded-md border border-neutral-200 bg-neutral-50 px-4 py-3">
-          <p className="text-sm text-neutral-600">
+        <li key={note.id} className="space-y-1 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+          <p className="text-[13px] text-neutral-600">
             {note.from?.name ?? ""} · {addisClock(note.created_at)}
             {note.to ? ` · ${t("note_to", { name: note.to.name })}` : ""}
           </p>

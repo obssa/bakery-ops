@@ -6,12 +6,14 @@ import type { Count, CountLine, Locale, VarianceReason } from "@/lib/api/types";
 import type { LineEdit } from "@/lib/api/counts";
 import { isTouched, needsReason, prefillOf, signedQuantity, varianceOf } from "@/lib/counts";
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
-import { Badge, Button, Select, TextInput } from "../ui";
+import { tableNum } from "../styles";
+import { Badge, Button, Select, Table, TextInput } from "../ui";
 
-// The lines of one count (step 3.7b). While the count is a draft each line has its counted figure to type (saved when the field is left),
-// an "As expected" button for the line the counter has looked at and found right, and, where the figure differs from what is expected,
-// the reason and the note. Quantities are decimal strings in the item's base unit, shown as the API sent them. Once the count is
-// handed in the same table reads as a record: the figures the approver sees.
+// The lines of one count (step 3.7b; on the Fresh Counter table since step 6.3c). While the count is a draft each line has its counted
+// figure to type (saved when the field is left), an "As expected" button for the line the counter has looked at and found right, and,
+// where the figure differs from what is expected, the reason and the note. Quantities are decimal strings in the item's base unit, shown
+// as the API sent them, in tabular figures. A line not counted yet is tinted amber and says so in words. Once the count is handed in the
+// same table reads as a record: the figures the approver sees.
 
 export function itemName(line: CountLine, locale: Locale): string {
   return locale === "am" ? line.item.name_am || line.item.name_en : line.item.name_en;
@@ -24,8 +26,8 @@ export function reasonName(reason: { name_en: string; name_am: string }, locale:
 function Quantity({ value, unit }: { value: string | null; unit: string }) {
   if (value === null) return <span className="text-neutral-500">—</span>;
   return (
-    <span className="whitespace-nowrap">
-      {trimDecimal(value)} <span className="text-sm text-neutral-600">{unit}</span>
+    <span className="whitespace-nowrap tabular-nums">
+      {trimDecimal(value)} <span className="text-[13px] text-neutral-600">{unit}</span>
     </span>
   );
 }
@@ -35,7 +37,7 @@ function Difference({ line }: { line: CountLine }) {
   if (variance === null) return <span className="text-neutral-500">—</span>;
   const sign = compareDecimal(variance, "0", 4);
   const tone = sign < 0 ? "text-red-700" : sign > 0 ? "text-amber-800" : "text-neutral-700";
-  return <span className={`whitespace-nowrap font-medium ${tone}`}>{signedQuantity(variance)}</span>;
+  return <span className={`whitespace-nowrap font-semibold tabular-nums ${tone}`}>{signedQuantity(variance)}</span>;
 }
 
 interface RowProps {
@@ -94,28 +96,29 @@ function LineRow({ count, line, reasons, editable, onEdit }: RowProps) {
   }
 
   return (
-    <tr className={touched ? "" : "bg-amber-50/40"}>
-      <th scope="row" className="px-3 py-3 text-left align-top text-base font-medium text-neutral-900">
+    <tr className={`align-top ${touched ? "" : "bg-amber-50/50"}`}>
+      <th scope="row" className="py-3 text-left text-base text-neutral-900">
         {name}
       </th>
-      <td className="px-3 py-3 align-top text-base">
+      <td className={`py-3 text-base ${tableNum}`}>
         <Quantity value={line.expected_qty ?? "0"} unit={unit} />
-        {moved !== null ? <span className="block text-sm text-amber-800">{t("moved_since", { qty: signedQuantity(moved), unit })}</span> : null}
+        {moved !== null ? <span className="block text-[13px] text-amber-800">{t("moved_since", { qty: signedQuantity(moved), unit })}</span> : null}
       </td>
       {count.type === "opening" ? (
-        <td className="px-3 py-3 align-top text-base">
+        <td className={`py-3 text-base ${tableNum}`}>
           <Quantity value={line.carried_qty} unit={unit} />
         </td>
       ) : null}
-      <td className="px-3 py-3 align-top text-base">
+      <td className="py-2 text-base">
         {editable ? (
-          <div className="w-36">
+          <div className="w-32">
             <TextInput
               inputMode="decimal"
               aria-label={t("counted_for", { item: name })}
               aria-invalid={invalid || undefined}
               placeholder={placeholder}
               value={text}
+              className="text-right font-semibold tabular-nums placeholder:font-normal"
               onFocus={() => setTyping(true)}
               onChange={(event) => setText(event.target.value)}
               onBlur={commit}
@@ -123,16 +126,18 @@ function LineRow({ count, line, reasons, editable, onEdit }: RowProps) {
                 if (event.key === "Enter") event.currentTarget.blur();
               }}
             />
-            {invalid ? <p className="mt-1 text-sm font-medium text-red-700">{t("qty_invalid")}</p> : null}
+            {invalid ? <p className="mt-1 text-[13px] font-medium text-red-700">{t("qty_invalid")}</p> : null}
           </div>
         ) : (
-          <Quantity value={line.counted_qty} unit={unit} />
+          <span className="block pt-1">
+            <Quantity value={line.counted_qty} unit={unit} />
+          </span>
         )}
       </td>
-      <td className="px-3 py-3 align-top text-base">
+      <td className={`py-3 text-base ${tableNum}`}>
         <Difference line={line} />
       </td>
-      <td className="min-w-56 px-3 py-3 align-top text-base">
+      <td className="min-w-52 py-2 text-base">
         {editable ? (
           explain ? (
             <div className="space-y-2">
@@ -166,26 +171,27 @@ function LineRow({ count, line, reasons, editable, onEdit }: RowProps) {
                 />
               ) : null}
             </div>
-          ) : null
+          ) : (
+            <span className="block pt-1 text-neutral-500">—</span>
+          )
         ) : (
-          <>
+          <span className="block pt-1">
             {line.reason ? <span className="font-medium">{reasonName(line.reason, locale)}</span> : <span className="text-neutral-500">—</span>}
-            {line.note ? <span className="block text-sm text-neutral-700">{line.note}</span> : null}
-            {line.decision_note ? <span className="block text-sm text-amber-800">{line.decision_note}</span> : null}
-          </>
+            {line.note ? <span className="block text-[13px] text-neutral-700">{line.note}</span> : null}
+            {line.decision_note ? <span className="block text-[13px] text-amber-800">{line.decision_note}</span> : null}
+          </span>
         )}
       </td>
-      <td className="px-3 py-3 align-top text-base">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone={touched ? "green" : "amber"}>{touched ? t("mark_counted") : t("mark_not_counted")}</Badge>
+      <td className="py-2 text-base">
+        <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
+          <Badge tone={touched ? "brand" : "amber"} dot>
+            {touched ? t("mark_counted") : t("mark_not_counted")}
+          </Badge>
           {editable && !touched ? (
-            <Button
-              type="button"
-              variant="secondary"
-              aria-label={t("as_expected_for", { item: name })}
-              onClick={() => onEdit([{ item_id: line.item.id, confirm: true }])}
-            >
-              {t("as_expected")}
+            <Button type="button" variant="secondary" compact onClick={() => onEdit([{ item_id: line.item.id, confirm: true }])}>
+              {/* named by its text for readers, "<item>: as expected"; the words alone are what it shows */}
+              <span aria-hidden="true">{t("as_expected")}</span>
+              <span className="sr-only">{t("as_expected_for", { item: name })}</span>
             </Button>
           ) : null}
         </div>
@@ -200,42 +206,34 @@ export function CountLines({ count, reasons, editable, onEdit }: { count: Count;
   const lines = [...count.lines].sort((a, b) => itemName(a, locale).localeCompare(itemName(b, locale)) || a.id - b.id);
   if (lines.length === 0) return <p className="text-base text-neutral-600">{t("no_lines")}</p>;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[56rem] border-collapse text-left">
+    <div className="-mx-1 overflow-x-auto px-1">
+      <Table className="min-w-[56rem]">
         <caption className="sr-only">{t("lines_caption")}</caption>
         <thead>
-          <tr className="border-b border-neutral-300 text-sm text-neutral-700">
-            <th scope="col" className="px-3 py-2 font-medium">
-              {t("col_item")}
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
+          <tr>
+            <th scope="col">{t("col_item")}</th>
+            <th scope="col" className={tableNum}>
               {t("col_expected")}
             </th>
             {count.type === "opening" ? (
-              <th scope="col" className="px-3 py-2 font-medium">
+              <th scope="col" className={tableNum}>
                 {t("col_carried")}
               </th>
             ) : null}
-            <th scope="col" className="px-3 py-2 font-medium">
-              {t("col_counted")}
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
+            <th scope="col">{t("col_counted")}</th>
+            <th scope="col" className={tableNum}>
               {t("col_difference")}
             </th>
-            <th scope="col" className="px-3 py-2 font-medium">
-              {t("col_reason")}
-            </th>
-            <th scope="col" className="px-3 py-2 font-medium">
-              {t("col_mark")}
-            </th>
+            <th scope="col">{t("col_reason")}</th>
+            <th scope="col">{t("col_mark")}</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-neutral-200">
+        <tbody>
           {lines.map((line) => (
             <LineRow key={line.id} count={count} line={line} reasons={reasons} editable={editable} onEdit={onEdit} />
           ))}
         </tbody>
-      </table>
+      </Table>
     </div>
   );
 }

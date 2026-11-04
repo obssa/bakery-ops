@@ -3,7 +3,8 @@ import am from "../../messages/am.json";
 import en from "../../messages/en.json";
 import { expectAccessible } from "../support/a11y";
 import { openAccountMenu } from "../support/admin";
-import { requireAdmin } from "../support/env";
+import { demoProduction } from "../support/demoProduction";
+import { live, requireAdmin } from "../support/env";
 import { buildStationFixture } from "../support/fixture";
 import { chooseTable, openAs, openPad, typeCode } from "../support/pad";
 import { attachPhoto, removePhoto } from "../support/productPhoto";
@@ -35,6 +36,12 @@ function fill(message: string, values: Record<string, string>): string {
 function prefix(message: string, values: Record<string, string>): string {
   const open = [...message.matchAll(/\{(\w+)\}/g)].find((match) => !(match[1] in values));
   return fill(open?.index === undefined ? message : message.slice(0, open.index), values);
+}
+
+/** The name of an open request card on the production board, "Request card: <product>", whatever the product. */
+function requestCard(locale: keyof typeof MESSAGES): RegExp {
+  const start = prefix(MESSAGES[locale].production.card_label, {}).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${start}`);
 }
 
 test.describe("a11y", () => {
@@ -105,6 +112,31 @@ test.describe("a11y", () => {
       } finally {
         await removePhoto(fixture.admin, fixture.product.id);
       }
+    });
+  }
+
+  // Step 6.3c: the production board in the demo bakery (its products carry the demo photos), as its admin sees it: a card in each
+  // column with its thumb and its one action (support/demoProduction.ts), then a request card open beside it.
+  for (const locale of ["en", "am"] as const) {
+    test(`the production board (${locale}), and a request card open on it, have no serious or critical axe violation`, async ({ page }) => {
+      test.skip(live, "CI only: the sweep reads the seeded demo bakery");
+      test.setTimeout(120_000);
+      const t = MESSAGES[locale];
+      const demo = await demoProduction();
+      await openAs(page, demo.admin, `${locale}/production/`, { device: demo.device });
+      await expect(page.locator("html")).toHaveAttribute("lang", locale);
+      await expect(page.getByRole("heading", { level: 1, name: t.production.title })).toBeVisible({ timeout: 30_000 });
+      for (const column of ["col_requested", "col_in_progress", "col_pending_confirmation", "col_done_today"] as const) {
+        await expect(page.getByRole("region", { name: t.production[column], exact: true })).toBeVisible({ timeout: 30_000 });
+      }
+      const card = page.getByRole("article").first();
+      await expect(card).toBeVisible({ timeout: 30_000 });
+      await expectAccessible(page, `${locale}/production/`);
+
+      // the card's name opens the request card in a panel from the right, beside the board (no dialog: the bar and the board stay usable)
+      await card.getByRole("button").first().click();
+      await expect(page.getByRole("region", { name: requestCard(locale) })).toBeVisible();
+      await expectAccessible(page, `${locale}/production/ (a request card open)`);
     });
   }
 

@@ -1,34 +1,39 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api/client";
-import { uuid, useIdempotencyKey } from "@/lib/api/idempotency";
+import { uuid } from "@/lib/api/idempotency";
 import { acceptRequest, batchGroup, cancelRequest, confirmBatch, sendBackBatch, submitFinishBatch, submitStartBatch, useProductionCard } from "@/lib/api/production";
-import type { CardLine, IngredientShort, Locale, ProductionRequest, RequestStatus } from "@/lib/api/types";
+import type { CardLine, IngredientShort, Locale, ProductImageView, ProductionRequest, RequestStatus } from "@/lib/api/types";
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { canCancel, canSignOff } from "@/lib/live/production";
 import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
 import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
+import { ICON_STROKE } from "../icons";
 import { RequestTransferSheet } from "../inventory/RequestTransferSheet";
-import { Alert, Badge, Button, Field, TextInput } from "../ui";
+import { tableNum } from "../styles";
+import { Alert, Badge, Button, Field, IconButton, ProductImage, Table, TextInput, type Tone } from "../ui";
 import { formatWhen } from "./RequestCard";
+import { useRequestRun } from "./useRequestRun";
 
-// The request card of the board (docs/architecture.md section 6): the recipe scaled to the quantity, what is on hand
-// against what is needed with the shortfalls in red (and a way to ask the store), the steps, and the one next move for
-// this person: Accept, Start, Done with produced and waste, Confirm or Send back for an overseer, Cancel where allowed.
-// Every write is online with an Idempotency-Key; a refusal (a short ingredient, the same person confirming, a 403) shows
-// inline, in the page language, from the API's own bilingual message.
+// The request card of the board (docs/architecture.md section 6), in a drawer from the right since step 6.3c: the product's photo, its
+// name and what to make, the facts (why, where, who, when), the recipe scaled to the quantity with what is on hand against what is needed
+// (the shortfalls in red, with a way to ask the store), the steps, and the one next move for this person: Accept, Start, Done with produced
+// and waste, Confirm or Send back for an overseer, Cancel where allowed. Every write is online with an Idempotency-Key (start and done go
+// through the outbox, step 5.2a); a refusal (a short ingredient, the same person confirming, a 403) shows inline, in the page language,
+// from the API's own bilingual message. The section keeps its name, "Request card: <product>".
 
-const STATUS_TONE: Record<RequestStatus, "neutral" | "blue" | "green" | "amber" | "red"> = {
+const STATUS_TONE: Record<RequestStatus, Tone> = {
   requested: "neutral",
   accepted: "blue",
   in_progress: "blue",
   pending_confirmation: "amber",
-  done: "green",
+  done: "brand",
   cancelled: "neutral",
 };
 
@@ -41,21 +46,17 @@ function shortfallOf(error: unknown): IngredientShort[] {
 function RecipeTable({ lines, locale, onTransfer, canTransfer }: { lines: CardLine[]; locale: Locale; onTransfer: (line: CardLine) => void; canTransfer: boolean }) {
   const t = useTranslations("production");
   return (
-    <table className="w-full border-collapse text-left text-base">
+    <Table>
       <thead>
-        <tr className="border-b border-neutral-300 text-sm text-neutral-700">
-          <th scope="col" className="py-2 pr-2 font-medium">
-            {t("ingredient")}
-          </th>
-          <th scope="col" className="py-2 pr-2 font-medium">
+        <tr>
+          <th scope="col">{t("ingredient")}</th>
+          <th scope="col" className={tableNum}>
             {t("needed")}
           </th>
-          <th scope="col" className="py-2 pr-2 font-medium">
+          <th scope="col" className={tableNum}>
             {t("on_hand")}
           </th>
-          <th scope="col" className="py-2 font-medium">
-            {t("stock")}
-          </th>
+          <th scope="col">{t("stock")}</th>
         </tr>
       </thead>
       <tbody>
@@ -64,49 +65,66 @@ function RecipeTable({ lines, locale, onTransfer, canTransfer }: { lines: CardLi
           const short = line.short === true;
           const reserved = line.on_hand !== null && line.available !== null && compareDecimal(line.on_hand, line.available) !== 0;
           return (
-            <tr key={line.ingredient.id} className={`border-b border-neutral-200 align-top ${short ? "bg-red-50 text-red-900" : "text-neutral-900"}`}>
-              <th scope="row" className="py-2 pr-2 font-medium">
+            <tr key={line.ingredient.id} className={`align-top ${short ? "bg-red-50 text-red-900" : ""}`}>
+              <th scope="row" className="py-2.5 text-left">
                 {name}
               </th>
-              <td className="py-2 pr-2">
+              <td className={`py-2.5 ${tableNum}`}>
                 {trimDecimal(line.needed)} {line.ingredient.unit}
               </td>
-              <td className="py-2 pr-2">
+              <td className={`py-2.5 ${tableNum}`}>
                 {line.on_hand === null ? (
                   "–"
                 ) : (
                   <>
                     {trimDecimal(line.on_hand)} {line.ingredient.unit}
-                    {reserved && line.available !== null ? <span className="block text-sm text-neutral-700">{t("available", { qty: trimDecimal(line.available), unit: line.ingredient.unit })}</span> : null}
+                    {reserved && line.available !== null ? <span className="block text-[13px] text-neutral-600">{t("available", { qty: trimDecimal(line.available), unit: line.ingredient.unit })}</span> : null}
                   </>
                 )}
               </td>
-              <td className="space-y-1 py-2">
+              <td className="space-y-1.5 py-2.5">
                 {line.short === null ? (
                   "–"
                 ) : short ? (
                   <>
                     <Badge tone="red">{t("short")}</Badge>
-                    <span className="block text-sm font-medium">{t("missing", { qty: trimDecimal(line.short_qty ?? "0"), unit: line.ingredient.unit })}</span>
+                    <span className="block text-[13px] font-medium">{t("missing", { qty: trimDecimal(line.short_qty ?? "0"), unit: line.ingredient.unit })}</span>
                     {canTransfer && line.transfer_hint ? (
-                      <Button type="button" variant="secondary" aria-label={t("request_transfer_of", { name })} onClick={() => onTransfer(line)}>
-                        {t("request_transfer")}
+                      <Button type="button" variant="secondary" size="md" onClick={() => onTransfer(line)}>
+                        {/* named by its text for readers, "Request transfer of <ingredient>" (the p2 shortfall spec reads it) */}
+                        <span aria-hidden="true">{t("request_transfer")}</span>
+                        <span className="sr-only">{t("request_transfer_of", { name })}</span>
                       </Button>
                     ) : null}
                   </>
                 ) : (
-                  <Badge tone="green">{t("enough")}</Badge>
+                  <Badge tone="brand">{t("enough")}</Badge>
                 )}
               </td>
             </tr>
           );
         })}
       </tbody>
-    </table>
+    </Table>
   );
 }
 
-export function RequestDetail({ summary, onClose, onChanged }: { summary: ProductionRequest; onClose: () => void; onChanged: () => void }) {
+export function RequestDetail({
+  summary,
+  image,
+  category,
+  focus,
+  onClose,
+  onChanged,
+}: {
+  summary: ProductionRequest;
+  image: ProductImageView | null;
+  category: string | null;
+  /** `finish`: opened from the card's "Finish · count made", so the Done form takes the focus */
+  focus?: "finish";
+  onClose: () => void;
+  onChanged: () => void;
+}) {
   const dates = useDateFormat();
   const t = useTranslations("production");
   const o = useTranslations("outbox");
@@ -114,8 +132,8 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
   const errorText = useErrorText();
   const queryClient = useQueryClient();
   const me = useSession((s) => s.me);
-  const keys = useIdempotencyKey();
   const batchUuid = useRef(uuid());
+  const producedField = useRef<HTMLDivElement>(null);
 
   const card = useProductionCard(summary.id, summary.version, summary.batch?.version ?? 0);
   const request: ProductionRequest = card.data ?? summary;
@@ -124,9 +142,8 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
   const unit = request.product.unit;
   const mine = !!me && request.assigned_to?.id === me.user.id;
   const fulfils = can(me, "production.fulfil");
+  const { busy, error, run: runWrite } = useRequestRun(request.id, onChanged);
 
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<unknown>(null);
   const [produced, setProduced] = useState(() => trimDecimal(batch?.planned_qty ?? request.requested_qty));
   const [waste, setWaste] = useState("0");
   const [invalid, setInvalid] = useState<"produced" | "waste" | "empty" | null>(null);
@@ -153,21 +170,7 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
   );
 
   async function run(kind: string, payload: unknown, call: (key: string) => Promise<unknown>) {
-    setBusy(kind);
-    setError(null);
-    try {
-      const outcome = await call(keys.keyFor({ kind, id: request.id, payload }));
-      keys.done();
-      setForm(null);
-      // queued by the outbox (offline): nothing changed on the server yet
-      if (outcome !== null && typeof outcome === "object" && (outcome as { sent?: unknown }).sent === false) return;
-      await queryClient.invalidateQueries({ queryKey: ["production-card", request.id] });
-      onChanged();
-    } catch (failure) {
-      setError(failure);
-    } finally {
-      setBusy(null);
-    }
+    if (await runWrite(kind, payload, call)) setForm(null);
   }
 
   function done() {
@@ -200,36 +203,51 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
   const shortages = shortfallOf(error);
   const place = (p: { name_en: string; name_am: string }) => (locale === "am" ? p.name_am : p.name_en);
 
+  // opened from the card's "Finish · count made": the figure of what was made is the first thing to type (after the drawer has taken the
+  // focus for itself on opening)
+  useEffect(() => {
+    if (focus !== "finish" || !canFinish) return;
+    const timer = window.setTimeout(() => producedField.current?.querySelector("input")?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, [focus, canFinish]);
+
+  const facts: { key: string; text: string; warn?: boolean }[] = [
+    { key: "reason", text: t(`reason_${request.reason}` as "reason_stock_out") },
+    { key: "station", text: t("station_is", { name: place(request.station) }) },
+  ];
+  if (request.requested_by) facts.push({ key: "asked", text: t("asked_by", { name: request.requested_by.name }) });
+  if (request.assigned_to) facts.push({ key: "baker", text: t("baker", { name: request.assigned_to.name }) });
+  if (request.due_at) facts.push({ key: "due", text: t("due", { time: formatWhen(request.due_at, dates) }) });
+  if (request.note) facts.push({ key: "note", text: t("note_is", { note: request.note }) });
+  if (batch?.finished_by)
+    facts.push({
+      key: "made",
+      text: `${t("made", { produced: trimDecimal(batch.produced_qty ?? "0"), waste: trimDecimal(batch.waste_qty ?? "0"), unit })} · ${t("finished_by", { name: batch.finished_by.name })}`,
+    });
+  if (batch?.confirmed_by) facts.push({ key: "confirmed", text: t("confirmed_by", { name: batch.confirmed_by.name }) });
+  if (batch?.send_back_note && status === "in_progress") facts.push({ key: "sent_back", text: t("sent_back", { note: batch.send_back_note }), warn: true });
+  if (status === "cancelled" && request.cancel_reason) facts.push({ key: "cancelled", text: t("cancelled_because", { reason: request.cancel_reason }) });
+
   return (
-    <section aria-label={t("card_label", { name })} className="space-y-4 rounded-lg border border-neutral-200 bg-white p-4 xl:sticky xl:top-4 xl:self-start">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 space-y-1">
-          <h2 className="text-xl font-semibold text-neutral-900">{name}</h2>
-          <p className="text-base text-neutral-800">{t("to_make", { qty: trimDecimal(request.requested_qty), unit })}</p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-2">
+    <section aria-label={t("card_label", { name })} className="space-y-5">
+      <div className="flex items-start gap-4">
+        <ProductImage image={image} name={name} category={category} size="card" className="w-32 shrink-0 rounded-2xl" />
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <h2 className="text-[22px] font-semibold leading-tight text-neutral-900">{name}</h2>
+          <p className="text-base text-neutral-700">{t("to_make", { qty: trimDecimal(request.requested_qty), unit })}</p>
           <Badge tone={STATUS_TONE[status]}>{t(`status_${status}` as "status_requested")}</Badge>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            {t("close_card")}
-          </Button>
         </div>
+        <IconButton label={t("close_card")} title={t("close_card")} variant="ghost" onClick={onClose} className="-mr-2 -mt-2 shrink-0">
+          <X className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </IconButton>
       </div>
 
-      <ul className="space-y-0.5 text-base text-neutral-700">
-        <li>{t(`reason_${request.reason}` as "reason_stock_out")}</li>
-        <li>{t("station_is", { name: place(request.station) })}</li>
-        {request.requested_by ? <li>{t("asked_by", { name: request.requested_by.name })}</li> : null}
-        {request.assigned_to ? <li>{t("baker", { name: request.assigned_to.name })}</li> : null}
-        {request.due_at ? <li>{t("due", { time: formatWhen(request.due_at, dates) })}</li> : null}
-        {request.note ? <li>{t("note_is", { note: request.note })}</li> : null}
-        {batch?.finished_by ? (
-          <li>
-            {t("made", { produced: trimDecimal(batch.produced_qty ?? "0"), waste: trimDecimal(batch.waste_qty ?? "0"), unit })} · {t("finished_by", { name: batch.finished_by.name })}
+      <ul className="space-y-1 rounded-2xl bg-neutral-50 px-4 py-3 text-[15px] text-neutral-700">
+        {facts.map((fact) => (
+          <li key={fact.key} className={fact.warn ? "font-medium text-amber-800" : undefined}>
+            {fact.text}
           </li>
-        ) : null}
-        {batch?.confirmed_by ? <li>{t("confirmed_by", { name: batch.confirmed_by.name })}</li> : null}
-        {batch?.send_back_note && status === "in_progress" ? <li className="font-medium text-amber-900">{t("sent_back", { note: batch.send_back_note })}</li> : null}
-        {status === "cancelled" && request.cancel_reason ? <li>{t("cancelled_because", { reason: request.cancel_reason })}</li> : null}
+        ))}
       </ul>
 
       {card.isError ? <Alert>{errorText.message(card.error)}</Alert> : null}
@@ -242,20 +260,22 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
       {card.data ? (
         recipe ? (
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-neutral-900">{t("recipe", { version: recipe.version })}</h3>
-            <p className="text-sm text-neutral-700">{t("recipe_scaled", { yield: trimDecimal(recipe.yield.qty), target: trimDecimal(recipe.target_qty), unit: recipe.yield.unit })}</p>
-            {consume ? <p className="text-sm text-neutral-700">{t("ingredients_from", { place: place(consume) })}</p> : <p className="text-sm text-amber-900">{t("no_stock_place")}</p>}
+            <div className="space-y-1">
+              <h3 className="text-[17px] font-semibold text-neutral-900">{t("recipe", { version: recipe.version })}</h3>
+              <p className="text-[13px] text-neutral-600">{t("recipe_scaled", { yield: trimDecimal(recipe.yield.qty), target: trimDecimal(recipe.target_qty), unit: recipe.yield.unit })}</p>
+              {consume ? <p className="text-[13px] text-neutral-600">{t("ingredients_from", { place: place(consume) })}</p> : <p className="text-[13px] font-medium text-amber-800">{t("no_stock_place")}</p>}
+            </div>
             <RecipeTable lines={recipe.lines} locale={locale} canTransfer={can(me, "transfers.request") && consume !== null} onTransfer={setTransfer} />
             {transferred ? (
-              <p role="status" className="rounded-md bg-green-50 px-4 py-3 text-base text-green-800">
+              <p role="status" className="rounded-xl bg-brand-50 px-4 py-3 text-base font-medium text-brand-700">
                 {t("transfer_sent")}
               </p>
             ) : null}
-            {output ? <p className="text-sm text-neutral-700">{t("goes_to", { place: place(output) })}</p> : null}
+            {output ? <p className="text-[13px] text-neutral-600">{t("goes_to", { place: place(output) })}</p> : null}
             {recipe.steps.length > 0 ? (
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-neutral-900">{t("steps")}</h3>
-                <ol className="list-decimal space-y-1 pl-6 text-base text-neutral-900">
+              <div className="space-y-2 pt-1">
+                <h3 className="text-[17px] font-semibold text-neutral-900">{t("steps")}</h3>
+                <ol className="list-decimal space-y-1 pl-6 text-base text-neutral-900 marker:text-neutral-500">
                   {[...recipe.steps]
                     .sort((a, b) => a.order - b.order)
                     .map((step) => (
@@ -266,12 +286,12 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
             ) : null}
           </div>
         ) : (
-          <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">{t("no_recipe")}</p>
+          <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">{t("no_recipe")}</p>
         )
       ) : null}
 
       {waiting ? (
-        <p role="status" className="rounded-md bg-blue-50 px-4 py-3 text-base font-medium text-blue-900">
+        <p role="status" className="rounded-xl bg-blue-50 px-4 py-3 text-base font-medium text-blue-800">
           {o("queued")}
         </p>
       ) : null}
@@ -298,19 +318,22 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
             event.preventDefault();
             done();
           }}
-          className="space-y-3 rounded-md bg-neutral-50 p-3"
+          className="space-y-4 rounded-2xl border border-neutral-200 p-4"
         >
-          <p className="text-base text-neutral-700">{t("done_hint", { unit })}</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <h3 className="text-[17px] font-semibold text-neutral-900">{t("done_form")}</h3>
+            <p className="text-[15px] text-neutral-600">{t("done_hint", { unit })}</p>
+          </div>
+          <div ref={producedField} className="grid gap-3 sm:grid-cols-2">
             <Field label={t("produced")} error={invalid === "produced" ? t("need_qty") : errorText.field(error, "produced_qty")}>
-              {(props) => <TextInput {...props} inputMode="decimal" value={produced} onChange={(event) => setProduced(event.target.value)} />}
+              {(props) => <TextInput {...props} controlSize="lg" inputMode="decimal" className="tabular-nums" value={produced} onChange={(event) => setProduced(event.target.value)} />}
             </Field>
             <Field label={t("waste")} error={invalid === "waste" ? t("need_qty") : errorText.field(error, "waste_qty")}>
-              {(props) => <TextInput {...props} inputMode="decimal" value={waste} onChange={(event) => setWaste(event.target.value)} />}
+              {(props) => <TextInput {...props} controlSize="lg" inputMode="decimal" className="tabular-nums" value={waste} onChange={(event) => setWaste(event.target.value)} />}
             </Field>
           </div>
           {invalid === "empty" ? <p className="text-sm font-medium text-red-700">{t("need_something")}</p> : null}
-          <Button type="submit" disabled={blocked}>
+          <Button type="submit" size="lg" className="w-full" disabled={blocked}>
             {busy === "done" ? t("working") : t("done")}
           </Button>
         </form>
@@ -320,15 +343,15 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
       {status === "pending_confirmation" && !signOff ? <p className="text-base text-neutral-700">{t("waiting_overseer")}</p> : null}
 
       {form === "send_back" ? (
-        <div className="space-y-3 rounded-md bg-neutral-50 p-3">
+        <div className="space-y-3 rounded-2xl border border-neutral-200 p-4">
           <Field label={t("send_back_note")} error={noteMissing ? t("send_back_need_note") : errorText.field(error, "note")}>
-            {(props) => <TextInput {...props} value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
+            {(props) => <TextInput {...props} controlSize="lg" value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
           </Field>
           <div className="flex flex-wrap gap-3">
-            <Button type="button" disabled={blocked} onClick={sendBack}>
+            <Button type="button" size="lg" disabled={blocked} onClick={sendBack}>
               {busy === "send_back" ? t("working") : t("send_back_submit")}
             </Button>
-            <Button type="button" variant="secondary" onClick={() => setForm(null)}>
+            <Button type="button" variant="secondary" size="lg" onClick={() => setForm(null)}>
               {t("keep")}
             </Button>
           </div>
@@ -336,15 +359,15 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
       ) : null}
 
       {form === "cancel" ? (
-        <div className="space-y-3 rounded-md bg-neutral-50 p-3">
+        <div className="space-y-3 rounded-2xl border border-neutral-200 p-4">
           <Field label={t("cancel_reason")} optionalLabel={t("optional")}>
-            {(props) => <TextInput {...props} value={reason} maxLength={255} onChange={(event) => setReason(event.target.value)} />}
+            {(props) => <TextInput {...props} controlSize="lg" value={reason} maxLength={255} onChange={(event) => setReason(event.target.value)} />}
           </Field>
           <div className="flex flex-wrap gap-3">
-            <Button type="button" disabled={blocked} onClick={() => void run("cancel", reason.trim(), (key) => cancelRequest(request.id, reason.trim(), key))}>
+            <Button type="button" variant="danger" size="lg" disabled={blocked} onClick={() => void run("cancel", reason.trim(), (key) => cancelRequest(request.id, reason.trim(), key))}>
               {busy === "cancel" ? t("working") : t("cancel_submit")}
             </Button>
-            <Button type="button" variant="secondary" onClick={() => setForm(null)}>
+            <Button type="button" variant="secondary" size="lg" onClick={() => setForm(null)}>
               {t("keep")}
             </Button>
           </div>
@@ -353,27 +376,27 @@ export function RequestDetail({ summary, onClose, onChanged }: { summary: Produc
 
       <div className="flex flex-wrap gap-3">
         {canAccept ? (
-          <Button type="button" disabled={blocked} onClick={() => void run("accept", null, (key) => acceptRequest(request.id, key))}>
+          <Button type="button" variant="dark" size="lg" disabled={blocked} onClick={() => void run("accept", null, (key) => acceptRequest(request.id, key))}>
             {busy === "accept" ? t("working") : t("accept")}
           </Button>
         ) : null}
         {canStart ? (
-          <Button type="button" disabled={blocked} onClick={() => void run("start", batchUuid.current, (key) => submitStartBatch(request.id, batchUuid.current, key))}>
+          <Button type="button" variant="dark" size="lg" disabled={blocked} onClick={() => void run("start", batchUuid.current, (key) => submitStartBatch(request.id, batchUuid.current, key))}>
             {busy === "start" ? t("working") : t("start")}
           </Button>
         ) : null}
         {signOff && batch ? (
           <>
-            <Button type="button" disabled={blocked} onClick={() => void run("confirm", null, (key) => confirmBatch(batch.id, key))}>
+            <Button type="button" size="lg" disabled={blocked} onClick={() => void run("confirm", null, (key) => confirmBatch(batch.id, key))}>
               {busy === "confirm" ? t("working") : t("confirm")}
             </Button>
-            <Button type="button" variant="secondary" disabled={blocked} onClick={() => setForm(form === "send_back" ? null : "send_back")}>
+            <Button type="button" variant="secondary" size="lg" disabled={blocked} onClick={() => setForm(form === "send_back" ? null : "send_back")}>
               {t("send_back")}
             </Button>
           </>
         ) : null}
         {cancellable ? (
-          <Button type="button" variant="secondary" disabled={blocked} onClick={() => setForm(form === "cancel" ? null : "cancel")}>
+          <Button type="button" variant="ghost" size="lg" disabled={blocked} onClick={() => setForm(form === "cancel" ? null : "cancel")}>
             {t("cancel")}
           </Button>
         ) : null}
