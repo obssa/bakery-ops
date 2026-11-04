@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -19,7 +20,8 @@ import type { ShiftSummary, ShiftTemplate, User, WorkStation } from "@/lib/api/t
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
 import { addDays, candidatesFor, canStartNow, cellKey, isoWeekday, shiftsByCell, templatesOn, weekOf } from "@/lib/shiftsAdmin";
-import { Alert, Button, Field, Modal, Panel, TextInput } from "../../ui";
+import { Toolbar, ToolbarField, TableCard } from "../../admin/kit";
+import { Alert, Button, Modal, Panel, Skeleton } from "../../ui";
 import { ShiftStatusBadge, useName, useToday } from "./common";
 
 // Admin > Shifts > Roster (step 3.7c): the calendar of a week. One table per station that tracks shifts; a row per template that serves
@@ -57,30 +59,37 @@ export function RosterScreen() {
   const tracked = (stations.data ?? []).filter((station) => station.tracks_shifts);
 
   return (
-    <div className="space-y-6">
-      <Panel title={t("roster.week")}>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="w-56">
-            <Field label={t("roster.week_of")}>
-              {(props) => <TextInput {...props} type="date" value={anchor} onChange={(event) => setAnchor(event.target.value)} />}
-            </Field>
+    <div className="flex flex-col gap-6">
+      <section aria-label={t("roster.week")}>
+        <Toolbar>
+          <ToolbarField label={t("roster.week_of")} type="date" value={anchor} onChange={(event) => setAnchor(event.target.value)} />
+          <div className="flex flex-wrap gap-1 rounded-xl border border-neutral-200 bg-white p-1">
+            <Button type="button" variant="ghost" size="md" compact className="!min-h-9 rounded-[9px] text-sm" disabled={!valid} onClick={() => setAnchor(addDays(anchor, -7))}>
+              <ChevronLeft className="size-4" strokeWidth={2} aria-hidden="true" />
+              {t("roster.previous_week")}
+            </Button>
+            <Button type="button" variant="ghost" size="md" compact className="!min-h-9 rounded-[9px] text-sm" disabled={!today} onClick={() => setAnchor(today)}>
+              {t("roster.this_week")}
+            </Button>
+            <Button type="button" variant="ghost" size="md" compact className="!min-h-9 rounded-[9px] text-sm" disabled={!valid} onClick={() => setAnchor(addDays(anchor, 7))}>
+              {t("roster.next_week")}
+              <ChevronRight className="size-4" strokeWidth={2} aria-hidden="true" />
+            </Button>
           </div>
-          <Button type="button" variant="secondary" disabled={!valid} onClick={() => setAnchor(addDays(anchor, -7))}>
-            {t("roster.previous_week")}
-          </Button>
-          <Button type="button" variant="secondary" disabled={!today} onClick={() => setAnchor(today)}>
-            {t("roster.this_week")}
-          </Button>
-          <Button type="button" variant="secondary" disabled={!valid} onClick={() => setAnchor(addDays(anchor, 7))}>
-            {t("roster.next_week")}
-          </Button>
-        </div>
-        {valid ? <p className="mt-3 text-sm text-neutral-600">{t("roster.range", { from: days[0], to: days[6] })}</p> : null}
-      </Panel>
+          {valid ? <p className="text-[15px] font-semibold tabular-nums text-neutral-700">{t("roster.range", { from: days[0], to: days[6] })}</p> : null}
+        </Toolbar>
+      </section>
 
       {shifts.isError ? <Alert>{t("roster.failed")}</Alert> : null}
-      {!valid || stations.isPending || templates.isPending ? <p className="text-base text-neutral-600">{t("roster.loading")}</p> : null}
-      {valid && templates.data && stations.data && tracked.length === 0 ? <p className="text-base text-neutral-700">{t("roster.no_stations")}</p> : null}
+      {!valid || stations.isPending || templates.isPending ? (
+        <div className="space-y-3">
+          <p role="status" className="text-[15px] text-neutral-600">
+            {t("roster.loading")}
+          </p>
+          <Skeleton className="h-56 rounded-[18px]" />
+        </div>
+      ) : null}
+      {valid && templates.data && stations.data && tracked.length === 0 ? <p className="text-[15px] text-neutral-600">{t("roster.no_stations")}</p> : null}
 
       {valid && templates.data
         ? tracked.map((station) => (
@@ -113,50 +122,52 @@ function StationWeek({
   const t = useTranslations("adminShifts");
   const name = useName();
   const rows = templates.filter((template) => template.is_active && template.station_ids.includes(station.station_id)).sort((a, b) => a.start_time.localeCompare(b.start_time));
+  if (rows.length === 0) {
+    return (
+      <Panel title={name(station)}>
+        <p className="text-[15px] text-neutral-600">{t("roster.no_templates")}</p>
+      </Panel>
+    );
+  }
   return (
-    <Panel title={name(station)}>
-      {rows.length === 0 ? (
-        <p className="text-base text-neutral-700">{t("roster.no_templates")}</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[56rem] table-fixed border-collapse text-left text-base">
-            <caption className="sr-only">{t("roster.caption", { station: name(station) })}</caption>
-            <thead>
-              <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-                <th scope="col" className="w-36 py-2 pr-3 font-medium">{t("roster.template")}</th>
-                {days.map((date) => (
-                  <th key={date} scope="col" className={`py-2 pr-3 font-medium ${date === today ? "text-blue-800" : ""}`}>
-                    {t(`weekday_short.${isoWeekday(date)}`)}
-                    <span className="block text-xs font-normal">{date.slice(5)}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((template) => (
-                <tr key={template.id} className="border-b border-neutral-100 last:border-0">
-                  <th scope="row" className="py-3 pr-3 align-top font-medium text-neutral-900">
-                    {name(template)}
-                    <span className="block text-sm font-normal text-neutral-600">
-                      {template.start_time}–{template.end_time}
-                    </span>
-                  </th>
-                  {days.map((date) => (
-                    <td key={date} className="py-3 pr-3 align-top">
-                      {templatesOn([template], station.station_id, date).length === 0 ? (
-                        <span className="text-neutral-600" aria-hidden="true">—</span>
-                      ) : (
-                        <Cell station={station} template={template} date={date} shifts={cells.get(cellKey(station.station_id, template.id, date)) ?? []} manage={manage} onAction={onAction} />
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Panel>
+    <TableCard caption={t("roster.caption", { station: name(station) })} title={name(station)} minWidth="min-w-[60rem] table-fixed">
+      <thead>
+        <tr>
+          <th scope="col" className="w-40">
+            {t("roster.template")}
+          </th>
+          {days.map((date) => (
+            <th key={date} scope="col" aria-current={date === today ? "date" : undefined} className={date === today ? "!text-brand-700" : ""}>
+              {t(`weekday_short.${isoWeekday(date)}`)}
+              <span className={`ml-1.5 font-medium tabular-nums ${date === today ? "rounded-full bg-brand-50 px-2 py-0.5" : ""}`}>{date.slice(5)}</span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((template) => (
+          <tr key={template.id}>
+            <th scope="row" className="align-top font-semibold text-neutral-900">
+              {name(template)}
+              <span className="block text-[13px] font-normal tabular-nums text-neutral-600">
+                {template.start_time}–{template.end_time}
+              </span>
+            </th>
+            {days.map((date) => (
+              <td key={date} className={`!px-1.5 align-top ${date === today ? "bg-brand-50/40" : ""}`}>
+                {templatesOn([template], station.station_id, date).length === 0 ? (
+                  <span className="block text-center text-neutral-600" aria-hidden="true">
+                    —
+                  </span>
+                ) : (
+                  <Cell station={station} template={template} date={date} shifts={cells.get(cellKey(station.station_id, template.id, date)) ?? []} manage={manage} onAction={onAction} />
+                )}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </TableCard>
   );
 }
 
@@ -172,7 +183,15 @@ function Cell({ station, template, date, shifts, manage, onAction }: Target & { 
         <ShiftInCell key={shift.id} shift={shift} target={{ station, template, date }} label={label} manage={manage} onAction={onAction} />
       ))}
       {manage && !busy ? (
-        <Button type="button" variant="secondary" className="w-full !px-2 text-sm" aria-label={t("roster.schedule_named", { label })} onClick={() => onAction({ kind: "schedule", station, template, date })}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          className="w-full border-dashed !px-2 text-sm text-neutral-700"
+          aria-label={t("roster.schedule_named", { label })}
+          onClick={() => onAction({ kind: "schedule", station, template, date })}
+        >
+          <Plus className="size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
           {t("roster.schedule")}
         </Button>
       ) : null}
@@ -187,15 +206,15 @@ function ShiftInCell({ shift, target, label, manage, onAction }: { shift: ShiftS
   const detail = useShift(scheduled ? shift.id : null);
   const people = detail.data?.roster.map((row) => row.user?.name).filter((value): value is string => !!value) ?? [];
   return (
-    <div className="space-y-2 rounded-md bg-neutral-50 p-2">
+    <div className="space-y-2 rounded-xl border border-neutral-200 bg-white p-2">
       <ShiftStatusBadge status={shift.status} />
-      {scheduled ? <p className="text-sm text-neutral-700">{people.length > 0 ? people.join(", ") : t("roster.nobody")}</p> : null}
+      {scheduled ? <p className="text-[13px] text-neutral-700">{people.length > 0 ? people.join(", ") : t("roster.nobody")}</p> : null}
       {scheduled && manage ? (
-        <div className="flex flex-col gap-2">
-          <Button type="button" className="w-full !px-2 text-sm" aria-label={t("roster.start_now_named", { label })} onClick={() => onAction({ kind: "start", shift, ...target })}>
+        <div className="flex flex-col gap-1.5">
+          <Button type="button" size="md" className="w-full !px-2 text-sm" aria-label={t("roster.start_now_named", { label })} onClick={() => onAction({ kind: "start", shift, ...target })}>
             {t("roster.start_now")}
           </Button>
-          <Button type="button" variant="secondary" className="w-full !px-2 text-sm" aria-label={t("roster.people_named", { label })} onClick={() => onAction({ kind: "people", shift, ...target })}>
+          <Button type="button" variant="secondary" size="md" className="w-full !px-2 text-sm" aria-label={t("roster.people_named", { label })} onClick={() => onAction({ kind: "people", shift, ...target })}>
             {t("roster.people")}
           </Button>
         </div>
@@ -307,7 +326,7 @@ function PeopleDialog({ action, onClose }: { action: Exclude<Action, { kind: "st
           <legend className="text-sm font-medium text-neutral-800">{t("people.legend")}</legend>
           <div className="flex flex-col gap-2">
             {candidates.map((person) => (
-              <label key={person.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-neutral-300 bg-white px-4 text-base has-[:checked]:border-blue-700 has-[:checked]:bg-blue-50">
+              <label key={person.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 bg-white px-4 text-[15px] accent-brand-600 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700">
                 <input type="checkbox" className="size-5" checked={selected.includes(person.id)} onChange={() => toggle(person.id)} />
                 {person.name}
               </label>

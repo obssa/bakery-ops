@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo, useState, type ReactNode } from "react";
 import { useAuditEntry } from "@/lib/api/audit";
@@ -10,7 +11,7 @@ import { useErrorText } from "@/lib/errors";
 import { useDateFormat } from "@/lib/useDates";
 import { RecordLink } from "../admin/RecordLink";
 import { addisStamp } from "../payments/shared";
-import { Alert, Badge, Button, Drawer } from "../ui";
+import { Alert, Badge, Button, Drawer, IconButton } from "../ui";
 import { SubjectCell } from "./SubjectCell";
 import { useNames } from "./names";
 
@@ -21,9 +22,15 @@ import { useNames } from "./names";
 // lists what was recorded. The context (a reason, an approver, an order) reads as one column. A field that names a person is named. The
 // raw JSON is there on request, as the API sent it (redacted too).
 
-const STATUS_TONE: Record<Exclude<DiffStatus, "same">, "amber" | "green" | "red"> = { changed: "amber", added: "green", removed: "red" };
-const ROW_TONE: Record<DiffStatus, string> = { changed: "bg-amber-50", added: "bg-green-50", removed: "bg-red-50", same: "" };
-const CELL = "py-2 pr-3 align-top";
+//
+// Step 6.4d (fresh-counter.md 2, the drawer; 4.4): the entry's facts in 13 px caps over their values (the kit's Fact) on a hairline card,
+// the diff and the context as the admin table on a hairline frame, a changed field amber, an added one brand teal (green is money
+// confirmed only), a removed one red; Close an icon button of that name.
+
+const STATUS_TONE: Record<Exclude<DiffStatus, "same">, "amber" | "brand" | "red"> = { changed: "amber", added: "brand", removed: "red" };
+const ROW_TONE: Record<DiffStatus, string> = { changed: "bg-amber-50", added: "bg-brand-50", removed: "bg-red-50", same: "" };
+const CELL = "py-2.5 pr-3 align-top first:pl-4 last:pr-4";
+const HEAD = "h-10 pr-3 text-[13px] font-semibold uppercase tracking-[0.08em] text-neutral-600 first:pl-4 last:pr-4";
 
 type People = Map<number, string | null>;
 
@@ -55,11 +62,11 @@ export function EntryDrawer({ id, onClose }: { id: number; onClose: () => void }
 
   return (
     <Drawer label={title} onClose={onClose} size="lg">
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="text-xl font-semibold text-neutral-900">{title}</h2>
-        <Button variant="secondary" onClick={onClose}>
-          {t("entry.close")}
-        </Button>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold tracking-tight text-neutral-900">{title}</h2>
+        <IconButton label={t("entry.close")} variant="ghost" size="md" onClick={onClose}>
+          <X className="size-5" strokeWidth={2} aria-hidden="true" />
+        </IconButton>
       </div>
       {body}
     </Drawer>
@@ -86,7 +93,7 @@ function EntryBody({ entry }: { entry: AuditDetail }) {
 
   return (
     <>
-      <dl className="grid gap-x-6 gap-y-2 rounded-lg border border-neutral-200 p-4 sm:grid-cols-2">
+      <dl className="grid gap-x-6 gap-y-4 rounded-2xl border border-neutral-200 p-5 sm:grid-cols-2">
         <Fact term={t("entry.time")}>{addisStamp(entry.at, dates)}</Fact>
         <Fact term={t("entry.action")}>
           <span className="font-mono text-sm" translate="no">
@@ -119,8 +126,8 @@ function EntryBody({ entry }: { entry: AuditDetail }) {
       </dl>
 
       <section className="space-y-2">
-        <h3 className="text-lg font-semibold text-neutral-900">{recorded ? t("entry.recorded") : t("entry.diff")}</h3>
-        <p className="text-sm text-neutral-600">{recorded ? t("entry.recorded_hint") : t("entry.diff_hint")}</p>
+        <h3 className="text-[17px] font-semibold text-neutral-900">{recorded ? t("entry.recorded") : t("entry.diff")}</h3>
+        <p className="text-[13px] text-neutral-600">{recorded ? t("entry.recorded_hint") : t("entry.diff_hint")}</p>
         {recorded ? (
           <ValuesTable caption={t("entry.recorded")} rows={valuesOf(entry.after)} people={people} />
         ) : (
@@ -130,17 +137,17 @@ function EntryBody({ entry }: { entry: AuditDetail }) {
 
       {entry.context && Object.keys(entry.context).length > 0 ? (
         <section className="space-y-2">
-          <h3 className="text-lg font-semibold text-neutral-900">{t("entry.context")}</h3>
+          <h3 className="text-[17px] font-semibold text-neutral-900">{t("entry.context")}</h3>
           <ValuesTable caption={t("entry.context")} rows={valuesOf(entry.context)} people={people} />
         </section>
       ) : null}
 
       <section className="space-y-2">
-        <Button variant="secondary" aria-pressed={raw} onClick={() => setRaw((open) => !open)}>
+        <Button variant="secondary" size="md" aria-pressed={raw} onClick={() => setRaw((open) => !open)}>
           {raw ? t("entry.raw_hide") : t("entry.raw_show")}
         </Button>
         {raw ? (
-          <section aria-label={t("entry.raw")} className="overflow-x-auto rounded-md bg-neutral-50 p-3">
+          <section aria-label={t("entry.raw")} className="overflow-x-auto rounded-xl border border-neutral-200 bg-neutral-50 p-4">
             <pre className="whitespace-pre-wrap break-words font-mono text-sm text-neutral-800">{JSON.stringify({ before: entry.before, after: entry.after, context: entry.context }, null, 2)}</pre>
           </section>
         ) : null}
@@ -151,9 +158,9 @@ function EntryBody({ entry }: { entry: AuditDetail }) {
 
 function Fact({ term, children }: { term: string; children: ReactNode }) {
   return (
-    <div className="min-w-0">
-      <dt className="text-sm font-medium text-neutral-600">{term}</dt>
-      <dd className="break-words text-base text-neutral-900">{children}</dd>
+    <div className="min-w-0 space-y-1">
+      <dt className="text-[13px] font-semibold uppercase tracking-[0.08em] text-neutral-600">{term}</dt>
+      <dd className="break-words text-[15px] text-neutral-900">{children}</dd>
     </div>
   );
 }
@@ -162,17 +169,17 @@ function DiffTable({ caption, rows, people, nested = false }: { caption: string;
   const t = useTranslations("audit");
   if (rows.length === 0) return <p className="text-base text-neutral-600">{t("entry.no_fields")}</p>;
   return (
-    <div className={nested ? "" : "overflow-x-auto rounded-lg border border-neutral-200 px-3"}>
-      <table className="w-full border-collapse text-left text-base">
+    <div className={nested ? "" : "overflow-x-auto rounded-xl border border-neutral-200"}>
+      <table className="w-full border-collapse text-left text-[15px] text-neutral-900">
         <caption className="sr-only">{caption}</caption>
         <thead>
-          <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-            <th scope="col" className="py-2 pr-3 font-medium">{t("entry.col_field")}</th>
-            <th scope="col" className="py-2 pr-3 font-medium">
+          <tr className="border-b border-neutral-200">
+            <th scope="col" className={HEAD}>{t("entry.col_field")}</th>
+            <th scope="col" className={HEAD}>
               <span className="sr-only">{t("entry.col_change")}</span>
             </th>
-            <th scope="col" className="py-2 pr-3 font-medium">{t("entry.col_before")}</th>
-            <th scope="col" className="py-2 pr-3 font-medium">{t("entry.col_after")}</th>
+            <th scope="col" className={HEAD}>{t("entry.col_before")}</th>
+            <th scope="col" className={HEAD}>{t("entry.col_after")}</th>
           </tr>
         </thead>
         <tbody>
@@ -187,7 +194,7 @@ function DiffTable({ caption, rows, people, nested = false }: { caption: string;
                 {row.fields ? (
                   <td colSpan={2} className={CELL}>
                     <details open={foldOpen(row)} className="space-y-2">
-                      <summary className="min-h-12 cursor-pointer py-2 text-sm text-neutral-700">
+                      <summary className="min-h-11 cursor-pointer py-2 text-[13px] font-semibold text-brand-600 hover:text-brand-700">
                         {t("entry.nested", { count: row.fields.length, changed: row.fields.filter((field) => field.status !== "same").length })}
                       </summary>
                       <DiffTable caption={t("entry.fields_of", { field: row.key })} rows={row.fields} people={people} nested />
@@ -216,13 +223,13 @@ function ValuesTable({ caption, rows, people, nested = false }: { caption: strin
   const t = useTranslations("audit");
   if (rows.length === 0) return <p className="text-base text-neutral-600">{t("entry.no_fields")}</p>;
   return (
-    <div className={nested ? "" : "overflow-x-auto rounded-lg border border-neutral-200 px-3"}>
-      <table className="w-full border-collapse text-left text-base">
+    <div className={nested ? "" : "overflow-x-auto rounded-xl border border-neutral-200"}>
+      <table className="w-full border-collapse text-left text-[15px] text-neutral-900">
         <caption className="sr-only">{caption}</caption>
         <thead>
-          <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-            <th scope="col" className="py-2 pr-3 font-medium">{t("entry.col_field")}</th>
-            <th scope="col" className="py-2 pr-3 font-medium">{t("entry.col_value")}</th>
+          <tr className="border-b border-neutral-200">
+            <th scope="col" className={HEAD}>{t("entry.col_field")}</th>
+            <th scope="col" className={HEAD}>{t("entry.col_value")}</th>
           </tr>
         </thead>
         <tbody>
@@ -295,7 +302,7 @@ function Value({ shown, field, people }: { shown: Shown; field: string; people: 
     case "object":
       return (
         <details>
-          <summary className="min-h-12 cursor-pointer py-2 text-sm text-neutral-700">{t("entry.object", { count: shown.rows.length })}</summary>
+          <summary className="min-h-11 cursor-pointer py-2 text-[13px] font-semibold text-brand-600 hover:text-brand-700">{t("entry.object", { count: shown.rows.length })}</summary>
           <ValuesTable caption={t("entry.fields_of", { field })} rows={shown.rows} people={people} nested />
         </details>
       );

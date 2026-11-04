@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -15,10 +16,12 @@ import { authed, useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
 import { useIsoDay } from "@/lib/useDates";
+import { CARD, TableCard } from "../admin/kit";
 import { HistoryLink } from "../audit/HistoryLink";
-import { Alert, Badge, Button, Field, Modal, PageHeader, Panel, Status, Textarea } from "../ui";
+import { Alert, Button, Chip, Field, Modal, PageHeader, Panel, Status, Textarea } from "../ui";
 import { OnlineOnlyButton } from "../OnlineOnly";
-import { focusRing } from "../styles";
+import { buttonClass } from "../styles";
+import { AdminShiftsNav } from "./admin/common";
 import { CashSummaryView } from "./CashSummaryView";
 import { ChainCard } from "./ChainCard";
 import { itemName, reasonName } from "./CountLines";
@@ -29,29 +32,36 @@ import { useKeys } from "./useKeys";
 // since the count, the reason and the note of every line, then Approve, Co-sign or Reject (with a note, and the lines to look at again).
 // A locked count shows its place in the chain and its fingerprint, and an admin may unlock it for a correction. The API decides who may
 // do what and answers in both languages; the buttons only offer what the person is allowed to try.
+//
+// Step 6.4d (fresh-counter.md 4.4, the boards' title row, cards and table): the title row with its Amharic twin, the way back and the
+// audit history as its actions, the Shifts sections under it; the count's facts a white card (its stage and type as chips); the lines a
+// table card (the figures right-aligned in tabular numbers, a shortage red, a surplus amber); the decision a white card.
 
 const POLL_MS = 6000;
 
-export function ApprovalReview() {
+export function ApprovalReview({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("counts");
   const params = useSearchParams();
   const raw = params.get("count") ?? "";
   if (!/^\d+$/.test(raw)) {
     return (
-      <div className="max-w-xl space-y-4">
-        <PageHeader title={t("review_page")} />
-        <Alert>{t("no_count")}</Alert>
-        <BackLink />
-      </div>
+      <>
+        <PageHeader title={t("review_page")} actions={<BackLink />} />
+        <div className="flex max-w-2xl flex-col gap-6">
+          <AdminShiftsNav />
+          <Alert>{t("no_count")}</Alert>
+        </div>
+      </>
     );
   }
-  return <Loaded countId={Number(raw)} />;
+  return <Loaded countId={Number(raw)} titleAm={titleAm} />;
 }
 
 function BackLink() {
   const t = useTranslations("counts");
   return (
-    <Link href="/admin/shifts" className={`inline-flex min-h-12 items-center rounded-md px-1 text-base font-medium text-blue-800 underline ${focusRing}`}>
+    <Link href="/admin/shifts" className={buttonClass({ variant: "ghost", size: "md" })}>
+      <ArrowLeft className="size-[18px]" strokeWidth={2} aria-hidden="true" />
       {t("back_to_queue")}
     </Link>
   );
@@ -59,7 +69,7 @@ function BackLink() {
 
 type Dialog = "reject" | "unlock" | null;
 
-function Loaded({ countId }: { countId: number }) {
+function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
   const t = useTranslations("counts");
   const isoDay = useIsoDay();
   const locale = useLocale() as Locale;
@@ -138,16 +148,18 @@ function Loaded({ countId }: { countId: number }) {
 
   if (countQuery.isError && !count) {
     return (
-      <div className="max-w-xl space-y-4">
-        <PageHeader title={t("review_page")} />
-        <Alert>{errorText.message(countQuery.error)}</Alert>
-        <BackLink />
-      </div>
+      <>
+        <PageHeader title={t("review_page")} actions={<BackLink />} />
+        <div className="flex max-w-2xl flex-col gap-6">
+          <AdminShiftsNav />
+          <Alert>{errorText.message(countQuery.error)}</Alert>
+        </div>
+      </>
     );
   }
   if (!count) {
     return (
-      <p role="status" className="text-base text-neutral-600">
+      <p role="status" className="text-[15px] text-neutral-600">
         {t("loading")}
       </p>
     );
@@ -157,141 +169,145 @@ function Loaded({ countId }: { countId: number }) {
   const place = count.location ? (locale === "am" ? count.location.name_am || count.location.name_en : count.location.name_en) : "";
   const station = shift ? (locale === "am" ? shift.station.name_am : shift.station.name_en) : "";
   const decided = count.status === "locked" || count.status === "rejected";
+  const anyMoved = lines.some((line) => line.moved_since !== null && compareDecimal(line.moved_since, "0", 4) !== 0);
 
   return (
-    <div className="space-y-6">
-      <BackLink />
-      <PageHeader title={t("count_number", { id: count.id })} intro={[station, place, shift ? t("shift_date", { date: isoDay(shift.date) }) : ""].filter(Boolean).join(" · ")} />
+    <>
+      <PageHeader
+        title={t("count_number", { id: count.id })}
+        twin={titleAm ? { text: titleAm.replace("{id}", String(count.id)), lang: "am" } : undefined}
+        intro={[station, place, shift ? t("shift_date", { date: isoDay(shift.date) }) : ""].filter(Boolean).join(" · ")}
+        actions={
+          <>
+            <BackLink />
+            <HistoryLink kind="stock_count" id={count.id} />
+          </>
+        }
+      />
+      <div className="flex flex-col gap-6">
+        <AdminShiftsNav />
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-neutral-200 bg-white px-5 py-4">
-        <Badge tone={STAGE_TONE[stage]}>{t(`stage_${stage}_badge`)}</Badge>
-        <Badge tone="neutral">{t(count.type === "opening" ? "type_opening" : "type_closing")}</Badge>
-        <span className="ml-auto">
-          <HistoryLink kind="stock_count" id={count.id} />
-        </span>
-        {count.counted_by ? <p className="text-base text-neutral-700">{t("handed_in_by", { name: count.counted_by.name, time: addisClock(count.submitted_at) })}</p> : null}
-        {count.cosigned_by ? <p className="text-base text-neutral-700">{t("cosigned_by", { name: count.cosigned_by.name })}</p> : null}
-        {decided && count.decided_by ? (
-          <p className="text-base text-neutral-700">
-            {t(count.decision === "rejected" ? "rejected_by" : "approved_by", { name: count.decided_by.name })}
-            {count.decision_note ? `: ${count.decision_note}` : ""}
+        <section aria-label={t("count_number", { id: count.id })} className={`${CARD} space-y-4 p-5`}>
+          <p className="flex flex-wrap items-center gap-2">
+            <Chip tone={STAGE_TONE[stage]} dot>
+              {t(`stage_${stage}_badge`)}
+            </Chip>
+            <Chip tone="neutral">{t(count.type === "opening" ? "type_opening" : "type_closing")}</Chip>
           </p>
-        ) : null}
-      </div>
-
-      {count.blocked_by_pending ? <Alert>{t("blocked_by_pending")}</Alert> : null}
-      {count.cash ? (
-        <Panel title={t("cash_side_title")}>
-          <CashSummaryView count={count} cash={count.cash} />
-        </Panel>
-      ) : null}
-
-      {count.cash && lines.length === 0 ? null : (
-      <Panel title={t("side_title")}>
-        {lines.length === 0 ? (
-          <p className="text-base text-neutral-600">{t("no_lines")}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[56rem] border-collapse text-left">
-              <caption className="sr-only">{t("side_caption")}</caption>
-              <thead>
-                <tr className="border-b border-neutral-300 text-sm text-neutral-700">
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("col_item")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("col_expected")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("col_counted")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("col_difference")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("col_moved")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("col_reason")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {lines.map((line) => {
-                  const variance = line.variance_qty ?? varianceOf(line);
-                  const sign = variance === null ? 0 : compareDecimal(variance, "0", 4);
-                  const moved = line.moved_since !== null && compareDecimal(line.moved_since, "0", 4) !== 0 ? line.moved_since : null;
-                  return (
-                    <tr key={line.id} className={sign === 0 ? "text-neutral-600" : ""}>
-                      <th scope="row" className="px-3 py-3 text-left align-top text-base font-medium text-neutral-900">
-                        {itemName(line, locale)}
-                        <span className="block text-sm font-normal text-neutral-600">{line.item.unit}</span>
-                      </th>
-                      <td className="px-3 py-3 align-top text-base">{trimDecimal(line.expected_qty ?? "0")}</td>
-                      <td className="px-3 py-3 align-top text-base">{line.counted_qty === null ? "—" : trimDecimal(line.counted_qty)}</td>
-                      <td className={`px-3 py-3 align-top text-base font-medium ${sign < 0 ? "text-red-700" : sign > 0 ? "text-amber-800" : ""}`}>
-                        {signedQuantity(variance)}
-                      </td>
-                      <td className="px-3 py-3 align-top text-base">
-                        {moved !== null ? <span className="font-medium text-amber-800">{signedQuantity(moved)}</span> : <span className="text-neutral-500">—</span>}
-                      </td>
-                      <td className="px-3 py-3 align-top text-base">
-                        {line.reason ? <span className="font-medium">{reasonName(line.reason, locale)}</span> : <span className="text-neutral-500">—</span>}
-                        {line.note ? <span className="block text-sm text-neutral-700">{line.note}</span> : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {lines.some((line) => line.moved_since !== null && compareDecimal(line.moved_since, "0", 4) !== 0) ? (
-          <p className="mt-3 text-sm text-amber-900">{t("moved_hint")}</p>
-        ) : null}
-      </Panel>
-      )}
-
-      {count.status === "locked" && count.chain ? <ChainCard chain={count.chain} /> : null}
-
-      {actions.approve || actions.cosign || actions.reject || actions.unlock ? (
-        <Panel title={t("decide_title")}>
-          <div className="space-y-4">
-            {actions.approve || actions.cosign ? (
-              <div className="max-w-xl">
-                <Field label={t("decision_note")} optionalLabel={t("optional")}>
-                  {(props) => <Textarea {...props} value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
-                </Field>
-              </div>
-            ) : null}
-            <div className="flex flex-wrap gap-3">
-              {actions.approve ? (
-                <OnlineOnlyButton type="button" disabled={busy !== null} onClick={() => void act("approve", (key) => approveCount(countId, note, key), t("done_approved"))}>
-                  {busy === "approve" ? t("working") : t("approve")}
-                </OnlineOnlyButton>
-              ) : null}
-              {actions.cosign ? (
-                <OnlineOnlyButton type="button" disabled={busy !== null} onClick={() => void act("cosign", (key) => cosignCount(countId, note, key), t("done_cosigned"))}>
-                  {busy === "cosign" ? t("working") : t("cosign")}
-                </OnlineOnlyButton>
-              ) : null}
-              {actions.reject ? (
-                <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => setDialog("reject")}>
-                  {t("reject")}
-                </Button>
-              ) : null}
-              {actions.unlock ? (
-                <Button type="button" variant="secondary" disabled={busy !== null} onClick={() => setDialog("unlock")}>
-                  {t("unlock")}
-                </Button>
+          {count.counted_by || count.cosigned_by || (decided && count.decided_by) ? (
+            <div className="flex flex-col gap-1 text-[15px] text-neutral-700">
+              {count.counted_by ? <p>{t("handed_in_by", { name: count.counted_by.name, time: addisClock(count.submitted_at) })}</p> : null}
+              {count.cosigned_by ? <p>{t("cosigned_by", { name: count.cosigned_by.name })}</p> : null}
+              {decided && count.decided_by ? (
+                <p>
+                  {t(count.decision === "rejected" ? "rejected_by" : "approved_by", { name: count.decided_by.name })}
+                  {count.decision_note ? `: ${count.decision_note}` : ""}
+                </p>
               ) : null}
             </div>
-          </div>
-        </Panel>
-      ) : null}
+          ) : null}
+        </section>
 
-      <Status>{done}</Status>
-      {failure && dialog === null ? <Alert>{errorText.message(failure)}</Alert> : null}
+        {count.blocked_by_pending ? <Alert>{t("blocked_by_pending")}</Alert> : null}
+        {count.cash ? (
+          <Panel title={t("cash_side_title")}>
+            <CashSummaryView count={count} cash={count.cash} />
+          </Panel>
+        ) : null}
+
+        {count.cash && lines.length === 0 ? null : lines.length === 0 ? (
+          <Panel title={t("side_title")}>
+            <p className="text-[15px] text-neutral-600">{t("no_lines")}</p>
+          </Panel>
+        ) : (
+          <TableCard caption={t("side_caption")} title={t("side_title")} intro={anyMoved ? t("moved_hint") : undefined} minWidth="min-w-[56rem]">
+            <thead>
+              <tr>
+                <th scope="col">{t("col_item")}</th>
+                <th scope="col" className="text-right">
+                  {t("col_expected")}
+                </th>
+                <th scope="col" className="text-right">
+                  {t("col_counted")}
+                </th>
+                <th scope="col" className="text-right">
+                  {t("col_difference")}
+                </th>
+                <th scope="col" className="text-right">
+                  {t("col_moved")}
+                </th>
+                <th scope="col">{t("col_reason")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line) => {
+                const variance = line.variance_qty ?? varianceOf(line);
+                const sign = variance === null ? 0 : compareDecimal(variance, "0", 4);
+                const moved = line.moved_since !== null && compareDecimal(line.moved_since, "0", 4) !== 0 ? line.moved_since : null;
+                return (
+                  <tr key={line.id} className={sign === 0 ? "text-neutral-600" : ""}>
+                    <th scope="row" className="text-left font-semibold text-neutral-900">
+                      {itemName(line, locale)}
+                      <span className="block text-[13px] font-normal text-neutral-600">{line.item.unit}</span>
+                    </th>
+                    <td className="text-right tabular-nums">{trimDecimal(line.expected_qty ?? "0")}</td>
+                    <td className="text-right tabular-nums">{line.counted_qty === null ? "—" : trimDecimal(line.counted_qty)}</td>
+                    <td className={`text-right font-semibold tabular-nums ${sign < 0 ? "text-red-700" : sign > 0 ? "text-amber-800" : ""}`}>{signedQuantity(variance)}</td>
+                    <td className="text-right tabular-nums">
+                      {moved !== null ? <span className="font-semibold text-amber-800">{signedQuantity(moved)}</span> : <span className="text-neutral-600">—</span>}
+                    </td>
+                    <td>
+                      {line.reason ? <span className="font-medium text-neutral-900">{reasonName(line.reason, locale)}</span> : <span className="text-neutral-600">—</span>}
+                      {line.note ? <span className="block text-[13px] text-neutral-700">{line.note}</span> : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </TableCard>
+        )}
+
+        {count.status === "locked" && count.chain ? <ChainCard chain={count.chain} /> : null}
+
+        {actions.approve || actions.cosign || actions.reject || actions.unlock ? (
+          <Panel title={t("decide_title")}>
+            <div className="space-y-4">
+              {actions.approve || actions.cosign ? (
+                <div className="max-w-xl">
+                  <Field label={t("decision_note")} optionalLabel={t("optional")}>
+                    {(props) => <Textarea {...props} value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
+                  </Field>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2.5">
+                {actions.approve ? (
+                  <OnlineOnlyButton type="button" size="md" disabled={busy !== null} onClick={() => void act("approve", (key) => approveCount(countId, note, key), t("done_approved"))}>
+                    {busy === "approve" ? t("working") : t("approve")}
+                  </OnlineOnlyButton>
+                ) : null}
+                {actions.cosign ? (
+                  <OnlineOnlyButton type="button" size="md" disabled={busy !== null} onClick={() => void act("cosign", (key) => cosignCount(countId, note, key), t("done_cosigned"))}>
+                    {busy === "cosign" ? t("working") : t("cosign")}
+                  </OnlineOnlyButton>
+                ) : null}
+                {actions.reject ? (
+                  <Button type="button" variant="danger" size="md" disabled={busy !== null} onClick={() => setDialog("reject")}>
+                    {t("reject")}
+                  </Button>
+                ) : null}
+                {actions.unlock ? (
+                  <Button type="button" variant="secondary" size="md" disabled={busy !== null} onClick={() => setDialog("unlock")}>
+                    {t("unlock")}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </Panel>
+        ) : null}
+
+        <Status>{done}</Status>
+        {failure && dialog === null ? <Alert>{errorText.message(failure)}</Alert> : null}
+      </div>
 
       {dialog === "reject" ? (
         <RejectDialog
@@ -310,7 +326,7 @@ function Loaded({ countId }: { countId: number }) {
           onUnlock={(text) => void act("unlock", (key) => unlockCount(countId, text, key), t("done_unlocked"))}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 

@@ -1,15 +1,17 @@
 "use client";
 
+import { Smartphone } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
-import { Alert, Button, Field, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { CARD, EmptyRow, FORM_GRID, TableCard } from "@/components/admin/kit";
+import { Alert, Avatar, Button, Chip, Field, PageHeader, Select, Skeleton, Status, TextInput } from "@/components/ui";
 import { usePatchStation, useStations } from "@/lib/api/catalog";
 import { useCreateUser, usePatchUserOnCall, useUsers } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { ROLES, type Locale, type NewUser, type Role, type Station, type User } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
 import { RequireAuth } from "@/components/RequireAuth";
-import { focusRing } from "@/components/styles";
+import { buttonClass } from "@/components/styles";
 import { Link } from "@/i18n/navigation";
 import { can, useSession } from "@/lib/session";
 
@@ -17,105 +19,118 @@ import { can, useSession } from "@/lib/session";
 // language their screens open in. Roles, stations, short codes and devices get their own screens later; the devices screen (step 5.1b)
 // is linked from here. The go-live settings (2026-11-02) add the On call switch to each person: the admin, the shift manager on duty and
 // everyone switched On call hear the ops alerts (backups, the restore drill) and the failed receipt prints.
+//
+// Step 6.4d (fresh-counter.md 4.4, the CatalogList board's title row and table): the title row with its Amharic twin and "Devices" as its
+// action; the people a table card (each name beside its initials, the role, the language, the status as a chip, the On call box); the new
+// person form a white card in two columns under it; the stations' overseer rule a table card last. The saved lines stay polite live
+// regions inside their cards.
 
 const LOCALES: readonly Locale[] = ["en", "am"];
 
-export function PeopleScreen() {
+/** A checkbox of a table row (On call, the overseer rule): 20 px in the brand teal, named by its aria-label. */
+const ROW_CHECK = "size-5 cursor-pointer accent-brand-600 disabled:cursor-not-allowed";
+
+export function PeopleScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("people");
   return (
     <RequireAuth permission="people.manage">
-      <PageHeader title={t("title")} intro={t("intro")} />
-      <DevicesLink />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_26rem]">
-        <div className="space-y-6">
-          <PeoplePanel />
-          <StationsPanel />
-        </div>
-        <NewPersonPanel />
+      <PageHeader title={t("title")} intro={t("intro")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} actions={<DevicesLink />} />
+      <div className="flex flex-col gap-6">
+        <PeopleTable />
+        <NewPersonCard />
+        <StationsTable />
       </div>
     </RequireAuth>
   );
 }
 
-/** The way to Admin > People > Devices, for whoever may manage devices (devices.manage, the admin). */
+/** The way to Admin > People > Devices, for whoever may manage devices (devices.manage, the admin): the title row's action. */
 function DevicesLink() {
   const t = useTranslations("people");
   const me = useSession((s) => s.me);
   if (!can(me, "devices.manage")) return null;
   return (
-    <p className="mb-6 flex flex-wrap items-center gap-3 text-base text-neutral-700">
-      <Link
-        href="/admin/people/devices"
-        className={`inline-flex min-h-12 items-center rounded-md border border-neutral-300 bg-white px-5 font-medium text-neutral-900 hover:bg-neutral-100 ${focusRing}`}
-      >
-        {t("devices_link")}
-      </Link>
-      <span>{t("devices_desc")}</span>
-    </p>
+    <Link href="/admin/people/devices" title={t("devices_desc")} className={buttonClass({ variant: "secondary", size: "md" })}>
+      <Smartphone className="size-[18px]" strokeWidth={2} aria-hidden="true" />
+      {t("devices_link")}
+    </Link>
   );
 }
 
-function PeoplePanel() {
+function LoadingRows({ span, rows = 4 }: { span: number; rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }, (_, i) => (
+        <tr key={i} aria-hidden="true">
+          <td colSpan={span}>
+            <Skeleton className="h-6" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function PeopleTable() {
   const t = useTranslations();
   const errorText = useErrorText();
   const users = useUsers();
   const [saved, setSaved] = useState<string | null>(null);
 
+  if (users.isError) {
+    return (
+      <section className={`${CARD} space-y-3 p-5`}>
+        <Alert>{errorText.message(users.error)}</Alert>
+        <Button variant="secondary" size="md" onClick={() => void users.refetch()}>
+          {t("common.retry")}
+        </Button>
+      </section>
+    );
+  }
   return (
-    <Panel title={t("people.list")}>
-      <p className="mb-4 text-base text-neutral-600">{t("people.on_call_intro")}</p>
-      {users.isPending ? (
-        <p className="py-6 text-base text-neutral-600">{t("common.loading")}</p>
-      ) : users.isError ? (
-        <div className="space-y-3">
-          <Alert>{errorText.message(users.error)}</Alert>
-          <Button variant="secondary" onClick={() => void users.refetch()}>
-            {t("common.retry")}
-          </Button>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-base">
-            <caption className="sr-only">{t("people.list")}</caption>
-            <thead>
-              <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-                <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_name")}</th>
-                <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_phone")}</th>
-                <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_role")}</th>
-                <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_language")}</th>
-                <th scope="col" className="py-2 pr-4 font-medium">{t("people.col_status")}</th>
-                <th scope="col" className="py-2 font-medium">{t("people.col_on_call")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.data.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-6 text-neutral-600">
-                    {t("people.no_people")}
-                  </td>
-                </tr>
-              ) : (
-                users.data.map((user) => (
-                  <tr key={user.id} className="border-b border-neutral-100 last:border-0">
-                    <td className="py-3 pr-4 font-medium text-neutral-900">{user.name}</td>
-                    <td className="py-3 pr-4 font-mono text-sm">{user.phone}</td>
-                    <td className="py-3 pr-4">{user.roles.map((r) => t(`people.roles.${r}`)).join(", ")}</td>
-                    <td className="py-3 pr-4" lang={user.locale}>
-                      {t(`locale.${user.locale}`)}
-                    </td>
-                    <td className="py-3 pr-4">{user.is_active ? t("people.active") : t("people.inactive")}</td>
-                    <OnCallCell user={user} onSaved={setSaved} />
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="mt-4">
-        <Status>{saved}</Status>
-      </div>
-    </Panel>
+    <TableCard caption={t("people.list")} title={t("people.list")} intro={t("people.on_call_intro")} action={<Status>{saved}</Status>} minWidth="min-w-[760px]">
+      <thead>
+        <tr>
+          <th scope="col">{t("people.col_name")}</th>
+          <th scope="col">{t("people.col_phone")}</th>
+          <th scope="col">{t("people.col_role")}</th>
+          <th scope="col">{t("people.col_language")}</th>
+          <th scope="col">{t("people.col_status")}</th>
+          <th scope="col" className="text-center">
+            {t("people.col_on_call")}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {users.isPending ? (
+          <LoadingRows span={6} />
+        ) : users.data.length === 0 ? (
+          <EmptyRow span={6}>{t("people.no_people")}</EmptyRow>
+        ) : (
+          users.data.map((user) => (
+            <tr key={user.id}>
+              <td>
+                <span className="flex items-center gap-3">
+                  <Avatar name={user.name} />
+                  <span className="font-semibold text-neutral-900">{user.name}</span>
+                </span>
+              </td>
+              <td className="whitespace-nowrap tabular-nums text-neutral-700">{user.phone}</td>
+              <td className="text-neutral-700">{user.roles.map((r) => t(`people.roles.${r}`)).join(", ")}</td>
+              <td className="text-neutral-700" lang={user.locale}>
+                {t(`locale.${user.locale}`)}
+              </td>
+              <td>
+                <Chip tone={user.is_active ? "brand" : "neutral"} dot>
+                  {user.is_active ? t("people.active") : t("people.inactive")}
+                </Chip>
+              </td>
+              <OnCallCell user={user} onSaved={setSaved} />
+            </tr>
+          ))
+        )}
+      </tbody>
+    </TableCard>
   );
 }
 
@@ -147,21 +162,25 @@ function OnCallCell({ user, onSaved }: { user: User; onSaved: (message: string |
   }
 
   return (
-    <td className="py-3">
+    <td className="text-center">
       <input
         type="checkbox"
-        className="size-6"
+        className={ROW_CHECK}
         aria-label={t("on_call_label", { name: user.name })}
         checked={onCall}
         disabled={patch.isPending}
         onChange={(event) => toggle(event.target.checked)}
       />
-      {patch.isError ? <span role="alert" className="mt-1 block text-sm font-medium text-red-700">{errorText.message(patch.error)}</span> : null}
+      {patch.isError ? (
+        <span role="alert" className="mt-1 block text-[13px] font-medium text-red-700">
+          {errorText.message(patch.error)}
+        </span>
+      ) : null}
     </td>
   );
 }
 
-function NewPersonPanel() {
+function NewPersonCard() {
   const t = useTranslations();
   const errorText = useErrorText();
   const create = useCreateUser();
@@ -194,73 +213,91 @@ function NewPersonPanel() {
   const fieldError = (field: string) => errorText.field(create.error, field);
 
   return (
-    <Panel title={t("people.new_person")}>
-      <form onSubmit={onSubmit} className="space-y-4">
-        <Field label={t("people.field_name")} error={fieldError("name")}>
-          {(props) => <TextInput {...props} required maxLength={120} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />}
-        </Field>
-        <Field label={t("people.field_phone")} error={fieldError("phone")}>
-          {(props) => (
-            <TextInput
-              {...props}
-              type="tel"
-              inputMode="tel"
-              required
-              pattern="\+?[0-9]{9,15}"
-              autoComplete="off"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          )}
-        </Field>
-        <Field label={t("people.field_password")} hint={t("people.password_hint")} error={fieldError("password")}>
-          {(props) => (
-            <TextInput
-              {...props}
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          )}
-        </Field>
-        <Field label={t("people.field_role")} error={fieldError("role")}>
-          {(props) => (
-            <Select {...props} value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {t(`people.roles.${r}`)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label={t("people.field_language")} error={fieldError("locale")}>
-          {(props) => (
-            <Select {...props} value={locale} onChange={(e) => setLocale(e.target.value as Locale)}>
-              {LOCALES.map((l) => (
-                <option key={l} value={l} lang={l}>
-                  {t(`locale.${l}`)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+    <FormCard title={t("people.new_person")}>
+      <form onSubmit={onSubmit} className="space-y-5">
+        <div className={FORM_GRID}>
+          <Field label={t("people.field_name")} error={fieldError("name")}>
+            {(props) => <TextInput {...props} controlSize="md" required maxLength={120} autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />}
+          </Field>
+          <Field label={t("people.field_phone")} error={fieldError("phone")}>
+            {(props) => (
+              <TextInput
+                {...props}
+                controlSize="md"
+                type="tel"
+                inputMode="tel"
+                required
+                pattern="\+?[0-9]{9,15}"
+                autoComplete="off"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            )}
+          </Field>
+          <Field label={t("people.field_role")} error={fieldError("role")}>
+            {(props) => (
+              <Select {...props} controlSize="md" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {t(`people.roles.${r}`)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field label={t("people.field_language")} error={fieldError("locale")}>
+            {(props) => (
+              <Select {...props} controlSize="md" value={locale} onChange={(e) => setLocale(e.target.value as Locale)}>
+                {LOCALES.map((l) => (
+                  <option key={l} value={l} lang={l}>
+                    {t(`locale.${l}`)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          {/* the password last, its hint under it, so the two columns above stay level */}
+          <Field label={t("people.field_password")} hint={t("people.password_hint")} error={fieldError("password")}>
+            {(props) => (
+              <TextInput
+                {...props}
+                controlSize="md"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            )}
+          </Field>
+        </div>
         {create.isError ? <Alert>{errorText.message(create.error)}</Alert> : null}
         <Status>{created ? t("people.person_created", { name: created }) : null}</Status>
-        <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? t("common.saving") : t("people.add_person")}
+        <Button type="submit" size="md" loading={create.isPending}>
+          {t("people.add_person")}
         </Button>
       </form>
-    </Panel>
+    </FormCard>
+  );
+}
+
+/** A form on the board's white card: a region named by its 17 / 600 title. */
+function FormCard({ title, children }: { title: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id} className={`${CARD} p-5`}>
+      <h2 id={id} className="mb-4 text-[17px] font-semibold text-neutral-900">
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }
 
 // The stations of the branch and the one switch they carry: whether a batch made there must be signed off by an overseer
 // (PATCH /stations/{id}, people.manage). The switch moves at once and goes back if the server refuses.
-function StationsPanel() {
+function StationsTable() {
   const t = useTranslations("people");
   const tc = useTranslations("common");
   const errorText = useErrorText();
@@ -268,40 +305,33 @@ function StationsPanel() {
   const [saved, setSaved] = useState<string | null>(null);
 
   return (
-    <Panel title={t("stations")}>
-      <p className="mb-4 text-base text-neutral-600">{t("stations_intro")}</p>
-      {stations.isPending ? (
-        <p className="text-base text-neutral-600">{tc("loading")}</p>
-      ) : stations.isError ? (
-        <div className="space-y-3">
-          <Alert>{errorText.message(stations.error)}</Alert>
-          <Button variant="secondary" onClick={() => void stations.refetch()}>
-            {tc("retry")}
-          </Button>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-base">
-            <caption className="sr-only">{t("stations")}</caption>
-            <thead>
-              <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-                <th scope="col" className="py-2 pr-4 font-medium">{t("col_station")}</th>
-                <th scope="col" className="py-2 pr-4 font-medium">{t("col_overseer")}</th>
-                <th scope="col" className="py-2 font-medium">{t("col_state")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stations.data.map((station) => (
-                <StationRow key={station.id} station={station} onSaved={setSaved} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="mt-4">
-        <Status>{saved}</Status>
-      </div>
-    </Panel>
+    <TableCard caption={t("stations")} title={t("stations")} intro={t("stations_intro")} action={<Status>{saved}</Status>}>
+      <thead>
+        <tr>
+          <th scope="col">{t("col_station")}</th>
+          <th scope="col" className="text-center">
+            {t("col_overseer")}
+          </th>
+          <th scope="col">{t("col_state")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {stations.isPending ? (
+          <LoadingRows span={3} rows={3} />
+        ) : stations.isError ? (
+          <tr>
+            <td colSpan={3} className="space-y-3 py-4">
+              <Alert>{errorText.message(stations.error)}</Alert>
+              <Button variant="secondary" size="md" onClick={() => void stations.refetch()}>
+                {tc("retry")}
+              </Button>
+            </td>
+          </tr>
+        ) : (
+          stations.data.map((station) => <StationRow key={station.id} station={station} onSaved={setSaved} />)
+        )}
+      </tbody>
+    </TableCard>
   );
 }
 
@@ -333,23 +363,31 @@ function StationRow({ station, onSaved }: { station: Station; onSaved: (message:
   }
 
   return (
-    <tr className="border-b border-neutral-100 align-top last:border-0">
-      <td className="py-3 pr-4">
-        <span className="block font-medium text-neutral-900">{name}</span>
-        <span className="block font-mono text-sm text-neutral-500">{station.code}</span>
+    <tr>
+      <td>
+        <span className="block font-semibold text-neutral-900">{name}</span>
+        <span className="block text-[13px] text-neutral-600" translate="no">
+          {station.code}
+        </span>
       </td>
-      <td className="py-3 pr-4">
+      <td className="text-center">
         <input
           type="checkbox"
-          className="size-6"
+          className={ROW_CHECK}
           aria-label={t("require_overseer", { name })}
           checked={required}
           disabled={patch.isPending}
           onChange={(event) => toggle(event.target.checked)}
         />
-        {patch.isError ? <span role="alert" className="mt-1 block text-sm font-medium text-red-700">{errorText.message(patch.error)}</span> : null}
+        {patch.isError ? (
+          <span role="alert" className="mt-1 block text-[13px] font-medium text-red-700">
+            {errorText.message(patch.error)}
+          </span>
+        ) : null}
       </td>
-      <td className="py-3">{required ? t("overseer_required") : t("overseer_not_required")}</td>
+      <td>
+        <Chip tone={required ? "blue" : "neutral"}>{required ? t("overseer_required") : t("overseer_not_required")}</Chip>
+      </td>
     </tr>
   );
 }
