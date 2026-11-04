@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Croissant, LayoutGrid, LogOut } from "lucide-react";
+import { Croissant, LayoutGrid, LogOut } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
@@ -137,8 +137,12 @@ function useStationShift(): { name: string | null; nameAm: string | null; shift:
   return { name: locale === "am" ? station.name_am : station.name_en, nameAm: station.name_am, shift: chip };
 }
 
-/** Whether this tablet's writes reached the server, in a word: online and sent, waiting (offline or not), or refused writes to look at. */
-export function SyncChip() {
+/**
+ * Whether this tablet's writes reached the server, in a word: online and sent, waiting (offline or not), or refused writes to look at.
+ * `compact` (the station top bar only, step 6.3c): the dot and a short word ("Online", "3 waiting"), the whole sentence for readers, so the
+ * screen's title never has to give way. The admin frame (AdminFrame) shows the whole sentence.
+ */
+export function SyncChip({ compact = false }: { compact?: boolean }) {
   const t = useTranslations("shell");
   const online = useOnline();
   const { here, elsewhere, conflicts, held } = useSyncState();
@@ -146,20 +150,31 @@ export function SyncChip() {
 
   let tone: Tone = "brand";
   let text = t("sync_online");
+  let short = t("sync_online_short");
   if (conflicts > 0) {
     tone = "amber";
     text = t("sync_conflicts", { count: conflicts });
+    short = t("sync_conflicts_short", { count: conflicts });
   } else if (!online) {
     tone = "neutral";
     text = waiting > 0 ? t("sync_offline_waiting", { count: waiting }) : t("sync_offline");
+    short = waiting > 0 ? t("sync_offline_waiting_short", { count: waiting }) : t("sync_offline");
   } else if (waiting > 0) {
     // a queue a device refusal holds (the tray says why) is amber, one that is only waiting its turn neutral
     tone = held ? "amber" : "neutral";
     text = t("sync_sending", { count: waiting });
+    short = t("sync_sending_short", { count: waiting });
   }
   return (
     <Chip tone={tone} dot className="whitespace-nowrap">
-      {text}
+      {compact ? (
+        <>
+          <span aria-hidden="true">{short}</span>
+          <span className="sr-only">{text}</span>
+        </>
+      ) : (
+        text
+      )}
     </Chip>
   );
 }
@@ -276,30 +291,25 @@ function AccountMenu({ fill, night }: { fill: boolean; night: boolean }) {
   const roleText = waiter ? t("pad.acting_role") : role ? t(`people.roles.${role}`) : null;
   return (
     <div ref={box} className="relative">
+      {/* the person as the circle only (step 6.3c: the screen's title never gives way to the bar's right-hand side); readers hear whose
+          menu it is ("Acting: <name>" while a waiter has the pad), and the name and role are the first lines of its panel */}
       <button
         type="button"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
+        title={name}
         onClick={() => setOpen((now) => !now)}
-        className={`flex items-center gap-2.5 rounded-xl py-1 pl-1 pr-2 ${night ? "hover:bg-night-divider" : "hover:bg-neutral-100"} ${focusRing}`}
+        className={`flex items-center rounded-full p-1 ${night ? "hover:bg-night-divider" : "hover:bg-neutral-100"} ${focusRing}`}
       >
         <Avatar name={name} />
-        <span className="hidden min-w-0 max-w-40 flex-col text-left leading-tight lg:flex">
-          <span className={`truncate text-sm font-semibold ${night ? "text-night-text" : "text-neutral-900"}`}>
-            {waiter ? <span className="sr-only">{t("pad.acting_prefix")} </span> : null}
-            {name}
-          </span>
-          {roleText ? <span className={`truncate text-xs ${night ? "text-night-text-muted" : "text-neutral-600"}`}>{roleText}</span> : null}
-        </span>
-        {/* below 1024 px the name is not shown: readers still hear whose menu it is */}
-        <span className="sr-only lg:hidden">{name}</span>
-        <ChevronDown className={`size-4 ${night ? "text-night-text-muted" : "text-neutral-500"}`} strokeWidth={2} aria-hidden="true" />
+        <span className="sr-only">{waiter ? `${t("pad.acting_prefix")} ${name}` : name}</span>
       </button>
       {open ? (
         <div id={id} className={`${MENU_PANEL} w-72 space-y-3 p-4`}>
           <div className="leading-tight">
-            <p className="truncate text-[15px] font-semibold">{me.user.name}</p>
-            {role ? <p className="truncate text-[13px] text-neutral-600">{t(`people.roles.${role}`)}</p> : null}
+            <p className="truncate text-[15px] font-semibold">{name}</p>
+            {roleText ? <p className="truncate text-[13px] text-neutral-600">{roleText}</p> : null}
+            {waiter ? <p className="truncate text-[13px] text-neutral-600">{me.user.name}</p> : null}
           </div>
           <DateDisplaySwitch />
           <button
@@ -354,7 +364,7 @@ function StationBar({ fill }: { fill: boolean }) {
           </Link>
           <div className="flex min-w-0 flex-col">
             <p className="flex min-w-0 items-baseline gap-2">
-              <span className={`truncate text-lg font-semibold leading-tight ${night ? "text-night-text" : "text-neutral-900"}`}>{title}</span>
+              <span className={`shrink-0 whitespace-nowrap text-lg font-semibold leading-tight ${night ? "text-night-text" : "text-neutral-900"}`}>{title}</span>
               {titleAm && titleAm !== title ? (
                 <span lang="am" className={`truncate text-[15px] font-medium ${night ? "text-night-text-muted" : "text-neutral-600"}`}>
                   <span aria-hidden="true">· </span>
@@ -373,7 +383,7 @@ function StationBar({ fill }: { fill: boolean }) {
         {/* on a phone the right-hand group wraps inside the window rather than pushing past it */}
         <div className="flex max-w-full flex-wrap items-center gap-2 md:shrink-0">
           <div ref={setActions} className="contents" />
-          {signedIn ? <SyncChip /> : null}
+          {signedIn ? <SyncChip compact /> : null}
           <Suspense fallback={<LanguageSwitcher look="toggle" />}>
             <LanguageSwitcherWithQuery look="toggle" />
           </Suspense>

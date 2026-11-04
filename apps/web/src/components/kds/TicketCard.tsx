@@ -6,7 +6,8 @@ import { useId, useState } from "react";
 import type { Line, Locale, RejectReason, Ticket } from "@/lib/api/types";
 import { REJECT_REASONS } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
-import { ageOf, clock, secondsSince, type TicketAge } from "@/lib/kds";
+import { ageOf, secondsSince, type TicketAge } from "@/lib/kds";
+import { useWaitText } from "@/lib/useWaitText";
 import { orderNoText } from "@/lib/orderNo";
 import { useNow } from "@/lib/useNow";
 import { queueAcceptLine, queueReadyLine, queueRejectLine, useOutbox } from "@/lib/outbox/store";
@@ -28,12 +29,14 @@ const TIMER: Record<TicketAge, { box: string; Icon: LucideIcon; word: "slow" | "
 
 function TimerChip({ sentAt, seconds, age }: { sentAt: string | null; seconds: number; age: TicketAge }) {
   const t = useTranslations("kds");
+  // "5:07", "1 h 05" or "3 d" (lib/durations.ts): a ticket left on the rail for days reads in days, never "5709:54"
+  const wait = useWaitText()(seconds);
   const { box, Icon, word } = TIMER[age];
   return (
     <p className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] px-3 text-[17px] font-semibold tabular-nums ${box}`}>
       <Icon className="size-[18px]" strokeWidth={2} aria-hidden="true" />
-      <time dateTime={sentAt ?? undefined} aria-label={t("elapsed", { time: clock(seconds) })}>
-        {clock(seconds)}
+      <time dateTime={sentAt ?? undefined} aria-label={t("elapsed", { time: wait })}>
+        {wait}
       </time>
       {word ? <span className="text-sm font-bold">{t(word)}</span> : null}
     </p>

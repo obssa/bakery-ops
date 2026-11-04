@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Bell, BellOff } from "lucide-react";
+import { Volume2, VolumeX } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { authed, can, useSession } from "@/lib/session";
@@ -157,7 +157,8 @@ export function KdsScreen({ kind, twins }: { kind: "kitchen" | "bar"; /** the Am
 
   const title = kind === "kitchen" ? t("kitchen_title") : t("bar_title");
   const loaded = !!snapshot?.loaded;
-  const MuteIcon = muted ? BellOff : Bell;
+  // a speaker, not a bell: the bell beside it in the bar is the notifications (the pad's chime looks the same)
+  const MuteIcon = muted ? VolumeX : Volume2;
   const twin: Record<KdsColumn, string | undefined> = { new: twins?.new, cooking: twins?.cooking, ready: twins?.ready };
   // the top bar names the display, in its night look; its line is the shift and who is on it (the shift feed's, as on every station)
   useStationHeader({ title, titleAm: twins?.title, night: true });

@@ -1,8 +1,9 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { CircleCheck, CircleDot, Lock, Plus, Undo2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError } from "@/lib/api/client";
 import { countGroup, submitCount, submitLines, type LineEdit } from "@/lib/api/counts";
 import { useItems } from "@/lib/api/hooks";
@@ -11,6 +12,7 @@ import { isQuantityText } from "@/lib/decimal";
 import { stageOf, withDraftEdits } from "@/lib/counts";
 import { useErrorText } from "@/lib/errors";
 import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
+import { ICON_STROKE } from "../icons";
 import { Alert, Badge, Button, Field, Panel, Select, TextInput } from "../ui";
 import { CashDeclaration } from "./CashDeclaration";
 import { CashReviewDialog } from "./CashReviewDialog";
@@ -20,23 +22,50 @@ import { CountLines } from "./CountLines";
 import { ReviewDialog } from "./ReviewDialog";
 import { useKeys } from "./useKeys";
 
-// One place's count on the count screen (step 3.7b): its lines, "Nothing changed", an item found that was not on the list, the review
-// and the submit, and what has happened to the count since: waiting for a co-signature or for the approval, locked with its hash, or
-// sent back (the recount shows what the approver said). A cash drawer's count has no lines: it is the till's cash declaration (step 3.7d), by denomination.
+// One place's count on the count screen (step 3.7b; on the Fresh Counter primitives since step 6.3c): a panel named by the place, with
+// the kind of count, its stage and its attempt beside the name; what has happened to the count (waiting for a co-signature or for the
+// approval, locked with its hash, sent back with what the approver said); "Nothing changed" over the lines; an item found that was not
+// on the list; and the one main action, "Review and submit", at the foot. A cash drawer's count has no lines: it is the till's cash
+// declaration (step 3.7d), by denomination.
 
+// locked is brand teal (the count is done and right); green means money confirmed and nothing else (fresh-counter.md 1.3)
 export const STAGE_TONE = {
   counting: "blue",
   waiting_cosign: "amber",
   waiting_approval: "amber",
-  locked: "green",
+  locked: "brand",
   sent_back: "red",
 } as const;
 
 export function StageBadge({ count }: { count: Count }) {
   const t = useTranslations("counts");
   const stage = stageOf(count);
-  return <Badge tone={STAGE_TONE[stage]}>{t(`stage_${stage}_badge`)}</Badge>;
+  return (
+    <Badge tone={STAGE_TONE[stage]} dot>
+      {t(`stage_${stage}_badge`)}
+    </Badge>
+  );
 }
+
+/** A notice in the panel: a tinted box with a line icon, in the tone of what it says. */
+function Notice({ tone, icon, children, role }: { tone: "amber" | "brand" | "red" | "blue"; icon: ReactNode; children: ReactNode; role?: "note" | "status" }) {
+  const look = {
+    amber: "border-amber-200 bg-amber-50 text-amber-900",
+    brand: "border-brand-100 bg-brand-50 text-brand-700",
+    red: "border-red-200 bg-red-50 text-red-800",
+    blue: "border-blue-200 bg-blue-50 text-blue-800",
+  }[tone];
+  return (
+    <div role={role} className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-base ${look}`}>
+      <span aria-hidden="true" className="mt-0.5 shrink-0">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1 space-y-1">{children}</div>
+    </div>
+  );
+}
+
+const ICON = "size-5";
 
 export function CountPanel({
   shiftId,
@@ -153,75 +182,93 @@ export function CountPanel({
   const untouched = count.lines.filter((line) => !line.confirmed).length;
 
   return (
-    <Panel title={placeName}>
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-center gap-3">
+    <Panel
+      title={placeName}
+      action={
+        <div className="flex flex-wrap items-center gap-2">
           <Badge tone="neutral">{t(count.type === "opening" ? "type_opening" : "type_closing")}</Badge>
           <StageBadge count={count} />
-          {count.seq > 1 ? <span className="text-sm text-neutral-600">{t("revision", { seq: count.seq })}</span> : null}
+          {count.seq > 1 ? <span className="text-[13px] text-neutral-600">{t("revision", { seq: count.seq })}</span> : null}
           {saving > 0 ? (
-            <span role="status" className="text-sm text-neutral-600">
+            <span role="status" className="text-[13px] text-neutral-600">
               {t("saving")}
             </span>
           ) : null}
         </div>
-
+      }
+    >
+      <div className="space-y-5">
         {previous && previous.status === "rejected" ? (
-          <div role="note" className="space-y-1 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-base text-red-900">
+          <Notice role="note" tone="red" icon={<Undo2 className={ICON} strokeWidth={ICON_STROKE} />}>
             <p className="font-semibold">{t("sent_back_title", { name: previous.decided_by?.name ?? "" })}</p>
             {previous.decision_note ? <p>{previous.decision_note}</p> : null}
             <p className="text-sm">{t("sent_back_hint")}</p>
-          </div>
+          </Notice>
         ) : null}
         {previous && previous.status === "locked" ? (
-          <p role="note" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
-            {t("reopened")}
-          </p>
+          <Notice role="note" tone="amber" icon={<Undo2 className={ICON} strokeWidth={ICON_STROKE} />}>
+            <p>{t("reopened")}</p>
+          </Notice>
         ) : null}
 
         {dropped > 0 ? (
-          <p role="status" className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-900">
-            {t("dropped_notice", { count: dropped })}
-          </p>
+          <Notice role="status" tone="amber" icon={<CircleDot className={ICON} strokeWidth={ICON_STROKE} />}>
+            <p>{t("dropped_notice", { count: dropped })}</p>
+          </Notice>
         ) : null}
-        {stage === "waiting_cosign" ? <p className="rounded-md bg-amber-50 px-4 py-3 text-base text-amber-900">{t("stage_waiting_cosign")}</p> : null}
-        {stage === "waiting_approval" ? <p className="rounded-md bg-amber-50 px-4 py-3 text-base text-amber-900">{t("stage_waiting_approval")}</p> : null}
+        {stage === "waiting_cosign" ? (
+          <Notice tone="amber" icon={<CircleDot className={ICON} strokeWidth={ICON_STROKE} />}>
+            <p>{t("stage_waiting_cosign")}</p>
+          </Notice>
+        ) : null}
+        {stage === "waiting_approval" ? (
+          <Notice tone="amber" icon={<CircleDot className={ICON} strokeWidth={ICON_STROKE} />}>
+            <p>{t("stage_waiting_approval")}</p>
+          </Notice>
+        ) : null}
         {stage === "locked" ? (
           <>
-            <p className="rounded-md bg-green-50 px-4 py-3 text-base text-green-900">{t("stage_locked")}</p>
+            <Notice tone="brand" icon={<Lock className={ICON} strokeWidth={ICON_STROKE} />}>
+              <p className="font-medium">{t("stage_locked")}</p>
+            </Notice>
             {count.chain ? <ChainCard chain={count.chain} /> : null}
           </>
         ) : null}
-        {stage === "sent_back" ? <p className="rounded-md bg-red-50 px-4 py-3 text-base text-red-900">{t("stage_sent_back")}</p> : null}
+        {stage === "sent_back" ? (
+          <Notice tone="red" icon={<Undo2 className={ICON} strokeWidth={ICON_STROKE} />}>
+            <p>{t("stage_sent_back")}</p>
+          </Notice>
+        ) : null}
         {count.blocked_by_pending ? <Alert>{t("blocked_by_pending")}</Alert> : null}
 
         {count.cash ? (
           editable ? (
-            <>
-              <CashDeclaration count={count} cash={count.cash} reasons={reasons} onChange={onChange} onBusy={(busy) => setSaving(busy ? 1 : 0)} />
-            </>
+            <CashDeclaration count={count} cash={count.cash} reasons={reasons} onChange={onChange} onBusy={(busy) => setSaving(busy ? 1 : 0)} />
           ) : (
             <CashSummaryView count={count} cash={count.cash} />
           )
         ) : (
           <>
             {editable ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" variant="secondary" disabled={untouched === 0 || saving > 0} onClick={() => void write({ confirm_all: true })}>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-neutral-50 px-4 py-3">
+                <Button type="button" variant="secondary" size="lg" disabled={untouched === 0 || saving > 0} onClick={() => void write({ confirm_all: true })}>
+                  <CircleCheck className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
                   {t("nothing_changed")}
                 </Button>
-                <p className="max-w-xl text-sm text-neutral-600">{t("nothing_changed_hint")}</p>
+                <p className="min-w-0 flex-1 basis-72 text-[13px] text-neutral-600">{t("nothing_changed_hint")}</p>
               </div>
             ) : null}
             <CountLines count={count} reasons={reasons} editable={editable} onEdit={(lines) => void write({ lines })} />
             {failure ? <Alert>{errorText.message(failure)}</Alert> : null}
 
             {editable ? (
-              <section aria-label={t("add_title")} className="space-y-3 rounded-md border border-neutral-200 px-4 py-4">
-                <h3 className="text-base font-semibold text-neutral-900">{t("add_title")}</h3>
-                <p className="text-sm text-neutral-600">{t("add_hint")}</p>
+              <section aria-label={t("add_title")} className="space-y-3 rounded-2xl border border-dashed border-neutral-300 px-4 py-4">
+                <div className="space-y-0.5">
+                  <h3 className="text-base font-semibold text-neutral-900">{t("add_title")}</h3>
+                  <p className="text-[13px] text-neutral-600">{t("add_hint")}</p>
+                </div>
                 <div className="flex flex-wrap items-end gap-3">
-                  <div className="w-72">
+                  <div className="w-72 max-w-full">
                     <Field label={t("add_item")}>
                       {(props) => (
                         <Select {...props} value={addItem} onChange={(event) => setAddItem(event.target.value)}>
@@ -237,10 +284,11 @@ export function CountPanel({
                   </div>
                   <div className="w-40">
                     <Field label={t("add_qty")} error={addInvalid ? t("qty_invalid") : undefined}>
-                      {(props) => <TextInput {...props} inputMode="decimal" value={addQty} onChange={(event) => setAddQty(event.target.value)} />}
+                      {(props) => <TextInput {...props} inputMode="decimal" className="tabular-nums" value={addQty} onChange={(event) => setAddQty(event.target.value)} />}
                     </Field>
                   </div>
                   <Button type="button" variant="secondary" disabled={addItem === "" || saving > 0} onClick={() => void add()}>
+                    <Plus className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
                     {t("add_button")}
                   </Button>
                 </div>
@@ -250,14 +298,14 @@ export function CountPanel({
         )}
 
         {waiting ? (
-          <p role="status" className="rounded-md bg-blue-50 px-4 py-3 text-base font-medium text-blue-900">
+          <p role="status" className="rounded-xl bg-blue-50 px-4 py-3 text-base font-medium text-blue-800">
             {o("queued")}
           </p>
         ) : null}
         {editable ? (
-          <div className="flex justify-end">
+          <div className="flex justify-end border-t border-neutral-200 pt-5">
             {/* handing in needs the connection and every draft on the server first */}
-            <Button type="button" disabled={saving > 0 || waiting} onClick={() => setReview(true)}>
+            <Button type="button" size="xl" disabled={saving > 0 || waiting} onClick={() => setReview(true)} className="min-w-64">
               {t("review_button")}
             </Button>
           </div>
