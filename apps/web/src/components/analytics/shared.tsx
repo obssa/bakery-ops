@@ -45,7 +45,7 @@ import { useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
 import { addisStamp, saveBlob } from "../payments/shared";
 import { CARD, Notice, SectionTabs, Toolbar, ToolbarField } from "../admin/kit";
-import { Alert, Button, Chip, PageHeader, Skeleton, Status } from "../ui";
+import { Alert, Button, PageHeader, Skeleton, Status } from "../ui";
 import { focusRing } from "../styles";
 
 // Step 6.4d (fresh-counter.md 4.4, the Admin and CatalogList boards): the title row with its Amharic twin and the exports as its actions,
@@ -126,9 +126,41 @@ export function AnalyticsNav() {
   return <SectionTabs label={t("sections")} tabs={tabs} />;
 }
 
-/** The title row of an analytics page: its title with the Amharic twin, the intro, the page's exports on the right. */
-export function AnalyticsHeader({ title, intro, titleAm, report, range }: { title: string; intro?: string; titleAm?: string; report?: ReportName; range?: AnalyticsRange }) {
-  return <PageHeader title={title} intro={intro} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} actions={report && range ? <ExportButtons report={report} range={range} /> : undefined} />;
+/**
+ * The title row of an analytics page: its title with the Amharic twin, the intro, and on the right how fresh the figures are (`fresh`,
+ * Today's "updated … ago") beside the page's exports.
+ */
+export function AnalyticsHeader({
+  title,
+  intro,
+  titleAm,
+  report,
+  range,
+  fresh,
+}: {
+  title: string;
+  intro?: string;
+  titleAm?: string;
+  report?: ReportName;
+  range?: AnalyticsRange;
+  fresh?: ReactNode;
+}) {
+  const exports = report && range ? <ExportButtons report={report} range={range} /> : null;
+  return (
+    <PageHeader
+      title={title}
+      intro={intro}
+      twin={titleAm ? { text: titleAm, lang: "am" } : undefined}
+      actions={
+        fresh || exports ? (
+          <>
+            {fresh}
+            {exports}
+          </>
+        ) : undefined
+      }
+    />
+  );
 }
 
 /**
@@ -276,7 +308,10 @@ export function useFreshness(range: DayRange, compare = false, enabled = true) {
 
 type Freshness = ReturnType<typeof useFreshness>;
 
-/** "Updated 2 min ago" (the oldest rebuild of the days read): a chip at the toolbar's right, amber while nothing is built. */
+/**
+ * "Updated 2 min ago" (the oldest rebuild of the days read): a white pill in the title row, as Today's "updated … ago", its dot brand teal,
+ * or amber while nothing is built.
+ */
 export function FreshnessChip({ state, asOf }: { state: Freshness; asOf?: string | null }) {
   const t = useTranslations("analytics");
   const dates = useDateFormat();
@@ -286,9 +321,10 @@ export function FreshnessChip({ state, asOf }: { state: Freshness; asOf?: string
   const ago = agoOf(stamp, now);
   if (freshness === null && asOf === undefined) return null;
   return (
-    <Chip tone={ago.unit === "never" ? "amber" : "neutral"} dot>
+    <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-neutral-200 bg-white px-3.5 text-[13px] font-semibold text-neutral-700">
+      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${ago.unit === "never" ? "bg-amber-700" : "bg-brand-600"}`} />
       <span title={stamp ? addisStamp(stamp, dates) : undefined}>{ago.unit === "never" ? t("fresh.never") : t(`fresh.${ago.unit}`, { count: ago.count })}</span>
-    </Chip>
+    </span>
   );
 }
 

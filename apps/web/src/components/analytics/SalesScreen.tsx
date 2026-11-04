@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { hourLabel, seriesLabel, spanLabel } from "@/lib/analytics";
 import { useHourly, useSales, type SeriesGroup } from "@/lib/api/analytics";
+import { compareDecimal } from "@/lib/decimal";
 import { useDateFormat } from "@/lib/useDates";
 import { InnerTable, TableCard } from "../admin/kit";
 import { Bars } from "../charts/Bars";
@@ -55,21 +56,23 @@ export function SalesScreen({ titleAm }: { titleAm?: string }) {
 
   return (
     <>
-      <AnalyticsHeader title={t("sales.title")} intro={t("sales.intro")} titleAm={titleAm} report="sales" range={range} />
+      <AnalyticsHeader title={t("sales.title")} intro={t("sales.intro")} titleAm={titleAm} report="sales" range={range} fresh={<FreshnessChip state={freshness} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
-        <RangeControl range={range} today={today} onChange={(next) => page.go(query({ range: next }))} aside={<FreshnessChip state={freshness} />}>
+        <RangeControl range={range} today={today} onChange={(next) => page.go(query({ range: next }))}>
           <Choices label={t("sales.group")} options={GROUPS} value={group} onChange={(next) => page.go(query({ group: next }))} text={(option) => t(`group.${option}`)} />
         </RangeControl>
         <FreshnessNotice state={freshness} />
-        <Series group={group} />
+        <Series group={group} part="chart" />
         <Hours />
+        <Series group={group} part="table" />
       </div>
     </>
   );
 }
 
-function Series({ group }: { group: SeriesGroup }) {
+/** The series (one read, cached): `chart` its line on a white card, `table` its figures as a table card; the charts come first. */
+function Series({ group, part }: { group: SeriesGroup; part: "chart" | "table" }) {
   const t = useTranslations("analytics");
   const dates = useDateFormat();
   const f = useFigures();
@@ -78,9 +81,9 @@ function Series({ group }: { group: SeriesGroup }) {
   const series = sales.data?.data.series ?? [];
   const label = (key: string) => (group === "week" ? t("week_of", { date: seriesLabel(key, group, dates) }) : seriesLabel(key, group, dates));
 
-  if (sales.error) return <ReadError error={sales.error} onRetry={() => void sales.refetch()} />;
-  return (
-    <>
+  if (sales.error) return part === "chart" ? <ReadError error={sales.error} onRetry={() => void sales.refetch()} /> : null;
+  if (part === "chart") {
+    return (
       <Section title={t(`sales.by_${group}`)} actions={<span className="text-[13px] text-neutral-600">{t("col.revenue")}</span>}>
         {!sales.data ? (
           <SkeletonRows rows={6} label={t("loading")} />
@@ -88,6 +91,10 @@ function Series({ group }: { group: SeriesGroup }) {
           <Line label={t("sales.chart_label", { range: spanLabel(range, dates) })} points={series.map((point) => ({ key: point.key, label: label(point.key), value: point.revenue }))} format={f.amount} />
         )}
       </Section>
+    );
+  }
+  return (
+    <>
       {sales.data ? (
         <TableCard caption={t(`sales.by_${group}`)} minWidth="min-w-[860px]">
           <thead>
@@ -146,6 +153,18 @@ function Series({ group }: { group: SeriesGroup }) {
   );
 }
 
+/** The hours the chart shows, as Today's: 06:00 to 17:00, widened to any hour that sold (the table under it keeps all 24). */
+function hourWindow<T extends { hour: number; revenue: string | null }>(hours: readonly T[]): T[] {
+  let first = 6;
+  let last = 17;
+  for (const { hour, revenue } of hours) {
+    if (revenue === null || compareDecimal(revenue, "0") <= 0) continue;
+    first = Math.min(first, hour);
+    last = Math.max(last, hour);
+  }
+  return hours.filter((hour) => hour.hour >= first && hour.hour <= last);
+}
+
 function Hours() {
   const t = useTranslations("analytics");
   const dates = useDateFormat();
@@ -167,10 +186,12 @@ function Hours() {
         <div className="space-y-3">
           <Bars
             label={t("sales.hourly_label", { range: spanLabel(range, dates) })}
-            points={hours.map((hour) => ({ key: String(hour.hour), label: hourLabel(hour.hour), value: hour.revenue }))}
+            points={hourWindow(hours).map((hour) => ({ key: String(hour.hour), label: hourLabel(hour.hour), value: hour.revenue }))}
             format={f.amount}
             height={180}
             highlight="peak"
+            ticks="all"
+            tick={(point) => point.key}
           />
           <details className="group">
             <summary className={FOLD_SUMMARY}>

@@ -61,11 +61,11 @@ export function ProductsScreen({ titleAm }: { titleAm?: string }) {
 
   return (
     <>
-      <AnalyticsHeader title={t("products.title")} intro={t("products.intro")} titleAm={titleAm} report="items" range={range} />
+      <AnalyticsHeader title={t("products.title")} intro={t("products.intro")} titleAm={titleAm} report="items" range={range} fresh={<FreshnessChip state={freshness} asOf={items.data?.as_of} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
         <div className="flex flex-col gap-3">
-          <RangeControl range={range} today={today} onChange={(next) => page.go(query({ range: next }))} aside={<FreshnessChip state={freshness} asOf={items.data?.as_of} />} />
+          <RangeControl range={range} today={today} onChange={(next) => page.go(query({ range: next }))} />
           <Options options={options} onChange={(next) => page.go(query(next))} />
         </div>
         <FreshnessNotice state={freshness} />

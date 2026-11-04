@@ -2,6 +2,7 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import { marginOf, seriesLabel, spanLabel } from "@/lib/analytics";
 import { ApiError } from "@/lib/api/client";
@@ -69,10 +70,10 @@ export function ProductScreen() {
   const notFound = answer.error instanceof ApiError && answer.error.status === 404;
   return (
     <>
-      <Header answer={answer.data} loading={!answer.data && !answer.error} />
+      <Header answer={answer.data} loading={!answer.data && !answer.error} fresh={<FreshnessChip state={freshness} asOf={answer.data?.as_of} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
-        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, { id: String(id) }))} aside={<FreshnessChip state={freshness} asOf={answer.data?.as_of} />} />
+        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, { id: String(id) }))} />
         <FreshnessNotice state={freshness} />
         {notFound ? (
           <Alert>{t("product.not_found")}</Alert>
@@ -97,7 +98,7 @@ function BackToProducts() {
   );
 }
 
-function Header({ answer, loading }: { answer: Answer<ItemPage> | undefined; loading: boolean }) {
+function Header({ answer, loading, fresh }: { answer: Answer<ItemPage> | undefined; loading: boolean; fresh?: ReactNode }) {
   const t = useTranslations("analytics");
   const locale = useLocale() as Locale;
   const names = useNames();
@@ -136,6 +137,7 @@ function Header({ answer, loading }: { answer: Answer<ItemPage> | undefined; loa
         </div>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+        {fresh}
         <BackToProducts />
       </div>
     </header>
@@ -198,7 +200,7 @@ function Launch({ answer }: { answer: Answer<ItemPage> | undefined }) {
         <p className="text-[15px] text-neutral-600">{t("product.never_sold")}</p>
       ) : (
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <Bars label={t("product.launch_label")} points={launch.weekly_units.map((week) => ({ key: String(week.week), label: t("product.week", { n: week.week }), value: week.units_sold_qty }))} format={f.qty} height={140} />
+          <Bars label={t("product.launch_label")} points={launch.weekly_units.map((week) => ({ key: String(week.week), label: t("product.week", { n: week.week }), value: week.units_sold_qty }))} format={f.qty} height={140} ticks="all" tick={(point) => point.key} />
           <InnerTable caption={t("product.launch_table")} minWidth="min-w-[420px]">
               <thead>
                 <tr>

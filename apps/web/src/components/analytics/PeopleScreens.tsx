@@ -56,10 +56,10 @@ export function StationsScreen({ titleAm }: { titleAm?: string }) {
   const stations = useStationFigures(range);
   return (
     <>
-      <AnalyticsHeader title={t("stations.title")} intro={t("stations.intro")} titleAm={titleAm} report="stations" range={range} />
+      <AnalyticsHeader title={t("stations.title")} intro={t("stations.intro")} titleAm={titleAm} report="stations" range={range} fresh={<FreshnessChip state={freshness} asOf={stations.data?.as_of} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
-        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, {}))} aside={<FreshnessChip state={freshness} asOf={stations.data?.as_of} />} />
+        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, {}))} />
         <FreshnessNotice state={freshness} />
         {stations.error ? (
           <ReadError error={stations.error} onRetry={() => void stations.refetch()} />
@@ -172,10 +172,10 @@ export function StaffScreen({ titleAm }: { titleAm?: string }) {
   const staff = useStaffFigures(range, roleKind);
   return (
     <>
-      <AnalyticsHeader title={t("staff.title")} intro={t("staff.intro")} titleAm={titleAm} report="staff" range={range} />
+      <AnalyticsHeader title={t("staff.title")} intro={t("staff.intro")} titleAm={titleAm} report="staff" range={range} fresh={<FreshnessChip state={freshness} asOf={staff.data?.as_of} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
-        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, { role_kind: roleKind }))} aside={<FreshnessChip state={freshness} asOf={staff.data?.as_of} />}>
+        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, { role_kind: roleKind }))}>
           <Choices label={t("staff.role_kind")} options={ROLE_OPTIONS} value={roleKind} onChange={(next) => page.go(pageQuery(range, { role_kind: next }))} text={(option) => t(`role.${option || "all"}`)} />
         </RangeControl>
         <FreshnessNotice state={freshness} />
@@ -277,10 +277,10 @@ export function MeScreen({ titleAm }: { titleAm?: string }) {
 
   return (
     <>
-      <AnalyticsHeader title={t("me.title")} intro={t("me.intro")} titleAm={titleAm} />
+      <AnalyticsHeader title={t("me.title")} intro={t("me.intro")} titleAm={titleAm} fresh={<FreshnessChip state={freshness} asOf={staff.data?.as_of} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
-        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, {}))} aside={<FreshnessChip state={freshness} asOf={staff.data?.as_of} />} />
+        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, {}))} />
         <FreshnessNotice state={freshness} />
         {staff.error ? (
           <ReadError error={staff.error} onRetry={() => void staff.refetch()} />

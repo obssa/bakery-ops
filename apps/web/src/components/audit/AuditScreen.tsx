@@ -330,7 +330,7 @@ function FilterForm({ filters, onApply, onClear }: { filters: AuditFilters; onAp
         </ToolbarSelect>
       </Toolbar>
       <Toolbar className="items-start">
-        <ToolbarSelect label={t("filters.action")} value={draft.actionPick} onChange={(event) => set("actionPick", event.target.value)}>
+        <ToolbarSelect label={t("filters.action")} className="w-60" value={draft.actionPick} onChange={(event) => set("actionPick", event.target.value)}>
           <option value="">{t("filters.any_action")}</option>
           {ACTION_PREFIXES.map((prefix) => (
             <option key={prefix} value={prefix}>
@@ -348,7 +348,7 @@ function FilterForm({ filters, onApply, onClear }: { filters: AuditFilters; onAp
             onChange={(event) => set("actionText", event.target.value)}
           />
         ) : null}
-        <ToolbarSelect label={t("filters.subject")} value={draft.subjectPick} onChange={(event) => set("subjectPick", event.target.value)}>
+        <ToolbarSelect label={t("filters.subject")} className="w-52" value={draft.subjectPick} onChange={(event) => set("subjectPick", event.target.value)}>
           <option value="">{t("filters.any_subject")}</option>
           {SUBJECT_CHOICES.map((kind) => (
             <option key={kind} value={kind}>

@@ -59,10 +59,10 @@ export function OverviewScreen({ titleAm }: { titleAm?: string }) {
 
   return (
     <>
-      <AnalyticsHeader title={t("overview.title")} intro={t("overview.intro")} titleAm={titleAm} />
+      <AnalyticsHeader title={t("overview.title")} intro={t("overview.intro")} titleAm={titleAm} fresh={<FreshnessChip state={freshness} asOf={overview.data?.as_of} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
-        <RangeControl range={range} today={today} onChange={(next) => choose(next)} aside={<FreshnessChip state={freshness} asOf={overview.data?.as_of} />}>
+        <RangeControl range={range} today={today} onChange={(next) => choose(next)}>
           <ToolbarCheck label={t("overview.compare")} checked={compare} onChange={(event) => choose(range, event.target.checked)} />
         </RangeControl>
         <FreshnessNotice state={freshness} />

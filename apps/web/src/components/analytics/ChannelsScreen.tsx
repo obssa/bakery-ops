@@ -57,10 +57,10 @@ export function ChannelsScreen({ titleAm }: { titleAm?: string }) {
 
   return (
     <>
-      <AnalyticsHeader title={t("channels.title")} intro={t("channels.intro")} titleAm={titleAm} report="channels" range={range} />
+      <AnalyticsHeader title={t("channels.title")} intro={t("channels.intro")} titleAm={titleAm} report="channels" range={range} fresh={<FreshnessChip state={freshness} asOf={figures.data?.as_of} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
-        <RangeControl range={range} today={today} onChange={(next) => page.go(query({ range: next }))} aside={<FreshnessChip state={freshness} asOf={figures.data?.as_of} />}>
+        <RangeControl range={range} today={today} onChange={(next) => page.go(query({ range: next }))}>
           <Choices label={t("sales.group")} options={GROUPS} value={group} onChange={(next) => page.go(query({ group: next }))} text={(option) => t(`group.${option}`)} />
         </RangeControl>
         <FreshnessNotice state={freshness} />

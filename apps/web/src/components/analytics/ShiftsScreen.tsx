@@ -44,10 +44,10 @@ export function ShiftsScreen({ titleAm }: { titleAm?: string }) {
 
   return (
     <>
-      <AnalyticsHeader title={t("shifts.title")} intro={t("shifts.intro")} titleAm={titleAm} report="shifts" range={range} />
+      <AnalyticsHeader title={t("shifts.title")} intro={t("shifts.intro")} titleAm={titleAm} report="shifts" range={range} fresh={<FreshnessChip state={freshness} asOf={shifts.data?.as_of} />} />
       <div className="flex flex-col gap-6">
         <AnalyticsNav />
-        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, {}))} aside={<FreshnessChip state={freshness} asOf={shifts.data?.as_of} />} />
+        <RangeControl range={range} today={today} onChange={(next) => page.go(pageQuery(next, {}))} />
         <FreshnessNotice state={freshness} />
         {shifts.error ? (
           <ReadError error={shifts.error} onRetry={() => void shifts.refetch()} />

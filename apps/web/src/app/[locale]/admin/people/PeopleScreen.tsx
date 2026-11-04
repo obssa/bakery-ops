@@ -234,20 +234,6 @@ function NewPersonCard() {
               />
             )}
           </Field>
-          <Field label={t("people.field_password")} hint={t("people.password_hint")} error={fieldError("password")}>
-            {(props) => (
-              <TextInput
-                {...props}
-                controlSize="md"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            )}
-          </Field>
           <Field label={t("people.field_role")} error={fieldError("role")}>
             {(props) => (
               <Select {...props} controlSize="md" value={role} onChange={(e) => setRole(e.target.value as Role)}>
@@ -268,6 +254,21 @@ function NewPersonCard() {
                   </option>
                 ))}
               </Select>
+            )}
+          </Field>
+          {/* the password last, its hint under it, so the two columns above stay level */}
+          <Field label={t("people.field_password")} hint={t("people.password_hint")} error={fieldError("password")}>
+            {(props) => (
+              <TextInput
+                {...props}
+                controlSize="md"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             )}
           </Field>
         </div>

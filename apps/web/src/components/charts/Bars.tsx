@@ -38,12 +38,19 @@ interface BarsProps {
   /** a vertical chart's height in px */
   height?: number;
   highlight?: BarHighlight;
+  /** a vertical chart's labels under its bars: each bar's own (Today's hours: `tick` gives the short form), or the first and last */
+  ticks?: "all" | "ends";
+  tick?: (point: ChartPoint) => string;
 }
 
-export function Bars({ label, points, orientation = "vertical", format = (value) => value, table, height = 160, highlight = "last" }: BarsProps) {
+export function Bars({ label, points, orientation = "vertical", format = (value) => value, table, height = 160, highlight = "last", ticks = "ends", tick }: BarsProps) {
   return (
     <figure className="space-y-3">
-      {orientation === "vertical" ? <Vertical label={label} points={points} height={height} format={format} highlight={highlight} /> : <Horizontal label={label} points={points} format={format} />}
+      {orientation === "vertical" ? (
+        <Vertical label={label} points={points} height={height} format={format} highlight={highlight} ticks={ticks} tick={tick ?? ((point) => point.label)} />
+      ) : (
+        <Horizontal label={label} points={points} format={format} />
+      )}
       {table ? <ChartFallback {...table} points={points} format={format} /> : null}
     </figure>
   );
@@ -64,7 +71,23 @@ function highlighted(points: readonly ChartPoint[], highlight: BarHighlight): nu
   return peak;
 }
 
-function Vertical({ label, points, height, format, highlight }: { label: string; points: readonly ChartPoint[]; height: number; format: (value: string) => string; highlight: BarHighlight }) {
+function Vertical({
+  label,
+  points,
+  height,
+  format,
+  highlight,
+  ticks,
+  tick,
+}: {
+  label: string;
+  points: readonly ChartPoint[];
+  height: number;
+  format: (value: string) => string;
+  highlight: BarHighlight;
+  ticks: "all" | "ends";
+  tick: (point: ChartPoint) => string;
+}) {
   const values = points.map((point) => point.value);
   const extent = extentOf(values);
   // laid out on a 100 x 100 box, so every position is a percent of the plot
@@ -76,7 +99,7 @@ function Vertical({ label, points, height, format, highlight }: { label: string;
   const last = points[points.length - 1];
   // a few points (the weeks since a launch) keep bars of a readable width instead of one bar across the page
   return (
-    <div style={{ maxWidth: Math.max(points.length * 72, 240) }}>
+    <div style={{ maxWidth: points.length <= 6 ? Math.max(points.length * 72, 240) : undefined }}>
       <p aria-hidden="true" className="mb-1 text-[13px] tabular-nums text-neutral-600">
         {format(extent.max)}
       </p>
@@ -98,10 +121,18 @@ function Vertical({ label, points, height, format, highlight }: { label: string;
           );
         })}
       </div>
-      {first ? (
+      {ticks === "all" && points.length > 0 ? (
+        <div aria-hidden="true" className="mt-2 grid text-center text-xs tabular-nums text-neutral-600" style={{ gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))` }}>
+          {points.map((point) => (
+            <span key={point.key} className="truncate">
+              {tick(point)}
+            </span>
+          ))}
+        </div>
+      ) : first ? (
         <div aria-hidden="true" className="mt-2 flex justify-between gap-4 text-[13px] tabular-nums text-neutral-600">
-          <span>{first.label}</span>
-          {last && last !== first ? <span>{last.label}</span> : null}
+          <span>{tick(first)}</span>
+          {last && last !== first ? <span>{tick(last)}</span> : null}
         </div>
       ) : null}
     </div>
