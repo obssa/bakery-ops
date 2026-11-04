@@ -156,7 +156,6 @@
     "queue_count": "{count, plural, one {# ትዕዛዝ} other {# ትዕዛዞች}}",
     "queue_items": "{count, plural, one {# ዕቃ} other {# ዕቃዎች}}",
     "queue_items_qty": "{qty} ዕቃዎች",
-    "queue_age": "{minutes} ደቂቃ",
     "pick_title": "ክፍያውን ለመቀበል ትዕዛዝ ይምረጡ",
     "pick_body": "ከዝርዝሩ ውስጥ ትዕዛዝ ይንኩ። ክፍያው እዚህ ይከፈታል፤ ደረሰኙም ከጎኑ ይታያል።",
     "stale": "አገልጋዩን ማግኘት አልተቻለም። የተጫነው ይታያል፤ ያረጀ ሊሆን ይችላል።",
@@ -463,7 +462,7 @@
     "chip_wasted": "{waste} ባከነ",
     "meta_started": "{name} · {time} ላይ ጀመረ",
     "meta_started_anon": "{time} ላይ ተጀመረ",
-    "meta_minutes": "እስካሁን {minutes} ደቂቃ",
+    "meta_waited": "እስካሁን {time}",
     "meta_overseer": "{name} · ተቆጣጣሪ ያስፈልጋል",
     "meta_confirmed": "{time} ላይ ተረጋግጧል",
     "meta_done": "{time} ላይ ተጠናቋል",
@@ -473,6 +472,7 @@
     "action_confirm": "ዙሩን አረጋግጥ",
     "action_of": "{action}፦ {name}",
     "display_case": "የማሳያው ክምችት",
+    "display_case_short": "ማሳያው",
     "new_batch": "አዲስ ዙር",
     "new_batch_title": "አዲስ የምርት ዙር ጠይቅ",
     "new_batch_product": "ምርት",
@@ -790,7 +790,9 @@
     "loading": "በመጫን ላይ…",
     "saving": "በማስቀመጥ ላይ…",
     "retry": "እንደገና ይሞክሩ",
-    "order_no_dated": "{no}፣ {date}"
+    "order_no_dated": "{no}፣ {date}",
+    "wait_hours": "{hours} ሰ {minutes}",
+    "wait_days": "{days} ቀ"
   },
   "errors": {
     "network": "አገልጋዩን ማግኘት አልተቻለም። ግንኙነቱን አረጋግጠው እንደገና ይሞክሩ።",

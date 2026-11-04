@@ -13,7 +13,6 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useProductImages } from "@/lib/productImages";
 import { authed, can, useSession } from "@/lib/session";
 import { useStationHeader } from "@/lib/topBar";
-import { useNow } from "@/lib/useNow";
 import { ICON_STROKE } from "../icons";
 import { StationHeaderActions } from "../StationHeaderActions";
 import { DisplayCasePanel } from "../till/DisplayCasePanel";
@@ -43,7 +42,6 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   const errorText = useErrorText();
   const me = useSession((s) => s.me);
   const params = useSearchParams();
-  const now = useNow(30_000);
 
   const shiftStation = useShiftStation({ kinds: PRODUCTION_KINDS });
   const feed = useMemo(() => createProductionFeed(), []);
@@ -182,7 +180,6 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
                     selected={request.id === opened?.id}
                     image={images.get(request.product.id) ?? null}
                     category={categoryOf.get(request.product.id) ?? null}
-                    now={now}
                     onOpen={open}
                     onChanged={refresh}
                   />

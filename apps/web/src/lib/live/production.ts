@@ -105,11 +105,3 @@ export function cardQty(request: ProductionRequest): string {
   const made = request.batch?.produced_qty;
   return (request.status === "pending_confirmation" || request.status === "done") && made != null ? made : request.requested_qty;
 }
-
-/** Whole minutes since the batch went in, for the card of a batch in the oven; null without a start or for a clock that runs behind. */
-export function minutesSince(iso: string | null | undefined, now: number): number | null {
-  if (!iso) return null;
-  const started = Date.parse(iso);
-  if (Number.isNaN(started) || now < started) return null;
-  return Math.floor((now - started) / 60_000);
-}

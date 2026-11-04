@@ -8,11 +8,13 @@ import type { Locale, ProductImageView, ProductionRequest } from "@/lib/api/type
 import { whenText, type DateFormatLike } from "@/lib/dates";
 import { trimDecimal, compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
-import { cardMove, cardQty, minutesSince, type CardMove } from "@/lib/live/production";
+import { cardMove, cardQty, type CardMove } from "@/lib/live/production";
 import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
 import { useSession } from "@/lib/session";
 import { addisClock } from "@/lib/shifts";
 import { useDateFormat } from "@/lib/useDates";
+import { useNow } from "@/lib/useNow";
+import { useWaitText } from "@/lib/useWaitText";
 import { Button, Chip, ProductImage } from "../ui";
 import { focusRing, type ButtonVariant } from "../styles";
 import { useRequestRun } from "./useRequestRun";
@@ -34,12 +36,26 @@ const MOVE_LOOK: Record<CardMove, { variant: ButtonVariant; label: "action_accep
   confirm: { variant: "primary", label: "action_confirm" },
 };
 
+/** How long a batch has been in, ticking every second: " · 22:14 so far", "1 h 05 so far" (lib/durations.ts). */
+function Waited({ since }: { since: string }) {
+  const t = useTranslations("production");
+  const now = useNow(1000);
+  const wait = useWaitText();
+  const started = Date.parse(since);
+  if (Number.isNaN(started)) return null;
+  return (
+    <span className="tabular-nums">
+      {" · "}
+      {t("meta_waited", { time: wait((now - started) / 1000) })}
+    </span>
+  );
+}
+
 export function RequestCard({
   request,
   selected,
   image,
   category,
-  now,
   onOpen,
   onChanged,
 }: {
@@ -49,8 +65,6 @@ export function RequestCard({
   image: ProductImageView | null;
   /** the product's category name, for the placeholder's icon */
   category: string | null;
-  /** the board's clock, for the minutes a batch has been in */
-  now: number;
   /** opens the request card; `finish` opens it on its Done form */
   onOpen: (request: ProductionRequest, focus?: "finish") => void;
   onChanged: () => void;
@@ -106,8 +120,6 @@ export function RequestCard({
   } else if (request.status === "in_progress" && batch) {
     const time = addisClock(batch.started_at);
     meta.push(request.assigned_to ? t("meta_started", { name: request.assigned_to.name, time }) : t("meta_started_anon", { time }));
-    const minutes = minutesSince(batch.started_at, now);
-    if (minutes !== null) meta.push(t("meta_minutes", { minutes }));
   } else if (request.status === "pending_confirmation" && batch) {
     meta.push(t("meta_overseer", { name: batch.finished_by?.name ?? request.assigned_to?.name ?? "" }));
   } else if (request.status === "done") {
@@ -158,7 +170,12 @@ export function RequestCard({
       ) : null}
 
       {/* the oven's progress bar needs a planned duration, which no batch carries yet (phase-6 plan 10.2 Q5): the minutes in show instead */}
-      {meta.length > 0 ? <p className="text-[13px] text-neutral-600">{meta.join(" · ")}</p> : null}
+      {meta.length > 0 ? (
+        <p className="text-[13px] text-neutral-600">
+          {meta.join(" · ")}
+          {request.status === "in_progress" && batch ? <Waited since={batch.started_at} /> : null}
+        </p>
+      ) : null}
       {batch?.send_back_note && request.status === "in_progress" ? <p className="text-[13px] font-medium text-amber-800">{t("sent_back", { note: batch.send_back_note })}</p> : null}
 
       {waiting ? (

@@ -156,7 +156,6 @@
     "queue_count": "{count, plural, one {# order} other {# orders}}",
     "queue_items": "{count, plural, one {# item} other {# items}}",
     "queue_items_qty": "{qty} items",
-    "queue_age": "{minutes} min",
     "pick_title": "Choose an order to take its payment",
     "pick_body": "Tap an order in the list. Its payment opens here, with the receipt beside it.",
     "stale": "Cannot reach the server. Showing what was loaded; it may be out of date.",
@@ -463,7 +462,7 @@
     "chip_wasted": "{waste} wasted",
     "meta_started": "{name} · started {time}",
     "meta_started_anon": "Started {time}",
-    "meta_minutes": "{minutes} min so far",
+    "meta_waited": "{time} so far",
     "meta_overseer": "{name} · needs an overseer",
     "meta_confirmed": "Confirmed {time}",
     "meta_done": "Done {time}",
@@ -473,6 +472,7 @@
     "action_confirm": "Confirm batch",
     "action_of": "{action}: {name}",
     "display_case": "Display case stock",
+    "display_case_short": "Display case",
     "new_batch": "New batch",
     "new_batch_title": "Ask for a new batch",
     "new_batch_product": "Product",
@@ -790,7 +790,9 @@
     "loading": "Loading…",
     "saving": "Saving…",
     "retry": "Try again",
-    "order_no_dated": "{no} of {date}"
+    "order_no_dated": "{no} of {date}",
+    "wait_hours": "{hours} h {minutes}",
+    "wait_days": "{days} d"
   },
   "errors": {
     "network": "Cannot reach the server. Check the connection and try again.",
