@@ -2,42 +2,33 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
-import { Link, usePathname } from "@/i18n/navigation";
+import { usePathname } from "@/i18n/navigation";
 import type { Locale, ShiftStatus } from "@/lib/api/types";
 import { adminSections } from "@/lib/shiftsAdmin";
 import { addisDate } from "@/lib/shiftsAdmin";
 import { useSession } from "@/lib/session";
-import { Badge } from "../../ui";
-import { focusRing } from "../../styles";
+import { SectionTabs } from "../../admin/kit";
+import { Chip, type Tone } from "../../ui";
 
 // Pieces the admin shifts screens share (step 3.7c): the section tabs, names in the page's language, the status label of a shift and
-// the branch's local "today".
+// the branch's local "today". Step 6.4d: the tabs as the admin's segmented tabs, the status a chip with its dot.
 
-/** The sections of the admin shifts screens the person may open, as pills under the admin tabs (like Inventory). */
+/**
+ * The sections of the admin shifts screens the person may open: the navigation "Shifts sections" with the same link names, drawn as
+ * segmented tabs under each page's title row (step 6.4d, components/admin/kit.tsx SectionTabs), as the catalog's Products and Ingredients
+ * switch and the Payment and Inventory sections are. The review of a count belongs to the overview.
+ */
 export function AdminShiftsNav() {
   const t = useTranslations("adminShifts");
   const me = useSession((s) => s.me);
   const pathname = usePathname().replace(/\/+$/, "");
-  const sections = adminSections(me?.permissions ?? []);
-  return (
-    <nav aria-label={t("sections")} className="mb-6 flex flex-wrap gap-2">
-      {sections.map(({ href, key }) => {
-        const current = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={current ? "page" : undefined}
-            className={`inline-flex min-h-12 items-center rounded-full border px-5 text-base ${
-              current ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100"
-            } ${focusRing}`}
-          >
-            {t(`nav.${key}`)}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  const tabs = adminSections(me?.permissions ?? []).map(({ href, key }) => ({
+    href,
+    label: t(`nav.${key}`),
+    current: pathname === href || (key === "overview" && pathname === "/admin/shifts/review"),
+  }));
+  if (tabs.length === 0) return null;
+  return <SectionTabs label={t("sections")} tabs={tabs} />;
 }
 
 /** The name of a station, template, place or reason in the page's language. */
@@ -46,10 +37,11 @@ export function useName(): (row: { name_en: string; name_am: string }) => string
   return (row) => (locale === "am" ? row.name_am || row.name_en : row.name_en || row.name_am);
 }
 
-const TONE: Record<ShiftStatus, "neutral" | "blue" | "green" | "amber"> = {
+// green is money confirmed only (fresh-counter.md 1.3): a shift that is open is brand teal, as the station bar's chip is
+const TONE: Record<ShiftStatus, Tone> = {
   scheduled: "neutral",
   opening: "blue",
-  open: "green",
+  open: "brand",
   counting: "blue",
   pending_approval: "amber",
   locked: "neutral",
@@ -58,7 +50,11 @@ const TONE: Record<ShiftStatus, "neutral" | "blue" | "green" | "amber"> = {
 
 export function ShiftStatusBadge({ status }: { status: ShiftStatus }) {
   const t = useTranslations("adminShifts");
-  return <Badge tone={TONE[status]}>{t(`status.${status}`)}</Badge>;
+  return (
+    <Chip tone={TONE[status]} dot>
+      {t(`status.${status}`)}
+    </Chip>
+  );
 }
 
 /** The branch's local date today, known only on the client (a static page cannot know it); "" until then. */
@@ -68,10 +64,7 @@ export function useToday(): string {
   return today;
 }
 
-export const TH = "py-2 pr-4 font-medium";
-export const TD = "py-3 pr-4 align-top";
-
 export function Loading() {
   const t = useTranslations("common");
-  return <p className="py-4 text-base text-neutral-600">{t("loading")}</p>;
+  return <p className="py-4 text-[15px] text-neutral-600">{t("loading")}</p>;
 }

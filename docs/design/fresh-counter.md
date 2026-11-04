@@ -333,6 +333,20 @@ As built for Sell and Make (step 6.4c, `components/admin/kit.tsx`), so each scre
 - the colours of a state: amber waiting, blue in progress, `brand` done or on, red refused or out, green only for money confirmed (a
   verified payment, an order paid in full).
 
+As built for Team, Insight and System (step 6.4d, on 6.4c's `components/admin/kit.tsx`):
+- the title row: the title with its Amharic name on the English page, the intro, the page's actions at the right (a page's exports as a
+  group "Export", the way back from a record as a ghost button with an arrow);
+- "Shifts sections" and "Analytics sections" as the kit's segmented tabs under each page's title row (the analytics ones keep the range);
+- the toolbar: the analytics range as a segment track (Today, 7, 30, 90 days, Custom range) with the page's options after it (how fresh
+  the figures are is a white pill in the title row, beside the exports); a list's filters as 44 px selects and boxed fields;
+- tables on the kit's table card, figures right-aligned in tabular numbers, a row's actions at its end; a product beside its 52 × 39 photo;
+- a form on a white card under its list in two columns, brought into view by Edit;
+- charts in the style of Today's "Sales by hour": the highlighted bar (the latest point, or the busiest hour) `brand-600`, the others
+  `brand-100`, rounded at the data end and square on the zero line, a shortage red under it; share bars `brand-600` on a `neutral-100`
+  track; a line 2 px `brand-600` with its latest point as a dot, the period before dashed `neutral-400`; no gradient, no blue;
+- the colours of a state as 6.4c's: an open shift, an active person, device, template or reason, a passing backup and a switch that is on
+  are `brand`; amber waiting or stale; red revoked, failed or a shortage; green for money confirmed only.
+
 ## 5. Accessibility and language
 
 - Contrast:

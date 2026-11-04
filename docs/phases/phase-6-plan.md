@@ -1288,7 +1288,67 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       transfers, reorder and the planner in English, and Payments and the stock list in Amharic. Left as they were (p6-a11y does not cover
       these screens): axe's label-content-name-mismatch on the Amharic order card names ("ትዕዛዝ {no}ን ክፈት" beside "ትዕዛዝ {no}"), the Amharic
       "Void order" and the reconciliation's drill link (named by its sentence, showing the count); changing them changes names.
-  - As built (step 6.4d): (to be written by 6.4d)
+  - **As built (step 6.4d, `phase-6/web-admin-team-insight`).** Branched from 6.4a's `phase-6/web-admin-today` (now `main` at `a43354a`).
+    6.4c's `components/admin/kit.tsx`, `lib/twin.ts`, its `PageHeader` change (the title and intro take what the actions leave) and its
+    `HistoryLink` are copied unchanged from `phase-6/web-admin-sell-make` at `5e97257`, so the Team, Insight and System screens use the same
+    patterns as the Sell and Make ones and the two branches merge cleanly. Web only, plus the review sheet (`docs/i18n/am-review.csv`) and
+    the spec's lines in fresh-counter.md 4.4. No API, route, registry, OpenAPI or ERD change, and **no Playwright selector changed**: every
+    accessible name, role, landmark, test id and visible string the p0 to p5 specs read is as it was. Where the code chose what the plan
+    left open:
+    - **The patterns.** Every page's title row carries its Amharic title beside the English one on the English page (`amharicTwin`; the
+      count review keeps "{id}" for the client to fill). "Shifts sections" and "Analytics sections" keep their names, links and
+      `aria-current`, drawn by each page as the kit's `SectionTabs` under its own title row (the layouts only enter the locale); the
+      analytics tabs keep the range in each link. Lists are the kit's `TableCard`; forms are white cards under their lists in two columns
+      from 1024 px (`FORM_GRID`), brought into view by Edit; `components/admin/rows.tsx` (new) draws a table card's grey rows while its first
+      read is pending and the API's message with "Try again" when it failed, so a card, its title and its filters stay in place.
+    - **People**: "Devices" is the title row's action (a secondary button with its icon; "devices_desc" its tooltip); the people a table
+      card (initials beside each name, hidden from readers, so the cell's name is still the person's; the status a chip; the On call box);
+      the new person form a white card in two columns under it; the stations' overseer rule a table card. The saved lines stay polite live
+      regions inside their cards. **Devices**: this device and the print bridges two white cards side by side, the enrolled devices a table
+      card under them (Active brand, Revoked red, Revoke the danger button as its confirmation is).
+    - **Shifts**: the overview's running shifts as the Today board's rows (station and state chip, the template and who started it, Open
+      the count at the row's end) beside the setup check from 1280 px (its fixes amber rows with a brand link, or one brand line when all is
+      in place), then the counts waiting for a decision (a card of rows, Review the primary button, the lines that differ in tabular figures).
+      A count's review: Back and its audit history in the title row, its facts a card with its stage and type as chips, its lines a table
+      card (a shortage red, a surplus amber), the decision a white card, Send back the danger button. History: the chain a card with the place
+      and Verify as its toolbar ("The chain is intact" brand-50), the shifts a table card with its two filters on its title row and the
+      pages in its foot. Notes: one card of shift rows, Show notes opening each. Reasons and templates: a table card each, the form under it
+      (days and stations as pill checkboxes, checked brand-50 on a brand-600 line); Retire's confirmation is the danger button. Replay: the
+      station and the moment as the toolbar, the station at that moment a card (the people on duty with their initials), each place's stock a
+      table card, the open orders and the counts two cards side by side. Roster: the week as the toolbar (the date box and a segment track
+      of Previous, This and Next week), a table card per station, today's column brand teal (`aria-current="date"` on its header). An open
+      shift is brand, never green; the overview's intro now says the tabs are below (en and am).
+    - **Analytics**: the title row's actions are how fresh the figures are (a white pill, "Updated … ago" with a brand dot, as Today's
+      intro says it) and the exports (a group "Export" described by what the file holds; the outcome in one line under them); the range is
+      the toolbar's segment track (the same pressed buttons, "Custom range" with its two dates under it), with the grouping, the kind of work
+      or "Compare with the previous period" (a 44 px pill checkbox) after it on the same row; a rebuild running and the days not built are
+      notices under it (the region "Days not built" and "Rebuild these days" as they were). The
+      headline figures are the board's KPI row (still each a group named by its label, money as "1,234.50 ETB"; a change for the worse in
+      red: a fall in takings, a rise in refunds, voids or cancelled orders); revenue by order type and the payment methods' shares are Today's
+      share bars side by side; the best sellers and the products table carry each product's photo (`useProductImages`, an ingredient none);
+      the product page's title row is its photo, its name, its other name in its own `lang` and its chips, "Back to Products" its action;
+      stations, staff and the payment methods are compact table cards that fit the page; Sales shows its line and its hours (06:00 to
+      17:00 widened to any hour that sold, every hour labelled, as Today's) before the table of its days. The staff table keeps the row
+      header to the name alone (`p4-dashboards` reads its text).
+    - **Charts** (`components/charts/*`), in Today's dataviz style: vertical bars laid out in percent on plain boxes (so a round end stays
+      round at any width), the highlighted bar brand-600 (the latest point; the busiest hour on Sales by hour) and the others brand-100,
+      rounded at the data end, square on the zero line, a shortage red under it, each bar's label and figure on hover; horizontal bars are
+      Today's share bars; a line is 2 px brand-600 with its latest point as a dot, the period before dashed neutral-400; days not built stay
+      neutral-100 columns; the folded tables are the admin Table on a hairline frame behind a brand link. No gradient, no blue.
+    - **Audit log**: the exports in the title row; the filters as the toolbar in two rows (still the search landmark "Audit log filters"
+      with the same labels; the hints are the controls' tooltips); Refresh and when the list was read above the table card; the action code
+      a neutral chip (still `translate="no"`), the subject a brand link, the older entries in the card's foot. The entry drawer: its facts in
+      13 px caps, its diff and context on the admin table (an added field brand-50, never green), Close an icon button of that name.
+    - **System**: each part a white card with its state as a chip beside its title (brand when well, amber or red when not), its figures
+      on hairline rows; the restore drill a framed part of the backups card; the backups card also says what the live product photos take,
+      "Product photos" with `files.media_used_mb` in MB (`lib/system.ts` gains the field, optional). Every `system-*` test id is where it was.
+    - Messages, both languages: `system.files.media`; `counts.admin_intro` reworded (the tabs are below). `docs/i18n/am-review.csv`
+      regenerated.
+    - Tests: `e2e/p6/screens.spec.ts` gains, at 1440 × 900 as the demo bakery's admin, People, Devices, the Shifts overview, the roster,
+      the history, the analytics overview and its Sales page, the audit log and System in English, and People and the analytics overview in
+      Amharic. Left as they were (p6-a11y does not cover these screens): the notes' "Show notes" buttons named "Show the notes of …" and
+      the running shifts' "Open the count" named by its station (axe's label-content-name-mismatch); changing them changes names.
+    - STATUS `web.admin` `done`: 6.4a to 6.4c are merged, and this is the last admin step.
 
 ### 6.5 docs (STATUS `docs`), one PR
 

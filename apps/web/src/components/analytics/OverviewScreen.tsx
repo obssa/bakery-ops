@@ -4,12 +4,31 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { differenceOf, percentChange, seriesLabel, type AnalyticsRange } from "@/lib/analytics";
 import { useOverview, useSales, type Answer, type Overview } from "@/lib/api/analytics";
+import { compareDecimal } from "@/lib/decimal";
 import { useDateFormat } from "@/lib/useDates";
+import { useProductImages } from "@/lib/productImages";
+import { TableCard, ToolbarCheck } from "../admin/kit";
 import { Bars } from "../charts/Bars";
 import { Sparkline } from "../charts/Sparkline";
-import { PageHeader } from "../ui";
-import { focusRing } from "../styles";
-import { FreshnessBar, Kpi, pageQuery, RangeControl, ReadError, Section, SkeletonRows, TableFrame, TD, TD_NUM, TH, TH_NUM, useAnalyticsPage, useFigures, useFreshness, useNames } from "./shared";
+import { ProductImage } from "../ui";
+import {
+  AnalyticsHeader,
+  AnalyticsNav,
+  FreshnessChip,
+  FreshnessNotice,
+  Kpi,
+  NUM,
+  pageQuery,
+  RangeControl,
+  ReadError,
+  ROW_LINK,
+  Section,
+  SkeletonRows,
+  useAnalyticsPage,
+  useFigures,
+  useFreshness,
+  useNames,
+} from "./shared";
 
 // Admin > Analytics > Overview (step 4.5e; analytics.view): the range's headline figures (revenue, net revenue, orders, the average ticket,
 // items sold, refunds, voids, cancelled orders), revenue by order type, the payment methods' shares and the five best sellers, from
@@ -17,10 +36,15 @@ import { FreshnessBar, Kpi, pageQuery, RangeControl, ReadError, Section, Skeleto
 // days before. The revenue tile's sparkline (GET /analytics/sales by day) and the freshness feed start once the overview has answered, so
 // nothing competes with it. Refunds are the summaries' figures (zero until steps 4.1b and 4.3d); a range with no built day shows no
 // figure at all (R-U: not built is never zero).
+//
+// Step 6.4d (fresh-counter.md 4.2 and 4.4, the Admin board): the title row with its Amharic twin and the exports, the Analytics sections,
+// the freshness pill in the title row, the range and "Compare" as the toolbar; the headline figures as the board's KPI row (a change down in red);
+// revenue by order type and the payment methods' shares as Today's share bars side by side; the best sellers a table card with each
+// product's photo, as Today's "Top sellers".
 
 const TYPES = ["dine_in", "takeaway", "delivery", "advance"] as const;
 
-export function OverviewScreen() {
+export function OverviewScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("analytics");
   const page = useAnalyticsPage();
   const { range, params, today } = page;
@@ -35,17 +59,15 @@ export function OverviewScreen() {
 
   return (
     <>
-      <PageHeader title={t("overview.title")} intro={t("overview.intro")} />
-      <div className="space-y-6">
+      <AnalyticsHeader title={t("overview.title")} intro={t("overview.intro")} titleAm={titleAm} fresh={<FreshnessChip state={freshness} asOf={overview.data?.as_of} />} />
+      <div className="flex flex-col gap-6">
+        <AnalyticsNav />
         <RangeControl range={range} today={today} onChange={(next) => choose(next)}>
-          <label className="inline-flex min-h-12 items-center gap-3 text-base text-neutral-800">
-            <input type="checkbox" className="h-5 w-5" checked={compare} onChange={(event) => choose(range, event.target.checked)} />
-            {t("overview.compare")}
-          </label>
+          <ToolbarCheck label={t("overview.compare")} checked={compare} onChange={(event) => choose(range, event.target.checked)} />
         </RangeControl>
-        <FreshnessBar state={freshness} asOf={overview.data?.as_of} />
+        <FreshnessNotice state={freshness} />
         {overview.error ? <ReadError error={overview.error} onRetry={() => void overview.refetch()} /> : <Headline answer={overview.data} compare={compare} range={range} showSpark={answered} />}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))]">
           <ByType answer={overview.data} />
           <ChannelShares answer={overview.data} />
         </div>
@@ -64,43 +86,62 @@ function Headline({ answer, compare, range, showSpark }: { answer: Answer<Overvi
   const before = answer?.previous;
   const beforeBuilt = before ? before.as_of !== null : false;
 
-  /** The change line of a tile with the comparison: a signed percent and the difference, or why there is none. */
-  function change(current: string, previous: string | undefined, kind: "money" | "count" | "qty") {
+  /** The change line of a tile with the comparison: a signed percent and the difference, or why there is none; `bad` when it fell. */
+  function change(current: string, previous: string | undefined, kind: "money" | "count" | "qty", worseUp = false): { text: string; bad: boolean } | undefined {
     if (!compare || !before || previous === undefined) return undefined;
-    if (!beforeBuilt) return t("overview.change_none");
+    if (!beforeBuilt) return { text: t("overview.change_none"), bad: false };
     const pct = percentChange(current, previous);
     const raw = differenceOf(current, previous, kind === "money" ? 2 : kind === "count" ? 0 : 4);
     const diff = kind === "qty" ? (raw.startsWith("+") ? `+${f.qty(raw.slice(1))}` : f.qty(raw)) : f.amount(raw);
-    return pct === null ? t("overview.change_from_zero", { difference: diff }) : t("overview.change", { pct, difference: diff });
+    // a fall in takings is bad; for refunds, voids and cancelled orders a rise is
+    const sign = compareDecimal(raw.replace(/^\+/, ""), "0");
+    const bad = worseUp ? sign > 0 : sign < 0;
+    return { text: pct === null ? t("overview.change_from_zero", { difference: diff }) : t("overview.change", { pct, difference: diff }), bad };
   }
 
   const value = (text: string) => (built ? text : "—");
   const detailNotBuilt = !loading && !built ? t("overview.not_built") : undefined;
 
+  const tiles: { key: string; label: string; value?: string; detail?: string; change?: { text: string; bad: boolean }; spark?: boolean }[] = [
+    { key: "revenue", label: t("kpi.revenue"), value: data && value(f.money(data.revenue)), change: data && built ? change(data.revenue, before?.data.revenue, "money") : undefined, spark: true },
+    { key: "net", label: t("kpi.net_revenue"), value: data && value(f.money(data.net_revenue)), change: data && built ? change(data.net_revenue, before?.data.net_revenue, "money") : undefined },
+    {
+      key: "orders",
+      label: t("kpi.orders"),
+      value: data && value(f.count(data.orders_count)),
+      change: data && built ? change(String(data.orders_count), before ? String(before.data.orders_count) : undefined, "count") : undefined,
+    },
+    { key: "avg", label: t("kpi.avg_ticket"), value: data && value(f.money(data.avg_ticket)), change: data && built ? change(data.avg_ticket, before?.data.avg_ticket, "money") : undefined },
+    { key: "items", label: t("kpi.items"), value: data && value(f.qty(data.items_qty)), change: data && built ? change(data.items_qty, before?.data.items_qty, "qty") : undefined },
+    {
+      key: "refunds",
+      label: t("kpi.refunds"),
+      value: data && value(f.money(data.refund_total)),
+      detail: data && built ? t("kpi.refunds_count", { count: data.refund_count }) : undefined,
+      change: data && built ? change(data.refund_total, before?.data.refund_total, "money", true) : undefined,
+    },
+    {
+      key: "voids",
+      label: t("kpi.voids"),
+      value: data && value(f.money(data.voided_total)),
+      detail: data && built ? t("kpi.voids_count", { count: data.voided_count }) : undefined,
+      change: data && built ? change(data.voided_total, before?.data.voided_total, "money", true) : undefined,
+    },
+    {
+      key: "cancelled",
+      label: t("kpi.cancelled"),
+      value: data && value(f.count(data.cancelled_count)),
+      change: data && built ? change(String(data.cancelled_count), before ? String(before.data.cancelled_count) : undefined, "count", true) : undefined,
+    },
+  ];
+
   return (
-    <section aria-label={t("overview.headline")} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Kpi label={t("kpi.revenue")} loading={loading} value={data && value(f.money(data.revenue))} detail={detailNotBuilt} change={data && built ? change(data.revenue, before?.data.revenue, "money") : undefined}>
-        {showSpark && built && range.from !== range.to ? <RevenueSpark range={range} /> : null}
-      </Kpi>
-      <Kpi label={t("kpi.net_revenue")} loading={loading} value={data && value(f.money(data.net_revenue))} detail={detailNotBuilt} change={data && built ? change(data.net_revenue, before?.data.net_revenue, "money") : undefined} />
-      <Kpi label={t("kpi.orders")} loading={loading} value={data && value(f.count(data.orders_count))} detail={detailNotBuilt} change={data && built ? change(String(data.orders_count), before ? String(before.data.orders_count) : undefined, "count") : undefined} />
-      <Kpi label={t("kpi.avg_ticket")} loading={loading} value={data && value(f.money(data.avg_ticket))} detail={detailNotBuilt} change={data && built ? change(data.avg_ticket, before?.data.avg_ticket, "money") : undefined} />
-      <Kpi label={t("kpi.items")} loading={loading} value={data && value(f.qty(data.items_qty))} detail={detailNotBuilt} change={data && built ? change(data.items_qty, before?.data.items_qty, "qty") : undefined} />
-      <Kpi
-        label={t("kpi.refunds")}
-        loading={loading}
-        value={data && value(f.money(data.refund_total))}
-        detail={data && built ? t("kpi.refunds_count", { count: data.refund_count }) : detailNotBuilt}
-        change={data && built ? change(data.refund_total, before?.data.refund_total, "money") : undefined}
-      />
-      <Kpi
-        label={t("kpi.voids")}
-        loading={loading}
-        value={data && value(f.money(data.voided_total))}
-        detail={data && built ? t("kpi.voids_count", { count: data.voided_count }) : detailNotBuilt}
-        change={data && built ? change(data.voided_total, before?.data.voided_total, "money") : undefined}
-      />
-      <Kpi label={t("kpi.cancelled")} loading={loading} value={data && value(f.count(data.cancelled_count))} detail={detailNotBuilt} change={data && built ? change(String(data.cancelled_count), before ? String(before.data.cancelled_count) : undefined, "count") : undefined} />
+    <section aria-label={t("overview.headline")} className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))]">
+      {tiles.map((tile) => (
+        <Kpi key={tile.key} label={tile.label} loading={loading} value={tile.value} detail={tile.detail ?? detailNotBuilt} change={tile.change?.text} bad={tile.change?.bad}>
+          {tile.spark && showSpark && built && range.from !== range.to ? <RevenueSpark range={range} /> : null}
+        </Kpi>
+      ))}
     </section>
   );
 }
@@ -111,7 +152,7 @@ function RevenueSpark({ range }: { range: AnalyticsRange }) {
   const dates = useDateFormat();
   const f = useFigures();
   const sales = useSales(range, "day");
-  if (!sales.data) return <span aria-hidden="true" className="mt-2 block h-9 animate-pulse rounded bg-neutral-100" />;
+  if (!sales.data) return <span aria-hidden="true" className="mt-2 block h-9 rounded-lg bg-neutral-100 motion-safe:animate-skeleton" />;
   const points = sales.data.data.series.map((point) => ({ key: point.key, label: seriesLabel(point.key, "day", dates), value: point.revenue }));
   return <Sparkline label={t("overview.spark_label")} points={points} format={f.amount} table={{ caption: t("overview.spark_label"), keyHeading: t("col.day"), valueHeading: t("col.revenue"), missingText: t("not_built") }} />;
 }
@@ -124,7 +165,7 @@ function ByType({ answer }: { answer: Answer<Overview> | undefined }) {
       {answer === undefined ? (
         <SkeletonRows rows={4} label={t("loading")} />
       ) : answer.as_of === null ? (
-        <p className="text-base text-neutral-600">{t("overview.not_built")}</p>
+        <p className="text-[15px] text-neutral-600">{t("overview.not_built")}</p>
       ) : (
         <Bars
           orientation="horizontal"
@@ -148,7 +189,7 @@ function ChannelShares({ answer }: { answer: Answer<Overview> | undefined }) {
       {answer === undefined ? (
         <SkeletonRows rows={4} label={t("loading")} />
       ) : channels.length === 0 ? (
-        <p className="text-base text-neutral-600">{answer.as_of === null ? t("overview.not_built") : t("overview.channels_empty")}</p>
+        <p className="text-[15px] text-neutral-600">{answer.as_of === null ? t("overview.not_built") : t("overview.channels_empty")}</p>
       ) : (
         <Bars
           orientation="horizontal"
@@ -167,40 +208,59 @@ function TopItems({ answer }: { answer: Answer<Overview> | undefined }) {
   const f = useFigures();
   const names = useNames();
   const page = useAnalyticsPage();
+  const images = useProductImages();
   const rows = answer?.data.top_items ?? [];
   return (
-    <Section title={t("overview.top_items")}>
-      {answer === undefined ? (
-        <SkeletonRows rows={5} label={t("loading")} />
-      ) : rows.length === 0 ? (
-        <p className="text-base text-neutral-600">{answer.as_of === null ? t("overview.not_built") : t("overview.top_items_empty")}</p>
-      ) : (
-        <TableFrame>
-          <table className="w-full border-collapse text-left text-base">
-            <caption className="sr-only">{t("overview.top_items")}</caption>
-            <thead>
-              <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-                <th scope="col" className={TH}>{t("col.product")}</th>
-                <th scope="col" className={TH_NUM}>{t("col.units")}</th>
-                <th scope="col" className={TH_NUM}>{t("col.revenue")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.item.id} className="border-b border-neutral-100">
-                  <th scope="row" className={`${TD} font-medium`}>
-                    <Link href={{ pathname: "/admin/analytics/product", query: page.withRange({ id: String(row.item.id) }) }} className={`inline-flex min-h-12 items-center text-blue-800 underline ${focusRing}`}>
-                      {names.item(row.item)}
+    <TableCard caption={t("overview.top_items")} title={t("overview.top_items")} minWidth="min-w-[560px]">
+      <thead>
+        <tr>
+          <th scope="col">{t("col.product")}</th>
+          <th scope="col" className={NUM}>
+            {t("col.units")}
+          </th>
+          <th scope="col" className={NUM}>
+            {t("col.revenue")}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {answer === undefined ? (
+          <tr>
+            <td colSpan={3}>
+              <SkeletonRows rows={5} label={t("loading")} />
+            </td>
+          </tr>
+        ) : rows.length === 0 ? (
+          <tr>
+            <td colSpan={3} className="py-6 text-neutral-600">
+              {answer.as_of === null ? t("overview.not_built") : t("overview.top_items_empty")}
+            </td>
+          </tr>
+        ) : (
+          rows.map((row, index) => {
+            const name = names.item(row.item);
+            return (
+              <tr key={row.item.id}>
+                <th scope="row" className="font-semibold">
+                  <span className="flex items-center gap-3">
+                    <span aria-hidden="true" className="w-5 shrink-0 text-sm tabular-nums text-neutral-600">
+                      {index + 1}
+                    </span>
+                    <span aria-hidden="true" className="shrink-0">
+                      <ProductImage image={images.get(row.item.id) ?? null} name={name} category={names.category(row.item)} size="thumb" className="w-13 rounded-lg" />
+                    </span>
+                    <Link href={{ pathname: "/admin/analytics/product", query: page.withRange({ id: String(row.item.id) }) }} className={ROW_LINK}>
+                      {name}
                     </Link>
-                  </th>
-                  <td className={TD_NUM}>{f.qty(row.units_sold_qty)}</td>
-                  <td className={TD_NUM}>{f.amount(row.revenue)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableFrame>
-      )}
-    </Section>
+                  </span>
+                </th>
+                <td className={NUM}>{f.qty(row.units_sold_qty)}</td>
+                <td className={`${NUM} font-semibold`}>{f.amount(row.revenue)}</td>
+              </tr>
+            );
+          })
+        )}
+      </tbody>
+    </TableCard>
   );
 }

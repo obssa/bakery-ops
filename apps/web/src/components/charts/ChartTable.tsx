@@ -1,10 +1,13 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { focusRing } from "../styles";
+import { Table } from "../ui";
 
 // The table behind every chart (step 4.5e): the same points, each figure exactly as the API sent it (formatted for reading, never
-// recomputed), and a point that was not built said in words. A chart is a picture of this table.
+// recomputed), and a point that was not built said in words. A chart is a picture of this table. Step 6.4d: the admin Table (13 px caps
+// header, hairline rows, figures right-aligned in tabular numbers) inside a hairline frame, folded under its chart behind a brand link.
 
 export interface ChartPoint {
   key: string;
@@ -27,21 +30,21 @@ export interface ChartTableProps {
   className?: string;
 }
 
+const NUM = "whitespace-nowrap text-right tabular-nums";
+
 export function ChartTable({ caption, keyHeading, valueHeading, points, format = (value) => value, missingText, compare, className = "" }: ChartTableProps) {
-  const cell = (value: string | null): ReactNode => (value === null ? <span className="text-neutral-500">{missingText}</span> : format(value));
+  const cell = (value: string | null): ReactNode => (value === null ? <span className="text-neutral-600">{missingText}</span> : format(value));
   return (
-    <table className={`w-full border-collapse text-left text-base ${className}`}>
+    <Table className={`[&_tr>*:first-child]:pl-4 [&_tr>*:last-child]:pr-4 [&_tbody_tr:last-child]:border-b-0 ${className}`}>
       <caption className="sr-only">{caption}</caption>
       <thead>
-        <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-          <th scope="col" className="py-2 pr-4 font-medium">
-            {keyHeading}
-          </th>
-          <th scope="col" className="py-2 pr-4 text-right font-medium">
+        <tr>
+          <th scope="col">{keyHeading}</th>
+          <th scope="col" className={NUM}>
             {valueHeading}
           </th>
           {compare ? (
-            <th scope="col" className="py-2 pr-4 text-right font-medium">
+            <th scope="col" className={NUM}>
               {compare.heading}
             </th>
           ) : null}
@@ -49,25 +52,30 @@ export function ChartTable({ caption, keyHeading, valueHeading, points, format =
       </thead>
       <tbody>
         {points.map((point, i) => (
-          <tr key={point.key} className="border-b border-neutral-100">
-            <th scope="row" className="py-2 pr-4 font-normal text-neutral-900">
+          <tr key={point.key}>
+            <th scope="row" className="!font-normal text-neutral-900">
               {point.label}
             </th>
-            <td className="py-2 pr-4 text-right tabular-nums">{cell(point.value)}</td>
-            {compare ? <td className="py-2 pr-4 text-right tabular-nums">{cell(compare.values[i] ?? null)}</td> : null}
+            <td className={NUM}>{cell(point.value)}</td>
+            {compare ? <td className={NUM}>{cell(compare.values[i] ?? null)}</td> : null}
           </tr>
         ))}
       </tbody>
-    </table>
+    </Table>
   );
 }
 
 /** The table folded under the chart: open it to read every figure (and for screen readers, the chart's long description). */
 export function ChartFallback({ summary, ...table }: ChartTableProps & { summary: string }) {
   return (
-    <details className="group mt-3">
-      <summary className={`inline-flex min-h-12 cursor-pointer items-center rounded-md px-2 text-base font-medium text-blue-800 hover:bg-blue-50 ${focusRing}`}>{summary}</summary>
-      <div className="mt-2 max-h-96 overflow-auto">
+    <details className="group">
+      <summary
+        className={`inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-lg px-1 text-sm font-semibold text-brand-600 hover:text-brand-700 [&::-webkit-details-marker]:hidden ${focusRing}`}
+      >
+        {summary}
+        <ChevronDown className="size-4 motion-safe:transition-transform group-open:rotate-180" strokeWidth={2} aria-hidden="true" />
+      </summary>
+      <div className="mt-2 max-h-96 overflow-auto rounded-xl border border-neutral-200">
         <ChartTable {...table} />
       </div>
     </details>

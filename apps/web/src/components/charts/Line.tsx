@@ -7,6 +7,9 @@ import { ChartFallback, type ChartPoint } from "./ChartTable";
 // A line over a series as small inline SVG (step 4.5e; no chart library, 10.8 R-H): the range's figures, and with a comparison the period
 // before as a dashed line over the same scale. A point not built breaks the line and shades its column (never drawn as zero); a figure
 // standing alone between two gaps is a dot. Positions come from lib/charts.ts; the labels and the table under it are the strings as given.
+//
+// Step 6.4d, in the dataviz style of Today (fresh-counter.md 4.2): the range's line 2 px in brand-600 with its latest point as a dot, the
+// period before dashed in neutral-400, the zero line a neutral-200 hairline, the columns not built neutral-100; no gradient, no fill.
 
 interface LineProps {
   label: string;
@@ -21,6 +24,11 @@ interface LineProps {
 
 const WIDTH = 600;
 
+/** A segment's path; one point alone is a zero-length stroke, drawn as a round dot by its line cap. */
+function segmentPath(segment: { x: number; y: number }[]): string {
+  return segment.length === 1 ? `M${segment[0].x} ${segment[0].y} L${segment[0].x} ${segment[0].y}` : pathOf(segment.map((point) => ({ ...point, value: "" })));
+}
+
 export function Line({ label, points, compare, format = (value) => value, table, height = 180 }: LineProps) {
   const values = points.map((point) => point.value);
   const extent = extentOf([...values, ...(compare?.values ?? [])]);
@@ -31,32 +39,55 @@ export function Line({ label, points, compare, format = (value) => value, table,
   const step = points.length > 1 ? WIDTH / (points.length - 1) : WIDTH;
   const first = points[0];
   const last = points[points.length - 1];
+  const tail = current.length > 0 ? current[current.length - 1] : null;
+  const end = tail ? tail[tail.length - 1] : null;
 
   return (
-    <figure className="space-y-2">
-      <p aria-hidden="true" className="text-sm tabular-nums text-neutral-500">
-        {format(extent.max)}
-      </p>
-      <svg role="img" aria-label={label} viewBox={`0 0 ${WIDTH} ${height}`} preserveAspectRatio="none" className="block w-full overflow-visible" style={{ height }}>
-        {points.map((point, i) =>
-          point.value === null ? (
-            <rect key={point.key} x={points.length > 1 ? Math.max(0, i * step - step / 2) : 0} y={0} width={points.length > 1 ? step : WIDTH} height={height} className="fill-neutral-100" />
-          ) : null,
-        )}
-        <line x1={0} x2={WIDTH} y1={zero} y2={zero} className="stroke-neutral-300" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-        {before.map((segment, i) => (
-          <path key={`before-${i}`} d={segment.length === 1 ? `${pathOf(segment)} L${segment[0].x} ${segment[0].y}` : pathOf(segment)} className="fill-none stroke-neutral-400" strokeWidth={segment.length === 1 ? 6 : 2} strokeDasharray={segment.length === 1 ? undefined : "6 4"} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-        ))}
-        {current.map((segment, i) => (
-          <path key={`now-${i}`} d={segment.length === 1 ? `${pathOf(segment)} L${segment[0].x} ${segment[0].y}` : pathOf(segment)} className="fill-none stroke-blue-700" strokeWidth={segment.length === 1 ? 7 : 2.5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        ))}
-      </svg>
-      {first ? (
-        <div aria-hidden="true" className="flex justify-between gap-4 text-sm text-neutral-600">
-          <span>{first.label}</span>
-          {last && last !== first ? <span>{last.label}</span> : null}
-        </div>
-      ) : null}
+    <figure className="space-y-3">
+      <div>
+        <p aria-hidden="true" className="mb-1 text-[13px] tabular-nums text-neutral-600">
+          {format(extent.max)}
+        </p>
+        <svg role="img" aria-label={label} viewBox={`0 0 ${WIDTH} ${height}`} preserveAspectRatio="none" className="block w-full overflow-visible" style={{ height }}>
+          {points.map((point, i) =>
+            point.value === null ? (
+              <rect key={point.key} x={points.length > 1 ? Math.max(0, i * step - step / 2) : 0} y={0} width={points.length > 1 ? step : WIDTH} height={height} className="fill-neutral-100" />
+            ) : null,
+          )}
+          <line x1={0} x2={WIDTH} y1={zero} y2={zero} className="stroke-neutral-200" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          {before.map((segment, i) => (
+            <path
+              key={`before-${i}`}
+              d={segmentPath(segment)}
+              className="fill-none stroke-neutral-400"
+              strokeWidth={segment.length === 1 ? 6 : 2}
+              strokeDasharray={segment.length === 1 ? undefined : "6 4"}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {current.map((segment, i) => (
+            <path
+              key={`now-${i}`}
+              d={segmentPath(segment)}
+              className="fill-none stroke-brand-600"
+              strokeWidth={segment.length === 1 ? 8 : 2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {end && tail && tail.length > 1 ? (
+            <path d={`M${end.x} ${end.y} L${end.x} ${end.y}`} className="fill-none stroke-brand-600" strokeWidth={9} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          ) : null}
+        </svg>
+        {first ? (
+          <div aria-hidden="true" className="mt-2 flex justify-between gap-4 text-[13px] tabular-nums text-neutral-600">
+            <span>{first.label}</span>
+            {last && last !== first ? <span>{last.label}</span> : null}
+          </div>
+        ) : null}
+      </div>
       {table ? <ChartFallback {...table} points={points} format={format} compare={compare} /> : null}
     </figure>
   );
