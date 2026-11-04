@@ -1744,7 +1744,7 @@
       "started_by": "Started by {name} at {time}",
       "since": "Since {time}",
       "open_count": "Open the count",
-      "open_count_named": "Open the count at {station}",
+      "open_count_named": "Open the count · {station}",
       "cancel_start": "Cancel start"
     },
     "templates": {
@@ -1868,8 +1868,8 @@
       "intro": "Open a shift to read the notes left on it.",
       "show": "Show notes",
       "hide": "Hide notes",
-      "show_named": "Show the notes of {label}",
-      "hide_named": "Hide the notes of {label}",
+      "show_named": "Show notes · {label}",
+      "hide_named": "Hide notes · {label}",
       "none": "No notes on this shift.",
       "by": "{name} at {time}",
       "for": "for {name}",

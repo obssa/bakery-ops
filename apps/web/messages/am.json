@@ -1744,7 +1744,7 @@
       "started_by": "{name} በ{time} ጀምሯል",
       "since": "ከ{time} ጀምሮ",
       "open_count": "ቆጠራውን ክፈት",
-      "open_count_named": "በ{station} ያለውን ቆጠራ ክፈት",
+      "open_count_named": "ቆጠራውን ክፈት · {station}",
       "cancel_start": "ጅማሬውን ሰርዝ"
     },
     "templates": {
@@ -1868,8 +1868,8 @@
       "intro": "በፈረቃው ላይ የተተዉ ማስታወሻዎችን ለማንበብ ፈረቃውን ይክፈቱ።",
       "show": "ማስታወሻዎችን አሳይ",
       "hide": "ማስታወሻዎችን ደብቅ",
-      "show_named": "የ{label} ማስታወሻዎችን አሳይ",
-      "hide_named": "የ{label} ማስታወሻዎችን ደብቅ",
+      "show_named": "ማስታወሻዎችን አሳይ · {label}",
+      "hide_named": "ማስታወሻዎችን ደብቅ · {label}",
       "none": "በዚህ ፈረቃ ላይ ማስታወሻ የለም።",
       "by": "{name} በ{time}",
       "for": "ለ{name}",
