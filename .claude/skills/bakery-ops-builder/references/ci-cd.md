@@ -26,7 +26,7 @@ they bolt on later.
 6. **Local parity.** `make ci` runs the same steps in the same order inside Docker. If local and CI
    disagree, fix the Makefile.
 7. **Every job states `timeout-minutes`** (since 5.5d): 20 unless a measured run needs more (`mod-inventory` 30,
-   `perf-dashboards` 40, `gate-p4` 45, `backup-drill` and `gate-p5` 25, `perf-load` 30), so a hung step cannot hold a runner
+   `perf-dashboards` 40, `gate-p4` 45, `backup-drill`, `gate-p5` and `gate-p6` 25, `perf-load` 30), so a hung step cannot hold a runner
    for six hours. A job that calls a reusable workflow cannot set its own: the reusable workflow's job does (`e2e.yml` 30,
    `module-tests.yml` its `timeout_minutes` input).
 
@@ -54,7 +54,7 @@ status ─┬─ api-lint → api-arch ─┬→ mod-identity → mod-catalog �
            gate-p3 ◄ [gate-p2, mod-shifts, rules-off-gates, e2e-p3]
            gate-p4 ◄ [gate-p3, mod-analytics, e2e-p4, perf-dashboards] (+ files-s3 ◄ [mod-payments, docker-build], the S3 proof); seeds 90 days, runs gate:p4
            gate-p5 ◄ [gate-p4, e2e-p5, i18n-check (strict), backup-drill, perf-load, print-bridge]; runs gate:p5, then the go-live checklist
-           gate-p6 ◄ [gate-p5, mod-catalog, mod-orders, e2e-p6, i18n-check]; gate_check (step 6.5 adds the gate:p6 Pest step)
+           gate-p6 ◄ [gate-p5, mod-catalog, mod-orders, e2e-p6, i18n-check]; runs gate:p6 (step 6.5), then gate_check
 
 uptime.yml (5.5c) is a workflow of its own on a schedule, outside this graph.
 ```
@@ -89,8 +89,8 @@ survive, only parallelism is lost.
 | `perf-load` (5.5d) | needs `status`, `docker-build`, `mod-analytics`, 30 min (measured 14 to 14.5): `compose.perf.yml` (PHP's built-in server, `PHP_CLI_SERVER_WORKERS=8`, OPcache on), `SEED_PHASE=5`, 7 days, `LOAD_DEVICES=60`, `php artisan optimize`; k6 `scripts/perf/load.k6.js` in the pinned image: 60 devices polling at the web's cadences (`apps/api/tests/Fixtures/perf/poll-profile.json`, kept equal to the web constants by `scripts/tests/test_poll_profile.py`) and 300 orders in 10 minutes; thresholds polls p95 < 300 ms, writes p95 < 800 ms, errors < 0.5 %, `orders_paid == 300`, `dropped_iterations == 0`; then `optimize:clear` and, once the queue drained, `pest --group=perf:load` (exactly 300 orders closed, the ledger oracle `ok`, no `failed_jobs`); figures to the step summary |
 | `print-bridge` (5.3b) | needs `status`, 20 min, no Docker: Node 22; at most one dependency and no native module (checked); `node --test` in `tools/print-bridge` (fake API, fake printer), failing on a skipped, cancelled or todo test; `install-service.ps1` parsed by PowerShell and kept ASCII (Windows PowerShell 5.1 reads a file without a byte-order mark as ANSI) |
 | `gate-p5` (5.6b) | needs `status`, `gate-p4`, `e2e-p5`, `i18n-check`, `backup-drill`, `perf-load`, `print-bridge`, 25 min, `permissions: { contents: read, actions: read }`, checkout with `fetch-depth: 0`. Loads the image and starts `app` on the compose stack, puts an empty `.env` in it, copies `docs/` and `scripts/` into the container (`/tmp/repo`, named in `GATE_REPO_ROOT`: the image holds `apps/api` only), and runs `pest --group=gate:p5` with `IDENTITY_REQUIRE_DEVICE=false`, failing when it ran nothing or on a skip or a warning, as `gate-p4`. Then `gate_check.py --mode done --phase 5 --ci` with `GH_TOKEN: ${{ github.token }}` for the checklist's workflow rows (`live-ops`, `uptime-monitor`) and `branch-protection`; the checklist rows go to the step summary. While the phase is open the run is informational: a checklist FAIL becomes `WARN` (`FAIL:` kept in its detail) and a sign-off row stays `WAIT` without failing the job; once STATUS claims the phase done, both fail it |
-| `e2e-p6` (6.0) | through `e2e.yml` (30), needs `status`, `mod-analytics`, `web-build`, `docker-build` (beside `e2e-p5`); profile `full`, `history_days: "2"`, `SEED_PHASE=6` (every phase seeder up to `Phase5Seeder` until 6.1c adds `Phase6Seeder` and its demo photos); projects `p6-product-photo p6-a11y`, fixme placeholders until 6.2b and 6.4b |
-| `gate-p6` (6.0) | needs `status`, `gate-p5`, `mod-catalog`, `mod-orders`, `e2e-p6`, `i18n-check`, 20 min, `fetch-depth: 0`; `gate_check.py --mode done --phase 6 --ci`, informational while the phase is open (every FAIL a WARN), strict once STATUS claims it; step 6.5 adds `pest --group=gate:p6` on the compose stack before it, as `gate-p5` has. The coordinator adds it to `main`'s required checks after the plan PR merges |
+| `e2e-p6` (6.0) | through `e2e.yml` (30), needs `status`, `mod-analytics`, `web-build`, `docker-build` (beside `e2e-p5`); profile `full`, `history_days: "2"`, `SEED_PHASE=6` (every phase seeder, `Phase6Seeder` last since 6.1c, so the demo bakery has its photos, in WebP from the image's `gd`); projects `p6-product-photo p6-a11y` (`p6-a11y` also runs `e2e/p6/screens.spec.ts`); the screenshots for review under `test-results/screens/` are uploaded as the artifact `screens` on every run (`if: always()`, 14 days), beside `playwright-p6` on a failure |
+| `gate-p6` (6.0, 6.5) | needs `status`, `gate-p5`, `mod-catalog`, `mod-orders`, `e2e-p6`, `i18n-check`, 25 min, `fetch-depth: 0`. Loads the image, starts `app` on the compose stack, puts an empty `.env` in it and runs `pest --group=gate:p6` (`tests/Gate/Phase6GateTest.php`) with `IDENTITY_REQUIRE_DEVICE=false`, failing when it ran nothing or on a skip or a warning, as `gate-p5`; it needs no repository files in the container and no token (phase 6 has no checklist). Then `gate_check.py --mode done --phase 6 --ci`, informational while the phase is open (every FAIL a WARN), strict once STATUS claims it; the Pest step fails the job either way. The coordinator added it to `main`'s required checks after the plan PR merged |
 | `uptime` (workflow `uptime.yml`, 5.5c) | not part of `ci`: schedule `*/15 * * * *` and `workflow_dispatch`, `contents: read`, 5 min, skipped while the repository variable `DEPLOY_URL` is unset (the URL is never written in the file); one `GET /api/v1/health` (a query string per read so no cache answers), a second 60 s later when it is not ok, and the job fails only when both are not ok: GitHub's email about the failed run is the alert. No checkout, no secret, no write |
 
 Live updates in e2e (ADR 0009): `e2e-p1` and later run the polling transport, as the live host does
@@ -137,6 +137,18 @@ another PR has merged, they prove nothing about the combination. So for every PR
 4. Fast-forward `main` to that head (`git merge --ff-only`), so main gets the very commit that was green.
 
 The next PR in line then merges the new `main` the same way.
+
+## Screens for review and reading a run from the developer PC (learned in Phase 6)
+
+- A redesign step is done when its screens look like their design boards (Ramin, 2026-11-03), and that is reviewed by a person, not by
+  CI (ADR 0023: no golden screenshots). `e2e/p6/screens.spec.ts` (in `p6-a11y`) saves each rebuilt screen as
+  `test-results/screens/<screen>-<width>x<height>-<locale>.png` once it is loaded, its fonts and photos drawn and its animations ended, and
+  `e2e-p6` uploads the folder as the artifact `screens` on every run. The reviewer downloads it with
+  `timeout 60 gh run download <run-id> -n screens -D <folder>` and compares each capture with its board before the PR merges; a step
+  that adds a screen adds its captures to the same spec.
+- From the developer PC, `gh run view --log` and `--log-failed` often hang on a big run while artifact downloads work: wrap every `gh`
+  call in `timeout 60`, retry, and read a failure from `playwright-p<N>` (`test-results` and the report) and the step summary
+  (`traps.md`, "Reading CI from the developer PC").
 
 ## `docs/phases/STATUS.json`
 
