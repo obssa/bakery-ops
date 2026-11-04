@@ -1,8 +1,11 @@
 "use client";
 
+import { ChevronRight, Plus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState, type FormEvent } from "react";
-import { Alert, Badge, Button, Field, Modal, PageHeader, Panel, Select, Status, TextInput } from "@/components/ui";
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import { EmptyRow, Fact, InnerTable, TableCard, Toolbar, ToolbarSegments } from "@/components/admin/kit";
+import { ICON_STROKE } from "@/components/icons";
+import { Alert, Button, Chip, Field, IconButton, Modal, PageHeader, Panel, Select, Status, TextInput, type Tone } from "@/components/ui";
 import { useItems, useUnits } from "@/lib/api/hooks";
 import { uuid, useIdempotencyKey } from "@/lib/api/idempotency";
 import {
@@ -24,16 +27,22 @@ import type { Item, Unit } from "@/lib/api/types";
 import { addDecimal, compareDecimal, isQuantityText, multiplyDecimal, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
-import { Pager, QueryBox, stamp, TD, TH, useNamer } from "./shared";
+import { InventoryNav, Pager, QueryBox, stamp, useNamer } from "./shared";
 
 // Admin > Inventory > Purchases (step 2.2b): a purchase is a draft with lines (item, quantity, unit, unit cost) until it
 // is confirmed, which puts the stock in the receiving place and moves each item's moving average; a draft may be cancelled,
 // a confirmed purchase is corrected with a stock adjustment, never undone. The cost columns and totals are shown only to
 // those with costs.view: the API leaves them out for everyone else. A second purchase with the same supplier and invoice
 // number is a warning the person can override on purpose (`allow_duplicate_invoice`).
+//
+// Step 6.4c (fresh-counter.md 4.4, the CatalogList board): the title row with its Amharic twin and "New purchase" as its action (as the
+// catalog's "Add product"); the section's tabs; the status as the toolbar's segments; the purchases a table card (the status chips, the
+// total right-aligned, the chevron "Open purchase <invoice>", the open one brand-50, the pages in its foot). The new purchase and the open
+// one are white cards above the list, brought into view when they open, the cost changes after the open one.
 
 const STATUSES: readonly PurchaseStatus[] = ["draft", "confirmed", "cancelled"];
 const DUPLICATE_KEY = "purchases.invoice.duplicate";
+const STATUS_TONE: Record<PurchaseStatus, Tone> = { draft: "blue", confirmed: "brand", cancelled: "neutral" };
 
 interface LineDraft {
   uuid: string;
@@ -85,7 +94,16 @@ function previewTotal(line: LineDraft): string | null {
   }
 }
 
-export function PurchasesScreen() {
+/** Brings a card into view once, when it opens (the "New purchase" button and a row's chevron sit above or beside it). */
+function useShownOnOpen<T extends HTMLElement>(): RefObject<T | null> {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
+  return ref;
+}
+
+export function PurchasesScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("inventory");
   const me = useSession((s) => s.me);
   const costs = can(me, "costs.view");
@@ -101,93 +119,36 @@ export function PurchasesScreen() {
 
   return (
     <>
-      <PageHeader title={t("purchases.title")} intro={t("purchases.intro")} />
-      <div className="space-y-6">
-        <Panel title={t("purchases.list")}>
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-            <div className="w-56">
-              <Field label={t("purchases.status")}>
-                {(props) => (
-                  <Select
-                    {...props}
-                    value={status ?? ""}
-                    onChange={(event) => {
-                      setStatus((STATUSES as readonly string[]).includes(event.target.value) ? (event.target.value as PurchaseStatus) : null);
-                      setPage(1);
-                    }}
-                  >
-                    <option value="">{t("purchases.all_statuses")}</option>
-                    {STATUSES.map((value) => (
-                      <option key={value} value={value}>
-                        {t(`purchase_status.${value}`)}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-            </div>
-            <Button
-              onClick={() => {
-                setCreating(true);
-                setFormKey((k) => k + 1);
-              }}
-            >
-              {t("purchases.new")}
-            </Button>
-          </div>
-          <QueryBox query={purchases}>
-            {(result) => (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-base">
-                    <caption className="sr-only">{t("purchases.list")}</caption>
-                    <thead>
-                      <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-                        <th scope="col" className={TH}>{t("purchases.col_date")}</th>
-                        <th scope="col" className={TH}>{t("purchases.col_supplier")}</th>
-                        <th scope="col" className={TH}>{t("purchases.col_invoice")}</th>
-                        <th scope="col" className={TH}>{t("purchases.col_status")}</th>
-                        {costs ? <th scope="col" className={TH}>{t("purchases.col_total")}</th> : null}
-                        <th scope="col" className="py-2 font-medium">{t("purchases.col_actions")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.data.length === 0 ? (
-                        <tr>
-                          <td colSpan={costs ? 6 : 5} className="py-6 text-neutral-600">{t("purchases.none")}</td>
-                        </tr>
-                      ) : (
-                        result.data.map((purchase) => (
-                          <tr key={purchase.id} className={`border-b border-neutral-100 last:border-0 ${selected === purchase.id ? "bg-blue-50" : ""}`}>
-                            <td className={`${TD} whitespace-nowrap`}>{purchase.purchase_date}</td>
-                            <td className={TD}>{purchase.supplier.name}</td>
-                            <th scope="row" className={`${TD} font-medium text-neutral-900`}>{purchase.invoice_no ?? "—"}</th>
-                            <td className={TD}><StatusBadge status={purchase.status} /></td>
-                            {costs ? <td className={`${TD} font-mono`}>{purchase.total ?? "—"}</td> : null}
-                            <td className="py-3">
-                              <Button
-                                variant="secondary"
-                                aria-label={t("purchases.open_named", { label: label(purchase) })}
-                                onClick={() => {
-                                  setSelected(purchase.id);
-                                  setCreating(false);
-                                  setConfirmed(null);
-                                }}
-                              >
-                                {t("open")}
-                              </Button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                <Pager page={result.meta.current_page} lastPage={result.meta.last_page} onPage={setPage} />
-              </>
-            )}
-          </QueryBox>
-        </Panel>
+      <PageHeader
+        title={t("purchases.title")}
+        intro={t("purchases.intro")}
+        twin={titleAm ? { text: titleAm, lang: "am" } : undefined}
+        actions={
+          <Button
+            size="md"
+            onClick={() => {
+              setCreating(true);
+              setFormKey((k) => k + 1);
+            }}
+          >
+            <Plus className="size-[18px]" strokeWidth={2.2} aria-hidden="true" />
+            {t("purchases.new")}
+          </Button>
+        }
+      />
+      <div className="flex flex-col gap-6">
+        <InventoryNav />
+        <Toolbar>
+          <ToolbarSegments
+            label={t("purchases.status")}
+            value={status ?? "all"}
+            onChange={(next) => {
+              setStatus(next === "all" ? null : next);
+              setPage(1);
+            }}
+            segments={[{ value: "all" as const, label: t("purchases.all_statuses") }, ...STATUSES.map((value) => ({ value, label: t(`purchase_status.${value}`) }))]}
+          />
+        </Toolbar>
 
         {creating ? (
           <NewPurchasePanel
@@ -217,14 +178,77 @@ export function PurchasesScreen() {
         ) : null}
 
         {confirmed && confirmed.id === selected ? <CostChanges purchase={confirmed} /> : null}
+
+        <QueryBox query={purchases}>
+          {(result) => (
+            <TableCard
+              caption={t("purchases.list")}
+              minWidth="min-w-[720px]"
+              footer={result.meta.last_page > 1 ? <Pager page={result.meta.current_page} lastPage={result.meta.last_page} onPage={setPage} /> : undefined}
+            >
+              <thead>
+                <tr>
+                  <th scope="col">{t("purchases.col_date")}</th>
+                  <th scope="col">{t("purchases.col_supplier")}</th>
+                  <th scope="col">{t("purchases.col_invoice")}</th>
+                  <th scope="col">{t("purchases.col_status")}</th>
+                  {costs ? (
+                    <th scope="col" className="text-right">
+                      {t("purchases.col_total")}
+                    </th>
+                  ) : null}
+                  <th scope="col">
+                    <span className="sr-only">{t("purchases.col_actions")}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.data.length === 0 ? (
+                  <EmptyRow span={costs ? 6 : 5}>{t("purchases.none")}</EmptyRow>
+                ) : (
+                  result.data.map((purchase) => (
+                    <tr key={purchase.id} className={selected === purchase.id ? "bg-brand-50 hover:bg-brand-50" : ""}>
+                      <td className="whitespace-nowrap tabular-nums text-neutral-700">{purchase.purchase_date}</td>
+                      <td>{purchase.supplier.name}</td>
+                      <th scope="row" className="font-semibold text-neutral-900">
+                        {purchase.invoice_no ?? "—"}
+                      </th>
+                      <td>
+                        <StatusChip status={purchase.status} />
+                      </td>
+                      {costs ? <td className="whitespace-nowrap text-right font-semibold tabular-nums">{purchase.total ?? "—"}</td> : null}
+                      <td className="text-right">
+                        <IconButton
+                          label={t("purchases.open_named", { label: label(purchase) })}
+                          size="md"
+                          onClick={() => {
+                            setSelected(purchase.id);
+                            setCreating(false);
+                            setConfirmed(null);
+                          }}
+                        >
+                          <ChevronRight className="size-[18px]" strokeWidth={2} aria-hidden="true" />
+                        </IconButton>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </TableCard>
+          )}
+        </QueryBox>
       </div>
     </>
   );
 }
 
-function StatusBadge({ status }: { status: PurchaseStatus }) {
+function StatusChip({ status }: { status: PurchaseStatus }) {
   const t = useTranslations("inventory");
-  return <Badge tone={status === "confirmed" ? "green" : status === "cancelled" ? "neutral" : "blue"}>{t(`purchase_status.${status}`)}</Badge>;
+  return (
+    <Chip tone={STATUS_TONE[status]} dot>
+      {t(`purchase_status.${status}`)}
+    </Chip>
+  );
 }
 
 function CostChanges({ purchase }: { purchase: Purchase }) {
@@ -239,35 +263,41 @@ function CostChanges({ purchase }: { purchase: Purchase }) {
     return unit ? `${value} / ${unit}` : value;
   };
   const itemOf = (id: number) => purchase.lines?.find((l) => l.item.id === id)?.item;
+  if (changes.length === 0) {
+    return (
+      <Panel title={t("purchases.cost_changes")}>
+        <p className="text-[15px] text-neutral-600">{t("purchases.no_cost_changes")}</p>
+      </Panel>
+    );
+  }
   return (
-    <Panel title={t("purchases.cost_changes")}>
-      {changes.length === 0 ? (
-        <p className="text-base text-neutral-600">{t("purchases.no_cost_changes")}</p>
-      ) : (
-        <table className="w-full border-collapse text-left text-base">
-          <caption className="sr-only">{t("purchases.cost_changes")}</caption>
-          <thead>
-            <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-              <th scope="col" className={TH}>{t("purchases.col_item")}</th>
-              <th scope="col" className={TH}>{t("purchases.cost_before")}</th>
-              <th scope="col" className="py-2 font-medium">{t("purchases.cost_after")}</th>
+    <TableCard caption={t("purchases.cost_changes")} title={t("purchases.cost_changes")} minWidth="min-w-[560px]">
+      <thead>
+        <tr>
+          <th scope="col">{t("purchases.col_item")}</th>
+          <th scope="col" className="text-right">
+            {t("purchases.cost_before")}
+          </th>
+          <th scope="col" className="text-right">
+            {t("purchases.cost_after")}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {changes.map((change) => {
+          const item = itemOf(change.item_id);
+          return (
+            <tr key={change.item_id}>
+              <th scope="row" className="font-semibold text-neutral-900">
+                {item ? name(item) : `#${change.item_id}`}
+              </th>
+              <td className="whitespace-nowrap text-right tabular-nums text-neutral-700">{change.cost_before === null ? "—" : rate(change.cost_before, change.item_id)}</td>
+              <td className="whitespace-nowrap text-right font-semibold tabular-nums">{rate(change.cost_after, change.item_id)}</td>
             </tr>
-          </thead>
-          <tbody>
-            {changes.map((change) => {
-              const item = itemOf(change.item_id);
-              return (
-                <tr key={change.item_id} className="border-b border-neutral-100 last:border-0">
-                  <th scope="row" className={`${TD} font-medium text-neutral-900`}>{item ? name(item) : `#${change.item_id}`}</th>
-                  <td className={`${TD} font-mono`}>{change.cost_before === null ? "—" : rate(change.cost_before, change.item_id)}</td>
-                  <td className="py-3 font-mono">{rate(change.cost_after, change.item_id)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-    </Panel>
+          );
+        })}
+      </tbody>
+    </TableCard>
   );
 }
 
@@ -298,78 +328,83 @@ function PurchaseLinesEditor({
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[40rem] border-collapse text-left text-base">
-          <caption className="sr-only">{t("purchases.lines")}</caption>
-          <thead>
-            <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-              <th scope="col" className={TH}>{t("purchases.col_item")}</th>
-              <th scope="col" className={TH}>{t("purchases.col_qty")}</th>
-              <th scope="col" className={TH}>{t("purchases.col_unit")}</th>
-              <th scope="col" className={TH}>{t("purchases.col_unit_cost")}</th>
-              {costs ? <th scope="col" className={TH}>{t("purchases.col_line_total")}</th> : null}
-              <th scope="col" className="py-2 font-medium"><span className="sr-only">{t("purchases.col_actions")}</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((line, index) => {
-              const n = index + 1;
-              const item = items.find((i) => String(i.id) === line.itemId);
-              const lineTotal = previewTotal(line);
-              return (
-                <tr key={line.uuid} className="border-b border-neutral-100 align-top last:border-0">
-                  <td className="py-2 pr-3">
-                    <Select
-                      aria-label={t("purchases.item_line", { n })}
-                      aria-invalid={errors[index] ? true : undefined}
-                      value={line.itemId}
-                      onChange={(event) => {
-                        const picked = items.find((i) => String(i.id) === event.target.value);
-                        patch(index, { itemId: event.target.value, unitId: picked ? String(picked.unit_id) : "" });
-                      }}
-                    >
-                      <option value="">{t("purchases.pick_item")}</option>
-                      {items.map((candidate) => (
-                        <option key={candidate.id} value={candidate.id}>
-                          {name(candidate)}
-                        </option>
-                      ))}
-                    </Select>
-                    {errors[index] ? <p className="mt-1 text-sm font-medium text-red-700">{errors[index]}</p> : null}
-                  </td>
-                  <td className="w-32 py-2 pr-3">
-                    <TextInput aria-label={t("purchases.qty_line", { n })} inputMode="decimal" value={line.qty} onChange={(event) => patch(index, { qty: event.target.value })} />
-                  </td>
-                  <td className="w-36 py-2 pr-3">
-                    <Select aria-label={t("purchases.unit_line", { n })} value={line.unitId} onChange={(event) => patch(index, { unitId: event.target.value })}>
-                      {line.unitId === "" ? <option value="" /> : null}
-                      {unitsFor(item, units).map((unit) => (
-                        <option key={unit.id} value={unit.id}>
-                          {unit.code}
-                        </option>
-                      ))}
-                    </Select>
-                  </td>
-                  <td className="w-36 py-2 pr-3">
-                    <TextInput aria-label={t("purchases.cost_line", { n })} inputMode="decimal" value={line.unitCost} onChange={(event) => patch(index, { unitCost: event.target.value })} />
-                  </td>
-                  {costs ? <td className="py-3 pr-3 font-mono">{lineTotal ?? "—"}</td> : null}
-                  <td className="py-2">
-                    <Button variant="secondary" disabled={lines.length === 1} aria-label={t("purchases.remove_line", { n })} onClick={() => onChange(lines.filter((_, i) => i !== index))}>
-                      {t("remove")}
-                    </Button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <InnerTable caption={t("purchases.lines")} minWidth="min-w-[44rem]">
+        <thead>
+          <tr>
+            <th scope="col">{t("purchases.col_item")}</th>
+            <th scope="col">{t("purchases.col_qty")}</th>
+            <th scope="col">{t("purchases.col_unit")}</th>
+            <th scope="col">{t("purchases.col_unit_cost")}</th>
+            {costs ? (
+              <th scope="col" className="text-right">
+                {t("purchases.col_line_total")}
+              </th>
+            ) : null}
+            <th scope="col">
+              <span className="sr-only">{t("purchases.col_actions")}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line, index) => {
+            const n = index + 1;
+            const item = items.find((i) => String(i.id) === line.itemId);
+            const lineTotal = previewTotal(line);
+            return (
+              <tr key={line.uuid} className="align-top hover:bg-transparent">
+                <td>
+                  <Select
+                    controlSize="md"
+                    aria-label={t("purchases.item_line", { n })}
+                    aria-invalid={errors[index] ? true : undefined}
+                    value={line.itemId}
+                    onChange={(event) => {
+                      const picked = items.find((i) => String(i.id) === event.target.value);
+                      patch(index, { itemId: event.target.value, unitId: picked ? String(picked.unit_id) : "" });
+                    }}
+                  >
+                    <option value="">{t("purchases.pick_item")}</option>
+                    {items.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {name(candidate)}
+                      </option>
+                    ))}
+                  </Select>
+                  {errors[index] ? <p className="mt-1 text-[13px] font-medium text-red-700">{errors[index]}</p> : null}
+                </td>
+                <td className="w-32">
+                  <TextInput controlSize="md" className="tabular-nums" aria-label={t("purchases.qty_line", { n })} inputMode="decimal" value={line.qty} onChange={(event) => patch(index, { qty: event.target.value })} />
+                </td>
+                <td className="w-32">
+                  <Select controlSize="md" aria-label={t("purchases.unit_line", { n })} value={line.unitId} onChange={(event) => patch(index, { unitId: event.target.value })}>
+                    {line.unitId === "" ? <option value="" /> : null}
+                    {unitsFor(item, units).map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.code}
+                      </option>
+                    ))}
+                  </Select>
+                </td>
+                <td className="w-36">
+                  <TextInput controlSize="md" className="tabular-nums" aria-label={t("purchases.cost_line", { n })} inputMode="decimal" value={line.unitCost} onChange={(event) => patch(index, { unitCost: event.target.value })} />
+                </td>
+                {costs ? <td className="whitespace-nowrap pt-5 text-right font-semibold tabular-nums">{lineTotal ?? "—"}</td> : null}
+                <td className="w-14 text-right">
+                  <IconButton label={t("purchases.remove_line", { n })} size="md" disabled={lines.length === 1} onClick={() => onChange(lines.filter((_, i) => i !== index))}>
+                    <X className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
+                  </IconButton>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </InnerTable>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="secondary" onClick={() => onChange([...lines, blankLine()])}>
+        <Button variant="secondary" size="md" onClick={() => onChange([...lines, blankLine()])}>
+          <Plus className="size-[18px]" strokeWidth={2} aria-hidden="true" />
           {t("purchases.add_line")}
         </Button>
-        {costs ? <p className="text-base font-medium text-neutral-900">{t("purchases.total_is", { total: total ?? "—" })}</p> : null}
+        {costs ? <p className="text-[17px] font-semibold tabular-nums text-neutral-900">{t("purchases.total_is", { total: total ?? "—" })}</p> : null}
       </div>
     </div>
   );
@@ -385,6 +420,7 @@ function NewPurchasePanel({ costs, onSaved, onClose }: { costs: boolean; onSaved
   const units = useUnits();
   const save = useSavePurchase();
   const idempotency = useIdempotencyKey();
+  const shown = useShownOnOpen<HTMLDivElement>();
   const [clientUuid] = useState(uuid);
   const [supplierId, setSupplierId] = useState("");
   const [invoice, setInvoice] = useState("");
@@ -429,60 +465,69 @@ function NewPurchasePanel({ costs, onSaved, onClose }: { costs: boolean; onSaved
   const fieldError = (field: string) => errorText.field(save.error, field);
 
   return (
-    <Panel title={t("purchases.new")}>
-      <form onSubmit={onSubmit} className="space-y-4" noValidate>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label={t("purchases.supplier")} error={fieldError("supplier_id")}>
-            {(props) => (
-              <Select {...props} value={supplierId} onChange={(event) => setSupplierId(event.target.value)} required>
-                <option value="">{t("purchases.pick_supplier")}</option>
-                {(suppliers.data ?? []).filter((s) => s.is_active).map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </Select>
-            )}
+    <div ref={shown} className="scroll-mt-8">
+      <Panel
+        title={t("purchases.new")}
+        action={
+          <IconButton label={t("close")} size="md" onClick={onClose} className="-my-2 -mr-2">
+            <X className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+          </IconButton>
+        }
+      >
+        <form onSubmit={onSubmit} className="space-y-5" noValidate>
+          <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Field label={t("purchases.supplier")} error={fieldError("supplier_id")}>
+              {(props) => (
+                <Select {...props} controlSize="md" value={supplierId} onChange={(event) => setSupplierId(event.target.value)} required>
+                  <option value="">{t("purchases.pick_supplier")}</option>
+                  {(suppliers.data ?? []).filter((s) => s.is_active).map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label={t("purchases.invoice")} optionalLabel={t("optional")} error={fieldError("invoice_no")}>
+              {(props) => <TextInput {...props} controlSize="md" value={invoice} onChange={(event) => setInvoice(event.target.value)} maxLength={64} />}
+            </Field>
+            <Field label={t("purchases.date")} error={fieldError("purchase_date")}>
+              {(props) => <TextInput {...props} controlSize="md" type="date" value={date} onChange={(event) => setDate(event.target.value)} required />}
+            </Field>
+            <Field label={t("purchases.location")} error={fieldError("location_id")}>
+              {(props) => (
+                <Select {...props} controlSize="md" value={locationId || (store ? String(store.id) : "")} onChange={(event) => setLocationId(event.target.value)}>
+                  {places.map((place) => (
+                    <option key={place.id} value={place.id}>
+                      {name(place)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          </div>
+          <Field label={t("purchases.notes")} optionalLabel={t("optional")} error={fieldError("notes")}>
+            {(props) => <TextInput {...props} controlSize="md" value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />}
           </Field>
-          <Field label={t("purchases.invoice")} optionalLabel={t("optional")} error={fieldError("invoice_no")}>
-            {(props) => <TextInput {...props} value={invoice} onChange={(event) => setInvoice(event.target.value)} maxLength={64} />}
-          </Field>
-          <Field label={t("purchases.date")} error={fieldError("purchase_date")}>
-            {(props) => <TextInput {...props} type="date" value={date} onChange={(event) => setDate(event.target.value)} required />}
-          </Field>
-          <Field label={t("purchases.location")} error={fieldError("location_id")}>
-            {(props) => (
-              <Select {...props} value={locationId || (store ? String(store.id) : "")} onChange={(event) => setLocationId(event.target.value)}>
-                {places.map((place) => (
-                  <option key={place.id} value={place.id}>
-                    {name(place)}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        </div>
-        <Field label={t("purchases.notes")} optionalLabel={t("optional")} error={fieldError("notes")}>
-          {(props) => <TextInput {...props} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} />}
-        </Field>
-        <PurchaseLinesEditor lines={lines} onChange={setLines} errors={lineErrors} items={buyable} units={units.data ?? []} costs={costs} />
-        {save.isError ? <Alert>{errorText.message(save.error)}</Alert> : null}
-        {duplicate ? (
-          <label className="flex min-h-12 items-center gap-3 text-base text-neutral-900">
-            <input type="checkbox" className="size-6" checked={allowDuplicate} onChange={(event) => setAllowDuplicate(event.target.checked)} />
-            {t("purchases.allow_duplicate")}
-          </label>
-        ) : null}
-        <div className="flex gap-3">
-          <Button type="submit" disabled={save.isPending || supplierId === ""}>
-            {save.isPending ? t("saving") : t("purchases.save_draft")}
-          </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            {t("cancel")}
-          </Button>
-        </div>
-      </form>
-    </Panel>
+          <PurchaseLinesEditor lines={lines} onChange={setLines} errors={lineErrors} items={buyable} units={units.data ?? []} costs={costs} />
+          {save.isError ? <Alert>{errorText.message(save.error)}</Alert> : null}
+          {duplicate ? (
+            <label className="flex min-h-11 items-center gap-3 text-[15px] text-neutral-900">
+              <input type="checkbox" className="size-5 shrink-0 accent-brand-600" checked={allowDuplicate} onChange={(event) => setAllowDuplicate(event.target.checked)} />
+              {t("purchases.allow_duplicate")}
+            </label>
+          ) : null}
+          <div className="flex gap-2.5 border-t border-neutral-200 pt-5">
+            <Button type="submit" size="md" disabled={save.isPending || supplierId === ""}>
+              {save.isPending ? t("saving") : t("purchases.save_draft")}
+            </Button>
+            <Button type="button" variant="secondary" size="md" onClick={onClose}>
+              {t("cancel")}
+            </Button>
+          </div>
+        </form>
+      </Panel>
+    </div>
   );
 }
 
@@ -501,10 +546,13 @@ function PurchaseDetail({
 }) {
   const t = useTranslations("inventory");
   const purchase = usePurchase(id);
+  const shown = useShownOnOpen<HTMLDivElement>();
   return (
-    <QueryBox query={purchase}>
-      {(p) => <PurchaseCard purchase={p} costs={costs} label={label(p)} onConfirmed={onConfirmed} onClosed={onClosed} closeText={t("close")} />}
-    </QueryBox>
+    <div ref={shown} className="scroll-mt-8">
+      <QueryBox query={purchase}>
+        {(p) => <PurchaseCard purchase={p} costs={costs} label={label(p)} onConfirmed={onConfirmed} onClosed={onClosed} closeText={t("close")} />}
+      </QueryBox>
+    </div>
   );
 }
 
@@ -597,108 +645,129 @@ function PurchaseCard({
   }
 
   return (
-    <Panel title={t("purchases.detail", { label })}>
-      <div className="space-y-4">
-        <dl className="grid gap-x-8 gap-y-2 text-base sm:grid-cols-2 lg:grid-cols-4">
-          <Info term={t("purchases.supplier")}>{purchase.supplier.name}</Info>
-          <Info term={t("purchases.date")}>{purchase.purchase_date}</Info>
-          <Info term={t("purchases.location")}>{name(purchase.location)}</Info>
-          <Info term={t("purchases.col_status")}><StatusBadge status={purchase.status} /></Info>
-          {costs && purchase.total !== undefined ? <Info term={t("purchases.col_total")}><span className="font-mono">{purchase.total} {purchase.currency}</span></Info> : null}
-          {purchase.confirmed_by ? <Info term={t("purchases.confirmed_by")}>{purchase.confirmed_by.name} · {stamp(purchase.confirmed_at)}</Info> : null}
-          {purchase.cancelled_at ? <Info term={t("purchases.cancelled")}>{stamp(purchase.cancelled_at)}{purchase.cancel_reason ? ` · ${purchase.cancel_reason}` : ""}</Info> : null}
-          {purchase.notes ? <Info term={t("purchases.notes")}>{purchase.notes}</Info> : null}
+    <Panel
+      title={t("purchases.detail", { label })}
+      action={
+        <IconButton label={closeText} size="md" onClick={onClosed} className="-my-2 -mr-2">
+          <X className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </IconButton>
+      }
+    >
+      <div className="space-y-5">
+        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Fact term={t("purchases.supplier")}>{purchase.supplier.name}</Fact>
+          <Fact term={t("purchases.date")}>
+            <span className="tabular-nums">{purchase.purchase_date}</span>
+          </Fact>
+          <Fact term={t("purchases.location")}>{name(purchase.location)}</Fact>
+          <Fact term={t("purchases.col_status")}>
+            <StatusChip status={purchase.status} />
+          </Fact>
+          {costs && purchase.total !== undefined ? (
+            <Fact term={t("purchases.col_total")}>
+              <span className="font-semibold tabular-nums">
+                {purchase.total} {purchase.currency}
+              </span>
+            </Fact>
+          ) : null}
+          {purchase.confirmed_by ? (
+            <Fact term={t("purchases.confirmed_by")}>
+              {purchase.confirmed_by.name} · <span className="tabular-nums">{stamp(purchase.confirmed_at)}</span>
+            </Fact>
+          ) : null}
+          {purchase.cancelled_at ? (
+            <Fact term={t("purchases.cancelled")}>
+              {stamp(purchase.cancelled_at)}
+              {purchase.cancel_reason ? ` · ${purchase.cancel_reason}` : ""}
+            </Fact>
+          ) : null}
+          {purchase.notes ? <Fact term={t("purchases.notes")}>{purchase.notes}</Fact> : null}
         </dl>
 
         {editing ? (
           <div className="space-y-3">
             <PurchaseLinesEditor lines={editing} onChange={setEditing} errors={lineErrors} items={buyable} units={units.data ?? []} costs={costs} />
-            <div className="flex gap-3">
-              <Button disabled={replace.isPending} onClick={saveLines}>
+            <div className="flex gap-2.5">
+              <Button size="md" disabled={replace.isPending} onClick={saveLines}>
                 {replace.isPending ? t("saving") : t("purchases.save_lines")}
               </Button>
-              <Button variant="secondary" onClick={() => setEditing(null)}>
+              <Button variant="secondary" size="md" onClick={() => setEditing(null)}>
                 {t("cancel")}
               </Button>
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-base">
-              <caption className="sr-only">{t("purchases.lines")}</caption>
-              <thead>
-                <tr className="border-b border-neutral-200 text-sm text-neutral-600">
-                  <th scope="col" className={TH}>{t("purchases.col_item")}</th>
-                  <th scope="col" className={TH}>{t("purchases.col_qty")}</th>
-                  <th scope="col" className={TH}>{t("purchases.col_unit")}</th>
-                  {costs ? <th scope="col" className={TH}>{t("purchases.col_unit_cost")}</th> : null}
-                  {costs ? <th scope="col" className="py-2 font-medium">{t("purchases.col_line_total")}</th> : null}
+          <InnerTable caption={t("purchases.lines")} minWidth="min-w-[32rem]">
+            <thead>
+              <tr>
+                <th scope="col">{t("purchases.col_item")}</th>
+                <th scope="col" className="text-right">
+                  {t("purchases.col_qty")}
+                </th>
+                <th scope="col">{t("purchases.col_unit")}</th>
+                {costs ? (
+                  <th scope="col" className="text-right">
+                    {t("purchases.col_unit_cost")}
+                  </th>
+                ) : null}
+                {costs ? (
+                  <th scope="col" className="text-right">
+                    {t("purchases.col_line_total")}
+                  </th>
+                ) : null}
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.id}>
+                  <th scope="row" className="font-semibold text-neutral-900">
+                    {name(line.item)}
+                  </th>
+                  <td className="text-right tabular-nums">{trimDecimal(line.qty)}</td>
+                  <td className="text-neutral-700">{line.unit.code}</td>
+                  {costs ? <td className="whitespace-nowrap text-right tabular-nums">{line.unit_cost ?? "—"}</td> : null}
+                  {costs ? <td className="whitespace-nowrap text-right font-semibold tabular-nums">{line.line_total ?? "—"}</td> : null}
                 </tr>
-              </thead>
-              <tbody>
-                {lines.map((line) => (
-                  <tr key={line.id} className="border-b border-neutral-100 last:border-0">
-                    <th scope="row" className={`${TD} font-medium text-neutral-900`}>{name(line.item)}</th>
-                    <td className={TD}>{trimDecimal(line.qty)}</td>
-                    <td className={TD}>{line.unit.code}</td>
-                    {costs ? <td className={`${TD} font-mono`}>{line.unit_cost ?? "—"}</td> : null}
-                    {costs ? <td className="py-3 font-mono">{line.line_total ?? "—"}</td> : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </InnerTable>
         )}
 
         {failure ? <Alert>{errorText.message(failure)}</Alert> : null}
         <Status>{note}</Status>
 
-        <div className="flex flex-wrap gap-3">
-          {draft && !editing ? (
-            <>
-              <Button disabled={confirm.isPending} onClick={confirmPurchase}>
-                {confirm.isPending ? t("saving") : t("purchases.confirm")}
-              </Button>
-              <Button variant="secondary" onClick={startEditing}>
-                {t("purchases.edit_lines")}
-              </Button>
-              <Button variant="secondary" onClick={() => setCancelling(true)}>
-                {t("purchases.cancel")}
-              </Button>
-            </>
-          ) : null}
-          <Button variant="secondary" onClick={onClosed}>
-            {closeText}
-          </Button>
-        </div>
+        {draft && !editing ? (
+          <div className="flex flex-wrap gap-2.5 border-t border-neutral-200 pt-5">
+            <Button size="md" disabled={confirm.isPending} onClick={confirmPurchase}>
+              {confirm.isPending ? t("saving") : t("purchases.confirm")}
+            </Button>
+            <Button variant="secondary" size="md" onClick={startEditing}>
+              {t("purchases.edit_lines")}
+            </Button>
+            <Button variant="danger" size="md" onClick={() => setCancelling(true)}>
+              {t("purchases.cancel")}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {cancelling ? (
         <Modal label={t("purchases.cancel_title")} onClose={() => setCancelling(false)}>
           <h3 className="text-lg font-semibold text-neutral-900">{t("purchases.cancel_title")}</h3>
           <Field label={t("purchases.cancel_reason")} optionalLabel={t("optional")}>
-            {(props) => <TextInput {...props} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={255} />}
+            {(props) => <TextInput {...props} controlSize="md" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={255} />}
           </Field>
           {cancel.isError ? <Alert>{errorText.message(cancel.error)}</Alert> : null}
-          <div className="flex gap-3">
-            <Button disabled={cancel.isPending} onClick={cancelPurchase}>
+          <div className="flex gap-2.5">
+            <Button variant="danger" size="md" disabled={cancel.isPending} onClick={cancelPurchase}>
               {t("purchases.cancel_confirm")}
             </Button>
-            <Button variant="secondary" onClick={() => setCancelling(false)}>
+            <Button variant="secondary" size="md" onClick={() => setCancelling(false)}>
               {t("purchases.keep")}
             </Button>
           </div>
         </Modal>
       ) : null}
     </Panel>
-  );
-}
-
-function Info({ term, children }: { term: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-sm text-neutral-600">{term}</dt>
-      <dd className="text-base text-neutral-900">{children}</dd>
-    </div>
   );
 }

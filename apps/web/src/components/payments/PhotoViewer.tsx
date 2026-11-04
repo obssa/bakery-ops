@@ -1,15 +1,18 @@
 "use client";
 
+import { ImageOff, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { signedFileUrl } from "@/lib/api/adminPayments";
 import { useErrorText } from "@/lib/errors";
-import { Alert, Button, Modal } from "../ui";
+import { ICON_STROKE } from "../icons";
+import { Alert, Button, IconButton, Modal } from "../ui";
 import { focusRing } from "../styles";
 
 // A payment's receipt photo (step 4.5c). The picture is only ever read through a signed URL that lives five minutes (ADR 0015): the list's
 // URL may be close to its end, so the viewer always asks GET /files/{file}/url for a fresh one when it opens, and once more when the picture
 // fails to load (an URL that expired while the viewer stayed open). A thumbnail starts from the list's URL and re-signs the same way.
+// Step 6.4c: the viewer's title row closes with an X ("Close"), the picture and the thumbs on the admin radii.
 
 /** How many fresh URLs one picture may ask for before it says it cannot be loaded (the first, then one after an error). */
 const MAX_SIGNS = 2;
@@ -71,23 +74,23 @@ export function PhotoViewer({ paymentId, fileId, onClose }: { paymentId: number;
     <Modal label={title} size="lg" onClose={onClose}>
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>
-        <Button variant="secondary" onClick={onClose}>
-          {t("close")}
-        </Button>
+        <IconButton label={t("close")} size="md" onClick={onClose} className="-mr-2 -mt-2">
+          <X className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </IconButton>
       </div>
       {failed ? (
         <div className="space-y-3">
           <Alert>{error ? errorText.message(error) : t("viewer.failed")}</Alert>
-          <Button variant="secondary" onClick={retry}>
+          <Button variant="secondary" size="md" onClick={retry}>
             {t("viewer.retry")}
           </Button>
         </div>
       ) : url ? (
         // a signed URL of the API's file store: next/image has nothing to optimise in a static export
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={title} onError={() => void sign()} className="mx-auto max-h-[70vh] w-auto rounded-md border border-neutral-200 object-contain" />
+        <img src={url} alt={title} onError={() => void sign()} className="mx-auto max-h-[70vh] w-auto rounded-xl border border-neutral-200 object-contain" />
       ) : (
-        <p role="status" className="py-10 text-center text-base text-neutral-600">
+        <p role="status" className="py-10 text-center text-[15px] text-neutral-600">
           {t("viewer.loading")}
         </p>
       )}
@@ -97,7 +100,6 @@ export function PhotoViewer({ paymentId, fileId, onClose }: { paymentId: number;
 
 /** A small picture of the photo that opens the viewer; it starts from the list's signed URL and asks for a fresh one if that fails. */
 export function PhotoThumb({ label, fileId, url, onOpen, large = false }: { label: string; fileId: number; url: string | null; onOpen: () => void; large?: boolean }) {
-  const t = useTranslations("adminPayments");
   const signed = useSignedUrl(fileId, url);
   const { sign } = signed;
 
@@ -110,13 +112,13 @@ export function PhotoThumb({ label, fileId, url, onOpen, large = false }: { labe
       type="button"
       aria-label={label}
       onClick={onOpen}
-      className={`inline-flex ${large ? "h-40 w-40" : "h-14 w-14"} items-center justify-center overflow-hidden rounded-md border border-neutral-300 bg-neutral-50 hover:border-neutral-500 ${focusRing}`}
+      className={`inline-flex ${large ? "size-40 rounded-2xl" : "size-12 rounded-[10px]"} shrink-0 items-center justify-center overflow-hidden border border-neutral-200 bg-neutral-100 text-neutral-400 hover:border-neutral-400 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
     >
       {signed.url && !signed.failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={signed.url} alt="" onError={() => void sign()} className="h-full w-full object-cover" />
       ) : (
-        <span className="text-sm text-neutral-600">{t("list.col_photo")}</span>
+        <ImageOff className={large ? "size-8" : "size-5"} strokeWidth={ICON_STROKE} aria-hidden="true" />
       )}
     </button>
   );

@@ -1,18 +1,18 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { Link, usePathname } from "@/i18n/navigation";
+import { usePathname } from "@/i18n/navigation";
 import type { Locale, PaymentListRow, PaymentStatus, PaymentView } from "@/lib/api/types";
 import { chipsOf, type PaymentChip } from "@/lib/adminPayments";
 import { stampText, type DateFormatLike } from "@/lib/dates";
 import { otherDayLabel } from "@/lib/orderNo";
 import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
-import { Badge } from "../ui";
-import { focusRing } from "../styles";
+import { SectionTabs } from "../admin/kit";
+import { Chip, type Tone } from "../ui";
 
-// Pieces the admin payments screens share (step 4.5c): the section tabs (as pills under the admin tabs, the way Inventory and Shifts do
-// them), names in the page's language, a status with its chips, an order's label and a money amount.
+// Pieces the admin payments screens share (step 4.5c): the section tabs, names in the page's language, a status with its chips, an order's
+// label and a money amount.
 
 const SECTIONS = [
   { href: "/admin/payments", key: "payments", permission: "payments.view" },
@@ -21,30 +21,16 @@ const SECTIONS = [
   { href: "/admin/payments/receipts", key: "receipts", permission: "payments.take" },
 ] as const;
 
-/** The payments screens the person may open. */
+/**
+ * The payments screens the person may open: the navigation "Payment sections" with the same link names, drawn as segmented tabs under the
+ * title row (step 6.4c, components/admin/kit.tsx SectionTabs), as the catalog's Products and Ingredients switch is.
+ */
 export function PaymentsNav() {
   const t = useTranslations("adminPayments");
   const me = useSession((s) => s.me);
   const pathname = usePathname().replace(/\/+$/, "");
-  return (
-    <nav aria-label={t("sections")} className="mb-6 flex flex-wrap gap-2">
-      {SECTIONS.filter((section) => can(me, section.permission)).map(({ href, key }) => {
-        const current = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={current ? "page" : undefined}
-            className={`inline-flex min-h-12 items-center rounded-full border px-5 text-base ${
-              current ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100"
-            } ${focusRing}`}
-          >
-            {t(`nav.${key}`)}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  const tabs = SECTIONS.filter((section) => can(me, section.permission)).map(({ href, key }) => ({ href, label: t(`nav.${key}`), current: pathname === href }));
+  return <SectionTabs label={t("sections")} tabs={tabs} />;
 }
 
 /** A channel's (or any bilingual row's) name in the page's language; a channel the API no longer names shows its code. */
@@ -65,7 +51,8 @@ export function useOrderLabel(): (order: PaymentListRow["order"]) => string {
   };
 }
 
-const STATUS_TONE: Record<PaymentStatus, "neutral" | "blue" | "green" | "amber" | "red"> = {
+// green is money confirmed only (fresh-counter.md 1.3): a verified payment; recorded is still to check (blue), a dispute red
+const STATUS_TONE: Record<PaymentStatus, Tone> = {
   recorded: "blue",
   verified: "green",
   disputed: "red",
@@ -80,11 +67,15 @@ export function PaymentStatusCell({ payment }: { payment: PaymentView }) {
   const chips = chipsOf(payment);
   return (
     <span className="flex flex-wrap gap-1.5">
-      {payment.status !== "disputed" ? <Badge tone={STATUS_TONE[payment.status]}>{t(`status.${payment.status}`)}</Badge> : null}
+      {payment.status !== "disputed" ? (
+        <Chip tone={STATUS_TONE[payment.status]} dot>
+          {t(`status.${payment.status}`)}
+        </Chip>
+      ) : null}
       {chips.map((chip) => (
-        <Badge key={chip} tone={CHIP_TONE[chip]}>
+        <Chip key={chip} tone={CHIP_TONE[chip]} dot>
           {t(`chip.${chip}`)}
-        </Badge>
+        </Chip>
       ))}
     </span>
   );
@@ -118,5 +109,6 @@ export function saveBlob(blob: Blob, name: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+// The cells of the tables of Phase 4 (the audit log reads them still); the payments screens are on the admin TableCard since step 6.4c.
 export const TH = "py-2 pr-4 font-medium";
 export const TD = "py-3 pr-4 align-top";
