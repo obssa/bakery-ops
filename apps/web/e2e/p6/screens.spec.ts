@@ -407,3 +407,92 @@ test.describe("screens: admin", () => {
     await capture(page, "admin-drawer-820x1180-en");
   });
 });
+
+// --- step 6.4d: the Team, Insight and System screens -------------------------------------------------------------------------------------
+//
+// As the demo bakery's admin at 1440 x 900, each in its loaded state: People and Devices; the Shifts overview, the roster and the history;
+// the analytics overview and its Sales page; the audit log; System. People and the analytics overview in Amharic too. A step that cannot be
+// done (the seed lacks a row) is noted and the screen is saved as it is (shoot).
+
+test.describe("screens: team, insight and system", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  for (const locale of ["en", "am"] as const) {
+    test(`People (the admin's table, form and stations), in ${locale}`, async ({ page }) => {
+      test.setTimeout(90_000);
+      const t = MESSAGES[locale];
+      await shoot(page, `people-1440x900-${locale}`, async () => {
+        await openAdmin(page, `${locale}/admin/people/`, t.people.title);
+        await expect(page.getByRole("table", { name: t.people.list }).getByRole("row").nth(1).getByRole("checkbox")).toBeVisible({ timeout: 30_000 });
+      });
+    });
+
+    test(`the analytics overview (the KPI row, the share bars, the best sellers), in ${locale}`, async ({ page }) => {
+      test.setTimeout(90_000);
+      const t = MESSAGES[locale];
+      await shoot(page, `analytics-1440x900-${locale}`, async () => {
+        await openAdmin(page, `${locale}/admin/analytics/`, t.analytics.overview.title);
+        await expect(page.getByRole("group", { name: t.analytics.kpi.revenue, exact: true })).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
+      });
+    });
+  }
+
+  test("Devices, in en", async ({ page }) => {
+    test.setTimeout(90_000);
+    const t = MESSAGES.en;
+    await shoot(page, "devices-1440x900-en", async () => {
+      await openAdmin(page, "en/admin/people/devices/", t.devices.title);
+      await expect(page.getByRole("table", { name: t.devices.list }).getByRole("row").nth(1)).toContainText(/\S/, { timeout: 30_000 });
+      await expect(page.getByText(t.common.loading, { exact: true })).toHaveCount(0, { timeout: 30_000 });
+    });
+  });
+
+  test("the Shifts overview, the roster and the history, in en", async ({ page }) => {
+    test.setTimeout(120_000);
+    const t = MESSAGES.en;
+    await shoot(page, "shifts-1440x900-en", async () => {
+      await openAdmin(page, "en/admin/shifts/", t.counts.admin_title);
+      await expect(page.getByRole("region", { name: t.adminShifts.setup.title }).getByText(t.adminShifts.setup.checking)).toHaveCount(0, { timeout: 30_000 });
+      await expect(page.getByText(t.adminShifts.running.loading)).toHaveCount(0, { timeout: 30_000 });
+    });
+    await shoot(page, "shifts-roster-1440x900-en", async () => {
+      await page.getByRole("navigation", { name: t.adminShifts.sections }).getByRole("link", { name: t.adminShifts.nav.roster, exact: true }).click();
+      await expect(page.getByRole("heading", { level: 1, name: t.adminShifts.title_roster })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByText(t.adminShifts.roster.loading, { exact: true })).toHaveCount(0, { timeout: 30_000 });
+      await expect(page.getByRole("table").first()).toBeVisible({ timeout: 30_000 });
+    });
+    await shoot(page, "shifts-history-1440x900-en", async () => {
+      await page.getByRole("navigation", { name: t.adminShifts.sections }).getByRole("link", { name: t.adminShifts.nav.history, exact: true }).click();
+      await expect(page.getByRole("heading", { level: 1, name: t.adminShifts.title_history })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("table", { name: t.adminShifts.history.shifts_title, exact: true }).getByRole("row").nth(1).getByRole("cell").first()).toContainText(/\d/, { timeout: 30_000 });
+    });
+  });
+
+  test("the analytics Sales page (the line, its days, the hours), in en", async ({ page }) => {
+    test.setTimeout(90_000);
+    const t = MESSAGES.en;
+    await shoot(page, "analytics-sales-1440x900-en", async () => {
+      await openAdmin(page, "en/admin/analytics/sales/", t.analytics.sales.title);
+      await expect(page.getByRole("region", { name: t.analytics.sales.hourly }).getByRole("status", { name: t.analytics.loading })).toHaveCount(0, { timeout: 30_000 });
+    });
+  });
+
+  test("the audit log, in en", async ({ page }) => {
+    test.setTimeout(90_000);
+    const t = MESSAGES.en;
+    await shoot(page, "audit-1440x900-en", async () => {
+      await openAdmin(page, "en/admin/audit/", t.audit.title);
+      await expect(page.getByRole("table", { name: t.audit.list.table, exact: true }).getByRole("button", { name: /^Open entry / }).first()).toBeVisible({ timeout: 30_000 });
+    });
+  });
+
+  test("System, in en", async ({ page }) => {
+    test.setTimeout(90_000);
+    const t = MESSAGES.en;
+    await shoot(page, "system-1440x900-en", async () => {
+      await openAdmin(page, "en/admin/system/", t.system.title);
+      await expect(page.getByTestId("system-scheduler")).toBeVisible({ timeout: 30_000 });
+    });
+  });
+});
