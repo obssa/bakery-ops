@@ -164,7 +164,7 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
   return (
     <div className="flex flex-col gap-4">
       {failure ? <Alert>{errorText.message(failure)}</Alert> : null}
-      <TableCard caption={t("channels.list")} title={t("channels.list")} minWidth="min-w-[1000px]">
+      <TableCard caption={t("channels.list")} title={t("channels.list")} minWidth="min-w-[880px]">
         <thead>
           <tr>
             <th scope="col" className="text-right">
