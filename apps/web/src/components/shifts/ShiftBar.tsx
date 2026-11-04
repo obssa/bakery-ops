@@ -353,7 +353,7 @@ export function ShiftBar({ model, look = "card" }: { model: ShiftStation; look?:
             <ChevronDown className={`size-4 text-neutral-500 motion-safe:transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden="true" />
           </button>
           {open ? (
-            <div className="absolute right-0 top-full z-30 mt-2 w-[min(44rem,calc(100vw-2rem))] space-y-3 rounded-[20px] border border-neutral-200 bg-white p-4 text-left shadow-float">
+            <div className="fixed right-4 top-[4.5rem] z-30 max-h-[calc(100dvh-5.5rem)] w-[min(44rem,calc(100vw-2rem))] space-y-3 overflow-y-auto rounded-[20px] border border-neutral-200 bg-white p-4 text-left shadow-float sm:right-6">
               {body}
             </div>
           ) : null}

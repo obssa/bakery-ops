@@ -878,7 +878,12 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       "Till views" and tab names. The columns and the list start right under the bar. Specs: `p3 handover-shift-bar` (its `bar()` helper and
       the Amharic case) and `p3 handover` (the kitchen's and the till's Close shift) open the shift's menu first through
       `e2e/support/shiftBar.ts` `openShiftBar`, a no-op where the bar is the card it was; `p3 handover` closes the cash widget's panel again
-      before the shift's menu. `kds.station_name` is gone with the page header.
+      before the shift's menu. `kds.station_name` is gone with the page header. The shift's and the cash widget's panels are fixed under
+      the bar at the window's right (a panel hung from its button ran off the left of a 1280 px window, where the p3 till flow could not
+      click "Open the count"), and the shift's sits over the cash's.
+    - **Amharic names whose words hold the card's title whole** (axe compares words): `till.take_payment_aria` "ትዕዛዝ {no}፦ ክፍያ ተቀበል" and
+      `till.open_order_aria` "ትዕዛዝ {no}፦ ክፈት" (they were "ለትዕዛዝ {no} …" and "ትዕዛዝ {no}ን …"). No spec selects the old strings; the
+      a11y spec reads the names from am.json.
     - **Names and visible words (axe `label-content-name-mismatch`, found by the first e2e-p6 run).** A waiting card's button is its
       title "Order N" (named "Take payment for order N" or "Open order N", whose words contain it), with its tap area stretched over the
       card; the rest of the card is its text. Three Amharic names now contain the words their buttons show: `kds.reject_line`
