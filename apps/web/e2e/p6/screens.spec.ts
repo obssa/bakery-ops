@@ -38,6 +38,11 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 //
 // Step 6.4b: the admin's product page at 1440 x 900 (ProductPhoto.dc.html, PhotoStates.dc.html): with a photo (en, am), the framing step,
 // no photo yet and a refusal (the describe at the end).
+//
+// Step 6.4c: the Sell and Make screens on the admin primitives, at 1440 x 900 as the demo bakery's admin, each brought to the state the
+// catalog list's board would draw it in (loaded, its first rows in view): the Orders board with a card's timeline open, an order's record,
+// Payments, Payment methods, Reconciliation and Receipt settings, the stock list, the ledger, purchases with one open, suppliers,
+// transfers, reorder and the planner, in English, and Payments and the stock list in Amharic.
 
 const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
@@ -526,6 +531,111 @@ test.describe("screens: admin", () => {
     await page.getByRole("button", { name: t.admin.open_sections }).click();
     await expect(page.getByRole("dialog", { name: t.admin.sections })).toBeVisible();
     await capture(page, "admin-drawer-820x1180-en");
+  });
+});
+
+// --- step 6.4c: the Sell and Make screens ---------------------------------------------------------------------------------------------
+
+interface DemoPayment {
+  id: number;
+  order: { id: number } | null;
+  receipt: unknown;
+}
+
+test.describe("screens: sell and make", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  test("the Orders board with a card's timeline open, and an order's record, in en", async ({ page }) => {
+    test.setTimeout(120_000);
+    const t = MESSAGES.en;
+    await openAdmin(page, "en/admin/orders/", t.adminOrders.title);
+    await expect(page.getByText(t.adminOrders.loading)).toHaveCount(0, { timeout: 30_000 });
+    const open = page.getByRole("button", { name: /^Open order / });
+    if ((await open.count()) > 0) {
+      await open.first().click();
+      await expect(page.getByRole("region", { name: /^Order .* timeline$/ })).toBeVisible();
+      await capture(page, "orders-timeline-1440x900-en", [t.adminOrders.timeline_loading]);
+    }
+
+    // the record of an order the demo bakery was paid for, one with a receipt photo when there is one
+    const demo = await demoBakery();
+    const payments = (await demo.admin.get<{ data: DemoPayment[] }>("/payments")).data.filter((p) => p.order !== null);
+    const paid = payments.find((p) => p.receipt !== null) ?? payments[0];
+    test.skip(!paid, "the demo bakery has no paid order to show");
+    await page.goto(`en/admin/orders/record/?id=${paid.order?.id}`);
+    await expect(page.getByRole("heading", { level: 1, name: /^Order / })).toBeVisible({ timeout: 30_000 });
+    await capture(page, "order-record-1440x900-en", [t.orderRecord.loading, t.orderRecord.payments_loading]);
+  });
+
+  for (const locale of ["en", "am"] as const) {
+    test(`Payments, in ${locale}`, async ({ page }) => {
+      test.setTimeout(90_000);
+      const t = MESSAGES[locale];
+      await openAdmin(page, `${locale}/admin/payments/`, t.adminPayments.list.title);
+      await capture(page, `payments-1440x900-${locale}`, [t.adminPayments.list.loading]);
+    });
+
+    test(`the stock list, in ${locale}`, async ({ page }) => {
+      test.setTimeout(90_000);
+      const t = MESSAGES[locale];
+      await openAdmin(page, `${locale}/admin/inventory/`, t.inventory.stock.title);
+      await capture(page, `inventory-1440x900-${locale}`, [t.common.loading]);
+    });
+  }
+
+  test("Payment methods, Reconciliation and Receipt settings, in en", async ({ page }) => {
+    test.setTimeout(120_000);
+    const t = MESSAGES.en;
+    const sections = page.getByRole("navigation", { name: t.adminPayments.sections });
+    await openAdmin(page, "en/admin/payments/channels/", t.adminPayments.channels.title);
+    await capture(page, "payments-channels-1440x900-en", [t.common.loading]);
+    await sections.getByRole("link", { name: t.adminPayments.nav.reconciliation, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: t.adminPayments.reconciliation.title })).toBeVisible({ timeout: 30_000 });
+    await capture(page, "payments-reconciliation-1440x900-en", [t.adminPayments.reconciliation.loading]);
+    await sections.getByRole("link", { name: t.adminPayments.nav.receipts, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: t.adminPayments.receipts.title })).toBeVisible({ timeout: 30_000 });
+    await capture(page, "payments-receipts-1440x900-en", [t.common.loading]);
+  });
+
+  test("the ledger, purchases with one open, suppliers, transfers and reorder, in en", async ({ page }) => {
+    test.setTimeout(150_000);
+    const t = MESSAGES.en;
+    const sections = page.getByRole("navigation", { name: t.inventory.sections });
+    await openAdmin(page, "en/admin/inventory/ledger/", t.inventory.ledger.title);
+    await capture(page, "inventory-ledger-1440x900-en", [t.common.loading]);
+
+    await sections.getByRole("link", { name: t.inventory.nav.purchases, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: t.inventory.purchases.title })).toBeVisible({ timeout: 30_000 });
+    await capture(page, "inventory-purchases-1440x900-en", [t.common.loading]);
+    const open = page.getByRole("button", { name: /^Open purchase / });
+    if ((await open.count()) > 0) {
+      await open.first().click();
+      await expect(page.getByRole("region", { name: /^Purchase / })).toBeVisible({ timeout: 30_000 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await capture(page, "inventory-purchase-1440x900-en", [t.common.loading]);
+    }
+
+    await sections.getByRole("link", { name: t.inventory.nav.suppliers, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: t.inventory.suppliers.title })).toBeVisible({ timeout: 30_000 });
+    await capture(page, "inventory-suppliers-1440x900-en", [t.common.loading]);
+
+    await sections.getByRole("link", { name: t.inventory.nav.transfers, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: t.inventory.transfers.title })).toBeVisible({ timeout: 30_000 });
+    // every status, so the demo's confirmed and rejected transfers show beside the requested ones
+    await page.getByRole("group", { name: t.inventory.transfers.status }).getByRole("button", { name: t.inventory.transfers.all, exact: true }).click();
+    await capture(page, "inventory-transfers-1440x900-en", [t.common.loading]);
+
+    await sections.getByRole("link", { name: t.inventory.nav.reorder, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: t.inventory.reorder.title })).toBeVisible({ timeout: 30_000 });
+    await capture(page, "inventory-reorder-1440x900-en", [t.common.loading]);
+  });
+
+  test("the planner, in en", async ({ page }) => {
+    test.setTimeout(90_000);
+    const t = MESSAGES.en;
+    await openAdmin(page, "en/admin/planner/", t.planner.title);
+    await capture(page, "planner-1440x900-en", [t.common.loading]);
   });
 });
 

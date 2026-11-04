@@ -319,6 +319,20 @@ Three zones from left to right.
 They move onto the same primitives: Card/Panel, Table, Chip, Stat, Button sizes and the page title row. No screen keeps its own
 colours. Forms use a two-column grid at 1024 px or wider and one column below.
 
+As built for Sell and Make (step 6.4c, `components/admin/kit.tsx`), so each screen could sit beside the catalog list on the canvas:
+- the title row: the title with its Amharic name in `neutral-600` on the English page, the intro, the actions at the right (the intro wraps
+  in its own column, so the actions stay on the row);
+- a section's own pages (Payment sections, Inventory sections) as a named navigation of links in a segment track under the title row,
+  the current one `brand-50` with `brand-700` text, as the catalog's Products and Ingredients;
+- the toolbar: segments (36 px in a 46 px track), 44 px selects whose first option says what they show unfiltered, a field with its label
+  inside the box for a date or a number, the search with its icon, a filter switch as a 44 px pill; Apply as the primary button;
+- tables on a white 18 px card: the 13 / 600 caps header on one line, 48 px rows on hairlines, the first and last columns 20 px in,
+  figures right-aligned in tabular numbers, status chips with a dot, a row's actions on one line at its end, the open row `brand-50`;
+  a table with a visible title carries it inside the card; a table of many figures (the reconciliation) uses 8 px columns;
+- a notice about the screen itself (stale data, a view-only form) in the Alert's shape: amber, blue or neutral;
+- the colours of a state: amber waiting, blue in progress, `brand` done or on, red refused or out, green only for money confirmed (a
+  verified payment, an order paid in full).
+
 As built for Team, Insight and System (step 6.4d, on 6.4c's `components/admin/kit.tsx`):
 - the title row: the title with its Amharic name on the English page, the intro, the page's actions at the right (a page's exports as a
   group "Export", the way back from a record as a ghost button with an arrow);

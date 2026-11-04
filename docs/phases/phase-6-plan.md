@@ -1229,7 +1229,65 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
   Stat, the Button sizes and the title row, with no screen keeping its own colours (spec 4.4). The sub-section navigations stay named
   navigations (styled as `SegmentedControl` tabs) with the same link names. Forms use two columns at 1024 px and one below. Each PR runs
   every p0 to p5 project. STATUS `web.admin` `done` after 6.4d.
-  - As built (step 6.4c): (to be written by 6.4c)
+  - **As built (step 6.4c, `phase-6/web-admin-sell-make`).** Branched from 6.4a's `phase-6/web-admin-today` (its admin frame and title
+    row, `origin/main` merged in). Web only, plus the review sheet (`docs/i18n/am-review.csv`) and the spec's lines in fresh-counter.md 4.4.
+    No API, route, registry, OpenAPI or ERD change, and **no Playwright selector changed**: every accessible name, role, landmark and visible
+    string the p0 to p5 specs read is as it was. Where the code chose what the plan left open:
+    - **The patterns, shared** (`components/admin/kit.tsx`), so each screen could sit beside the catalog list on the canvas: `SectionTabs`
+      (a section's pages as a named navigation of links in the catalog's segment track, the current one brand-50); `Toolbar`,
+      `ToolbarSegments` (36 px pressed buttons in a 46 px track), `ToolbarSelect` (44 px, the first option says what it shows unfiltered,
+      named by `label`; `showLabel` sets the label in the box), `ToolbarField` (a date or a number with its label in the box), `ToolbarCheck`
+      (a filter switch as a 44 px pill) and `SearchBox` (the catalog's); `TableCard` (the Table primitive on the board's white 18 px card:
+      the 13 / 600 caps header on one line, 48 px rows, the first and last columns 20 px in, no line under the last row, a visible title
+      inside the card making it a region named by it; `compact` for many columns of figures) and `InnerTable` (a table inside a card's
+      body); `ACTIONS_CELL` (a row's actions on one line at its end); `Notice` (stale data or a view-only screen, amber, blue or neutral, in
+      the Alert's shape); `FORM_GRID` (two columns from 1024 px); `TEXT_LINK`; `Fact` (13 px caps label over its value); `useProductLook`
+      and `ProductThumb` (a product's photo and category from the catalog's own reads, the till's way).
+    - **The title row**: every page sets its Amharic title beside the English one on the English page (`lib/twin.ts` `amharicTwin`, read
+      from am.json while the page is prerendered; the order record's keeps "{no}" for the client to fill). `PageHeader` now gives the title
+      and intro the room the actions leave (at least 24rem before they wrap under), so a long intro wraps in its column and the actions stay
+      at the right of the row as the boards draw them; Today's and the catalog's rows are unchanged.
+    - **The section tabs**: "Payment sections" and "Inventory sections" keep their names, links and `aria-current`, drawn by each page under
+      its own title row (the layouts only enter the locale), as the catalog draws Products and Ingredients.
+    - **Orders**: the two filters as the toolbar (still labelled "Status" and "Table"); the columns as the production board draws them, a
+      title and a count pill over white 16 px cards, no grey track (two columns beside an open timeline from 1280 px, three without it, six
+      from 1536 px); a card is the order and where it is, its waiter and age (in the stations' words for a wait, 6.3c's
+      `lib/durations.ts`: "5:07", "1 h 05", "3 d"), a stack of its products' photos (the till's), its lines with
+      their state chips and its total; the opened card held by a brand-600 line. The card's button holds only the order's name and stretches
+      over the head (the head still opens the timeline; axe's label-content-name-mismatch). The timeline is a white card closed by an X
+      ("Close timeline"); Void is the danger button.
+    - **The order record**: Back and Refresh in the title row; the details card (the facts in 13 px caps, the balance a 30 px figure with its
+      state chip, History and Void as the card's actions); then, from 1280 px, the lines (a table card with each product's photo) and the
+      timeline on the left, and the payments (one card, each payment a block on a hairline), the receipt (6.3b's stacked actions) and the
+      refund on the right.
+    - **Payments**: the exports as the title row's actions (a group "Export" described by what the file holds); the filters as the toolbar,
+      still the search landmark "Filters" with the same labels; the list a table card (the photo a 48 px thumb, the status chips with a dot,
+      the chevron "Open payment N"), the older pages and the last read in its foot. The payment dialog closes with an X ("Close"), its facts
+      over hairlines, the two decisions as two white cards (Verify primary, Dispute the danger button), what came of them in the brand-50
+      status line. The photo viewer and its thumbs on the admin radii (a thumb without its picture shows an icon).
+    - **Payment methods**: the methods a titled table card, the moves as arrow buttons named "Move up <name>" and "Move down <name>", Edit,
+      Switch off and Remove (danger), the cash row's lock note; the removed ones folded under it in a white card; the form a white card in
+      two columns. **Reconciliation**: the range as the toolbar; the range's totals as four Stats (receipts, amount, refunded, net, from the
+      report's totals); each day and the range a compact table card that fits the content without scrolling, the drill a brand link, the
+      totals in the table's foot. **Receipt settings**: one form in two cards from 1280 px, the receipt's words (English beside Amharic) and
+      the printing (each switch still a labelled checkbox with its help, the paper a radio group).
+    - **Inventory**: stock with the place (its label in the box, "Location") and the search ("Find an item") as the toolbar; the ledger's
+      filters as the toolbar, the reason a chip; purchases and transfers filtered by status segments; "New purchase" in the title row, the
+      new purchase and an open one white cards above the list, brought into view when they open (Close is an X); suppliers and reorder rules
+      full width with their forms under them in two columns, brought into view by Edit. **The planner**: the open requests a table card
+      with each product's 52 × 39 photo and its other name, the priority and the state as chips, the baker picked in the row; the schedule
+      form under it in two columns.
+    - **Colours**: green is money confirmed only (a verified payment, an order paid in full); a ready line, a confirmed purchase or transfer,
+      a method switched on and an active supplier or rule are brand; the open or linked row brand-50; links brand; no blue tab, green
+      notice or own border is left on these screens. `HistoryLink`, `RecordLink`, `QueryBox` (grey rows while loading), `Pager` and
+      `PaymentStatusCell` take the admin look wherever they are used.
+    - Messages, both languages: `adminPayments.receipts.text_title`, `print_title`, `inventory.stock.clear_search`. `docs/i18n/am-review.csv`
+      regenerated.
+    - Tests: `e2e/p6/screens.spec.ts` gains, at 1440 × 900 as the demo bakery's admin, the Orders board with a timeline open, an order's
+      record, Payments, Payment methods, Reconciliation, Receipt settings, the stock list, the ledger, purchases with one open, suppliers,
+      transfers, reorder and the planner in English, and Payments and the stock list in Amharic. Left as they were (p6-a11y does not cover
+      these screens): axe's label-content-name-mismatch on the Amharic order card names ("ትዕዛዝ {no}ን ክፈት" beside "ትዕዛዝ {no}"), the Amharic
+      "Void order" and the reconciliation's drill link (named by its sentence, showing the count); changing them changes names.
   - **As built (step 6.4d, `phase-6/web-admin-team-insight`).** Branched from 6.4a's `phase-6/web-admin-today` (now `main` at `a43354a`).
     6.4c's `components/admin/kit.tsx`, `lib/twin.ts`, its `PageHeader` change (the title and intro take what the actions leave) and its
     `HistoryLink` are copied unchanged from `phase-6/web-admin-sell-make` at `5e97257`, so the Team, Insight and System screens use the same
@@ -1290,7 +1348,7 @@ The p0 to p5 Playwright projects are the regression guard, and they run unchange
       the history, the analytics overview and its Sales page, the audit log and System in English, and People and the analytics overview in
       Amharic. Left as they were (p6-a11y does not cover these screens): the notes' "Show notes" buttons named "Show the notes of …" and
       the running shifts' "Open the count" named by its station (axe's label-content-name-mismatch); changing them changes names.
-    - STATUS `web.admin` stays `in_progress`: 6.4b and 6.4c were not merged when this PR opened.
+    - STATUS `web.admin` `done`: 6.4a to 6.4c are merged, and this is the last admin step.
 
 ### 6.5 docs (STATUS `docs`), one PR
 
