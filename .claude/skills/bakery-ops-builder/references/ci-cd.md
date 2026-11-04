@@ -25,7 +25,7 @@ they bolt on later.
    production) and runs Playwright natively against the built Next app.
 6. **Local parity.** `make ci` runs the same steps in the same order inside Docker. If local and CI
    disagree, fix the Makefile.
-7. **Every job states `timeout-minutes`** (since 5.5d): 20 unless a measured run needs more (`mod-inventory` 30,
+7. **Every job states `timeout-minutes`** (since 5.5d): 20 unless a measured run needs more (`mod-inventory` and `mod-shifts` 30,
    `perf-dashboards` 40, `gate-p4` 45, `backup-drill`, `gate-p5` and `gate-p6` 25, `perf-load` 30), so a hung step cannot hold a runner
    for six hours. A job that calls a reusable workflow cannot set its own: the reusable workflow's job does (`e2e.yml` 30,
    `module-tests.yml` its `timeout_minutes` input).

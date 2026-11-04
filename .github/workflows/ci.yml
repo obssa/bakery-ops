@@ -222,7 +222,9 @@ jobs:
     # `seeds`: the demo bakery (Phase0Seeder ..) must stay valid as later phases change. Since step 3.2c the seeders open the
     # stations' shifts through Shifts (Demo\DemoShifts), so they run here, after every module they write through is green.
     # contract:ops->shifts (step 5.5b): HashChain::verifyAll on a named connection, which the restore drill of App\Ops reads
-    with: { module: shifts, groups: "module:shifts,seeds", contracts: "contract:analytics->facts,contract:ops->shifts" }
+    # 30 minutes, not the reusable job's 20: it took 18 m 16 s on PR #120 (run 41816119723, attempt 2; 12 m 39 s on another runner the same day), so the
+    # seeds of every phase left too little room before the gate chain would be cancelled
+    with: { module: shifts, groups: "module:shifts,seeds", contracts: "contract:analytics->facts,contract:ops->shifts", timeout_minutes: 30 }
 
   # The kill switch rehearsal (phase-3-plan.md 10.1): since step 3.7e the three shift rules are ON by default, so every module job and
   # every e2e job runs with them on. This job runs the Phase 0-2 exit-gate tests with all three OFF, the state the live host is in when
