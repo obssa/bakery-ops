@@ -104,7 +104,12 @@ the production board draws them, with a stack of each order's photos; the record
 the reconciliation's four Stats and compact tables that fit the page. Green means money confirmed only; no blue tab or green notice is
 left on these screens. Web only, and no Playwright selector changed.
 
-**6.4d `phase-6/web-admin-team-insight` (PR #119).** «6.4d»
+**6.4d `phase-6/web-admin-team-insight` (PR #119).** People, Devices, the Shifts overview, a count's review, the history, notes, reasons,
+templates, replay and roster, Analytics with its pages, the Audit log and System, on 6.4c's patterns (`components/admin/rows.tsx` adds a
+table card's grey rows while its first read is pending). Analytics has the board's KPI row, Today's share bars, each product's photo and
+the charts in one style (`components/charts/*`: brand-600 for the point that matters, brand-100 for the rest, no gradient, no blue). System
+is a card per part with its state as a chip, and shows what the live product photos take (`files.media_used_mb`, from 6.1b). Web only, and
+no Playwright selector changed. STATUS `web.admin` done.
 
 **6.5 `phase-6/gate` (PR #120), this step.** `Phase6GateTest` (`gate:p6`, six cases): a 2400 × 1800 upload through the API gives the three
 sizes in the format `auto` picks on the host; a 1000 × 750 crop keeps 1000 × 750 as large and draws exactly that rectangle; a 799 × 600
@@ -157,8 +162,10 @@ accepted with their dated notes, the manifest's `phases.6.adrs`, the skill's `ci
 Every step that rebuilt a screen captured it in `e2e/p6/screens.spec.ts` (in `p6-a11y`, on the demo bakery seeded with `SEED_PHASE=6`,
 so with its demo photos): stations at 1180 × 820, admin pages at 1440 × 900, in `en` with one `am` capture per screen, after the screen's
 loading lines were gone, its fonts and photos drawn and its animations ended. `e2e-p6` uploads them as the artifact `screens` on every
-run. The coordinator reviewed each step's captures against its board (`Main`, `Login`, `Pad`, `Kitchen`, `Till`, `Production`, `Admin`,
-`CatalogList`, `ProductPhoto` and `PhotoStates`) before merging it; no capture is compared by a machine (ADR 0023, no golden screenshots).
+run. The process (the brief's rule of 2026-11-03) has the coordinator compare each step's captures with its board (`Main`, `Login`, `Pad`,
+`Kitchen`, `Till`, `Production`, `Admin`, `CatalogList`, `ProductPhoto` and `PhotoStates`) before merging it, and Ramin look at the live URL;
+this report lists what was captured and the differences the steps recorded, and does not itself sign the comparison. No capture is compared
+by a machine (ADR 0023, no golden screenshots).
 The run of this step («SCREENS-RUN») holds «SCREENS-COUNT» captures:
 
 «SCREENS-TABLE»
@@ -185,18 +192,46 @@ From the As built notes, for the review on the live URL:
   the drag-over line says "JPG, PNG or WebP" where the board names the file and its size (a browser hides both until the drop); the
   upload's line leaves out the board's "On a weak line the upload waits in the queue" (an admin upload is never queued); the page's
   "Saved." status line is not on the board.
-- **Sell, Make, Team, Insight and System** (6.4c, 6.4d): «6.4cd-DIFF»
+- **Sell, Make, Team, Insight and System** (6.4c, 6.4d): the canvas draws no board for most of these screens, so each was built beside the
+  catalog list and the Admin board, from their patterns (spec 4.4). What a person should look at is whether they read as one product,
+  not whether they match a drawing.
 - **Sign-in** (6.2b): no "Staff code" tab (Q1) and no eye button on the password field (its name, "Show password", would also answer
   `getByLabel("Password")`).
+
+## Added to step 6.5 by the coordinator
+
+**The admin accessibility pass.** `p6-a11y` had not covered the screens of 6.4c and 6.4d. `e2e/p6/a11y-admin.spec.ts` now reads Orders with a
+card's timeline open, Payments with its Reconciliation, Stock, People, Shifts with its Handover notes, Analytics, the Audit log and System,
+in `en` and in `am`, as the demo bakery's admin at 1440 × 900. It is a light pass: the main page of each section, not every sub-page and not
+every state. A pass reads every screen and fails once at its end, naming every serious or critical finding. What it found:
+
+«A11Y-FINDINGS»
+
+**Names that hold the words their controls show** (axe's `label-content-name-mismatch`, WCAG 2.5.3, which compares whole words):
+
+| Control | Old name | New name | Specs |
+|---|---|---|---|
+| Shift notes, Show and Hide | "Show the notes of …", "Hide the notes of …"; am "የ{label} ማስታወሻዎችን አሳይ" | "Show notes · …", "Hide notes · …"; am "ማስታወሻዎችን አሳይ · …" | none selects them |
+| Running shifts, Open the count | "Open the count at {station}"; am "በ{station} ያለውን ቆጠራ ክፈት" | "Open the count · {station}"; am "ቆጠራውን ክፈት · {station}" | none selects them: the p3 specs read the station shift bar's own "Open the count", which does not change |
+| Admin order card (am) | "ትዕዛዝ {no}ን ክፈት" beside "ትዕዛዝ {no}" | "ትዕዛዝ {no}፦ ክፈት" | none: p1 and p4 read the English name, unchanged |
+| Admin Void order (am) | "ትዕዛዝ {no}ን ውድቅ አድርግ" beside "ትዕዛዙን ውድቅ አድርግ" | "ትዕዛዙን ውድቅ አድርግ · {no}" | none: p4 reads the English name, unchanged |
+| Reconciliation's drill link | "Show the payments without a photo: {channel}, {day}", showing only the count | the same words, then " · {count}" | none changed: `p4 pay-admin` and `dashboards-live` match the opening words as a substring |
+
+**From the coordinator's screen review.** Large stock figures read "25000 g" on the admin's stock screens; they now read "25,000 g" on
+Stock, the Ledger, Purchases, Transfers and Reorder, through `qtyFigure` (`trimDecimal` and `groupDigits` on the decimal string, never a float).
+A field a person edits stays ungrouped, and the KDS strip keeps its "1000 g". `p2-purchase-transfer`'s fixture changed with it, because it
+reads the figure on those screens: `after.onHandText` "20,000 g", `rule.reorderText` "50,000 g" and `ask.text` "5,000 g". The Payments table's
+clipped chevron at 1440 × 900 was the review's other item; it is fixed in PR #121, so this step's own fix was reverted (`9e6a5a1`) to leave one.
 
 ## Known gaps
 
 Not fixed in Phase 6; none blocks the claim:
 
-- **axe names left on screens `p6-a11y` does not cover** (6.4c, 6.4d): the Amharic order card names ("ትዕዛዝ {no}ን ክፈት" beside
-  "ትዕዛዝ {no}"), the Amharic "Void order", the reconciliation's drill link (named by its sentence, showing the count), the shift notes'
-  "Show notes" buttons named "Show the notes of …" and the running shifts' "Open the count" named by its station break
-  `label-content-name-mismatch`. Changing them changes names the p0 to p5 specs read, so they wait for a step that moves both.
+- **Names the admin pass does not reach** (a comparison of each `_named` and `_aria` message with its base message, not an axe run, so a
+  base message that is not what the control shows reads as a false alarm): `pad.cancel_order_aria` (am),
+  `inventory.reorder.edit_named` (en, am), `adminShifts.templates.edit_named`, `reasons.edit_named` and `roster.people_named` (am), and
+  `adminPayments.channels.remove_confirm_named` (en, am). They sit on sub-pages or in states the light pass does not open, and were left
+  as they are.
 - **Four catalog messages no screen shows** (6.4b): `catalog.refund_save`, `refund_saving`, `refund_saved` and `refund_settings_intro`
   stay in both dictionaries (6.4b left them to keep clear of 6.4a's edits beside them, open at the time); a later clean-up removes them.
 - **The service worker's photo cache is not proved in CI**: CI serves `next start`, which has no `sw.js`. `web-build` greps the export's
