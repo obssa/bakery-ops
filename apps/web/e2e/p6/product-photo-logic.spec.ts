@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test";
 import type { ProductImageView } from "../../src/lib/api/types";
+import { fitWithin, PRODUCT_PHOTO, RECEIPT_PHOTO } from "../../src/lib/images/downscale";
+import { clampView, clampZoom, coverSize, cropFields, cropOf, imageStyle, initialView, MAX_ZOOM, MIN_CROP, MIN_ZOOM, panBy, qualityOf, SHARP_CROP, sourceRect, zoomAt } from "../../src/lib/images/frame";
 import { frameSize, initialsOf, mediaUrl, placeholderIcon, RENDITIONS, sizesFor, srcSetOf } from "../../src/lib/images/productImage";
 
-// Phase 6 step 6.2a, under p6-product-photo (docs/phases/phase-6-plan.md 6.2a and section 7): what ProductImage puts on the page, as pure
+// Phase 6 steps 6.2a and 6.4b, under p6-product-photo (docs/phases/phase-6-plan.md 6.2a, 6.4b and section 7): what ProductImage puts on
+// the page, and the photo card's framing maths (at the end), as pure
 // functions (no browser, no stack). The API (step 6.1a, ADR 0022) answers a product's photo as {thumb, card, large, width, height}: three
 // content-addressed paths without a host, and the size of the large rendition, which the server never upscales (a crop of 1000 x 750 keeps
 // 1000 x 750 as large; 800 x 600 is the smallest it accepts).
@@ -124,5 +127,140 @@ test.describe("product photo: initials", () => {
     expect(initialsOf("")).toBe("");
     expect(initialsOf("300")).toBe("");
     expect(initialsOf("(ቁራጭ)")).toBe("ቁ");
+  });
+});
+
+// Step 6.4b (phase-6 plan 6.4b; fresh-counter.md 4.3 "Photo card"): the framing step's maths, lib/images/frame.ts. The admin moves and zooms
+// the photo inside a fixed 4:3 frame; what the server is sent is the source rectangle in the pixels of the file the browser uploads (the
+// photo shrunk to 2400 px on its long side, lib/images/downscale.ts), always exactly 4:3 (4k x 3k) and inside the photo, so the server's
+// snap (CropRect, step 6.1a) keeps it as it is. The quality line reads that rectangle: sharp from 1200 x 900, soft from 800 x 600 (the
+// server's minimum), refused below.
+test.describe("product photo: framing", () => {
+  const PHOTO = { width: 1600, height: 1200 };
+  const WIDE = { width: 2400, height: 1000 };
+  const TALL = { width: 1000, height: 2000 };
+
+  test("at 1x a 4:3 photo is framed whole, and the frame covers it exactly", () => {
+    const view = initialView(PHOTO);
+    expect(view).toEqual({ zoom: 1, cx: 800, cy: 600 });
+    expect(sourceRect(PHOTO, view)).toEqual({ x: 0, y: 0, width: 1600, height: 1200 });
+    expect(imageStyle(PHOTO, view)).toEqual({ left: 0, top: 0, width: 100, height: 100 });
+  });
+
+  test("a photo of another shape starts on its largest centred 4:3 rectangle", () => {
+    expect(coverSize(WIDE)).toEqual({ width: 4000 / 3, height: 1000 });
+    expect(sourceRect(WIDE, initialView(WIDE))).toEqual({ x: 534, y: 1, width: 1332, height: 999 });
+    expect(coverSize(TALL)).toEqual({ width: 1000, height: 750 });
+    expect(sourceRect(TALL, initialView(TALL))).toEqual({ x: 0, y: 625, width: 1000, height: 750 });
+    // the img is drawn larger than the frame on its long side and moved so the rectangle is what shows
+    const wide = imageStyle(WIDE, initialView(WIDE));
+    expect(wide.width).toBeCloseTo(180, 6);
+    expect(wide.height).toBeCloseTo(100, 6);
+    expect(wide.left).toBeCloseTo(-40, 6);
+    expect(wide.top).toBeCloseTo(0, 6);
+  });
+
+  test("zooming in frames a smaller rectangle around the same centre", () => {
+    const view = zoomAt(PHOTO, initialView(PHOTO), 2);
+    expect(view).toEqual({ zoom: 2, cx: 800, cy: 600 });
+    expect(sourceRect(PHOTO, view)).toEqual({ x: 400, y: 300, width: 800, height: 600 });
+    expect(imageStyle(PHOTO, view)).toEqual({ left: -50, top: -50, width: 200, height: 200 });
+    // 1.2x, as the board shows it: 1333.3 x 1000 rounds down to the 4:3 rectangle of whole pixels inside it
+    expect(sourceRect(PHOTO, zoomAt(PHOTO, initialView(PHOTO), 1.2))).toEqual({ x: 134, y: 101, width: 1332, height: 999 });
+  });
+
+  test("the zoom stays between 1x and 3x", () => {
+    expect(clampZoom(0.5)).toBe(MIN_ZOOM);
+    expect(clampZoom(9)).toBe(MAX_ZOOM);
+    expect(clampZoom(Number.NaN)).toBe(MIN_ZOOM);
+    expect([MIN_ZOOM, MAX_ZOOM]).toEqual([1, 3]);
+    expect(zoomAt(PHOTO, initialView(PHOTO), 5).zoom).toBe(3);
+    expect(sourceRect(PHOTO, zoomAt(PHOTO, initialView(PHOTO), 5))).toEqual({ x: 534, y: 401, width: 532, height: 399 });
+  });
+
+  test("zooming at a point (a pinch, a trackpad) keeps the point under the fingers where it was", () => {
+    // at 1x the frame's top-left quarter point shows source (400, 300); after 2x at that point it still does
+    const view = zoomAt(PHOTO, initialView(PHOTO), 2, { x: 0.25, y: 0.25 });
+    const crop = cropOf(PHOTO, view);
+    expect(crop.x + 0.25 * crop.width).toBeCloseTo(400, 6);
+    expect(crop.y + 0.25 * crop.height).toBeCloseTo(300, 6);
+    expect(view).toEqual({ zoom: 2, cx: 600, cy: 450 });
+  });
+
+  test("a drag moves the photo with the pointer, in the frame's pixels turned into the photo's", () => {
+    // the frame is 400 px wide on screen and shows 800 source pixels at 2x: 2 source pixels a screen pixel
+    const start = zoomAt(PHOTO, initialView(PHOTO), 2);
+    const moved = panBy(PHOTO, start, 400, 50, -25);
+    // the photo follows the pointer right and up, so the rectangle moves left and down
+    expect(moved).toEqual({ zoom: 2, cx: 700, cy: 650 });
+    expect(sourceRect(PHOTO, moved)).toEqual({ x: 300, y: 350, width: 800, height: 600 });
+  });
+
+  test("the photo cannot be dragged off the frame: the rectangle is held inside the photo", () => {
+    const start = zoomAt(PHOTO, initialView(PHOTO), 2);
+    expect(sourceRect(PHOTO, panBy(PHOTO, start, 400, 5000, 5000))).toEqual({ x: 0, y: 0, width: 800, height: 600 });
+    expect(sourceRect(PHOTO, panBy(PHOTO, start, 400, -5000, -5000))).toEqual({ x: 800, y: 600, width: 800, height: 600 });
+    // at 1x on a 4:3 photo there is nothing to move
+    expect(panBy(PHOTO, initialView(PHOTO), 400, 120, 80)).toEqual(initialView(PHOTO));
+    // a wide photo moves sideways only
+    expect(sourceRect(WIDE, panBy(WIDE, initialView(WIDE), 400, -5000, 300))).toEqual({ x: 1067, y: 1, width: 1332, height: 999 });
+    // zooming out near an edge pulls the rectangle back inside
+    const edge = panBy(PHOTO, zoomAt(PHOTO, initialView(PHOTO), 3), 400, 5000, 5000);
+    expect(clampView(PHOTO, { ...edge, zoom: 1 })).toEqual(initialView(PHOTO));
+    expect(zoomAt(PHOTO, edge, 1)).toEqual(initialView(PHOTO));
+  });
+
+  test("whatever the view, the rectangle is whole pixels, exactly 4:3 and inside the photo", () => {
+    const sources = [PHOTO, WIDE, TALL, { width: 2400, height: 1800 }, { width: 1999, height: 1337 }, { width: 801, height: 601 }];
+    let seed = 7;
+    const next = () => {
+      seed = (seed * 48271) % 2147483647;
+      return seed / 2147483647;
+    };
+    for (const source of sources) {
+      for (let i = 0; i < 200; i += 1) {
+        const zoomed = zoomAt(source, initialView(source), 1 + next() * 2.5, { x: next(), y: next() });
+        const view = panBy(source, zoomed, 300 + next() * 300, (next() - 0.5) * 900, (next() - 0.5) * 900);
+        const rect = sourceRect(source, view);
+        expect(Number.isInteger(rect.x) && Number.isInteger(rect.y) && Number.isInteger(rect.width) && Number.isInteger(rect.height)).toBe(true);
+        expect(rect.width * 3).toBe(rect.height * 4);
+        expect(rect.x).toBeGreaterThanOrEqual(0);
+        expect(rect.y).toBeGreaterThanOrEqual(0);
+        expect(rect.x + rect.width).toBeLessThanOrEqual(source.width);
+        expect(rect.y + rect.height).toBeLessThanOrEqual(source.height);
+      }
+    }
+  });
+
+  test("the quality line: sharp from 1200 x 900, soft from 800 x 600, too small below (the server's minimum)", () => {
+    expect([SHARP_CROP, MIN_CROP]).toEqual([
+      { width: 1200, height: 900 },
+      { width: 800, height: 600 },
+    ]);
+    expect(qualityOf({ width: 2400, height: 1800 })).toBe("sharp");
+    expect(qualityOf({ width: 1200, height: 900 })).toBe("sharp");
+    expect(qualityOf({ width: 1196, height: 897 })).toBe("soft");
+    expect(qualityOf({ width: 800, height: 600 })).toBe("soft");
+    expect(qualityOf({ width: 796, height: 597 })).toBe("too_small");
+    expect(qualityOf({ width: 0, height: 0 })).toBe("too_small");
+    // the fixture at 2x is the server's minimum exactly; a 640 x 480 photo is too small at every zoom
+    expect(qualityOf(sourceRect(PHOTO, zoomAt(PHOTO, initialView(PHOTO), 2)))).toBe("soft");
+    expect(qualityOf(sourceRect(PHOTO, zoomAt(PHOTO, initialView(PHOTO), 2.01)))).toBe("too_small");
+    const small = { width: 640, height: 480 };
+    expect(sourceRect(small, initialView(small))).toEqual({ x: 0, y: 0, width: 640, height: 480 });
+    expect(qualityOf(sourceRect(small, initialView(small)))).toBe("too_small");
+  });
+
+  test("the rectangle goes to the server as the four crop fields of POST /items/{item}/image", () => {
+    expect(cropFields({ x: 134, y: 101, width: 1332, height: 999 })).toEqual({ crop_x: "134", crop_y: "101", crop_width: "1332", crop_height: "999" });
+  });
+
+  test("a product photo is shrunk to 2400 px on its long side as JPEG 0.9; a receipt keeps 1600 px and 0.82", () => {
+    expect(PRODUCT_PHOTO).toEqual({ maxEdge: 2400, quality: 0.9 });
+    expect(RECEIPT_PHOTO).toEqual({ maxEdge: 1600, quality: 0.82 });
+    expect(fitWithin(4032, 3024, PRODUCT_PHOTO.maxEdge)).toEqual({ width: 2400, height: 1800 });
+    expect(fitWithin(3024, 4032, PRODUCT_PHOTO.maxEdge)).toEqual({ width: 1800, height: 2400 });
+    expect(fitWithin(1600, 1200, PRODUCT_PHOTO.maxEdge)).toEqual({ width: 1600, height: 1200 });
+    expect(fitWithin(4032, 3024)).toEqual({ width: 1600, height: 1200 });
   });
 });

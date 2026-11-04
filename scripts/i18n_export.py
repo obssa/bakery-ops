@@ -51,6 +51,8 @@ SCREENS = {
     "refund": "/admin/orders/record (refund)",
     "catalog": "/admin/catalog",
     "recipe": "/admin/catalog (item page)",
+    "product": "/admin/catalog (product page)",
+    "photo": "/admin/catalog (product page, photo card)",
     "people": "/admin/people",
     "devices": "/admin/people/devices",
     "deviceGate": "/pad, /till, /kds, /production (a computer not enrolled)",

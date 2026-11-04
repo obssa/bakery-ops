@@ -2,7 +2,7 @@
 
 import { Ellipsis } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Locale, MenuItem } from "@/lib/api/types";
 import { compareDecimal, trimDecimal } from "@/lib/decimal";
 import { focusRing } from "../styles";
@@ -15,7 +15,7 @@ import { IconButton, ProductImage } from "../ui";
 // it always was (name, price, availability; or why it is not available), so the earlier specs still find it; a tap adds one, a long press
 // or the small "More" button beside the price opens the options. An unavailable card is aria-disabled, not disabled: it stays focusable
 // and a tap says why. Also drawn without handlers as a `preview` (the catalog's grid view, step 6.4a, and the photo card's live preview,
-// step 6.4b).
+// step 6.4b, which passes the photo being framed as `photo`).
 
 /** What a card shows: a menu entry, or a catalog row put in the same shape. */
 export type ProductCardItem = Pick<
@@ -37,6 +37,8 @@ export interface ProductCardProps<T extends ProductCardItem> {
   onUnavailable?: (item: T, reason: string) => void;
   /** drawn as the waiter would see it, without a button or handlers */
   preview?: boolean;
+  /** drawn in the photo's place, in its 4:3 frame (step 6.4b: the photo card's live preview of a photo being framed) */
+  photo?: ReactNode;
 }
 
 const LONG_PRESS_MS = 500;
@@ -48,7 +50,7 @@ export function isUnavailable(item: Pick<MenuItem, "available" | "unavailable_re
   return item.unavailable_reason !== undefined || compareDecimal(item.available, "0") <= 0;
 }
 
-export function ProductCard<T extends ProductCardItem>({ item, locale, category, onAdd, onMore, onUnavailable, preview = false }: ProductCardProps<T>) {
+export function ProductCard<T extends ProductCardItem>({ item, locale, category, onAdd, onMore, onUnavailable, preview = false, photo }: ProductCardProps<T>) {
   const t = useTranslations("pad");
   const name = locale === "am" ? item.name_am : item.name_en;
   const unavailable = isUnavailable(item);
@@ -79,14 +81,18 @@ export function ProductCard<T extends ProductCardItem>({ item, locale, category,
   const face = (
     <>
       <span className="relative block overflow-hidden rounded-t-[15px]">
-        <ProductImage
-          image={item.image}
-          name={name}
-          category={category}
-          size="card"
-          // the photo in grey at 60 %; a placeholder is grey already and keeps its contrast
-          className={unavailable ? "[&_img]:opacity-60 [&_img]:grayscale" : ""}
-        />
+        {photo !== undefined ? (
+          <span className={`relative block aspect-[4/3] overflow-hidden bg-neutral-100 ${unavailable ? "[&_img]:opacity-60 [&_img]:grayscale" : ""}`}>{photo}</span>
+        ) : (
+          <ProductImage
+            image={item.image}
+            name={name}
+            category={category}
+            size="card"
+            // the photo in grey at 60 %; a placeholder is grey already and keeps its contrast
+            className={unavailable ? "[&_img]:opacity-60 [&_img]:grayscale" : ""}
+          />
+        )}
         {!unavailable && item.low ? (
           <span className="absolute left-2 top-2 inline-flex min-h-6.5 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold tabular-nums text-amber-800">
             <span aria-hidden="true" className="size-[7px] shrink-0 rounded-full bg-amber-700" />

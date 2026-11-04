@@ -15,6 +15,9 @@ test.describe("admin catalog and planning", () => {
 
     await openAs(page, f.admin, `en/admin/catalog/?item=${f.cake.id}`);
     await expect(page.getByRole("heading", { level: 1, name: f.cake.name_en })).toBeVisible({ timeout: 30_000 });
+    // step 6.4b: the product page is the ProductPhoto board (details, refunds, photo); the recipe sits behind "Recipe and cost"
+    await page.getByRole("button", { name: "Recipe and cost" }).click();
+    await expect(page.getByRole("dialog", { name: "Recipe and cost" })).toBeVisible();
 
     // version 1: cost and margin sit beside the price
     const money = page.getByRole("region", { name: "Price and cost" });
