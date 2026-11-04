@@ -1,7 +1,8 @@
 # ADR 0022: Product photos, storage and serving
 
-- Status: **proposed** (step 6.1a, 2026-11-03, from phase-6 plan sections 3, 4.1, 4.2, 9 and 10.1 D1 to D5). Steps 6.1b (the menu, the
-  prune, the backup), 6.1c (the demo photos) and 6.3a (the service worker) add their notes; step 6.5 accepts it as built.
+- Status: **accepted** (step 6.5, 2026-11-04; proposed in step 6.1a, 2026-11-03, from phase-6 plan sections 3, 4.1, 4.2, 9 and 10.1 D1
+  to D5). The decision is accepted as built in steps 6.1a (the API), 6.1b (the menu, the prune, the backup), 6.1c (the demo photos), 6.3a
+  (the service worker) and 6.4b (the admin's photo manager). What the build changed or made concrete is in the dated notes below.
 - Date: 2026-11-03
 - Phase: 6
 
@@ -119,3 +120,53 @@ uses `Files`, `StoredFile` or signed URLs; the pipeline uses `ImageProcessor`; n
   a 1x tablet may take the thumb for a 180 px card); the order line draws the `thumb`, from the menu's photo of the product as it is now,
   so a photo replaced or removed since the line was added shows as it is. A product without a photo, or one whose file fails, shows the
   category's placeholder.
+
+## Note, 2026-11-04: accepted at the Phase 6 gate (step 6.5)
+
+This note records steps 6.1a, 6.1c and 6.4b, from their As built notes in phase-6 plan section 6 (6.1b and 6.3a have their own notes
+above). What the build changed from, or made concrete in, the decision:
+
+- **The snap** (decision 3). A crop within 1 px of 4:3 (`|4h - 3w| <= 4`) becomes the largest exact 4:3 rectangle (4k × 3k) inside it,
+  centred in it, so it can never leave the image and loses at most 3 px a side. The 800 × 600 minimum is checked on the snapped crop, so
+  a 799 × 600 crop is refused as `width 796, height 597`.
+- **The refusals** are eight keys, both languages: `not_a_product`, `not_an_image`, `unsupported_type`, `too_large`, `crop_invalid`,
+  `too_small`, `unavailable` and `processing_failed` (500: a rendition that failed its re-read). `ImageProcessor`'s own refusals are told in
+  Catalog's words (`CatalogError::fromFilesError`). A request without a photo part is `not_an_image`; a crop with some of its four fields
+  is `validation.failed`. `DELETE` on an ingredient answers as a product without a photo does (200, nothing written).
+- **Files before the transaction** (decision 5). The three renditions are written under a temporary name and moved into place before the
+  row's transaction, so no reader ever sees half of a file cached as immutable. A write whose transaction then fails leaves
+  content-addressed files that a retry reuses. The audit rows are `recordEvent` rows on the item, written inside the photo's transaction,
+  so a lost `client_uuid` race and a remove without a photo write none.
+- **The route stays in the `api` group only** (decision 6): bindings and nothing else, so no session can start and no cookie is sent.
+- **`ImageProcessor`** gained `resample()` (one rectangle onto white, so a PNG's transparency never turns black) and `canWebp()` beside
+  `load()` and `encodeScrubbed()`; `process()` is built from them and keeps its receipt behaviour and tests.
+- **The demo photos** (decision 8, D5; step 6.1c). 29 WebP files of 1600 × 1200 in `apps/api/resources/demo/product-images/` (3.1 MB in
+  all, no EXIF, XMP or ICC), one per product of the demo bakery, with `manifest.json` (exactly five keys an entry: slug, file, the
+  `name_en` it matches, the source page and the licence name; Unsplash and Pexels pages, no person named) and the folder's README.
+  `bakery:demo-product-images --branch= [--dry-run] [--force] [--as=]` and `Phase6Seeder` attach them through `ProductPhotos::set(...,
+  'demo')` with a centre crop, so the renditions, the sha256, `catalog_version` and the audit row are the upload's. They refuse a branch that
+  is not a demo branch (stock photos never land on a shop's real products) and check the whole manifest before writing. A product with an
+  uploaded photo is never touched, and `--force` replaces only `demo` photos. The actor is the branch's first active admin, or `--as`, and
+  must hold `catalog.manage`. `.gitattributes` marks `*.webp binary`. The live Demo Bakery branch gets its photos from one run of the
+  command by the coordinator, never from a deploy.
+- **The client** (decision 3; step 6.4b). The product page's Photo card checks the type (JPEG, PNG or WebP), decodes the file and shrinks
+  it in the browser to 2400 px on the long side, JPEG 0.9, the EXIF orientation applied, on white and without metadata
+  (`lib/images/downscale.ts` `PRODUCT_PHOTO`; receipts keep 1600 px and 0.82). The framing maths (`lib/images/frame.ts`) sends whole
+  pixels, exactly 4k × 3k inside the photo, so the server's snap keeps the rectangle (1.2× of a 1600 × 1200 photo is 1332 × 999). The
+  quality line reads that rectangle: sharp from 1200 × 900, "may look soft" from 800 × 600, and below it "Use this photo" is off. The
+  upload is an `XMLHttpRequest` with the API client's headers (bearer, Idempotency-Key, `X-Device-Id`), for its progress; one key and one
+  `client_uuid` per photo and crop, so pressing "Use this photo" again after a failure is the same write. It never goes through the outbox:
+  admin screens are online only.
+- **The gate** (step 6.5). `tests/Gate/Phase6GateTest.php` (`gate:p6`, run by `gate-p6` on the compose stack in the API image, whose
+  `gd` has WebP) proves the decision end to end: the three sizes of a 2400 × 1800 upload and of a 1000 × 750 crop in the format `auto`
+  picks, `too_small` in both languages, the route's headers, 304 and 404 signed out, every product of the seeded demo bakery with a live
+  demo photo after `Phase6Seeder`, and the `media` disk under `storage/` with `public/` unchanged by an upload, a replace, a remove and
+  the whole demo seed.
+
+Enforcement, added to the list above: `Phase6GateTest` (`gate:p6`); `MenuImageTest` and `PruneProductImagesTest` (6.1b);
+`DemoPhotoManifestTest`, `DemoProductImagesCommandTest` and `Phase6SeederTest` (6.1c); `BackupRunTest` (`ops`, the media folder);
+`p6-product-photo` (the pad's photos, the admin's drop, frame, replace and remove, the menu's ETag); `web-build` (the export's `sw.js`
+holds the media route).
+
+The rest (Catalog's ownership, a new row per photo, not receipt evidence, the three renditions, WebP or JPEG by `gd`, the public immutable
+route and why it is safe, the edits as the item's) is as proposed.

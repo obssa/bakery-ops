@@ -1,7 +1,8 @@
 # ADR 0023: The design system and its tokens
 
-- Status: **proposed** (step 6.2a, 2026-11-03, from phase-6 plan D6, D7, sections 6.0.2 and 9, and `docs/design/fresh-counter.md`). It is
-  accepted at the Phase 6 gate (step 6.5), once steps 6.2b to 6.4d have moved every screen onto it.
+- Status: **accepted** (step 6.5, 2026-11-04; proposed in step 6.2a, 2026-11-03, from phase-6 plan D6, D7, sections 6.0.2 and 9, and
+  `docs/design/fresh-counter.md`). The decision is accepted as built in steps 6.2a to 6.4d, which moved every screen onto it. What the
+  build changed or made concrete, including Ramin's design-fidelity rule of 2026-11-03, is in the dated note below.
 - Date: 2026-11-03
 - Phase: 6
 
@@ -103,3 +104,53 @@ tested, but it was plain, and it did not look like one product. Ramin approved a
   class of every screen for one wall-mounted display. Its own `night-*` tokens keep it explicit.
 - **Golden screenshots of each screen.** They fail on a font hinting change between runners, which teaches people to re-bless them
   without looking; axe and role-based assertions test what matters.
+
+## Note, 2026-11-04: accepted at the Phase 6 gate (step 6.5)
+
+This note records steps 6.2a to 6.4d, from their As built notes in phase-6 plan section 6. What the build changed from, or made concrete
+in, the decision:
+
+- **Design fidelity** (Ramin, 2026-11-03, after comparing the live screens with the canvas). Restyling a screen with the tokens is not
+  enough: a screen is done only when it looks like its board, region by region (the same layout and regions, order, sizes, colours, radii,
+  type and spacing). A region the old screen had and the board does not show moves where the board puts it, or behind the control the
+  board shows (the pad's "Tables" sheet, the product page's "Recipe and cost" drawer), reachable in one step. This sharpens decision 7: a
+  spec that has to follow a moved control changes in the same commit as the screen, keeps the accessible names, and the step's As built
+  note names the old selector, the new one and why. Steps 6.3a to 6.4b changed such specs (the pad's tables and "My orders", the till's
+  Void and typed cash, the shift's menu in the station bar, the admin's account menu and Today, the catalog's new item drawer, the
+  recipe drawer and the product page's one "Save changes"); 6.4c and 6.4d changed none.
+- **Screenshots for review, not goldens** (decision 9). `e2e/p6/screens.spec.ts` (in `p6-a11y`) captures every rebuilt screen at
+  1180 × 820 (stations) or 1440 × 900 (admin), in `en` with one `am` capture per screen, after its loading lines are gone, its fonts and
+  photos loaded and its animations ended; `e2e-p6` uploads them as the artifact `screens` on every run. Nothing compares them: a person
+  reviews them against the boards before a step merges.
+- **Two frames.** Every station screen has one 68 px station top bar (`StationBar`), named by the screen through `useStationHeader`
+  (`lib/topBar.ts`) and carrying its buttons through `StationHeaderActions` (a portal, so they stay in the screen's tree), with the
+  "Screens" navigation, the person and the shift as menus in the bar; the shift's own menu is `ShiftBar look="menu"`. An admin page has no
+  top bar at all (6.4a): the 264 px sidebar holds the mark, the sections, the "Screens" navigation, the sync chip, the bell and the
+  person's account menu (dates, language, sign out); below 1024 px it is a drawer.
+- **Kitchen night** (decision 1) is the `night-*` tokens plus a scoped remap: the shell puts `kitchen-night` on the display's frame, and
+  `globals.css` maps `white`, `ground`, `neutral`, `brand` and the status scales onto the night tokens inside that class only, so the
+  shared parts of the shell turn dark on the KDS without a second set of classes. The scrim is a token too (`bg-scrim`).
+- **Tokens added**: `shadow-float`, `animate-skeleton`, `animate-drawer-in` and `animate-sidebar-in`, all under `motion-safe:`, and
+  `bg-scrim`. Green means money confirmed only, so `Status`, the open shift, a ready line, a locked count and a confirmed purchase moved
+  to brand teal.
+- **Shared screen parts** beside the primitives: `ProductCard` (`components/pad/ProductCard.tsx`, the pad's card, also the catalog's grid
+  and the photo manager's live preview, `preview` mode), the admin patterns of `components/admin/kit.tsx` (`SectionTabs`, `Toolbar` and
+  its segments, selects, fields and checks, `SearchBox`, `TableCard`, `InnerTable`, `Notice`, `FORM_GRID`, `Fact`, `ProductThumb`) and
+  `components/admin/rows.tsx`, the charts of `components/charts/*` in one style (brand-600 for the point that matters, brand-100 for the
+  rest, no gradient), and the title row's Amharic twin (`PageHeader twin`, `lib/twin.ts`, outside the `h1` in its own `lang`). A wait is
+  printed one way everywhere (`lib/durations.ts`: "5:07", "1 h 05", "3 d").
+- **Axe as built** (decision 8). The check emulates reduced motion and waits for every ending animation before it reads contrast: a colour
+  half way through a transition is neither the one before nor after. Its `label-content-name-mismatch` rule (WCAG 2.5.3) compares whole
+  words, so a control is named by its own text (an sr-only span holding the name the specs read, what it draws hidden from readers) instead
+  of an `aria-label` over different words, and an Amharic name must contain the visible word whole (a prefix such as `ለ` or a suffix such
+  as `ን` glued to it breaks the match). A few names on screens `p6-a11y` does not cover still break the rule and are left, because fixing
+  them changes names the specs read (6.4c, 6.4d).
+- **The login photo** is self-hosted too (`apps/web/public/images/login-counter.webp`, its licence in `LICENSES.json`), precached by the
+  service worker with the shell.
+
+Enforcement, added to the list above: `p6-a11y` (login, the pad, the KDS and bar, the till, production, Today, the catalog list and the
+product page, in `en` and `am`); `e2e/p6/screens.spec.ts` and the `screens` artifact; `product-photo-thumbs-logic.spec.ts` and
+`screens-durations-logic.spec.ts`; every p0 to p5 project, unchanged but for the selectors the As built notes name.
+
+The rest (the tokens in `@theme` with the `neutral` remap, what a colour may mean, the self-hosted fonts, the primitives keeping their
+names and props, `lucide-react`, `ProductImage` as the one way a photo reaches a screen, no golden screenshots) is as proposed.

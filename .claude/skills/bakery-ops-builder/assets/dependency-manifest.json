@@ -1606,7 +1606,7 @@
         {
           "id": "6.5",
           "module": "docs",
-          "builds": "Phase6GateTest (gate:p6) and the gate-p6 job's Pest step, ADRs 0022 and 0023 accepted and listed under adrs, the handbook's product photo page, phase-6-report.md, the claim"
+          "builds": "Phase6GateTest (gate:p6) and the gate-p6 job's Pest step, ADRs 0022 and 0023 accepted and listed under adrs, the skill's references, phase-6-report.md (the handbook's product photo page came with 6.4b; the claim is the coordinator's, after every Phase 6 PR is merged and gate-p6 is green on main)"
         }
       ],
       "gate": {
@@ -1625,7 +1625,10 @@
           "ADRs 0022 (product photos storage and serving) and 0023 (design system and tokens) accepted; no TODO(p6) marker left"
         ]
       },
-      "adrs": [],
+      "adrs": [
+        "0022-product-photos-storage-and-serving",
+        "0023-design-system-and-tokens"
+      ],
       "e2e_profile": {
         "job": "e2e-p6",
         "profiles": "full",
@@ -1636,7 +1639,7 @@
         ],
         "note": "phase-6 plan 7.1: polling with the worker (full, no Reverb, ADR 0009), beside e2e-p5 after mod-analytics; SEED_PHASE=6, which composes Phase0Seeder to Phase5Seeder (DemoSeeder::LAST_PHASE 5) until step 6.1c adds Phase6Seeder with the demo photos; device enforcement on, as in every e2e job (compose.ci.yml)"
       },
-      "note": "step 6.0 (phase-6/plan) adds this entry, the CI jobs e2e-p6 and gate-p6 (informational until the claim, as every gate job is while its phase is open: gate_check --ci), the Playwright projects and their fixme placeholders; adrs stays empty until step 6.5 lists 0022-product-photos-storage-and-serving and 0023-design-system-and-tokens (written proposed in 6.1a and 6.2a); the design spec is docs/design/fresh-counter.md"
+      "note": "step 6.0 (phase-6/plan) adds this entry, the CI jobs e2e-p6 and gate-p6 (informational until the claim, as every gate job is while its phase is open: gate_check --ci), the Playwright projects and their fixme placeholders; adrs lists 0022-product-photos-storage-and-serving and 0023-design-system-and-tokens since step 6.5, which accepted them (written proposed in 6.1a and 6.2a), so gate_check --mode done requires both files; the design spec is docs/design/fresh-counter.md"
     }
   },
   "ci": {
