@@ -84,7 +84,17 @@ sales by hour, top sellers with thumbs, channels, stock alerts, shifts, system; 
 the catalog list (one kind at a time, the board's columns, the table or pad-card grid, "Add product" in a drawer). Specs moved with the
 screen: h1 "Today", the account menu for the language and the dates, the new item drawer, one kind at a time.
 
-**6.4b `phase-6/web-photo-manager` (PR #118).** «6.4b»
+**6.4b `phase-6/web-photo-manager` (PR #118).** The product page built from the ProductPhoto and PhotoStates boards: the breadcrumb, the
+title row (the name with its Amharic twin, the menu and stock chips, "Recipe and cost", "Take off the menu" and one "Save changes" for
+both cards), Details and Refunds beside the sticky Photo card. The recipe (prices and cost, versions, publishing, the scaled preview,
+comparing) moved unchanged behind "Recipe and cost", a 768 px drawer. The Photo card: the dashed 4:3 dropzone (a label around the file
+input, so the keyboard reaches it and a tablet offers its camera), the drag-over state, the framing step (drag, pinch, a "Zoom" range
+from 1× to 3×, the arrow keys, the rule-of-thirds overlay), the quality line, the live preview as the real pad card and a 48 × 36 line
+thumb, the upload with its progress (`lib/api/upload.ts`, an `XMLHttpRequest` with the client's headers; one Idempotency-Key and one
+`client_uuid` per photo and crop; never the outbox), "Added by … · date · W × H", Replace, Remove behind its dialog, and the refusal in
+the server's words. `lib/images/frame.ts` sends whole pixels, exactly 4k × 3k inside the photo; `downscale.ts` gained the presets (product
+photos 2400 px and JPEG 0.9, receipts unchanged). `product-photo.spec.ts` replaced the last placeholder and its to-do marker; the product
+page in `p6-a11y` (`a11y-product.spec.ts`); `docs/handbook/product-photos.md`.
 
 **6.4c `phase-6/web-admin-sell-make` (PR #117).** «6.4c»
 
@@ -163,7 +173,12 @@ From the As built notes, for the review on the live URL:
   names the branch); Today's top sellers carry 52 × 39 thumbs (the board's size; the plan said 44 px) and read the overview's figures
   instead of `/analytics/items` and `/analytics/channels`; the catalog table no longer shows the kind, unit, SKU or refund settings of a
   product (the product page does).
-- **The product page** (6.4b): «6.4b-DIFF»
+- **The product page** (6.4b): "Recipe and cost" is a button the board does not have; the fulfilment has the API's three choices at 44 px
+  (the board's two at 36 px have no place for a product bought in); the card's buttons are 48 px with 16 px text (15 on the board); the
+  preview is the real pad card, so its price reads "ETB 65.00" with the "More" dots and its stock chip shows only when the API says low;
+  the drag-over line says "JPG, PNG or WebP" where the board names the file and its size (a browser hides both until the drop); the
+  upload's line leaves out the board's "On a weak line the upload waits in the queue" (an admin upload is never queued); the page's
+  "Saved." status line is not on the board.
 - **Sell, Make, Team, Insight and System** (6.4c, 6.4d): «6.4cd-DIFF»
 - **Sign-in** (6.2b): no "Staff code" tab (Q1) and no eye button on the password field (its name, "Show password", would also answer
   `getByLabel("Password")`).
@@ -176,6 +191,8 @@ Not fixed in Phase 6; none blocks the claim:
   "ትዕዛዝ {no}"), the Amharic "Void order", the reconciliation's drill link (named by its sentence, showing the count), the shift notes'
   "Show notes" buttons named "Show the notes of …" and the running shifts' "Open the count" named by its station break
   `label-content-name-mismatch`. Changing them changes names the p0 to p5 specs read, so they wait for a step that moves both.
+- **Four catalog messages no screen shows** (6.4b): `catalog.refund_save`, `refund_saving`, `refund_saved` and `refund_settings_intro`
+  stay in both dictionaries (6.4b left them to keep clear of 6.4a's edits beside them, open at the time); a later clean-up removes them.
 - **The service worker's photo cache is not proved in CI**: CI serves `next start`, which has no `sw.js`. `web-build` greps the export's
   `sw.js` for the route, and the server runbook's tablet check ("On the tablets") covers it on the live host.
 - **The prune's one race** (6.1b): an upload of exactly the same bytes as a photo past its 30 days, between the upload's "files already
@@ -235,7 +252,10 @@ Each change is in the commit of its screen, with the reason in the step's As bui
   link on the Amharic catalog became the "Today" link; the new item and categories form in the "New item" drawer; one kind at a time in
   the catalog list; the list's "Back to stock" column removed (the product page still checks both settings); the region "Stations and
   shifts" became Today's "Shifts".
-- **6.4b**: «6.4b-SPECS»
+- **6.4b**: `p2 stockout-catalog-planning` presses "Recipe and cost" and reads the regions "Price and cost", "Publish a new version",
+  "Scaled preview", "Compare costs" and the table "Version history" inside that dialog (the board draws the page without the recipe);
+  `p4 pay-refund` presses the page's "Save changes" and reads the page's status "Saved." instead of the form's own button and status (the
+  board saves the page from its title row; the form "Refund settings" and its checkboxes are as they were).
 - **6.4c and 6.4d**: none.
 
 ## Deviations from the plan and assumptions taken
