@@ -1,20 +1,16 @@
-# Phase 6 report — Fresh Counter redesign and product photos (before the claim)
+# Phase 6 report — Fresh Counter redesign and product photos
 
-Commit: `main` at `9c854f3` (PR #121, the last screen PR) with step 6.5's branch `phase-6/gate` (pull request #120) on top · CI run: 41816119723, attempt 2, at
-`213c6a8`, every job green; the run on this report's head is the coordinator's to read · Date: 2026-11-04
+Commit: `main` at `2f6bbd9` (pull request #123, the last Phase 6 change) · CI run: 41947773135, every one of its 40 jobs green · Deploy: 41958516079, 40 of 40 `@live` · Date: 2026-11-05
 
-**This is the report before the claim, not a claim that the phase is done.** All fifteen pull requests of the plan's steps are merged or
-are this one: the plan (#107), 6.1a to 6.1c, 6.2a and 6.2b, 6.3a to 6.3c, 6.4a to 6.4d with 6.4c's follow-up (#121), and 6.5 (#120). STATUS keeps phase 6
-`in_progress`, no `done_commit` is set and no tag is made. Phase 6 is the last phase in the manifest, so once it is claimed the strict gate
-freezes `apps/` after `done_commit`: the coordinator claims (`phase_status.py claim-done 6`) only when every Phase 6 pull request is
-merged and `gate-p6` is green on `main`, then tags `phase-6-complete`.
+**The phase is claimed**: `phase_status.py claim-done 6` on 2026-11-05 at `2f6bbd9` with run 41947773135, tag `phase-6-complete`. All seventeen pull requests are merged: the
+plan (#107), 6.1a to 6.1c, 6.2a and 6.2b, 6.3a to 6.3c, 6.4a to 6.4d with 6.4c's follow-up (#121), 6.5 (#120), the chain verify's time limit and the live run's timeout (#122), and the
+shift's strip (#123). Phase 6 is the last phase in the manifest, so the strict gate now freezes `apps/` after `done_commit`; a later app change restates the claim, as pull request #106
+did for Phase 5, and the tag stays where it is.
 
 ## Verdict
 
-NOT CLAIMED, READY TO CLAIM ONCE `gate-p6` IS GREEN ON `main`. The gate is built: the `gate:p6` tests (`Phase6GateTest`), the `gate-p6`
-job's Pest step on the compose stack, ADRs 0022 and 0023 accepted and listed under `phases.6.adrs`, and this report. The local
-`gate_check --mode done --phase 6 --no-tests --no-e2e` (PASS, 0 failed) is under "Before the claim". Phase 6 has no go-live checklist: it changes how
-the shop looks, not whether it may run (plan 10.3), so nothing in it waits for a sign-off.
+CLAIMED at `2f6bbd9`. The gate is built and green: the `gate:p6` tests (`Phase6GateTest`), the `gate-p6` job's Pest step on the compose stack, ADRs 0022 and 0023 accepted and listed
+under `phases.6.adrs`, and this report. Phase 6 has no go-live checklist: it changes how the shop looks, not whether it may run (plan 10.3), so nothing in it waits for a sign-off.
 
 ## What was built, step by step
 
@@ -140,7 +136,7 @@ accepted with their dated notes, the manifest's `phases.6.adrs`, the skill's `ci
 | 4 | every p0 to p5 Playwright project and `gate-p0` to `gate-p5` stay green in the same run; selectors move only where the plan names the spec and the reason | `e2e-p0` to `e2e-p5`, `gate-p0` to `gate-p5`; the specs each step changed are listed under "Specs that changed" | green at `213c6a8` |
 | 5 | ADRs 0022 and 0023 accepted; no phase 6 to-do marker left | `gate_check`'s ADR and marker rows, under "Before the claim" | PASS |
 
-These results are from `213c6a8`, the last run read before this report's head; that head adds PR #121, the names' logic spec, `mod-shifts`' timeout, Today's words and documents. The coordinator's run on the head is the one the claim rests on.
+The claim rests on run 41947773135 at `2f6bbd9`, under "The claim run on `main`".
 
 ## CI evidence
 
@@ -174,7 +170,15 @@ These results are from `213c6a8`, the last run read before this report's head; t
 - **Attempt 1 of that run** failed with no failed job: `mod-orders`, `gate-p0` and `backup-drill` have no job record, and what needs them was skipped. `main`'s run 41815631204 at
   `5fd19f0` ended the same way minutes apart, with `mod-orders` and `backup-drill` missing. It looks like a GitHub fault in creating those jobs, not the code, though that is
   inferred from the timing and the missing records. `gh run rerun --failed` was refused; a full rerun passed.
-- **The run on this report's head has not been read here.** It adds PR #121, `a11y-names-logic.spec.ts`, `mod-shifts`' timeout, Today's words and documents.
+
+### The claim run on `main`
+
+- **Run 41947773135** (`main` at `2f6bbd9`, every one of its 40 jobs green, about 97 minutes):
+  - `gate-p6`, job 127018424484: `gate:p6` **6 passed (141 assertions)**, then `gate_check` **PASS (0 failed, 0 warnings, 17 checks)**, informational until the claim.
+  - `e2e-p6`: **133 passed in 3.9 minutes**, up from 100 at step 6.5 with the specs added since, the shift's strip among them.
+- **Deploy 41958516079** of that commit: **40 of 40 `@live`** in 17.6 minutes, health ok, 106 migrations.
+- **On the live URL after that deploy** (read only, as the demo admin, at 1180 × 820 and 390 × 844): on the till and the kitchen display the shift's panel is closed after load and the
+  strip shows; on the production board, whose shift was open, no strip shows; none of them scrolls sideways.
 
 ## The screens reviewed against the canvas
 
@@ -307,6 +311,8 @@ Not fixed in Phase 6; none blocks the claim:
   links on the live host (0 failures). That passed PHP's 30 s limit and answered a 500 on the E2E branch, whose chains grow with every
   `@live` run; the Demo Bakery has one link. This read now gets 90 s, under Cloudflare's 100 s, which holds about 850 links at that
   speed. The hash logic is unchanged. The lasting fix is to verify in pages or in a background job.
+- **The station top bar is tall on a phone**: it wraps to between 173 and 232 px, and the shift's strip adds 113 px, so with a count in progress on the till the page starts about 338 px down
+  an 844 px screen. Nothing overlaps or scrolls sideways, and the bar scrolls away with the page. Compacting it was outside the strip's brief; it is Ramin's call.
 - **Phase 5's open items are unchanged**: device enforcement stays off on the live host until Ramin's word; the live restore drill waits
   for its scratch database; the off-site hook stays off; the display-case COGS gap and the other Phase 4 gaps (`phase-5-report.md`, "What
   is open").
@@ -443,15 +449,11 @@ The As built notes list them step by step. The ones that change what the plan's 
 (The marker row is respelled here: the gate greps `docs/` for the marker's literal spelling, so printing it would fail the row.) The SKIP rows are the tests and projects that `gate-p6` proves in CI through its needs and its own `gate:p6` step. The last row stays SKIP
 until the claim.
 
-## What the coordinator and Ramin do next
+## What stays open after the claim
 
-- [ ] When this pull request is merged and `gate-p6` is green on `main`: `python scripts/phase_status.py claim-done 6 --commit <sha>
-      --run-url <run>`, commit and push STATUS, wait for `gate-p6` green on that commit, tag `phase-6-complete`. From then on `gate-p6`
-      is strict and `apps/` is frozen after `done_commit` (Phase 6 is the last phase in the manifest).
-- [ ] Run `bakery:demo-product-images --branch=<id> --dry-run`, then without `--dry-run`, once on the live Demo Bakery branch, if not
-      done yet (`docs/runbook/server.md`).
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
       photos' licences meet the plan's rule), when convenient. The tests do not check Q4's point, and the photos ship in this public
-      repository, so read it before calling that part settled; none blocks the claim's gate.
+      repository, so read it before calling that part settled.
 - [ ] Ramin: review the restyled screens on the live URL (Q18).
+- [ ] Ramin: replace the demo photos with the shop's own through the product page's Replace, the weakest matches first (papaya juice, bottled water, Ethiopian coffee, bread roll, mulmul).
 - [ ] Phase 5's open items, unchanged (`phase-5-report.md`).
