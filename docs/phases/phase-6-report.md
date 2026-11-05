@@ -180,6 +180,12 @@ The claim rests on run 41947773135 at `2f6bbd9`, under "The claim run on `main`"
 - **On the live URL after that deploy** (read only, as the demo admin, at 1180 × 820 and 390 × 844): on the till and the kitchen display the shift's panel is closed after load and the
   strip shows; on the production board, whose shift was open, no strip shows; none of them scrolls sideways.
 
+### The strict gate on the claim commit
+
+- **Run 41961434691** (`main` at `341befe`, the claim, documents only). Attempt 1: `mod-production` failed in `ProductionBatchRaceTest` (see "Known gaps"), so what needs it was skipped, `gate-p6` and the deploy among them.
+  Attempt 2, `gh run rerun --failed`: every one of its 40 jobs green, `gate-p6` job 127062675907 strict.
+- **Deploy 41972374091** of that commit: **40 of 40 `@live`** in 17.8 minutes, health ok. Tag `phase-6-complete` on `2f6bbd9`.
+
 ## The screens reviewed against the canvas
 
 Every step that rebuilt a screen captured it in `e2e/p6/screens.spec.ts` (in `p6-a11y`, on the demo bakery seeded with `SEED_PHASE=6`,
@@ -313,6 +319,11 @@ Not fixed in Phase 6; none blocks the claim:
   speed. The hash logic is unchanged. The lasting fix is to verify in pages or in a background job.
 - **The station top bar is tall on a phone**: it wraps to between 173 and 232 px, and the shift's strip adds 113 px, so with a count in progress on the till the page starts about 338 px down
   an 844 px screen. Nothing overlaps or scrolls sideways, and the bar scrolls away with the page. Compacting it was outside the strip's brief; it is Ramin's call.
+- **One deadlock in a batch race test, cause not proven**: on `341befe`, whose app code is that of `2f6bbd9`, `ProductionBatchRaceTest`'s "two people confirm one batch" failed its last assertion:
+  the engine's deadlock counter moved from 0 to 1. Every business check of its 15 rounds passed (both answers 200, one set of movements, one audit row, the right balances, the ledger oracle agrees), and the rerun passed.
+  A deadlock in the confirm's own transaction would have answered an error: the audit transaction does not retry, and the ledger's retry does not apply to a nested batch. So the likely victim is a statement that
+  swallows it, Laravel's `DatabaseLock` prune or release on `cache_locks`, which ignore concurrency errors on purpose. That is an inference: the job does not record `SHOW ENGINE INNODB STATUS`, and the counter is global.
+  The lasting fix is to capture the engine's status when the counter moves, then narrow the assertion if that is the cause; a change to the test restates the claim.
 - **Phase 5's open items are unchanged**: device enforcement stays off on the live host until Ramin's word; the live restore drill waits
   for its scratch database; the off-site hook stays off; the display-case COGS gap and the other Phase 4 gaps (`phase-5-report.md`, "What
   is open").
