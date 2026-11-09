@@ -2994,7 +2994,7 @@
     "none_body": "Add a table, or several at once. The pads show a new table within a few seconds.",
     "seats": "{count, plural, one {# seat} other {# seats}}",
     "no_seats": "Seats not set",
-    "sort_value": "Order {sort}",
+    "sort_value": "Position {sort}",
     "state_free": "Free",
     "state_ordering": "Ordering",
     "state_waiting": "Waiting",

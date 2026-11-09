@@ -2759,7 +2759,7 @@ web:tables.none_title,/admin/tables,No tables yet,ገና ምንም ጠረጴዛ 
 web:tables.none_body,/admin/tables,"Add a table, or several at once. The pads show a new table within a few seconds.",አንድ ጠረጴዛ ወይም ብዙ በአንድ ጊዜ ይጨምሩ። ፓዶቹ አዲሱን ጠረጴዛ በጥቂት ሰከንዶች ውስጥ ያሳያሉ።,,
 web:tables.seats,/admin/tables,"{count, plural, one {# seat} other {# seats}}",{count} መቀመጫ,,
 web:tables.no_seats,/admin/tables,Seats not set,የመቀመጫ ብዛት አልተሰጠም,,
-web:tables.sort_value,/admin/tables,Order {sort},ቅደም ተከተል {sort},,
+web:tables.sort_value,/admin/tables,Position {sort},ቅደም ተከተል {sort},,
 web:tables.state_free,/admin/tables,Free,ባዶ,,
 web:tables.state_ordering,/admin/tables,Ordering,በማዘዝ ላይ,,
 web:tables.state_waiting,/admin/tables,Waiting,በመጠበቅ ላይ,,
