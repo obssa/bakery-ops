@@ -36,8 +36,9 @@ final class PermissionRegistry
         'orders.accept' => ['admin', 'manager', 'chef', 'barista'],
         'orders.void' => ['admin', 'manager'],
         'orders.void_request' => ['admin', 'manager', 'cashier'],
-        // the dining tables the pads show (Orders, Phase 1): configuration, admin only like catalog.manage
-        'tables.manage' => ['admin'],
+        // the dining tables the pads show (Orders, Phase 1, the admin's only then). Phase 6 follow-up (Ramin, 2026-11-09): the manager adds and
+        // switches off tables too (Admin > Tables); the grant reaches a live database through 2026_11_14_100000_grant_tables_manage_to_manager.
+        'tables.manage' => ['admin', 'manager'],
         'payments.take' => ['admin', 'manager', 'cashier'],
         'payments.void' => ['admin', 'manager'],
         'production.request' => ['admin', 'manager', 'cashier', 'chef', 'barista'],

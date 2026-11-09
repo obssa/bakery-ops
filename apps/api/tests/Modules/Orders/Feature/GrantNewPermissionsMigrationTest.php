@@ -63,9 +63,11 @@ it('adds a permission the database lacks and grants it to its default roles', fu
     $permission = Permission::query()->where('name', 'tables.manage')->firstOrFail();
     expect($permission->guard_name)->toBe('web')
         ->and(permissionsOf('admin'))->toContain('tables.manage');
-    foreach (['manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'] as $role) {
+    // the registry's roles (the admin since Phase 1, the manager since the Phase 6 follow-up Admin > Tables), and nobody else
+    foreach (['cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'] as $role) {
         expect(permissionsOf($role))->not->toContain('tables.manage', $role);
     }
+    expect(permissionsOf('manager'))->toContain('tables.manage');
     foreach (PermissionRegistry::ROLES as $role) {
         $expected = PermissionRegistry::permissionsFor($role);
         sort($expected);

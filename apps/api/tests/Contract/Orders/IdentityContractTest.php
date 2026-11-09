@@ -184,5 +184,5 @@ it('holds the order permissions as the section 7 matrix says, through the seeded
     'accept / ready / reject a line' => ['orders.accept', ['admin', 'manager', 'chef', 'barista']],
     'approve a void (PIN)' => ['orders.void', ['admin', 'manager']],
     'ask for a void' => ['orders.void_request', ['admin', 'manager', 'cashier']],
-    'manage the dining tables' => ['tables.manage', ['admin']],
+    'manage the dining tables (admin and manager since the Phase 6 follow-up Admin > Tables)' => ['tables.manage', ['admin', 'manager']],
 ])->group('contract:orders->identity', 'contract');

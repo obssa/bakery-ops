@@ -101,6 +101,7 @@ flows and the phase plan's endpoint list: every bullet below is a behaviour the 
 | Approve / reject variance | ✓ | ✓ | – | – | – | – | – | – |
 | Unlock a locked count | ✓ | – | – | – | – | – | – | – |
 | Edit items, recipes, prices | ✓ | – | – | – | – | – | – | – |
+| Add, rename and switch off dining tables (`tables.manage`, Admin → Tables) | ✓ | ✓ | – | – | – | – | – | – |
 | Manage payment channels | ✓ | – | – | – | – | – | – | – |
 | Manage users, roles, short codes | ✓ | – | – | – | – | – | – | – |
 | View analytics | ✓ | ✓ | own shift totals | own orders | own station | own station | own station | own station |
