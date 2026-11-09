@@ -281,7 +281,7 @@ Three zones from left to right.
   - The app mark and name, then the branch switcher.
   - Navigation in groups with 18 px line icons, 44 px rows, the active row `brand-50` with `brand-700` text:
     - Today;
-    - Sell: Orders, Payments, Refunds;
+    - Sell: Orders, Payments, Tables (4.5), Refunds;
     - Make: Catalog, Inventory, Production, Planner;
     - Team: People, Shifts, Devices;
     - Insight: Analytics, Audit log;
@@ -364,6 +364,35 @@ As built for Team, Insight and System (step 6.4d, on 6.4c's `components/admin/ki
   track; a line 2 px `brand-600` with its latest point as a dot, the period before dashed `neutral-400`; no gradient, no blue;
 - the colours of a state as 6.4c's: an open shift, an active person, device, template or reason, a passing backup and a switch that is on
   are `brand`; amber waiting or stale; red revoked, failed or a shortage; green for money confirmed only.
+
+### 4.5 Tables (Phase 6 follow-up)
+
+Where the dining tables the pads show are added, renamed and switched off (`/admin/tables`, `tables.manage`: the admin and the manager).
+No design board draws it; it is built from the console's primitives and the pad's table grid, so the admin sees a table the way a waiter
+does.
+- **Sidebar:** "Tables" in Sell, after Orders and Payments, with the `UtensilsCrossed` line icon; shown to whoever holds `tables.manage`.
+- **Title row:** "Tables" with its Amharic title on the English page, a one-line intro (a table is never deleted, its orders keep its
+  code), and the actions on the right: "Add several" (secondary, `Rows3` icon) and "Add table" (primary, `Plus`).
+- **The grid:** a heading "The dining tables" with "N on the pads · M switched off" at its right, then one white 18 px card per table in
+  the pads' order (sort, then code), as many columns as fit at 240 px or wider (four at 1440 px, one on a phone). A card: the code
+  (28 / 700, never translated) with the state chip at its right, the name in the page's language (15 / 600) over the other language's
+  (14, `neutral-600`, in its own `lang`), the seats with a `UsersRound` icon and the place in the order, and at its foot Edit and
+  Switch off (or Switch on) side by side, each named for its table ("Edit table T3"). The chip is the pad's state in a word and a
+  colour: Free neutral, Ordering blue, Waiting amber, Served `brand`, Bill neutral; a switched-off table shows "Off" (neutral), its
+  card `neutral-50` and its code `neutral-500`. The chips follow the floor every 10 s.
+- **No tables yet:** the empty state on a white card (the `UtensilsCrossed` circle, "No tables yet", one line, "Add table").
+- **Add table and Edit:** the 480 px drawer (the whole width on a phone): the title and a close button, then Code (with its rule as the
+  hint; read-only on Edit, where the hint says why: the table's orders keep it), Name (English), Name (Amharic), and Seats (optional)
+  beside Order on the pad (filled with the next place). A code already used, a switched-off table's included, is the Code field's own
+  error in the page's language; the other field errors sit under their fields. A save closes the drawer and says so in the page's
+  status line.
+- **Add several:** the same drawer: "Code starts with" (T), From and To numbers (after the highest T number there is, ten by default, at
+  most 50), the English and Amharic names before the number ("Table" and "ጠረጴዛ", so T11 is "Table 11" / "ጠረጴዛ 11"), Seats, and a
+  `neutral-100` line that previews the range. "Add 10 tables" makes one table per code, each with its own Idempotency-Key, in order after
+  the last table; the status line counts them as they go, then names the ones added and the ones whose code was taken; a failure (a lost
+  connection) is an Alert with "Try the rest again", which sends only the failed codes with the keys they had.
+- Every write reads the tables again here and on any open pad (its grid polls every 5 s), so a new table is on the pads within seconds
+  and a switched-off one leaves them. The pad's empty grid says where tables are added: "A manager adds them in Admin → Tables".
 
 ## 5. Accessibility and language
 
