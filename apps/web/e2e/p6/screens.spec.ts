@@ -48,6 +48,10 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 // open, and each with the panel open, at 1180 x 820 and at 390 x 844; the kitchen display at night with the strip, a refusal and the panel; the
 // production board with the strip. It settles shifts, so it runs last, and it puts them back. The one thing it asserts about a picture: at the
 // phone's width the page does not scroll sideways, on the demo bakery's real names and order cards, which are longer than the fixtures'.
+//
+// phase-6/admin-tables (the Phase 6 follow-up, the describe after it): Admin > Tables as the demo bakery's admin, at 1440 x 900 and at
+// 390 x 844, in English and in Amharic: the grid of the demo tables with their states, a table's Edit drawer, "Add table" refused on a code
+// that is taken (nothing is written) and "Add several". At the phone's width the page must not scroll sideways.
 
 const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
@@ -968,3 +972,63 @@ test.describe("screens: the shift's strip", () => {
     }
   });
 });
+
+// --- Phase 6 follow-up: Admin > Tables ---------------------------------------------------------------------------------------------------
+
+test.describe("screens: Admin > Tables", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  /** The page as it stands at the admin's 1440 x 900 and at the phone's 390 x 844; at the phone's width it must not scroll sideways. */
+  async function laptopAndPhone(page: Page, name: string, locale: keyof typeof MESSAGES): Promise<void> {
+    const loading = [MESSAGES[locale].tables.loading];
+    await page.setViewportSize(DESKTOP);
+    await capture(page, `${name}-1440x900-${locale}`, loading);
+    await page.setViewportSize(PHONE);
+    await capture(page, `${name}-390x844-${locale}`, loading);
+    const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+    expect(scroll, `${name} at 390 x 844 scrolls sideways`).toBeLessThanOrEqual(client);
+    await page.setViewportSize(DESKTOP);
+  }
+
+  for (const locale of ["en", "am"] as const) {
+    test(`Tables: the grid, a table's drawer, a new table refused and Add several, at 1440 x 900 and 390 x 844, in ${locale}`, async ({ page }) => {
+      test.setTimeout(120_000);
+      const t = MESSAGES[locale].tables;
+      await openAdmin(page, `${locale}/admin/tables/`, t.title);
+      const cards = page.getByRole("article");
+      await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+      await laptopAndPhone(page, "tables", locale);
+
+      // a table's drawer, as Edit opens it: the code fixed, the names, the seats and the order
+      await cards.first().getByRole("button", { name: around(t.edit_named) }).click();
+      await expect(page.getByRole("dialog", { name: around(t.edit_title) })).toBeVisible();
+      await laptopAndPhone(page, "tables-edit", locale);
+      await page.keyboard.press("Escape");
+
+      // "Add table" with the code of a table there is: the API's refusal under the Code field (nothing is written)
+      await page.getByRole("button", { name: t.add, exact: true }).first().click();
+      const form = page.getByRole("dialog", { name: t.new_title });
+      await expect(form).toBeVisible();
+      const taken = (await cards.first().getByRole("heading").textContent())?.trim() ?? "T1";
+      await form.getByLabel(t.field_code, { exact: true }).fill(taken);
+      await form.getByLabel(t.field_name_en).fill("Table 1");
+      await form.getByLabel(t.field_name_am).fill("ጠረጴዛ 1");
+      await form.getByRole("button", { name: t.save_new, exact: true }).click();
+      await expect(form.getByText(locale === "en" ? /already has this code/ : /ይህ ኮድ አለው/).first()).toBeVisible({ timeout: 30_000 });
+      await laptopAndPhone(page, "tables-new-refused", locale);
+      await page.keyboard.press("Escape");
+
+      // "Add several": the range after the tables there are, with its preview
+      await page.getByRole("button", { name: t.add_several, exact: true }).click();
+      await expect(page.getByRole("dialog", { name: t.several_title })).toBeVisible();
+      await laptopAndPhone(page, "tables-several", locale);
+    });
+  }
+});
+
+/** A name built from a message around its one placeholder ("Edit table {code}"), whatever fills it. */
+function around(message: string): RegExp {
+  const [before, after = ""] = message.split(/\{\w+\}/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`^${before}.*${after}$`);
+}

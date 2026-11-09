@@ -10,7 +10,7 @@ import { openAs } from "../support/pad";
 
 // Phase 6 gate project p6-a11y, step 6.5 (the coordinator's addition of 2026-11-04; ADR 0023): a light pass over the admin screens of 6.4c
 // and 6.4d, which a11y.spec.ts did not cover: Orders with a card's timeline open, Payments with its Reconciliation, Stock, People, Shifts with
-// its Handover notes, Analytics, the Audit log and System, each in its loaded state, once in English and once in Amharic, as the demo
+// its Handover notes, Analytics, the Audit log, Tables with its "Add several" (the Phase 6 follow-up) and System, each in its loaded state, once in English and once in Amharic, as the demo
 // bakery's admin at the admin's 1440 x 900. The demo bakery is the one with figures to draw: SEED_PHASE=6 leaves orders, payments, shifts,
 // notes and audit rows, and the product photos.
 //
@@ -93,6 +93,21 @@ const SCREENS: AdminScreen[] = [
     heading: (t) => t.audit.title,
     loaded: async (page, t) => {
       await expect(page.getByRole("table", { name: t.audit.list.table, exact: true }).getByRole("row").nth(1)).toBeVisible(TIMEOUT);
+    },
+  },
+  {
+    // the Phase 6 follow-up: the dining tables, and the drawer of "Add several" (the busiest of its two forms)
+    name: "Tables",
+    path: "admin/tables/",
+    heading: (t) => t.tables.title,
+    loading: (t) => [t.tables.loading],
+    loaded: async (page) => {
+      await expect(page.getByRole("article").first()).toBeVisible(TIMEOUT);
+    },
+    also: async (page, t) => {
+      await page.getByRole("button", { name: t.tables.add_several, exact: true }).click();
+      await expect(page.getByRole("dialog", { name: t.tables.several_title })).toBeVisible(TIMEOUT);
+      return "Add several";
     },
   },
   {
