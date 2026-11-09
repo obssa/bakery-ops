@@ -1,5 +1,5 @@
 // How long something has waited, as the station screens show it (step 6.3c): the kitchen and bar tickets' timers, the till's waiting orders
-// and the production board's batches in the oven. Under an hour it is minutes and seconds, "5:07"; under a day hours and minutes, "1 h 05";
+// and the production board's batches while they bake. Under an hour it is minutes and seconds, "5:07"; under a day hours and minutes, "1 h 05";
 // beyond that whole days, "3 d". So an order left open for days reads "4 d", not "5709:54". The words of the last two come from the
 // dictionary (common.wait_hours, common.wait_days; lib/useWaitText.ts); this file only splits the time and stays free of React, so the
 // logic spec runs it in Node.
