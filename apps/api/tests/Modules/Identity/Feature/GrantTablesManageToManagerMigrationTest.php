@@ -68,6 +68,32 @@ it('grants tables.manage to the manager, keeps the admin, and gives it to no oth
         ->and(makeUser($branch, 'waiter')->fresh()?->can('tables.manage'))->toBeFalse();
 });
 
+it('is the only grant migration that makes the manager\'s grant: every earlier one still does exactly what it did', function () {
+    beforeTablesForManagers();
+    $managerHolds = fn (): bool => Role::findByName('manager', 'web')->permissions()->where('name', 'tables.manage')->exists();
+
+    $earlier = array_filter(
+        glob(database_path('migrations/*_grant_*.php')) ?: [],
+        fn (string $file): bool => strcmp(basename($file), '2026_11_14_100000') < 0,
+    );
+    expect(count($earlier))->toBeGreaterThanOrEqual(10);
+    foreach ($earlier as $file) {
+        /** @var Migration $migration */
+        $migration = require $file;
+        $migration->up();
+        expect($managerHolds())->toBeFalse(basename($file));
+    }
+
+    tablesManageGrantMigration()->up();
+    expect($managerHolds())->toBeTrue();
+
+    // the registry as each migration knew it: the grant from its own migration on, and in today's matrix (RolesSeeder)
+    expect(PermissionRegistry::permissionsFor('manager', '2026_11_13_100100'))->not->toContain('tables.manage')
+        ->and(PermissionRegistry::permissionsFor('manager', '2026_11_14_100000'))->toContain('tables.manage')
+        ->and(PermissionRegistry::permissionsFor('manager'))->toContain('tables.manage')
+        ->and(PermissionRegistry::permissionsFor('admin', '2026_10_21_120100'))->toContain('tables.manage');
+});
+
 it('never revokes: a hand-made grant and a direct permission survive', function () {
     $branch = Branch::factory()->create();
     beforeTablesForManagers();

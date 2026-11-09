@@ -63,13 +63,13 @@ it('adds a permission the database lacks and grants it to its default roles', fu
     $permission = Permission::query()->where('name', 'tables.manage')->firstOrFail();
     expect($permission->guard_name)->toBe('web')
         ->and(permissionsOf('admin'))->toContain('tables.manage');
-    // the registry's roles (the admin since Phase 1, the manager since the Phase 6 follow-up Admin > Tables), and nobody else
-    foreach (['cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'] as $role) {
+    foreach (['manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'] as $role) {
         expect(permissionsOf($role))->not->toContain('tables.manage', $role);
     }
-    expect(permissionsOf('manager'))->toContain('tables.manage');
     foreach (PermissionRegistry::ROLES as $role) {
-        $expected = PermissionRegistry::permissionsFor($role);
+        // the matrix as this migration knew it: a default grant added later with a grant migration of its own (the manager's
+        // tables.manage, Phase 6 follow-up) is not made here, so the manager still lacks tables.manage, as asserted above
+        $expected = PermissionRegistry::permissionsFor($role, '2026_10_21_120100');
         sort($expected);
         expect(permissionsOf($role))->toBe($expected, $role);
     }
@@ -145,8 +145,7 @@ it('grants only the roles that exist and leaves other roles and other guards alo
     grantMigration()->up();
 
     expect(Role::query()->where('name', 'bread_baker')->exists())->toBeFalse()
-        // one grant per registry role of tables.manage (the admin, and the manager since the Phase 6 follow-up Admin > Tables)
-        ->and(DB::table('role_has_permissions')->count())->toBe($before + count(PermissionRegistry::rolesFor('tables.manage')))
+        ->and(DB::table('role_has_permissions')->count())->toBe($before + 1)
         ->and(Role::findByName('admin', 'sanctum')->permissions()->pluck('name')->all())->toBe(['catalog.manage'])
         ->and(Permission::query()->where('name', 'tables.manage')->count())->toBe(1);
 })->group('module:orders', 'feature');

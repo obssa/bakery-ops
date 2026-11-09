@@ -32,7 +32,12 @@ final class GrantRegistryPermissions
 {
     private const string GUARD = 'web';
 
-    public static function run(): void
+    /**
+     * `$asOf` is the calling migration's timestamp (YYYY_MM_DD_HHMMSS): a grant that joined the registry later than its permission
+     * (PermissionRegistry::LATER_GRANTS) is made only by the migration that brings it, or one after it. Without one, as the grant
+     * migrations made before the first later grant call it, no later grant is made, so each of them still does exactly what it did.
+     */
+    public static function run(?string $asOf = null): void
     {
         /** @var array{permissions: string, roles: string, role_has_permissions: string} $tables */
         $tables = config('permission.table_names');
@@ -40,7 +45,7 @@ final class GrantRegistryPermissions
             return;
         }
 
-        DB::transaction(function () use ($tables): void {
+        DB::transaction(function () use ($tables, $asOf): void {
             $now = now();
 
             /** @var array<string, int> $permissionIds name => id */
@@ -62,7 +67,7 @@ final class GrantRegistryPermissions
             foreach ($roleIds as $role => $roleId) {
                 $held = DB::table($tables['role_has_permissions'])->where('role_id', $roleId)->pluck('permission_id')
                     ->map(static fn (mixed $id): int => (int) $id)->all();
-                foreach (PermissionRegistry::permissionsFor($role) as $name) {
+                foreach (PermissionRegistry::permissionsFor($role, $asOf ?? '') as $name) {
                     if (! in_array($permissionIds[$name], $held, true)) {
                         DB::table($tables['role_has_permissions'])->insertOrIgnore(['permission_id' => $permissionIds[$name], 'role_id' => $roleId]);
                     }
