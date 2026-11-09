@@ -62,6 +62,7 @@ SCREENS = {
     "counts": "/shifts/count",
     "adminShifts": "/admin/shifts",
     "adminPayments": "/admin/payments",
+    "tables": "/admin/tables",
     "analytics": "/admin/analytics",
     "audit": "/admin/audit",
 }
