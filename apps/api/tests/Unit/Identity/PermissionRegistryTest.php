@@ -65,7 +65,7 @@ it('follows the matrix row by row', function (string $permission, array $roles) 
     'view own figures' => ['analytics.view_own', ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker']],
     'view audit log' => ['audit.view', ['admin', 'manager']],
     'act at any station' => ['stations.all', ['admin', 'manager']],
-    'manage the dining tables (Phase 1)' => ['tables.manage', ['admin']],
+    'manage the dining tables (Phase 1; the manager since the Phase 6 follow-up Admin > Tables)' => ['tables.manage', ['admin', 'manager']],
     'read the production board (Phase 2)' => ['production.view', ['admin', 'manager', 'cashier', 'chef', 'barista', 'cake_baker', 'bread_baker']],
     'plan production: due time, priority, assign, cancel (Phase 2)' => ['production.plan', ['admin', 'manager']],
     'own notification inbox and channels (Phase 2)' => ['notifications.view', ['admin', 'manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker']],
