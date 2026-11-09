@@ -2,7 +2,7 @@
 
 import { BookOpen, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
 import { useItem, useItemPrices, useProductPageMenu, useSaveProduct, useSetOnMenu } from "@/lib/api/catalog";
 import { useCategories } from "@/lib/api/hooks";
@@ -10,6 +10,7 @@ import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { FULFILMENTS, type Fulfilment, type Item, type ItemChanges, type ItemPrice, type Locale, type MenuItem } from "@/lib/api/types";
 import { dayText } from "@/lib/dates";
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
+import { createdFor, letGoCreated, type CreatedItem } from "@/lib/createdItem";
 import { useErrorText } from "@/lib/errors";
 import { refundSettingsBody } from "@/lib/refund";
 import { can, useSession } from "@/lib/session";
@@ -32,6 +33,8 @@ import { RefundToggles } from "./RefundSettings";
 // "Save changes" saves both cards at once: PATCH /items/{item} with what changed, then POST /items/{item}/prices for a new price. The recipe
 // (price and cost, the versions, publishing the next one, comparing two) is not on the board, so it sits behind "Recipe and cost", a drawer
 // (RecipePanels, as it was). Only catalog.manage changes anything; anyone else reads the page.
+// phase-6/new-item-page: opened by the new item page right after a create, the page says so in its status line and what comes next (the
+// photo, and the recipe of a product that is made), and, when the first price was refused, why it is missing (lib/createdItem.ts).
 
 const CARD = "rounded-[18px] border border-neutral-200 bg-white p-5";
 const CHIP = "inline-flex h-6.5 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold";
@@ -47,7 +50,7 @@ interface Draft {
   restock: boolean;
 }
 
-function Breadcrumb({ current }: { current?: string }) {
+export function Breadcrumb({ current }: { current?: string }) {
   const t = useTranslations("product");
   const tcat = useTranslations("catalog");
   return (
@@ -69,6 +72,9 @@ export function ItemPage({ id }: { id: number }) {
   const tc = useTranslations("common");
   const errorText = useErrorText();
   const item = useItem(id);
+  // what the new item page handed over, kept for this visit only: a reload shows the page without it
+  const [created] = useState<CreatedItem | null>(() => createdFor(id));
+  useEffect(() => letGoCreated(id), [id]);
 
   if (item.isPending) {
     return (
@@ -91,7 +97,7 @@ export function ItemPage({ id }: { id: number }) {
       </div>
     );
   }
-  return <ProductPage key={item.data.id} product={item.data} />;
+  return <ProductPage key={item.data.id} product={item.data} created={created} />;
 }
 
 /** The day a price started, as the page's dates read: "19 Oct 2026" (the API gives a date, or an instant read in Addis Ababa). */
@@ -101,7 +107,7 @@ function sinceDay(price: ItemPrice): string {
   return Number.isNaN(at.getTime()) ? price.effective_from : addisDate(at);
 }
 
-function ProductPage({ product }: { product: Item }) {
+function ProductPage({ product, created }: { product: Item; created: CreatedItem | null }) {
   const t = useTranslations("product");
   const tcat = useTranslations("catalog");
   const locale = useLocale() as Locale;
@@ -118,8 +124,14 @@ function ProductPage({ product }: { product: Item }) {
   const priceKey = useIdempotencyKey();
   const menuKey = useIdempotencyKey();
   const [edits, setEdits] = useState<Partial<Draft>>({});
-  const [notice, setNotice] = useState<string | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
+  // an item just created: what it is called, and what its page is for next (a photo, and the recipe of a product that is made)
+  const [notice, setNotice] = useState<string | null>(() => {
+    if (!created) return null;
+    const shown = locale === "am" ? product.name_am : product.name_en;
+    if (product.kind !== "product") return t("created_ingredient", { name: shown });
+    return product.fulfilment === "bought_in" ? t("created_photo", { name: shown }) : t("created", { name: shown });
+  });
+  const [problem, setProblem] = useState<string | null>(() => (created?.priceError ? t("price_not_saved", { reason: created.priceError }) : null));
   const [recipeOpen, setRecipeOpen] = useState(false);
 
   const current = prices.data?.find((price) => price.is_current) ?? null;

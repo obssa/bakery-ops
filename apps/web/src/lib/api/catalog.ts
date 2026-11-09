@@ -66,6 +66,19 @@ export function useSaveProduct(id: number) {
   });
 }
 
+/**
+ * The first price of a product just created on the new item page: POST /items/{item}/prices, the call "Save changes" makes, for an id the
+ * page learns only from the create's answer. Its own Idempotency-Key, so a retry replays and the item is never created twice.
+ */
+export function useAddPrice() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, price, idempotencyKey }: { id: number; price: string; idempotencyKey: string }) =>
+      authed<ItemPrice>(`/items/${id}/prices`, { method: "POST", body: { price }, idempotencyKey }),
+    onSettled: (_answer, _error, { id }) => refreshProduct(client, id),
+  });
+}
+
 /** "Take off the menu" and "Put back on the menu": PATCH /items/{item} with is_active (step 6.4b). */
 export function useSetOnMenu(id: number) {
   const client = useQueryClient();

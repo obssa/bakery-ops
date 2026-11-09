@@ -141,7 +141,8 @@ test.describe("a11y", () => {
   }
 
   // Step 6.4a: the admin frame with Today and its account menu open, then the catalog list as a table (a product with a photo among
-  // ones without), as pad cards, and with the drawer of a new item open.
+  // ones without), as pad cards, and with the drawer of a new item open. phase-6/new-item-page: "Add product" opens the new item page (was
+  // the drawer), read with its heading in view, and "Categories" opens the categories' drawer.
   for (const locale of ["en", "am"] as const) {
     test(`admin Today and the catalog list (${locale}) have no serious or critical axe violation`, async ({ page }) => {
       test.setTimeout(150_000);
@@ -167,9 +168,14 @@ test.describe("a11y", () => {
         await page.getByRole("button", { name: t.catalog.view_grid }).click();
         await expect(page.getByRole("region", { name: t.catalog.grid }).getByRole("listitem").first()).toBeVisible({ timeout: 30_000 });
         await expectAccessible(page, `${locale}/admin/catalog/?view=grid (the pad cards)`);
+        await page.getByRole("button", { name: t.catalog.categories, exact: true }).click();
+        await expect(page.getByRole("dialog", { name: t.catalog.categories })).toBeVisible();
+        await expectAccessible(page, `${locale}/admin/catalog/ (the drawer of the categories)`);
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog", { name: t.catalog.categories })).toHaveCount(0);
         await page.getByRole("button", { name: t.catalog.add_product }).click();
-        await expect(page.getByRole("dialog", { name: t.catalog.new_item })).toBeVisible();
-        await expectAccessible(page, `${locale}/admin/catalog/ (the drawer of a new item)`);
+        await expect(page.getByRole("heading", { level: 1, name: t.catalog.new.title_product })).toBeVisible({ timeout: 30_000 });
+        await expectAccessible(page, `${locale}/admin/catalog/new/ (the new item page)`);
       } finally {
         await removePhoto(fixture.admin, fixture.product.id);
       }
