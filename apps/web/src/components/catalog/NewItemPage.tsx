@@ -16,7 +16,7 @@ import { useErrorText } from "@/lib/errors";
 import { refundSettingsBody } from "@/lib/refund";
 import { buttonClass, focusRing } from "../styles";
 import { Alert, Button, Field, Modal, MoneyInput, Select, Status, TextInput } from "../ui";
-import { Breadcrumb } from "./ItemPage";
+import { Breadcrumb } from "./Breadcrumb";
 import { RefundToggles } from "./RefundSettings";
 
 // Admin > Catalog > New product / New ingredient (phase-6/new-item-page, docs/design/fresh-counter.md 4.3): a page of its own, where the

@@ -3,7 +3,6 @@
 import { BookOpen, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { Link } from "@/i18n/navigation";
 import { useItem, useItemPrices, useProductPageMenu, useSaveProduct, useSetOnMenu } from "@/lib/api/catalog";
 import { useCategories } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
@@ -16,8 +15,8 @@ import { refundSettingsBody } from "@/lib/refund";
 import { can, useSession } from "@/lib/session";
 import { addisDate } from "@/lib/shiftsAdmin";
 import { useDateFormat } from "@/lib/useDates";
-import { focusRing } from "../styles";
 import { Alert, Button, Drawer, Field, IconButton, MoneyInput, SegmentedControl, Select, Status, TextInput } from "../ui";
+import { Breadcrumb } from "./Breadcrumb";
 import { PhotoCard } from "./PhotoCard";
 import { RecipePanels } from "./RecipePanels";
 import { RefundToggles } from "./RefundSettings";
@@ -48,24 +47,6 @@ interface Draft {
   price: string;
   refundable: boolean;
   restock: boolean;
-}
-
-export function Breadcrumb({ current }: { current?: string }) {
-  const t = useTranslations("product");
-  const tcat = useTranslations("catalog");
-  return (
-    <nav aria-label={t("breadcrumb")} className="flex flex-wrap items-center gap-2 text-sm text-neutral-600">
-      <Link href="/admin/catalog" className={`rounded-md font-semibold text-brand-600 hover:text-brand-700 ${focusRing}`}>
-        {tcat("title")}
-      </Link>
-      {current ? (
-        <>
-          <span aria-hidden="true">/</span>
-          <span aria-current="page">{current}</span>
-        </>
-      ) : null}
-    </nav>
-  );
 }
 
 export function ItemPage({ id }: { id: number }) {
