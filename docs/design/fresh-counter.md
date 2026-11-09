@@ -307,9 +307,28 @@ Three zones from left to right.
   - A toolbar with search, a kind filter (Products, Ingredients), a category filter and "Add product".
   - The default view is a table: a 64 × 48 thumb, the name (English over Amharic), category, where it is sold from, price, a status
     chip (On the menu, Hidden, New) and a chevron.
-  - "Add product" opens the new item form (and the categories) in a drawer.
+  - "Add product" ("Add ingredient" in the ingredients) opens the new item page; "Categories" beside it opens the categories of both
+    kinds in a drawer.
   - A grid toggle shows the products as pad cards, as a waiter would see them.
   - Products without a photo show the placeholder plus an "Add photo" link in the row.
+- **New item page** (`admin/catalog/new/?kind=product|ingredient`, phase-6/new-item-page; it replaced a 480 px drawer that stacked
+  every field). No board draws it: it takes the ProductPhoto board's cards (white, 18 px radius, 20 px in, 17 / 600 titles, 44 px
+  controls) and the forms rule of 4.4 (two columns from 1024 px, one below). Under the breadcrumb and the title ("New product" or "New
+  ingredient", following the choice), one column of cards, at most 960 px wide:
+  1. "What are you adding?": Product and Ingredient as two choice cards (a 44 px icon well, the name, one plain sentence; the chosen one
+     `brand-50` with a 2 px `brand-600` border and a check), one radio group named "Kind";
+  2. Basics: the two names side by side, then the category (with a secondary "New category" that opens a small dialog for one of the
+     kind being added, chosen once it exists) and the unit (its common ones first);
+  3. "How it's sold", products only: Made to order, Made in batches, Bought in, three choice cards with a sentence each (the radio
+     group "Fulfilment");
+  4. Price, products only and optional (an ETB money input), saved after the item by the product page's own price call;
+  5. "More options", folded: the SKU, and for a product the two refund switches. An ingredient shows no refund section at all;
+  6. a white footer bar that stays in view at the bottom of the window (`shadow-float`, 16 px off the edge): Cancel, and "Create
+     product" or "Create ingredient".
+  The page checks the names, the unit and the price before it sends; each error, its own or the API's, shows under its field, a red line
+  under the form says so, and the first field in error takes the focus. A create opens the item's own page with a status line ("Created
+  ... Add a photo and a recipe"), where the photo and the recipe live. On a phone the cards and fields are one column and the footer's
+  two buttons share its width.
 - **Product page.** Two columns: the form on the left (names, category, price, station, refund settings, all as now) and a sticky
   right column with the **Photo** card.
 - **Photo card.**

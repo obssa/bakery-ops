@@ -48,6 +48,11 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 // open, and each with the panel open, at 1180 x 820 and at 390 x 844; the kitchen display at night with the strip, a refusal and the panel; the
 // production board with the strip. It settles shifts, so it runs last, and it puts them back. The one thing it asserts about a picture: at the
 // phone's width the page does not scroll sideways, on the demo bakery's real names and order cards, which are longer than the fixtures'.
+//
+// phase-6/new-item-page: the new item page (no board; ProductPhoto.dc.html's cards and fresh-counter.md 4.3) at 1440 x 900 and 390 x 844, in
+// English and in Amharic: a product filled in, an ingredient, and a product sent with its errors; at 1440 x 900 in English, the whole
+// product page with "More options" open, the "New category" dialog, and the catalog's "Categories" drawer. Nothing is created: the captures
+// stop before "Create", except the one sent empty, which the page refuses itself. At the phone's width the page must not scroll sideways.
 
 const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
@@ -473,6 +478,7 @@ test.describe("screens", () => {
 
 const DESKTOP = { width: 1440, height: 900 };
 const PORTRAIT = { width: 820, height: 1180 };
+const PHONE = { width: 390, height: 844 };
 
 /** An admin page of the demo bakery as its admin sees it, on the captures' tablet, once its h1 shows. */
 async function openAdmin(page: Page, path: string, heading: string): Promise<void> {
@@ -513,10 +519,11 @@ test.describe("screens: admin", () => {
     await expect(grid.getByRole("listitem").first()).toContainText(/ETB/, { timeout: 30_000 });
     await capture(page, "catalog-grid-1440x900-en");
 
-    // the drawer "Add product" opens: the new item form and the categories
-    await page.getByRole("button", { name: t.catalog.add_product }).click();
-    await expect(page.getByRole("dialog", { name: t.catalog.new_item })).toBeVisible();
-    await capture(page, "catalog-new-item-1440x900-en");
+    // the drawer "Categories" opens (phase-6/new-item-page: "Add product" opens a page, captured in "screens: the new item page")
+    await page.getByRole("button", { name: t.catalog.categories, exact: true }).click();
+    const drawer = page.getByRole("dialog", { name: t.catalog.categories });
+    await expect(drawer.getByRole("listitem").first()).toBeVisible({ timeout: 30_000 });
+    await capture(page, "catalog-categories-1440x900-en");
   });
 
   test("the Orders board in the admin frame, in en", async ({ page }) => {
@@ -537,6 +544,83 @@ test.describe("screens: admin", () => {
     await expect(page.getByRole("dialog", { name: t.admin.sections })).toBeVisible();
     await capture(page, "admin-drawer-820x1180-en");
   });
+});
+
+// --- phase-6/new-item-page: adding a product or an ingredient is a page of its own --------------------------------------------------------
+
+test.describe("screens: the new item page", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  /** The page as it stands at 1440 x 900 and at 390 x 844; `focusFirstError` brings the first field in error back into view at each size. */
+  async function sizes(page: Page, name: string, locale: keyof typeof MESSAGES, focusFirstError = false): Promise<void> {
+    for (const [size, viewport] of [["1440x900", DESKTOP], ["390x844", PHONE]] as const) {
+      await page.setViewportSize(viewport);
+      if (focusFirstError) await page.locator('form [aria-invalid="true"]').first().focus();
+      else await page.evaluate(() => window.scrollTo(0, 0));
+      await capture(page, `${name}-${size}-${locale}`);
+      if (size === "390x844") {
+        const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+        expect(scroll, `${name} at 390 x 844 scrolls sideways`).toBeLessThanOrEqual(client);
+      }
+    }
+    await page.setViewportSize(DESKTOP);
+  }
+
+  /** Chooses the unit whose code is `code` in the form's Unit list, once the units have loaded. */
+  async function chooseUnit(form: Locator, label: string, code: string): Promise<void> {
+    const unit = form.getByLabel(label);
+    const option = unit.getByRole("option", { name: new RegExp(`\\(${code}\\)$`) });
+    await expect(option).toHaveCount(1, { timeout: 30_000 });
+    await unit.selectOption(String(await option.getAttribute("value")));
+  }
+
+  for (const locale of ["en", "am"] as const) {
+    test(`a product, an ingredient and a product with its errors, at 1440 x 900 and 390 x 844, in ${locale}`, async ({ page }) => {
+      test.setTimeout(150_000);
+      const c = MESSAGES[locale].catalog;
+      const form = page.getByRole("form", { name: c.new.title_product });
+
+      // a product, filled in as the admin would: the names, a category of the demo bakery's, pieces, made in batches, a price
+      await openAdmin(page, `${locale}/admin/catalog/new/?kind=product`, c.new.title_product);
+      await chooseUnit(form, c.field_unit, "pcs");
+      await form.getByLabel(c.field_name_en).fill("Banana bread");
+      await form.getByLabel(c.field_name_am).fill("የሙዝ ዳቦ");
+      const category = form.getByLabel(c.field_category);
+      if ((await category.getByRole("option").count()) > 1) await category.selectOption({ index: 1 });
+      await form.getByRole("radio", { name: c.fulfilment_to_stock, exact: true }).check();
+      await form.getByLabel(c.new.price_label).fill("85.00");
+      await form.getByLabel(c.new.price_label).blur();
+      await sizes(page, "new-item-product", locale);
+      if (locale === "en") {
+        await form.getByText(c.new.more, { exact: true }).click();
+        await capture(page, "new-item-product-full-1440x900-en", [], true);
+        await form.getByRole("button", { name: c.new.new_category }).click();
+        await expect(page.getByRole("dialog", { name: c.new.new_category })).toBeVisible();
+        await capture(page, "new-item-category-1440x900-en");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog", { name: c.new.new_category })).toHaveCount(0);
+      }
+
+      // an ingredient: no "How it's sold", no price, no refunds
+      await openAdmin(page, `${locale}/admin/catalog/new/?kind=ingredient`, c.new.title_ingredient);
+      const ingredient = page.getByRole("form", { name: c.new.title_ingredient });
+      await chooseUnit(ingredient, c.field_unit, "kg");
+      await ingredient.getByLabel(c.field_name_en).fill("Rye flour");
+      await ingredient.getByLabel(c.field_name_am).fill("የአጃ ዱቄት");
+      await ingredient.getByLabel(c.field_name_am).blur();
+      await expect(ingredient.getByRole("radiogroup", { name: c.field_fulfilment })).toHaveCount(0);
+      await sizes(page, "new-item-ingredient", locale);
+
+      // a product sent with nothing filled in but a price the page cannot read: its own checks, each under its field
+      await openAdmin(page, `${locale}/admin/catalog/new/?kind=product`, c.new.title_product);
+      await expect(form.getByLabel(c.field_unit).getByRole("option", { name: /\(pcs\)$/ })).toHaveCount(1, { timeout: 30_000 });
+      await form.getByLabel(c.new.price_label).fill("12,5");
+      await form.getByRole("button", { name: c.new.create_product }).click();
+      await expect(page.getByRole("alert").filter({ hasText: c.new.check_fields })).toBeVisible();
+      await sizes(page, "new-item-errors", locale, true);
+    });
+  }
 });
 
 // --- step 6.4c: the Sell and Make screens ---------------------------------------------------------------------------------------------
@@ -831,8 +915,6 @@ test.describe("screens: the product page", () => {
 });
 
 // --- phase-6/shift-strip: the shift's prompt under the bar, covering nothing ---------------------------------------------------------------
-
-const PHONE = { width: 390, height: 844 };
 
 test.describe("screens: the shift's strip", () => {
   test.skip(live, "CI only: the captures read the seeded demo bakery");

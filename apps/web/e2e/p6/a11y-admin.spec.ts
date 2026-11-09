@@ -14,6 +14,8 @@ import { openAs } from "../support/pad";
 // bakery's admin at the admin's 1440 x 900. The demo bakery is the one with figures to draw: SEED_PHASE=6 leaves orders, payments, shifts,
 // notes and audit rows, and the product photos.
 //
+// phase-6/new-item-page adds the new item page: a product with its units loaded, then an ingredient sent empty, with its errors.
+//
 // A pass reads every screen and fails once, at its end, naming every serious or critical finding on every screen, so one run of the job says
 // all there is to fix. A screen that does not reach its loaded state is a finding too.
 
@@ -103,6 +105,21 @@ const SCREENS: AdminScreen[] = [
       await expect(page.getByTestId("system-scheduler")).toBeVisible(TIMEOUT);
     },
   },
+  {
+    name: "New product",
+    path: "admin/catalog/new/",
+    heading: (t) => t.catalog.new.title_product,
+    loaded: async (page, t) => {
+      await expect(page.getByRole("radiogroup", { name: t.catalog.field_fulfilment })).toBeVisible(TIMEOUT);
+      await expect(page.getByLabel(t.catalog.field_unit).getByRole("option")).not.toHaveCount(1, TIMEOUT);
+    },
+    also: async (page, t) => {
+      await page.getByRole("radio", { name: t.catalog.kind_ingredient, exact: true }).check();
+      await page.getByRole("button", { name: t.catalog.new.create_ingredient }).click();
+      await expect(page.getByRole("alert").filter({ hasText: t.catalog.new.check_fields })).toBeVisible(TIMEOUT);
+      return "an ingredient sent empty, with its errors";
+    },
+  },
 ];
 
 let signedIn: Promise<{ admin: Api; device: string }> | null = null;
@@ -125,7 +142,7 @@ test.describe("a11y: the admin screens", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   for (const locale of ["en", "am"] as const) {
-    test(`Orders, Payments, Stock, People, Shifts, Analytics, the Audit log and System (${locale}) have no serious or critical axe violation`, async ({ page }) => {
+    test(`Orders, Payments, Stock, People, Shifts, Analytics, the Audit log, System and the new item page (${locale}) have no serious or critical axe violation`, async ({ page }) => {
       test.setTimeout(360_000);
       const t = MESSAGES[locale];
       const { admin, device } = await demoAdmin();
