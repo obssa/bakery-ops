@@ -460,6 +460,24 @@ The As built notes list them step by step. The ones that change what the plan's 
 (The marker row is respelled here: the gate greps `docs/` for the marker's literal spelling, so printing it would fail the row.) The SKIP rows are the tests and projects that `gate-p6` proves in CI through its needs and its own `gate:p6` step. The last row stays SKIP
 until the claim.
 
+## After the claim: the add page and Tables
+
+Ramin, 2026-11-09, with screenshots: the "New item" drawer was too cramped to add a product or an ingredient, and there was no place to
+add a dining table. He chose a page of its own for the first and "admin and manager" for the second. Two follow-ups, built side by side:
+
+- **Pull request #125, the new item page** (`/admin/catalog/new/?kind=product|ingredient`): the kind and the fulfilment as choice cards,
+  the names, category and unit in two columns, an optional price saved after the item, "More options" for the SKU and (products only)
+  the refund pair, a sticky footer; categories moved to a "Categories" drawer on the catalog. No API change.
+- **Pull request #124, Admin > Tables**: managers hold `tables.manage` as well as admins (migration
+  `2026_11_14_100000_grant_tables_manage_to_manager`, with `PermissionRegistry::permissionsFor($role, $asOf)` so the October grant
+  migration stays what ran on live), `GET /dining-tables/manage` without the station device check, the Tables screen under Sell with
+  Add, Add several, Edit and Switch off, and the pad's empty grid pointing there.
+
+Both change `apps/`, which the strict gate freezes after `done_commit`. #124's branch was merged into #125's so both reach `main`
+under one restated claim: `phase_status.py claim-done 6` on 2026-11-10 at `d162ee7` (the last code commit of the combined branch),
+after `gate_check.py --mode done --phase 6 --no-tests --no-e2e` passed 20 of 20 checks (the test rows run in `gate-p6` on CI). The tag
+`phase-6-complete` stays on `2f6bbd9`, the first claim, as Phase 5's did after pull request #106.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
