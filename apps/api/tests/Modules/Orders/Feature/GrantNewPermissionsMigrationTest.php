@@ -145,7 +145,8 @@ it('grants only the roles that exist and leaves other roles and other guards alo
     grantMigration()->up();
 
     expect(Role::query()->where('name', 'bread_baker')->exists())->toBeFalse()
-        ->and(DB::table('role_has_permissions')->count())->toBe($before + 1)
+        // one grant per registry role of tables.manage (the admin, and the manager since the Phase 6 follow-up Admin > Tables)
+        ->and(DB::table('role_has_permissions')->count())->toBe($before + count(PermissionRegistry::rolesFor('tables.manage')))
         ->and(Role::findByName('admin', 'sanctum')->permissions()->pluck('name')->all())->toBe(['catalog.manage'])
         ->and(Permission::query()->where('name', 'tables.manage')->count())->toBe(1);
 })->group('module:orders', 'feature');
