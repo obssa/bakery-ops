@@ -589,8 +589,8 @@ test.describe("screens: the new item page", () => {
       const category = form.getByLabel(c.field_category);
       if ((await category.getByRole("option").count()) > 1) await category.selectOption({ index: 1 });
       await form.getByRole("radio", { name: c.fulfilment_to_stock, exact: true }).check();
-      await form.getByRole("textbox", { name: c.new.price_label, exact: true }).fill("85.00");
-      await form.getByRole("textbox", { name: c.new.price_label, exact: true }).blur();
+      await form.getByRole("textbox", { name: c.new.price_label }).fill("85.00");
+      await form.getByRole("textbox", { name: c.new.price_label }).blur();
       await sizes(page, "new-item-product", locale);
       if (locale === "en") {
         await form.getByText(c.new.more, { exact: true }).click();
@@ -615,7 +615,7 @@ test.describe("screens: the new item page", () => {
       // a product sent with nothing filled in but a price the page cannot read: its own checks, each under its field
       await openAdmin(page, `${locale}/admin/catalog/new/?kind=product`, c.new.title_product);
       await expect(form.getByLabel(c.field_unit).getByRole("option", { name: /\(pcs\)$/ })).toHaveCount(1, { timeout: 30_000 });
-      await form.getByRole("textbox", { name: c.new.price_label, exact: true }).fill("12,5");
+      await form.getByRole("textbox", { name: c.new.price_label }).fill("12,5");
       await form.getByRole("button", { name: c.new.create_product }).click();
       await expect(page.getByRole("alert").filter({ hasText: c.new.check_fields })).toBeVisible();
       await sizes(page, "new-item-errors", locale, true);
