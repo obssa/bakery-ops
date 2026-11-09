@@ -3278,6 +3278,41 @@
                 }
             }
         },
+        "/v1/dining-tables/manage": {
+            "get": {
+                "operationId": "orders.tables.manage",
+                "tags": [
+                    "DiningTables"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "array",
+                                                "items": {}
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/v1/dining-tables/{table}": {
             "patch": {
                 "operationId": "orders.tables.update",

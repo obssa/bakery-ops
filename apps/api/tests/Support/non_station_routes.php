@@ -85,6 +85,7 @@ return [
     'POST /api/v1/transfers/{transfer}/confirm' => 'inventory',
     'POST /api/v1/transfers/{transfer}/reject' => 'inventory',
     // orders
+    'GET /api/v1/dining-tables/manage' => 'orders',
     'POST /api/v1/dining-tables' => 'orders',
     'PATCH /api/v1/dining-tables/{table}' => 'orders',
     // payments

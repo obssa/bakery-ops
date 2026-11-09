@@ -24,6 +24,10 @@ use Illuminate\Http\Request;
  * (rule 8). A code is used once per branch, an inactive table included (orders snapshot it), compared without regard
  * to case. Tables are switched off with is_active, never deleted from the API. GET returns the stored fields and the
  * derived state (Support\TableStates, one grouped query for the whole grid) in the grid's order (sort, code, id).
+ *
+ * Phase 6 follow-up (Admin > Tables): tables.manage is the admin's and the manager's, and GET /dining-tables/manage is the admin screen's
+ * read: every table of the branch, switched-off ones included, in the same order and shape, without the station `device` middleware (a
+ * back-office computer is not a pad).
  */
 final class DiningTablesController
 {
@@ -42,6 +46,19 @@ final class DiningTablesController
 
         $tables = DiningTable::query()
             ->when(! $all, fn ($q) => $q->where('is_active', true))
+            ->orderBy('sort')->orderBy('code')->orderBy('id')
+            ->get();
+
+        $states = $this->states->for($tables);
+
+        return response()->json(['data' => $tables->map(
+            fn (DiningTable $t): array => (new DiningTableResource($t, $states[$t->id] ?? TableStates::FREE))->resolve($request),
+        )->values()->all()]);
+    }
+
+    public function manage(Request $request): JsonResponse
+    {
+        $tables = DiningTable::query()
             ->orderBy('sort')->orderBy('code')->orderBy('id')
             ->get();
 
