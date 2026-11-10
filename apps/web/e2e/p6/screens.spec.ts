@@ -850,6 +850,57 @@ test.describe("screens: team, insight and system", () => {
       await expect(page.getByTestId("system-scheduler")).toBeVisible({ timeout: 30_000 });
     });
   });
+
+  // The Phase 6 follow-up's Brand card (Admin > System): as a bakery that has set nothing sees it, then with a made-up name and the test
+  // fixture as its logo, typed and uploaded through the card, so the sidebar's mark and name show them. Both sizes, both languages, no
+  // sideways scroll at 390 and no serious axe finding; the demo bakery's brand is put back to nothing at the end, whatever happened.
+  test("System's Brand card, unset and then set, at 1440 and 390, in en and am", async ({ page }) => {
+    test.setTimeout(180_000);
+    const demo = await demoBakery();
+    const reset = async () => {
+      await demo.admin.put("/brand", { name_en: null, name_am: null });
+      await demo.admin.delete("/brand/logo");
+    };
+    const sizes = async (name: string) => {
+      for (const [size, viewport] of [["1440x900", DESKTOP], ["390x844", PHONE]] as const) {
+        await page.setViewportSize(viewport);
+        await page.getByTestId("system-brand").scrollIntoViewIfNeeded();
+        await capture(page, `${name}-${size}`);
+        if (size === "390x844") {
+          const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+          expect(scroll, `${name} at 390 x 844 scrolls sideways`).toBeLessThanOrEqual(client);
+        }
+      }
+      await page.setViewportSize(DESKTOP);
+    };
+    await reset();
+    try {
+      for (const locale of ["en", "am"] as const) {
+        const t = MESSAGES[locale];
+        await openAdmin(page, `${locale}/admin/system/`, t.system.title);
+        const card = page.getByTestId("system-brand");
+        await expect(card.getByText(t.system.brand.logo_default)).toBeVisible({ timeout: 30_000 });
+        await sizes(`system-brand-${locale}`);
+        await expectAccessible(page, `System > Brand (${locale})`);
+      }
+
+      const t = MESSAGES.en;
+      await openAdmin(page, "en/admin/system/", t.system.title);
+      const card = page.getByTestId("system-brand");
+      await card.getByLabel(t.system.brand.name_en).fill("Corner Bakery");
+      await card.getByLabel(t.system.brand.name_am).fill("የማዕዘን ዳቦ ቤት");
+      await card.getByRole("button", { name: t.system.brand.save_name }).click();
+      await expect(card.getByRole("status")).toHaveText(t.system.brand.saved_name, { timeout: 30_000 });
+      await card.getByLabel(t.system.brand.upload_logo).setInputFiles(FIXTURE_PHOTO);
+      await expect(card.getByRole("status")).toHaveText(t.system.brand.saved_logo, { timeout: 60_000 });
+      // the sidebar now carries the bakery's name beside its logo
+      await expect(page.getByRole("link", { name: "Corner Bakery" }).locator("img")).toBeVisible({ timeout: 30_000 });
+      await sizes("system-brand-set-en");
+      await expectAccessible(page, "System > Brand, set (en)");
+    } finally {
+      await reset();
+    }
+  });
 });
 
 // Step 6.4b: the product page (ProductPhoto.dc.html and PhotoStates.dc.html) at 1440 x 900, an admin's size. A demo product with its demo
