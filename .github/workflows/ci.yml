@@ -4,10 +4,17 @@
 # phase N relies on. Jobs for phases above docs/phases/STATUS.json current_phase are skipped.
 # Every job states its timeout-minutes (phase-5 plan 7.1, step 5.5d): 20 unless a measured run needs more, so a hung step cannot hold a
 # runner for six hours; a job that calls a reusable workflow gets the workflow's own (module-tests.yml 20 or its input, e2e.yml 30).
+# A pull request runs only the jobs its change can affect (the `changes` job, scripts/ci_affected.py: a module's job and every module job
+# downstream of it, the web jobs for the web, every e2e project for any app change); a push to main and a manual run run everything, so
+# main's full run stays the gate before the deploy. Each job's `if:` has two branches: the full run keeps `success()` (a failed or
+# skipped need skips the job, as before), and a selective run starts a selected job when every need it has passed or was not selected.
+# The gate jobs are the required checks: they always run, and fail when anything they wait for failed. The label full-ci runs everything.
 name: ci
 
 on:
   pull_request:
+    # labeled: adding the label full-ci restarts the run in full
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
   workflow_dispatch:
@@ -36,8 +43,35 @@ jobs:
       - name: Validate STATUS.json
         run: python3 scripts/phase_status.py validate
 
+  # ------------------------------------------------------------------ what this change can affect
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      full: ${{ steps.c.outputs.full }}
+      jobs: ${{ steps.c.outputs.jobs }}
+    steps:
+      - uses: actions/checkout@v4
+        # full history: the changed files are the diff between the pull request's base and its head
+        with: { fetch-depth: 0 }
+      - name: The selection's own tests
+        run: python3 -m unittest discover -s scripts/tests -p "test_ci_affected.py" -v
+      - id: c
+        name: Which jobs this change can affect
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: python3 scripts/ci_affected.py --event "$EVENT" --base "$BASE" --head "$HEAD" --labels-json "$LABELS"
+
   # ------------------------------------------------------------------ api static
   api-lint:
+    needs: changes
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'api-lint'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -51,7 +85,12 @@ jobs:
         run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
 
   api-arch:
-    needs: api-lint
+    needs: [changes, api-lint]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'api-arch')
+      && (needs.api-lint.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'api-lint')))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
@@ -89,7 +128,12 @@ jobs:
         run: bash scripts/ci/pest-groups.sh "arch,invariants,unit,module:shared,module:audit"
 
   invariants:
-    needs: api-arch
+    needs: [changes, api-arch]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'invariants')
+      && (needs.api-arch.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'api-arch')))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
@@ -122,7 +166,12 @@ jobs:
         run: python3 scripts/verify_chain.py
 
   openapi-check:
-    needs: api-arch
+    needs: [changes, api-arch]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'openapi-check')
+      && (needs.api-arch.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'api-arch')))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # Scramble types model attributes from the database schema, so the export needs a migrated database
@@ -165,7 +214,12 @@ jobs:
           PY
 
   erd-check:
-    needs: api-arch
+    needs: [changes, api-arch]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'erd-check')
+      && (needs.api-arch.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'api-arch')))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -174,17 +228,32 @@ jobs:
 
   # ------------------------------------------------------------------ module chain (dependency order)
   mod-identity:
-    needs: api-arch
+    needs: [changes, api-arch]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-identity')
+      && (needs.api-arch.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'api-arch')))
     uses: ./.github/workflows/module-tests.yml
     with: { module: identity, groups: "module:identity", contracts: "contract:catalog->identity,contract:orders->identity,contract:production->identity,contract:notifications->identity,contract:shifts->identity" }
 
   mod-catalog:
-    needs: mod-identity
+    needs: [changes, mod-identity]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-catalog')
+      && (needs.mod-identity.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-identity')))
     uses: ./.github/workflows/module-tests.yml
     with: { module: catalog, groups: "module:catalog", contracts: "contract:inventory->catalog,contract:orders->catalog,contract:production->catalog" }
 
   mod-inventory:
-    needs: mod-catalog
+    needs: [changes, mod-catalog]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-inventory')
+      && (needs.mod-catalog.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-catalog')))
     uses: ./.github/workflows/module-tests.yml
     # 30 minutes, not the reusable job's 20: the inventory groups (module:inventory, property, concurrency and four consumers'
     # contracts) took 18 m 34 s on PR #79 (run 40586333985) and 19 m 18 s on main at 76c25a0 (run 40554229133), so the 20-minute
@@ -192,32 +261,54 @@ jobs:
     with: { module: inventory, groups: "module:inventory,property,concurrency", contracts: "contract:orders->inventory,contract:production->inventory,contract:shifts->inventory,contract:analytics->facts,contract:ops->inventory", timeout_minutes: 30 }
 
   mod-orders:
-    needs: [status, mod-inventory]
-    if: fromJSON(needs.status.outputs.phase) >= 1
+    needs: [status, changes, mod-inventory]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 1 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-orders')
+      && (needs.mod-inventory.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-inventory')))
     uses: ./.github/workflows/module-tests.yml
     with: { module: orders, groups: "module:orders", contracts: "contract:payments->orders,contract:shifts->orders,contract:analytics->facts" }
 
   mod-payments:
-    needs: [status, mod-orders]
-    if: fromJSON(needs.status.outputs.phase) >= 1
+    needs: [status, changes, mod-orders]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 1 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-payments')
+      && (needs.mod-orders.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-orders')))
     uses: ./.github/workflows/module-tests.yml
     with: { module: payments, groups: "module:payments", contracts: "contract:shifts->payments,contract:payments->files,contract:analytics->facts" }
 
   mod-production:
-    needs: [status, mod-inventory]
-    if: fromJSON(needs.status.outputs.phase) >= 2
+    needs: [status, changes, mod-inventory]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 2 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-production')
+      && (needs.mod-inventory.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-inventory')))
     uses: ./.github/workflows/module-tests.yml
     with: { module: production, groups: "module:production", contracts: "contract:analytics->facts" }
 
   mod-notifications:
-    needs: [status, mod-inventory]
-    if: fromJSON(needs.status.outputs.phase) >= 2
+    needs: [status, changes, mod-inventory]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 2 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-notifications')
+      && (needs.mod-inventory.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-inventory')))
     uses: ./.github/workflows/module-tests.yml
     with: { module: notifications, groups: "module:notifications" }
 
   mod-shifts:
-    needs: [status, mod-orders, mod-inventory, mod-payments]
-    if: fromJSON(needs.status.outputs.phase) >= 3
+    needs: [status, changes, mod-orders, mod-inventory, mod-payments]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 3 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-shifts')
+      && (needs.mod-orders.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-orders'))
+      && (needs.mod-inventory.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-inventory'))
+      && (needs.mod-payments.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-payments')))
     uses: ./.github/workflows/module-tests.yml
     # `seeds`: the demo bakery (Phase0Seeder ..) must stay valid as later phases change. Since step 3.2c the seeders open the
     # stations' shifts through Shifts (Demo\DemoShifts), so they run here, after every module they write through is green.
@@ -231,8 +322,14 @@ jobs:
   # the switch is thrown (the server .env sets the three variables to false and `php artisan config:cache` is run), so the kill switch
   # is proven to leave a working system. The fixtures open the shifts they write at (Tests\Support\Shifts), which is a no-op when off.
   rules-off-gates:
-    needs: [status, mod-payments, mod-production, mod-notifications]
-    if: fromJSON(needs.status.outputs.phase) >= 3
+    needs: [status, changes, mod-payments, mod-production, mod-notifications]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 3 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'rules-off-gates')
+      && (needs.mod-payments.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-payments'))
+      && (needs.mod-production.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-production'))
+      && (needs.mod-notifications.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-notifications')))
     uses: ./.github/workflows/module-tests.yml
     with:
       module: rules-off-gates
@@ -243,8 +340,14 @@ jobs:
         PAYMENTS_REQUIRE_SHIFT_FOR_CASH=false
 
   mod-analytics:
-    needs: [status, mod-shifts, mod-production, mod-notifications]
-    if: fromJSON(needs.status.outputs.phase) >= 4
+    needs: [status, changes, mod-shifts, mod-production, mod-notifications]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 4 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-analytics')
+      && (needs.mod-shifts.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-shifts'))
+      && (needs.mod-production.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-production'))
+      && (needs.mod-notifications.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-notifications')))
     uses: ./.github/workflows/module-tests.yml
     # the Facts contract is green since step 4.1c and runs here with Analytics absent (its ports live in the providers) and in every provider job
     # `seeds:p4`: the Phase 4 demo history (Phase4SeederTest, step 4.6a) rebuilds every day it writes, so it runs after Analytics is green
@@ -252,6 +355,11 @@ jobs:
 
   # ------------------------------------------------------------------ web
   web-lint:
+    needs: changes
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-lint'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -270,7 +378,12 @@ jobs:
         working-directory: apps/web
 
   i18n-check:
-    needs: [status, web-lint]
+    needs: [status, changes, web-lint]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'i18n-check')
+      && (needs.web-lint.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-lint')))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -281,7 +394,12 @@ jobs:
       - run: python3 scripts/i18n_report.py
 
   web-build:
-    needs: web-lint
+    needs: [changes, web-lint]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build')
+      && (needs.web-lint.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-lint')))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -340,7 +458,12 @@ jobs:
   # made-up DSN must carry the SDK (so the pattern above proves something) and send a page's error to a fake ingest, a page.route sink, with
   # nothing personal in it (p5-errors-on). Nothing leaves the runner; no API is needed (the specs stub its answers).
   web-errors:
-    needs: web-build
+    needs: [changes, web-build]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-errors')
+      && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build')))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -391,8 +514,11 @@ jobs:
   # tools/print-bridge: Node 22, no dependencies, no Docker. node --test runs it against a fake API (the rules of the bridge routes) and a
   # fake TCP printer that reads the bytes through the JS port of tests/Support/EscPosEmulator.php; install-service.ps1 must parse.
   print-bridge:
-    needs: [status]
-    if: fromJSON(needs.status.outputs.phase) >= 5
+    needs: [status, changes]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 5 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'print-bridge'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
@@ -424,6 +550,11 @@ jobs:
 
   # ------------------------------------------------------------------ api image for e2e
   docker-build:
+    needs: changes
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -443,13 +574,26 @@ jobs:
 
   # ------------------------------------------------------------------ e2e per phase
   e2e-p0:
-    needs: [status, mod-catalog, web-build, docker-build]
+    needs: [status, changes, mod-catalog, web-build, docker-build]
+    if: >-
+      (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'e2e-p0')
+      && (needs.mod-catalog.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-catalog'))
+      && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     uses: ./.github/workflows/e2e.yml
     with: { phase: 0, projects: "p0-admin-smoke" }
 
   e2e-p1:
-    needs: [status, mod-payments, web-build, docker-build]
-    if: fromJSON(needs.status.outputs.phase) >= 1
+    needs: [status, changes, mod-payments, web-build, docker-build]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 1 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'e2e-p1')
+      && (needs.mod-payments.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-payments'))
+      && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     uses: ./.github/workflows/e2e.yml
     # polling transport, as the live host runs it (ADR 0009): the worker but no `ws` (Reverb) service,
     # BROADCAST_CONNECTION=null, NEXT_PUBLIC_LIVE_TRANSPORT=poll
@@ -457,22 +601,41 @@ jobs:
 
   # e2e-p2, e2e-p3 and e2e-p4 are settled (phase-2-plan.md section 2, phase-3-plan.md section 2, F7, phase-4-plan.md 10.9 item 3): polling, with the worker the queued chains need.
   e2e-p2:
-    needs: [status, mod-production, mod-notifications, web-build, docker-build]
-    if: fromJSON(needs.status.outputs.phase) >= 2
+    needs: [status, changes, mod-production, mod-notifications, web-build, docker-build]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 2 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'e2e-p2')
+      && (needs.mod-production.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-production'))
+      && (needs.mod-notifications.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-notifications'))
+      && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     uses: ./.github/workflows/e2e.yml
     with: { phase: 2, projects: "p2-stockout-production p2-purchase-transfer", profiles: "full" }
 
   e2e-p3:
-    needs: [status, mod-shifts, web-build, docker-build]
-    if: fromJSON(needs.status.outputs.phase) >= 3
+    needs: [status, changes, mod-shifts, web-build, docker-build]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 3 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'e2e-p3')
+      && (needs.mod-shifts.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-shifts'))
+      && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     uses: ./.github/workflows/e2e.yml
     with: { phase: 3, projects: "p3-handover p3-opening-prefill", profiles: "full" }
 
   e2e-p4:
     # Receipt photos use the local `files` disk here, as on the live host; an S3-compatible store is proved only by the
     # portability job `files-s3` (phase-4-plan.md 4.2b, 10.9 item 1).
-    needs: [status, mod-analytics, web-build, docker-build]
-    if: fromJSON(needs.status.outputs.phase) >= 4
+    needs: [status, changes, mod-analytics, web-build, docker-build]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 4 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'e2e-p4')
+      && (needs.mod-analytics.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-analytics'))
+      && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     uses: ./.github/workflows/e2e.yml
     # the demo history: 60 days here, the CI-only fallback of phase-4 plan section 8 (4.6a measured 938 s for the 90 days, over the 10-minute
     # budget); the 90-day figure stays for perf-dashboards (4.6b)
@@ -482,8 +645,13 @@ jobs:
   # stack. CI only, never against the live host (which has no bucket). The app container signs and fetches against AWS_ENDPOINT
   # (http://minio:9000); AWS_URL (http://localhost:9000) is the browser-side name, see the two-hosts trap in references/traps.md.
   files-s3:
-    needs: [status, mod-payments, docker-build]
-    if: fromJSON(needs.status.outputs.phase) >= 4
+    needs: [status, changes, mod-payments, docker-build]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 4 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'files-s3')
+      && (needs.mod-payments.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-payments'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -522,8 +690,13 @@ jobs:
   # read and in all. It runs beside e2e-p4 (both after mod-analytics, as the CI design's graph has it); the browser's first-data budget
   # is dashboards.spec.ts in e2e-p4 (its 60 days hold the 30 days the overview reads by default in full).
   perf-dashboards:
-    needs: [status, mod-analytics, docker-build]
-    if: fromJSON(needs.status.outputs.phase) >= 4
+    needs: [status, changes, mod-analytics, docker-build]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 4 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'perf-dashboards')
+      && (needs.mod-analytics.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-analytics'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
@@ -589,8 +762,13 @@ jobs:
   # figures describe the code under load, not the host: PollBudgetTest and docs/runbook/server.md "Poll budget" speak for the host).
   # The queue worker starts after the seed, so migrate:fresh never races it.
   perf-load:
-    needs: [status, docker-build, mod-analytics]
-    if: fromJSON(needs.status.outputs.phase) >= 5
+    needs: [status, changes, docker-build, mod-analytics]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 5 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'perf-load')
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build'))
+      && (needs.mod-analytics.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-analytics')))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -687,8 +865,14 @@ jobs:
   # it; two days of demo history (its projects need none, the default would replay 90). The 30-minute limit is e2e.yml's job timeout (a
   # job that calls a reusable workflow cannot set its own). Device enforcement is on for every e2e job (compose.ci.yml).
   e2e-p5:
-    needs: [status, mod-analytics, web-build, docker-build]
-    if: fromJSON(needs.status.outputs.phase) >= 5
+    needs: [status, changes, mod-analytics, web-build, docker-build]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 5 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'e2e-p5')
+      && (needs.mod-analytics.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-analytics'))
+      && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     uses: ./.github/workflows/e2e.yml
     with: { phase: 5, projects: "p5-device p5-offline p5-amharic", profiles: "full", history_days: "2" }
 
@@ -697,8 +881,14 @@ jobs:
   # every demo product gets its demo photo. p6-product-photo and p6-a11y start as fixme placeholders (e2e.yml refuses an empty project of
   # a phase in progress); 6.2b replaces the a11y one, 6.4b the product-photo one.
   e2e-p6:
-    needs: [status, mod-analytics, web-build, docker-build]
-    if: fromJSON(needs.status.outputs.phase) >= 6
+    needs: [status, changes, mod-analytics, web-build, docker-build]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 6 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'e2e-p6')
+      && (needs.mod-analytics.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-analytics'))
+      && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build'))
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     uses: ./.github/workflows/e2e.yml
     with: { phase: 6, projects: "p6-product-photo p6-a11y", profiles: "full", history_days: "2" }
 
@@ -709,8 +899,13 @@ jobs:
   # Pest process with gate:p0 (Phase 0's ledger property and oracle tests, on the same server) and gate:p5:restored (RestoredLedgerGateTest
   # on the restored copy, against the source). A skipped or warning test fails the step, as in gate-p4. Nothing here touches the live host.
   backup-drill:
-    needs: [status, docker-build, mod-inventory]
-    if: fromJSON(needs.status.outputs.phase) >= 5
+    needs: [status, changes, docker-build, mod-inventory]
+    if: >-
+      fromJSON(needs.status.outputs.phase) >= 5 && (needs.changes.outputs.full == 'true' && success() ||
+      needs.changes.outputs.full == 'false' && !cancelled() && needs.changes.result == 'success'
+      && contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'backup-drill')
+      && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build'))
+      && (needs.mod-inventory.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'mod-inventory')))
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
@@ -765,7 +960,8 @@ jobs:
 
   # ------------------------------------------------------------------ gates (required checks on main)
   gate-p0:
-    needs: [api-arch, mod-inventory, mod-catalog, e2e-p0, openapi-check, erd-check, invariants]
+    needs: [changes, api-arch, mod-inventory, mod-catalog, e2e-p0, openapi-check, erd-check, invariants]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -773,11 +969,19 @@ jobs:
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer
         with: { fetch-depth: 0 }
+      # a gate is a required check, so it runs even when a job it waits for failed, and fails here instead of being skipped
+      # (a skipped required check counts as passed); on a pull request a job the change did not need may be skipped
+      - name: Every job this gate waits for passed, or this change did not need it
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FULL: ${{ needs.changes.outputs.full }}
+          JOBS: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/ci_affected.py --check-needs
       - run: python3 scripts/gate_check.py --mode done --phase 0 --ci
 
   gate-p1:
-    needs: [status, gate-p0, mod-orders, mod-payments, e2e-p1]
-    if: fromJSON(needs.status.outputs.phase) >= 1
+    needs: [status, changes, gate-p0, mod-orders, mod-payments, e2e-p1]
+    if: ${{ !cancelled() && fromJSON(needs.status.outputs.phase) >= 1 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -785,11 +989,19 @@ jobs:
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer
         with: { fetch-depth: 0 }
+      # a gate is a required check, so it runs even when a job it waits for failed, and fails here instead of being skipped
+      # (a skipped required check counts as passed); on a pull request a job the change did not need may be skipped
+      - name: Every job this gate waits for passed, or this change did not need it
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FULL: ${{ needs.changes.outputs.full }}
+          JOBS: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/ci_affected.py --check-needs
       - run: python3 scripts/gate_check.py --mode done --phase 1 --ci
 
   gate-p2:
-    needs: [status, gate-p1, mod-production, mod-notifications, e2e-p2]
-    if: fromJSON(needs.status.outputs.phase) >= 2
+    needs: [status, changes, gate-p1, mod-production, mod-notifications, e2e-p2]
+    if: ${{ !cancelled() && fromJSON(needs.status.outputs.phase) >= 2 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -797,11 +1009,19 @@ jobs:
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer
         with: { fetch-depth: 0 }
+      # a gate is a required check, so it runs even when a job it waits for failed, and fails here instead of being skipped
+      # (a skipped required check counts as passed); on a pull request a job the change did not need may be skipped
+      - name: Every job this gate waits for passed, or this change did not need it
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FULL: ${{ needs.changes.outputs.full }}
+          JOBS: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/ci_affected.py --check-needs
       - run: python3 scripts/gate_check.py --mode done --phase 2 --ci
 
   gate-p3:
-    needs: [status, gate-p2, mod-shifts, rules-off-gates, e2e-p3]
-    if: fromJSON(needs.status.outputs.phase) >= 3
+    needs: [status, changes, gate-p2, mod-shifts, rules-off-gates, e2e-p3]
+    if: ${{ !cancelled() && fromJSON(needs.status.outputs.phase) >= 3 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -809,6 +1029,14 @@ jobs:
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer
         with: { fetch-depth: 0 }
+      # a gate is a required check, so it runs even when a job it waits for failed, and fails here instead of being skipped
+      # (a skipped required check counts as passed); on a pull request a job the change did not need may be skipped
+      - name: Every job this gate waits for passed, or this change did not need it
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FULL: ${{ needs.changes.outputs.full }}
+          JOBS: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/ci_affected.py --check-needs
       - run: python3 scripts/gate_check.py --mode done --phase 3 --ci
 
   # The Phase 4 gate (phase-4 plan 10.3): the needs of the CI design (gate-p3, mod-analytics, e2e-p4, perf-dashboards) and the S3 proof of
@@ -818,29 +1046,44 @@ jobs:
   # DatabaseTruncation, and fail, never skip, when fewer days are built; the race tests of the group (DatabaseTruncation) keep
   # phpunit.xml's bakery_test, so nothing beside the seeded tests can wipe the seed. A skipped or warning test fails the step. Then gate_check.
   gate-p4:
-    needs: [status, gate-p3, mod-analytics, e2e-p4, perf-dashboards, files-s3]
-    if: fromJSON(needs.status.outputs.phase) >= 4
+    needs: [status, changes, gate-p3, mod-analytics, e2e-p4, perf-dashboards, files-s3]
+    if: ${{ !cancelled() && fromJSON(needs.status.outputs.phase) >= 4 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       GATE_SEED_DAYS: "90"
+      # the seeded gate:p4 group runs when the change can affect it (scripts/ci_affected.py); gate_check runs on every change
+      GATE_PEST: ${{ needs.changes.outputs.full == 'true' || contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'gate-p4') }}
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer
         with: { fetch-depth: 0 }
+      # a gate is a required check, so it runs even when a job it waits for failed, and fails here instead of being skipped
+      # (a skipped required check counts as passed); on a pull request a job the change did not need may be skipped
+      - name: Every job this gate waits for passed, or this change did not need it
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FULL: ${{ needs.changes.outputs.full }}
+          JOBS: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/ci_affected.py --check-needs
       - uses: actions/download-artifact@v4
+        if: env.GATE_PEST == 'true'
         with: { name: api-image, path: /tmp }
       - run: docker load -i /tmp/api.tar
+        if: env.GATE_PEST == 'true'
       - name: Start the stack (the API, the database, Redis)
+        if: env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180 app
       - name: Migrate and seed ${{ env.GATE_SEED_DAYS }} days of demo history
+        if: env.GATE_PEST == 'true'
         run: |
           set -o pipefail
           docker compose -f compose.yml -f compose.ci.yml exec -T -e SEED_PHASE=4 -e DEMO_HISTORY_DAYS="$GATE_SEED_DAYS" app \
             php artisan migrate:fresh --force --seed --seeder=DemoSeeder 2>&1 | grep -v ' DEBUG: ' | tee /tmp/seed.txt | tail -30
           grep -E '^Phase 4: ' /tmp/seed.txt | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Pest group gate:p4 on the seeded history
+        if: env.GATE_PEST == 'true'
         run: |
           set -o pipefail
           # the image has no .env (the variables come from compose): phpdotenv's suppressed read of a missing file is reported by PHPUnit
@@ -855,10 +1098,10 @@ jobs:
       - name: gate_check
         run: python3 scripts/gate_check.py --mode done --phase 4 --ci
       - name: Logs on failure
-        if: failure()
+        if: failure() && env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=120 app
       - name: Stop the stack
-        if: always()
+        if: always() && env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml down -v
 
   # The Phase 5 gate (phase-5 plan 7.1 and 10.3, step 5.6b): the needs of the CI design (gate-p4, e2e-p5, i18n-check, the backup drill,
@@ -867,23 +1110,38 @@ jobs:
   # docs/ and scripts/ from a copy in the container named by GATE_REPO_ROOT. A skipped or warning test fails the step, as in gate-p4;
   # its passing is the checklist's `self` (device-enforcement, print-emulator).
   gate-p5:
-    needs: [status, gate-p4, e2e-p5, i18n-check, backup-drill, perf-load, print-bridge]
-    if: fromJSON(needs.status.outputs.phase) >= 5
+    needs: [status, changes, gate-p4, e2e-p5, i18n-check, backup-drill, perf-load, print-bridge]
+    if: ${{ !cancelled() && fromJSON(needs.status.outputs.phase) >= 5 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     # the go-live checklist (step 5.6a) reads the Actions API (live-ops, uptime-monitor) and main's required checks
     permissions: { contents: read, actions: read }
+    env:
+      # the gate:p5 group runs when the change can affect it (scripts/ci_affected.py); gate_check and its checklist run on every change
+      GATE_PEST: ${{ needs.changes.outputs.full == 'true' || contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'gate-p5') }}
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer; the sign-off rows read who committed each file
         with: { fetch-depth: 0 }
+      # a gate is a required check, so it runs even when a job it waits for failed, and fails here instead of being skipped
+      # (a skipped required check counts as passed); on a pull request a job the change did not need may be skipped
+      - name: Every job this gate waits for passed, or this change did not need it
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FULL: ${{ needs.changes.outputs.full }}
+          JOBS: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/ci_affected.py --check-needs
       - uses: actions/download-artifact@v4
+        if: env.GATE_PEST == 'true'
         with: { name: api-image, path: /tmp }
       - run: docker load -i /tmp/api.tar
+        if: env.GATE_PEST == 'true'
       - name: Start the stack (the API, the database, Redis)
+        if: env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180 app
       - name: Pest group gate:p5
+        if: env.GATE_PEST == 'true'
         run: |
           set -o pipefail
           dc="docker compose -f compose.yml -f compose.ci.yml"
@@ -906,10 +1164,10 @@ jobs:
           python3 scripts/gate_check.py --mode done --phase 5 --ci 2>&1 | tee /tmp/gate-check.txt
           { echo '```'; grep -E "checklist " /tmp/gate-check.txt || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Logs on failure
-        if: failure()
+        if: failure() && env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=120 app
       - name: Stop the stack
-        if: always()
+        if: always() && env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml down -v
 
   # The Phase 6 gate (phase-6 plan 7.1 and 10.3): the needs of the phase (gate-p5, the Catalog and Orders module jobs the photos change, e2e-p6,
@@ -918,21 +1176,36 @@ jobs:
   # nothing under public/), in the API image, whose gd has WebP as the live host's has, then gate_check. Informational while the phase is
   # open, as every gate job is (gate_check --ci turns a FAIL into a WARN until STATUS claims the phase done); the Pest step fails either way.
   gate-p6:
-    needs: [status, gate-p5, mod-catalog, mod-orders, e2e-p6, i18n-check]
-    if: fromJSON(needs.status.outputs.phase) >= 6
+    needs: [status, changes, gate-p5, mod-catalog, mod-orders, e2e-p6, i18n-check]
+    if: ${{ !cancelled() && fromJSON(needs.status.outputs.phase) >= 6 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      # the gate:p6 group runs when the change can affect it (scripts/ci_affected.py); gate_check runs on every change
+      GATE_PEST: ${{ needs.changes.outputs.full == 'true' || contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'gate-p6') }}
     steps:
       - uses: actions/checkout@v4
         # full history: once a phase is claimed done, gate_check verifies done_commit is an ancestor of HEAD and that
         # no app code changed after it, which a shallow clone cannot answer
         with: { fetch-depth: 0 }
+      # a gate is a required check, so it runs even when a job it waits for failed, and fails here instead of being skipped
+      # (a skipped required check counts as passed); on a pull request a job the change did not need may be skipped
+      - name: Every job this gate waits for passed, or this change did not need it
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          FULL: ${{ needs.changes.outputs.full }}
+          JOBS: ${{ needs.changes.outputs.jobs }}
+        run: python3 scripts/ci_affected.py --check-needs
       - uses: actions/download-artifact@v4
+        if: env.GATE_PEST == 'true'
         with: { name: api-image, path: /tmp }
       - run: docker load -i /tmp/api.tar
+        if: env.GATE_PEST == 'true'
       - name: Start the stack (the API, the database, Redis)
+        if: env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180 app
       - name: Pest group gate:p6
+        if: env.GATE_PEST == 'true'
         run: |
           set -o pipefail
           dc="docker compose -f compose.yml -f compose.ci.yml"
@@ -946,8 +1219,8 @@ jobs:
       - name: gate_check
         run: python3 scripts/gate_check.py --mode done --phase 6 --ci
       - name: Logs on failure
-        if: failure()
+        if: failure() && env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml logs --no-color --tail=120 app
       - name: Stop the stack
-        if: always()
+        if: always() && env.GATE_PEST == 'true'
         run: docker compose -f compose.yml -f compose.ci.yml down -v

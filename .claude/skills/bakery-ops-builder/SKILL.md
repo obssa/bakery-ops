@@ -27,7 +27,7 @@ This skill makes that mechanical. Follow it in order; the scripts refuse to let 
 | Machine-readable truth for all of the above | `assets/dependency-manifest.json` |
 | Templates: phase plan, gate report, ADR, contract test | `assets/templates/` |
 | Canonical CI files | `assets/ci/` |
-| Scripts (copied into the repo's `scripts/`) | `scripts/gate_check.py`, `scripts/phase_status.py`, `scripts/check_invariants.py` |
+| Scripts (copied into the repo's `scripts/`) | `scripts/gate_check.py`, `scripts/phase_status.py`, `scripts/check_invariants.py`, `scripts/ci_affected.py` (which CI jobs a PR runs) |
 
 The long-form architecture is `docs/architecture.md` in the repo (sections 1–13). The skill references
 are the condensed, build-oriented version; when they are silent, the doc decides.
@@ -168,5 +168,5 @@ make doctor          # PHP 8.3 in container, Node 24, LF endings, docker, gh
 python scripts/phase_status.py show
 ```
 
-If `scripts/` lacks `gate_check.py`, `phase_status.py` or `check_invariants.py`, copy them from this
+If `scripts/` lacks `gate_check.py`, `phase_status.py`, `check_invariants.py` or `ci_affected.py`, copy them from this
 skill's `scripts/` directory; they are the same files.

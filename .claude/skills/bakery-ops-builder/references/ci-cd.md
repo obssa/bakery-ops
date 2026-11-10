@@ -100,6 +100,38 @@ compose profile, `ws` (not part of `full`); `e2e.yml` sets `BROADCAST_CONNECTION
 Reverb); the Phase 5 plan settled `e2e-p5` on polling too (step 5.1b; it listed `full,ws` before). When a WebSocket transport is switched on, Reverb inside compose: the app container reaches `ws:8080`;
 the browser reaches `localhost:8080`. These are two env vars (`REVERB_HOST` vs `NEXT_PUBLIC_REVERB_HOST`), never one.
 
+## Pull requests run what their change can affect (Ramin, 2026-11-10)
+
+A push to `main` and a manual run run the whole graph above: main's full run is the gate before the deploy (`deploy.yml` deploys only
+after a green `push` run). A pull request runs only the jobs its change can affect. The `changes` job (beside `status`) reads the
+diff between the PR's base and head (`git diff --name-only --no-renames base...head`) and `scripts/ci_affected.py` maps it:
+
+| Changed path | Runs |
+|---|---|
+| `apps/api/app/Modules/<M>`, `apps/api/tests/Modules/<M>`, `apps/api/routes/modules/<m>.php` | `mod-<m>` and every module job downstream of it (its consumers in the manifest's `modules.*.depends_on` and in ci.yml's needs between `mod-*` jobs, transitively, plus one hop over `event_only` / `interface_only`), `api-lint`, `api-arch`, `invariants`, `openapi-check`, `erd-check` |
+| any other `apps/api/` path (Shared, Ops, migrations, seeders, config, `routes/api.php`, `tests/Support`, `tests/Contract`, `tests/Gate`, composer) | every API job |
+| `apps/web/` | `web-lint`, `i18n-check`, `web-build`, `web-errors` |
+| any `apps/` change | also `docker-build` and every `e2e-p*` project; an API change also every job with no rule of its own (`rules-off-gates`, `files-s3`, `perf-*`, `backup-drill`) and the Pest steps of `gate-p4` .. `gate-p6` |
+| `tools/print-bridge/` | `print-bridge` |
+| `docs/openapi.json` / `docs/erd.dbml` / `docs/i18n/` | `openapi-check` / `erd-check` / `i18n-check`, and `invariants` |
+| any other doc (`docs/`, a root `*.md`) | `invariants` |
+| `.github/`, `scripts/`, `docker/`, compose files, `Makefile`, `.claude/`, `.githooks/`, `docs/phases/`, `docs/adr/`, `docs/go-live*`, an unknown path | everything |
+
+The label `full-ci` runs everything on a PR (adding it restarts the run). A job of a phase not reached yet is left out of the selection.
+
+How ci.yml carries it: every job needs `changes`, and its `if:` has two branches. The full run keeps `success()`, so a failed or
+skipped need skips the job exactly as before. A selective run starts a selected job when every need it has passed or was not selected,
+`(needs.<n>.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), '<n>'))` per need, so a failure still stops
+everything downstream of it although the jobs in between were skipped. The gate jobs are the required checks, and a skipped required check
+counts as passed, so a gate always runs (`!cancelled()`): its first step (`ci_affected.py --check-needs`, reading `toJSON(needs)`) fails
+when anything it waits for failed, or was selected and skipped, and `gate-p4` .. `gate-p6` run their seeded stack and Pest group only
+when selected (`env.GATE_PEST`), `gate_check` every time. `scripts/tests/test_ci_affected.py` (run first in `changes`) pins the mapping
+and checks that every job of `ci.yml` and of `assets/ci/ci.yml` carries these guards, so a job added without them fails the next run.
+
+Roughly, from the green runs of Phase 6: docs only 3 to 5 minutes; a web change 15 to 20 (the e2e projects after web-build and
+docker-build, no module job); `analytics` about 45 (its job, then perf-dashboards and gate-p4's seeded history); `orders` about 75;
+Identity, Catalog, Shared, migrations or seeders the full 90 to 100.
+
 ## Caching
 
 composer (`~/.composer/cache`, key `composer.lock`), PHPStan (`apps/api/tmp/phpstan`), pnpm store via
@@ -133,7 +165,8 @@ another PR has merged, they prove nothing about the combination. So for every PR
 2. Never hand-merge the generated docs. On a conflict in `docs/openapi.json` take either side and re-export it the way the
    `openapi-check` job prints (`scripts/artisan scramble:export --path=../../docs/openapi.json`, against a migrated database);
    in `docs/erd.dbml` add every table `erd-check` (`scripts/erd_check.py`) lists as missing. Commit the result with the merge.
-3. Push and let the full CI run on the merged head; only that run counts.
+3. Push and let CI run on the merged head; only that run counts. It runs what the PR's own change can affect (the section above),
+   now on top of the other PR's code; the full graph runs again on `main` before the deploy, and the label `full-ci` runs it on the PR.
 4. Fast-forward `main` to that head (`git merge --ff-only`), so main gets the very commit that was green.
 
 The next PR in line then merges the new `main` the same way.
