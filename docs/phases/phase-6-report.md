@@ -481,12 +481,16 @@ after `gate_check.py --mode done --phase 6 --no-tests --no-e2e` passed 20 of 20 
 The combined branch's run 42727928906 (head `643ec12`) passed all 40 jobs; `main` was fast-forwarded to it, and `main`'s run
 42739984891 passed with the strict `gate-p6` green (now `gate_run_url`). Deploy 42749665184: 42 of 42 `@live`, health ok, 107 migrations.
 
+Restated again at `f1778cf` (pull request #128, test-only): two checks that failed by chance (the short-code reset's audit search, the
+gate:p4 window across Addis midnight) were fixed under `apps/api/tests`, which the strict gate also freezes.
+
 **The recipe on the new item page** (Ramin, 2026-11-10: a product such as a chicken sandwich needs its ingredients and how much of each
 while it is added). The page now carries the recipe of a product that is made, with the product page's own lines editor: required
 made to order (without one the product could never be sold), optional made in batches, absent for bought in and ingredients; it is
 saved as version 1 after the item and the price, and a refused recipe opens the product page's drawer on it. Web only: the stock gating
 and the consumption it relies on already exist and stay proven by `SendOrderTest` (shortfall), `ReadyLineTest` (consumption per
-ingredient), `CreateOrderTest` (no recipe) and `MenuEndpointTest` (unavailable when short). Claim restated at `9eed345`; the tag stays.
+ingredient), `CreateOrderTest` (no recipe) and `MenuEndpointTest` (unavailable when short). Pull request #129 carries #128's two test
+fixes as well (merged into its branch), so one restated claim and one run cover both: claim restated at `MERGE_SHA`; the tag stays.
 
 ## What stays open after the claim
 
