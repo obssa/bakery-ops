@@ -496,6 +496,13 @@ The branch's run 42766291246 (head `4dc43d8`) passed all 40 jobs; `main` was fas
 passed with the strict `gate-p6` green (now `gate_run_url`). Deploy 42788256793: 43 of 43 `@live` (the new recipe test among them),
 health ok, 107 migrations.
 
+**The recipe editor's layout** (Ramin, 2026-11-10, a screenshot of the "Recipe and cost" drawer: the ingredient line squeezed six
+controls into one row, the unit cut to "k", every label wrapped, and the same on a phone). The recipe lines and the steps are now laid out by
+the room the form has (a container query), not by the window: a table with its column names once where there is room, a small card per
+line in the drawer and on a phone, a trash icon, a "%" inside the waste, and each control still named by its line for readers and tests.
+The drawer's yield reads "This recipe makes [1] [pcs]", a product with no recipe yet shows a callout saying what that means, and "Set the
+price" under "No price set" closes the drawer onto the price field. Web only. Claim restated at `069b6c0`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
