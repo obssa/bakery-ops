@@ -508,6 +508,17 @@ claim restated at `069b6c0`. `main`'s run 42811697524 passed with the strict `ga
 42 of 43 `@live`; `admin-smoke` "admin creates an ingredient and a product" ran out of its 60 s test time (57 to 58 s on the two
 deploys before, the page had switched to Amharic while the catalog was still loading); the next pull request gives it more time.
 
+**The bakery's colours and its own name and logo** (Ramin, 2026-11-10: "take the color branding" from the bakery's logo, red and charcoal;
+decided: red accents with charcoal buttons, and the name and logo set on the live site so this public repository never holds them). The
+brand scale is the logo's red (the mark, the current place, a chosen card, links, the focus ring, "New"); primary and dark buttons, ticked
+checkboxes, a focused input's border and the charts are charcoal `ink`; the old teal became `positive`, a good or "on" state (open, ready,
+done, confirmed, locked, active, a switch that is on), so red never means "done". The kitchen night keeps its teal. Admin > System gains a
+Brand card (branding.manage, the admin's, through the grant-only migration `2026_11_15_100000`): the business name in both languages and a
+logo kept whole on a white 256 px square (`brand_profiles`, one row per branch; PUT /brand, POST and DELETE /brand/logo, idempotent and
+audited; GET /me carries `brand`; the file is public at /api/v1/media/brand/{sha}.{ext}, content-addressed and immutable like a product
+photo's). The sidebar, the station bar, the sign-in screen (from the brand this device last saw) and the browser's title show them; until
+the admin sets them, the app's own name and mark. The same pull request gives `admin-smoke`'s catalog flow `test.slow()` (above).
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
