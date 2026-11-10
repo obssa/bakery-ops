@@ -690,7 +690,7 @@ export function Drawer({ label, onClose, size = "md", children }: { label: strin
         aria-modal="true"
         aria-label={label}
         tabIndex={-1}
-        className={`h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-[480px]"} space-y-5 overflow-y-auto bg-white p-6 shadow-float outline-none motion-safe:animate-drawer-in`}
+        className={`h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-[480px]"} space-y-5 overflow-y-auto bg-white p-4 shadow-float sm:p-6 outline-none motion-safe:animate-drawer-in`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}

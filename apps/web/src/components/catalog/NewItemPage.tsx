@@ -402,7 +402,6 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
               error={fieldError("recipe")}
               errorId={recipeErrorId}
               disabled={busy}
-              controlSize="md"
             />
           </Section>
         ) : null}

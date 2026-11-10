@@ -325,7 +325,16 @@ function ProductPage({ product, created }: { product: Item; created: CreatedItem
               <X className="size-5" strokeWidth={2} aria-hidden="true" />
             </IconButton>
           </div>
-          <RecipePanels product={product} draft={recipeDraft} onPublished={() => setRecipeDraft(null)} />
+          <RecipePanels
+            product={product}
+            draft={recipeDraft}
+            onPublished={() => setRecipeDraft(null)}
+            onSetPrice={() => {
+              // the price is set in Details, on the page behind the drawer: close it and put the cursor there
+              setRecipeOpen(false);
+              requestAnimationFrame(() => document.querySelector<HTMLInputElement>("[data-price-input]")?.focus());
+            }}
+          />
         </Drawer>
       ) : null}
     </div>
@@ -387,7 +396,7 @@ function DetailsCard({
         </Field>
         {isProduct ? (
           <Field label={t("field_price")} hint={pricesPending ? tc("loading") : since ? t("price_since", { date: since }) : t("price_none")} error={fieldError("price")}>
-            {(props) => <MoneyInput {...props} controlSize="md" currency={current?.currency ?? "ETB"} disabled={disabled} value={draft.price} onChange={(e) => onEdit({ price: e.target.value })} />}
+            {(props) => <MoneyInput {...props} data-price-input="" controlSize="md" currency={current?.currency ?? "ETB"} disabled={disabled} value={draft.price} onChange={(e) => onEdit({ price: e.target.value })} />}
           </Field>
         ) : null}
       </div>

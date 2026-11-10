@@ -336,6 +336,15 @@ Three zones from left to right.
   two buttons share its width.
 - **Product page.** Two columns: the form on the left (names, category, price, station, refund settings, all as now) and a sticky
   right column with the **Photo** card.
+- **Recipe lines** (the new item page's "Recipe" and the product page's "Recipe and cost" drawer, phase-6/recipe-editor-layout). Laid
+  out by the room the form has (a container query), not by the window, since the drawer is narrow on a wide screen: from 42rem, a table
+  in one hairline box (the column names once on `neutral-50`: Ingredient, Quantity, Unit, Waste, Optional; one 44 px row per line, rows
+  divided by hairlines, a ghost trash icon at the end); below, each line is a small card in the same box (the ingredient with the trash
+  beside it, then quantity and unit side by side, then waste and "Optional"), each control with a 13 / 600 caption. Waste carries a "%"
+  inside its field; the trash of the only line is not drawn; "Add ingredient" is a secondary button with a plus. Steps follow the same
+  rule (number, English, Amharic, trash). In the drawer the yield reads as one sentence, "This recipe makes [1] [pcs]", and a product
+  with no version yet shows a `brand-50` callout saying what that means (made to order: it cannot be sold), with "Set the price" under
+  "No price set" closing the drawer onto the price field.
 - **Photo card.**
   - Empty: a 4:3 dropzone with a dashed `neutral-300` border, an image icon, "Drop a photo here or browse your files", and the rules
     line "JPG, PNG or WebP · best at 1200 × 900 px or larger". Dragging over turns the border to a solid `brand-600` and the fill to
