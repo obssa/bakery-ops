@@ -32,11 +32,16 @@ export async function fontsReady(page: Page): Promise<void> {
 /**
  * Resolves once every animation and transition that ends has ended (step 6.3a): a colour measured half way through a 150 ms transition (a
  * button just enabled, a sheet sliding in) is neither the colour before nor after, so axe's contrast check would read a colour the screen
- * never rests on. Endless ones (a skeleton's pulse) are not waited for.
+ * never rests on. Endless ones (a skeleton's pulse) are not waited for, nor those on an element the page does not draw: a switch that
+ * changes inside a closed <details> (the new item page's "More options") starts a transition the browser never runs, so it never ends.
  */
 export async function settledAnimations(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const ending = document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity);
+    const drawn = (animation: Animation): boolean => {
+      const target = animation.effect instanceof KeyframeEffect ? animation.effect.target : null;
+      return !target || target.checkVisibility();
+    };
+    const ending = document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity && drawn(animation));
     await Promise.all(ending.map((animation) => animation.finished.catch(() => undefined)));
   });
 }
