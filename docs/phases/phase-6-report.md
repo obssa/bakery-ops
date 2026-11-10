@@ -538,7 +538,10 @@ gives them the admin's choice; `ModuleBoundariesTest` lets Analytics read it); t
 Ethiopian time column (`received_at_ethiopian`, `at_ethiopian`). Tests: `screens-clock-logic` (every minute of the day, the boundaries, the
 way back), Pest `EthiopianClockTest`, the clock endpoint in `BrandProfileTest`, the receipt and export cases; captures of System > Time
 (off and with the 12-hour clock), the template picker and the Shifts overview in Amharic, at 1440 and 390.
-Claim restated at `7cc316d` (the merge of `main`, with the fixes to the audit dictionary test and the dashboards' read check); the tag stays on `2f6bbd9`.
+The same pull request makes a table card's scroll box hold its visually hidden header labels: the Templates page scrolled sideways at
+390 px because the Actions column's hidden label was placed by the page (757 px), which any table card with one could do on a phone.
+Claim restated at `a4912c8` (after the merge of `main` and the fixes to the audit dictionary test, the dashboards' read check, that scroll
+box and the Amharic 12-hour label); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
