@@ -318,6 +318,7 @@ Roles carry defaults; the admin can grant or revoke any single permission per us
 | Approve / reject variance | Yes | Yes | No | No | No | No | No | No |
 | Unlock a locked count | Yes | No | No | No | No | No | No | No |
 | Edit items, recipes, prices | Yes | No | No | No | No | No | No | No |
+| Add, rename and switch off dining tables | Yes | Yes | No | No | No | No | No | No |
 | Manage payment channels | Yes | No | No | No | No | No | No | No |
 | Manage users, roles, short codes | Yes | No | No | No | No | No | No | No |
 | View analytics | Yes | Yes | Own shift totals | Own orders | Own station | Own station | Own station | Own station |

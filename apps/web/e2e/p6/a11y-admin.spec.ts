@@ -10,9 +10,11 @@ import { openAs } from "../support/pad";
 
 // Phase 6 gate project p6-a11y, step 6.5 (the coordinator's addition of 2026-11-04; ADR 0023): a light pass over the admin screens of 6.4c
 // and 6.4d, which a11y.spec.ts did not cover: Orders with a card's timeline open, Payments with its Reconciliation, Stock, People, Shifts with
-// its Handover notes, Analytics, the Audit log and System, each in its loaded state, once in English and once in Amharic, as the demo
+// its Handover notes, Analytics, the Audit log, Tables with its "Add several" (the Phase 6 follow-up) and System, each in its loaded state, once in English and once in Amharic, as the demo
 // bakery's admin at the admin's 1440 x 900. The demo bakery is the one with figures to draw: SEED_PHASE=6 leaves orders, payments, shifts,
 // notes and audit rows, and the product photos.
+//
+// phase-6/new-item-page adds the new item page: a product with its units loaded, then an ingredient sent empty, with its errors.
 //
 // A pass reads every screen and fails once, at its end, naming every serious or critical finding on every screen, so one run of the job says
 // all there is to fix. A screen that does not reach its loaded state is a finding too.
@@ -96,11 +98,43 @@ const SCREENS: AdminScreen[] = [
     },
   },
   {
+    // the Phase 6 follow-up: the dining tables, and the drawer of "Add several" (the busiest of its two forms)
+    name: "Tables",
+    path: "admin/tables/",
+    heading: (t) => t.tables.title,
+    loading: (t) => [t.tables.loading],
+    loaded: async (page) => {
+      await expect(page.getByRole("article").first()).toBeVisible(TIMEOUT);
+    },
+    also: async (page, t) => {
+      await page.getByRole("button", { name: t.tables.add_several, exact: true }).click();
+      await expect(page.getByRole("dialog", { name: t.tables.several_title })).toBeVisible(TIMEOUT);
+      return "Add several";
+    },
+  },
+  {
     name: "System",
     path: "admin/system/",
     heading: (t) => t.system.title,
     loaded: async (page) => {
       await expect(page.getByTestId("system-scheduler")).toBeVisible(TIMEOUT);
+    },
+  },
+  {
+    name: "New product",
+    path: "admin/catalog/new/",
+    heading: (t) => t.catalog.new.title_product,
+    loaded: async (page, t) => {
+      await expect(page.getByRole("radiogroup", { name: t.catalog.field_fulfilment })).toBeVisible(TIMEOUT);
+      // exact: the recipe (made to order, the default) has "Unit, line 1" (phase-6/new-item-recipe); its ingredient list loads too
+      await expect(page.getByLabel(t.catalog.field_unit, { exact: true }).getByRole("option")).not.toHaveCount(1, TIMEOUT);
+      await expect(page.getByLabel(t.recipe.field_ingredient.replace("{n}", "1")).getByRole("option")).not.toHaveCount(1, TIMEOUT);
+    },
+    also: async (page, t) => {
+      await page.getByRole("radio", { name: t.catalog.kind_ingredient, exact: true }).check();
+      await page.getByRole("button", { name: t.catalog.new.create_ingredient }).click();
+      await expect(page.getByRole("alert").filter({ hasText: t.catalog.new.check_fields })).toBeVisible(TIMEOUT);
+      return "an ingredient sent empty, with its errors";
     },
   },
 ];
@@ -125,7 +159,7 @@ test.describe("a11y: the admin screens", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   for (const locale of ["en", "am"] as const) {
-    test(`Orders, Payments, Stock, People, Shifts, Analytics, the Audit log and System (${locale}) have no serious or critical axe violation`, async ({ page }) => {
+    test(`Orders, Payments, Stock, People, Shifts, Analytics, the Audit log, System and the new item page (${locale}) have no serious or critical axe violation`, async ({ page }) => {
       test.setTimeout(360_000);
       const t = MESSAGES[locale];
       const { admin, device } = await demoAdmin();

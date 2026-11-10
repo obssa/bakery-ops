@@ -460,6 +460,49 @@ The As built notes list them step by step. The ones that change what the plan's 
 (The marker row is respelled here: the gate greps `docs/` for the marker's literal spelling, so printing it would fail the row.) The SKIP rows are the tests and projects that `gate-p6` proves in CI through its needs and its own `gate:p6` step. The last row stays SKIP
 until the claim.
 
+## After the claim: the add page and Tables
+
+Ramin, 2026-11-09, with screenshots: the "New item" drawer was too cramped to add a product or an ingredient, and there was no place to
+add a dining table. He chose a page of its own for the first and "admin and manager" for the second. Two follow-ups, built side by side:
+
+- **Pull request #125, the new item page** (`/admin/catalog/new/?kind=product|ingredient`): the kind and the fulfilment as choice cards,
+  the names, category and unit in two columns, an optional price saved after the item, "More options" for the SKU and (products only)
+  the refund pair, a sticky footer; categories moved to a "Categories" drawer on the catalog. No API change.
+- **Pull request #124, Admin > Tables**: managers hold `tables.manage` as well as admins (migration
+  `2026_11_14_100000_grant_tables_manage_to_manager`, with `PermissionRegistry::permissionsFor($role, $asOf)` so the October grant
+  migration stays what ran on live), `GET /dining-tables/manage` without the station device check, the Tables screen under Sell with
+  Add, Add several, Edit and Switch off, and the pad's empty grid pointing there.
+
+Both change `apps/`, which the strict gate freezes after `done_commit`. #124's branch was merged into #125's so both reach `main`
+under one restated claim: `phase_status.py claim-done 6` on 2026-11-10 at `b717b75` (the last code commit of the combined branch: the merge, then a test-only fix to the captures' wait for animations),
+after `gate_check.py --mode done --phase 6 --no-tests --no-e2e` passed 20 of 20 checks (the test rows run in `gate-p6` on CI). The tag
+`phase-6-complete` stays on `2f6bbd9`, the first claim, as Phase 5's did after pull request #106.
+
+The combined branch's run 42727928906 (head `643ec12`) passed all 40 jobs; `main` was fast-forwarded to it, and `main`'s run
+42739984891 passed with the strict `gate-p6` green (now `gate_run_url`). Deploy 42749665184: 42 of 42 `@live`, health ok, 107 migrations.
+
+Restated again at `f1778cf` (pull request #128, test-only): two checks that failed by chance (the short-code reset's audit search, the
+gate:p4 window across Addis midnight) were fixed under `apps/api/tests`, which the strict gate also freezes.
+
+**The recipe on the new item page** (Ramin, 2026-11-10: a product such as a chicken sandwich needs its ingredients and how much of each
+while it is added). The page now carries the recipe of a product that is made, with the product page's own lines editor: required
+made to order (without one the product could never be sold), optional made in batches, absent for bought in and ingredients; it is
+saved as version 1 after the item and the price, and a refused recipe opens the product page's drawer on it. Web only: the stock gating
+and the consumption it relies on already exist and stay proven by `SendOrderTest` (shortfall), `ReadyLineTest` (consumption per
+ingredient), `CreateOrderTest` (no recipe) and `MenuEndpointTest` (unavailable when short). Pull request #129 carries #128's two test
+fixes as well (merged into its branch), so one restated claim and one run cover both: claim restated at `bd40cba` (the merge commit, the last that changes `apps/`); the tag stays.
+
+The branch's run 42766291246 (head `4dc43d8`) passed all 40 jobs; `main` was fast-forwarded to it, and `main`'s run 42775801661
+passed with the strict `gate-p6` green (now `gate_run_url`). Deploy 42788256793: 43 of 43 `@live` (the new recipe test among them),
+health ok, 107 migrations.
+
+**The recipe editor's layout** (Ramin, 2026-11-10, a screenshot of the "Recipe and cost" drawer: the ingredient line squeezed six
+controls into one row, the unit cut to "k", every label wrapped, and the same on a phone). The recipe lines and the steps are now laid out by
+the room the form has (a container query), not by the window: a table with its column names once where there is room, a small card per
+line in the drawer and on a phone, a trash icon, a "%" inside the waste, and each control still named by its line for readers and tests.
+The drawer's yield reads "This recipe makes [1] [pcs]", a product with no recipe yet shows a callout saying what that means, and "Set the
+price" under "No price set" closes the drawer onto the price field. Web only. Claim restated at `069b6c0`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the

@@ -2,7 +2,8 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState, type FormEvent } from "react";
+import { CookingPot, Plus, Trash2 } from "lucide-react";
+import { useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useItemPrices, usePublishRecipe, useRecipeCost, useRecipeVersions } from "@/lib/api/catalog";
 import { useItems, useUnits } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
@@ -12,7 +13,9 @@ import { useErrorText } from "@/lib/errors";
 import { authed, can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { formatWhen } from "../production/RequestCard";
-import { Alert, Badge, Button, Field, Panel, Select, Status, TextInput } from "../ui";
+import { focusRing } from "../styles";
+import { Alert, Badge, Button, Field, IconButton, Panel, Select, Status, TextInput } from "../ui";
+import { checkLines, draftKey, linesFrom, RecipeLinesEditor, specLines, type DraftLine } from "./RecipeLinesEditor";
 
 // A product's recipe on its page (Phase 2, step 2.8d; behind "Recipe and cost" since step 6.4b, a drawer from the title row, because the
 // ProductPhoto board draws the page as its details, refunds and photo): the price with the cost and margin of the version being looked at
@@ -34,21 +37,42 @@ function useRecipeAt(id: number, version: number | null) {
   });
 }
 
-/** The recipe of a product, or why it has none (an ingredient, a product bought in). */
-export function RecipePanels({ product }: { product: Item }) {
+/** A recipe as typed (the body of a write) shaped as the publish form reads a version, to start the form from it. */
+function draftAsRecipe(product: Item, spec: RecipeSpec): Recipe {
+  return {
+    id: null,
+    product_item_id: product.id,
+    version: null,
+    is_active: false,
+    published_at: null,
+    published_by: null,
+    change_note: null,
+    yield_qty: spec.yield_qty,
+    yield_unit_id: spec.yield_unit_id,
+    yield_unit_code: null,
+    base_unit_code: "",
+    lines: spec.lines.map((line, index) => ({ id: -1 - index, ingredient_item_id: line.ingredient_item_id, qty: line.qty, unit_id: line.unit_id, unit_code: "", qty_base: line.qty, base_unit_code: "", is_optional: line.is_optional, waste_pct: line.waste_pct })),
+    steps: spec.steps.map((step, index) => ({ id: -1 - index, step_order: index + 1, text_en: step.text_en, text_am: step.text_am })),
+  };
+}
+
+/**
+ * The recipe of a product, or why it has none (an ingredient, a product bought in). `draft`: a recipe the new item page could not save,
+ * which the publish form starts from (phase-6/new-item-recipe); `onPublished` tells the page once a version is saved.
+ */
+export function RecipePanels({ product, draft = null, onPublished, onSetPrice }: { product: Item; draft?: RecipeSpec | null; onPublished?: () => void; onSetPrice?: () => void }) {
   const t = useTranslations("recipe");
   if (product.kind !== "product") return <p className="text-base text-neutral-700">{t("not_a_product")}</p>;
   if (product.fulfilment === "bought_in") return <p className="text-base text-neutral-700">{t("bought_in")}</p>;
-  return <Recipes product={product} />;
+  return <Recipes product={product} draft={draft} onPublished={onPublished} onSetPrice={onSetPrice} />;
 }
 
-function Recipes({ product }: { product: Item }) {
-  const t = useTranslations("recipe");
+function Recipes({ product, draft, onPublished, onSetPrice }: { product: Item; draft: RecipeSpec | null; onPublished?: () => void; onSetPrice?: () => void }) {
   const tc = useTranslations("common");
   const errorText = useErrorText();
   const versions = useRecipeVersions(product.id);
   const [chosen, setChosen] = useState<number | null>(null);
-  const [seed, setSeed] = useState<{ recipe: Recipe; key: string } | null>(null);
+  const [seed, setSeed] = useState<{ recipe: Recipe; key: string } | null>(() => (draft ? { recipe: draftAsRecipe(product, draft), key: "created" } : null));
 
   if (versions.isPending) return <p className="text-base text-neutral-600">{tc("loading")}</p>;
   if (versions.isError) {
@@ -69,8 +93,8 @@ function Recipes({ product }: { product: Item }) {
 
   return (
     <div className="space-y-6">
-      <PriceAndCost product={product} version={viewed} />
-      {rows.length > 0 ? <History rows={rows} viewed={viewed} onView={setChosen} /> : <p className="text-base text-neutral-700">{t("no_recipe")}</p>}
+      <PriceAndCost product={product} version={viewed} onSetPrice={onSetPrice} />
+      {rows.length > 0 ? <History rows={rows} viewed={viewed} onView={setChosen} /> : <NoRecipe product={product} />}
       {viewed !== null ? <VersionView product={product} version={viewed} onStartFrom={(recipe) => setSeed({ recipe, key: `from-${recipe.version}-${Date.now()}` })} /> : null}
       <PublishPanel
         product={product}
@@ -79,6 +103,7 @@ function Recipes({ product }: { product: Item }) {
         onPublished={() => {
           setSeed(null);
           setChosen(null);
+          onPublished?.();
         }}
       />
       {active && viewed !== null ? <ComparePanel product={product} viewed={viewed} versions={rows.map((row) => row.version)} /> : null}
@@ -86,9 +111,25 @@ function Recipes({ product }: { product: Item }) {
   );
 }
 
+/** No version yet: what that means for this product (made to order, it cannot be sold), and that the form below saves the first one. */
+function NoRecipe({ product }: { product: Item }) {
+  const t = useTranslations("recipe");
+  return (
+    <div className="flex gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4">
+      <span aria-hidden="true" className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-brand-700">
+        <CookingPot className="size-5" strokeWidth={1.75} aria-hidden="true" />
+      </span>
+      <div className="min-w-0 space-y-1">
+        <p className="text-base font-semibold text-neutral-900">{t("no_recipe_title")}</p>
+        <p className="text-[15px] text-neutral-700">{product.fulfilment === "to_order" ? t("no_recipe_to_order") : t("no_recipe_to_stock")}</p>
+      </div>
+    </div>
+  );
+}
+
 // --- price, cost and margin -------------------------------------------------------------------------------------
 
-function PriceAndCost({ product, version }: { product: Item; version: number | null }) {
+function PriceAndCost({ product, version, onSetPrice }: { product: Item; version: number | null; onSetPrice?: () => void }) {
   const t = useTranslations("recipe");
   const tc = useTranslations("common");
   const locale = useLocale() as Locale;
@@ -103,7 +144,17 @@ function PriceAndCost({ product, version }: { product: Item; version: number | n
   return (
     <Panel title={t("price_and_cost")}>
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Figure label={t("price")} value={prices.isPending ? tc("loading") : current ? `${current.price} ${current.currency}` : t("no_price")} />
+        <Figure
+          label={t("price")}
+          value={prices.isPending ? tc("loading") : current ? `${current.price} ${current.currency}` : t("no_price")}
+          action={
+            !prices.isPending && !current && onSetPrice && can(me, "catalog.manage") ? (
+              <button type="button" className={`rounded text-[15px] font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800 ${focusRing}`} onClick={onSetPrice}>
+                {t("set_price")}
+              </button>
+            ) : null
+          }
+        />
         {showCosts && version !== null ? (
           cost.isPending ? (
             <Figure label={t("cost_per_unit")} value={tc("loading")} />
@@ -132,12 +183,13 @@ function PriceAndCost({ product, version }: { product: Item; version: number | n
   );
 }
 
-function Figure({ label, value, note }: { label: string; value: string; note?: string }) {
+function Figure({ label, value, note, action }: { label: string; value: string; note?: string; action?: ReactNode }) {
   return (
     <div>
       <dt className="text-sm font-medium text-neutral-600">{label}</dt>
       <dd className="text-xl font-semibold text-neutral-900">{value}</dd>
       {note ? <dd className="text-sm text-neutral-600">{note}</dd> : null}
+      {action ? <dd className="mt-1">{action}</dd> : null}
     </div>
   );
 }
@@ -279,22 +331,11 @@ function VersionView({ product, version, onStartFrom }: { product: Item; version
 
 // --- publish a new version, with the scaled preview ------------------------------------------------------------
 
-interface DraftLine {
-  key: number;
-  ingredient: string;
-  qty: string;
-  unit: string;
-  optional: boolean;
-  waste: string;
-}
-
 interface DraftStep {
   key: number;
   en: string;
   am: string;
 }
-
-let nextKey = 1;
 
 function PublishPanel({ product, activeVersion, seed, onPublished }: { product: Item; activeVersion: number | null; seed: { recipe: Recipe; key: string } | null; onPublished: () => void }) {
   const tc = useTranslations("common");
@@ -305,6 +346,11 @@ function PublishPanel({ product, activeVersion, seed, onPublished }: { product: 
   const base = seed?.recipe ?? (activeVersion !== null ? (active.data ?? null) : null);
   return <PublishForm key={seed?.key ?? `active-${base?.version ?? "none"}`} product={product} base={base} first={activeVersion === null} onPublished={onPublished} />;
 }
+
+// a step: its number with the trash, then the two languages one under the other; with room, one row (number, English, Amharic, trash)
+const STEP_ROW =
+  "grid gap-3 p-3 grid-cols-[minmax(0,1fr)_2.75rem] [grid-template-areas:'no_del'_'en_en'_'am_am'] " +
+  "@2xl:items-center @2xl:grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_2.75rem] @2xl:[grid-template-areas:'no_en_am_del']";
 
 function PublishForm({ product, base, first, onPublished }: { product: Item; base: Recipe | null; first: boolean; onPublished: () => void }) {
   const t = useTranslations("recipe");
@@ -318,37 +364,27 @@ function PublishForm({ product, base, first, onPublished }: { product: Item; bas
 
   const [yieldQty, setYieldQty] = useState(base?.yield_qty ? trimDecimal(base.yield_qty) : "1");
   const [yieldUnit, setYieldUnit] = useState(String(base?.yield_unit_id ?? product.unit_id));
-  const [lines, setLines] = useState<DraftLine[]>(() =>
-    base && base.lines.length > 0
-      ? base.lines.map((line) => ({ key: nextKey++, ingredient: String(line.ingredient_item_id), qty: trimDecimal(line.qty), unit: String(line.unit_id), optional: line.is_optional, waste: trimDecimal(line.waste_pct) }))
-      : [{ key: nextKey++, ingredient: "", qty: "", unit: "", optional: false, waste: "0" }],
-  );
-  const [steps, setSteps] = useState<DraftStep[]>(() => (base?.steps ?? []).map((step) => ({ key: nextKey++, en: step.text_en, am: step.text_am })));
+  const [lines, setLines] = useState<DraftLine[]>(() => linesFrom(base));
+  const [steps, setSteps] = useState<DraftStep[]>(() => (base?.steps ?? []).map((step) => ({ key: draftKey(), en: step.text_en, am: step.text_am })));
   const [note, setNote] = useState("");
   const [previewQty, setPreviewQty] = useState(() => (base?.yield_qty ? trimDecimal(base.yield_qty) : "1"));
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
-
-  function change(key: number, patch: Partial<DraftLine>) {
-    setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
-  }
+  const yieldId = useId();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaved(null);
     if (!isQuantityText(yieldQty) || compareDecimal(yieldQty, "0") <= 0) return setProblem(t("check_yield"));
-    for (const line of lines) {
-      if (!line.ingredient || !line.unit) return setProblem(t("check_lines"));
-      if (!isQuantityText(line.qty) || compareDecimal(line.qty, "0") <= 0) return setProblem(t("check_lines"));
-      if (!isQuantityText(line.waste || "0", 2) || compareDecimal(line.waste || "0", "100", 2) >= 0) return setProblem(t("check_waste"));
-    }
+    const linesProblem = checkLines(lines);
+    if (linesProblem) return setProblem(t(linesProblem));
     const kept = steps.filter((step) => step.en.trim() || step.am.trim());
     if (kept.some((step) => !step.en.trim() || !step.am.trim())) return setProblem(t("check_steps"));
     setProblem(null);
     const body: RecipeSpec = {
       yield_qty: yieldQty.trim(),
       yield_unit_id: Number(yieldUnit),
-      lines: lines.map((line) => ({ ingredient_item_id: Number(line.ingredient), qty: line.qty.trim(), unit_id: Number(line.unit), is_optional: line.optional, waste_pct: (line.waste || "0").trim() })),
+      lines: specLines(lines),
       steps: kept.map((step) => ({ text_en: step.en.trim(), text_am: step.am.trim() })),
       ...(first ? {} : { change_note: note.trim() }),
     };
@@ -376,86 +412,54 @@ function PublishForm({ product, base, first, onPublished }: { product: Item; bas
     <div className="grid items-start gap-6">
       <Panel title={first ? t("first_title") : t("publish_title")}>
         <form onSubmit={onSubmit} className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t("field_yield_qty")}>{(props) => <TextInput {...props} inputMode="decimal" required autoComplete="off" value={yieldQty} onChange={(e) => setYieldQty(e.target.value)} />}</Field>
-            <Field label={t("field_yield_unit")}>
-              {(props) => (
-                <Select {...props} value={yieldUnit} onChange={(e) => setYieldUnit(e.target.value)}>
+          {/* the yield as one sentence, "This recipe makes [1] [pcs]": the quantities below are for that much */}
+          <div role="group" aria-labelledby={yieldId} aria-describedby={`${yieldId}-hint`} className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span id={yieldId} className="text-base font-semibold text-neutral-900">
+                {t("yield_makes")}
+              </span>
+              <div className="flex items-center gap-2">
+                <TextInput controlSize="md" aria-label={t("field_yield_qty")} inputMode="decimal" required autoComplete="off" className="w-24 tabular-nums" value={yieldQty} onChange={(e) => setYieldQty(e.target.value)} />
+                <Select controlSize="md" aria-label={t("field_yield_unit")} className="w-28" value={yieldUnit} onChange={(e) => setYieldUnit(e.target.value)}>
                   {unitOptions}
                 </Select>
-              )}
-            </Field>
+              </div>
+            </div>
+            <p id={`${yieldId}-hint`} className="text-sm text-neutral-600">
+              {t("yield_hint")}
+            </p>
           </div>
 
-          <fieldset className="space-y-4">
-            <legend className="mb-2 text-base font-semibold text-neutral-900">{t("lines")}</legend>
-            {lines.map((line, index) => {
-              const n = index + 1;
-              return (
-                <div key={line.key} className="grid items-end gap-3 rounded-md border border-neutral-200 p-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
-                  <Field label={t("field_ingredient", { n })}>
-                    {(props) => (
-                      <Select
-                        {...props}
-                        value={line.ingredient}
-                        onChange={(e) => {
-                          const picked = (items.data ?? []).find((row) => String(row.id) === e.target.value);
-                          change(line.key, { ingredient: e.target.value, unit: picked ? String(picked.unit_id) : line.unit });
-                        }}
-                      >
-                        <option value="" disabled>
-                          {items.isPending ? tc("loading") : t("choose_ingredient")}
-                        </option>
-                        {(items.data ?? []).map((row) => (
-                          <option key={row.id} value={row.id}>
-                            {pick(locale, row)}
-                          </option>
-                        ))}
-                      </Select>
-                    )}
-                  </Field>
-                  <Field label={t("field_qty", { n })}>{(props) => <TextInput {...props} inputMode="decimal" autoComplete="off" value={line.qty} onChange={(e) => change(line.key, { qty: e.target.value })} />}</Field>
-                  <Field label={t("field_unit", { n })}>
-                    {(props) => (
-                      <Select {...props} value={line.unit} onChange={(e) => change(line.key, { unit: e.target.value })}>
-                        <option value="" disabled>
-                          {t("choose_unit")}
-                        </option>
-                        {unitOptions}
-                      </Select>
-                    )}
-                  </Field>
-                  <Field label={t("field_waste", { n })}>{(props) => <TextInput {...props} inputMode="decimal" autoComplete="off" value={line.waste} onChange={(e) => change(line.key, { waste: e.target.value })} />}</Field>
-                  <label className="flex min-h-12 items-center gap-2 text-base text-neutral-800">
-                    <input type="checkbox" className="size-5" aria-label={t("field_optional", { n })} checked={line.optional} onChange={(e) => change(line.key, { optional: e.target.checked })} />
-                    {t("optional")}
-                  </label>
-                  <Button type="button" variant="secondary" aria-label={t("remove_line", { n })} disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))}>
-                    {t("remove")}
-                  </Button>
-                </div>
-              );
-            })}
-            <Button type="button" variant="secondary" onClick={() => setLines((current) => [...current, { key: nextKey++, ingredient: "", qty: "", unit: "", optional: false, waste: "0" }])}>
-              {t("add_line")}
-            </Button>
-          </fieldset>
+          <RecipeLinesEditor lines={lines} onLines={setLines} legend={t("lines")} />
 
-          <fieldset className="space-y-4">
+          <fieldset className="min-w-0 space-y-3">
             <legend className="mb-2 text-base font-semibold text-neutral-900">{t("steps")}</legend>
-            {steps.map((step, index) => {
-              const n = index + 1;
-              return (
-                <div key={step.key} className="grid items-end gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                  <Field label={t("field_step_en", { n })}>{(props) => <TextInput {...props} lang="en" value={step.en} onChange={(e) => setSteps((current) => current.map((row) => (row.key === step.key ? { ...row, en: e.target.value } : row)))} />}</Field>
-                  <Field label={t("field_step_am", { n })}>{(props) => <TextInput {...props} lang="am" value={step.am} onChange={(e) => setSteps((current) => current.map((row) => (row.key === step.key ? { ...row, am: e.target.value } : row)))} />}</Field>
-                  <Button type="button" variant="secondary" aria-label={t("remove_step", { n })} onClick={() => setSteps((current) => current.filter((row) => row.key !== step.key))}>
-                    {t("remove")}
-                  </Button>
-                </div>
-              );
-            })}
-            <Button type="button" variant="secondary" onClick={() => setSteps((current) => [...current, { key: nextKey++, en: "", am: "" }])}>
+            {steps.length > 0 ? (
+              <div className="@container">
+                <ol className="divide-y divide-neutral-200 rounded-xl border border-neutral-200">
+                  {steps.map((step, index) => {
+                    const n = index + 1;
+                    return (
+                      <li key={step.key} className={STEP_ROW}>
+                        <span aria-hidden="true" className="self-center text-[13px] font-semibold text-neutral-700 [grid-area:no] @2xl:text-center @2xl:text-[15px] @2xl:text-neutral-500">
+                          <span className="@2xl:hidden">{t("step_n", { n })}</span>
+                          <span className="hidden @2xl:inline">{n}</span>
+                        </span>
+                        <TextInput controlSize="md" aria-label={t("field_step_en", { n })} placeholder={t("step_en_placeholder")} lang="en" className="[grid-area:en]" value={step.en} onChange={(e) => setSteps((current) => current.map((row) => (row.key === step.key ? { ...row, en: e.target.value } : row)))} />
+                        <TextInput controlSize="md" aria-label={t("field_step_am", { n })} placeholder={t("step_am_placeholder")} lang="am" className="[grid-area:am]" value={step.am} onChange={(e) => setSteps((current) => current.map((row) => (row.key === step.key ? { ...row, am: e.target.value } : row)))} />
+                        <IconButton label={t("remove_step", { n })} size="md" className="group [grid-area:del]" onClick={() => setSteps((current) => current.filter((row) => row.key !== step.key))}>
+                          <Trash2 className="size-[18px] text-neutral-500 group-hover:text-red-700" strokeWidth={1.75} aria-hidden="true" />
+                        </IconButton>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            ) : (
+              <p className="text-[15px] text-neutral-600">{t("steps_none")}</p>
+            )}
+            <Button type="button" variant="secondary" size="md" onClick={() => setSteps((current) => [...current, { key: draftKey(), en: "", am: "" }])}>
+              <Plus className="size-[18px]" strokeWidth={2} aria-hidden="true" />
               {t("add_step")}
             </Button>
           </fieldset>
@@ -469,7 +473,7 @@ function PublishForm({ product, base, first, onPublished }: { product: Item; bas
           {problem ? <Alert>{problem}</Alert> : null}
           {publish.isError ? <Alert>{errorText.message(publish.error)}</Alert> : null}
           <Status>{saved}</Status>
-          <Button type="submit" disabled={publish.isPending}>
+          <Button type="submit" size="md" disabled={publish.isPending}>
             {publish.isPending ? tc("saving") : first ? t("save_first") : t("publish")}
           </Button>
         </form>

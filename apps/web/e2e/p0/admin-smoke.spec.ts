@@ -27,6 +27,15 @@ import { deviceOf, placeDevice } from "../support/devices";
 // - the catalog lists one kind at a time, products by default (was both, with an "All" link and a Kind column): the ingredient is looked
 //   for under "Ingredients", the product under "Products", and a row reads its fulfilment, not its kind;
 // - the new item form and the categories are in the drawer that "Add product" opens (was a column beside the list).
+//
+// phase-6/new-item-page moved them again, with the same names:
+// - "Add product" opens a page of its own, the form "New product" ("New ingredient" once Ingredient is chosen), was the drawer's region
+//   "New item": the form is found by its name;
+// - Kind and Fulfilment are radio groups of choice cards (were selects): a radio is checked by its name;
+// - the SKU sits under "More options", folded: it is opened first;
+// - "Create item" is "Create product" or "Create ingredient", and a create opens the item's own page, whose status line says
+//   "Created ..." (was the form's status): the list is reached again through the breadcrumb's "Catalog";
+// - the categories are in the drawer "Categories" of the catalog's title row (were under the drawer's form).
 
 const live = !!process.env.PLAYWRIGHT_BASE_URL;
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || process.env.PLAYWRIGHT_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
@@ -116,36 +125,52 @@ test.describe("p0 admin smoke", () => {
     await expect(page).toHaveURL(/\/app\/en\/admin\/catalog\/$/);
     await expect(page.getByRole("heading", { level: 1, name: "Catalog" })).toBeVisible();
 
-    // the drawer of "Add product": a category of the ingredient kind, then the ingredient in it
-    await page.getByRole("button", { name: "Add product" }).click();
-    const drawer = page.getByRole("dialog", { name: "New item" });
+    // the drawer "Categories": a category of the ingredient kind
+    await page.getByRole("button", { name: "Categories", exact: true }).click();
+    const drawer = page.getByRole("dialog", { name: "Categories" });
     const categories = drawer.getByRole("region", { name: "Categories" });
     await categories.getByLabel("Kind").selectOption("ingredient");
     await categories.getByLabel("Name (English)").fill(category.en);
     await categories.getByLabel("Name (Amharic)").fill(category.am);
     await categories.getByRole("button", { name: "Add category" }).click();
     await expect(categories.getByRole("listitem").filter({ hasText: category.en })).toBeVisible();
+    await drawer.getByRole("button", { name: "Close" }).click();
+    await expect(drawer).toHaveCount(0);
 
-    const form = drawer.getByRole("region", { name: "New item" });
-    await form.getByLabel("Kind").selectOption("ingredient");
+    // "Add product" opens the new item page: the ingredient in that category
+    const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
+    const form = page.getByRole("form", { name: /^New (product|ingredient)$/ });
+    await page.getByRole("button", { name: "Add product" }).click();
+    await expect(page).toHaveURL(/\/app\/en\/admin\/catalog\/new\/\?kind=product$/);
+    await form.getByRole("radio", { name: "Ingredient", exact: true }).check();
+    await expect(page.getByRole("heading", { level: 1, name: "New ingredient" })).toBeVisible();
     await expect(form.getByLabel("Fulfilment")).toHaveCount(0);
+    // an ingredient is never sold: no refund section at all
+    await expect(form.getByRole("checkbox", { name: "Refundable" })).toHaveCount(0);
     await form.getByLabel("Name (English)").fill(flour.en);
     await form.getByLabel("Name (Amharic)").fill(flour.am);
     await form.getByLabel("Category").selectOption({ label: category.en });
     await form.getByLabel("Unit").selectOption({ label: "Kilogram (kg)" });
+    await form.getByText("More options", { exact: true }).click();
     await form.getByLabel("SKU").fill(`E2E-F-${run}`);
-    await form.getByRole("button", { name: "Create item" }).click();
-    await expect(form.getByRole("status")).toContainText(flour.en);
+    await form.getByRole("button", { name: "Create ingredient" }).click();
+    await expect(page).toHaveURL(/[?&]item=\d+/, { timeout: 30_000 });
+    await expect(page.getByRole("status").filter({ hasText: `Created “${flour.en}”.` })).toBeVisible({ timeout: 30_000 });
 
-    await form.getByLabel("Kind").selectOption("product");
-    await form.getByLabel("Fulfilment").selectOption("to_stock");
+    // and the product, made in batches
+    await breadcrumb.getByRole("link", { name: "Catalog" }).click();
+    await page.getByRole("button", { name: "Add product" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "New product" })).toBeVisible({ timeout: 30_000 });
+    await form.getByRole("radio", { name: "Made in batches", exact: true }).check();
     await form.getByLabel("Name (English)").fill(bread.en);
     await form.getByLabel("Name (Amharic)").fill(bread.am);
-    await form.getByLabel("Unit").selectOption({ label: "Piece (pcs)" });
-    await form.getByRole("button", { name: "Create item" }).click();
-    await expect(form.getByRole("status")).toContainText(bread.en);
-    await drawer.getByRole("button", { name: "Close" }).click();
-    await expect(drawer).toHaveCount(0);
+    // exact: a product that is made shows its recipe, whose lines have "Unit, line 1" (phase-6/new-item-recipe); made in batches, the
+    // recipe is optional and left empty here
+    await form.getByLabel("Unit", { exact: true }).selectOption({ label: "Piece (pcs)" });
+    await form.getByRole("button", { name: "Create product" }).click();
+    await expect(page.getByRole("status").filter({ hasText: `Created “${bread.en}”.` })).toBeVisible({ timeout: 30_000 });
+    await breadcrumb.getByRole("link", { name: "Catalog" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Catalog" })).toBeVisible();
 
     // the products, the default: the product with how it is made, not the ingredient
     const items = page.getByRole("table", { name: "Items" });

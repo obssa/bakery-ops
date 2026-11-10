@@ -66,6 +66,19 @@ export function useSaveProduct(id: number) {
   });
 }
 
+/**
+ * The first price of a product just created on the new item page: POST /items/{item}/prices, the call "Save changes" makes, for an id the
+ * page learns only from the create's answer. Its own Idempotency-Key, so a retry replays and the item is never created twice.
+ */
+export function useAddPrice() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, price, idempotencyKey }: { id: number; price: string; idempotencyKey: string }) =>
+      authed<ItemPrice>(`/items/${id}/prices`, { method: "POST", body: { price }, idempotencyKey }),
+    onSettled: (_answer, _error, { id }) => refreshProduct(client, id),
+  });
+}
+
 /** "Take off the menu" and "Put back on the menu": PATCH /items/{item} with is_active (step 6.4b). */
 export function useSetOnMenu(id: number) {
   const client = useQueryClient();
@@ -168,6 +181,19 @@ export function usePublishRecipe(id: number) {
       first ? authed<Recipe>(`/items/${id}/recipe`, { method: "PUT", body, idempotencyKey }) : authed<Recipe>(`/items/${id}/recipe/versions`, { method: "POST", body, idempotencyKey }),
     // a refusal (a publish that lost a race) is read again too: the history on screen may be out of date
     onSettled: () => {
+      void client.invalidateQueries({ queryKey: ["recipe-versions", id] });
+      void client.invalidateQueries({ queryKey: ["recipe-version", id] });
+      void client.invalidateQueries({ queryKey: ["recipe-cost", id] });
+    },
+  });
+}
+
+/** The first version of a product's recipe, for a product the page has just created (the new item page knows its id only then). */
+export function usePutRecipe() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body, idempotencyKey }: Write<RecipeSpec> & { id: number }) => authed<Recipe>(`/items/${id}/recipe`, { method: "PUT", body, idempotencyKey }),
+    onSettled: (_recipe, _error, { id }) => {
       void client.invalidateQueries({ queryKey: ["recipe-versions", id] });
       void client.invalidateQueries({ queryKey: ["recipe-version", id] });
       void client.invalidateQueries({ queryKey: ["recipe-cost", id] });

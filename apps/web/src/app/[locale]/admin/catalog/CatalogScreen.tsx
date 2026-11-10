@@ -1,29 +1,27 @@
 "use client";
 
-import { ChevronRight, LayoutGrid, List, Plus, Search, X } from "lucide-react";
+import { ChevronRight, Tags, LayoutGrid, List, Plus, Search, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useId, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useMemo, useState, type FormEvent } from "react";
 import { ICON_STROKE } from "@/components/icons";
 import { ProductCard, type ProductCardItem } from "@/components/pad/ProductCard";
 import { focusRing } from "@/components/styles";
 import { Alert, Button, Chip, Drawer, EmptyState, Field, IconButton, PageHeader, ProductImage, Select, Skeleton, Status, TextInput } from "@/components/ui";
 import { ItemPage } from "@/components/catalog/ItemPage";
-import { RefundToggles } from "@/components/catalog/RefundSettings";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useItemPrices, useStations } from "@/lib/api/catalog";
-import { useCategories, useCreateCategory, useCreateItem, useItems, useUnits } from "@/lib/api/hooks";
+import { useCategories, useCreateCategory, useItems } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
-import { FULFILMENTS, type Category, type Fulfilment, type Item, type ItemKind, type Locale, type NewCategory, type NewItem } from "@/lib/api/types";
+import type { Category, Item, ItemKind, Locale, NewCategory } from "@/lib/api/types";
 import { groupDigits } from "@/lib/analytics";
 import { useErrorText } from "@/lib/errors";
-import { refundSettingsBody } from "@/lib/refund";
 import { can, useSession } from "@/lib/session";
 import { useSeen } from "@/lib/useSeen";
 
 // Admin > Catalog (Phase 0 step 0.7; step 6.4a, fresh-counter.md 4.3 and the CatalogList board): both inventories, one at a time.
 //   - The title row: "Catalog" with its Amharic twin, a line that counts the products and those still without a photo, and "Add product"
-//     ("Add ingredient" in the ingredients) for the admin (catalog.manage).
+//     ("Add ingredient" in the ingredients) for the admin (catalog.manage), beside "Categories".
 //   - The toolbar: Products or Ingredients (a two-segment navigation of links, ?kind=, products by default), the search (either name, in
 //     the browser), the category filter and, for products, the table or pad-card view (?view=grid).
 //   - The table: a product's 64 × 48 photo (the thumb rendition, or its category's placeholder) and "Add photo" when it has none (it opens
@@ -31,7 +29,8 @@ import { useSeen } from "@/lib/useSeen";
 //     from (the stations its lines go to, or the display case for one sold from stock) over how it is made, the current price, the status
 //     (New, On the menu, Hidden) and the chevron that opens the product's page. An ingredient: its name, category, unit, SKU and status.
 //   - The grid: the products on the menu as the waiter sees them, 6.3a's ProductCard in preview mode, each one a link to its page.
-//   - "Add product" opens the new item form and the categories in a drawer (a dialog from the right): they no longer sit beside the list.
+//   - "Add product" opens the new item page (admin/catalog/new, phase-6/new-item-page; it was a drawer of step 6.4a), and "Categories"
+//     opens the categories of both kinds in a drawer, as they were under the drawer's form.
 // The price is the product's current one (GET /items/{item}/prices, the product page's own read), asked only for the rows in view
 // (lib/useSeen.ts): the list has no price, and a branch may hold thousands of items. Names are always entered in both languages (rule 9).
 // One product's page (recipe versions, cost and margin, refund settings, photo) is the same route with ?item=<id>: a static export has no
@@ -82,7 +81,8 @@ function CatalogList({ titleAm, kind, view }: { titleAm?: string; kind: ItemKind
   const categories = useCategories();
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [adding, setAdding] = useState(false);
+  const router = useRouter();
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const shownView: View = kind === "product" ? view : "table";
 
   const ofKind = useMemo(() => (categories.data ?? []).filter((c) => c.kind === kind), [categories.data, kind]);
@@ -117,10 +117,17 @@ function CatalogList({ titleAm, kind, view }: { titleAm?: string; kind: ItemKind
         twin={titleAm ? { text: titleAm, lang: "am" } : undefined}
         actions={
           manage ? (
-            <Button size="md" onClick={() => setAdding(true)}>
-              <Plus className="size-[18px]" strokeWidth={2.2} aria-hidden="true" />
-              {kind === "product" ? t("add_product") : t("add_ingredient")}
-            </Button>
+            <>
+              <Button variant="secondary" size="md" onClick={() => setCategoriesOpen(true)}>
+                <Tags className="size-[18px]" strokeWidth={2} aria-hidden="true" />
+                {t("categories")}
+              </Button>
+              {/* a button (as it was), going to the page: the specs and screen readers keep the role they have always had */}
+              <Button size="md" onClick={() => router.push({ pathname: "/admin/catalog/new", query: { kind } })}>
+                <Plus className="size-[18px]" strokeWidth={2.2} aria-hidden="true" />
+                {kind === "product" ? t("add_product") : t("add_ingredient")}
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -181,7 +188,11 @@ function CatalogList({ titleAm, kind, view }: { titleAm?: string; kind: ItemKind
         )}
       </div>
 
-      {adding ? <NewItemDrawer kind={kind} onClose={() => setAdding(false)} /> : null}
+      {categoriesOpen ? (
+        <Drawer label={t("categories")} onClose={() => setCategoriesOpen(false)}>
+          <CategoriesSection onClose={() => setCategoriesOpen(false)} />
+        </Drawer>
+      ) : null}
     </>
   );
 }
@@ -579,186 +590,10 @@ function ProductGrid({
   );
 }
 
-// --- the drawer: a new item and the categories ----------------------------------------------------------------------------------------------
+// --- the drawer: the categories --------------------------------------------------------------------------------------------------------------
 
-function NewItemDrawer({ kind, onClose }: { kind: ItemKind; onClose: () => void }) {
-  const t = useTranslations("catalog");
-  const headingId = useId();
-  return (
-    <Drawer label={t("new_item")} onClose={onClose}>
-      <section aria-labelledby={headingId} className="space-y-5">
-        <div className="flex items-center justify-between gap-3">
-          <h2 id={headingId} className="text-xl font-semibold text-neutral-900">
-            {t("new_item")}
-          </h2>
-          <IconButton label={t("close")} size="md" onClick={onClose}>
-            <X className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
-          </IconButton>
-        </div>
-        <NewItemForm initialKind={kind} />
-      </section>
-      <CategoriesSection />
-    </Drawer>
-  );
-}
-
-function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
-  const t = useTranslations("catalog");
-  const tc = useTranslations("common");
-  const locale = useLocale() as Locale;
-  const errorText = useErrorText();
-  const units = useUnits();
-  const categories = useCategories();
-  const create = useCreateItem();
-  const idempotency = useIdempotencyKey();
-
-  const [kind, setKind] = useState<ItemKind>(initialKind);
-  const [fulfilment, setFulfilment] = useState<Fulfilment>("to_order");
-  const [nameEn, setNameEn] = useState("");
-  const [nameAm, setNameAm] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [unitId, setUnitId] = useState("");
-  const [sku, setSku] = useState("");
-  // the refund settings (step 4.5g): untouched, the API gives the natural values (a product refundable, back into stock when it can)
-  const [refundable, setRefundable] = useState<boolean | null>(null);
-  const [restock, setRestock] = useState<boolean | null>(null);
-  const [created, setCreated] = useState<string | null>(null);
-  const settingsFulfilment: Fulfilment = kind === "product" ? fulfilment : "bought_in";
-
-  const ofKind: Category[] = (categories.data ?? []).filter((c) => c.kind === kind);
-
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const body: NewItem = {
-      kind,
-      ...(kind === "product" ? { fulfilment } : {}),
-      name_en: nameEn.trim(),
-      name_am: nameAm.trim(),
-      category_id: categoryId ? Number(categoryId) : null,
-      unit_id: Number(unitId),
-      sku: sku.trim() || null,
-      ...(refundable !== null || restock !== null ? refundSettingsBody(kind, settingsFulfilment, refundable ?? kind === "product", restock ?? true) : {}),
-    };
-    setCreated(null);
-    create.mutate(
-      { body, idempotencyKey: idempotency.keyFor(body) },
-      {
-        onSuccess: (item) => {
-          idempotency.done();
-          setCreated(named(locale, item).primary);
-          setNameEn("");
-          setNameAm("");
-          setSku("");
-        },
-      },
-    );
-  }
-
-  const fieldError = (field: string) => errorText.field(create.error, field);
-
-  return (
-    <form onSubmit={onSubmit} aria-label={t("new_item")} className="space-y-4">
-      <Field label={t("field_kind")}>
-        {(props) => (
-          <Select
-            {...props}
-            controlSize="md"
-            value={kind}
-            onChange={(e) => {
-              setKind(e.target.value as ItemKind);
-              setCategoryId("");
-            }}
-          >
-            {KINDS.map((k) => (
-              <option key={k} value={k}>
-                {t(`kind_${k}`)}
-              </option>
-            ))}
-          </Select>
-        )}
-      </Field>
-      {kind === "product" ? (
-        <Field label={t("field_fulfilment")} error={fieldError("fulfilment")}>
-          {(props) => (
-            <Select {...props} controlSize="md" value={fulfilment} onChange={(e) => setFulfilment(e.target.value as Fulfilment)}>
-              {FULFILMENTS.map((f) => (
-                <option key={f} value={f}>
-                  {t(`fulfilment_${f}`)}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-      ) : null}
-      <Field label={t("field_name_en")} error={fieldError("name_en")}>
-        {(props) => <TextInput {...props} controlSize="md" lang="en" required maxLength={160} value={nameEn} onChange={(e) => setNameEn(e.target.value)} />}
-      </Field>
-      <Field label={t("field_name_am")} error={fieldError("name_am")}>
-        {(props) => <TextInput {...props} controlSize="md" lang="am" required maxLength={160} value={nameAm} onChange={(e) => setNameAm(e.target.value)} />}
-      </Field>
-      <Field label={t("field_category")} optionalLabel={t("optional")} error={fieldError("category_id")}>
-        {(props) => (
-          <Select {...props} controlSize="md" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">{t("no_category")}</option>
-            {ofKind.map((c) => (
-              <option key={c.id} value={c.id}>
-                {named(locale, c).primary}
-              </option>
-            ))}
-          </Select>
-        )}
-      </Field>
-      <Field label={t("field_unit")} error={fieldError("unit_id")}>
-        {(props) => (
-          <Select {...props} controlSize="md" required value={unitId} onChange={(e) => setUnitId(e.target.value)}>
-            <option value="" disabled>
-              {units.isPending ? tc("loading") : t("choose_unit")}
-            </option>
-            {(units.data ?? []).map((u) => (
-              <option key={u.id} value={u.id}>
-                {`${named(locale, u).primary} (${u.code})`}
-              </option>
-            ))}
-          </Select>
-        )}
-      </Field>
-      <Field label={t("field_sku")} optionalLabel={t("optional")} error={fieldError("sku")}>
-        {(props) => <TextInput {...props} controlSize="md" maxLength={64} autoComplete="off" value={sku} onChange={(e) => setSku(e.target.value)} />}
-      </Field>
-      <RefundToggles
-        kind={kind}
-        fulfilment={settingsFulfilment}
-        refundable={refundable ?? kind === "product"}
-        restock={restock ?? true}
-        onRefundable={setRefundable}
-        onRestock={setRestock}
-      />
-      {create.isError ? <Alert>{errorText.message(create.error)}</Alert> : null}
-      <Status>{created ? t("item_created", { name: created }) : null}</Status>
-      <Button type="submit" size="md" disabled={create.isPending}>
-        {create.isPending ? tc("saving") : t("create_item")}
-      </Button>
-    </form>
-  );
-}
-
-function DrawerSection({ title, intro, children }: { title: string; intro?: string; children: ReactNode }) {
-  const id = useId();
-  return (
-    <section aria-labelledby={id} className="space-y-4 border-t border-neutral-200 pt-5">
-      <div className="space-y-1">
-        <h2 id={id} className="text-[17px] font-semibold text-neutral-900">
-          {title}
-        </h2>
-        {intro ? <p className="text-[13px] text-neutral-600">{intro}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/** The categories of both kinds, and a new one: what the item form's Category list offers. */
-function CategoriesSection() {
+/** The categories of both kinds, and a new one: what the new item page's Category list offers. */
+function CategoriesSection({ onClose }: { onClose: () => void }) {
   const t = useTranslations("catalog");
   const tc = useTranslations("common");
   const locale = useLocale() as Locale;
@@ -771,6 +606,7 @@ function CategoriesSection() {
   const [nameEn, setNameEn] = useState("");
   const [nameAm, setNameAm] = useState("");
   const [created, setCreated] = useState<string | null>(null);
+  const headingId = useId();
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -790,7 +626,18 @@ function CategoriesSection() {
   }
 
   return (
-    <DrawerSection title={t("categories")} intro={t("categories_intro")}>
+    <section aria-labelledby={headingId} className="space-y-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h2 id={headingId} className="text-xl font-semibold text-neutral-900">
+            {t("categories")}
+          </h2>
+          <p className="text-[13px] text-neutral-600">{t("categories_intro")}</p>
+        </div>
+        <IconButton label={t("close")} size="md" onClick={onClose}>
+          <X className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </IconButton>
+      </div>
       {categories.isPending ? (
         <p className="text-base text-neutral-600">{tc("loading")}</p>
       ) : categories.isError ? (
@@ -839,6 +686,6 @@ function CategoriesSection() {
           {create.isPending ? tc("saving") : t("add_category")}
         </Button>
       </form>
-    </DrawerSection>
+    </section>
   );
 }

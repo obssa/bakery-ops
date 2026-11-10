@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\Route;
  * for the station actions accept, ready and reject, checked again at the line's own station by the controller;
  * orders.void_request (admin, manager, cashier) to ask for a void, which a manager's or the admin's PIN approves;
  * orders.create to read the menu, the order list, one order and the dining tables, orders.accept to read a station's rail
- * (checked again at that station by the controller), tables.manage (admin) to add and change them; every
+ * (checked again at that station by the controller), tables.manage (admin and manager) to list them all on Admin > Tables (GET
+ * /dining-tables/manage, a back-office read without the device middleware) and to add and change them; every
  * write also carries idempotency (rule 7). {order} and {line} bind through the BranchScoped models, so another
  * branch's order or line is 404. Every route is listed in tests/Support/route_permissions.php and every write in
  * tests/Support/write_endpoints.php.
@@ -38,6 +39,7 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
     });
     Route::get('/stations/{station}/tickets', StationTicketsController::class)->middleware('permission:orders.accept')->whereNumber('station')->middleware('device')->name('orders.station.tickets');
     Route::get('/dining-tables', [DiningTablesController::class, 'index'])->middleware('permission:orders.create')->middleware('device')->name('orders.tables.index');
+    Route::get('/dining-tables/manage', [DiningTablesController::class, 'manage'])->middleware('permission:tables.manage')->name('orders.tables.manage');
     Route::middleware(['permission:tables.manage', 'idempotency'])->group(function (): void {
         Route::post('/dining-tables', [DiningTablesController::class, 'store'])->name('orders.tables.store');
         Route::patch('/dining-tables/{table}', [DiningTablesController::class, 'update'])->whereNumber('table')->name('orders.tables.update');

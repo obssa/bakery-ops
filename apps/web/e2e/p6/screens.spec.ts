@@ -4,12 +4,12 @@ import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
 import en from "../../messages/en.json";
-import { fontsReady, settledAnimations } from "../support/a11y";
+import { expectAccessible, fontsReady, settledAnimations } from "../support/a11y";
 import { uuid, type Api } from "../support/api";
 import { demoPerson, demoProduction } from "../support/demoProduction";
 import { freshDevice } from "../support/devices";
 import { live } from "../support/env";
-import { loginOnce } from "../support/fixture";
+import { loginOnce, unitLookup } from "../support/fixture";
 import { openAs, typeCode } from "../support/pad";
 import { dropFile, FIXTURE_PHOTO } from "../support/productPhoto";
 import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCounts, settleStation } from "../support/shifts";
@@ -48,6 +48,19 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 // open, and each with the panel open, at 1180 x 820 and at 390 x 844; the kitchen display at night with the strip, a refusal and the panel; the
 // production board with the strip. It settles shifts, so it runs last, and it puts them back. The one thing it asserts about a picture: at the
 // phone's width the page does not scroll sideways, on the demo bakery's real names and order cards, which are longer than the fixtures'.
+//
+// phase-6/new-item-page: the new item page (no board; ProductPhoto.dc.html's cards and fresh-counter.md 4.3) at 1440 x 900 and 390 x 844, in
+// English and in Amharic: a product filled in, an ingredient, and a product sent with its errors; at 1440 x 900 in English, the whole
+// product page with "More options" open, the "New category" dialog, and the catalog's "Categories" drawer. Nothing is created: the captures
+// stop before "Create", except the one sent empty, which the page refuses itself. At the phone's width the page must not scroll sideways.
+//
+// phase-6/admin-tables (the Phase 6 follow-up, the describe after it): Admin > Tables as the demo bakery's admin, at 1440 x 900 and at
+// 390 x 844, in English and in Amharic: the grid of the demo tables with their states, a table's Edit drawer, "Add table" refused on a code
+// that is taken (nothing is written) and "Add several". At the phone's width the page must not scroll sideways.
+//
+// phase-6/recipe-editor-layout (in the product page's describe): the "Recipe and cost" drawer at 1440 x 900 and at 390 x 844, in English and
+// in Amharic: a product made to order with no recipe yet (created for the capture, switched off after) with two lines typed, and a demo
+// product's form for its next version. At the phone's width neither the page nor the drawer scrolls sideways.
 
 const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
@@ -473,6 +486,7 @@ test.describe("screens", () => {
 
 const DESKTOP = { width: 1440, height: 900 };
 const PORTRAIT = { width: 820, height: 1180 };
+const PHONE = { width: 390, height: 844 };
 
 /** An admin page of the demo bakery as its admin sees it, on the captures' tablet, once its h1 shows. */
 async function openAdmin(page: Page, path: string, heading: string): Promise<void> {
@@ -513,10 +527,11 @@ test.describe("screens: admin", () => {
     await expect(grid.getByRole("listitem").first()).toContainText(/ETB/, { timeout: 30_000 });
     await capture(page, "catalog-grid-1440x900-en");
 
-    // the drawer "Add product" opens: the new item form and the categories
-    await page.getByRole("button", { name: t.catalog.add_product }).click();
-    await expect(page.getByRole("dialog", { name: t.catalog.new_item })).toBeVisible();
-    await capture(page, "catalog-new-item-1440x900-en");
+    // the drawer "Categories" opens (phase-6/new-item-page: "Add product" opens a page, captured in "screens: the new item page")
+    await page.getByRole("button", { name: t.catalog.categories, exact: true }).click();
+    const drawer = page.getByRole("dialog", { name: t.catalog.categories });
+    await expect(drawer.getByRole("listitem").first()).toBeVisible({ timeout: 30_000 });
+    await capture(page, "catalog-categories-1440x900-en");
   });
 
   test("the Orders board in the admin frame, in en", async ({ page }) => {
@@ -537,6 +552,110 @@ test.describe("screens: admin", () => {
     await expect(page.getByRole("dialog", { name: t.admin.sections })).toBeVisible();
     await capture(page, "admin-drawer-820x1180-en");
   });
+});
+
+// --- phase-6/new-item-page: adding a product or an ingredient is a page of its own --------------------------------------------------------
+
+test.describe("screens: the new item page", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  /** The page as it stands at 1440 x 900 and at 390 x 844; `focusFirstError` brings the first field in error back into view at each size. */
+  async function sizes(page: Page, name: string, locale: keyof typeof MESSAGES, focusFirstError = false): Promise<void> {
+    for (const [size, viewport] of [["1440x900", DESKTOP], ["390x844", PHONE]] as const) {
+      await page.setViewportSize(viewport);
+      if (focusFirstError) await page.locator('form [aria-invalid="true"]').first().focus();
+      else await page.evaluate(() => window.scrollTo(0, 0));
+      await capture(page, `${name}-${size}-${locale}`);
+      if (size === "390x844") {
+        const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+        expect(scroll, `${name} at 390 x 844 scrolls sideways`).toBeLessThanOrEqual(client);
+      }
+    }
+    await page.setViewportSize(DESKTOP);
+  }
+
+  /** Chooses the unit whose code is `code` in the form's Unit list, once the units have loaded (exact: a recipe line has "Unit, line 1"). */
+  async function chooseUnit(form: Locator, label: string, code: string): Promise<void> {
+    const unit = form.getByLabel(label, { exact: true });
+    const option = unit.getByRole("option", { name: new RegExp(`\\(${code}\\)$`) });
+    await expect(option).toHaveCount(1, { timeout: 30_000 });
+    await unit.selectOption(String(await option.getAttribute("value")));
+  }
+
+  for (const locale of ["en", "am"] as const) {
+    test(`a product, an ingredient and a product with its errors, at 1440 x 900 and 390 x 844, in ${locale}`, async ({ page }) => {
+      test.setTimeout(150_000);
+      const c = MESSAGES[locale].catalog;
+      const form = page.getByRole("form", { name: c.new.title_product });
+
+      // a product, filled in as the admin would: the names, a category of the demo bakery's, pieces, made in batches, a price
+      await openAdmin(page, `${locale}/admin/catalog/new/?kind=product`, c.new.title_product);
+      await chooseUnit(form, c.field_unit, "pcs");
+      await form.getByLabel(c.field_name_en).fill("Banana bread");
+      await form.getByLabel(c.field_name_am).fill("የሙዝ ዳቦ");
+      const category = form.getByLabel(c.field_category);
+      if ((await category.getByRole("option").count()) > 1) await category.selectOption({ index: 1 });
+      await form.getByRole("radio", { name: c.fulfilment_to_stock, exact: true }).check();
+      // phase-6/new-item-recipe: made in batches, the recipe is optional; one batch of twelve, from one of the demo bakery's ingredients
+      const r = MESSAGES[locale].recipe;
+      const recipe = form.getByRole("region", { name: c.new.recipe_title });
+      await recipe.getByLabel(c.new.yield_label).fill("12");
+      await expect(recipe.getByLabel(r.field_ingredient.replace("{n}", "1")).getByRole("option")).not.toHaveCount(1, { timeout: 30_000 });
+      await recipe.getByLabel(r.field_ingredient.replace("{n}", "1")).selectOption({ index: 1 });
+      await recipe.getByLabel(r.field_qty.replace("{n}", "1")).fill("0.5");
+      await form.getByRole("textbox", { name: c.new.price_label }).fill("85.00");
+      await form.getByRole("textbox", { name: c.new.price_label }).blur();
+      await sizes(page, "new-item-product", locale);
+      if (locale === "en") {
+        await form.getByText(c.new.more, { exact: true }).click();
+        await capture(page, "new-item-product-full-1440x900-en", [], true);
+        await form.getByRole("button", { name: c.new.new_category }).click();
+        await expect(page.getByRole("dialog", { name: c.new.new_category })).toBeVisible();
+        await capture(page, "new-item-category-1440x900-en");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("dialog", { name: c.new.new_category })).toHaveCount(0);
+      }
+
+      // phase-6/new-item-recipe: a product made to order, with what goes into one (two lines), "For 1 pcs."
+      await openAdmin(page, `${locale}/admin/catalog/new/?kind=product`, c.new.title_product);
+      await chooseUnit(form, c.field_unit, "pcs");
+      await form.getByLabel(c.field_name_en).fill("Chicken sandwich");
+      await form.getByLabel(c.field_name_am).fill("የዶሮ ሳንድዊች");
+      const sandwich = form.getByRole("region", { name: c.new.recipe_title });
+      await expect(sandwich).toContainText(c.new.recipe_for_one.replace("{unit}", "pcs"));
+      const firstIngredient = sandwich.getByLabel(r.field_ingredient.replace("{n}", "1"));
+      await expect(firstIngredient.getByRole("option")).not.toHaveCount(1, { timeout: 30_000 });
+      await firstIngredient.selectOption({ index: 1 });
+      await sandwich.getByLabel(r.field_qty.replace("{n}", "1")).fill("0.2");
+      await sandwich.getByRole("button", { name: r.add_line }).click();
+      await sandwich.getByLabel(r.field_ingredient.replace("{n}", "2")).selectOption({ index: 2 });
+      await sandwich.getByLabel(r.field_qty.replace("{n}", "2")).fill("1");
+      await sandwich.getByLabel(r.field_qty.replace("{n}", "2")).blur();
+      await sizes(page, "new-item-recipe", locale);
+
+      // an ingredient: no "How it's sold", no price, no refunds, no recipe
+      await openAdmin(page, `${locale}/admin/catalog/new/?kind=ingredient`, c.new.title_ingredient);
+      const ingredient = page.getByRole("form", { name: c.new.title_ingredient });
+      await chooseUnit(ingredient, c.field_unit, "kg");
+      await ingredient.getByLabel(c.field_name_en).fill("Rye flour");
+      await ingredient.getByLabel(c.field_name_am).fill("የአጃ ዱቄት");
+      await ingredient.getByLabel(c.field_name_am).blur();
+      await expect(ingredient.getByRole("radiogroup", { name: c.field_fulfilment })).toHaveCount(0);
+      await expect(ingredient.getByRole("region", { name: c.new.recipe_title })).toHaveCount(0);
+      await sizes(page, "new-item-ingredient", locale);
+
+      // a product sent with nothing filled in but a price the page cannot read: its own checks, each under its field (made to order, the
+      // default, so the recipe says it needs an ingredient)
+      await openAdmin(page, `${locale}/admin/catalog/new/?kind=product`, c.new.title_product);
+      await expect(form.getByLabel(c.field_unit, { exact: true }).getByRole("option", { name: /\(pcs\)$/ })).toHaveCount(1, { timeout: 30_000 });
+      await form.getByRole("textbox", { name: c.new.price_label }).fill("12,5");
+      await form.getByRole("button", { name: c.new.create_product }).click();
+      await expect(page.getByRole("alert").filter({ hasText: c.new.check_fields })).toBeVisible();
+      await expect(form.getByRole("region", { name: c.new.recipe_title })).toContainText(c.new.check_recipe_required);
+      await sizes(page, "new-item-errors", locale, true);
+    });
+  }
 });
 
 // --- step 6.4c: the Sell and Make screens ---------------------------------------------------------------------------------------------
@@ -828,11 +947,71 @@ test.describe("screens: the product page", () => {
       }
     }
   });
+
+  // phase-6/recipe-editor-layout: the "Recipe and cost" drawer at 1440 x 900 and at 390 x 844, in English and in Amharic. A product made to
+  // order with no recipe (created here, switched off after): the drawer's top with "No recipe yet", then its first version with two lines
+  // typed (nothing is saved); and a demo product made to order whose recipe is in use: the form that publishes its next version, filled from
+  // it. The lines are laid out by the drawer's own width, so the narrow drawer of a wide screen draws them as cards, as a phone does. At the
+  // phone's width neither the page nor the drawer scrolls sideways.
+  for (const locale of ["en", "am"] as const) {
+    test(`the recipe drawer: no recipe yet with two lines typed, and a recipe in use, at 1440 x 900 and 390 x 844, in ${locale}`, async ({ page }) => {
+      test.setTimeout(180_000);
+      const t = MESSAGES[locale];
+      const demo = await demoBakery();
+      const unit = await unitLookup(demo.admin);
+      const tag = randomUUID().slice(0, 6);
+      const created = await demo.admin.post<{ id: number }>("/items", { kind: "product", fulfilment: "to_order", name_en: `Chicken wrap ${tag}`, name_am: `የዶሮ ጥቅልል ${tag}`, unit_id: unit("pcs") });
+      const drawer = page.getByRole("dialog", { name: t.product.recipe });
+
+      /** The drawer as it stands at both sizes, `into` scrolled into view (else its top), with the sideways check at the phone's width. */
+      async function drawerSizes(name: string, into?: Locator): Promise<void> {
+        for (const [size, viewport] of [["1440x900", DESKTOP], ["390x844", PHONE]] as const) {
+          await page.setViewportSize(viewport);
+          if (into) await into.scrollIntoViewIfNeeded();
+          else await drawer.evaluate((element) => element.scrollTo(0, 0));
+          await capture(page, `${name}-${size}-${locale}`);
+          if (size === "390x844") {
+            const widths = await drawer.evaluate((element) => ({ drawer: element.scrollWidth - element.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
+            expect(widths, `${name} at 390 x 844 scrolls sideways`).toEqual({ drawer: 0, page: 0 });
+          }
+        }
+        await page.setViewportSize(DESKTOP);
+      }
+
+      try {
+        await openProduct(page, demo, { id: created.id, name_en: `Chicken wrap ${tag}`, name_am: `የዶሮ ጥቅልል ${tag}`, image: null }, locale);
+        await page.getByRole("button", { name: t.product.recipe }).click();
+        await expect(drawer.getByText(t.recipe.no_recipe_title, { exact: true })).toBeVisible({ timeout: 15_000 });
+        await expect(drawer.getByRole("button", { name: t.recipe.set_price })).toBeVisible();
+        const form = drawer.getByRole("region", { name: t.recipe.first_title });
+        const first = form.getByLabel(t.recipe.field_ingredient.replace("{n}", "1"), { exact: true });
+        await expect(first.getByRole("option")).not.toHaveCount(1, { timeout: 30_000 });
+        await first.selectOption({ index: 1 });
+        await form.getByLabel(t.recipe.field_qty.replace("{n}", "1"), { exact: true }).fill("0.15");
+        await form.getByRole("button", { name: t.recipe.add_line }).click();
+        await form.getByLabel(t.recipe.field_ingredient.replace("{n}", "2"), { exact: true }).selectOption({ index: 2 });
+        await form.getByLabel(t.recipe.field_qty.replace("{n}", "2"), { exact: true }).fill("1");
+        await form.getByLabel(t.recipe.field_qty.replace("{n}", "2"), { exact: true }).blur();
+        await drawerSizes("product-recipe-new");
+        await drawerSizes("product-recipe-lines", form.getByRole("group", { name: t.recipe.lines }));
+        await expectAccessible(page, `${locale}/admin/catalog/?item (the recipe drawer, no recipe yet, two lines typed)`);
+      } finally {
+        await demo.admin.patch(`/items/${created.id}`, { is_active: false }).catch(() => undefined);
+      }
+
+      const products = (await demo.admin.get<{ data: (DemoProduct & { fulfilment: string })[] }>("/items", { kind: "product" })).data;
+      const made = products.find((p) => p.fulfilment === "to_order" && p.id !== created.id && !p.name_en.startsWith("Chicken wrap"));
+      if (!made) throw new Error("the demo bakery has no product made to order");
+      await openProduct(page, demo, made, locale);
+      await page.getByRole("button", { name: t.product.recipe }).click();
+      const publish = drawer.getByRole("region", { name: t.recipe.publish_title });
+      await expect(publish.getByLabel(t.recipe.field_ingredient.replace("{n}", "1"), { exact: true })).toHaveValue(/\d+/, { timeout: 15_000 });
+      await drawerSizes("product-recipe-publish", publish);
+    });
+  }
 });
 
 // --- phase-6/shift-strip: the shift's prompt under the bar, covering nothing ---------------------------------------------------------------
-
-const PHONE = { width: 390, height: 844 };
 
 test.describe("screens: the shift's strip", () => {
   test.skip(live, "CI only: the captures read the seeded demo bakery");
@@ -968,3 +1147,63 @@ test.describe("screens: the shift's strip", () => {
     }
   });
 });
+
+// --- Phase 6 follow-up: Admin > Tables ---------------------------------------------------------------------------------------------------
+
+test.describe("screens: Admin > Tables", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  /** The page as it stands at the admin's 1440 x 900 and at the phone's 390 x 844; at the phone's width it must not scroll sideways. */
+  async function laptopAndPhone(page: Page, name: string, locale: keyof typeof MESSAGES): Promise<void> {
+    const loading = [MESSAGES[locale].tables.loading];
+    await page.setViewportSize(DESKTOP);
+    await capture(page, `${name}-1440x900-${locale}`, loading);
+    await page.setViewportSize(PHONE);
+    await capture(page, `${name}-390x844-${locale}`, loading);
+    const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+    expect(scroll, `${name} at 390 x 844 scrolls sideways`).toBeLessThanOrEqual(client);
+    await page.setViewportSize(DESKTOP);
+  }
+
+  for (const locale of ["en", "am"] as const) {
+    test(`Tables: the grid, a table's drawer, a new table refused and Add several, at 1440 x 900 and 390 x 844, in ${locale}`, async ({ page }) => {
+      test.setTimeout(120_000);
+      const t = MESSAGES[locale].tables;
+      await openAdmin(page, `${locale}/admin/tables/`, t.title);
+      const cards = page.getByRole("article");
+      await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+      await laptopAndPhone(page, "tables", locale);
+
+      // a table's drawer, as Edit opens it: the code fixed, the names, the seats and the order
+      await cards.first().getByRole("button", { name: around(t.edit_named) }).click();
+      await expect(page.getByRole("dialog", { name: around(t.edit_title) })).toBeVisible();
+      await laptopAndPhone(page, "tables-edit", locale);
+      await page.keyboard.press("Escape");
+
+      // "Add table" with the code of a table there is: the API's refusal under the Code field (nothing is written)
+      await page.getByRole("button", { name: t.add, exact: true }).first().click();
+      const form = page.getByRole("dialog", { name: t.new_title });
+      await expect(form).toBeVisible();
+      const taken = (await cards.first().getByRole("heading").textContent())?.trim() ?? "T1";
+      await form.getByLabel(t.field_code, { exact: true }).fill(taken);
+      await form.getByLabel(t.field_name_en).fill("Table 1");
+      await form.getByLabel(t.field_name_am).fill("ጠረጴዛ 1");
+      await form.getByRole("button", { name: t.save_new, exact: true }).click();
+      await expect(form.getByText(locale === "en" ? /already has this code/ : /ይህ ኮድ አለው/).first()).toBeVisible({ timeout: 30_000 });
+      await laptopAndPhone(page, "tables-new-refused", locale);
+      await page.keyboard.press("Escape");
+
+      // "Add several": the range after the tables there are, with its preview
+      await page.getByRole("button", { name: t.add_several, exact: true }).click();
+      await expect(page.getByRole("dialog", { name: t.several_title })).toBeVisible();
+      await laptopAndPhone(page, "tables-several", locale);
+    });
+  }
+});
+
+/** A name built from a message around its one placeholder ("Edit table {code}"), whatever fills it. */
+function around(message: string): RegExp {
+  const [before, after = ""] = message.split(/\{\w+\}/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp(`^${before}.*${after}$`);
+}

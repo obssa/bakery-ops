@@ -138,10 +138,12 @@ return [
     'GET /api/v1/orders/{order}' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
     'GET /api/v1/stations/{station}/tickets' => ['permission' => 'orders.accept', 'roles' => $stationStaff, 'module' => 'orders'],
 
-    // dining tables (step 1.3e): the order takers read the grid, only the admin (tables.manage) configures it
+    // dining tables (step 1.3e): the order takers read the grid, tables.manage configures it (the admin; the manager as well since the
+    // Phase 6 follow-up Admin > Tables, which reads every table, switched-off ones included, through GET /dining-tables/manage)
     'GET /api/v1/dining-tables' => ['permission' => 'orders.create', 'roles' => $orderTakers, 'module' => 'orders'],
-    'POST /api/v1/dining-tables' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],
-    'PATCH /api/v1/dining-tables/{table}' => ['permission' => 'tables.manage', 'roles' => ['admin'], 'module' => 'orders'],
+    'GET /api/v1/dining-tables/manage' => ['permission' => 'tables.manage', 'roles' => ['admin', 'manager'], 'module' => 'orders'],
+    'POST /api/v1/dining-tables' => ['permission' => 'tables.manage', 'roles' => ['admin', 'manager'], 'module' => 'orders'],
+    'PATCH /api/v1/dining-tables/{table}' => ['permission' => 'tables.manage', 'roles' => ['admin', 'manager'], 'module' => 'orders'],
 
     // production requests (step 2.7b): the floor reads the board and a card; production.request asks, production.plan assigns,
     // production.fulfil accepts (and at the request's station: 403 production.station.forbidden, checked by the action);

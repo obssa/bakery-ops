@@ -26,10 +26,16 @@ use Spatie\Permission\PermissionRegistrar;
  * It talks to the tables, not to the Spatie models, so a later change to the models cannot change what this migration
  * did. A deliberate removal of a default grant by hand is not preserved (the grant is put back): the registry is the
  * default, and the application has no screen that edits a role.
+ *
+ * It reads the matrix as of itself (AS_OF): a default grant added to the registry later, with a grant migration of its own
+ * (PermissionRegistry::LATER_GRANTS, the manager's tables.manage of the Phase 6 follow-up), is not made here, so this migration still
+ * does exactly what it did when it ran on the live database.
  */
 return new class extends Migration
 {
     private const string GUARD = 'web';
+
+    private const string AS_OF = '2026_10_21_120100';
 
     public function up(): void
     {
@@ -61,7 +67,7 @@ return new class extends Migration
             foreach ($roleIds as $role => $roleId) {
                 $held = DB::table($tables['role_has_permissions'])->where('role_id', $roleId)->pluck('permission_id')
                     ->map(static fn (mixed $id): int => (int) $id)->all();
-                foreach (PermissionRegistry::permissionsFor($role) as $name) {
+                foreach (PermissionRegistry::permissionsFor($role, self::AS_OF) as $name) {
                     if (! in_array($permissionIds[$name], $held, true)) {
                         DB::table($tables['role_has_permissions'])->insertOrIgnore(['permission_id' => $permissionIds[$name], 'role_id' => $roleId]);
                     }

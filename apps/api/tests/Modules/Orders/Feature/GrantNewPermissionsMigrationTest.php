@@ -67,7 +67,9 @@ it('adds a permission the database lacks and grants it to its default roles', fu
         expect(permissionsOf($role))->not->toContain('tables.manage', $role);
     }
     foreach (PermissionRegistry::ROLES as $role) {
-        $expected = PermissionRegistry::permissionsFor($role);
+        // the matrix as this migration knew it: a default grant added later with a grant migration of its own (the manager's
+        // tables.manage, Phase 6 follow-up) is not made here, so the manager still lacks tables.manage, as asserted above
+        $expected = PermissionRegistry::permissionsFor($role, '2026_10_21_120100');
         sort($expected);
         expect(permissionsOf($role))->toBe($expected, $role);
     }

@@ -9,7 +9,8 @@ use Illuminate\Support\Str;
 
 /*
  * The dining tables of the pad's grid (docs/phases/phase-1-plan.md section 4; step 1.3e): POST and PATCH need
- * tables.manage (admin), GET needs orders.create (the order takers). A table's code is unique per branch (also
+ * tables.manage (the admin, and the manager since the Phase 6 follow-up Admin > Tables, whose read is GET /dining-tables/manage: every
+ * table, switched-off ones included), GET needs orders.create (the order takers). A table's code is unique per branch (also
  * against an inactive table: orders snapshot it), writes are idempotent and audited, another branch's table is 404.
  * GET returns the stored fields and the derived state in the grid's order (sort, code, id); see DiningTableStateTest for the state (free, ordering, waiting,
  * served, bill) arrives with the read models of step 1.5.
@@ -140,13 +141,14 @@ it('lists the active tables of the branch in grid order for every order taker, i
         ->toBe([$first->id, $tieB->id, $second->id]);
 })->group('module:orders', 'feature');
 
-it('keeps the roles apart: only the admin writes, the order takers read, the rest are refused', function () {
+it('keeps the roles apart: the admin and the manager write, the order takers read, the rest are refused', function () {
     $table = DiningTable::factory()->create(['branch_id' => $this->branch->id]);
-    foreach (['manager', 'cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'] as $role) {
+    foreach (['cashier', 'waiter', 'chef', 'barista', 'cake_baker', 'bread_baker'] as $role) {
         loginAs(makeUser($this->branch, $role));
         $this->withHeaders(idempotencyKey())->postJson('/api/v1/dining-tables', ['code' => "X{$role}", 'name_en' => 'x', 'name_am' => 'x'])
             ->assertForbidden()->assertJsonPath('message_key', 'auth.forbidden');
         $this->withHeaders(idempotencyKey())->patchJson("/api/v1/dining-tables/{$table->id}", ['sort' => 3])->assertForbidden();
+        $this->getJson('/api/v1/dining-tables/manage')->assertForbidden()->assertJsonPath('message_key', 'auth.forbidden');
     }
     foreach (['chef', 'barista', 'cake_baker', 'bread_baker'] as $role) {
         loginAs(makeUser($this->branch, $role));
@@ -162,4 +164,56 @@ it('treats another branch table as not found and never changes it', function () 
     $this->withHeaders(idempotencyKey())->patchJson("/api/v1/dining-tables/{$foreign->id}", ['name_en' => 'Mine'])->assertNotFound();
     $this->withHeaders(idempotencyKey())->patchJson('/api/v1/dining-tables/999999', ['name_en' => 'Mine'])->assertNotFound();
     expect(DiningTable::query()->withoutGlobalScopes()->findOrFail($foreign->id)->name_en)->toBe('Theirs');
+})->group('module:orders', 'feature');
+
+it('lets the manager add, rename and switch off a table, audited under the manager', function () {
+    $manager = makeUser($this->branch, 'manager');
+    loginAs($manager);
+    withActor($manager->id);
+
+    $created = ($this->post)(['code' => 'T11', 'name_en' => 'Table 11', 'name_am' => 'ጠረጴዛ 11', 'seats' => 4, 'sort' => 11])
+        ->assertCreated()->assertJson(['code' => 'T11', 'is_active' => true, 'state' => 'free']);
+    $id = $created->json('id');
+    expect(DiningTable::query()->findOrFail($id)->created_by_user_id)->toBe($manager->id);
+
+    $this->withHeaders(idempotencyKey())->patchJson("/api/v1/dining-tables/{$id}", ['name_en' => 'Window 11', 'name_am' => 'መስኮት 11'])
+        ->assertOk()->assertJson(['code' => 'T11', 'name_en' => 'Window 11', 'name_am' => 'መስኮት 11']);
+    $this->withHeaders(idempotencyKey())->patchJson("/api/v1/dining-tables/{$id}", ['is_active' => false])
+        ->assertOk()->assertJsonPath('is_active', false);
+    ($this->post)(['code' => 't11', 'name_en' => 'Again', 'name_am' => 'እንደገና'])
+        ->assertStatus(422)->assertJsonPath('message_key', 'orders.table.code_taken');
+
+    expect(AuditLog::query()->where('action', 'dining_table.create')->where('subject_id', $id)->value('actor_id'))->toEqual($manager->id)
+        ->and(AuditLog::query()->where('action', 'dining_table.update')->where('subject_id', $id)->count())->toBe(2);
+    expect(array_column($this->getJson('/api/v1/dining-tables')->json('data'), 'id'))->not->toContain($id);
+})->group('module:orders', 'feature');
+
+it('lists every table of the branch on the admin read, switched-off ones included, in grid order, for the admin and the manager', function () {
+    $b = $this->branch->id;
+    $second = DiningTable::factory()->create(['branch_id' => $b, 'code' => 'T2', 'sort' => 2]);
+    $first = DiningTable::factory()->create(['branch_id' => $b, 'code' => 'T10', 'sort' => 1]);
+    $off = DiningTable::factory()->create(['branch_id' => $b, 'code' => 'OFF', 'sort' => 0, 'is_active' => false]);
+    $tieB = DiningTable::factory()->create(['branch_id' => $b, 'code' => 'B', 'sort' => 2]);
+    $foreign = DiningTable::factory()->create(['branch_id' => $this->other->id, 'sort' => 0]);
+    $gone = DiningTable::factory()->create(['branch_id' => $b, 'code' => 'GONE', 'sort' => 0]);
+    $gone->delete();
+
+    foreach (['admin', 'manager'] as $role) {
+        loginAs(makeUser($this->branch, $role));
+        $rows = $this->getJson('/api/v1/dining-tables/manage')->assertOk()->json('data');
+        expect(array_column($rows, 'id'))->toBe([$off->id, $first->id, $tieB->id, $second->id], $role)
+            ->and(array_keys($rows[0]))->toBe(['id', 'code', 'name_en', 'name_am', 'seats', 'sort', 'is_active', 'state'])
+            ->and($rows[0]['is_active'])->toBeFalse()
+            ->and($rows[1]['state'])->toBe('free')
+            ->and(array_column($rows, 'id'))->not->toContain($foreign->id);
+    }
+})->group('module:orders', 'feature');
+
+it('treats another branch table as not found for the manager as well', function () {
+    $manager = makeUser($this->branch, 'manager');
+    loginAs($manager);
+    $foreign = DiningTable::factory()->create(['branch_id' => $this->other->id, 'name_en' => 'Theirs']);
+
+    $this->withHeaders(idempotencyKey())->patchJson("/api/v1/dining-tables/{$foreign->id}", ['is_active' => false])->assertNotFound();
+    expect(DiningTable::query()->withoutGlobalScopes()->findOrFail($foreign->id)->is_active)->toBeTrue();
 })->group('module:orders', 'feature');

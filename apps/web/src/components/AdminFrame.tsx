@@ -30,8 +30,8 @@ import { Avatar, IconButton } from "./ui";
 // The sections and who sees them are as they were: Catalog and People (Phase 0), the live Orders board (Phase 1), Inventory with its own
 // sub-tabs (Phase 2), Shifts (Phase 3), Payments (Phase 4, step 4.5c: shown to whoever holds one of its permissions), Analytics (step 4.5e:
 // the dashboards for analytics.view; a person who holds only analytics.view_own, every role, is taken to their own figures), the Audit log
-// (step 4.5f: audit.view, the admin and the manager), System (step 5.5c: system.view, the admin: the host's health), and Today (step 6.4a,
-// the console's first page, for everyone). The navigation is still "Admin sections" with the same link names. The spec's rows without a page
+// (step 4.5f: audit.view, the admin and the manager), System (step 5.5c: system.view, the admin: the host's health), Today (step 6.4a,
+// the console's first page, for everyone), and Tables in Sell after Payments (the Phase 6 follow-up: tables.manage, the admin and the manager). The navigation is still "Admin sections" with the same link names. The spec's rows without a page
 // here wait (Refunds, phase-6 plan 10.2 Q2), and so do the ones that are other pages' links already: Production is the station screen in
 // "Screens", Devices is People's own link. The branch's name waits for an API every role may read that names it (Q3).
 //
@@ -56,6 +56,7 @@ const SECTIONS: readonly Section[] = [
   { href: "/admin/planner", key: "planner" },
   { href: "/admin/shifts", key: "shifts" },
   { href: "/admin/payments", key: "payments", anyOf: ["payments.view", "channels.manage"] },
+  { href: "/admin/tables", key: "tables", anyOf: ["tables.manage"] },
   { href: "/admin/analytics", key: "analytics", anyOf: ["analytics.view", "analytics.view_own"], own: { unless: "analytics.view", href: "/admin/analytics/me" } },
   { href: "/admin/audit", key: "audit", anyOf: ["audit.view"] },
   { href: "/admin/system", key: "system", anyOf: ["system.view"] },
@@ -64,7 +65,7 @@ const SECTIONS: readonly Section[] = [
 /** The sidebar's groups (fresh-counter.md 4.1), each a list of section keys; Today and System have no heading. */
 const GROUPS: readonly { label: string | null; keys: readonly string[] }[] = [
   { label: null, keys: ["today"] },
-  { label: "group_sell", keys: ["orders", "payments"] },
+  { label: "group_sell", keys: ["orders", "payments", "tables"] },
   { label: "group_make", keys: ["catalog", "inventory", "planner"] },
   { label: "group_team", keys: ["people", "shifts"] },
   { label: "group_insight", keys: ["analytics", "audit"] },

@@ -164,28 +164,33 @@ test.describe("pay-refund", () => {
     expect(madeToOrder.refund_restock).toBe(false);
     try {
       await openAs(page, admin, "en/admin/catalog/");
-      // step 6.4a: the new item form is in the drawer "Add product" opens (it was a column beside the list)
+      // step 6.4a: the new item form is in the drawer "Add product" opens (it was a column beside the list). phase-6/new-item-page: it is
+      // a page of its own, the form "New product" (was the drawer's form "New item"); Kind and Fulfilment are radio groups of choice cards
+      // (were selects), and the refund settings sit under "More options", folded, opened first
       await page.getByRole("button", { name: "Add product" }).click({ timeout: 30_000 });
-      const form = page.getByRole("form", { name: "New item" });
-      await form.getByLabel("Kind").selectOption("product");
-      await form.getByLabel("Fulfilment").selectOption("to_order");
+      const form = page.getByRole("form", { name: "New product" });
+      await form.getByRole("radio", { name: "Product", exact: true }).check({ timeout: 30_000 });
+      await form.getByRole("radio", { name: "Made to order", exact: true }).check();
+      await form.getByText("More options", { exact: true }).click();
       const refundable = form.getByRole("checkbox", { name: "Refundable" });
       const restock = form.getByRole("checkbox", { name: "Goes back to stock when refunded" });
       // made to order: its ingredients are used, nothing can go back into stock
       await expect(restock).toBeDisabled();
       await expect(restock).toHaveAccessibleDescription(/made to order/i);
       // sold from stock: both may be on
-      await form.getByLabel("Fulfilment").selectOption("to_stock");
+      await form.getByRole("radio", { name: "Made in batches", exact: true }).check();
       await expect(restock).toBeEnabled();
       await refundable.check();
       await restock.check();
       await form.getByLabel("Name (English)").fill(nameEn);
       await form.getByLabel("Name (Amharic)").fill(`የሙከራ መቀያየሪያ ${run}`);
-      const unit = form.getByLabel("Unit");
+      // exact: the recipe's lines have "Unit, line 1" (phase-6/new-item-recipe); made in batches, the recipe is optional and left empty
+      const unit = form.getByLabel("Unit", { exact: true });
       const pcs = await unit.getByRole("option", { name: /\(pcs\)$/ }).first().getAttribute("value");
       await unit.selectOption(pcs ?? "");
-      await form.getByRole("button", { name: "Create item" }).click();
-      await expect(form.getByText(`Created “${nameEn}”.`)).toBeVisible({ timeout: 30_000 });
+      // the create opens the product's own page (was the form's own line), which says so
+      await form.getByRole("button", { name: "Create product" }).click();
+      await expect(page.getByRole("status").filter({ hasText: `Created “${nameEn}”.` })).toBeVisible({ timeout: 30_000 });
 
       const items = await admin.get<{ data: { id: number; name_en: string; refundable: boolean; refund_restock: boolean }[] }>("/items", { kind: "product" });
       const created = items.data.find((i) => i.name_en === nameEn);

@@ -36,8 +36,9 @@ final class PermissionRegistry
         'orders.accept' => ['admin', 'manager', 'chef', 'barista'],
         'orders.void' => ['admin', 'manager'],
         'orders.void_request' => ['admin', 'manager', 'cashier'],
-        // the dining tables the pads show (Orders, Phase 1): configuration, admin only like catalog.manage
-        'tables.manage' => ['admin'],
+        // the dining tables the pads show (Orders, Phase 1, the admin's only then). Phase 6 follow-up (Ramin, 2026-11-09): the manager adds and
+        // switches off tables too (Admin > Tables); the grant reaches a live database through 2026_11_14_100000_grant_tables_manage_to_manager alone (LATER_GRANTS, below).
+        'tables.manage' => ['admin', 'manager'],
         'payments.take' => ['admin', 'manager', 'cashier'],
         'payments.void' => ['admin', 'manager'],
         'production.request' => ['admin', 'manager', 'cashier', 'chef', 'barista'],
@@ -112,9 +113,25 @@ final class PermissionRegistry
     }
 
     /**
+     * The default grants that joined the matrix after their permission had reached the live database: permission => role => the
+     * timestamp of the grant-only migration that brings that one grant there. An already-run grant migration must stay a faithful record
+     * of what it did, so a grant migration made before that timestamp never makes the grant (see permissionsFor's $asOf); RolesSeeder,
+     * a fresh install's role map, makes it with the rest.
+     *
+     * @var array<string, array<string, string>>
+     */
+    private const array LATER_GRANTS = [
+        // Phase 6 follow-up (Admin > Tables; Ramin, 2026-11-09): the manager manages the dining tables as the admin does
+        'tables.manage' => ['manager' => '2026_11_14_100000'],
+    ];
+
+    /**
+     * The permissions a role holds by default. `$asOf`, a grant migration's timestamp (YYYY_MM_DD_HHMMSS), leaves out a later grant
+     * (LATER_GRANTS) whose own migration comes after it: the matrix as that migration knew it. Null is today's matrix (RolesSeeder, Access).
+     *
      * @return list<string>
      */
-    public static function permissionsFor(string $role): array
+    public static function permissionsFor(string $role, ?string $asOf = null): array
     {
         if (! self::isRole($role)) {
             return [];
@@ -122,7 +139,15 @@ final class PermissionRegistry
 
         return array_keys(array_filter(
             self::MATRIX,
-            static fn (array $roles): bool => in_array($role, $roles, true),
+            static function (array $roles, string $permission) use ($role, $asOf): bool {
+                if (! in_array($role, $roles, true)) {
+                    return false;
+                }
+                $since = self::LATER_GRANTS[$permission][$role] ?? null;
+
+                return $asOf === null || $since === null || strcmp($since, $asOf) <= 0;
+            },
+            ARRAY_FILTER_USE_BOTH,
         ));
     }
 
