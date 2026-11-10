@@ -481,6 +481,9 @@ after `gate_check.py --mode done --phase 6 --no-tests --no-e2e` passed 20 of 20 
 The combined branch's run 42727928906 (head `643ec12`) passed all 40 jobs; `main` was fast-forwarded to it, and `main`'s run
 42739984891 passed with the strict `gate-p6` green (now `gate_run_url`). Deploy 42749665184: 42 of 42 `@live`, health ok, 107 migrations.
 
+Restated again at `f1778cf` (pull request #128, test-only): two checks that failed by chance (the short-code reset's audit search, the
+gate:p4 window across Addis midnight) were fixed under `apps/api/tests`, which the strict gate also freezes.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
