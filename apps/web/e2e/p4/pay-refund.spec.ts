@@ -184,7 +184,8 @@ test.describe("pay-refund", () => {
       await restock.check();
       await form.getByLabel("Name (English)").fill(nameEn);
       await form.getByLabel("Name (Amharic)").fill(`የሙከራ መቀያየሪያ ${run}`);
-      const unit = form.getByLabel("Unit");
+      // exact: the recipe's lines have "Unit, line 1" (phase-6/new-item-recipe); made in batches, the recipe is optional and left empty
+      const unit = form.getByLabel("Unit", { exact: true });
       const pcs = await unit.getByRole("option", { name: /\(pcs\)$/ }).first().getAttribute("value");
       await unit.selectOption(pcs ?? "");
       // the create opens the product's own page (was the form's own line), which says so

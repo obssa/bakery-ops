@@ -68,6 +68,6 @@ export default defineConfig({
     { name: "p6-product-photo", testDir: "./e2e/p6", testMatch: /[\\/]p6[\\/]product-photo[^\\/]*\.spec\.ts$/, use: tablet },
     // p6-a11y also carries the screenshots for review (screens.spec.ts, brief "Design fidelity"), uploaded by e2e-p6 as the artifact "screens",
     // the shift's strip that covers nothing (shift-strip.spec.ts), and Admin > Tables (admin-tables.spec.ts, the Phase 6 follow-up)
-    { name: "p6-a11y", testDir: "./e2e/p6", testMatch: /[\\/]p6[\\/](a11y|screens|shift-strip|admin-tables)[^\\/]*\.spec\.ts$/, use: tablet },
+    { name: "p6-a11y", testDir: "./e2e/p6", testMatch: /[\\/]p6[\\/](a11y|screens|shift-strip|admin-tables|new-item-recipe)[^\\/]*\.spec\.ts$/, use: tablet },
   ],
 });

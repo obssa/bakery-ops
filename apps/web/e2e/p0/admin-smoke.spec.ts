@@ -164,7 +164,9 @@ test.describe("p0 admin smoke", () => {
     await form.getByRole("radio", { name: "Made in batches", exact: true }).check();
     await form.getByLabel("Name (English)").fill(bread.en);
     await form.getByLabel("Name (Amharic)").fill(bread.am);
-    await form.getByLabel("Unit").selectOption({ label: "Piece (pcs)" });
+    // exact: a product that is made shows its recipe, whose lines have "Unit, line 1" (phase-6/new-item-recipe); made in batches, the
+    // recipe is optional and left empty here
+    await form.getByLabel("Unit", { exact: true }).selectOption({ label: "Piece (pcs)" });
     await form.getByRole("button", { name: "Create product" }).click();
     await expect(page.getByRole("status").filter({ hasText: `Created “${bread.en}”.` })).toBeVisible({ timeout: 30_000 });
     await breadcrumb.getByRole("link", { name: "Catalog" }).click();

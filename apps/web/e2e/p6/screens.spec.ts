@@ -571,9 +571,9 @@ test.describe("screens: the new item page", () => {
     await page.setViewportSize(DESKTOP);
   }
 
-  /** Chooses the unit whose code is `code` in the form's Unit list, once the units have loaded. */
+  /** Chooses the unit whose code is `code` in the form's Unit list, once the units have loaded (exact: a recipe line has "Unit, line 1"). */
   async function chooseUnit(form: Locator, label: string, code: string): Promise<void> {
-    const unit = form.getByLabel(label);
+    const unit = form.getByLabel(label, { exact: true });
     const option = unit.getByRole("option", { name: new RegExp(`\\(${code}\\)$`) });
     await expect(option).toHaveCount(1, { timeout: 30_000 });
     await unit.selectOption(String(await option.getAttribute("value")));
@@ -593,6 +593,13 @@ test.describe("screens: the new item page", () => {
       const category = form.getByLabel(c.field_category);
       if ((await category.getByRole("option").count()) > 1) await category.selectOption({ index: 1 });
       await form.getByRole("radio", { name: c.fulfilment_to_stock, exact: true }).check();
+      // phase-6/new-item-recipe: made in batches, the recipe is optional; one batch of twelve, from one of the demo bakery's ingredients
+      const r = MESSAGES[locale].recipe;
+      const recipe = form.getByRole("region", { name: c.new.recipe_title });
+      await recipe.getByLabel(c.new.yield_label).fill("12");
+      await expect(recipe.getByLabel(r.field_ingredient.replace("{n}", "1")).getByRole("option")).not.toHaveCount(1, { timeout: 30_000 });
+      await recipe.getByLabel(r.field_ingredient.replace("{n}", "1")).selectOption({ index: 1 });
+      await recipe.getByLabel(r.field_qty.replace("{n}", "1")).fill("0.5");
       await form.getByRole("textbox", { name: c.new.price_label }).fill("85.00");
       await form.getByRole("textbox", { name: c.new.price_label }).blur();
       await sizes(page, "new-item-product", locale);
@@ -606,7 +613,24 @@ test.describe("screens: the new item page", () => {
         await expect(page.getByRole("dialog", { name: c.new.new_category })).toHaveCount(0);
       }
 
-      // an ingredient: no "How it's sold", no price, no refunds
+      // phase-6/new-item-recipe: a product made to order, with what goes into one (two lines), "For 1 pcs."
+      await openAdmin(page, `${locale}/admin/catalog/new/?kind=product`, c.new.title_product);
+      await chooseUnit(form, c.field_unit, "pcs");
+      await form.getByLabel(c.field_name_en).fill("Chicken sandwich");
+      await form.getByLabel(c.field_name_am).fill("የዶሮ ሳንድዊች");
+      const sandwich = form.getByRole("region", { name: c.new.recipe_title });
+      await expect(sandwich).toContainText(c.new.recipe_for_one.replace("{unit}", "pcs"));
+      const firstIngredient = sandwich.getByLabel(r.field_ingredient.replace("{n}", "1"));
+      await expect(firstIngredient.getByRole("option")).not.toHaveCount(1, { timeout: 30_000 });
+      await firstIngredient.selectOption({ index: 1 });
+      await sandwich.getByLabel(r.field_qty.replace("{n}", "1")).fill("0.2");
+      await sandwich.getByRole("button", { name: r.add_line }).click();
+      await sandwich.getByLabel(r.field_ingredient.replace("{n}", "2")).selectOption({ index: 2 });
+      await sandwich.getByLabel(r.field_qty.replace("{n}", "2")).fill("1");
+      await sandwich.getByLabel(r.field_qty.replace("{n}", "2")).blur();
+      await sizes(page, "new-item-recipe", locale);
+
+      // an ingredient: no "How it's sold", no price, no refunds, no recipe
       await openAdmin(page, `${locale}/admin/catalog/new/?kind=ingredient`, c.new.title_ingredient);
       const ingredient = page.getByRole("form", { name: c.new.title_ingredient });
       await chooseUnit(ingredient, c.field_unit, "kg");
@@ -614,14 +638,17 @@ test.describe("screens: the new item page", () => {
       await ingredient.getByLabel(c.field_name_am).fill("የአጃ ዱቄት");
       await ingredient.getByLabel(c.field_name_am).blur();
       await expect(ingredient.getByRole("radiogroup", { name: c.field_fulfilment })).toHaveCount(0);
+      await expect(ingredient.getByRole("region", { name: c.new.recipe_title })).toHaveCount(0);
       await sizes(page, "new-item-ingredient", locale);
 
-      // a product sent with nothing filled in but a price the page cannot read: its own checks, each under its field
+      // a product sent with nothing filled in but a price the page cannot read: its own checks, each under its field (made to order, the
+      // default, so the recipe says it needs an ingredient)
       await openAdmin(page, `${locale}/admin/catalog/new/?kind=product`, c.new.title_product);
-      await expect(form.getByLabel(c.field_unit).getByRole("option", { name: /\(pcs\)$/ })).toHaveCount(1, { timeout: 30_000 });
+      await expect(form.getByLabel(c.field_unit, { exact: true }).getByRole("option", { name: /\(pcs\)$/ })).toHaveCount(1, { timeout: 30_000 });
       await form.getByRole("textbox", { name: c.new.price_label }).fill("12,5");
       await form.getByRole("button", { name: c.new.create_product }).click();
       await expect(page.getByRole("alert").filter({ hasText: c.new.check_fields })).toBeVisible();
+      await expect(form.getByRole("region", { name: c.new.recipe_title })).toContainText(c.new.check_recipe_required);
       await sizes(page, "new-item-errors", locale, true);
     });
   }

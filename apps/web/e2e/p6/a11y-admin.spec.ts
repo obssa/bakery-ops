@@ -126,7 +126,9 @@ const SCREENS: AdminScreen[] = [
     heading: (t) => t.catalog.new.title_product,
     loaded: async (page, t) => {
       await expect(page.getByRole("radiogroup", { name: t.catalog.field_fulfilment })).toBeVisible(TIMEOUT);
-      await expect(page.getByLabel(t.catalog.field_unit).getByRole("option")).not.toHaveCount(1, TIMEOUT);
+      // exact: the recipe (made to order, the default) has "Unit, line 1" (phase-6/new-item-recipe); its ingredient list loads too
+      await expect(page.getByLabel(t.catalog.field_unit, { exact: true }).getByRole("option")).not.toHaveCount(1, TIMEOUT);
+      await expect(page.getByLabel(t.recipe.field_ingredient.replace("{n}", "1")).getByRole("option")).not.toHaveCount(1, TIMEOUT);
     },
     also: async (page, t) => {
       await page.getByRole("radio", { name: t.catalog.kind_ingredient, exact: true }).check();
