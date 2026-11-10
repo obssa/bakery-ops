@@ -478,6 +478,9 @@ under one restated claim: `phase_status.py claim-done 6` on 2026-11-10 at `b717b
 after `gate_check.py --mode done --phase 6 --no-tests --no-e2e` passed 20 of 20 checks (the test rows run in `gate-p6` on CI). The tag
 `phase-6-complete` stays on `2f6bbd9`, the first claim, as Phase 5's did after pull request #106.
 
+The combined branch's run 42727928906 (head `643ec12`) passed all 40 jobs; `main` was fast-forwarded to it, and `main`'s run
+42739984891 passed with the strict `gate-p6` green (now `gate_run_url`). Deploy 42749665184: 42 of 42 `@live`, health ok, 107 migrations.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
