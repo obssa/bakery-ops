@@ -61,7 +61,16 @@ final class SeededGate
         actInBranch($branch);
 
         $count = (int) $days;
+        // the seed's today, not the clock's: a job that seeds just before the branch's midnight and runs the group just after would
+        // otherwise read a window one day later, whose last day is the seed's own today, which sold nothing yet
         $today = CarbonImmutable::now($branch->timezone)->startOfDay();
+        $latest = DB::table('analytics_days')->where('branch_id', $branch->id)->max('day');
+        if ($latest !== null) {
+            $seeded = CarbonImmutable::parse(substr((string) $latest, 0, 10), $branch->timezone)->startOfDay();
+            if ($seeded->lessThan($today)) {
+                $today = $seeded;
+            }
+        }
         $window = [];
         for ($n = $count; $n >= 1; $n--) {
             $window[] = $today->subDays($n)->toDateString();

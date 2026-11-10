@@ -9,6 +9,7 @@ use App\Modules\Identity\Models\User;
 use App\Shared\Enums\StationCode;
 use App\Shared\Models\Branch;
 use App\Shared\Models\Station;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -182,7 +183,8 @@ it('resets a short code: returns the new code once, the old one stops verifying,
 
     $row = AuditLog::query()->where('action', 'user.short_code.reset')->where('subject_id', $user->id)->firstOrFail();
     expect($row->after['short_code_hash'] ?? null)->toBe('[redacted]')
-        ->and(json_encode($row->after))->not->toContain($code);
+        // no stored value is the code; a substring check would also match a date or an id that happens to hold its digits ("2026")
+        ->and(collect(Arr::dot($row->after))->contains(fn (mixed $value): bool => (string) $value === $code))->toBeFalse();
 
     $this->getJson('/api/v1/users')->assertOk()->assertJsonMissingPath('data.0.short_code');
 })->group('module:identity', 'feature');
