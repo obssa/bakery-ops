@@ -286,7 +286,8 @@ async function chooseMethod(page: Page): Promise<void> {
 /** The pay sheet keeps inside itself: nothing in it scrolls sideways, and every method card and field ends inside its padding. */
 async function expectSheetFits(page: Page, name: string): Promise<void> {
   const fit = await page.getByRole("dialog").evaluate((sheet) => {
-    const inner = sheet.getBoundingClientRect().right - parseFloat(getComputedStyle(sheet).paddingRight);
+    // the sheet's content box ends where its one child (the sheet's container) does
+    const inner = (sheet.firstElementChild ?? sheet).getBoundingClientRect().right;
     const edges = Array.from(sheet.querySelectorAll<HTMLElement>("button[aria-pressed], input"))
       .filter((element) => element.getBoundingClientRect().width > 1)
       .map((element) => ({ what: element.getAttribute("aria-label") ?? element.textContent?.trim() ?? element.id, right: element.getBoundingClientRect().right }));
