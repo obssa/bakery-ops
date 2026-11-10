@@ -72,7 +72,7 @@ it('asks for both names or neither, and neither puts the app\'s own name back', 
     ($this->send)('PUT', '/api/v1/brand', ['name_en' => 'Corner Bakery', 'name_am' => 'የማዕዘን ዳቦ ቤት'])->assertOk();
 
     ($this->send)('PUT', '/api/v1/brand', ['name_en' => '', 'name_am' => ''])->assertOk()
-        ->assertJsonPath('data.name_en', null)->assertJsonPath('data.name_am', null);
+        ->assertJsonPath('data.name_en', null)->assertJsonPath('data.name_am', null)->assertJsonPath('data.is_default', true);
     expect(BrandProfile::query()->count())->toBe(1);
 });
 

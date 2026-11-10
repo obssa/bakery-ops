@@ -58,7 +58,7 @@ final class BrandProfile extends Model
 
     /**
      * The brand as GET /me and the /brand writes answer it: the saved name pair (null when none: the app shows its own), the logo's public
-     * URL and size (null when none) and whether the branch has saved anything.
+     * URL and size (null when none) and is_default, true while the branch shows the app's own name and mark (no row, or a row with neither).
      *
      * @return array{name_en: string|null, name_am: string|null, logo: array{url: string, size: int}|null, is_default: bool}
      */
@@ -67,15 +67,16 @@ final class BrandProfile extends Model
         if (! $row instanceof self) {
             return ['name_en' => null, 'name_am' => null, 'logo' => null, 'is_default' => true];
         }
+        $logo = $row->logo_sha256 === null || $row->logo_mime === null ? null : [
+            'url' => '/api/v1/media/brand/'.$row->logo_sha256.'.'.self::extensionOf($row->logo_mime),
+            'size' => (int) $row->logo_size,
+        ];
 
         return [
             'name_en' => $row->name_en,
             'name_am' => $row->name_am,
-            'logo' => $row->logo_sha256 === null || $row->logo_mime === null ? null : [
-                'url' => '/api/v1/media/brand/'.$row->logo_sha256.'.'.self::extensionOf($row->logo_mime),
-                'size' => (int) $row->logo_size,
-            ],
-            'is_default' => false,
+            'logo' => $logo,
+            'is_default' => $row->name_en === null && $logo === null,
         ];
     }
 }

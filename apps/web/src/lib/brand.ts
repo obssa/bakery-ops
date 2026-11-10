@@ -18,7 +18,7 @@ export interface BrandView {
   name: string;
   /** the logo's URL, or null for the app's own mark */
   logo: string | null;
-  /** the bakery's own brand is set */
+  /** the bakery's own name is set (the title then ends in it) */
   custom: boolean;
 }
 
@@ -34,7 +34,7 @@ export function useBrand(): BrandView {
   }, [fromMe]);
   const brand = fromMe ?? remembered;
   const name = brand ? (locale === "am" ? brand.name_am : brand.name_en) : null;
-  return { name: name ?? t("name"), logo: brand?.logo ? mediaUrl(brand.logo.url) : null, custom: Boolean(brand && !brand.is_default) };
+  return { name: name ?? t("name"), logo: brand?.logo ? mediaUrl(brand.logo.url) : null, custom: Boolean(name) };
 }
 
 /** The page's title ends in the app's name (layout metadata); with the bakery's name set, it ends in that one instead. */
@@ -42,8 +42,9 @@ export function useBrandTitle(): void {
   const t = useTranslations("app");
   const { name, custom } = useBrand();
   useEffect(() => {
-    if (!custom) return;
     const own = t("name");
+    if (!custom || name === own) return;
+    // only ever writes a title that ends in the app's name, so its own write never matches again (no observer loop)
     const rename = () => {
       const title = document.title;
       if (title === own) document.title = name;

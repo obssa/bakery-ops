@@ -557,7 +557,7 @@
                                                             ]
                                                         },
                                                         "is_default": {
-                                                            "type": "boolean"
+                                                            "type": "string"
                                                         }
                                                     },
                                                     "required": [
@@ -1156,7 +1156,7 @@
                                                             ]
                                                         },
                                                         "is_default": {
-                                                            "type": "boolean"
+                                                            "type": "string"
                                                         }
                                                     },
                                                     "required": [
@@ -1262,7 +1262,7 @@
                                                             ]
                                                         },
                                                         "is_default": {
-                                                            "type": "boolean"
+                                                            "type": "string"
                                                         }
                                                     },
                                                     "required": [
@@ -1356,7 +1356,7 @@
                                                             ]
                                                         },
                                                         "is_default": {
-                                                            "type": "boolean"
+                                                            "type": "string"
                                                         }
                                                     },
                                                     "required": [

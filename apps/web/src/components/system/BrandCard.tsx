@@ -2,7 +2,7 @@
 
 import { ImageUp, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { useRemoveBrandLogo, useSaveBrandName, useUploadBrandLogo } from "@/lib/brand";
 import { useErrorText } from "@/lib/errors";
@@ -18,6 +18,9 @@ import { Alert, Button, Field, Status, TextInput } from "../ui";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
+// the formats keep their machine names in every language: marked translate="no", so the Amharic screens read them as identifiers
+const types = (chunks: ReactNode) => <span translate="no">{chunks}</span>;
+
 export function BrandCard() {
   const t = useTranslations("system.brand");
   const errorText = useErrorText();
@@ -27,7 +30,7 @@ export function BrandCard() {
   const fileId = useId();
   const [nameEn, setNameEn] = useState(brand?.name_en ?? "");
   const [nameAm, setNameAm] = useState(brand?.name_am ?? "");
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<ReactNode>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const save = useSaveBrandName();
   const uploadLogo = useUploadBrandLogo();
@@ -57,7 +60,7 @@ export function BrandCard() {
   function onFile(file: File | undefined) {
     setSaved(null);
     if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return setProblem(t("check_type"));
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return setProblem(t.rich("check_type", { types }));
     if (file.size > MAX_BYTES) return setProblem(t("check_size"));
     setProblem(null);
     uploadLogo.mutate(
@@ -105,7 +108,7 @@ export function BrandCard() {
             <p className="min-w-0 text-sm text-neutral-700">{brand?.logo ? t("logo_set") : t("logo_default")}</p>
           </div>
           <p id={`${fileId}-hint`} className="text-[13px] text-neutral-600">
-            {t("logo_hint")}
+            {t.rich("logo_hint", { types })}
           </p>
           <div className="flex flex-wrap gap-3">
             {/* the file input inside its label: the label is the button people see, and its ring follows the input's keyboard focus */}
