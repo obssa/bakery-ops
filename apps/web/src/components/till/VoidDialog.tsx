@@ -113,13 +113,13 @@ export function VoidDialog({
                 <Alert>{errorText.message(payments.error)}</Alert>
               ) : null}
               {wholeAllowed ? (
-                <label className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                <label className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-ink-900 has-[:checked]:bg-ink-50">
                   <input type="radio" name="void-target" className="size-5 accent-ink-900" checked={target === "order"} onChange={() => setTarget("order")} />
                   <span className="text-base">{t("void_whole_order")}</span>
                 </label>
               ) : null}
               {voidable.map((payment) => (
-                <label key={payment.id} className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
+                <label key={payment.id} className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-ink-900 has-[:checked]:bg-ink-50">
                   <input type="radio" name="void-target" className="size-5 accent-ink-900" checked={target === payment.id} onChange={() => setTarget(payment.id)} />
                   <span className="text-base">{paymentLabel(payment, locale)}</span>
                 </label>

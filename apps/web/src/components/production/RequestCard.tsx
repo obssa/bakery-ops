@@ -134,7 +134,7 @@ export function RequestCard({
   return (
     <article
       className={`flex flex-col gap-2.5 rounded-2xl border bg-white p-3.5 motion-safe:transition-colors motion-safe:duration-150 ${
-        selected ? "border-brand-600 inset-ring-1 inset-ring-brand-600" : "border-neutral-200"
+        selected ? "border-ink-900 inset-ring-1 inset-ring-ink-900" : "border-neutral-200"
       }`}
     >
       {/* The button is named by its own text, "Open <product>" (the name the p2 specs read), which readers hear; what the card draws (the

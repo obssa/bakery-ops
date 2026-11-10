@@ -397,6 +397,16 @@ test.describe("screens", () => {
       if (!pressed) await row.getByRole("button", { name: t.till.exact }).click();
       await expect(row).toContainText(t.till.change_label);
     });
+    // a method other than cash chosen, at 1440 and 390 (Ramin 2026-11-10: a chosen card is charcoal, red reads as an error)
+    await shoot(page, "till-method-1440x900-en", async () => {
+      await page.setViewportSize(DESKTOP);
+      const row = page.getByRole("dialog").getByRole("group").first();
+      const methods = row.locator("button[aria-pressed]:enabled");
+      await methods.nth(Math.min(1, (await methods.count()) - 1)).click();
+      await expect(row.locator('button[aria-pressed="true"]')).toHaveCount(1);
+    });
+    await shoot(page, "till-method-390x844-en", () => page.setViewportSize(PHONE));
+    await page.setViewportSize(TABLET);
     await shoot(page, "till-1180x820-am", () => openTill(page, d, "am", cashier));
   });
 

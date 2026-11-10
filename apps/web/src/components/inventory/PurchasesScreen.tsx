@@ -37,7 +37,7 @@ import { InventoryNav, Pager, QueryBox, qtyFigure, stamp, useNamer } from "./sha
 //
 // Step 6.4c (fresh-counter.md 4.4, the CatalogList board): the title row with its Amharic twin and "New purchase" as its action (as the
 // catalog's "Add product"); the section's tabs; the status as the toolbar's segments; the purchases a table card (the status chips, the
-// total right-aligned, the chevron "Open purchase <invoice>", the open one brand-50, the pages in its foot). The new purchase and the open
+// total right-aligned, the chevron "Open purchase <invoice>", the open one ink-100, the pages in its foot). The new purchase and the open
 // one are white cards above the list, brought into view when they open, the cost changes after the open one.
 
 const STATUSES: readonly PurchaseStatus[] = ["draft", "confirmed", "cancelled"];
@@ -207,7 +207,7 @@ export function PurchasesScreen({ titleAm }: { titleAm?: string }) {
                   <EmptyRow span={costs ? 6 : 5}>{t("purchases.none")}</EmptyRow>
                 ) : (
                   result.data.map((purchase) => (
-                    <tr key={purchase.id} className={selected === purchase.id ? "bg-brand-50 hover:bg-brand-50" : ""}>
+                    <tr key={purchase.id} className={selected === purchase.id ? "bg-ink-100 hover:bg-ink-100" : ""}>
                       <td className="whitespace-nowrap tabular-nums text-neutral-700">{purchase.purchase_date}</td>
                       <td>{purchase.supplier.name}</td>
                       <th scope="row" className="font-semibold text-neutral-900">

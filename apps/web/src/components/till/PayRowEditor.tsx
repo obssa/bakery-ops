@@ -157,12 +157,12 @@ export function PayRowEditor({
                 disabled={!usable}
                 onClick={() => onChange({ channel: c.code })}
                 className={`flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[14px] px-3 py-2 text-center text-base font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
-                  selected ? "border-2 border-brand-600 bg-brand-50 text-brand-700" : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
+                  selected ? "border-2 border-ink-900 bg-ink-50 text-ink-900" : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
                 } disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-50 disabled:text-neutral-400 ${focusRing}`}
               >
                 <span>{name(c)}</span>
                 {needs ? (
-                  <span aria-hidden="true" className={`text-xs font-medium ${selected ? "text-brand-700" : "text-neutral-600"}`}>
+                  <span aria-hidden="true" className={`text-xs font-medium ${selected ? "text-ink-700" : "text-neutral-600"}`}>
                     {needs}
                   </span>
                 ) : null}
