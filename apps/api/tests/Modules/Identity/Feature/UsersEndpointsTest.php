@@ -184,7 +184,7 @@ it('resets a short code: returns the new code once, the old one stops verifying,
     $row = AuditLog::query()->where('action', 'user.short_code.reset')->where('subject_id', $user->id)->firstOrFail();
     expect($row->after['short_code_hash'] ?? null)->toBe('[redacted]')
         // no stored value is the code; a substring check would also match a date or an id that happens to hold its digits ("2026")
-        ->and(collect(Arr::dot($row->after))->contains(fn (mixed $value): bool => (string) $value === $code))->toBeFalse();
+        ->and(collect(Arr::dot($row->after))->contains(fn (mixed $value): bool => is_scalar($value) && (string) $value === $code))->toBeFalse();
 
     $this->getJson('/api/v1/users')->assertOk()->assertJsonMissingPath('data.0.short_code');
 })->group('module:identity', 'feature');
