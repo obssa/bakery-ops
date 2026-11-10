@@ -490,7 +490,7 @@ made to order (without one the product could never be sold), optional made in ba
 saved as version 1 after the item and the price, and a refused recipe opens the product page's drawer on it. Web only: the stock gating
 and the consumption it relies on already exist and stay proven by `SendOrderTest` (shortfall), `ReadyLineTest` (consumption per
 ingredient), `CreateOrderTest` (no recipe) and `MenuEndpointTest` (unavailable when short). Pull request #129 carries #128's two test
-fixes as well (merged into its branch), so one restated claim and one run cover both: claim restated at `MERGE_SHA`; the tag stays.
+fixes as well (merged into its branch), so one restated claim and one run cover both: claim restated at `bd40cba` (the merge commit, the last that changes `apps/`); the tag stays.
 
 ## What stays open after the claim
 
