@@ -520,6 +520,24 @@ photo's). The sidebar, the station bar, the sign-in screen (from the brand this 
 the admin sets them, the app's own name and mark. The same pull request gives `admin-smoke`'s catalog flow `test.slow()` (above).
 Claim restated at `671dbd2` (the merge of `main` after the fix that keeps the title from looping and the Amharic hint free of Latin words); the tag stays on `2f6bbd9`.
 
+**The Ethiopian clock** (Ramin, 2026-11-10: the time must always be Ethiopian, the day's hours 1 to 12 and then the night's 1 to 12, shown
+professionally, with an admin option for the international 12-hour or 24-hour time; decided: four parts of the day). Every time of day the
+app shows goes through `lib/clock.ts`: the hour is ((h + 6) mod 12), 12 for 0, with ጠዋት 06:00-11:59, ከሰዓት 12:00-17:59, ማታ
+18:00-23:59 and ሌሊት 00:00-05:59, so 07:50 reads "1:50 ጠዋት" ("1:50 morning"), always on the bakery's wall clock (the inventory pages
+read the browser's zone before, and so did the bell's and the production board's dates). The shift pages, the bar, the KDS wall clock, the
+payments, the audit log, the order timeline, the void dialog, the inventory pages and the charts' hour ticks ("12" with "ጠዋት" under it,
+then "1", "2", ...) follow it; durations ("5:07", "4 d") stay as they were. Admin > System gains a Time card (branding.manage): how the
+clock reads, with examples across the day, and "Also show international time: Off / 12-hour / 24-hour" (`brand_profiles.clock_also`,
+migration `2026_11_16_100000`, PUT /brand/clock, idempotent and audited `identity.brand.clock`, GET /me `brand.clock_also`), which adds
+"· 4:10 PM" or "· 16:10" for everyone. Shift templates are picked on that clock (the hour listed from sunrise, "12 morning" to "11 night",
+and the minutes in fives; the API keeps "HH:MM"). The API prints the same words through `Shared\Time\EthiopianClock` on the receipts
+(HTML, PDF and the printer's raster, whose goldens were drawn again), the report PDFs and the weekly PDF (Identity's `ClockPreference`
+gives them the admin's choice; `ModuleBoundariesTest` lets Analytics read it); the CSV and XLSX exports keep the 24-hour stamp and gain an
+Ethiopian time column (`received_at_ethiopian`, `at_ethiopian`). Tests: `screens-clock-logic` (every minute of the day, the boundaries, the
+way back), Pest `EthiopianClockTest`, the clock endpoint in `BrandProfileTest`, the receipt and export cases; captures of System > Time
+(off and with the 12-hour clock), the template picker and the Shifts overview in Amharic, at 1440 and 390.
+Claim restated at `203bafa`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
