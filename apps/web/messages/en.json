@@ -817,7 +817,7 @@
     "new": {
       "title_product": "New product",
       "title_ingredient": "New ingredient",
-      "intro_product": "Start with the basics. You add the photo and the recipe next, on the product's own page.",
+      "intro_product": "Start with the basics and, for a product you make, its recipe. You add the photo next, on the product's own page.",
       "intro_ingredient": "Start with the basics. Its stock is counted in the unit you choose here.",
       "kind_title": "What are you adding?",
       "kind_product_hint": "Something you sell. It shows on the waiter pad and the till.",
@@ -846,7 +846,19 @@
       "check_name_am": "Enter the name in Amharic.",
       "check_unit": "Choose a unit.",
       "check_price": "Enter a price above zero, with at most 2 decimals.",
-      "check_fields": "Check the fields marked in red."
+      "check_fields": "Check the fields marked in red.",
+      "recipe_title": "Recipe",
+      "recipe_hint_to_order": "The ingredients and how much of each goes into one. An order is refused when the kitchen is short of any of them, and they come off the stock when the item is ready.",
+      "recipe_hint_to_stock": "The ingredients one batch uses, and how many it makes. They come off the stock when a batch is recorded. You can add the recipe later.",
+      "recipe_for_one": "For 1 {unit}.",
+      "recipe_for_one_unit": "For one of the product's unit.",
+      "yield_label": "One batch makes",
+      "yield_hint": "In {unit}, the product's unit.",
+      "yield_hint_unit": "In the product's unit.",
+      "recipe_no_ingredients": "There are no ingredients yet.",
+      "recipe_new_ingredient": "Add an ingredient first",
+      "check_recipe_required": "Add at least one ingredient with its quantity. A product made to order cannot be sold without its recipe.",
+      "check_yield": "Enter how many one batch makes, above zero."
     }
   },
   "people": {
@@ -1351,7 +1363,9 @@
     "created": "Created “{name}”. Add a photo and a recipe.",
     "created_photo": "Created “{name}”. Add a photo.",
     "created_ingredient": "Created “{name}”.",
-    "price_not_saved": "The product was created, but its price was not saved: {reason} Enter the price here and save."
+    "price_not_saved": "The product was created, but its price was not saved: {reason} Enter the price here and save.",
+    "created_with_recipe": "Created “{name}” with its recipe. Add a photo.",
+    "recipe_not_saved": "The product was created, but its recipe was not saved: {reason} Check it in the recipe and save."
   },
   "photo": {
     "title": "Photo",

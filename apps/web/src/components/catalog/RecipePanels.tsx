@@ -13,6 +13,7 @@ import { authed, can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { formatWhen } from "../production/RequestCard";
 import { Alert, Badge, Button, Field, Panel, Select, Status, TextInput } from "../ui";
+import { checkLines, draftKey, linesFrom, RecipeLinesEditor, specLines, type DraftLine } from "./RecipeLinesEditor";
 
 // A product's recipe on its page (Phase 2, step 2.8d; behind "Recipe and cost" since step 6.4b, a drawer from the title row, because the
 // ProductPhoto board draws the page as its details, refunds and photo): the price with the cost and margin of the version being looked at
@@ -34,21 +35,43 @@ function useRecipeAt(id: number, version: number | null) {
   });
 }
 
-/** The recipe of a product, or why it has none (an ingredient, a product bought in). */
-export function RecipePanels({ product }: { product: Item }) {
+/** A recipe as typed (the body of a write) shaped as the publish form reads a version, to start the form from it. */
+function draftAsRecipe(product: Item, spec: RecipeSpec): Recipe {
+  return {
+    id: null,
+    product_item_id: product.id,
+    version: null,
+    is_active: false,
+    published_at: null,
+    published_by: null,
+    change_note: null,
+    yield_qty: spec.yield_qty,
+    yield_unit_id: spec.yield_unit_id,
+    yield_unit_code: null,
+    base_unit_code: "",
+    lines: spec.lines.map((line, index) => ({ id: -1 - index, ingredient_item_id: line.ingredient_item_id, qty: line.qty, unit_id: line.unit_id, unit_code: "", qty_base: line.qty, base_unit_code: "", is_optional: line.is_optional, waste_pct: line.waste_pct })),
+    steps: spec.steps.map((step, index) => ({ id: -1 - index, step_order: index + 1, text_en: step.text_en, text_am: step.text_am })),
+  };
+}
+
+/**
+ * The recipe of a product, or why it has none (an ingredient, a product bought in). `draft`: a recipe the new item page could not save,
+ * which the publish form starts from (phase-6/new-item-recipe); `onPublished` tells the page once a version is saved.
+ */
+export function RecipePanels({ product, draft = null, onPublished }: { product: Item; draft?: RecipeSpec | null; onPublished?: () => void }) {
   const t = useTranslations("recipe");
   if (product.kind !== "product") return <p className="text-base text-neutral-700">{t("not_a_product")}</p>;
   if (product.fulfilment === "bought_in") return <p className="text-base text-neutral-700">{t("bought_in")}</p>;
-  return <Recipes product={product} />;
+  return <Recipes product={product} draft={draft} onPublished={onPublished} />;
 }
 
-function Recipes({ product }: { product: Item }) {
+function Recipes({ product, draft, onPublished }: { product: Item; draft: RecipeSpec | null; onPublished?: () => void }) {
   const t = useTranslations("recipe");
   const tc = useTranslations("common");
   const errorText = useErrorText();
   const versions = useRecipeVersions(product.id);
   const [chosen, setChosen] = useState<number | null>(null);
-  const [seed, setSeed] = useState<{ recipe: Recipe; key: string } | null>(null);
+  const [seed, setSeed] = useState<{ recipe: Recipe; key: string } | null>(() => (draft ? { recipe: draftAsRecipe(product, draft), key: "created" } : null));
 
   if (versions.isPending) return <p className="text-base text-neutral-600">{tc("loading")}</p>;
   if (versions.isError) {
@@ -79,6 +102,7 @@ function Recipes({ product }: { product: Item }) {
         onPublished={() => {
           setSeed(null);
           setChosen(null);
+          onPublished?.();
         }}
       />
       {active && viewed !== null ? <ComparePanel product={product} viewed={viewed} versions={rows.map((row) => row.version)} /> : null}
@@ -279,22 +303,11 @@ function VersionView({ product, version, onStartFrom }: { product: Item; version
 
 // --- publish a new version, with the scaled preview ------------------------------------------------------------
 
-interface DraftLine {
-  key: number;
-  ingredient: string;
-  qty: string;
-  unit: string;
-  optional: boolean;
-  waste: string;
-}
-
 interface DraftStep {
   key: number;
   en: string;
   am: string;
 }
-
-let nextKey = 1;
 
 function PublishPanel({ product, activeVersion, seed, onPublished }: { product: Item; activeVersion: number | null; seed: { recipe: Recipe; key: string } | null; onPublished: () => void }) {
   const tc = useTranslations("common");
@@ -318,37 +331,26 @@ function PublishForm({ product, base, first, onPublished }: { product: Item; bas
 
   const [yieldQty, setYieldQty] = useState(base?.yield_qty ? trimDecimal(base.yield_qty) : "1");
   const [yieldUnit, setYieldUnit] = useState(String(base?.yield_unit_id ?? product.unit_id));
-  const [lines, setLines] = useState<DraftLine[]>(() =>
-    base && base.lines.length > 0
-      ? base.lines.map((line) => ({ key: nextKey++, ingredient: String(line.ingredient_item_id), qty: trimDecimal(line.qty), unit: String(line.unit_id), optional: line.is_optional, waste: trimDecimal(line.waste_pct) }))
-      : [{ key: nextKey++, ingredient: "", qty: "", unit: "", optional: false, waste: "0" }],
-  );
-  const [steps, setSteps] = useState<DraftStep[]>(() => (base?.steps ?? []).map((step) => ({ key: nextKey++, en: step.text_en, am: step.text_am })));
+  const [lines, setLines] = useState<DraftLine[]>(() => linesFrom(base));
+  const [steps, setSteps] = useState<DraftStep[]>(() => (base?.steps ?? []).map((step) => ({ key: draftKey(), en: step.text_en, am: step.text_am })));
   const [note, setNote] = useState("");
   const [previewQty, setPreviewQty] = useState(() => (base?.yield_qty ? trimDecimal(base.yield_qty) : "1"));
   const [problem, setProblem] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
 
-  function change(key: number, patch: Partial<DraftLine>) {
-    setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
-  }
-
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaved(null);
     if (!isQuantityText(yieldQty) || compareDecimal(yieldQty, "0") <= 0) return setProblem(t("check_yield"));
-    for (const line of lines) {
-      if (!line.ingredient || !line.unit) return setProblem(t("check_lines"));
-      if (!isQuantityText(line.qty) || compareDecimal(line.qty, "0") <= 0) return setProblem(t("check_lines"));
-      if (!isQuantityText(line.waste || "0", 2) || compareDecimal(line.waste || "0", "100", 2) >= 0) return setProblem(t("check_waste"));
-    }
+    const linesProblem = checkLines(lines);
+    if (linesProblem) return setProblem(t(linesProblem));
     const kept = steps.filter((step) => step.en.trim() || step.am.trim());
     if (kept.some((step) => !step.en.trim() || !step.am.trim())) return setProblem(t("check_steps"));
     setProblem(null);
     const body: RecipeSpec = {
       yield_qty: yieldQty.trim(),
       yield_unit_id: Number(yieldUnit),
-      lines: lines.map((line) => ({ ingredient_item_id: Number(line.ingredient), qty: line.qty.trim(), unit_id: Number(line.unit), is_optional: line.optional, waste_pct: (line.waste || "0").trim() })),
+      lines: specLines(lines),
       steps: kept.map((step) => ({ text_en: step.en.trim(), text_am: step.am.trim() })),
       ...(first ? {} : { change_note: note.trim() }),
     };
@@ -387,59 +389,7 @@ function PublishForm({ product, base, first, onPublished }: { product: Item; bas
             </Field>
           </div>
 
-          <fieldset className="space-y-4">
-            <legend className="mb-2 text-base font-semibold text-neutral-900">{t("lines")}</legend>
-            {lines.map((line, index) => {
-              const n = index + 1;
-              return (
-                <div key={line.key} className="grid items-end gap-3 rounded-md border border-neutral-200 p-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
-                  <Field label={t("field_ingredient", { n })}>
-                    {(props) => (
-                      <Select
-                        {...props}
-                        value={line.ingredient}
-                        onChange={(e) => {
-                          const picked = (items.data ?? []).find((row) => String(row.id) === e.target.value);
-                          change(line.key, { ingredient: e.target.value, unit: picked ? String(picked.unit_id) : line.unit });
-                        }}
-                      >
-                        <option value="" disabled>
-                          {items.isPending ? tc("loading") : t("choose_ingredient")}
-                        </option>
-                        {(items.data ?? []).map((row) => (
-                          <option key={row.id} value={row.id}>
-                            {pick(locale, row)}
-                          </option>
-                        ))}
-                      </Select>
-                    )}
-                  </Field>
-                  <Field label={t("field_qty", { n })}>{(props) => <TextInput {...props} inputMode="decimal" autoComplete="off" value={line.qty} onChange={(e) => change(line.key, { qty: e.target.value })} />}</Field>
-                  <Field label={t("field_unit", { n })}>
-                    {(props) => (
-                      <Select {...props} value={line.unit} onChange={(e) => change(line.key, { unit: e.target.value })}>
-                        <option value="" disabled>
-                          {t("choose_unit")}
-                        </option>
-                        {unitOptions}
-                      </Select>
-                    )}
-                  </Field>
-                  <Field label={t("field_waste", { n })}>{(props) => <TextInput {...props} inputMode="decimal" autoComplete="off" value={line.waste} onChange={(e) => change(line.key, { waste: e.target.value })} />}</Field>
-                  <label className="flex min-h-12 items-center gap-2 text-base text-neutral-800">
-                    <input type="checkbox" className="size-5" aria-label={t("field_optional", { n })} checked={line.optional} onChange={(e) => change(line.key, { optional: e.target.checked })} />
-                    {t("optional")}
-                  </label>
-                  <Button type="button" variant="secondary" aria-label={t("remove_line", { n })} disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((row) => row.key !== line.key))}>
-                    {t("remove")}
-                  </Button>
-                </div>
-              );
-            })}
-            <Button type="button" variant="secondary" onClick={() => setLines((current) => [...current, { key: nextKey++, ingredient: "", qty: "", unit: "", optional: false, waste: "0" }])}>
-              {t("add_line")}
-            </Button>
-          </fieldset>
+          <RecipeLinesEditor lines={lines} onLines={setLines} legend={t("lines")} />
 
           <fieldset className="space-y-4">
             <legend className="mb-2 text-base font-semibold text-neutral-900">{t("steps")}</legend>
@@ -455,7 +405,7 @@ function PublishForm({ product, base, first, onPublished }: { product: Item; bas
                 </div>
               );
             })}
-            <Button type="button" variant="secondary" onClick={() => setSteps((current) => [...current, { key: nextKey++, en: "", am: "" }])}>
+            <Button type="button" variant="secondary" onClick={() => setSteps((current) => [...current, { key: draftKey(), en: "", am: "" }])}>
               {t("add_step")}
             </Button>
           </fieldset>

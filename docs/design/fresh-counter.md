@@ -321,9 +321,14 @@ Three zones from left to right.
      kind being added, chosen once it exists) and the unit (its common ones first);
   3. "How it's sold", products only: Made to order, Made in batches, Bought in, three choice cards with a sentence each (the radio
      group "Fulfilment");
-  4. Price, products only and optional (an ETB money input), saved after the item by the product page's own price call;
-  5. "More options", folded: the SKU, and for a product the two refund switches. An ingredient shows no refund section at all;
-  6. a white footer bar that stays in view at the bottom of the window (`shadow-float`, 16 px off the edge): Cancel, and "Create
+  4. "Recipe", a product that is made only (phase-6/new-item-recipe): one sentence on what the recipe does, then the ingredient lines of
+     the product page's own recipe form (ingredient, quantity, unit, waste %, optional, Remove; "Add ingredient"). Made to order: "For 1
+     {unit}." and at least one line, required, since a product made to order cannot be sold without its recipe; made in batches: "One
+     batch makes" (in the product's unit) and the lines, optional. Bought in and ingredients show no recipe. Saved after the item and the
+     price as the recipe's version 1; a recipe the API refuses opens the product page's recipe drawer on it, as typed, saying why;
+  5. Price, products only and optional (an ETB money input), saved after the item by the product page's own price call;
+  6. "More options", folded: the SKU, and for a product the two refund switches. An ingredient shows no refund section at all;
+  7. a white footer bar that stays in view at the bottom of the window (`shadow-float`, 16 px off the edge): Cancel, and "Create
      product" or "Create ingredient".
   The page checks the names, the unit and the price before it sends; each error, its own or the API's, shows under its field, a red line
   under the form says so, and the first field in error takes the focus. A create opens the item's own page with a status line ("Created

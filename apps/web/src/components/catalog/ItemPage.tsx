@@ -34,6 +34,7 @@ import { RefundToggles } from "./RefundSettings";
 // (RecipePanels, as it was). Only catalog.manage changes anything; anyone else reads the page.
 // phase-6/new-item-page: opened by the new item page right after a create, the page says so in its status line and what comes next (the
 // photo, and the recipe of a product that is made), and, when the first price was refused, why it is missing (lib/createdItem.ts).
+// phase-6/new-item-recipe: the recipe is typed on the new item page; when it was refused, the drawer opens on it as typed, saying why.
 
 const CARD = "rounded-[18px] border border-neutral-200 bg-white p-5";
 const CHIP = "inline-flex h-6.5 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold";
@@ -110,10 +111,16 @@ function ProductPage({ product, created }: { product: Item; created: CreatedItem
     if (!created) return null;
     const shown = locale === "am" ? product.name_am : product.name_en;
     if (product.kind !== "product") return t("created_ingredient", { name: shown });
-    return product.fulfilment === "bought_in" ? t("created_photo", { name: shown }) : t("created", { name: shown });
+    if (product.fulfilment === "bought_in") return t("created_photo", { name: shown });
+    return created.recipeSaved ? t("created_with_recipe", { name: shown }) : t("created", { name: shown });
   });
-  const [problem, setProblem] = useState<string | null>(() => (created?.priceError ? t("price_not_saved", { reason: created.priceError }) : null));
-  const [recipeOpen, setRecipeOpen] = useState(false);
+  const [problem, setProblem] = useState<string | null>(() => {
+    const reasons = [created?.priceError ? t("price_not_saved", { reason: created.priceError }) : null, created?.recipeError ? t("recipe_not_saved", { reason: created.recipeError }) : null];
+    return reasons.filter(Boolean).join(" ") || null;
+  });
+  // a recipe the new item page could not save: the drawer opens on it, as typed (phase-6/new-item-recipe)
+  const [recipeOpen, setRecipeOpen] = useState(() => Boolean(created?.recipeDraft));
+  const [recipeDraft, setRecipeDraft] = useState(() => created?.recipeDraft ?? null);
 
   const current = prices.data?.find((price) => price.is_current) ?? null;
   const draft: Draft = {
@@ -318,7 +325,7 @@ function ProductPage({ product, created }: { product: Item; created: CreatedItem
               <X className="size-5" strokeWidth={2} aria-hidden="true" />
             </IconButton>
           </div>
-          <RecipePanels product={product} />
+          <RecipePanels product={product} draft={recipeDraft} onPublished={() => setRecipeDraft(null)} />
         </Drawer>
       ) : null}
     </div>

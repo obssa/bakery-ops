@@ -6,10 +6,10 @@ import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useAddPrice } from "@/lib/api/catalog";
-import { useCategories, useCreateCategory, useCreateItem, useUnits } from "@/lib/api/hooks";
+import { useAddPrice, usePutRecipe } from "@/lib/api/catalog";
+import { useCategories, useCreateCategory, useCreateItem, useItems, useUnits } from "@/lib/api/hooks";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
-import { FULFILMENTS, type Category, type Fulfilment, type ItemKind, type Locale, type NewCategory, type NewItem, type Unit } from "@/lib/api/types";
+import { FULFILMENTS, type Category, type Fulfilment, type ItemKind, type Locale, type NewCategory, type NewItem, type RecipeSpec, type Unit } from "@/lib/api/types";
 import { handCreated } from "@/lib/createdItem";
 import { compareDecimal, isQuantityText } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
@@ -17,6 +17,7 @@ import { refundSettingsBody } from "@/lib/refund";
 import { buttonClass, focusRing } from "../styles";
 import { Alert, Button, Field, Modal, MoneyInput, Select, Status, TextInput } from "../ui";
 import { Breadcrumb } from "./Breadcrumb";
+import { blankLine, checkLines, isBlank, RecipeLinesEditor, specLines, type DraftLine } from "./RecipeLinesEditor";
 import { RefundToggles } from "./RefundSettings";
 
 // Admin > Catalog > New product / New ingredient (phase-6/new-item-page, docs/design/fresh-counter.md 4.3): a page of its own, where the
@@ -26,14 +27,18 @@ import { RefundToggles } from "./RefundSettings";
 //   2. Basics: the two names side by side, then the category (with "New category", a small dialog, so a missing one never sends the admin
 //      away) and the unit, its common ones first;
 //   3. "How it's sold" (a product): Made to order, Made in batches, Bought in, three choice cards, the radio group "Fulfilment";
-//   4. Price (a product, optional): saved after the item, by the product page's own call (POST /items/{item}/prices);
-//   5. "More options", folded: the SKU, and for a product the two refund settings (RefundToggles, as the product page has them). An
+//   4. the recipe (phase-6/new-item-recipe, a product that is made): its ingredients and how much of each, the product page's own lines
+//      (RecipeLinesEditor). Made to order: what goes into one, required, since a made-to-order product without a recipe can never be
+//      sold (the send holds each ingredient and refuses when one is short; the ingredients come off the stock when the line is ready).
+//      Made in batches: what one batch uses and how many it makes, optional (the batch takes them off the stock when it is recorded);
+//   5. Price (a product, optional): saved after the item, by the product page's own call (POST /items/{item}/prices);
+//   6. "More options", folded: the SKU, and for a product the two refund settings (RefundToggles, as the product page has them). An
 //      ingredient is never sold, so it shows no refund section and sends none;
-//   6. a footer that stays in view: Cancel, and "Create product" or "Create ingredient".
+//   7. a footer that stays in view: Cancel, and "Create product" or "Create ingredient".
 // The checks run in the page first (the names, the unit, the price), then the API's: each error shows under its field and the first one
 // takes the focus. On success the item's own page opens (?item=<id>), saying it was created and what comes next (the photo, the recipe).
-// Two writes, each with its own Idempotency-Key: a retry replays, and when the price is refused the item still exists once and its page
-// says why the price is missing.
+// Up to three writes (the item, its price, its recipe's version 1), each with its own Idempotency-Key: a retry replays, and when the price
+// or the recipe is refused the item still exists once and its page says why (a refused recipe opens the page's recipe drawer, filled in).
 
 const CARD = "rounded-[18px] border border-neutral-200 bg-white p-5";
 const KINDS: readonly ItemKind[] = ["product", "ingredient"];
@@ -42,7 +47,7 @@ const FULFILMENT_ICONS: Record<Fulfilment, LucideIcon> = { to_order: ChefHat, to
 /** The units a bakery names first for each kind; the rest follow in the page's language. */
 const COMMON_UNITS: Record<ItemKind, readonly string[]> = { product: ["pcs", "slice", "tray"], ingredient: ["kg", "g", "L", "ml", "pcs"] };
 
-type FieldName = "name_en" | "name_am" | "category_id" | "unit_id" | "fulfilment" | "price" | "sku";
+type FieldName = "name_en" | "name_am" | "category_id" | "unit_id" | "fulfilment" | "price" | "sku" | "recipe" | "yield_qty";
 
 function kindFrom(raw: string | null): ItemKind {
   return raw === "ingredient" ? "ingredient" : "product";
@@ -69,16 +74,21 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
   const t = useTranslations("catalog.new");
   const tcat = useTranslations("catalog");
   const tc = useTranslations("common");
+  const trecipe = useTranslations("recipe");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
   const router = useRouter();
   const client = useQueryClient();
   const units = useUnits();
   const categories = useCategories();
+  const ingredients = useItems("ingredient");
   const create = useCreateItem();
   const addPrice = useAddPrice();
+  const putRecipe = usePutRecipe();
   const itemKey = useIdempotencyKey();
   const priceKey = useIdempotencyKey();
+  const recipeKey = useIdempotencyKey();
+  const recipeErrorId = useId();
   const formRef = useRef<HTMLFormElement>(null);
 
   const [kind, setKind] = useState<ItemKind>(initialKind);
@@ -89,6 +99,8 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
   const [unitId, setUnitId] = useState("");
   const [price, setPrice] = useState("");
   const [sku, setSku] = useState("");
+  const [lines, setLines] = useState<DraftLine[]>(() => [blankLine()]);
+  const [yieldQty, setYieldQty] = useState("");
   // the refund settings (step 4.5g): untouched, the API gives the natural values (refundable, back into stock when sold from stock)
   const [refundable, setRefundable] = useState<boolean | null>(null);
   const [restock, setRestock] = useState<boolean | null>(null);
@@ -101,13 +113,15 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
 
   const isProduct = kind === "product";
   const title = isProduct ? t("title_product") : t("title_ingredient");
-  const busy = create.isPending || addPrice.isPending || leaving;
+  const busy = create.isPending || addPrice.isPending || putRecipe.isPending || leaving;
+  const made = isProduct && fulfilment !== "bought_in";
+  const unitCode = (units.data ?? []).find((u) => String(u.id) === unitId)?.code ?? null;
   const ofKind: Category[] = (categories.data ?? []).filter((c) => c.kind === kind);
   const groups = unitGroups(units.data ?? [], kind, locale);
 
   const fieldError = (field: FieldName): string | undefined => checks[field] ?? errorText.field(create.error, field);
   const clear = (field: FieldName) => setChecks((before) => (before[field] ? { ...before, [field]: undefined } : before));
-  const anyFieldError = (["name_en", "name_am", "category_id", "unit_id", "fulfilment", "price", "sku"] as const).some((field) => fieldError(field));
+  const anyFieldError = (["name_en", "name_am", "category_id", "unit_id", "fulfilment", "price", "sku", "recipe", "yield_qty"] as const).some((field) => fieldError(field));
 
   // after a refused submit, the first field marked invalid takes the focus (a radio group gives it to its chosen card)
   useEffect(() => {
@@ -136,6 +150,14 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
     if (!nameAm.trim()) found.name_am = t("check_name_am");
     if (!unitId) found.unit_id = t("check_unit");
     if (isProduct && typedPrice && (!isQuantityText(typedPrice, 2) || compareDecimal(typedPrice, "0", 2) <= 0)) found.price = t("check_price");
+    // the recipe: the lines typed into (a blank one is left out); one at least for a product made to order
+    const typedLines = lines.filter((line) => !isBlank(line));
+    if (made) {
+      const linesProblem = checkLines(typedLines);
+      if (fulfilment === "to_order" && typedLines.length === 0) found.recipe = t("check_recipe_required");
+      else if (linesProblem) found.recipe = trecipe(linesProblem);
+      if (fulfilment === "to_stock" && typedLines.length > 0 && (!isQuantityText(yieldQty.trim()) || compareDecimal(yieldQty.trim(), "0") <= 0)) found.yield_qty = t("check_yield");
+    }
     create.reset();
     setChecks(found);
     setNotice(null);
@@ -165,6 +187,9 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
     }
     itemKey.done();
     setLeaving(true);
+    // made to order, the recipe is for one of the product's unit; made in batches, for the batch it makes
+    const recipe: RecipeSpec | null =
+      made && typedLines.length > 0 ? { yield_qty: fulfilment === "to_order" ? "1" : yieldQty.trim(), yield_unit_id: Number(unitId), lines: specLines(typedLines), steps: [] } : null;
     let priceError: string | null = null;
     if (isProduct && typedPrice) {
       try {
@@ -174,7 +199,16 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
         priceError = errorText.message(error);
       }
     }
-    handCreated({ id, priceError });
+    let recipeError: string | null = null;
+    if (recipe) {
+      try {
+        await putRecipe.mutateAsync({ id, body: recipe, idempotencyKey: recipeKey.keyFor({ item: id, recipe }) });
+        recipeKey.done();
+      } catch (error) {
+        recipeError = errorText.message(error);
+      }
+    }
+    handCreated({ id, priceError, recipeSaved: recipe !== null && recipeError === null, recipeError, recipeDraft: recipeError ? recipe : null });
     // the item's page replaces this one: Back from it goes to the list, not to a form that would create the item again
     router.replace({ pathname: "/admin/catalog", query: { item: id } });
   }
@@ -321,6 +355,54 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
               error={fieldError("fulfilment")}
               className="md:grid-cols-3"
               options={FULFILMENTS.map((value) => ({ value, title: tcat(`fulfilment_${value}`), hint: t(`fulfilment_${value}_hint`), icon: FULFILMENT_ICONS[value] }))}
+            />
+          </Section>
+        ) : null}
+
+        {made ? (
+          <Section title={t("recipe_title")}>
+            <p className="-mt-2 text-[15px] text-neutral-600">{fulfilment === "to_order" ? t("recipe_hint_to_order") : t("recipe_hint_to_stock")}</p>
+            {fulfilment === "to_order" ? (
+              <p className="text-[15px] font-medium text-neutral-800">{unitCode ? t("recipe_for_one", { unit: unitCode }) : t("recipe_for_one_unit")}</p>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Field label={t("yield_label")} hint={unitCode ? t("yield_hint", { unit: unitCode }) : t("yield_hint_unit")} error={fieldError("yield_qty")}>
+                  {(props) => (
+                    <TextInput
+                      {...props}
+                      controlSize="md"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      disabled={busy}
+                      value={yieldQty}
+                      onChange={(e) => {
+                        setYieldQty(e.target.value);
+                        clear("yield_qty");
+                      }}
+                    />
+                  )}
+                </Field>
+              </div>
+            )}
+            {ingredients.data && ingredients.data.length === 0 ? (
+              <p className="text-[15px] text-neutral-700">
+                {t("recipe_no_ingredients")}{" "}
+                <Link href={{ pathname: "/admin/catalog/new", query: { kind: "ingredient" } }} className="font-semibold text-brand-700 underline">
+                  {t("recipe_new_ingredient")}
+                </Link>
+              </p>
+            ) : null}
+            <RecipeLinesEditor
+              lines={lines}
+              onLines={(update) => {
+                setLines(update);
+                clear("recipe");
+              }}
+              legend={trecipe("lines")}
+              error={fieldError("recipe")}
+              errorId={recipeErrorId}
+              disabled={busy}
+              controlSize="md"
             />
           </Section>
         ) : null}

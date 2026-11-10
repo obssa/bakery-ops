@@ -188,6 +188,19 @@ export function usePublishRecipe(id: number) {
   });
 }
 
+/** The first version of a product's recipe, for a product the page has just created (the new item page knows its id only then). */
+export function usePutRecipe() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body, idempotencyKey }: Write<RecipeSpec> & { id: number }) => authed<Recipe>(`/items/${id}/recipe`, { method: "PUT", body, idempotencyKey }),
+    onSettled: (_recipe, _error, { id }) => {
+      void client.invalidateQueries({ queryKey: ["recipe-versions", id] });
+      void client.invalidateQueries({ queryKey: ["recipe-version", id] });
+      void client.invalidateQueries({ queryKey: ["recipe-cost", id] });
+    },
+  });
+}
+
 export function useStations() {
   const me = useSession((s) => s.me);
   const enabled = useSignedIn() && can(me, "people.manage");
