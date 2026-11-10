@@ -518,7 +518,7 @@ logo kept whole on a white 256 px square (`brand_profiles`, one row per branch; 
 audited; GET /me carries `brand`; the file is public at /api/v1/media/brand/{sha}.{ext}, content-addressed and immutable like a product
 photo's). The sidebar, the station bar, the sign-in screen (from the brand this device last saw) and the browser's title show them; until
 the admin sets them, the app's own name and mark. The same pull request gives `admin-smoke`'s catalog flow `test.slow()` (above).
-Claim restated at `638a53f` (the merge of `main`, after the last commit that changes `apps/`); the tag stays on `2f6bbd9`.
+Claim restated at `671dbd2` (the merge of `main` after the fix that keeps the title from looping and the Amharic hint free of Latin words); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
