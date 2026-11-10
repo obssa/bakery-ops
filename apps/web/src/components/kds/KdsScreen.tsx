@@ -54,14 +54,17 @@ function useStations(kind: StationCode): { stations: StationChoice[]; loading: b
   return { stations: [...merged.values()].sort((a, b) => a.id - b.id), loading: lists && all.isLoading };
 }
 
-/** The wall clock of the display, in Addis Ababa time (big, tabular: read across the room). */
+/** The wall clock of the display, on the Ethiopian clock (big, tabular: read across the room); the part of the day smaller beside it. */
 function WallClock() {
   const clock = useClock();
   const now = useNow(15_000);
   const iso = new Date(now).toISOString();
+  const text = clock(iso);
+  const space = text.indexOf(" ");
   return (
-    <time dateTime={iso} className="text-[26px] font-semibold leading-none tabular-nums text-night-text">
-      {clock(iso)}
+    <time dateTime={iso} className="whitespace-nowrap leading-none tabular-nums text-night-text">
+      <span className="text-[26px] font-semibold">{space < 0 ? text : text.slice(0, space)}</span>
+      {space < 0 ? null : <span className="ml-1.5 text-[15px] font-medium">{text.slice(space + 1)}</span>}
     </time>
   );
 }
