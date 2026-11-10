@@ -4,12 +4,12 @@ import path from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import am from "../../messages/am.json";
 import en from "../../messages/en.json";
-import { fontsReady, settledAnimations } from "../support/a11y";
+import { expectAccessible, fontsReady, settledAnimations } from "../support/a11y";
 import { uuid, type Api } from "../support/api";
 import { demoPerson, demoProduction } from "../support/demoProduction";
 import { freshDevice } from "../support/devices";
 import { live } from "../support/env";
-import { loginOnce } from "../support/fixture";
+import { loginOnce, unitLookup } from "../support/fixture";
 import { openAs, typeCode } from "../support/pad";
 import { dropFile, FIXTURE_PHOTO } from "../support/productPhoto";
 import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCounts, settleStation } from "../support/shifts";
@@ -57,6 +57,10 @@ import { currentShift, ensureOpenShift, finishClosingCounts, resolvePendingCount
 // phase-6/admin-tables (the Phase 6 follow-up, the describe after it): Admin > Tables as the demo bakery's admin, at 1440 x 900 and at
 // 390 x 844, in English and in Amharic: the grid of the demo tables with their states, a table's Edit drawer, "Add table" refused on a code
 // that is taken (nothing is written) and "Add several". At the phone's width the page must not scroll sideways.
+//
+// phase-6/recipe-editor-layout (in the product page's describe): the "Recipe and cost" drawer at 1440 x 900 and at 390 x 844, in English and
+// in Amharic: a product made to order with no recipe yet (created for the capture, switched off after) with two lines typed, and a demo
+// product's form for its next version. At the phone's width neither the page nor the drawer scrolls sideways.
 
 const SHOTS = path.join("test-results", "screens");
 const TABLET = { width: 1180, height: 820 };
@@ -943,6 +947,68 @@ test.describe("screens: the product page", () => {
       }
     }
   });
+
+  // phase-6/recipe-editor-layout: the "Recipe and cost" drawer at 1440 x 900 and at 390 x 844, in English and in Amharic. A product made to
+  // order with no recipe (created here, switched off after): the drawer's top with "No recipe yet", then its first version with two lines
+  // typed (nothing is saved); and a demo product made to order whose recipe is in use: the form that publishes its next version, filled from
+  // it. The lines are laid out by the drawer's own width, so the narrow drawer of a wide screen draws them as cards, as a phone does. At the
+  // phone's width neither the page nor the drawer scrolls sideways.
+  for (const locale of ["en", "am"] as const) {
+    test(`the recipe drawer: no recipe yet with two lines typed, and a recipe in use, at 1440 x 900 and 390 x 844, in ${locale}`, async ({ page }) => {
+      test.setTimeout(180_000);
+      const t = MESSAGES[locale];
+      const demo = await demoBakery();
+      const unit = await unitLookup(demo.admin);
+      const tag = randomUUID().slice(0, 6);
+      const created = await demo.admin.post<{ id: number }>("/items", { kind: "product", fulfilment: "to_order", name_en: `Chicken wrap ${tag}`, name_am: `የዶሮ ጥቅልል ${tag}`, unit_id: unit("pcs") });
+      const drawer = page.getByRole("dialog", { name: t.product.recipe });
+
+      /** The drawer as it stands at both sizes, `into` scrolled into view (else its top), with the sideways check at the phone's width. */
+      async function drawerSizes(name: string, into?: Locator): Promise<void> {
+        for (const [size, viewport] of [["1440x900", DESKTOP], ["390x844", PHONE]] as const) {
+          await page.setViewportSize(viewport);
+          if (into) await into.scrollIntoViewIfNeeded();
+          else await drawer.evaluate((element) => element.scrollTo(0, 0));
+          await capture(page, `${name}-${size}-${locale}`);
+          if (size === "390x844") {
+            const widths = await drawer.evaluate((element) => ({ drawer: element.scrollWidth - element.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
+            expect(widths, `${name} at 390 x 844 scrolls sideways`).toEqual({ drawer: 0, page: 0 });
+          }
+        }
+        await page.setViewportSize(DESKTOP);
+      }
+
+      try {
+        await openProduct(page, demo, { id: created.id, name_en: `Chicken wrap ${tag}`, name_am: `የዶሮ ጥቅልል ${tag}`, image: null }, locale);
+        await page.getByRole("button", { name: t.product.recipe }).click();
+        await expect(drawer.getByText(t.recipe.no_recipe_title, { exact: true })).toBeVisible({ timeout: 15_000 });
+        await expect(drawer.getByRole("button", { name: t.recipe.set_price })).toBeVisible();
+        const form = drawer.getByRole("region", { name: t.recipe.first_title });
+        const first = form.getByLabel(t.recipe.field_ingredient.replace("{n}", "1"), { exact: true });
+        await expect(first.getByRole("option")).not.toHaveCount(1, { timeout: 30_000 });
+        await first.selectOption({ index: 1 });
+        await form.getByLabel(t.recipe.field_qty.replace("{n}", "1"), { exact: true }).fill("0.15");
+        await form.getByRole("button", { name: t.recipe.add_line }).click();
+        await form.getByLabel(t.recipe.field_ingredient.replace("{n}", "2"), { exact: true }).selectOption({ index: 2 });
+        await form.getByLabel(t.recipe.field_qty.replace("{n}", "2"), { exact: true }).fill("1");
+        await form.getByLabel(t.recipe.field_qty.replace("{n}", "2"), { exact: true }).blur();
+        await drawerSizes("product-recipe-new");
+        await drawerSizes("product-recipe-lines", form.getByRole("group", { name: t.recipe.lines }));
+        await expectAccessible(page, `${locale}/admin/catalog/?item (the recipe drawer, no recipe yet, two lines typed)`);
+      } finally {
+        await demo.admin.patch(`/items/${created.id}`, { is_active: false }).catch(() => undefined);
+      }
+
+      const products = (await demo.admin.get<{ data: (DemoProduct & { fulfilment: string })[] }>("/items", { kind: "product" })).data;
+      const made = products.find((p) => p.fulfilment === "to_order" && p.id !== created.id && !p.name_en.startsWith("Chicken wrap"));
+      if (!made) throw new Error("the demo bakery has no product made to order");
+      await openProduct(page, demo, made, locale);
+      await page.getByRole("button", { name: t.product.recipe }).click();
+      const publish = drawer.getByRole("region", { name: t.recipe.publish_title });
+      await expect(publish.getByLabel(t.recipe.field_ingredient.replace("{n}", "1"), { exact: true })).toHaveValue(/\d+/, { timeout: 15_000 });
+      await drawerSizes("product-recipe-publish", publish);
+    });
+  }
 });
 
 // --- phase-6/shift-strip: the shift's prompt under the bar, covering nothing ---------------------------------------------------------------
