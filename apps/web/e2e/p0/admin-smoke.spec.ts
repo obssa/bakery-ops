@@ -115,6 +115,8 @@ test.describe("p0 admin smoke", () => {
   });
 
   test("admin creates an ingredient and a product and sees both in English and Amharic @live", async ({ page }) => {
+    // three times the limit: on the live site this flow took 57-58 s of the 60 s on two deploys and timed out on the third (2026-11-10)
+    test.slow();
     requireAdmin();
     const flour = { en: `E2E flour ${run}`, am: `የሙከራ ዱቄት ${run}` };
     const bread = { en: `E2E bread ${run}`, am: `የሙከራ ዳቦ ${run}` };
