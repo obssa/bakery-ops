@@ -103,7 +103,9 @@ export function PayRowEditor({
   }
 
   return (
-    <fieldset aria-labelledby={titleId} className={`space-y-4 ${single ? "" : "rounded-2xl border border-neutral-200 bg-white p-4"}`}>
+    // min-w-0: a fieldset is never narrower than its content by default, and its two-column method grid's content is the cards at their
+    // widest, so on a 390 px phone the sheet ran past its right edge
+    <fieldset aria-labelledby={titleId} className={`min-w-0 space-y-4 ${single ? "" : "rounded-2xl border border-neutral-200 bg-white p-4"}`}>
       <div className={single ? "sr-only" : "flex flex-wrap items-center justify-between gap-2"}>
         <h3 id={titleId} className="text-base font-semibold text-neutral-900">
           {t("row_title", { n })}
@@ -156,7 +158,7 @@ export function PayRowEditor({
                 aria-pressed={selected}
                 disabled={!usable}
                 onClick={() => onChange({ channel: c.code })}
-                className={`flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[14px] px-3 py-2 text-center text-base font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
+                className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[14px] px-3 py-2 text-center [overflow-wrap:anywhere] text-base font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
                   selected ? "border-2 border-ink-900 bg-ink-50 text-ink-900" : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
                 } disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-50 disabled:text-neutral-400 ${focusRing}`}
               >

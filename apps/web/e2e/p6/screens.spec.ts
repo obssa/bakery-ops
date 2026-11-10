@@ -274,6 +274,29 @@ async function openTill(page: Page, d: DemoStations, locale: keyof typeof MESSAG
   await expect(page.getByRole("dialog").getByRole("status", { name: t.till.amount_due })).toBeVisible({ timeout: 30_000 });
 }
 
+/** Chooses the pay sheet's second usable method (the first other than cash) and waits for it to be the pressed one. */
+async function chooseMethod(page: Page): Promise<void> {
+  const row = page.getByRole("dialog").getByRole("group").first();
+  const methods = row.locator("button[aria-pressed]:enabled");
+  await expect(methods.first()).toBeVisible({ timeout: 30_000 });
+  await methods.nth(Math.min(1, (await methods.count()) - 1)).click();
+  await expect(row.locator('button[aria-pressed="true"]')).toHaveCount(1);
+}
+
+/** The pay sheet keeps inside itself: nothing in it scrolls sideways, and every method card and field ends inside its padding. */
+async function expectSheetFits(page: Page, name: string): Promise<void> {
+  const fit = await page.getByRole("dialog").evaluate((sheet) => {
+    const inner = sheet.getBoundingClientRect().right - parseFloat(getComputedStyle(sheet).paddingRight);
+    const edges = Array.from(sheet.querySelectorAll<HTMLElement>("button[aria-pressed], input"))
+      .filter((element) => element.getBoundingClientRect().width > 1)
+      .map((element) => ({ what: element.getAttribute("aria-label") ?? element.textContent?.trim() ?? element.id, right: element.getBoundingClientRect().right }));
+    return { scroll: sheet.scrollWidth, client: sheet.clientWidth, inner, edges };
+  });
+  expect(fit.scroll, `${name}: the pay sheet scrolls sideways`).toBeLessThanOrEqual(fit.client);
+  const past = fit.edges.filter(({ right }) => right > fit.inner + 0.5).map(({ what, right }) => `${what} (${Math.round(right)} > ${Math.round(fit.inner)})`);
+  expect(past, `${name}: past the sheet's right edge`).toEqual([]);
+}
+
 /**
  * Brings the screen to its board's state and saves it as `name`, whatever happens on the way: a capture is a picture for review, not a
  * gate, so a step that cannot be done (the seed lacks a ticket, a key is not there) is noted on the test and the screen is saved as it is.
@@ -397,17 +420,22 @@ test.describe("screens", () => {
       if (!pressed) await row.getByRole("button", { name: t.till.exact }).click();
       await expect(row).toContainText(t.till.change_label);
     });
-    // a method other than cash chosen, at 1440 and 390 (Ramin 2026-11-10: a chosen card is charcoal, red reads as an error)
+    // a method other than cash chosen, at 1440 and 390 (Ramin 2026-11-10: a chosen card is charcoal, red reads as an error); on a phone
+    // the sheet keeps inside itself, in en and am
     await shoot(page, "till-method-1440x900-en", async () => {
       await page.setViewportSize(DESKTOP);
-      const row = page.getByRole("dialog").getByRole("group").first();
-      const methods = row.locator("button[aria-pressed]:enabled");
-      await methods.nth(Math.min(1, (await methods.count()) - 1)).click();
-      await expect(row.locator('button[aria-pressed="true"]')).toHaveCount(1);
+      await chooseMethod(page);
     });
     await shoot(page, "till-method-390x844-en", () => page.setViewportSize(PHONE));
+    await expectSheetFits(page, "till-method-390x844-en");
     await page.setViewportSize(TABLET);
     await shoot(page, "till-1180x820-am", () => openTill(page, d, "am", cashier));
+    await shoot(page, "till-method-390x844-am", async () => {
+      await page.setViewportSize(PHONE);
+      await chooseMethod(page);
+    });
+    await expectSheetFits(page, "till-method-390x844-am");
+    await page.setViewportSize(TABLET);
   });
 
   test("the production board (Production board): the board, a request card, New batch and the display case, in en", async ({ page }) => {
