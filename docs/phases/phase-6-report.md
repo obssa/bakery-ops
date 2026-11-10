@@ -525,8 +525,11 @@ today" passed on its retry); `admin-smoke` passed inside its new time.
 A choice is charcoal, never red (Ramin, 2026-11-10, of the till's chosen pay method: "red looks like an error"): the chosen pay
 method, the chosen kind card and its tick, the opened order and request cards, the till's chosen order, the ticked pills and filters, the
 pressed admin segments and the open or linked row are drawn in `ink` (`ink-50` or `ink-100` with `ink-900`); red keeps the mark, the
-current sidebar item and section tab, links, the focus ring and "New" (fresh-counter.md 1.2). Web only; the till's captures gain one with
-a method chosen at 1440 and 390. Claim restated at `c9adfac`; the tag stays on `2f6bbd9`.
+current sidebar item and section tab, links, the focus ring and "New" (fresh-counter.md 1.2). The same pull request keeps the till's pay
+sheet inside itself on a 390 px phone: the row's fieldset took its method grid's widest content as its least width, so the right column and
+the amount ran past the sheet's edge (`min-w-0`, and a long method name wraps). Web only; the till's captures gain a method chosen at 1440
+(en) and 390 (en and am), and at 390 they assert nothing in the sheet scrolls sideways and every method card and field ends inside it.
+Claim restated at `91e22be`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
