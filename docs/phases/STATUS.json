@@ -223,8 +223,8 @@
       "report": "docs/phases/phase-6-report.md",
       "gate_job": "gate-p6",
       "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/41947773135",
-      "done_commit": "d162ee7a5f54c8b4cb86034e6dc735657a218e8e",
-      "done_at": "2026-11-09T22:53:33Z",
+      "done_commit": "b717b75b622397572421340f080ee708b3c0d2b3",
+      "done_at": "2026-11-10T00:23:14Z",
       "adrs": [
         "0022-product-photos-storage-and-serving",
         "0023-design-system-and-tokens"

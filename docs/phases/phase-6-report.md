@@ -474,7 +474,7 @@ add a dining table. He chose a page of its own for the first and "admin and mana
   Add, Add several, Edit and Switch off, and the pad's empty grid pointing there.
 
 Both change `apps/`, which the strict gate freezes after `done_commit`. #124's branch was merged into #125's so both reach `main`
-under one restated claim: `phase_status.py claim-done 6` on 2026-11-10 at `d162ee7` (the last code commit of the combined branch),
+under one restated claim: `phase_status.py claim-done 6` on 2026-11-10 at `b717b75` (the last code commit of the combined branch: the merge, then a test-only fix to the captures' wait for animations),
 after `gate_check.py --mode done --phase 6 --no-tests --no-e2e` passed 20 of 20 checks (the test rows run in `gate-p6` on CI). The tag
 `phase-6-complete` stays on `2f6bbd9`, the first claim, as Phase 5's did after pull request #106.
 
