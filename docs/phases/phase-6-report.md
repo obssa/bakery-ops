@@ -538,7 +538,7 @@ gives them the admin's choice; `ModuleBoundariesTest` lets Analytics read it); t
 Ethiopian time column (`received_at_ethiopian`, `at_ethiopian`). Tests: `screens-clock-logic` (every minute of the day, the boundaries, the
 way back), Pest `EthiopianClockTest`, the clock endpoint in `BrandProfileTest`, the receipt and export cases; captures of System > Time
 (off and with the 12-hour clock), the template picker and the Shifts overview in Amharic, at 1440 and 390.
-Claim restated at `203bafa`; the tag stays on `2f6bbd9`.
+Claim restated at `7cc316d` (the merge of `main`, with the fixes to the audit dictionary test and the dashboards' read check); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
