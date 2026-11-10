@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Models;
 
 use App\Shared\Tenancy\BranchScoped;
+use App\Shared\Time\EthiopianClock;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $logo_disk
  * @property string|null $logo_key
  * @property int|null $logo_size
+ * @property string $clock_also
  * @property int $created_by_user_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -58,14 +60,15 @@ final class BrandProfile extends Model
 
     /**
      * The brand as GET /me and the /brand writes answer it: the saved name pair (null when none: the app shows its own), the logo's public
-     * URL and size (null when none) and is_default, true while the branch shows the app's own name and mark (no row, or a row with neither).
+     * URL and size (null when none), is_default, true while the branch shows the app's own name and mark (no row, or a row with neither),
+     * and clock_also, the international clock shown beside the Ethiopian one (none, h12 or h24; none without a row).
      *
-     * @return array{name_en: string|null, name_am: string|null, logo: array{url: string, size: int}|null, is_default: bool}
+     * @return array{name_en: string|null, name_am: string|null, logo: array{url: string, size: int}|null, is_default: bool, clock_also: string}
      */
     public static function view(?self $row): array
     {
         if (! $row instanceof self) {
-            return ['name_en' => null, 'name_am' => null, 'logo' => null, 'is_default' => true];
+            return ['name_en' => null, 'name_am' => null, 'logo' => null, 'is_default' => true, 'clock_also' => 'none'];
         }
         $logo = $row->logo_sha256 === null || $row->logo_mime === null ? null : [
             'url' => '/api/v1/media/brand/'.$row->logo_sha256.'.'.self::extensionOf($row->logo_mime),
@@ -77,6 +80,7 @@ final class BrandProfile extends Model
             'name_am' => $row->name_am,
             'logo' => $logo,
             'is_default' => $row->name_en === null && $logo === null,
+            'clock_also' => in_array($row->clock_also, EthiopianClock::ALSO, true) ? $row->clock_also : 'none',
         ];
     }
 }

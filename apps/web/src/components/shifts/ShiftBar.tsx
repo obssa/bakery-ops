@@ -9,10 +9,10 @@ import { uuid } from "@/lib/api/idempotency";
 import { closeShift, joinShift, leaveShift, cancelShift, startShift } from "@/lib/api/shifts";
 import type { Locale, Shift } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
-import { addisClock, barActions, onDuty, stripAction, stripShown, type BarMode } from "@/lib/shifts";
+import { barActions, onDuty, stripAction, stripShown, type BarMode } from "@/lib/shifts";
 import { can, useSession } from "@/lib/session";
 import { useShiftNotice } from "@/lib/station";
-import { useIsoDay } from "@/lib/useDates";
+import { useClock, useIsoDay } from "@/lib/useDates";
 import { Alert, Badge, Button, Field, Modal, Select } from "../ui";
 import { buttonClass, focusRing } from "../styles";
 import { StationHeaderActions, StationHeaderNotice } from "../StationHeaderActions";
@@ -52,6 +52,7 @@ const BADGE: Record<BarMode, { tone: "amber" | "blue" | "positive"; key: string 
 type ActionName = "start" | "start_carried" | "join" | "leave" | "close" | "cancel";
 
 export function ShiftBar({ model, look = "card", quiet = false }: { model: ShiftStation; look?: "card" | "strip" | "menu"; /** `menu` only: no attention strip for a count in progress, as the count is this screen */ quiet?: boolean }) {
+  const clock = useClock();
   const strip = look !== "card";
   const size = strip ? ("md" as const) : undefined;
   const t = useTranslations("shifts");
@@ -153,15 +154,15 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
       break;
     case "opening":
       headline = t("opening");
-      detail = shift?.started_by ? t("opening_by", { name: shift.started_by.name, time: addisClock(shift.started_at) }) : null;
+      detail = shift?.started_by ? t("opening_by", { name: shift.started_by.name, time: clock(shift.started_at) }) : null;
       break;
     case "open":
       headline = t("open");
-      detail = t("open_since", { time: addisClock(shift?.opened_at ?? shift?.started_at) });
+      detail = t("open_since", { time: clock(shift?.opened_at ?? shift?.started_at) });
       break;
     case "counting":
       headline = t("counting");
-      detail = shift?.closed_by ? t("counting_by", { name: shift.closed_by.name, time: addisClock(shift.closing_started_at) }) : null;
+      detail = shift?.closed_by ? t("counting_by", { name: shift.closed_by.name, time: clock(shift.closing_started_at) }) : null;
       break;
   }
 

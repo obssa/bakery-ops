@@ -154,6 +154,16 @@ it('prints the Ethiopian date when the settings ask for it, and the TIN', functi
     expect($text)->toContain('Tikimt 16, 2019')->toContain('ጥቅምት 16')->toContain('0012345678')->toContain('2026-10-26');
 });
 
+it('prints the time on the Ethiopian clock, with the international one when the admin turned it on', function () {
+    $issued = CarbonImmutable::parse('2026-10-26 16:10:00', 'Africa/Addis_Ababa');
+
+    $en = Receipts::text(app(ReceiptRenderer::class)->render(($this->receipt)(['locale' => 'en', 'issuedAt' => $issued])));
+    $am = Receipts::text(app(ReceiptRenderer::class)->render(($this->receipt)(['locale' => 'am', 'issuedAt' => $issued, 'clockAlso' => 'h12'])));
+
+    expect($en)->toContain('2026-10-26 10:10 afternoon')->not->toContain('16:10')
+        ->and($am)->toContain('2026-10-26 10:10 ከሰዓት (4:10 PM)');
+});
+
 it('says so at the top of a pro-forma', function () {
     $text = Receipts::text(app(ReceiptRenderer::class)->render(($this->receipt)(['proforma' => true, 'lines' => ($this->lines)(1)])));
 

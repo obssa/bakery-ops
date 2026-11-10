@@ -9,6 +9,7 @@ use App\Modules\Orders\Contracts\Orders;
 use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Models\PaymentChannel;
 use App\Shared\Tenancy\CurrentBranch;
+use App\Shared\Time\EthiopianClock;
 use Carbon\CarbonImmutable;
 use Generator;
 use OpenSpout\Common\Entity\Cell;
@@ -32,9 +33,12 @@ final class PaymentsExport
     /** @var list<string> */
     public const array FORMATS = ['csv', 'xlsx'];
 
-    /** @var list<string> the columns, in order; their headers are lang/{en,am}/receipts.php export.* */
+    /**
+     * @var list<string> the columns, in order; their headers are lang/{en,am}/receipts.php export.*. received_at stays the 24-hour local stamp
+     *                   a spreadsheet can sort and compute with; received_at_ethiopian says it as people read it ("2:00 morning", the Ethiopian clock)
+     */
     public const array COLUMNS = [
-        'id', 'received_at', 'day', 'order_no', 'business_date', 'channel_code', 'channel', 'amount', 'tendered_amount', 'change_amount',
+        'id', 'received_at', 'received_at_ethiopian', 'day', 'order_no', 'business_date', 'channel_code', 'channel', 'amount', 'tendered_amount', 'change_amount',
         'currency', 'reference_no', 'status', 'has_photo', 'verified_at', 'disputed_at', 'dispute_reason', 'voided_at', 'void_reason',
         'refunded_amount', 'shift_id', 'batch_uuid', 'received_by',
     ];
@@ -151,6 +155,7 @@ final class PaymentsExport
             $row = [
                 'id' => (string) $payment->id,
                 'received_at' => $local($payment->received_at),
+                'received_at_ethiopian' => EthiopianClock::of($payment->received_at->setTimezone($this->branch->timezone()))->format($locale === 'am' ? 'am' : 'en'),
                 'day' => $payment->received_at->setTimezone($this->branch->timezone())->toDateString(),
                 'order_no' => $order?->orderNo === null ? '' : (string) $order->orderNo,
                 'business_date' => (string) ($order->businessDate ?? ''),

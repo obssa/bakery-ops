@@ -49,7 +49,7 @@
             <td class="num">
                 <h1>{!! $l($r->proforma ? 'proforma' : 'title') !!}</h1>
                 <div>{!! $l('order') !!} #{{ $r->orderNo ?? '-' }}</div>
-                <div>{!! $l('date') !!}: {{ $r->issuedAt->format('Y-m-d H:i') }}</div>
+                <div>{!! $l('date') !!}: {{ $r->stamp($r->issuedAt) }}</div>
                 @if ($r->ethiopianDate !== null)
                     <div class="small">{!! $l('ethiopian_date') !!}: {!! $n($r->ethiopianDate->format('en'), $r->ethiopianDate->format('am')) !!}</div>
                 @endif
@@ -132,7 +132,7 @@
         <table>
             @foreach ($r->refunds as $refund)
                 <tr>
-                    <td>{!! $n($refund['channel_en'], $refund['channel_am']) !!} <span class="muted small">&middot; {{ $refund['refunded_at'] }}</span></td>
+                    <td>{!! $n($refund['channel_en'], $refund['channel_am']) !!} <span class="muted small">&middot; {{ $r->stamp($refund['refunded_at']) }}</span></td>
                     <td class="num">-{{ $refund['amount'] }}</td>
                 </tr>
             @endforeach

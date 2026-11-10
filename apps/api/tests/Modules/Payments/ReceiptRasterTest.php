@@ -138,7 +138,7 @@ it('lays out the business in both languages, the TIN, the order, the cashier, bo
         ->toContain('011 000 0000')
         ->toContain('TIN / '.trans('receipts.tin', [], 'am').': 0012345678')
         ->toContain('#128')
-        ->toContain('2026-11-01 14:05')
+        ->toContain('2026-11-01 8:05 afternoon / ከሰዓት')
         ->toContain(EthiopianDate::of(CarbonImmutable::parse('2026-11-01 14:05:00', 'Africa/Addis_Ababa'))->format('am'))
         ->toContain('Abebe K.')
         ->toContain('2 x Black tea ሻይ | 25.00')

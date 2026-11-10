@@ -1,4 +1,5 @@
 import type { RosterRow, Shift, WorkStation } from "./api/types";
+import { clockText, type ClockFormat } from "./clock";
 
 // The plain logic of the shift bar (step 3.7a): who is on duty, which buttons a person gets in each state of the shift, when the
 // till's Pay is blocked, how the two "shift required" refusals are recognised. No React and no browser, so e2e/p3 tests it directly.
@@ -136,11 +137,11 @@ export function chooseStation(choices: readonly WorkStation[], wanted: number | 
   return choices.find((station) => station.station_id === wanted) ?? choices[0] ?? null;
 }
 
-const CLOCK = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Addis_Ababa", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-
-/** HH:MM in Africa/Addis_Ababa for a UTC ISO-8601 instant ("" for none). */
-export function addisClock(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const time = Date.parse(iso);
-  return Number.isNaN(time) ? "" : CLOCK.format(new Date(time));
+/**
+ * A UTC ISO-8601 instant on the Ethiopian clock of Addis Ababa ("2:30 morning" for 08:30; "" for none or a text that is no time). The
+ * screens use lib/useDates.ts useClock(), which adds the page's language and the admin's international clock; this is the same rule.
+ */
+export function addisClock(iso: string | null | undefined, fmt: ClockFormat = { locale: "en" }): string {
+  if (!iso || Number.isNaN(Date.parse(iso))) return "";
+  return clockText(iso, fmt);
 }

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Analytics\Weekly;
 
 use App\Modules\Analytics\Export\Labels;
+use App\Modules\Identity\Contracts\ClockPreference;
 use App\Shared\Pdf\PdfRenderer;
+use App\Shared\Time\EthiopianClock;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\Factory as ViewFactory;
 
@@ -20,6 +22,7 @@ final class WeeklySummaryPdf
     public function __construct(
         private readonly PdfRenderer $pdf,
         private readonly ViewFactory $views,
+        private readonly ClockPreference $clock,
     ) {}
 
     /**
@@ -29,7 +32,10 @@ final class WeeklySummaryPdf
     {
         $labels = new Labels($locale);
         $zone = (string) $summary['timezone'];
-        $asOf = is_string($summary['as_of'] ?? null) ? CarbonImmutable::parse($summary['as_of'])->setTimezone($zone)->format('Y-m-d H:i') : null;
+        // the time as people read it, on the Ethiopian clock (with the international one when the admin turned it on)
+        $also = $this->clock->also();
+        $said = static fn (CarbonImmutable $local): string => EthiopianClock::stamp($local, $locale, $also);
+        $asOf = is_string($summary['as_of'] ?? null) ? $said(CarbonImmutable::parse($summary['as_of'])->setTimezone($zone)) : null;
         $stale = is_array($summary['stale_days'] ?? null) ? count($summary['stale_days']) : 0;
         $name = fn (array $row): string => (string) $labels->name($row);
 
@@ -43,7 +49,7 @@ final class WeeklySummaryPdf
             'stale' => $asOf === null ? null : ($stale === 0 ? $labels->text('pdf.all_built') : $labels->count('pdf.not_built', $stale)),
             'name' => $name,
             'change' => static fn (?string $pct): string => $pct === null ? '-' : ($pct[0] === '-' ? $pct : '+'.$pct).'%',
-            'printed' => $labels->with('pdf.printed', ['at' => CarbonImmutable::now($zone)->format('Y-m-d H:i')]),
+            'printed' => $labels->with('pdf.printed', ['at' => $said(CarbonImmutable::now($zone))]),
         ])->render();
 
         return $this->pdf->render($html, $labels->text('titles.weekly').' '.$summary['week_start'])->bytes;

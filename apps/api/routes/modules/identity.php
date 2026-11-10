@@ -56,6 +56,7 @@ Route::prefix('api/v1')->middleware('api')->group(function (): void {
         // the business name and logo the app shows (Phase 6 follow-up): the admin sets them, everyone reads them in GET /me
         Route::middleware('permission:branding.manage')->group(function (): void {
             Route::put('/brand', [BrandController::class, 'update'])->middleware('idempotency')->name('identity.brand.update');
+            Route::put('/brand/clock', [BrandController::class, 'updateClock'])->middleware('idempotency')->name('identity.brand.clock');
             Route::post('/brand/logo', [BrandController::class, 'storeLogo'])->middleware('idempotency')->name('identity.brand.logo.store');
             Route::delete('/brand/logo', [BrandController::class, 'destroyLogo'])->middleware('idempotency')->name('identity.brand.logo.destroy');
         });

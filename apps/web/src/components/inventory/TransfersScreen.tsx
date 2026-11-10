@@ -10,7 +10,7 @@ import { useConfirmTransfer, useRejectTransfer, useTransfers, type Transfer, typ
 import { compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
-import { InventoryNav, QueryBox, qty, stamp, useNamer } from "./shared";
+import { InventoryNav, QueryBox, qty, useStamp, useNamer } from "./shared";
 
 // Admin > Inventory > Transfers (step 2.3): stock a station asked the store for. The requested list is the work: confirm
 // moves the stock (one ledger pair), reject needs a reason. Rows show what the source has available; an answer the API
@@ -54,6 +54,7 @@ export function TransfersScreen({ titleAm }: { titleAm?: string }) {
 }
 
 function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | null }) {
+  const stamp = useStamp();
   const t = useTranslations("inventory");
   const name = useNamer();
   const errorText = useErrorText();

@@ -697,6 +697,20 @@
       "saved_default": "Name cleared: the app's own name shows again.",
       "saved_logo": "Logo saved. Everyone sees it the next time their screen loads.",
       "saved_no_logo": "Logo removed: the app's own mark shows again."
+    },
+    "clock": {
+      "title": "Time",
+      "intro": "Every time in the app, on receipts and on printed reports is Ethiopian time. The day's hours start at sunrise: 06:00 is 12:00 in the morning and 07:00 is 1:00. Noon is 6:00 in the afternoon; at 18:00 the evening starts again at 12:00, and the night's hours run until the next morning.",
+      "also_label": "Also show international time",
+      "also_none": "Off",
+      "also_h12": "12-hour (4:10 PM)",
+      "also_h24": "24-hour (16:10)",
+      "also_hint": "For everyone, on every screen, receipt and printed report. Spreadsheet exports always keep the 24-hour time beside the Ethiopian one.",
+      "examples": "How times read now",
+      "example_at": "International {time}",
+      "saved_none": "Saved: Ethiopian time only.",
+      "saved_h12": "Saved: the 12-hour international time shows beside Ethiopian time.",
+      "saved_h24": "Saved: the 24-hour international time shows beside Ethiopian time."
     }
   },
   "adminOrders": {
@@ -1868,7 +1882,11 @@
       "issue_name_am": "Enter a name in Amharic.",
       "issue_times": "Enter a start and an end time that are different.",
       "issue_days": "Choose at least one day.",
-      "issue_stations": "Choose at least one station."
+      "issue_stations": "Choose at least one station.",
+      "time_hour": "Hour",
+      "time_minute": "Minutes",
+      "time_international": "International time: {time}",
+      "time_hint": "Times are Ethiopian time: the day starts at 12:00 in the morning (06:00), so 1:00 in the morning is 07:00 and 12:00 in the evening is 18:00."
     },
     "roster": {
       "week": "Week",

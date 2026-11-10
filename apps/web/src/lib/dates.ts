@@ -1,3 +1,4 @@
+import { addisWall, wallText, type ClockAlso, type ClockFormat } from "./clock";
 import { toEthiopian } from "./ethiopianDate";
 
 // How dates read for people (step 4.5f): one formatter for every date the web shows, so a person's choice of calendar reaches all of them.
@@ -5,8 +6,9 @@ import { toEthiopian } from "./ethiopianDate";
 // components/payments/shared.tsx: the payments, the audit log, the freshness badge), the shift pages' dates and the order labels all come
 // here. The calendar is a display choice only: every date stays a Gregorian local date (YYYY-MM-DD) or a UTC instant underneath, in the
 // addresses, the date pickers and every request. The Ethiopian labels follow the API's EthiopianDate::format ("Tikimt 16, 2019",
-// "ጥቅምት 16 ቀን 2019 ዓ.ም.") with the month names of messages/*.json (dates.ethiopian_months); the clock stays the 24-hour clock of
-// Addis Ababa in every calendar. "both" writes the Gregorian label with the Ethiopian one in brackets.
+// "ጥቅምት 16 ቀን 2019 ዓ.ም.") with the month names of messages/*.json (dates.ethiopian_months). The time of day is the Ethiopian clock of
+// Addis Ababa in every calendar (lib/clock.ts: "1:50 ጠዋት"), with the international one beside it when the admin turned it on
+// (clockAlso). "both" writes the Gregorian label with the Ethiopian one in brackets.
 
 export type DateDisplay = "gregorian" | "ethiopian" | "both";
 export const DATE_DISPLAYS: readonly DateDisplay[] = ["gregorian", "ethiopian", "both"];
@@ -18,6 +20,8 @@ export interface DateFormat {
   display: DateDisplay;
   /** the thirteen Ethiopian month names in the page's language, Meskerem first (from messages: dates.ethiopian_months) */
   months: readonly string[];
+  /** the international clock shown beside the Ethiopian one (GET /me brand.clock_also); none when not given */
+  clockAlso?: ClockAlso;
 }
 
 /** A format, or a bare locale: a bare locale reads in the Gregorian calendar (how every label read before step 4.5f). */
@@ -140,41 +144,48 @@ export function isoDayText(date: string, like: DateFormatLike): string {
   return shown(fmt, () => date, () => ethiopianLabel(date, fmt, true));
 }
 
+/** How the time of day reads with this format: its language and the admin's international clock. */
+export function clockFormatOf(like: DateFormatLike): ClockFormat {
+  const fmt = formatOf(like);
+  return { locale: fmt.locale, also: fmt.clockAlso ?? "none" };
+}
+
 /**
- * An instant (ISO 8601) in the bakery's time zone: "2026-10-27 14:05" (the same in both languages), "Tikimt 17, 2019 14:05", or
- * "2026-10-27 14:05 (Tikimt 17, 2019)". The day is Addis Ababa's local day, as the API's EthiopianDate reads a local time.
+ * An instant (ISO 8601) in the bakery's time zone: "2026-10-27 8:05 afternoon" ("2026-10-27 8:05 ከሰዓት" in Amharic), "Tikimt 17, 2019
+ * 8:05 afternoon", or "2026-10-27 8:05 afternoon (Tikimt 17, 2019)". The day is Addis Ababa's local day, as the API's EthiopianDate reads
+ * a local time; the time is the Ethiopian clock (lib/clock.ts).
  */
 export function stampText(iso: string | null | undefined, like: DateFormatLike): string {
   if (!iso) return "—";
   const fmt = formatOf(like);
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return iso;
-  const local = new Date(at.getTime() + ADDIS_OFFSET_MS).toISOString();
-  const date = local.slice(0, 10);
-  const clock = local.slice(11, 16);
+  const local = new Date(at.getTime() + ADDIS_OFFSET_MS);
+  const date = local.toISOString().slice(0, 10);
+  const clock = wallText(local.getUTCHours(), local.getUTCMinutes(), clockFormatOf(fmt));
   if (fmt.display === "ethiopian") return `${ethiopianLabel(date, fmt, true)} ${clock}`;
   if (fmt.display === "both") return `${date} ${clock} (${ethiopianLabel(date, fmt, true)})`;
   return `${date} ${clock}`;
 }
 
 /**
- * An instant with its day and clock, as the bell, the production board and the till's receipt preview write it: "27 Oct, 14:05" ("27 Oct
- * 2026, 14:05" with the year; in the device's time zone unless one is named, as before step 4.5f); "Tikimt 17 14:05" in Addis Ababa's day
- * and clock; or both.
+ * An instant with its day and clock, as the bell, the production board and the till's receipt preview write it: "27 Oct, 8:05 afternoon"
+ * ("27 Oct 2026, 8:05 afternoon" with the year); "Tikimt 17, 8:05 afternoon"; or both. Always Addis Ababa's day and the Ethiopian clock
+ * (lib/clock.ts), whatever the device's time zone.
  */
-export function whenText(iso: string | null | undefined, like: DateFormatLike, options: { withYear?: boolean; timeZone?: string } = {}): string {
+export function whenText(iso: string | null | undefined, like: DateFormatLike, options: { withYear?: boolean } = {}): string {
   if (!iso) return "—";
   const fmt = formatOf(like);
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  const { withYear = false, timeZone } = options;
-  const gregorian = () =>
-    at.toLocaleString(intlOf(fmt.locale), { ...(timeZone ? { timeZone } : {}), day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}), hour: "2-digit", minute: "2-digit" });
-  const ethiopian = () => {
-    const local = new Date(at.getTime() + ADDIS_OFFSET_MS).toISOString();
-    return `${ethiopianLabel(local.slice(0, 10), fmt, withYear)} ${local.slice(11, 16)}`;
-  };
-  return shown(fmt, gregorian, ethiopian);
+  const wall = addisWall(iso);
+  if (!wall) return iso;
+  const { withYear = false } = options;
+  const date = new Date(Date.parse(iso) + ADDIS_OFFSET_MS).toISOString().slice(0, 10);
+  const clock = wallText(wall[0], wall[1], clockFormatOf(fmt));
+  return shown(
+    fmt,
+    () => `${gregorianDay(date, fmt.locale, withYear, false)}, ${clock}`,
+    () => `${ethiopianLabel(date, fmt, withYear)}, ${clock}`,
+  );
 }
 
 // --- the person's choice, kept in the browser -----------------------------------------------------------------------------------------------

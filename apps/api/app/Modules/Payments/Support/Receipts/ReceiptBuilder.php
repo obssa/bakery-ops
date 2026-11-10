@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Payments\Support\Receipts;
 
+use App\Modules\Identity\Contracts\ClockPreference;
 use App\Modules\Orders\Contracts\Orders;
 use App\Modules\Payments\Enums\PaymentStatus;
 use App\Modules\Payments\Exceptions\PaymentError;
@@ -35,6 +36,7 @@ final class ReceiptBuilder
     public function __construct(
         private readonly Orders $orders,
         private readonly CurrentBranch $branch,
+        private readonly ClockPreference $clock,
     ) {}
 
     /**
@@ -138,6 +140,7 @@ final class ReceiptBuilder
             ],
             payments: $payments,
             refunds: $refunds,
+            clockAlso: $this->clock->also(),
         );
     }
 

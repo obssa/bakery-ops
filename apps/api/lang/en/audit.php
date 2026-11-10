@@ -14,6 +14,7 @@ return [
         'columns' => [
             'id' => 'ID',
             'at' => 'Time',
+            'at_ethiopian' => 'Ethiopian time',
             'actor_id' => 'Actor ID',
             'actor' => 'Actor',
             'acting_user_id' => 'Acting user ID',

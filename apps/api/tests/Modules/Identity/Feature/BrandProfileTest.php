@@ -47,7 +47,7 @@ it('shows every signed-in person the app\'s own name and mark while the admin ha
     loginAs(makeUser($this->branch, $role));
 
     $this->getJson('/api/v1/me')->assertOk()
-        ->assertJsonPath('brand', ['name_en' => null, 'name_am' => null, 'logo' => null, 'is_default' => true]);
+        ->assertJsonPath('brand', ['name_en' => null, 'name_am' => null, 'logo' => null, 'is_default' => true, 'clock_also' => 'none']);
 })->with(['admin', 'waiter', 'cake_baker']);
 
 it('saves the name pair on the first save, audited, and everyone reads it in GET /me', function () {
@@ -117,6 +117,31 @@ it('removes the logo (audited) and the old URL stops answering; removing none wr
     ($this->send)('DELETE', '/api/v1/brand/logo')->assertOk()->assertJsonPath('data.logo', null);
     expect(DB::table('audit_log')->where('action', 'identity.brand.logo_removed')->count())->toBe(1);
 });
+
+it('saves the international clock beside the Ethiopian one, audited, keeps the name and logo, and everyone reads it', function () {
+    ($this->send)('PUT', '/api/v1/brand/clock', ['clock_also' => 'h12'])->assertOk()
+        ->assertJsonPath('data.clock_also', 'h12')
+        ->assertJsonPath('data.is_default', true);
+    $audit = DB::table('audit_log')->where('action', 'identity.brand.clock')->sole();
+    expect(json_decode((string) $audit->after, true)['clock_also'])->toBe('h12');
+
+    ($this->send)('PUT', '/api/v1/brand', ['name_en' => 'Corner Bakery', 'name_am' => 'የማዕዘን ዳቦ ቤት'])->assertOk()->assertJsonPath('data.clock_also', 'h12');
+    ($this->send)('PUT', '/api/v1/brand/clock', ['clock_also' => 'h24'])->assertOk()
+        ->assertJsonPath('data.clock_also', 'h24')
+        ->assertJsonPath('data.name_en', 'Corner Bakery');
+
+    loginAs(makeUser($this->branch, 'cashier'));
+    $this->getJson('/api/v1/me')->assertJsonPath('brand.clock_also', 'h24');
+
+    ($this->send)('PUT', '/api/v1/brand/clock', ['clock_also' => 'none'])->assertOk()->assertJsonPath('data.clock_also', 'none');
+    expect(BrandProfile::query()->count())->toBe(1);
+});
+
+it('refuses a clock that is not none, h12 or h24', function (mixed $also) {
+    ($this->send)('PUT', '/api/v1/brand/clock', ['clock_also' => $also])
+        ->assertStatus(422)->assertJsonPath('message_key', 'validation.failed');
+    expect(BrandProfile::query()->count())->toBe(0);
+})->with(['12h', 'H24', '', null, 'ethiopian']);
 
 it('answers 404 for an unknown sha or the wrong extension', function () {
     $url = (string) ($this->upload)(imgJpeg(300, 300))->json('data.logo.url');

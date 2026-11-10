@@ -58,7 +58,7 @@ export interface Me {
   brand?: Brand;
 }
 
-/** GET /me brand, and the answer of PUT /brand and POST and DELETE /brand/logo ({data: Brand}): set by the admin on the live site. */
+/** GET /me brand, and the answer of PUT /brand, PUT /brand/clock and POST and DELETE /brand/logo ({data: Brand}): set by the admin on the live site. */
 export interface Brand {
   /** both or neither; null shows the app's own name */
   name_en: string | null;
@@ -67,6 +67,8 @@ export interface Brand {
   logo: { url: string; size: number } | null;
   /** nothing saved yet */
   is_default: boolean;
+  /** the international clock shown beside the Ethiopian one (lib/clock.ts): none, h12 or h24; absent from an older answer, read as none */
+  clock_also?: "none" | "h12" | "h24";
 }
 
 export type ShiftStatus = "scheduled" | "opening" | "open" | "counting" | "pending_approval" | "locked" | "cancelled";

@@ -408,13 +408,15 @@ test.describe("dashboards-logic", () => {
     expect(rangeFromParams(params({ from: "2026-10-21", to: TODAY }), TODAY)).toEqual({ preset: "custom", from: "2026-10-21", to: TODAY });
   });
 
-  test("timestamps and shift dates go through the same formatter: Addis Ababa's local day, the 24-hour clock kept", () => {
-    expect(stampText("2026-10-27T11:05:00Z", as("en", "gregorian"))).toBe("2026-10-27 14:05");
-    expect(stampText("2026-10-27T11:05:00Z", as("en", "ethiopian"))).toBe("Tikimt 17, 2019 14:05");
-    expect(stampText("2026-10-27T11:05:00Z", as("am", "ethiopian"))).toBe("ጥቅምት 17 ቀን 2019 ዓ.ም. 14:05");
-    expect(stampText("2026-10-27T11:05:00Z", as("en", "both"))).toBe("2026-10-27 14:05 (Tikimt 17, 2019)");
+  test("timestamps and shift dates go through the same formatter: Addis Ababa's local day, the Ethiopian clock", () => {
+    // 14:05 in Addis Ababa is 8:05 in the afternoon on the Ethiopian clock (lib/clock.ts)
+    expect(stampText("2026-10-27T11:05:00Z", as("en", "gregorian"))).toBe("2026-10-27 8:05 afternoon");
+    expect(stampText("2026-10-27T11:05:00Z", as("en", "ethiopian"))).toBe("Tikimt 17, 2019 8:05 afternoon");
+    expect(stampText("2026-10-27T11:05:00Z", as("am", "ethiopian"))).toBe("ጥቅምት 17 ቀን 2019 ዓ.ም. 8:05 ከሰዓት");
+    expect(stampText("2026-10-27T11:05:00Z", as("en", "both"))).toBe("2026-10-27 8:05 afternoon (Tikimt 17, 2019)");
+    expect(stampText("2026-10-27T11:05:00Z", { ...as("en", "gregorian"), clockAlso: "h12" })).toBe("2026-10-27 8:05 afternoon · 2:05 PM");
     // 21:30 UTC on the 26th is 00:30 on the 27th in Addis Ababa, as the API's EthiopianDate reads a local time
-    expect(stampText("2026-10-26T21:30:00Z", as("en", "ethiopian"))).toBe("Tikimt 17, 2019 00:30");
+    expect(stampText("2026-10-26T21:30:00Z", as("en", "ethiopian"))).toBe("Tikimt 17, 2019 6:30 night");
     expect(stampText(null, as("en", "ethiopian"))).toBe("—");
     expect(stampText("not a time", as("en", "ethiopian"))).toBe("not a time");
     // a shift's date (a local date) reads as it always did in Gregorian

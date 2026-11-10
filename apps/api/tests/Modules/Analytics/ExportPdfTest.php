@@ -42,7 +42,7 @@ it('prints the sales summary on one page with the title, the range, the stamp, t
         ->and(Exports::pdfPages($pdf))->toBe(1)
         ->and($text)->toContain((string) trans('reports.titles.sales'))
         ->and($text)->toContain('2026-11-16')->toContain('2026-11-18')->toContain('Africa/Addis_Ababa')
-        ->and($text)->toContain('2026-11-22 08:00')
+        ->and($text)->toContain('2026-11-22 2:00 morning')
         ->and($text)->toContain((string) trans_choice('reports.pdf.not_built', 1, ['count' => 1]))
         ->and($text)->toContain('240.25')
         ->and($text)->toContain('180.00')->toContain('60.25')->toContain('80.08');

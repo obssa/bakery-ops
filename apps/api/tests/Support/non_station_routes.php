@@ -26,6 +26,7 @@ return [
     'POST /api/v1/stations' => 'identity',
     'PATCH /api/v1/stations/{station}' => 'identity',
     'PUT /api/v1/brand' => 'identity',
+    'PUT /api/v1/brand/clock' => 'identity',
     'POST /api/v1/brand/logo' => 'identity',
     'DELETE /api/v1/brand/logo' => 'identity',
     'GET /api/v1/media/brand/{sha}.{ext}' => 'identity',

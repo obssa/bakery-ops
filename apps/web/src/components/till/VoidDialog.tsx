@@ -10,6 +10,7 @@ import { compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { isSettled, UNPAID_STATUSES } from "@/lib/live/orders";
 import { useOrderNo } from "@/lib/orderNo";
+import { useClock } from "@/lib/useDates";
 import { keepsKey } from "@/lib/paySheet";
 import { RefundDialog } from "../refunds/RefundDialog";
 import { Alert, Button, Field, Modal, TextInput } from "../ui";
@@ -31,10 +32,10 @@ const PIN = /^\d{4,6}$/;
 
 type Target = "order" | number;
 
-function paymentLabel(payment: PaymentView, locale: Locale): string {
+/** "Telebirr 120.00 ETB · 1:50 morning": the channel, the amount and when it was received (the Ethiopian clock, `time` from useClock). */
+function paymentLabel(payment: PaymentView, locale: Locale, time: (iso: string) => string): string {
   const name = (locale === "am" ? payment.channel.name_am : payment.channel.name_en) ?? payment.channel.code ?? "";
-  const time = new Date(payment.received_at).toLocaleTimeString(locale === "am" ? "am-ET" : "en-GB", { timeZone: "Africa/Addis_Ababa", hour: "2-digit", minute: "2-digit" });
-  return `${name} ${payment.amount} ${payment.currency} · ${time}`;
+  return `${name} ${payment.amount} ${payment.currency} · ${time(payment.received_at)}`;
 }
 
 export function VoidDialog({
@@ -51,6 +52,7 @@ export function VoidDialog({
 }) {
   const t = useTranslations("till");
   const locale = useLocale() as Locale;
+  const clock = useClock();
   const no = useOrderNo(order);
   const errorText = useErrorText();
   const queries = useQueryClient();
@@ -121,7 +123,7 @@ export function VoidDialog({
               {voidable.map((payment) => (
                 <label key={payment.id} className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
                   <input type="radio" name="void-target" className="size-5 accent-ink-900" checked={target === payment.id} onChange={() => setTarget(payment.id)} />
-                  <span className="text-base">{paymentLabel(payment, locale)}</span>
+                  <span className="text-base">{paymentLabel(payment, locale, clock)}</span>
                 </label>
               ))}
             </fieldset>

@@ -6,10 +6,12 @@ import { useLocale, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { usePathname } from "@/i18n/navigation";
 import { groupDigits } from "@/lib/analytics";
+import { stampText } from "@/lib/dates";
 import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
 import type { Locale } from "@/lib/api/types";
+import { useDateFormat } from "@/lib/useDates";
 import { SectionTabs } from "../admin/kit";
 import { Alert, Button, Skeleton } from "../ui";
 
@@ -53,13 +55,13 @@ export function qty(value: string, unit: string): string {
   return unit ? `${qtyFigure(value)} ${unit}` : qtyFigure(value);
 }
 
-/** An ISO instant as "2026-10-22 14:05" in the browser's time zone, the same in both languages. */
-export function stamp(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const two = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
+/**
+ * An ISO instant as the inventory pages write it: "2026-10-22 8:05 afternoon" in Addis Ababa's day and on the Ethiopian clock, in the
+ * person's calendar (lib/dates.ts stampText; before, the browser's own time zone and the 24-hour clock).
+ */
+export function useStamp(): (iso: string | null) => string {
+  const dates = useDateFormat();
+  return (iso) => stampText(iso, dates);
 }
 
 /** Shows a read's three states: loading (the line for readers and grey rows), the error with a retry, and its data. */

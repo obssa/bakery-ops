@@ -7,9 +7,9 @@ import type { CountPlace, Locale } from "@/lib/api/types";
 import { shortHash } from "@/lib/counts";
 import { useErrorText } from "@/lib/errors";
 import { useSession } from "@/lib/session";
-import { addisClock } from "@/lib/shifts";
 import { Alert, Badge, Panel, Skeleton } from "../ui";
 import { NotesList } from "./Notes";
+import { useClock } from "@/lib/useDates";
 
 // What the last shift left for this one (GET /stations/{station}/handover, step 3.7b; on the Fresh Counter primitives since step 6.3c): who
 // handed it in, its notes and the notes addressed to me, one row per place for how it was left (a closing still waiting for approval is
@@ -22,6 +22,7 @@ function placeName(place: CountPlace, locale: Locale): string {
 }
 
 export function HandoverPanel({ stationId }: { stationId: number }) {
+  const clock = useClock();
   const t = useTranslations("counts");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
@@ -81,7 +82,7 @@ export function HandoverPanel({ stationId }: { stationId: number }) {
                           <code title={row.payload_hash ?? ""} className="font-mono text-neutral-700">
                             {shortHash(row.payload_hash)}
                           </code>
-                          {row.locked_at ? ` · ${addisClock(row.locked_at)}` : ""}
+                          {row.locked_at ? ` · ${clock(row.locked_at)}` : ""}
                         </span>
                       </>
                     )}

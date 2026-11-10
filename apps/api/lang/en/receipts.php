@@ -46,6 +46,7 @@ return [
     'export' => [
         'id' => 'id',
         'received_at' => 'received_at',
+        'received_at_ethiopian' => 'received_at_ethiopian',
         'day' => 'day',
         'order_no' => 'order_no',
         'business_date' => 'business_date',

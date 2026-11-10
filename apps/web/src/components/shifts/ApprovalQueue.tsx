@@ -8,8 +8,7 @@ import { signedQuantity, varianceOf } from "@/lib/counts";
 import { trimDecimal } from "@/lib/decimal";
 import { createQueueFeed } from "@/lib/live/counts";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
-import { addisClock } from "@/lib/shifts";
-import { useIsoDay } from "@/lib/useDates";
+import { useClock, useIsoDay } from "@/lib/useDates";
 import { Notice } from "../admin/kit";
 import { Chip, Skeleton } from "../ui";
 import { buttonClass } from "../styles";
@@ -27,6 +26,7 @@ import { itemName } from "./CountLines";
 const SHOWN_LINES = 4;
 
 function Row({ row }: { row: QueueRow }) {
+  const clock = useClock();
   const isoDay = useIsoDay();
   const t = useTranslations("counts");
   const locale = useLocale() as Locale;
@@ -46,7 +46,7 @@ function Row({ row }: { row: QueueRow }) {
           </p>
           <p className="text-[13px] text-neutral-600">
             {station} · {place} · {t("shift_date", { date: isoDay(row.shift.date) })}
-            {row.counted_by ? ` · ${t("handed_in_by", { name: row.counted_by.name, time: addisClock(row.submitted_at) })}` : null}
+            {row.counted_by ? ` · ${t("handed_in_by", { name: row.counted_by.name, time: clock(row.submitted_at) })}` : null}
             {row.cosigned_by ? ` · ${t("cosigned_by", { name: row.cosigned_by.name })}` : ""}
           </p>
         </div>

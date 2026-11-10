@@ -136,8 +136,10 @@ test.describe("p3 shift bar: logic", () => {
   });
 
   test("times are shown in Addis Ababa", () => {
-    expect(addisClock("2026-10-23T05:30:00Z")).toBe("08:30");
-    expect(addisClock("2026-10-23T21:05:00Z")).toBe("00:05");
+    // the Ethiopian clock (lib/clock.ts): 08:30 in Addis Ababa is 2:30 in the morning, 00:05 is 6:05 at night
+    expect(addisClock("2026-10-23T05:30:00Z")).toBe("2:30 morning");
+    expect(addisClock("2026-10-23T21:05:00Z", { locale: "am" })).toBe("6:05 ሌሊት");
+    expect(addisClock("2026-10-23T21:05:00Z", { locale: "en", also: "h24" })).toBe("6:05 night · 00:05");
     expect(addisClock(null)).toBe("");
   });
 });

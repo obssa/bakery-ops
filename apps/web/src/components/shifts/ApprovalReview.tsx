@@ -13,9 +13,8 @@ import { approvalActions, signedQuantity, stageOf, varianceOf } from "@/lib/coun
 import { compareDecimal, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { authed, useSession } from "@/lib/session";
-import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
-import { useIsoDay } from "@/lib/useDates";
+import { useClock, useIsoDay } from "@/lib/useDates";
 import { CARD, TableCard } from "../admin/kit";
 import { HistoryLink } from "../audit/HistoryLink";
 import { Alert, Button, Chip, Field, Modal, PageHeader, Panel, Status, Textarea } from "../ui";
@@ -70,6 +69,7 @@ function BackLink() {
 type Dialog = "reject" | "unlock" | null;
 
 function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
+  const clock = useClock();
   const t = useTranslations("counts");
   const isoDay = useIsoDay();
   const locale = useLocale() as Locale;
@@ -196,7 +196,7 @@ function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
           </p>
           {count.counted_by || count.cosigned_by || (decided && count.decided_by) ? (
             <div className="flex flex-col gap-1 text-[15px] text-neutral-700">
-              {count.counted_by ? <p>{t("handed_in_by", { name: count.counted_by.name, time: addisClock(count.submitted_at) })}</p> : null}
+              {count.counted_by ? <p>{t("handed_in_by", { name: count.counted_by.name, time: clock(count.submitted_at) })}</p> : null}
               {count.cosigned_by ? <p>{t("cosigned_by", { name: count.cosigned_by.name })}</p> : null}
               {decided && count.decided_by ? (
                 <p>

@@ -40,8 +40,10 @@ test.describe("p3 admin shifts", () => {
       const form = page.getByRole("region", { name: "New template" });
       await form.getByLabel("Name in English").fill(name);
       await form.getByLabel("Name in Amharic").fill(`የሙከራ አብነት ${run}`);
-      await form.getByLabel("Starts at").fill("06:00");
-      await form.getByLabel("Ends at").fill("14:00");
+      // the window on the Ethiopian clock (EthiopianTimeField): the hour as the day runs from sunrise, its value the 24-hour hour
+      await form.getByRole("group", { name: "Starts at" }).getByLabel("Hour").selectOption("6"); // 12 in the morning
+      await form.getByRole("group", { name: "Ends at" }).getByLabel("Hour").selectOption("14"); // 8 in the afternoon
+      await form.getByRole("group", { name: "Ends at" }).getByLabel("Minutes").selectOption("0");
       await form.getByRole("checkbox", { name: station.name_en, exact: true }).check();
       await form.getByRole("button", { name: "Add template", exact: true }).click();
       await expect(page.getByText(`Saved ${name}.`)).toBeVisible({ timeout: 30_000 });
@@ -52,9 +54,9 @@ test.describe("p3 admin shifts", () => {
       // --- edited: the window moves ------------------------------------------------------------------------------------------------
       await page.getByRole("button", { name: `Edit template ${name}`, exact: true }).click();
       const editing = page.getByRole("region", { name: "Edit template" });
-      await editing.getByLabel("Ends at").fill("15:00");
+      await editing.getByRole("group", { name: "Ends at" }).getByLabel("Hour").selectOption("15");
       await editing.getByRole("button", { name: "Save changes", exact: true }).click();
-      await expect(page.getByRole("row").filter({ hasText: name })).toContainText("06:00–15:00", { timeout: 30_000 });
+      await expect(page.getByRole("row").filter({ hasText: name })).toContainText("12:00 morning – 9:00 afternoon", { timeout: 30_000 });
       expect((await admin.get<{ data: TemplateRow[] }>("/shift-templates")).data.find((row) => row.id === made!.id)?.end_time).toBe("15:00");
 
       // --- retired: it leaves the list ---------------------------------------------------------------------------------------------

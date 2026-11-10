@@ -6,14 +6,15 @@ import { ApiError } from "@/lib/api/client";
 import { addNote } from "@/lib/api/counts";
 import type { HandoverNote, RosterRow } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
-import { addisClock } from "@/lib/shifts";
 import { Alert, Button, Field, Select, Textarea } from "../ui";
 import { useKeys } from "./useKeys";
+import { useClock } from "@/lib/useDates";
 
 // Handover notes (step 3.7b): the list of what the last shift left, and the form that writes one (POST /shifts/{id}/notes). A note is
 // append-only: there is nothing to edit or delete. A note may be addressed to one person on the shift; the others still see it.
 
 export function NotesList({ notes }: { notes: HandoverNote[] }) {
+  const clock = useClock();
   const t = useTranslations("counts");
   if (notes.length === 0) return <p className="text-base text-neutral-600">{t("notes_none")}</p>;
   return (
@@ -21,7 +22,7 @@ export function NotesList({ notes }: { notes: HandoverNote[] }) {
       {notes.map((note) => (
         <li key={note.id} className="space-y-1 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
           <p className="text-[13px] text-neutral-600">
-            {note.from?.name ?? ""} · {addisClock(note.created_at)}
+            {note.from?.name ?? ""} · {clock(note.created_at)}
             {note.to ? ` · ${t("note_to", { name: note.to.name })}` : ""}
           </p>
           <p className="whitespace-pre-line text-base text-neutral-900">{note.body}</p>

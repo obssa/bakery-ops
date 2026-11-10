@@ -11,7 +11,6 @@ import { columnsOf, KDS_COLUMNS, playChime, storeMuted, storedMuted, unlockAudio
 import { createTicketsFeed, lineIdsOf, railOf } from "@/lib/live/tickets";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { onOutboxApplied } from "@/lib/outbox/store";
-import { addisClock } from "@/lib/shifts";
 import { useStationHeader } from "@/lib/topBar";
 import { useNow } from "@/lib/useNow";
 import { Alert, Chip, IconButton, Select } from "../ui";
@@ -23,6 +22,7 @@ import { useShiftStation } from "../shifts/useShiftStation";
 import { StockStrip } from "./StockStrip";
 import { TicketCard } from "./TicketCard";
 import type { KdsTwins } from "./twins";
+import { useClock } from "@/lib/useDates";
 
 // One display for a station kind (/kds/kitchen, /kds/bar): the user own station of that kind (a picker when there are several), its ticket
 // rail through the live feed, a chime on new tickets with a mute toggle. Step 6.3b (fresh-counter.md 3.3): kitchen night, the one dark
@@ -56,11 +56,12 @@ function useStations(kind: StationCode): { stations: StationChoice[]; loading: b
 
 /** The wall clock of the display, in Addis Ababa time (big, tabular: read across the room). */
 function WallClock() {
+  const clock = useClock();
   const now = useNow(15_000);
   const iso = new Date(now).toISOString();
   return (
     <time dateTime={iso} className="text-[26px] font-semibold leading-none tabular-nums text-night-text">
-      {addisClock(iso)}
+      {clock(iso)}
     </time>
   );
 }

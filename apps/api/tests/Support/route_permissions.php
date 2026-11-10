@@ -42,6 +42,7 @@ return [
     'GET /api/v1/devices/this' => ['permission' => 'devices.self', 'roles' => $all, 'module' => 'identity'],
     // the business name and logo the app shows (Phase 6 follow-up): the admin sets them; everyone reads them in GET /me
     'PUT /api/v1/brand' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'PUT /api/v1/brand/clock' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/brand/logo' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'DELETE /api/v1/brand/logo' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
     // live updates (step 1.2, ADR 0009): every active user may ask; the channel rules decide which channel (403 otherwise)

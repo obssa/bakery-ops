@@ -80,13 +80,13 @@ it('exports one row per payment, oldest first, as CSV and as XLSX, with the same
         ->and($response->headers->get('Cache-Control'))->toContain('no-store');
     $rows = ($this->rows)($response, $format);
     expect($rows)->toHaveCount(4)
-        ->and($rows[0])->toBe(['id', 'received_at', 'day', 'order_no', 'business_date', 'channel_code', 'channel', 'amount', 'tendered_amount',
+        ->and($rows[0])->toBe(['id', 'received_at', 'received_at_ethiopian', 'day', 'order_no', 'business_date', 'channel_code', 'channel', 'amount', 'tendered_amount',
             'change_amount', 'currency', 'reference_no', 'status', 'has_photo', 'verified_at', 'disputed_at', 'dispute_reason', 'voided_at',
             'void_reason', 'refunded_amount', 'shift_id', 'batch_uuid', 'received_by'])
         ->and(array_map(fn (array $r): string => $r[0], array_slice($rows, 1)))->toBe([(string) $first->id, (string) $second->id, (string) $third->id]);
     $telebirr = array_combine($rows[0], $rows[2]);
     expect($telebirr)->toMatchArray([
-        'received_at' => '2026-10-20 10:00:00', 'day' => '2026-10-20', 'channel_code' => 'telebirr', 'channel' => 'Telebirr', 'amount' => '70.50',
+        'received_at' => '2026-10-20 10:00:00', 'received_at_ethiopian' => '4:00 morning', 'day' => '2026-10-20', 'channel_code' => 'telebirr', 'channel' => 'Telebirr', 'amount' => '70.50',
         'currency' => 'ETB', 'reference_no' => 'FT26TX009876', 'status' => 'verified', 'has_photo' => 'yes', 'refunded_amount' => '0.00', 'received_by' => 'Meron',
     ])
         ->and(array_combine($rows[0], $rows[3])['day'])->toBe('2026-10-21', '23:59:59 in Addis Ababa is still that day')

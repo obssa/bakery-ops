@@ -28,7 +28,6 @@ import { PrintButton, PrintOffButton, PrintStatus, ReceiptQr, usePrintReceipt } 
 // (`layout="stack"`: the code, the link, Print, the PDF); with printing off in the receipt settings, Print stays in its place, disabled,
 // saying "off in Admin". Before the bill is paid the zone is ReceiptPending (the lines, the total, how the receipt will reach the customer).
 
-const ADDIS = "Africa/Addis_Ababa";
 
 export function ReceiptPanel({
   order,
@@ -70,7 +69,7 @@ export function ReceiptPanel({
         <div className="space-y-0.5 text-center">
           {business ? <p className="text-base font-semibold">{business}</p> : null}
           <p>{t("order_heading", { no })}</p>
-          <p className="text-[13px] text-neutral-600">{whenText(payments[0]?.received_at ?? new Date().toISOString(), receiptDates, { withYear: true, timeZone: ADDIS })}</p>
+          <p className="text-[13px] text-neutral-600">{whenText(payments[0]?.received_at ?? new Date().toISOString(), receiptDates, { withYear: true })}</p>
         </div>
         <ReceiptLines order={order} />
         <p className="flex justify-between gap-3 border-t border-neutral-300 pt-2 text-base font-semibold">

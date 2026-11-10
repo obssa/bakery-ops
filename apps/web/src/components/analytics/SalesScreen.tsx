@@ -3,6 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { hourLabel, seriesLabel, spanLabel } from "@/lib/analytics";
+import { hourTick } from "@/lib/clock";
 import { useHourly, useSales, type SeriesGroup } from "@/lib/api/analytics";
 import { compareDecimal } from "@/lib/decimal";
 import { useDateFormat } from "@/lib/useDates";
@@ -174,6 +175,8 @@ function Hours() {
   const hourly = useHourly(range);
   const hours = hourly.data?.data.hours ?? [];
   const built = hourly.data ? hourly.data.as_of !== null : false;
+  const shown = hourWindow(hours);
+  const first = shown[0]?.hour;
 
   return (
     <Section title={t("sales.hourly")} actions={<span className="text-[13px] text-neutral-600">{t("sales.hourly_note")}</span>}>
@@ -187,12 +190,12 @@ function Hours() {
         <div className="space-y-3">
           <Bars
             label={t("sales.hourly_label", { range: spanLabel(range, dates) })}
-            points={hourWindow(hours).map((hour) => ({ key: String(hour.hour), label: hourLabel(hour.hour), value: hour.revenue }))}
+            points={shown.map((hour) => ({ key: String(hour.hour), label: hourLabel(hour.hour, dates), value: hour.revenue }))}
             format={f.amount}
             height={180}
             highlight="peak"
             ticks="all"
-            tick={(point) => point.key}
+            tick={(point) => hourTick(Number(point.key), dates.locale, Number(point.key) === first ? undefined : Number(point.key) - 1)}
           />
           <details className="group">
             <summary className={FOLD_SUMMARY}>
@@ -219,7 +222,7 @@ function Hours() {
                   {hours.map((hour) => (
                     <tr key={hour.hour}>
                       <th scope="row" className="font-semibold tabular-nums">
-                        {hourLabel(hour.hour)}
+                        {hourLabel(hour.hour, dates)}
                       </th>
                       <td className={NUM}>{f.count(hour.orders_count)}</td>
                       <td className={NUM}>{f.qty(hour.items_qty)}</td>

@@ -558,13 +558,27 @@
                                                         },
                                                         "is_default": {
                                                             "type": "string"
+                                                        },
+                                                        "clock_also": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "string",
+                                                                    "enum": [
+                                                                        "none"
+                                                                    ]
+                                                                }
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
                                                         "name_en",
                                                         "name_am",
                                                         "logo",
-                                                        "is_default"
+                                                        "is_default",
+                                                        "clock_also"
                                                     ]
                                                 },
                                                 {
@@ -581,13 +595,18 @@
                                                         },
                                                         "is_default": {
                                                             "type": "boolean"
+                                                        },
+                                                        "clock_also": {
+                                                            "type": "string",
+                                                            "const": "none"
                                                         }
                                                     },
                                                     "required": [
                                                         "name_en",
                                                         "name_am",
                                                         "logo",
-                                                        "is_default"
+                                                        "is_default",
+                                                        "clock_also"
                                                     ]
                                                 }
                                             ]
@@ -1157,13 +1176,27 @@
                                                         },
                                                         "is_default": {
                                                             "type": "string"
+                                                        },
+                                                        "clock_also": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "string",
+                                                                    "enum": [
+                                                                        "none"
+                                                                    ]
+                                                                }
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
                                                         "name_en",
                                                         "name_am",
                                                         "logo",
-                                                        "is_default"
+                                                        "is_default",
+                                                        "clock_also"
                                                     ]
                                                 },
                                                 {
@@ -1180,13 +1213,143 @@
                                                         },
                                                         "is_default": {
                                                             "type": "boolean"
+                                                        },
+                                                        "clock_also": {
+                                                            "type": "string",
+                                                            "const": "none"
                                                         }
                                                     },
                                                     "required": [
                                                         "name_en",
                                                         "name_am",
                                                         "logo",
-                                                        "is_default"
+                                                        "is_default",
+                                                        "clock_also"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/brand/clock": {
+            "put": {
+                "operationId": "identity.brand.clock",
+                "tags": [
+                    "Brand"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateBrandClockRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "logo": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ],
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "size": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "size"
+                                                            ]
+                                                        },
+                                                        "is_default": {
+                                                            "type": "string"
+                                                        },
+                                                        "clock_also": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "string",
+                                                                    "enum": [
+                                                                        "none"
+                                                                    ]
+                                                                }
+                                                            ]
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default",
+                                                        "clock_also"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "null"
+                                                        },
+                                                        "logo": {
+                                                            "type": "null"
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "clock_also": {
+                                                            "type": "string",
+                                                            "const": "none"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default",
+                                                        "clock_also"
                                                     ]
                                                 }
                                             ]
@@ -1263,13 +1426,27 @@
                                                         },
                                                         "is_default": {
                                                             "type": "string"
+                                                        },
+                                                        "clock_also": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "string",
+                                                                    "enum": [
+                                                                        "none"
+                                                                    ]
+                                                                }
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
                                                         "name_en",
                                                         "name_am",
                                                         "logo",
-                                                        "is_default"
+                                                        "is_default",
+                                                        "clock_also"
                                                     ]
                                                 },
                                                 {
@@ -1286,13 +1463,18 @@
                                                         },
                                                         "is_default": {
                                                             "type": "boolean"
+                                                        },
+                                                        "clock_also": {
+                                                            "type": "string",
+                                                            "const": "none"
                                                         }
                                                     },
                                                     "required": [
                                                         "name_en",
                                                         "name_am",
                                                         "logo",
-                                                        "is_default"
+                                                        "is_default",
+                                                        "clock_also"
                                                     ]
                                                 }
                                             ]
@@ -1357,13 +1539,27 @@
                                                         },
                                                         "is_default": {
                                                             "type": "string"
+                                                        },
+                                                        "clock_also": {
+                                                            "anyOf": [
+                                                                {
+                                                                    "type": "string"
+                                                                },
+                                                                {
+                                                                    "type": "string",
+                                                                    "enum": [
+                                                                        "none"
+                                                                    ]
+                                                                }
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
                                                         "name_en",
                                                         "name_am",
                                                         "logo",
-                                                        "is_default"
+                                                        "is_default",
+                                                        "clock_also"
                                                     ]
                                                 },
                                                 {
@@ -1380,13 +1576,18 @@
                                                         },
                                                         "is_default": {
                                                             "type": "boolean"
+                                                        },
+                                                        "clock_also": {
+                                                            "type": "string",
+                                                            "const": "none"
                                                         }
                                                     },
                                                     "required": [
                                                         "name_en",
                                                         "name_am",
                                                         "logo",
-                                                        "is_default"
+                                                        "is_default",
+                                                        "clock_also"
                                                     ]
                                                 }
                                             ]
@@ -19879,6 +20080,24 @@
                     "reason"
                 ],
                 "title": "UnlockCountRequest"
+            },
+            "UpdateBrandClockRequest": {
+                "type": "object",
+                "description": "PUT /brand/clock (Phase 6 follow-up, the Ethiopian clock): the international clock shown beside the Ethiopian one, none (the Ethiopian\nclock alone, the default), h12 (\"4:10 PM\") or h24 (\"16:10\"). Anything else is 422 validation.failed.",
+                "properties": {
+                    "clock_also": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "h12",
+                            "h24"
+                        ]
+                    }
+                },
+                "required": [
+                    "clock_also"
+                ],
+                "title": "UpdateBrandClockRequest"
             },
             "UpdateBrandRequest": {
                 "type": "object",

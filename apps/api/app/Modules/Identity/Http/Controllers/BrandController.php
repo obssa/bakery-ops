@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Identity\Http\Controllers;
 
 use App\Modules\Identity\Http\Requests\StoreBrandLogoRequest;
+use App\Modules\Identity\Http\Requests\UpdateBrandClockRequest;
 use App\Modules\Identity\Http\Requests\UpdateBrandRequest;
 use App\Modules\Identity\Models\BrandProfile;
 use App\Modules\Identity\Support\BrandProfiles;
@@ -20,6 +21,8 @@ use Throwable;
  * The business name and logo the app shows (Phase 6 follow-up, Ramin 2026-11-10). Every signed-in person reads them in GET /me (`brand`).
  *
  *   PUT    /brand        branding.manage (the admin), Idempotency-Key: {name_en, name_am}, both or neither; answers {data: brand}
+ *   PUT    /brand/clock  branding.manage, Idempotency-Key: {clock_also: none|h12|h24}, the international clock shown beside the Ethiopian
+ *                        one on every screen, receipt and printed report; answers {data: brand}
  *   POST   /brand/logo   branding.manage, Idempotency-Key, multipart `logo`: stored as a 256 px square; answers {data: brand}
  *   DELETE /brand/logo   branding.manage, Idempotency-Key: the app's own mark again; answers {data: brand} (nothing written without a logo)
  *   GET    /media/brand/{sha}.{ext}   public: the logo's file. An <img> on the sign-in page sends no bearer token, and a logo is not secret.
@@ -36,6 +39,11 @@ final class BrandController
         [$nameEn, $nameAm] = $request->names();
 
         return response()->json(['data' => BrandProfile::view($this->brand->saveNames($nameEn, $nameAm))]);
+    }
+
+    public function updateClock(UpdateBrandClockRequest $request): JsonResponse
+    {
+        return response()->json(['data' => BrandProfile::view($this->brand->saveClock($request->also()))]);
     }
 
     public function storeLogo(StoreBrandLogoRequest $request): JsonResponse

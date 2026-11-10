@@ -45,6 +45,7 @@ return [
     'export' => [
         'id' => 'መለያ',
         'received_at' => 'የተቀበለበት ጊዜ',
+        'received_at_ethiopian' => 'የተቀበለበት ሰዓት (በኢትዮጵያ አቆጣጠር)',
         'day' => 'ቀን',
         'order_no' => 'የትዕዛዝ ቁጥር',
         'business_date' => 'የንግድ ቀን',

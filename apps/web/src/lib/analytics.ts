@@ -1,5 +1,6 @@
 import type { ChannelPoint, FreshnessDay, ItemFigures, ReportName, SeriesGroup } from "./api/analytics";
-import { dayText, monthText, rangeText, spanText, type DateFormatLike } from "./dates";
+import { wallText } from "./clock";
+import { clockFormatOf, dayText, monthText, rangeText, spanText, type DateFormatLike } from "./dates";
 import { addDecimal, compareDecimal, divideDecimal, subtractDecimal } from "./decimal";
 
 export type { FreshnessDay } from "./api/analytics";
@@ -159,9 +160,9 @@ export function spanLabel(range: DayRange, fmt: DateFormatLike): string {
   return spanText(range, fmt);
 }
 
-/** A local hour of the day: "07:00". */
-export function hourLabel(hour: number): string {
-  return `${String(hour).padStart(2, "0")}:00`;
+/** A local hour of the day on the Ethiopian clock: "1:00 morning" for 07:00 ("1:00 ጠዋት"; with the international clock when it is on). */
+export function hourLabel(hour: number, like: DateFormatLike): string {
+  return wallText(hour, 0, clockFormatOf(like));
 }
 
 // --- freshness ------------------------------------------------------------------------------------------------------------------------------
