@@ -503,6 +503,11 @@ line in the drawer and on a phone, a trash icon, a "%" inside the waste, and eac
 The drawer's yield reads "This recipe makes [1] [pcs]", a product with no recipe yet shows a callout saying what that means, and "Set the
 price" under "No price set" closes the drawer onto the price field. Web only. Claim restated at `069b6c0`; the tag stays on `2f6bbd9`.
 
+The recipe editor laid out by its room (pull request #130, Ramin 2026-11-10: the drawer's lines were squeezed and the unit cut off):
+claim restated at `069b6c0`. `main`'s run 42811697524 passed with the strict `gate-p6` green (now `gate_run_url`). Deploy 42825765745:
+42 of 43 `@live`; `admin-smoke` "admin creates an ingredient and a product" ran out of its 60 s test time (57 to 58 s on the two
+deploys before, the page had switched to Amharic while the catalog was still loading); the next pull request gives it more time.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
