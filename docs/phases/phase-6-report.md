@@ -492,6 +492,10 @@ and the consumption it relies on already exist and stay proven by `SendOrderTest
 ingredient), `CreateOrderTest` (no recipe) and `MenuEndpointTest` (unavailable when short). Pull request #129 carries #128's two test
 fixes as well (merged into its branch), so one restated claim and one run cover both: claim restated at `bd40cba` (the merge commit, the last that changes `apps/`); the tag stays.
 
+The branch's run 42766291246 (head `4dc43d8`) passed all 40 jobs; `main` was fast-forwarded to it, and `main`'s run 42775801661
+passed with the strict `gate-p6` green (now `gate_run_url`). Deploy 42788256793: 43 of 43 `@live` (the new recipe test among them),
+health ok, 107 migrations.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
