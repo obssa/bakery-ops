@@ -526,7 +526,7 @@ A choice is charcoal, never red (Ramin, 2026-11-10, of the till's chosen pay met
 method, the chosen kind card and its tick, the opened order and request cards, the till's chosen order, the ticked pills and filters, the
 pressed admin segments and the open or linked row are drawn in `ink` (`ink-50` or `ink-100` with `ink-900`); red keeps the mark, the
 current sidebar item and section tab, links, the focus ring and "New" (fresh-counter.md 1.2). Web only; the till's captures gain one with
-a method chosen at 1440 and 390.
+a method chosen at 1440 and 390. Claim restated at `c9adfac`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
