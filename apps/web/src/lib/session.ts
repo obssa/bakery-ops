@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { ApiError, isActingExpired, request, requestBlob, type RequestOptions } from "./api/client";
 import { uuid } from "./api/idempotency";
 import type { LoginResponse, Me } from "./api/types";
+import { rememberBrand } from "./brandMemory";
 import { isDeviceRefusal } from "./device";
 
 // The signed-in state of this device (ADR 0007): a Sanctum bearer token kept in memory and in localStorage (so a
@@ -15,12 +16,16 @@ import { isDeviceRefusal } from "./device";
  * client has then made this device a new id (lib/device.ts), so /me is asked once more with it instead of signing the person out.
  */
 async function readMe(token: string): Promise<Me> {
+  let me: Me;
   try {
-    return await request<Me>("/me", { token });
+    me = await request<Me>("/me", { token });
   } catch (error) {
-    if (isDeviceRefusal(error)) return request<Me>("/me", { token });
-    throw error;
+    if (!isDeviceRefusal(error)) throw error;
+    me = await request<Me>("/me", { token });
   }
+  // the brand this device last saw, for the sign-in screen, which nobody is signed in to (lib/brandMemory.ts)
+  rememberBrand(me.brand ?? null);
+  return me;
 }
 
 const TOKEN_KEY = "bakery-ops.token";

@@ -114,7 +114,7 @@ function TemplateRows({ rows, stations, manage, onEdit }: { rows: ShiftTemplate[
           <td className="text-neutral-700">{stationNames(row.station_ids) || "—"}</td>
           <td>
             {row.is_active ? (
-              <Chip tone="brand" dot>
+              <Chip tone="positive" dot>
                 {t("templates.active")}
               </Chip>
             ) : (
@@ -233,7 +233,7 @@ function TemplateForm({ editing, stations, presetStation, onDone }: { editing: S
             <div className="flex flex-col justify-end gap-2">
               {crossesMidnight(form.start_time, form.end_time) ? <p className="text-[13px] text-neutral-600">{t("templates.midnight_hint")}</p> : null}
               <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] text-neutral-900">
-                <input type="checkbox" className="size-5 accent-brand-600" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} />
+                <input type="checkbox" className="size-5 accent-ink-900" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} />
                 {t("templates.is_active")}
               </label>
             </div>
@@ -243,7 +243,7 @@ function TemplateForm({ editing, stations, presetStation, onDone }: { editing: S
               <div className="flex flex-wrap gap-2">
                 {WEEKDAYS.map((day) => (
                   <label key={day} className={PILL}>
-                    <input type="checkbox" className="size-[18px] accent-brand-600 outline-none" checked={form.days.includes(day)} onChange={() => setForm({ ...form, days: toggle(form.days, day) })} />
+                    <input type="checkbox" className="size-[18px] accent-ink-900 outline-none" checked={form.days.includes(day)} onChange={() => setForm({ ...form, days: toggle(form.days, day) })} />
                     {t(`weekday_short.${day}`)}
                   </label>
                 ))}
@@ -258,7 +258,7 @@ function TemplateForm({ editing, stations, presetStation, onDone }: { editing: S
                   <label key={station.station_id} className={PILL}>
                     <input
                       type="checkbox"
-                      className="size-[18px] accent-brand-600 outline-none"
+                      className="size-[18px] accent-ink-900 outline-none"
                       checked={form.station_ids.includes(station.station_id)}
                       onChange={() => setForm({ ...form, station_ids: toggle(form.station_ids, station.station_id) })}
                     />

@@ -57,7 +57,7 @@ const ICON_STROKE = 1.75;
 // ------------------------------------------------------------------ buttons
 
 /**
- * A button. Variants primary (brand teal), secondary (white, hairline), ghost, danger (red-50) and dark (ink); sizes md 44 px (admin),
+ * A button. Variants primary (ink), secondary (white, hairline), ghost, danger (red-50) and dark (ink, as primary); sizes md 44 px (admin),
  * lg 52 px (station) and xl 64 px (the one main action of a station screen), or the 48 px of Phase 0 without a size. `loading` shows a
  * spinner in place of the label and keeps the width; the label stays in the accessible name.
  */
@@ -201,7 +201,7 @@ export function MoneyInput({
     <div
       className={
         `flex w-full items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3 ${CONTROL_HEIGHT[controlSize ?? "base"]} ` +
-        "focus-within:border-brand-600 focus-within:inset-ring-1 focus-within:inset-ring-brand-600 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1 " +
+        "focus-within:border-ink-900 focus-within:inset-ring-1 focus-within:inset-ring-ink-900 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1 " +
         "has-[[aria-invalid=true]]:border-red-700 has-[:disabled]:bg-neutral-50 " +
         className
       }
@@ -219,7 +219,7 @@ export function MoneyInput({
 }
 
 /**
- * An on/off setting: a real <button role="switch" aria-checked> (52 × 32, brand teal when on) with its visible label beside it; the
+ * An on/off setting: a real <button role="switch" aria-checked> (52 × 32, positive when on) with its visible label beside it; the
  * label names the switch and a tap on it toggles too.
  */
 export function Switch({
@@ -259,7 +259,7 @@ export function Switch({
         aria-describedby={hintId}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`inline-flex h-8 w-13 shrink-0 items-center rounded-full p-1 motion-safe:transition-colors motion-safe:duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${checked ? "bg-brand-600" : "bg-neutral-300"} ${focusRing}`}
+        className={`inline-flex h-8 w-13 shrink-0 items-center rounded-full p-1 motion-safe:transition-colors motion-safe:duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${checked ? "bg-positive-600" : "bg-neutral-300"} ${focusRing}`}
       >
         <span
           aria-hidden="true"
@@ -276,7 +276,7 @@ export interface SegmentOption<T extends string> {
 }
 
 const SEGMENT_SELECTED = {
-  station: "bg-neutral-900 text-white",
+  station: "bg-ink-900 text-white",
   admin: "bg-brand-50 text-brand-700",
 } as const;
 
@@ -339,7 +339,7 @@ export function Alert({ children }: { children: ReactNode }) {
 /** A polite live region; renders even when empty so screen readers pick up the first message. */
 export function Status({ children }: { children?: ReactNode }) {
   return (
-    <p role="status" aria-live="polite" className={children ? "rounded-xl bg-brand-50 px-4 py-3 text-base font-medium text-brand-700" : "sr-only"}>
+    <p role="status" aria-live="polite" className={children ? "rounded-xl bg-positive-50 px-4 py-3 text-base font-medium text-positive-700" : "sr-only"}>
       {children}
     </p>
   );
@@ -426,13 +426,13 @@ export function PageHeader({
   );
 }
 
-/** A KPI: a label (14, neutral-600), the value (30 / 700, tabular) and a delta (brand-700, or red-700 when it is bad). */
+/** A KPI: a label (14, neutral-600), the value (30 / 700, tabular) and a delta (positive-700, or red-700 when it is bad). */
 export function Stat({ label, value, delta, bad = false, className = "" }: { label: string; value: ReactNode; delta?: ReactNode; bad?: boolean; className?: string }) {
   return (
     <div className={`${surface} ${className}`}>
       <p className="text-sm text-neutral-600">{label}</p>
       <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums text-neutral-900">{value}</p>
-      {delta ? <p className={`mt-1 text-[13px] font-semibold tabular-nums ${bad ? "text-red-700" : "text-brand-700"}`}>{delta}</p> : null}
+      {delta ? <p className={`mt-1 text-[13px] font-semibold tabular-nums ${bad ? "text-red-700" : "text-positive-700"}`}>{delta}</p> : null}
     </div>
   );
 }
@@ -500,6 +500,7 @@ export function Table({ className = "", children, ...props }: TableHTMLAttribute
 const TONES = {
   neutral: { fill: "bg-neutral-100 text-neutral-700", dot: "bg-neutral-500" },
   brand: { fill: "bg-brand-50 text-brand-700", dot: "bg-brand-600" },
+  positive: { fill: "bg-positive-50 text-positive-700", dot: "bg-positive-600" },
   amber: { fill: "bg-amber-50 text-amber-800", dot: "bg-amber-700" },
   red: { fill: "bg-red-50 text-red-700", dot: "bg-red-700" },
   blue: { fill: "bg-blue-50 text-blue-700", dot: "bg-blue-700" },
@@ -510,8 +511,9 @@ const TONES = {
 export type Tone = keyof typeof TONES;
 
 /**
- * A pill with an optional 8 px dot. Amber means low or waiting, red out, void, late or an error, blue information or in progress, brand
- * the current or good state, green money confirmed. The words carry the meaning; the tone only adds to it.
+ * A pill with an optional 8 px dot. Amber means low or waiting, red out, void, late or an error, blue information or in progress, positive
+ * a good or "on" state, brand (the bakery's red) a highlight such as "New", green money confirmed. The words carry the meaning; the tone
+ * only adds to it.
  */
 export function Chip({ tone = "neutral", dot = false, children, className = "" }: { tone?: Tone; dot?: boolean; children: ReactNode; className?: string }) {
   return (

@@ -18,7 +18,7 @@ import { ProductImage, Table } from "../ui";
 //   - TableCard: a table on a white card with an 18 px radius (the board's), the 13 px caps header, 48 px rows on hairline dividers, the
 //     first and last columns 20 px in, no line under the last row; a title row inside the card when the table has a visible title;
 //   - Notice: a line that says something about the screen itself (stale data, a view-only screen), amber for waiting or stale, blue for
-//     information, in the Alert's shape; FORM_GRID: a form's two columns from 1024 px; TEXT_LINK: the board's brand-teal text link.
+//     information, in the Alert's shape; FORM_GRID: a form's two columns from 1024 px; TEXT_LINK: the board's brand-red text link.
 // Every word comes from the caller (messages/{en,am}.json).
 
 /** The board's card: white, a neutral-200 hairline, 18 px corners. */
@@ -27,7 +27,7 @@ export const CARD = "rounded-[18px] border border-neutral-200 bg-white";
 /** A form's fields: two columns from 1024 px, one below (fresh-counter.md 4.4). */
 export const FORM_GRID = "grid gap-x-5 gap-y-4 lg:grid-cols-2";
 
-/** A link in the brand teal, as the boards draw "All products" and "Add photo". */
+/** A link in the brand red, as the boards draw "All products" and "Add photo". */
 export const TEXT_LINK = `rounded-md text-sm font-semibold text-brand-600 hover:text-brand-700 hover:underline ${focusRing}`;
 
 // ------------------------------------------------------------------ the section's own pages
@@ -111,7 +111,7 @@ export function ToolbarSegments<T extends string>({
 
 const BOX =
   "flex h-11 min-w-0 items-center gap-2.5 rounded-xl border border-neutral-300 bg-white px-3.5 " +
-  "focus-within:border-brand-600 focus-within:inset-ring-1 focus-within:inset-ring-brand-600 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1 " +
+  "focus-within:border-ink-900 focus-within:inset-ring-1 focus-within:inset-ring-ink-900 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1 " +
   "has-[[aria-invalid=true]]:border-red-700";
 
 /** The catalog's search box: a 44 px field with the search icon, its label for readers, Escape or X to clear it. */
@@ -232,7 +232,7 @@ export function ToolbarField({
 export function ToolbarCheck({ label, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: string }) {
   return (
     <label className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-neutral-300 bg-white px-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-600/35 has-[:focus-visible]:ring-offset-1">
-      <input type="checkbox" className="size-[18px] accent-brand-600 outline-none" {...props} />
+      <input type="checkbox" className="size-[18px] accent-ink-900 outline-none" {...props} />
       {label}
     </label>
   );

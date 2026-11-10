@@ -33,7 +33,7 @@ const STATUS_TONE: Record<RequestStatus, Tone> = {
   accepted: "blue",
   in_progress: "blue",
   pending_confirmation: "amber",
-  done: "brand",
+  done: "positive",
   cancelled: "neutral",
 };
 
@@ -98,7 +98,7 @@ function RecipeTable({ lines, locale, onTransfer, canTransfer }: { lines: CardLi
                     ) : null}
                   </>
                 ) : (
-                  <Badge tone="brand">{t("enough")}</Badge>
+                  <Badge tone="positive">{t("enough")}</Badge>
                 )}
               </td>
             </tr>
@@ -267,7 +267,7 @@ export function RequestDetail({
             </div>
             <RecipeTable lines={recipe.lines} locale={locale} canTransfer={can(me, "transfers.request") && consume !== null} onTransfer={setTransfer} />
             {transferred ? (
-              <p role="status" className="rounded-xl bg-brand-50 px-4 py-3 text-base font-medium text-brand-700">
+              <p role="status" className="rounded-xl bg-positive-50 px-4 py-3 text-base font-medium text-positive-700">
                 {t("transfer_sent")}
               </p>
             ) : null}

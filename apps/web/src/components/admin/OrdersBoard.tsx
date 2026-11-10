@@ -40,7 +40,7 @@ import { CARD, Notice, Toolbar, ToolbarSelect, useProductLook, type ProductLook 
 const LINE_TONE: Record<LineStatus, Tone> = {
   queued: "neutral",
   accepted: "blue",
-  ready: "brand",
+  ready: "positive",
   served: "neutral",
   rejected: "red",
   voided: "neutral",

@@ -42,7 +42,7 @@ import {
 // of the range (a display-case product made in the house, 4.4a) is said in words: "cost incomplete", never a margin of 100 % or 0 %.
 //
 // Step 6.4d (fresh-counter.md 4.3 and 4.4): the title row is the product, its photo beside the name, the name in the other language beside
-// it on the English page (as the catalog's rows), its chips (New brand teal) and "Back to Products" as the action; the range as the
+// it on the English page (as the catalog's rows), its chips (New brand red) and "Back to Products" as the action; the range as the
 // toolbar; the totals as the board's KPI row; the weeks since launch Today's bars (the latest week brand-600) beside their table card; the
 // days a brand-600 line over their table card.
 

@@ -366,7 +366,7 @@ function RefundLineRow({ line, view, checked, currency, onToggle }: { line: Line
   return (
     <li>
       <label className={`flex min-h-14 items-center gap-3 rounded-xl border px-4 py-2 ${disabled ? "border-neutral-200 bg-neutral-50" : "cursor-pointer border-neutral-300"}`}>
-        <input type="checkbox" className="size-5 shrink-0 accent-brand-600" checked={checked} disabled={disabled} aria-labelledby={nameId} aria-describedby={noteId} onChange={onToggle} />
+        <input type="checkbox" className="size-5 shrink-0 accent-ink-900" checked={checked} disabled={disabled} aria-labelledby={nameId} aria-describedby={noteId} onChange={onToggle} />
         <span className="min-w-0 flex-1">
           <span id={nameId} className={`block text-base font-medium ${disabled ? "text-neutral-600" : "text-neutral-900"}`}>
             {lineName(line, locale)}

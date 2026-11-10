@@ -94,6 +94,10 @@ final class PermissionRegistry
         // Phase 5 (step 5.5c; plan sections 3 M2c, 4.4 and 10.6), through the grant-only migration
         // 2026_11_11_100800_grant_phase_5_ops_permissions. system.view: the System page and GET /system/status (the host's health).
         'system.view' => ['admin'],
+        // Phase 6 follow-up (the bakery's own brand, Ramin 2026-11-10), through the grant-only migration
+        // 2026_11_15_100000_grant_branding_permission. branding.manage: PUT /brand and POST and DELETE /brand/logo, the business name and logo
+        // the app shows (every signed-in person reads them in GET /me).
+        'branding.manage' => ['admin'],
     ];
 
     /**

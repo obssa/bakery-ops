@@ -49,7 +49,7 @@ const FIELD_OF: Record<ReceiptIssue, keyof ReceiptForm> = {
   too_long: "business_name_en",
 };
 
-const CHECK = "mt-0.5 size-5 shrink-0 accent-brand-600 disabled:cursor-not-allowed";
+const CHECK = "mt-0.5 size-5 shrink-0 accent-ink-900 disabled:cursor-not-allowed";
 
 export function ReceiptSettingsScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("adminPayments");
@@ -198,7 +198,7 @@ function SettingsForm({ settings }: { settings: ReceiptSettings }) {
               </p>
               {PAPER_WIDTHS.map((width) => (
                 <label key={width} className="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] text-neutral-900">
-                  <input type="radio" name="paper_width_mm" className="size-5 shrink-0 accent-brand-600" disabled={!editable} checked={form.paper_width_mm === width} onChange={() => set("paper_width_mm", width)} />
+                  <input type="radio" name="paper_width_mm" className="size-5 shrink-0 accent-ink-900" disabled={!editable} checked={form.paper_width_mm === width} onChange={() => set("paper_width_mm", width)} />
                   {t(`receipts.paper_${width}`)}
                 </label>
               ))}

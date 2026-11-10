@@ -15,12 +15,12 @@ import { focusRing } from "../styles";
 // table's state, in a word as well as a colour (colour is never the only signal). Choosing a table or takeaway closes it. An order the
 // API already holds keeps its type and table, so its head has no "Change".
 
-// Status colours keep their meaning (fresh-counter.md 1.3): blue in progress, amber waiting, brand teal served, neutral free or the bill.
+// Status colours keep their meaning (fresh-counter.md 1.3): blue in progress, amber waiting, positive served, neutral free or the bill.
 const STATE_STYLE: Record<TableState, string> = {
   free: "border-neutral-300 bg-white text-neutral-900",
   ordering: "border-blue-200 bg-blue-50 text-blue-800",
   waiting: "border-amber-200 bg-amber-50 text-amber-900",
-  served: "border-brand-100 bg-brand-50 text-brand-800",
+  served: "border-positive-100 bg-positive-50 text-positive-800",
   bill: "border-neutral-300 bg-neutral-100 text-neutral-900",
 };
 

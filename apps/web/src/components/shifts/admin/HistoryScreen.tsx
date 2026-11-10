@@ -110,7 +110,7 @@ function ChainBody({ placeId, placeName, head, picker, children }: { placeId: nu
       </Toolbar>
       {verify.isError ? <Alert>{errorText.message(verify.error)}</Alert> : null}
       {summary?.ok ? (
-        <p role="status" className="flex items-start gap-3 rounded-xl bg-brand-50 px-4 py-3 text-[15px] font-medium text-brand-700">
+        <p role="status" className="flex items-start gap-3 rounded-xl bg-positive-50 px-4 py-3 text-[15px] font-medium text-positive-700">
           <CircleCheck className="mt-0.5 size-5 shrink-0" strokeWidth={2} aria-hidden="true" />
           {t("history.verify_ok", { count: summary.checked })}
         </p>

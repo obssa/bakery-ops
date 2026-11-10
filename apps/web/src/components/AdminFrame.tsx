@@ -8,7 +8,7 @@ import type { Me } from "@/lib/api/types";
 import { isCurrent, SCREENS } from "@/lib/screens";
 import { can, useSession } from "@/lib/session";
 import { useOnline } from "@/lib/useOnline";
-import { AppMark, SyncChip } from "./AppShell";
+import { AppMark, BrandName, SyncChip } from "./AppShell";
 import { DateDisplaySwitch } from "./DateDisplaySwitch";
 import { DeviceGate } from "./DeviceGate";
 import { ICON_STROKE, SCREEN_ICONS, SECTION_ICONS } from "./icons";
@@ -277,11 +277,10 @@ function useDrawer() {
 
 /** The app's mark and name, the way home (the start page), as the board's sidebar opens. */
 function Brand() {
-  const t = useTranslations("app");
   return (
     <Link href="/" className={`flex min-w-0 items-center gap-3 rounded-xl px-2 ${focusRing}`}>
       <AppMark />
-      <span className="truncate text-lg font-bold tracking-tight text-neutral-900">{t("name")}</span>
+      <BrandName className="truncate text-lg font-bold tracking-tight text-neutral-900" />
     </Link>
   );
 }

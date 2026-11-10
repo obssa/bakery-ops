@@ -97,7 +97,7 @@ function ReasonRows({ rows, manage, onEdit }: { rows: VarianceReason[]; manage: 
           <td className="text-neutral-700">{row.requires_note ? t("reasons.note_required") : t("reasons.note_optional")}</td>
           <td>
             {row.is_active ? (
-              <Chip tone="brand" dot>
+              <Chip tone="positive" dot>
                 {t("reasons.active")}
               </Chip>
             ) : (
@@ -183,7 +183,7 @@ function ReasonForm({ editing, onDone }: { editing: VarianceReason | null; onDon
               {(props) => <TextInput {...props} controlSize="md" value={code} maxLength={32} disabled={editing !== null} onChange={(event) => setCode(event.target.value)} />}
             </Field>
             <label className="flex min-h-11 cursor-pointer items-center gap-3 self-start text-[15px] text-neutral-900 lg:mt-7">
-              <input type="checkbox" className="size-5 accent-brand-600" checked={requiresNote} onChange={(event) => setRequiresNote(event.target.checked)} />
+              <input type="checkbox" className="size-5 accent-ink-900" checked={requiresNote} onChange={(event) => setRequiresNote(event.target.checked)} />
               {t("reasons.requires_note")}
             </label>
             <Field label={t("reasons.name_en")} error={issue("name_en") ?? fieldError("name_en")}>

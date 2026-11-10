@@ -9,6 +9,7 @@ use App\Modules\Identity\Contracts\Authenticate;
 use App\Modules\Identity\Contracts\Stations;
 use App\Modules\Identity\Http\Requests\LoginRequest;
 use App\Modules\Identity\Http\Resources\UserResource;
+use App\Modules\Identity\Models\BrandProfile;
 use App\Modules\Identity\Models\User;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Station;
@@ -17,7 +18,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * POST /login (public, throttled), GET /me, POST /logout. Bearer tokens only (ADR 0007).
+ * POST /login (public, throttled), GET /me, POST /logout. Bearer tokens only (ADR 0007). GET /me carries the branch's `brand` (Phase 6
+ * follow-up): the business name and logo the app shows, or nulls and is_default true while the admin has set none (BrandProfile::view).
  */
 final class AuthController
 {
@@ -67,6 +69,7 @@ final class AuthController
                 'requires_overseer' => $s->requires_overseer,
                 'current_shift' => $this->shifts->currentFor($s->id),
             ])->values()->all(),
+            'brand' => BrandProfile::view(BrandProfile::query()->first()),
         ]);
     }
 

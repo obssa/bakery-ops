@@ -21,7 +21,7 @@ import { useErrorText } from "@/lib/errors";
 // each with its own Idempotency-Key, and says which codes were taken already. Every write reads the tables again everywhere
 // (["dining-tables"]), so an open pad's grid shows the change on its next poll. A table is never deleted, only switched off.
 
-const STATE_TONE: Record<TableState, Tone> = { free: "neutral", ordering: "blue", waiting: "amber", served: "brand", bill: "neutral" };
+const STATE_TONE: Record<TableState, Tone> = { free: "neutral", ordering: "blue", waiting: "amber", served: "positive", bill: "neutral" };
 
 /** The API's rule for a code (StoreDiningTableRequest): letters, digits, - and _, at most 16, starting with a letter or a digit. */
 const CODE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,15}$/;

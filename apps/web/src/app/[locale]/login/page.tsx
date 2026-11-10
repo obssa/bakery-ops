@@ -1,7 +1,7 @@
 import { Smartphone } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
-import { AppMark, ScreensNav } from "@/components/AppShell";
+import { AppMark, BrandName, ScreensNav } from "@/components/AppShell";
 import { LanguageSwitcher, LanguageSwitcherWithQuery } from "@/components/LanguageSwitcher";
 import { PageHeader } from "@/components/ui";
 import { enterLocale, titledBy, type LocaleProps } from "@/lib/page";
@@ -38,7 +38,7 @@ export default async function LoginPage(props: LocaleProps) {
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2.5 bg-neutral-900/60 px-6 py-5 text-white md:px-9 md:py-8">
           <p className="flex items-center gap-3">
             <AppMark size="lg" />
-            <span className="text-[22px] font-bold tracking-tight">{t("app.name")}</span>
+            <BrandName className="text-[22px] font-bold tracking-tight" />
           </p>
           <p className="hidden text-[17px] leading-normal md:block">{t("app.tagline")}</p>
         </div>

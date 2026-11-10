@@ -326,7 +326,7 @@ function PeopleDialog({ action, onClose }: { action: Exclude<Action, { kind: "st
           <legend className="text-sm font-medium text-neutral-800">{t("people.legend")}</legend>
           <div className="flex flex-col gap-2">
             {candidates.map((person) => (
-              <label key={person.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 bg-white px-4 text-[15px] accent-brand-600 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700">
+              <label key={person.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 bg-white px-4 text-[15px] accent-ink-900 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700">
                 <input type="checkbox" className="size-5" checked={selected.includes(person.id)} onChange={() => toggle(person.id)} />
                 {person.name}
               </label>

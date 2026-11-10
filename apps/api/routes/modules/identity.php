@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Identity\Http\Controllers\AuthController;
+use App\Modules\Identity\Http\Controllers\BrandController;
 use App\Modules\Identity\Http\Controllers\BroadcastingAuthController;
 use App\Modules\Identity\Http\Controllers\DevicesController;
 use App\Modules\Identity\Http\Controllers\ShortCodeController;
@@ -51,5 +52,19 @@ Route::prefix('api/v1')->middleware('api')->group(function (): void {
             Route::post('/devices/{id}/revoke', [DevicesController::class, 'revoke'])->middleware('idempotency')->whereNumber('id')->name('identity.devices.revoke');
         });
         Route::get('/devices/this', [DevicesController::class, 'current'])->middleware('permission:devices.self')->name('identity.devices.this');
+
+        // the business name and logo the app shows (Phase 6 follow-up): the admin sets them, everyone reads them in GET /me
+        Route::middleware('permission:branding.manage')->group(function (): void {
+            Route::put('/brand', [BrandController::class, 'update'])->middleware('idempotency')->name('identity.brand.update');
+            Route::post('/brand/logo', [BrandController::class, 'storeLogo'])->middleware('idempotency')->name('identity.brand.logo.store');
+            Route::delete('/brand/logo', [BrandController::class, 'destroyLogo'])->middleware('idempotency')->name('identity.brand.logo.destroy');
+        });
     });
+
+    // The logo's file (Phase 6 follow-up), public by design like a product photo's renditions: the sign-in page's <img> sends no bearer
+    // token and a logo is not secret; the URL names the file's sha256 (cached as immutable). Listed in tests/Support/public_routes.php and
+    // in PUBLIC_ROUTES of scripts/check_invariants.py. The pattern admits a 64-hex sha and the two extensions only.
+    Route::get('/media/brand/{sha}.{ext}', [BrandController::class, 'media'])
+        ->where(['sha' => '[0-9a-f]{64}', 'ext' => 'webp|jpg'])
+        ->name('identity.brand.media');
 });

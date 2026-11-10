@@ -12,7 +12,7 @@ import { focusRing } from "../styles";
 // greyed out, unticked, with the reason under it. Used by the new item form and by the product's page.
 //
 // Step 6.4b (the ProductPhoto board's Refunds card): each setting is a row, its name (15 / 600) over its hint (13, neutral-600), with a
-// 52 x 32 switch at the right, brand teal when on. The switch is the same checkbox as before, drawn as a track and a knob, so its role,
+// 52 x 32 switch at the right, positive when on. The switch is the same checkbox as before, drawn as a track and a knob, so its role,
 // name ("Refundable", "Goes back to stock when refunded") and description are what the specs and screen readers have always had, and a tap
 // anywhere on the row toggles it.
 
@@ -45,7 +45,7 @@ function ToggleRow({
       <span className="relative inline-flex h-8 w-13 shrink-0">
         <input
           type="checkbox"
-          className={`peer absolute inset-0 m-0 size-full cursor-pointer appearance-none rounded-full bg-neutral-300 checked:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
+          className={`peer absolute inset-0 m-0 size-full cursor-pointer appearance-none rounded-full bg-neutral-300 checked:bg-positive-600 disabled:cursor-not-allowed disabled:opacity-50 motion-safe:transition-colors motion-safe:duration-150 ${focusRing}`}
           checked={checked}
           disabled={disabled}
           aria-labelledby={ids.label}

@@ -23,7 +23,7 @@ import { ShiftStatusBadge, useName } from "./common";
 // station at that moment a white card (its shift's chip, the people on duty with their initials), each place's stock a table card (the
 // figures right-aligned in tabular numbers), the open orders and the counts two white cards side by side.
 
-const COUNT_TONE: Record<string, Tone> = { locked: "brand", approved: "brand", rejected: "red", awaiting_cosign: "amber", pending_approval: "amber", draft: "blue" };
+const COUNT_TONE: Record<string, Tone> = { locked: "positive", approved: "positive", rejected: "red", awaiting_cosign: "amber", pending_approval: "amber", draft: "blue" };
 
 export function ReplayScreen() {
   const t = useTranslations("adminShifts");

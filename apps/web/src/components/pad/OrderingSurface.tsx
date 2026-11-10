@@ -153,7 +153,7 @@ export function OrderingSurface({
           </p>
           <a
             href={`#${ORDER_PANEL_ID}`}
-            className={`inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl bg-brand-600 px-4 text-base font-semibold text-white hover:bg-brand-700 ${focusRing}`}
+            className={`inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl bg-ink-900 px-4 text-base font-semibold text-white hover:bg-ink-800 ${focusRing}`}
           >
             {t("view_order")}
             <ChevronDown className="size-5" strokeWidth={2} aria-hidden="true" />

@@ -196,7 +196,7 @@ export function PhotoFramer({
             const zoom = Number(event.target.value) / 100;
             onView((current) => zoomAt(photo, current, zoom));
           }}
-          className={`h-11 min-w-0 grow cursor-pointer accent-brand-600 disabled:cursor-not-allowed ${focusRing}`}
+          className={`h-11 min-w-0 grow cursor-pointer accent-ink-900 disabled:cursor-not-allowed ${focusRing}`}
         />
         <span aria-hidden="true" className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums text-neutral-900">
           {zoomText}

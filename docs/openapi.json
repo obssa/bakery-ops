@@ -526,6 +526,71 @@
                                                     "current_shift"
                                                 ]
                                             }
+                                        },
+                                        "brand": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "logo": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ],
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "size": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "size"
+                                                            ]
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "null"
+                                                        },
+                                                        "logo": {
+                                                            "type": "null"
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default"
+                                                    ]
+                                                }
+                                            ]
                                         }
                                     },
                                     "required": [
@@ -534,7 +599,8 @@
                                         "locale",
                                         "acting",
                                         "device",
-                                        "work_stations"
+                                        "work_stations",
+                                        "brand"
                                     ]
                                 }
                             }
@@ -1032,6 +1098,372 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/brand": {
+            "put": {
+                "operationId": "identity.brand.update",
+                "tags": [
+                    "Brand"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateBrandRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "logo": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ],
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "size": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "size"
+                                                            ]
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "null"
+                                                        },
+                                                        "logo": {
+                                                            "type": "null"
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
+        "/v1/brand/logo": {
+            "post": {
+                "operationId": "identity.brand.logo.store",
+                "tags": [
+                    "Brand"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreBrandLogoRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "logo": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ],
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "size": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "size"
+                                                            ]
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "null"
+                                                        },
+                                                        "logo": {
+                                                            "type": "null"
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "identity.brand.logo.destroy",
+                "tags": [
+                    "Brand"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "anyOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "string"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "string"
+                                                        },
+                                                        "logo": {
+                                                            "type": [
+                                                                "object",
+                                                                "null"
+                                                            ],
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "size": {
+                                                                    "type": "integer"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "size"
+                                                            ]
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default"
+                                                    ]
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "name_en": {
+                                                            "type": "null"
+                                                        },
+                                                        "name_am": {
+                                                            "type": "null"
+                                                        },
+                                                        "logo": {
+                                                            "type": "null"
+                                                        },
+                                                        "is_default": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "name_en",
+                                                        "name_am",
+                                                        "logo",
+                                                        "is_default"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/v1/media/brand/{sha}.{ext}": {
+            "get": {
+                "operationId": "identity.brand.media",
+                "tags": [
+                    "Brand"
+                ],
+                "parameters": [
+                    {
+                        "name": "sha",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ext",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "304": {
+                        "description": "",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "public, max-age=31536000, immutable"
+                                }
+                            },
+                            "ETag": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
                     }
                 }
             }
@@ -18143,6 +18575,22 @@
                 ],
                 "title": "StockLineResource"
             },
+            "StoreBrandLogoRequest": {
+                "type": "object",
+                "description": "POST /brand/logo (multipart/form-data, Phase 6 follow-up): `logo`, the picture (JPEG, PNG or WebP, at most BrandProfiles::MAX_UPLOAD_BYTES).\nNo usable file part is files.not_an_image; a part over the limit (or one the server cut off at its own) is files.too_large. What the file\nholds is the image processor's to judge (Support\\BrandProfiles::setLogo).",
+                "properties": {
+                    "logo": {
+                        "type": "string",
+                        "format": "binary",
+                        "contentMediaType": "application/octet-stream",
+                        "description": "checked in prepareForValidation; named here so the OpenAPI body is multipart"
+                    }
+                },
+                "required": [
+                    "logo"
+                ],
+                "title": "StoreBrandLogoRequest"
+            },
             "StoreCategoryRequest": {
                 "type": "object",
                 "description": "POST /categories: a category of one kind in the admin's branch, named in both languages (rule 9), optionally under\na live parent of the same kind and branch.",
@@ -19205,7 +19653,8 @@
                                 "devices.self",
                                 "print.create",
                                 "print.view",
-                                "system.view"
+                                "system.view",
+                                "branding.manage"
                             ]
                         }
                     },
@@ -19430,6 +19879,31 @@
                     "reason"
                 ],
                 "title": "UnlockCountRequest"
+            },
+            "UpdateBrandRequest": {
+                "type": "object",
+                "description": "PUT /brand (Phase 6 follow-up): the business name the app shows, in English and in Amharic (rule 9), both or neither, up to 120 each.\nNeither (both empty or null) puts the app's own name back. Anything else is 422 validation.failed.",
+                "properties": {
+                    "name_en": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    },
+                    "name_am": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 120
+                    }
+                },
+                "required": [
+                    "name_en",
+                    "name_am"
+                ],
+                "title": "UpdateBrandRequest"
             },
             "UpdateCategoryRequest": {
                 "type": "object",
@@ -19967,7 +20441,8 @@
                                 "devices.self",
                                 "print.create",
                                 "print.view",
-                                "system.view"
+                                "system.view",
+                                "branding.manage"
                             ]
                         }
                     },

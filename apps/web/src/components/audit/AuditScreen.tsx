@@ -458,7 +458,7 @@ function ExportButtons({ filters, query }: { filters: AuditFilters; query: Recor
           {tooLarge ? <span className="block">{t("export.too_large", { rows: tooLarge.rows, max: tooLarge.maxRows })}</span> : null}
         </p>
       ) : null}
-      <p role="status" className={saved ? "max-w-md truncate text-right text-[13px] font-medium text-brand-700" : "sr-only"}>
+      <p role="status" className={saved ? "max-w-md truncate text-right text-[13px] font-medium text-positive-700" : "sr-only"}>
         {saved ? t("export.saved", { name: saved }) : null}
       </p>
     </div>

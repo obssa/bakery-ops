@@ -43,8 +43,9 @@ BRANCH_ALLOWLIST = {
 APPEND_ONLY_TABLES = ["stock_movements", "audit_log", "order_events", "item_cost_history", "handover_notes", "payment_refunds", "stock_movement_reversals", "order_refunds", "order_refund_lines"]
 # api/v1 routes public by design; each reason is in apps/api/tests/Support/public_routes.php, which this mirrors. Step 6.1a adds
 # "GET api/v1/media/items/{sha}/{rendition}.{ext}": a product photo's renditions, which an <img> on a pad fetches without a token; not
-# secret, named by the photo's sha256 (unguessable, new with every photo), so cached as immutable; it writes nothing and reads no branch
-PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify", "api/v1/telegram/webhook/{secret}", "GET api/v1/files/{file}", "GET api/v1/receipts/{order}", "GET api/v1/weekly-summaries/{week}", "GET api/v1/media/items/{sha}/{rendition}.{ext}", "GET api/v1/bridge/jobs/next", "POST api/v1/bridge/jobs/{job}/claim", "POST api/v1/bridge/jobs/{job}/printed", "POST api/v1/bridge/jobs/{job}/failed"}
+# secret, named by the photo's sha256 (unguessable, new with every photo), so cached as immutable; it writes nothing and reads no branch.
+# The Phase 6 follow-up adds "GET api/v1/media/brand/{sha}.{ext}", the bakery's logo, on the same terms (the sign-in page shows it)
+PUBLIC_ROUTES = {"api/v1/login", "api/v1/health", "api/v1/auth/login", "api/v1/short-code/verify", "api/v1/telegram/webhook/{secret}", "GET api/v1/files/{file}", "GET api/v1/receipts/{order}", "GET api/v1/weekly-summaries/{week}", "GET api/v1/media/items/{sha}/{rendition}.{ext}", "GET api/v1/media/brand/{sha}.{ext}", "GET api/v1/bridge/jobs/next", "POST api/v1/bridge/jobs/{job}/claim", "POST api/v1/bridge/jobs/{job}/printed", "POST api/v1/bridge/jobs/{job}/failed"}
 # write-method routes that write nothing (mirrors apps/api/tests/Support/read_like_writes.php)
 READ_LIKE_WRITES = {"POST api/v1/broadcasting/auth"}
 MONEY_RX = re.compile(r"(price|amount|total|subtotal|discount|tax|deposit|float)", re.I)

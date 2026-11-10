@@ -375,7 +375,7 @@ export function PaySheet({
         </output>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {allServed && !completed ? <Chip tone="brand">{t("all_served")}</Chip> : null}
+        {allServed && !completed ? <Chip tone="positive">{t("all_served")}</Chip> : null}
         {settled ? <Chip tone="green">{t("settled")}</Chip> : null}
         {onVoid && !completed && !queued ? (
           <Button type="button" variant="ghost" size="md" disabled={pending} aria-label={settled ? t("void_payment_aria", { no }) : t("void_aria", { no })} onClick={onVoid}>
@@ -398,7 +398,7 @@ export function PaySheet({
         className={
           single && settledLeft
             ? "sr-only"
-            : `flex w-fit items-baseline gap-3 rounded-xl px-3.5 py-2 text-base font-semibold ${settledLeft ? "bg-brand-50 text-brand-700" : "bg-amber-50 text-amber-900"}`
+            : `flex w-fit items-baseline gap-3 rounded-xl px-3.5 py-2 text-base font-semibold ${settledLeft ? "bg-positive-50 text-positive-700" : "bg-amber-50 text-amber-900"}`
         }
       >
         <span id={leftId}>{t("left_to_pay")}</span>

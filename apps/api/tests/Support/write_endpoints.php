@@ -34,6 +34,7 @@ use App\Modules\Identity\Contracts\ShortCodes;
 use App\Modules\Identity\Models\Device;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Models\UserStationAssignment;
+use App\Modules\Identity\Support\BrandProfiles;
 use App\Modules\Inventory\Enums\LocationType;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Purchase;
@@ -272,6 +273,49 @@ return [
             $device = Device::factory()->create(['branch_id' => $me->branch_id, 'enrolled_by' => $me->id]);
 
             return ['{id}' => (string) $device->id];
+        },
+        'payload' => fn (): array => [],
+    ],
+    // the business name and logo the app shows (Phase 6 follow-up): the first save of the name or the logo writes the branch's
+    // brand_profiles row; removing the logo changes that row, so its one new row is the audit row
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/brand',
+        'module' => 'identity',
+        'table' => 'brand_profiles',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => ['name_en' => 'Idempotent Bakery', 'name_am' => 'ዳቦ ቤት'],
+    ],
+    [
+        'method' => 'POST',
+        'uri' => '/api/v1/brand/logo',
+        'module' => 'identity',
+        'table' => 'brand_profiles',
+        'setup' => function (TestCase $t) use ($admin): array {
+            Storage::fake(config('catalog.images.disk'));
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => [],
+        'files' => fn (): array => ['logo' => UploadedFile::fake()->createWithContent('logo.png', imgPng(300, 200))],
+    ],
+    [
+        'method' => 'DELETE',
+        'uri' => '/api/v1/brand/logo',
+        'module' => 'identity',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($admin): array {
+            Storage::fake(config('catalog.images.disk'));
+            $me = $admin();
+            withActor($me->id);
+            app(BrandProfiles::class)->setLogo(imgPng(300, 200));
+
+            return [];
         },
         'payload' => fn (): array => [],
     ],

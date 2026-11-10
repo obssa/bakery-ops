@@ -9,13 +9,13 @@ import { queueCancelOrder, queueServeLine, useOutbox } from "@/lib/outbox/store"
 import { Badge, Button } from "../ui";
 
 // The acting waiter own open orders with the live status of every line: sent, cooking, ready, served. A ready line
-// has a brand-teal badge and a Served button; an unsent order (open) can be cancelled. Void is not on the pad. Step 6.3a: the cards
-// are Fresh Counter surfaces, and "ready" is brand teal (green means money confirmed only, fresh-counter.md 1.3).
+// has a positive badge and a Served button; an unsent order (open) can be cancelled. Void is not on the pad. Step 6.3a: the cards
+// are Fresh Counter surfaces, and "ready" is positive (green means money confirmed only, fresh-counter.md 1.3).
 
-const TONE: Record<LineStatus, "neutral" | "blue" | "brand" | "amber" | "red"> = {
+const TONE: Record<LineStatus, "neutral" | "blue" | "positive" | "amber" | "red"> = {
   queued: "neutral",
   accepted: "blue",
-  ready: "brand",
+  ready: "positive",
   served: "neutral",
   rejected: "red",
   voided: "neutral",
@@ -68,7 +68,7 @@ function OrderCard({ order }: { order: Order }) {
   const where = order.type === "takeaway" ? k("takeaway") : order.dining_table ? k("table", { code: order.dining_table.code }) : "";
 
   return (
-    <article className={`rounded-2xl border bg-white p-5 ${ready > 0 ? "border-brand-600 ring-1 ring-brand-600" : "border-neutral-200"}`}>
+    <article className={`rounded-2xl border bg-white p-5 ${ready > 0 ? "border-positive-600 ring-1 ring-positive-600" : "border-neutral-200"}`}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-lg font-semibold text-neutral-900">
           {t("order_heading", { no: orderNoText(order.order_no) })}
@@ -76,7 +76,7 @@ function OrderCard({ order }: { order: Order }) {
         </h3>
         <div className="flex items-center gap-2">
           {ready > 0 ? (
-            <Badge tone="brand" dot>
+            <Badge tone="positive" dot>
               {t("ready_badge", { count: ready })}
             </Badge>
           ) : null}

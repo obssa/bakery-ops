@@ -184,7 +184,7 @@ function LineRow({ count, line, reasons, editable, onEdit }: RowProps) {
       </td>
       <td className="py-2 text-base">
         <div className="flex flex-nowrap items-center gap-2 whitespace-nowrap">
-          <Badge tone={touched ? "brand" : "amber"} dot>
+          <Badge tone={touched ? "positive" : "amber"} dot>
             {touched ? t("mark_counted") : t("mark_not_counted")}
           </Badge>
           {editable && !touched ? (

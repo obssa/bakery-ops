@@ -70,7 +70,7 @@ export function Line({ label, points, compare, format = (value) => value, table,
             <path
               key={`now-${i}`}
               d={segmentPath(segment)}
-              className="fill-none stroke-brand-600"
+              className="fill-none stroke-ink-800"
               strokeWidth={segment.length === 1 ? 8 : 2}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -78,7 +78,7 @@ export function Line({ label, points, compare, format = (value) => value, table,
             />
           ))}
           {end && tail && tail.length > 1 ? (
-            <path d={`M${end.x} ${end.y} L${end.x} ${end.y}`} className="fill-none stroke-brand-600" strokeWidth={9} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            <path d={`M${end.x} ${end.y} L${end.x} ${end.y}`} className="fill-none stroke-ink-800" strokeWidth={9} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
           ) : null}
         </svg>
         {first ? (

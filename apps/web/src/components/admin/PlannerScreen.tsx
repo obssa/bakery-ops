@@ -31,7 +31,7 @@ const STATUS_TONE: Record<ProductionRequest["status"], Tone> = {
   accepted: "blue",
   in_progress: "blue",
   pending_confirmation: "blue",
-  done: "brand",
+  done: "positive",
   cancelled: "neutral",
 };
 

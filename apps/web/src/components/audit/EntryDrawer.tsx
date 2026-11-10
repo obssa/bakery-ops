@@ -24,11 +24,11 @@ import { useNames } from "./names";
 
 //
 // Step 6.4d (fresh-counter.md 2, the drawer; 4.4): the entry's facts in 13 px caps over their values (the kit's Fact) on a hairline card,
-// the diff and the context as the admin table on a hairline frame, a changed field amber, an added one brand teal (green is money
+// the diff and the context as the admin table on a hairline frame, a changed field amber, an added one positive (green is money
 // confirmed only), a removed one red; Close an icon button of that name.
 
-const STATUS_TONE: Record<Exclude<DiffStatus, "same">, "amber" | "brand" | "red"> = { changed: "amber", added: "brand", removed: "red" };
-const ROW_TONE: Record<DiffStatus, string> = { changed: "bg-amber-50", added: "bg-brand-50", removed: "bg-red-50", same: "" };
+const STATUS_TONE: Record<Exclude<DiffStatus, "same">, "amber" | "positive" | "red"> = { changed: "amber", added: "positive", removed: "red" };
+const ROW_TONE: Record<DiffStatus, string> = { changed: "bg-amber-50", added: "bg-positive-50", removed: "bg-red-50", same: "" };
 const CELL = "py-2.5 pr-3 align-top first:pl-4 last:pr-4";
 const HEAD = "h-10 pr-3 text-[13px] font-semibold uppercase tracking-[0.08em] text-neutral-600 first:pl-4 last:pr-4";
 

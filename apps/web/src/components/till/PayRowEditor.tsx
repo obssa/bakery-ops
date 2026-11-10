@@ -192,7 +192,7 @@ export function PayRowEditor({
               <label htmlFor={receivedId} className="text-[15px] font-semibold text-neutral-900">
                 {t("cash_received")}
               </label>
-              <div className="flex min-h-15 items-center gap-2.5 rounded-[14px] border-2 border-brand-600 bg-white px-4 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1">
+              <div className="flex min-h-15 items-center gap-2.5 rounded-[14px] border-2 border-ink-900 bg-white px-4 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1">
                 <span className="shrink-0 text-[15px] text-neutral-600">{currency}</span>
                 <input
                   id={receivedId}

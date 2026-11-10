@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
-/* Fresh Counter, the design system of every screen (docs/design/fresh-counter.md section 1, ADR 0023). A calm, bright counter: a
-   neutral ground, white surfaces with a hairline border, one teal accent for "go" and the current choice, status colours that only
-   mean status. Components use the Tailwind names these tokens make (bg-ground, text-brand-700, bg-night-surface, shadow-float, ...) and
-   never write a hex value.
+/* Fresh Counter, the design system of every screen (docs/design/fresh-counter.md section 1, ADR 0023). A calm, bright counter: a neutral
+   ground, white surfaces with a hairline border, the bakery's red for its mark and the current choice, charcoal ink for the main action,
+   status colours that only mean status. Components use the Tailwind names these tokens make (bg-ground, text-brand-700, bg-ink-900,
+   bg-night-surface, shadow-float, ...) and never write a hex value.
 
    The fonts are self-hosted (@fontsource-variable, bundled into /app/_next/static/media, imported by the layouts), so a pad works
    offline; nothing is ever loaded from Google Fonts at runtime (web-build fails an export that names its hosts). Inter comes first and
@@ -28,19 +28,47 @@
   /* the page behind the white surfaces */
   --color-ground: #f4f5f7;
 
-  /* Brand teal: primary buttons, the focus ring, links and the current choice (600, white text 5.1:1); 700 for hover and for text on
-     50 (6.7:1); 400 only on the kitchen's dark ground. Amber, red, blue and green stay Tailwind's and mean low/waiting, out/error,
-     information and money confirmed, each with a word or an icon beside the colour. */
-  --color-brand-50: #e6f4f0;
-  --color-brand-100: #cde9e1;
-  --color-brand-200: #9dd3c4;
-  --color-brand-300: #5fb8a2;
-  --color-brand-400: #2dd4bf;
-  --color-brand-500: #138a72;
-  --color-brand-600: #0e7c66;
-  --color-brand-700: #0a5f4e;
-  --color-brand-800: #084c3f;
-  --color-brand-900: #063a30;
+  /* Brand red, the bakery's colour (fresh-counter.md 1.2): the mark, the current place (sidebar item, tab, segment), a chosen card, links,
+     the focus ring and highlights such as "New". 600 is the mark's red (white text 5.9:1, 5.4:1 as text on the ground); 700 for hover and
+     for text on 50 (7.1:1). Red as a status (out, void, late, an error) stays Tailwind's red and always comes with a word or an icon,
+     and the main buttons are ink, not red, so a red control never reads as "danger". */
+  --color-brand-50: #fdf1f1;
+  --color-brand-100: #fbe0e1;
+  --color-brand-200: #f6bfc2;
+  --color-brand-300: #ee8f94;
+  --color-brand-400: #e35d64;
+  --color-brand-500: #d3313a;
+  --color-brand-600: #c41e2a;
+  --color-brand-700: #a3141f;
+  --color-brand-800: #84121b;
+  --color-brand-900: #6b1219;
+
+  /* Ink, the charcoal of the bakery's lettering: the primary and dark buttons, a ticked checkbox, chart bars. 900 with white text is
+     16.9:1; 200 is a quiet bar beside a lit one. */
+  --color-ink-50: #f6f6f6;
+  --color-ink-100: #ebebeb;
+  --color-ink-200: #d6d6d6;
+  --color-ink-300: #b8b8b8;
+  --color-ink-400: #8c8c8c;
+  --color-ink-500: #6b6b6b;
+  --color-ink-600: #4f4f4f;
+  --color-ink-700: #3b3b3b;
+  --color-ink-800: #2b2b2b;
+  --color-ink-900: #1f1f1f;
+  --color-ink-950: #141414;
+
+  /* Positive, a calm green-teal: a good or "on" state (open, ready, done, confirmed, active, running, locked), a switch that is on, a
+     message that something worked. 700 on 50 is 6.7:1, 600 with white text 5.1:1. Green stays for money confirmed, with its word. */
+  --color-positive-50: #e6f4f0;
+  --color-positive-100: #cde9e1;
+  --color-positive-200: #9dd3c4;
+  --color-positive-300: #5fb8a2;
+  --color-positive-400: #2dd4bf;
+  --color-positive-500: #138a72;
+  --color-positive-600: #0e7c66;
+  --color-positive-700: #0a5f4e;
+  --color-positive-800: #084c3f;
+  --color-positive-900: #063a30;
 
   /* Kitchen night (fresh-counter.md 1.6): the one dark screen, the kitchen and bar displays, read across a hot room. */
   --color-night-ground: #0b1220;
@@ -102,12 +130,13 @@ body {
 /* Kitchen night, scoped (fresh-counter.md 1.6, step 6.3b): the kitchen and bar displays are the one dark screen, top bar included. The
    shell puts `kitchen-night` on its frame on those routes only (lib/screens.ts isNightScreen), and inside it the light scale is remapped
    onto the night tokens: white is the ticket surface, the ground is the night ground, neutral runs from the divider (100) to the night
-   text (900), brand 600 and 700 are the accent teal, and the status scales take the night fills and texts. So everything the shell and a
-   station screen share (the top bar, the Screens strip, the outbox band, the shift bar, the stock strip's sheet, a dialog) is drawn dark
-   with the classes it already has, and nothing outside the scope changes. Every text pair stays at 4.5:1 or more (neutral-600 on white is
-   6.9:1, brand-700 on brand-50 8.2:1, amber-800 on amber-50 8.2:1, red-700 on red-50 7.9:1); neutral-400 is still for disabled text and
-   placeholder icons only. Text on a filled control ("text-white" on the primary button, the selected segment, the avatar) becomes the dark
-   surface, 9.2:1 on the accent. */
+   text (900), brand 600 and 700 are the accent teal (the bakery's red would read as "late" here, so the night keeps its teal), positive
+   takes the fresh fills, ink becomes the night text (a dark button turns light, its white text the dark surface), and the status scales
+   take the night fills and texts. So everything the shell and a station screen share (the top bar, the Screens strip, the outbox band,
+   the shift bar, the stock strip's sheet, a dialog) is drawn dark with the classes it already has, and nothing outside the scope changes.
+   Every text pair stays at 4.5:1 or more (neutral-600 on white is 6.9:1, brand-700 on brand-50 8.2:1, amber-800 on amber-50 8.2:1,
+   red-700 on red-50 7.9:1); neutral-400 is still for disabled text and placeholder icons only. Text on a filled control ("text-white" on
+   the primary button, the selected segment, the avatar) becomes the dark surface, 9.2:1 on the accent. */
 .kitchen-night {
   color-scheme: dark;
   --color-white: var(--color-night-surface);
@@ -127,6 +156,12 @@ body {
   --color-brand-100: #145347;
   --color-brand-600: var(--color-night-accent);
   --color-brand-700: var(--color-night-fresh-text);
+  --color-positive-50: var(--color-night-fresh);
+  --color-positive-100: #145347;
+  --color-positive-600: #2dd4bf;
+  --color-positive-700: var(--color-night-fresh-text);
+  --color-ink-800: #d3dae6;
+  --color-ink-900: var(--color-night-text);
   --color-amber-50: var(--color-night-waiting);
   --color-amber-200: #5c4212;
   --color-amber-300: #7a5716;

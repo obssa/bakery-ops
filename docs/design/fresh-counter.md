@@ -4,8 +4,8 @@ Status: approved by Ramin on 2026-11-03 for Phase 6 ("check and then implement")
 account. This file is the written spec the code follows. Where this file and the canvas disagree, this file wins. Change it in the
 same PR as the code.
 
-What the look is: a calm, bright counter. It has a neutral ground, white surfaces with a hairline border, one teal accent for "go"
-actions and the current choice, and status colours that only ever mean status. Product photos carry the colour. The chrome stays quiet
+What the look is: a calm, bright counter. It has a neutral ground, white surfaces with a hairline border, the bakery's red for its mark
+and the current choice, charcoal ink for the main actions, and status colours that only ever mean status. Product photos carry the colour. The chrome stays quiet
 so the food stands out. The kitchen display is the one dark screen: it hangs on a wall in a hot room and has to be read across it.
 
 ## 1. Tokens
@@ -33,20 +33,30 @@ without touching a class.
 | `neutral-950` | `#0B1220` | the kitchen night ground |
 | `ground` | `#F4F5F7` | page background behind surfaces |
 
-### 1.2 Brand teal (new)
+### 1.2 Brand red, ink and positive (the bakery's colours, Phase 6 follow-up)
+
+Ramin, 2026-11-10: the colours come from the bakery's logo, a warm red and charcoal lettering. The red is the bakery's mark and the
+current place; the main buttons are charcoal ink, so a red control never reads as "danger", and red as a status (out, late, an error)
+keeps its meaning beside its word or icon. The calm green-teal that was the brand before became its own `positive` scale: a good or
+"on" state, never the brand. The bakery's name and logo themselves are not in the repository: the admin sets them on the live site
+(Admin > System > Brand), and until then the app shows its own name and the croissant mark on red.
 
 | Token | Hex | Use |
 |---|---|---|
-| `brand-50` | `#E6F4F0` | selected fill, "online" chip |
-| `brand-100` | `#CDE9E1` | selected border, chart bars (other) |
-| `brand-200` | `#9DD3C4` | |
-| `brand-300` | `#5FB8A2` | |
-| `brand-400` | `#2DD4BF` | kitchen-night accent (dark ground only) |
-| `brand-500` | `#138A72` | hover of the primary button on dark |
-| `brand-600` | `#0E7C66` | primary buttons, focus ring, links, the highlighted chart bar (white text 5.1:1) |
-| `brand-700` | `#0A5F4E` | primary hover/pressed; text on `brand-50` (6.7:1) |
-| `brand-800` | `#084C3F` | |
-| `brand-900` | `#063A30` | |
+| `brand-50` | `#FDF1F1` | the current sidebar item, tab and segment; a chosen card; a highlighted row |
+| `brand-100` | `#FBE0E1` | |
+| `brand-200` | `#F6BFC2` | hover border of a start-page tile |
+| `brand-300` .. `500` | `#EE8F94` `#E35D64` `#D3313A` | |
+| `brand-600` | `#C41E2A` | the app's mark, a chosen card's border, links, the focus ring, "New" badges (white text 5.9:1; as text 5.4:1 on the ground) |
+| `brand-700` | `#A3141F` | link hover; text on `brand-50` (7.1:1) |
+| `brand-800` / `900` | `#84121B` / `#6B1219` | |
+| `ink-900` | `#1F1F1F` | primary and dark buttons (white text 16.5:1), the station's selected segment, a focused input's border, ticked checkboxes |
+| `ink-800` | `#2B2B2B` | button hover; the lit chart bar, a chart's line |
+| `ink-200` | `#D6D6D6` | the other chart bars |
+| `ink-50` .. `700` | `#F6F6F6` .. `#3B3B3B` | |
+| `positive-50` / `700` | `#E6F4F0` / `#0A5F4E` | a good or "on" chip and a success message (6.7:1) |
+| `positive-600` | `#0E7C66` | its dot; a switch that is on |
+| `positive-100` | `#CDE9E1` | the border of a positive box |
 
 ### 1.3 Status
 
@@ -54,7 +64,9 @@ These use Tailwind's stock scales and keep their meaning everywhere:
 - amber means low or waiting (`amber-50` fill, `amber-800` text, `amber-700` dot);
 - red means out, void, late or an error (`red-50` / `red-700`);
 - blue means information or in progress (`blue-50` / `blue-700`);
-- green is used only for money confirmed (`green-50` / `green-800`).
+- green is used only for money confirmed (`green-50` / `green-800`);
+- positive means a good or "on" state: open, ready, served, done, confirmed, locked, active, running, online (`positive-50` /
+  `positive-700`, `positive-600` dot). Brand red is never a status: it marks the bakery, the current choice and highlights such as "New".
 
 Never tell two states apart by hue alone. Each one also carries a word ("Low", "Out") or an icon.
 
@@ -91,7 +103,8 @@ Never tell two states apart by hue alone. Each one also carries a word ("Low", "
 - Touch:
   - station targets at least 48 px tall (primary actions 56-68 px); admin targets at least 44 px;
   - at least 8 px between targets.
-- Focus: `focus-visible:ring-4 ring-brand-600/35 ring-offset-1`. It is always visible and never removed.
+- Focus: `focus-visible:ring-4 ring-brand-600/35 ring-offset-1`. It is always visible and never removed. A focused input also takes an
+  `ink-900` border (never red, which marks an input in error).
 - Motion: 150 ms ease-out for colour and opacity, 200 ms for drawers. Everything is under `motion-safe:`; reduced motion turns
   transitions off.
 
@@ -117,7 +130,8 @@ The night is scoped to the kitchen and bar routes (step 6.3b): the shell's frame
 light scale is remapped onto the night tokens, so the top bar, the shift strip, the stock strip's sheet and every shared primitive are
 drawn dark with the classes they already have, and no other screen changes. `white` is the ticket surface, `ground` the night ground,
 `neutral-100` the divider, `neutral-200` the ticket border, `neutral-600` the secondary text, `neutral-900` the text; `brand-50`/`brand-700`
-the fresh fill and text, `brand-600` the accent; `amber-50`/`amber-800` the waiting pair, `red-50`/`red-700` the late pair. The shades the
+the fresh fill and text, `brand-600` the accent (the night keeps its teal: the bakery's red would read as "late" on a dark ticket);
+`positive-50`/`positive-700` the fresh pair too; `ink-900` the night text, so a dark button turns light with the dark surface as its text; `amber-50`/`amber-800` the waiting pair, `red-50`/`red-700` the late pair. The shades the
 table above does not name are, in the same spirit: `neutral-50` `#161F33`, `neutral-300` `#3A4866` (the outline of Reject), `neutral-400`
 `#5B6882`, `neutral-500` `#8794AB`, `neutral-700` `#B8C2D3`, `neutral-800` `#D3DAE6`, `amber-900` `#FCD34D`, `red-800` `#FECACA`, blue `50`
 `#0E2A47` with `700` `#93C5FD`, green `50` `#0F3D24` with `800` `#86EFAC`. Text on a filled control becomes the dark surface (9.2:1 on the
@@ -131,7 +145,7 @@ Icons come from `lucide-react` at 1.75-2 px stroke, 18-22 px; an icon-only butto
 - **Button.** Every variant has a disabled state with no hover, `neutral-50` fill and `neutral-400` text, plus a loading state with a
   spinner that keeps the width.
   - Variants:
-    - `primary`: `brand-600`, white text;
+    - `primary`: `ink-900`, white text (`brand-600` until the bakery's colours, Phase 6 follow-up);
     - `secondary`: white, `neutral-300` border, ink text;
     - `ghost`: no fill, ink text, `neutral-100` on hover;
     - `danger`: `red-50` fill, `red-700` text;
@@ -174,13 +188,13 @@ Icons come from `lucide-react` at 1.75-2 px stroke, 18-22 px; an icon-only butto
 
 Every station screen shares a **top bar**, 68 px, white with a bottom hairline. Left: the station mark (a 36 px `brand-600` square with
 the app's line icon) and the station name, then a chip with the shift. Right, in this order:
-1. the sync chip ("Online · all sent" in `brand-50`, "Offline · 2 waiting" in `neutral-100`, "Conflicts" in `amber-50`);
+1. the sync chip ("Online · all sent" in `positive-50`, "Offline · 2 waiting" in `neutral-100`, "Conflicts" in `amber-50`);
 2. the language button (shows the other language's name);
 3. the notification bell where the screen has one;
 4. the user's avatar with name and role.
 
 **The shift's states.** The shift never floats over the work unasked. On the KDS, the till, the production board and the count screen the
-bar holds its chip: amber "No shift", blue "Opening" or "Closing", brand teal "Open". A tap on the chip opens the floating panel with the
+bar holds its chip: amber "No shift", blue "Opening" or "Closing", positive "Open". A tap on the chip opens the floating panel with the
 shift's words and every action; the chip, a tap outside it or Escape closes it (the focus returns to the chip), and it fits under the bar
 and within the window, scrolling inside itself. The till's cash panel behaves the same way.
 
@@ -354,7 +368,7 @@ Three zones from left to right.
     - a rule-of-thirds overlay and a "Drag to move" chip;
     - "Use this photo" (primary), "Choose another" (secondary) and "Cancel" (ghost);
     - a quality line under the frame:
-      - `brand-50` "Sharp on every screen · crop W × H px" at 1200 × 900 source pixels or more;
+      - `positive-50` "Sharp on every screen · crop W × H px" at 1200 × 900 source pixels or more;
       - amber "This photo may look soft on big screens" between 800 × 600 and 1200 × 900;
       - "Use this photo" disabled with a red line below 800 × 600, the server's minimum.
   - **Preview:** under the frame, the product as a pad card at real size (with its stock chip) and as a 48 px order-line thumb, both
@@ -381,7 +395,7 @@ As built for Sell and Make (step 6.4c, `components/admin/kit.tsx`), so each scre
   figures right-aligned in tabular numbers, status chips with a dot, a row's actions on one line at its end, the open row `brand-50`;
   a table with a visible title carries it inside the card; a table of many figures (the reconciliation) uses 8 px columns;
 - a notice about the screen itself (stale data, a view-only form) in the Alert's shape: amber, blue or neutral;
-- the colours of a state: amber waiting, blue in progress, `brand` done or on, red refused or out, green only for money confirmed (a
+- the colours of a state: amber waiting, blue in progress, `positive` done or on, red refused or out, green only for money confirmed (a
   verified payment, an order paid in full).
 
 As built for Team, Insight and System (step 6.4d, on 6.4c's `components/admin/kit.tsx`):

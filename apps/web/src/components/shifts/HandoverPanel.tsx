@@ -73,7 +73,7 @@ export function HandoverPanel({ stationId }: { stationId: number }) {
                       </Badge>
                     ) : (
                       <>
-                        <Badge tone="brand" dot>
+                        <Badge tone="positive" dot>
                           {t("closing_locked")}
                         </Badge>
                         <span className="text-[13px] text-neutral-600">

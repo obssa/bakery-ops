@@ -67,15 +67,15 @@ const STATUS_TONE: Record<OrderStatus, ChipTone> = {
   open: "amber",
   sent: "blue",
   in_progress: "blue",
-  ready: "brand",
-  served: "brand",
+  ready: "positive",
+  served: "positive",
   paid: "green",
   closed: "green",
   cancelled: "neutral",
   voided: "red",
 };
 
-const LINE_TONE: Record<LineStatus, ChipTone> = { queued: "neutral", accepted: "blue", ready: "brand", served: "neutral", rejected: "red", voided: "neutral" };
+const LINE_TONE: Record<LineStatus, ChipTone> = { queued: "neutral", accepted: "blue", ready: "positive", served: "neutral", rejected: "red", voided: "neutral" };
 
 const DOT: Record<Tone, string> = {
   neutral: "bg-neutral-500",

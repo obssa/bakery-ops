@@ -54,6 +54,19 @@ export interface Me {
   device: null | { id: number };
   /** The stations this person may work at (every station for stations.all), each with the shift running there (step 3.1a). */
   work_stations: WorkStation[];
+  /** The business name and logo the app shows (Phase 6 follow-up); absent from the sign-in answer until /me is read. */
+  brand?: Brand;
+}
+
+/** GET /me brand, and the answer of PUT /brand and POST and DELETE /brand/logo ({data: Brand}): set by the admin on the live site. */
+export interface Brand {
+  /** both or neither; null shows the app's own name */
+  name_en: string | null;
+  name_am: string | null;
+  /** an absolute path on the API origin (/api/v1/media/brand/<sha>.<ext>), a square of `size` pixels; null shows the app's own mark */
+  logo: { url: string; size: number } | null;
+  /** nothing saved yet */
+  is_default: boolean;
 }
 
 export type ShiftStatus = "scheduled" | "opening" | "open" | "counting" | "pending_approval" | "locked" | "cancelled";

@@ -258,7 +258,7 @@ function Toolbar({
         })}
       </nav>
 
-      <div className="flex h-11 min-w-0 flex-[1_1_260px] items-center gap-2.5 rounded-xl border border-neutral-300 bg-white px-3.5 focus-within:border-brand-600 focus-within:inset-ring-1 focus-within:inset-ring-brand-600 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1">
+      <div className="flex h-11 min-w-0 flex-[1_1_260px] items-center gap-2.5 rounded-xl border border-neutral-300 bg-white px-3.5 focus-within:border-ink-900 focus-within:inset-ring-1 focus-within:inset-ring-ink-900 focus-within:ring-4 focus-within:ring-brand-600/35 focus-within:ring-offset-1">
         <Search className="size-[18px] shrink-0 text-neutral-600" strokeWidth={2} aria-hidden="true" />
         <label htmlFor={searchId} className="sr-only">
           {t("search_label")}
@@ -355,7 +355,7 @@ function StatusChip({ item }: { item: Item }) {
   if (item.kind === "product" && item.is_new)
     return <span className="inline-flex min-h-7 items-center rounded-full bg-brand-600 px-3 text-[13px] font-bold text-white">{t("status_new")}</span>;
   return (
-    <Chip tone="brand" dot>
+    <Chip tone="positive" dot>
       {item.kind === "product" ? t("status_active") : t("status_in_use")}
     </Chip>
   );

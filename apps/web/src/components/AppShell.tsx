@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useActing } from "@/lib/acting";
+import { useBrand, useBrandTitle } from "@/lib/brand";
 import type { Locale } from "@/lib/api/types";
 import { frameOf, isCurrent, isNightScreen, SCREENS } from "@/lib/screens";
 import { useSession } from "@/lib/session";
@@ -34,21 +35,38 @@ import { Avatar, Chip, type Tone } from "./ui";
 // is not enrolled shows the "not enrolled" screen instead (step 5.1b, DeviceGate). On the kitchen and bar displays the whole frame, the bar
 // included, is kitchen night (step 6.3b: `.kitchen-night`, globals.css), and only there.
 
-/** The app's mark: a brand-teal square with the line icon, hidden from readers (the name beside it, or the link around it, says it). */
+/**
+ * The app's mark, hidden from readers (the name beside it, or the link around it, says it): the bakery's logo when the admin has set one
+ * (Admin > System > Brand, lib/brand.ts), on a white tile with a hairline, else the app's own mark, a brand-red square with the line icon.
+ */
 export function AppMark({ size = "md" }: { size?: "md" | "lg" }) {
+  const { logo } = useBrand();
+  const box = size === "lg" ? "size-10 rounded-xl" : "size-9 rounded-[10px]";
+  if (logo) {
+    return (
+      <span aria-hidden="true" className={`inline-flex shrink-0 overflow-hidden border border-neutral-200 bg-white ${box}`}>
+        {/* a static export serves no image optimiser (next.config images.unoptimized) */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logo} alt="" width={256} height={256} decoding="async" className="size-full object-contain" />
+      </span>
+    );
+  }
   return (
-    <span
-      aria-hidden="true"
-      className={`inline-flex shrink-0 items-center justify-center bg-brand-600 text-white ${size === "lg" ? "size-10 rounded-xl" : "size-9 rounded-[10px]"}`}
-    >
+    <span aria-hidden="true" className={`inline-flex shrink-0 items-center justify-center bg-brand-600 text-white ${box}`}>
       <Croissant className={size === "lg" ? "size-[22px]" : "size-5"} strokeWidth={1.8} aria-hidden="true" />
     </span>
   );
 }
 
+/** The business name (the bakery's when the admin has set it, else the app's own), for the sign-in screen and the sidebar. */
+export function BrandName({ className = "" }: { className?: string }) {
+  const { name } = useBrand();
+  return <span className={className}>{name}</span>;
+}
+
 /**
  * The "Screens" navigation (its name and link names are what the earlier specs read, phase-6 plan 6.0.2): tabs under the station top bar
- * (the current screen underlined in brand teal), or a row of plain links in the sign-in screen's footer.
+ * (the current screen underlined in brand red), or a row of plain links in the sign-in screen's footer.
  */
 export function ScreensNav({ look = "tabs" }: { look?: "tabs" | "links" }) {
   const t = useTranslations("nav");
@@ -101,17 +119,18 @@ export function ScreensNav({ look = "tabs" }: { look?: "tabs" | "links" }) {
 }
 
 // The shift's tone and word in each state of the shift bar (the shift bar's own badge, ShiftBar.tsx): amber while none runs, blue for a
-// count in progress, brand teal while open.
+// count in progress, positive while open.
 const SHIFT_CHIP: Record<BarMode, { tone: Tone; key: string }> = {
   idle: { tone: "amber", key: "badge_none" },
   opening: { tone: "blue", key: "badge_opening" },
-  open: { tone: "brand", key: "badge_open" },
+  open: { tone: "positive", key: "badge_open" },
   counting: { tone: "blue", key: "badge_counting" },
 };
 
 const SHIFT_DOT: Record<Tone, string> = {
   neutral: "bg-neutral-500",
   brand: "bg-brand-600",
+  positive: "bg-positive-600",
   amber: "bg-amber-700",
   red: "bg-red-700",
   blue: "bg-blue-700",
@@ -149,7 +168,7 @@ export function SyncChip({ compact = false }: { compact?: boolean }) {
   const { here, elsewhere, conflicts, held } = useSyncState();
   const waiting = here + elsewhere;
 
-  let tone: Tone = "brand";
+  let tone: Tone = "positive";
   let text = t("sync_online");
   let short = t("sync_online_short");
   if (conflicts > 0) {
@@ -215,7 +234,7 @@ function barButton(night: boolean): string {
 
 /**
  * The "Screens" menu (step 6.3a): a grid button in the bar; open, it holds the "Screens" navigation with the same link names (phase-6 plan
- * 6.0.2), the current one in brand teal.
+ * 6.0.2), the current one in brand red.
  */
 function ScreensMenu({ night }: { night: boolean }) {
   const t = useTranslations("nav");
@@ -361,7 +380,7 @@ function StationBar({ fill }: { fill: boolean }) {
         <div className="flex min-w-0 flex-1 items-center gap-3.5">
           <Link href="/" className={`flex shrink-0 items-center rounded-xl ${focusRing}`}>
             <AppMark />
-            <span className="sr-only">{t("app.name")}</span>
+            <BrandName className="sr-only" />
           </Link>
           <div className="flex min-w-0 flex-col">
             <p className="flex min-w-0 items-baseline gap-2">
@@ -406,6 +425,7 @@ function StationNoticePlace() {
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations("app");
   const pathname = usePathname();
+  useBrandTitle();
   const frame = frameOf(pathname);
   // the kitchen and bar displays are kitchen night from the top bar down (step 6.3b): the palette is remapped inside this frame only
   const night = isNightScreen(pathname);

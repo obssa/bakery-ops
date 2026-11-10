@@ -673,6 +673,30 @@
       "released_at": "Released",
       "migrations": "Database migrations",
       "error_tracking": "Error tracking"
+    },
+    "brand": {
+      "title": "Brand",
+      "intro": "The bakery's name and logo. They show in the menu, on the station screens, on the sign-in screen and in the browser tab, in place of the app's own.",
+      "name_en": "Business name (English)",
+      "name_am": "Business name (Amharic)",
+      "optional": "(optional)",
+      "name_hint": "Give both names, or leave both empty to show the app's own name.",
+      "save_name": "Save name",
+      "logo": "Logo",
+      "logo_set": "The bakery's logo shows across the app.",
+      "logo_default": "No logo yet: the app's own mark shows.",
+      "logo_hint": "A PNG, JPEG or WebP of up to 5 MB. It is kept whole on a white square; a square logo with a little space around it looks best.",
+      "upload_logo": "Upload logo",
+      "replace_logo": "Replace logo",
+      "uploading": "Uploading…",
+      "remove_logo": "Remove logo",
+      "check_names": "Give the name in both English and Amharic, or leave both empty.",
+      "check_type": "Choose a PNG, JPEG or WebP picture.",
+      "check_size": "The picture is larger than 5 MB. Choose a smaller one.",
+      "saved_name": "Name saved. Everyone sees it the next time their screen loads.",
+      "saved_default": "Name cleared: the app's own name shows again.",
+      "saved_logo": "Logo saved. Everyone sees it the next time their screen loads.",
+      "saved_no_logo": "Logo removed: the app's own mark shows again."
     }
   },
   "adminOrders": {

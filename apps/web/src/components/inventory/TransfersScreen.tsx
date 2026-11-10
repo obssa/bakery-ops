@@ -23,7 +23,7 @@ import { InventoryNav, QueryBox, qty, stamp, useNamer } from "./shared";
 
 const STATUSES: readonly TransferStatus[] = ["requested", "confirmed", "rejected"];
 
-const STATUS_TONE: Record<TransferStatus, Tone> = { requested: "amber", confirmed: "brand", rejected: "red" };
+const STATUS_TONE: Record<TransferStatus, Tone> = { requested: "amber", confirmed: "positive", rejected: "red" };
 
 type Filter = TransferStatus | "all";
 

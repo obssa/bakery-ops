@@ -110,7 +110,7 @@ function Vertical({
         <div aria-hidden="true" className="absolute inset-x-0 border-t border-neutral-200" style={{ top: `${zero}%` }} />
         {bars.map((bar, i) => {
           if (bar.missing || bar.height <= 0) return null;
-          const tone = bar.negative ? (i === lit ? "bg-red-700" : "bg-red-300") : i === lit ? "bg-brand-600" : "bg-brand-100";
+          const tone = bar.negative ? (i === lit ? "bg-red-700" : "bg-red-300") : i === lit ? "bg-ink-800" : "bg-ink-200";
           return (
             <div
               key={points[i].key}
@@ -155,7 +155,7 @@ function Horizontal({ label, points, format }: { label: string; points: readonly
               </span>
               <span className="block h-2.5 overflow-hidden rounded-full bg-neutral-100">
                 {bar && !bar.missing && bar.width > 0 ? (
-                  <span className={`block h-2.5 rounded-full ${bar.negative ? "bg-red-700" : "bg-brand-600"}`} style={{ marginLeft: `${bar.x}%`, width: `${bar.width}%` }} />
+                  <span className={`block h-2.5 rounded-full ${bar.negative ? "bg-red-700" : "bg-ink-800"}`} style={{ marginLeft: `${bar.x}%`, width: `${bar.width}%` }} />
                 ) : null}
               </span>
             </li>

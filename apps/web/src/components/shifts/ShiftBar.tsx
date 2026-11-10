@@ -40,12 +40,12 @@ import type { ShiftStation } from "./useShiftStation";
 // amber, and the one main action of that state. So an important prompt pushes the page down instead of hiding it. While the panel is open the
 // strip keeps its words and hides its controls, in place: a name never matches two visible controls, and the page does not jump.
 
-// open is brand teal since step 6.2b: green means money confirmed and nothing else (fresh-counter.md 1.3); the station top bar's chip uses
+// open is positive (brand teal from step 6.2b, its own tone since the bakery's red): green means money confirmed and nothing else (fresh-counter.md 1.3); the station top bar's chip uses
 // the same tones (AppShell.tsx)
-const BADGE: Record<BarMode, { tone: "amber" | "blue" | "brand"; key: string }> = {
+const BADGE: Record<BarMode, { tone: "amber" | "blue" | "positive"; key: string }> = {
   idle: { tone: "amber", key: "badge_none" },
   opening: { tone: "blue", key: "badge_opening" },
-  open: { tone: "brand", key: "badge_open" },
+  open: { tone: "positive", key: "badge_open" },
   counting: { tone: "blue", key: "badge_counting" },
 };
 

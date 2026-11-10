@@ -27,7 +27,7 @@ export function Sparkline({ label, points, format, table }: SparklineProps) {
     <figure className="mt-2">
       <svg role="img" aria-label={label} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" className="block h-9 w-full overflow-visible">
         {segments.map((segment, i) => (
-          <path key={i} d={segment.length === 1 ? `${pathOf(segment)} L${segment[0].x} ${segment[0].y}` : pathOf(segment)} className="fill-none stroke-brand-600" strokeWidth={segment.length === 1 ? 5 : 2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          <path key={i} d={segment.length === 1 ? `${pathOf(segment)} L${segment[0].x} ${segment[0].y}` : pathOf(segment)} className="fill-none stroke-ink-800" strokeWidth={segment.length === 1 ? 5 : 2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         ))}
       </svg>
       <div className="sr-only">

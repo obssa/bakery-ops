@@ -11,8 +11,8 @@ import { addisClock } from "@/lib/shifts";
 export function ChainCard({ chain }: { chain: CountChain }) {
   const t = useTranslations("counts");
   return (
-    <section aria-label={t("chain_title")} className="space-y-2 rounded-xl border border-brand-100 bg-brand-50 px-4 py-3">
-      <h3 className="text-base font-semibold text-brand-700">{t("chain_title")}</h3>
+    <section aria-label={t("chain_title")} className="space-y-2 rounded-xl border border-positive-100 bg-positive-50 px-4 py-3">
+      <h3 className="text-base font-semibold text-positive-700">{t("chain_title")}</h3>
       <dl className="grid gap-x-6 gap-y-1 text-base sm:grid-cols-[max-content_1fr]">
         <dt className="text-neutral-700">{t("chain_seq")}</dt>
         <dd className="text-neutral-900">

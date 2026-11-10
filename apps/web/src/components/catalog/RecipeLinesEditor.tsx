@@ -198,7 +198,7 @@ export function RecipeLinesEditor({
                   <label className="flex min-h-11 cursor-pointer items-center gap-2.5 self-end text-[15px] text-neutral-800 [grid-area:opt] @2xl:justify-center @2xl:self-center">
                     <input
                       type="checkbox"
-                      className="size-5 shrink-0 cursor-pointer accent-brand-600 disabled:cursor-not-allowed"
+                      className="size-5 shrink-0 cursor-pointer accent-ink-900 disabled:cursor-not-allowed"
                       disabled={disabled}
                       aria-label={t("field_optional", { n })}
                       checked={line.optional}

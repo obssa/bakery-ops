@@ -47,7 +47,7 @@ import { focusRing } from "../styles";
 // the code, what each asks for, its On or Off chip; the moves as arrow buttons named "Move up <name>" and "Move down <name>", then Edit,
 // Switch off and Remove), the removed ones folded under it, and the form a white card in two columns from 1024 px.
 
-const CHECK = "size-5 shrink-0 accent-brand-600";
+const CHECK = "size-5 shrink-0 accent-ink-900";
 
 export function ChannelsScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("adminPayments");
@@ -201,7 +201,7 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
                 </td>
                 <td>
                   {row.is_enabled ? (
-                    <Chip tone="brand" dot>
+                    <Chip tone="positive" dot>
                       {t("channels.on")}
                     </Chip>
                   ) : (
@@ -326,8 +326,8 @@ function ChannelTable({ rows, onEdit }: { rows: PaymentChannel[]; onEdit: (row: 
 /** The reason ReferencePattern gave for a refused pattern (422 payments.channel.pattern_invalid {reason}), in the page's language. */
 const PATTERN_REASONS = new Set(["too_long", "does_not_compile", "unsupported", "nested_quantifier", "backtracks"]);
 
-/** A check said as it is typed: brand-50 when it reads well, amber when it does not, neutral before there is anything to check. */
-const CHECK_LOOK = { good: "bg-brand-50 text-brand-700", bad: "bg-amber-50 text-amber-800", none: "bg-neutral-50 text-neutral-700" } as const;
+/** A check said as it is typed: positive-50 when it reads well, amber when it does not, neutral before there is anything to check. */
+const CHECK_LOOK = { good: "bg-positive-50 text-positive-700", bad: "bg-amber-50 text-amber-800", none: "bg-neutral-50 text-neutral-700" } as const;
 
 function ChannelForm({ editing, saved, onSaved, onCancel }: { editing: PaymentChannel | null; saved: string | null; onSaved: (name: string) => void; onCancel: () => void }) {
   const t = useTranslations("adminPayments");

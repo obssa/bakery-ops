@@ -114,13 +114,13 @@ export function VoidDialog({
               ) : null}
               {wholeAllowed ? (
                 <label className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                  <input type="radio" name="void-target" className="size-5 accent-brand-600" checked={target === "order"} onChange={() => setTarget("order")} />
+                  <input type="radio" name="void-target" className="size-5 accent-ink-900" checked={target === "order"} onChange={() => setTarget("order")} />
                   <span className="text-base">{t("void_whole_order")}</span>
                 </label>
               ) : null}
               {voidable.map((payment) => (
                 <label key={payment.id} className="flex min-h-13 cursor-pointer items-center gap-3 rounded-xl border border-neutral-300 px-4 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50">
-                  <input type="radio" name="void-target" className="size-5 accent-brand-600" checked={target === payment.id} onChange={() => setTarget(payment.id)} />
+                  <input type="radio" name="void-target" className="size-5 accent-ink-900" checked={target === payment.id} onChange={() => setTarget(payment.id)} />
                   <span className="text-base">{paymentLabel(payment, locale)}</span>
                 </label>
               ))}

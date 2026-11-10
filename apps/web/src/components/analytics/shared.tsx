@@ -309,7 +309,7 @@ export function useFreshness(range: DayRange, compare = false, enabled = true) {
 type Freshness = ReturnType<typeof useFreshness>;
 
 /**
- * "Updated 2 min ago" (the oldest rebuild of the days read): a white pill in the title row, as Today's "updated … ago", its dot brand teal,
+ * "Updated 2 min ago" (the oldest rebuild of the days read): a white pill in the title row, as Today's "updated … ago", its dot positive,
  * or amber while nothing is built.
  */
 export function FreshnessChip({ state, asOf }: { state: Freshness; asOf?: string | null }) {
@@ -322,7 +322,7 @@ export function FreshnessChip({ state, asOf }: { state: Freshness; asOf?: string
   if (freshness === null && asOf === undefined) return null;
   return (
     <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-neutral-200 bg-white px-3.5 text-[13px] font-semibold text-neutral-700">
-      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${ago.unit === "never" ? "bg-amber-700" : "bg-brand-600"}`} />
+      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${ago.unit === "never" ? "bg-amber-700" : "bg-positive-600"}`} />
       <span title={stamp ? addisStamp(stamp, dates) : undefined}>{ago.unit === "never" ? t("fresh.never") : t(`fresh.${ago.unit}`, { count: ago.count })}</span>
     </span>
   );
@@ -476,7 +476,7 @@ export function ExportButtons({ report, range }: { report: ReportName; range: An
           {errorText.message(error)}
         </p>
       ) : null}
-      <p role="status" className={saved ? "max-w-md truncate text-right text-[13px] font-medium text-brand-700" : "sr-only"}>
+      <p role="status" className={saved ? "max-w-md truncate text-right text-[13px] font-medium text-positive-700" : "sr-only"}>
         {saved ? t("export.saved", { name: saved }) : null}
       </p>
     </div>
@@ -522,7 +522,7 @@ export function Kpi({
         <p className="text-3xl font-bold tracking-tight tabular-nums text-neutral-900">{value}</p>
       )}
       {!loading && detail ? <p className="text-[13px] font-semibold text-neutral-600">{detail}</p> : null}
-      {!loading && change ? <p className={`text-[13px] font-semibold ${bad ? "text-red-700" : "text-brand-700"}`}>{change}</p> : null}
+      {!loading && change ? <p className={`text-[13px] font-semibold ${bad ? "text-red-700" : "text-positive-700"}`}>{change}</p> : null}
       {!loading ? children : null}
     </div>
   );
@@ -624,5 +624,5 @@ export const NUM = "whitespace-nowrap text-right tabular-nums";
 /** A cell that says a point was not built, across the figures of its row. */
 export const NOT_BUILT = "text-right text-neutral-600";
 
-/** A link of a table (a product's name to its page): the brand teal, underlined on hover, 44 px tall for a finger. */
+/** A link of a table (a product's name to its page): the brand red, underlined on hover, 44 px tall for a finger. */
 export const ROW_LINK = `-my-1 inline-flex min-h-11 items-center rounded-md font-semibold text-brand-600 hover:text-brand-700 hover:underline ${focusRing}`;

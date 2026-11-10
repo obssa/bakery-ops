@@ -32,7 +32,7 @@ import {
 //
 // Step 6.4d (fresh-counter.md 4.3 and 4.4, the CatalogList board): the title row with its twin and the exports; the range as the toolbar
 // and the kind, category and sort as a second row of 44 px selects; the items a table card, each product with its 52 x 39 photo (an
-// ingredient has none) and its category under its name, New in brand teal, an incomplete cost an amber chip, the figures right-aligned.
+// ingredient has none) and its category under its name, New in brand red, an incomplete cost an amber chip, the figures right-aligned.
 
 const KINDS = ["", "product", "ingredient"] as const;
 

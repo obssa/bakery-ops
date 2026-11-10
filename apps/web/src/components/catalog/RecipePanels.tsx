@@ -115,8 +115,8 @@ function Recipes({ product, draft, onPublished, onSetPrice }: { product: Item; d
 function NoRecipe({ product }: { product: Item }) {
   const t = useTranslations("recipe");
   return (
-    <div className="flex gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4">
-      <span aria-hidden="true" className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-brand-700">
+    <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <span aria-hidden="true" className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-amber-800">
         <CookingPot className="size-5" strokeWidth={1.75} aria-hidden="true" />
       </span>
       <div className="min-w-0 space-y-1">

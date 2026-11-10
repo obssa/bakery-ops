@@ -205,8 +205,8 @@ function ProductPage({ product, created }: { product: Item; created: CreatedItem
   const chips: ReactNode[] = [];
   if (isProduct) {
     chips.push(
-      <span key="menu" className={`${CHIP} ${product.is_active ? "bg-brand-50 text-brand-700" : "bg-neutral-100 text-neutral-700"}`}>
-        <span aria-hidden="true" className={`size-[7px] rounded-full ${product.is_active ? "bg-brand-600" : "bg-neutral-500"}`} />
+      <span key="menu" className={`${CHIP} ${product.is_active ? "bg-positive-50 text-positive-700" : "bg-neutral-100 text-neutral-700"}`}>
+        <span aria-hidden="true" className={`size-[7px] rounded-full ${product.is_active ? "bg-positive-600" : "bg-neutral-500"}`} />
         {product.is_active ? t("on_menu") : t("off_menu")}
       </span>,
     );

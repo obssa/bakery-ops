@@ -189,7 +189,7 @@ function RulesTable({ rows, manage, onEdit }: { rows: ReorderRule[]; manage: boo
                   <td className="whitespace-nowrap text-right tabular-nums">{qty(rule.reorder_qty, rule.item.unit)}</td>
                   <td>
                     {rule.is_active ? (
-                      <Chip tone="brand" dot>
+                      <Chip tone="positive" dot>
                         {t("reorder.active")}
                       </Chip>
                     ) : (
@@ -337,7 +337,7 @@ function RuleForm({ editing, onDone }: { editing: ReorderRule | null; onDone: ()
               <label key={role} className="flex min-h-11 items-center gap-3 text-[15px] text-neutral-900">
                 <input
                   type="checkbox"
-                  className="size-5 shrink-0 accent-brand-600"
+                  className="size-5 shrink-0 accent-ink-900"
                   checked={roles.includes(role)}
                   onChange={(event) => setRoles(event.target.checked ? [...roles, role] : roles.filter((r) => r !== role))}
                 />

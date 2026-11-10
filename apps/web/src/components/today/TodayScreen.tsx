@@ -30,7 +30,7 @@ import { Alert, Chip, PageHeader, ProductImage, Skeleton, Status, type Tone } fr
 //   - analytics.view (the admin, the manager): the title row's "Compare with last <weekday>" (the Sales page over the eight days) and
 //     "Export day" (the day's sales report as Excel); the KPI row, Sales, Orders, Average ticket and Refunds, from GET /analytics/overview
 //     for today, each against the same weekday a week before (a second overview of that one day); "Sales by hour"
-//     (GET /analytics/sales/hourly, the current hour in brand teal); "Top sellers today" and "Payments by channel", the five best sellers and
+//     (GET /analytics/sales/hourly, the current hour in ink); "Top sellers today" and "Payments by channel", the five best sellers and
 //     the channels' shares the overview already carries, the sellers with the photo the catalog holds (useProductImages);
 //   - inventory.view: "Stock alerts", the reorder list (GET /reorder-list), out first;
 //   - stations.all: "Shifts", the stations and the shift running at each (GET /me work_stations, as the shifts screens read it);
@@ -295,7 +295,7 @@ function Kpis({ answer, before, weekday }: { answer: Answer<Overview> | undefine
             <>
               <p className="text-3xl font-bold tracking-tight tabular-nums text-neutral-900">{built ? value : "—"}</p>
               {built && delta ? (
-                <p className={`text-[13px] font-semibold ${delta.bad ? "text-red-700" : "text-brand-700"}`}>{delta.text}</p>
+                <p className={`text-[13px] font-semibold ${delta.bad ? "text-red-700" : "text-positive-700"}`}>{delta.text}</p>
               ) : !built ? (
                 <p className="text-[13px] font-semibold text-neutral-600">{t("not_built")}</p>
               ) : null}
@@ -360,7 +360,7 @@ function SalesByHour({ range }: { range: AnalyticsRange }) {
               return (
                 <div
                   key={hour}
-                  className={`rounded-t-md ${hour === nowHour ? "bg-brand-600" : "bg-brand-100"}`}
+                  className={`rounded-t-md ${hour === nowHour ? "bg-ink-800" : "bg-ink-200"}`}
                   style={{ height: `${height}%` }}
                 />
               );
@@ -445,7 +445,7 @@ function Channels({ answer }: { answer: Answer<Overview> | undefined }) {
                   </span>
                 </span>
                 <span aria-hidden="true" className="block h-2.5 overflow-hidden rounded-full bg-neutral-100">
-                  <span className="block h-2.5 rounded-full bg-brand-600" style={{ width: `${width}%` }} />
+                  <span className="block h-2.5 rounded-full bg-ink-800" style={{ width: `${width}%` }} />
                 </span>
               </li>
             );
@@ -518,7 +518,7 @@ function shiftChip(station: WorkStation): { tone: Tone; key: string } | null {
   if (!shift) return { tone: "amber", key: "badge_none" };
   if (shift.status === "opening") return { tone: "blue", key: "badge_opening" };
   if (shift.status === "counting") return { tone: "blue", key: "badge_counting" };
-  return { tone: "brand", key: "badge_open" };
+  return { tone: "positive", key: "badge_open" };
 }
 
 function Shifts({ twin }: { twin?: string }) {
@@ -570,8 +570,8 @@ function Shifts({ twin }: { twin?: string }) {
 
 // --- system -------------------------------------------------------------------------------------------------------------------------------
 
-const HEARTBEAT_TONE = { running: "brand", stopped: "red", never: "amber" } as const;
-const BACKUP_TONE = { ok: "brand", stale: "red", failed: "red", running: "blue", none: "neutral" } as const;
+const HEARTBEAT_TONE = { running: "positive", stopped: "red", never: "amber" } as const;
+const BACKUP_TONE = { ok: "positive", stale: "red", failed: "red", running: "blue", none: "neutral" } as const;
 
 function SystemCard() {
   const t = useTranslations("today");

@@ -131,7 +131,7 @@ function OptionsSheet({
               <label key={modifier.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-2 text-base hover:bg-neutral-50">
                 <input
                   type="checkbox"
-                  className="size-5 accent-brand-600"
+                  className="size-5 accent-ink-900"
                   checked={modifierIds.includes(modifier.id)}
                   onChange={(event) => setModifierIds(event.target.checked ? [...modifierIds, modifier.id] : modifierIds.filter((id) => id !== modifier.id))}
                 />

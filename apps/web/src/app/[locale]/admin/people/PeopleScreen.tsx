@@ -27,8 +27,8 @@ import { can, useSession } from "@/lib/session";
 
 const LOCALES: readonly Locale[] = ["en", "am"];
 
-/** A checkbox of a table row (On call, the overseer rule): 20 px in the brand teal, named by its aria-label. */
-const ROW_CHECK = "size-5 cursor-pointer accent-brand-600 disabled:cursor-not-allowed";
+/** A checkbox of a table row (On call, the overseer rule): 20 px in ink, named by its aria-label. */
+const ROW_CHECK = "size-5 cursor-pointer accent-ink-900 disabled:cursor-not-allowed";
 
 export function PeopleScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("people");
@@ -121,7 +121,7 @@ function PeopleTable() {
                 {t(`locale.${user.locale}`)}
               </td>
               <td>
-                <Chip tone={user.is_active ? "brand" : "neutral"} dot>
+                <Chip tone={user.is_active ? "positive" : "neutral"} dot>
                   {user.is_active ? t("people.active") : t("people.inactive")}
                 </Chip>
               </td>

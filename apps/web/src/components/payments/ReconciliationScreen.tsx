@@ -26,7 +26,7 @@ import { PaymentsNav, useChannelName } from "./shared";
 //
 // Step 6.4c (fresh-counter.md 4.4, the Admin board's KPI row and the CatalogList board's table): the title row with its Amharic twin, the
 // section's tabs, the range as the toolbar (still the search landmark with the same labels), the range's totals as four Stats (the figures
-// the totals table holds), then each day a table card titled by its day, the drill a brand-teal link, the day's total in the table's foot.
+// the totals table holds), then each day a table card titled by its day, the drill a brand-red link, the day's total in the table's foot.
 
 const COLUMNS = ["receipts", "amount", "with_photo", "without_photo", "with_reference", "verified", "disputed", "voided", "refunds", "refund_amount", "net_amount"] as const;
 const MONEY = new Set<string>(["amount", "refund_amount", "net_amount"]);

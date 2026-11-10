@@ -33,6 +33,10 @@ return [
     // secret. The URL names the photo's sha256, so it cannot be guessed and changes with the photo, which is why the answer is cached as immutable;
     // it reads no branch, no actor and no session, answers only while a live item_images row names the sha, and writes nothing.
     'GET api/v1/media/items/{sha}/{rendition}.{ext}',
+    // The bakery's logo (Phase 6 follow-up): the sign-in page's <img> sends no bearer token, and a logo is not secret. As a product photo's
+    // URL, it names the file's sha256 (cached as immutable), reads no branch, actor or session, answers only while a brand_profiles row
+    // names the sha, and writes nothing.
+    'GET api/v1/media/brand/{sha}.{ext}',
     'GET api/v1/bridge/jobs/next',
     'POST api/v1/bridge/jobs/{job}/claim',
     'POST api/v1/bridge/jobs/{job}/printed',

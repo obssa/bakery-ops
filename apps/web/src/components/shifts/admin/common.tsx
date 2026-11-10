@@ -37,11 +37,11 @@ export function useName(): (row: { name_en: string; name_am: string }) => string
   return (row) => (locale === "am" ? row.name_am || row.name_en : row.name_en || row.name_am);
 }
 
-// green is money confirmed only (fresh-counter.md 1.3): a shift that is open is brand teal, as the station bar's chip is
+// green is money confirmed only (fresh-counter.md 1.3): a shift that is open is positive, as the station bar's chip is
 const TONE: Record<ShiftStatus, Tone> = {
   scheduled: "neutral",
   opening: "blue",
-  open: "brand",
+  open: "positive",
   counting: "blue",
   pending_approval: "amber",
   locked: "neutral",

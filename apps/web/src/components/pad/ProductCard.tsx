@@ -10,7 +10,7 @@ import { IconButton, ProductImage } from "../ui";
 
 // A product as the waiter sees it (fresh-counter.md 3.2 and the Pad board, step 6.3a): a white card with the 4:3 photo on top (the card
 // rendition, or the category's placeholder), the name on one line (on the English page the Amharic name under it, as the board has it)
-// and the price. Over the photo: "3 left" in amber when the API says the stock is low (nothing when there is plenty), the brand-teal "New"
+// and the price. Over the photo: "3 left" in amber when the API says the stock is low (nothing when there is plenty), the brand-red "New"
 // chip, or, for a product that cannot be sold, the photo in grey with the reason in a red chip. The whole card is the add button, named as
 // it always was (name, price, availability; or why it is not available), so the earlier specs still find it; a tap adds one, a long press
 // or the small "More" button beside the price opens the options. An unavailable card is aria-disabled, not disabled: it stays focusable

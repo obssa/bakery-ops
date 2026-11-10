@@ -42,7 +42,7 @@ import { InventoryNav, Pager, QueryBox, qtyFigure, stamp, useNamer } from "./sha
 
 const STATUSES: readonly PurchaseStatus[] = ["draft", "confirmed", "cancelled"];
 const DUPLICATE_KEY = "purchases.invoice.duplicate";
-const STATUS_TONE: Record<PurchaseStatus, Tone> = { draft: "blue", confirmed: "brand", cancelled: "neutral" };
+const STATUS_TONE: Record<PurchaseStatus, Tone> = { draft: "blue", confirmed: "positive", cancelled: "neutral" };
 
 interface LineDraft {
   uuid: string;
@@ -513,7 +513,7 @@ function NewPurchasePanel({ costs, onSaved, onClose }: { costs: boolean; onSaved
           {save.isError ? <Alert>{errorText.message(save.error)}</Alert> : null}
           {duplicate ? (
             <label className="flex min-h-11 items-center gap-3 text-[15px] text-neutral-900">
-              <input type="checkbox" className="size-5 shrink-0 accent-brand-600" checked={allowDuplicate} onChange={(event) => setAllowDuplicate(event.target.checked)} />
+              <input type="checkbox" className="size-5 shrink-0 accent-ink-900" checked={allowDuplicate} onChange={(event) => setAllowDuplicate(event.target.checked)} />
               {t("purchases.allow_duplicate")}
             </label>
           ) : null}

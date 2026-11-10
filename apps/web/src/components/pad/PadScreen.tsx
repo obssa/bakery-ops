@@ -140,7 +140,7 @@ function Workspace({ userId, notice, onNoticeOff, orders, menu }: WorkspaceProps
         role="status"
         className={
           notice
-            ? "fixed bottom-6 left-1/2 z-30 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-2xl border border-brand-100 bg-brand-50 px-5 py-3.5 text-base font-semibold text-brand-700 shadow-float lg:left-[calc((100%-368px)/2)]"
+            ? "fixed bottom-6 left-1/2 z-30 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-2xl border border-positive-100 bg-positive-50 px-5 py-3.5 text-base font-semibold text-positive-700 shadow-float lg:left-[calc((100%-368px)/2)]"
             : "sr-only"
         }
       >

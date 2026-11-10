@@ -2,7 +2,7 @@
 // is a client reference on the server, not the string). The design system is docs/design/fresh-counter.md; the tokens behind
 // these names live in app/globals.css (ADR 0023).
 
-/** Always-visible keyboard focus in the brand teal (fresh-counter.md 1.5): never removed, on every control. */
+/** Always-visible keyboard focus in the brand red (fresh-counter.md 1.5): never removed, on every control. */
 export const focusRing =
   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/35 focus-visible:ring-offset-1";
 
@@ -12,11 +12,11 @@ export type ButtonSize = "md" | "lg" | "xl";
 
 // Each variant at rest and on hover. The hover is left out while a button is loading, and a disabled button's look (below) wins over it.
 const BUTTON_LOOK: Record<ButtonVariant, { rest: string; hover: string }> = {
-  primary: { rest: "border-transparent bg-brand-600 text-white", hover: "hover:bg-brand-700 active:bg-brand-700" },
+  primary: { rest: "border-transparent bg-ink-900 text-white", hover: "hover:bg-ink-800 active:bg-ink-800" },
   secondary: { rest: "border-neutral-300 bg-white text-neutral-900", hover: "hover:bg-neutral-100" },
   ghost: { rest: "border-transparent bg-transparent text-neutral-900", hover: "hover:bg-neutral-100" },
   danger: { rest: "border-transparent bg-red-50 text-red-700", hover: "hover:bg-red-100" },
-  dark: { rest: "border-transparent bg-neutral-900 text-white", hover: "hover:bg-neutral-800" },
+  dark: { rest: "border-transparent bg-ink-900 text-white", hover: "hover:bg-ink-800" },
 };
 
 // Every variant disabled alike: no hover, a neutral-50 fill, neutral-400 text (fresh-counter.md 2, Button).
@@ -77,7 +77,7 @@ export const CONTROL_HEIGHT: Record<ControlSize | "base", string> = {
 export function controlClass(size?: ControlSize): string {
   return (
     `block w-full rounded-xl border border-neutral-300 bg-white px-3 text-neutral-900 ${CONTROL_HEIGHT[size ?? "base"]} ` +
-    "placeholder:text-neutral-500 focus:border-brand-600 focus:inset-ring-1 focus:inset-ring-brand-600 " +
+    "placeholder:text-neutral-500 focus:border-ink-900 focus:inset-ring-1 focus:inset-ring-ink-900 " +
     "aria-[invalid=true]:border-red-700 aria-[invalid=true]:focus:inset-ring-red-700 " +
     "disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500 " +
     focusRing

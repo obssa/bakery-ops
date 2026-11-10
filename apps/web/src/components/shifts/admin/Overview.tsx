@@ -64,7 +64,7 @@ export function SetupCheck() {
       {result === null ? (
         <p className="text-[15px] text-neutral-600">{t("setup.checking")}</p>
       ) : result.ok ? (
-        <p className="flex items-start gap-3 rounded-xl bg-brand-50 px-4 py-3 text-[15px] font-medium text-brand-700">
+        <p className="flex items-start gap-3 rounded-xl bg-positive-50 px-4 py-3 text-[15px] font-medium text-positive-700">
           <CircleCheck className="mt-0.5 size-5 shrink-0" strokeWidth={2} aria-hidden="true" />
           {t("setup.ok")}
         </p>
@@ -182,7 +182,7 @@ export function RunningShifts() {
   const shifts = snapshot?.state.shifts ?? [];
   const loaded = !!snapshot?.loaded;
   return (
-    <OverviewCard title={t("running.title")} aside={shifts.length > 0 ? <Chip tone="brand">{t("running.count", { count: shifts.length })}</Chip> : null}>
+    <OverviewCard title={t("running.title")} aside={shifts.length > 0 ? <Chip tone="positive">{t("running.count", { count: shifts.length })}</Chip> : null}>
       {!loaded && !snapshot?.error ? (
         <>
           <p role="status" className="sr-only">

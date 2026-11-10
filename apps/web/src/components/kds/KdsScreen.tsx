@@ -185,7 +185,7 @@ export function KdsScreen({ kind, twins }: { kind: "kitchen" | "bar"; /** the Am
         ) : null}
         {stationId !== null && loaded ? (
           // the rail's own state: live, or showing what was last read (the stale line below says why)
-          <Chip tone={snapshot?.error ? "amber" : "brand"} dot className="min-h-[34px] px-3.5 text-sm">
+          <Chip tone={snapshot?.error ? "amber" : "positive"} dot className="min-h-[34px] px-3.5 text-sm">
             {snapshot?.error ? t("feed_stale") : t("feed_live")}
           </Chip>
         ) : null}

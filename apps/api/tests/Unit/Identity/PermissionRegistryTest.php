@@ -80,6 +80,7 @@ it('follows the matrix row by row', function (string $permission, array $roles) 
     'print a receipt on the bridge (Phase 5)' => ['print.create', ['admin', 'manager', 'cashier']],
     'see the print jobs and the receipt bytes (Phase 5)' => ['print.view', ['admin', 'manager', 'cashier']],
     'read the System page and GET /system/status (Phase 5)' => ['system.view', ['admin']],
+    'set the business name and logo the app shows (Phase 6 follow-up)' => ['branding.manage', ['admin']],
 ])->group('unit', 'module:identity');
 
 it('knows no role outside the eight and no permission outside the matrix', function () {

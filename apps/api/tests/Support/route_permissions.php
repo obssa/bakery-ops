@@ -40,6 +40,10 @@ return [
     'POST /api/v1/devices/{id}/rename' => ['permission' => 'devices.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/devices/{id}/revoke' => ['permission' => 'devices.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'GET /api/v1/devices/this' => ['permission' => 'devices.self', 'roles' => $all, 'module' => 'identity'],
+    // the business name and logo the app shows (Phase 6 follow-up): the admin sets them; everyone reads them in GET /me
+    'PUT /api/v1/brand' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'POST /api/v1/brand/logo' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'DELETE /api/v1/brand/logo' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
     // live updates (step 1.2, ADR 0009): every active user may ask; the channel rules decide which channel (403 otherwise)
     'POST /api/v1/broadcasting/auth' => ['permission' => 'identity.authenticated', 'roles' => $all, 'module' => 'identity'],
 

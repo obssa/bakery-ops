@@ -79,7 +79,7 @@ function SupplierTable({ rows, onEdit }: { rows: Supplier[]; onEdit: (supplier: 
                 <td className="whitespace-nowrap font-mono text-sm text-neutral-700">{supplier.tin ?? "—"}</td>
                 <td>
                   {supplier.is_active ? (
-                    <Chip tone="brand" dot>
+                    <Chip tone="positive" dot>
                       {t("suppliers.active")}
                     </Chip>
                   ) : (

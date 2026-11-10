@@ -28,12 +28,12 @@ import { useKeys } from "./useKeys";
 // on the list; and the one main action, "Review and submit", at the foot. A cash drawer's count has no lines: it is the till's cash
 // declaration (step 3.7d), by denomination.
 
-// locked is brand teal (the count is done and right); green means money confirmed and nothing else (fresh-counter.md 1.3)
+// locked is positive (the count is done and right); green means money confirmed and nothing else (fresh-counter.md 1.3)
 export const STAGE_TONE = {
   counting: "blue",
   waiting_cosign: "amber",
   waiting_approval: "amber",
-  locked: "brand",
+  locked: "positive",
   sent_back: "red",
 } as const;
 
@@ -48,10 +48,10 @@ export function StageBadge({ count }: { count: Count }) {
 }
 
 /** A notice in the panel: a tinted box with a line icon, in the tone of what it says. */
-function Notice({ tone, icon, children, role }: { tone: "amber" | "brand" | "red" | "blue"; icon: ReactNode; children: ReactNode; role?: "note" | "status" }) {
+function Notice({ tone, icon, children, role }: { tone: "amber" | "positive" | "red" | "blue"; icon: ReactNode; children: ReactNode; role?: "note" | "status" }) {
   const look = {
     amber: "border-amber-200 bg-amber-50 text-amber-900",
-    brand: "border-brand-100 bg-brand-50 text-brand-700",
+    positive: "border-positive-100 bg-positive-50 text-positive-700",
     red: "border-red-200 bg-red-50 text-red-800",
     blue: "border-blue-200 bg-blue-50 text-blue-800",
   }[tone];
@@ -228,7 +228,7 @@ export function CountPanel({
         ) : null}
         {stage === "locked" ? (
           <>
-            <Notice tone="brand" icon={<Lock className={ICON} strokeWidth={ICON_STROKE} />}>
+            <Notice tone="positive" icon={<Lock className={ICON} strokeWidth={ICON_STROKE} />}>
               <p className="font-medium">{t("stage_locked")}</p>
             </Notice>
             {count.chain ? <ChainCard chain={count.chain} /> : null}

@@ -163,7 +163,7 @@ export function TillScreen({ titleTwin }: { /** the Amharic title beside the Eng
       </StationHeaderActions>
 
 
-      <p role="status" className={notice ? "rounded-xl bg-brand-50 px-4 py-3 text-base font-medium text-brand-700" : "sr-only"}>
+      <p role="status" className={notice ? "rounded-xl bg-positive-50 px-4 py-3 text-base font-medium text-positive-700" : "sr-only"}>
         {notice ? t("sent") : ""}
       </p>
 

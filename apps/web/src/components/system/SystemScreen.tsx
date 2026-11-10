@@ -14,6 +14,7 @@ import { useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
 import { CARD, Notice, TEXT_LINK } from "../admin/kit";
 import { Alert, Button, Chip, PageHeader, Skeleton, type Tone } from "../ui";
+import { BrandCard } from "./BrandCard";
 
 // Admin > System (step 5.5c, phase-5 plan 4.4; system.view, the admin): the health of the host the bakery runs on, polled every 30 s with
 // an ETag (lib/live/system.ts). The scheduler's heartbeat, the backups and the weekly restore drill, the queue, the disk the receipt photos
@@ -22,13 +23,13 @@ import { Alert, Button, Chip, PageHeader, Skeleton, type Tone } from "../ui";
 // switch the page does not name yet) is marked translate="no"; everything a person reads is in their language.
 //
 // Step 6.4d (fresh-counter.md 4.4, the Admin board's "System" card): the title row with its Amharic twin; each part a white 18 px card,
-// its state as a chip with a dot beside its title (brand teal when well, amber or red when not: green is money confirmed only), its
+// its state as a chip with a dot beside its title (positive when well, amber or red when not: green is money confirmed only), its
 // figures on hairline rows, labels in neutral-600 and values right-aligned in tabular numbers. The backups card also says what the live
 // product photos take ("Product photos", files.media_used_mb, step 6.1b).
 
-const HEARTBEAT_TONE: Record<HeartbeatState, Tone> = { running: "brand", stopped: "red", never: "amber" };
-const BACKUP_TONE: Record<BackupState, Tone> = { ok: "brand", stale: "red", failed: "red", running: "blue", none: "neutral" };
-const DRILL_TONE: Record<DrillState, Tone> = { ok: "brand", old: "amber", failed: "red", running: "blue", not_configured: "neutral" };
+const HEARTBEAT_TONE: Record<HeartbeatState, Tone> = { running: "positive", stopped: "red", never: "amber" };
+const BACKUP_TONE: Record<BackupState, Tone> = { ok: "positive", stale: "red", failed: "red", running: "blue", none: "neutral" };
+const DRILL_TONE: Record<DrillState, Tone> = { ok: "positive", old: "amber", failed: "red", running: "blue", not_configured: "neutral" };
 
 export function SystemScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("system");
@@ -43,6 +44,7 @@ export function SystemScreen({ titleAm }: { titleAm?: string }) {
     <>
       <PageHeader title={t("title")} intro={t("intro")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
       <div className="flex flex-col gap-6">
+        <BrandCard />
         {snapshot?.error && snapshot.loaded ? <Notice tone="amber">{t("stale")}</Notice> : null}
         {status === null ? (
           snapshot?.error ? (
@@ -213,7 +215,7 @@ function FlagsCard({ status }: { status: SystemStatus }) {
       <dl>
         {rows.map(({ key, known, on }) => (
           <Row key={key} label={known ? t(`flags.${key}`) : <span translate="no">{key}</span>}>
-            <Chip tone={on ? "brand" : "neutral"} dot>
+            <Chip tone={on ? "positive" : "neutral"} dot>
               {on ? t("flags.on") : t("flags.off")}
             </Chip>
           </Row>
@@ -241,7 +243,7 @@ function ReleaseCard({ status }: { status: SystemStatus }) {
         <Row label={t("release.released_at")}>{stampText(app.released_at, dates)}</Row>
         <Row label={t("release.migrations")}>{app.migrations}</Row>
         <Row label={t("release.error_tracking")}>
-          <Chip tone={status.error_tracking.enabled ? "brand" : "neutral"} dot>
+          <Chip tone={status.error_tracking.enabled ? "positive" : "neutral"} dot>
             {status.error_tracking.enabled ? t("flags.on") : t("flags.off")}
           </Chip>
         </Row>

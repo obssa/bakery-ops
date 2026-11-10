@@ -20,7 +20,7 @@ import { useDateFormat } from "@/lib/useDates";
 //
 // Step 6.4d (fresh-counter.md 4.4, the boards' cards and table): the title row with its Amharic twin; this device and the print bridges
 // as two white cards side by side from 1024 px; the enrolled devices a table card under them (the state a chip with its dot: Active in
-// brand teal, Revoked red; the row's Rename and Revoke at its end, Revoke the danger button, as its confirmation is).
+// positive, Revoked red; the row's Rename and Revoke at its end, Revoke the danger button, as its confirmation is).
 
 export function DevicesScreen({ titleAm }: { titleAm?: string }) {
   const t = useTranslations("devices");
@@ -70,7 +70,7 @@ function ThisDeviceCard() {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             {here.data.enrolled || here.data.revoked ? (
-              <Chip tone={here.data.enrolled ? "brand" : "red"} dot>
+              <Chip tone={here.data.enrolled ? "positive" : "red"} dot>
                 {here.data.enrolled ? t("devices.active") : t("devices.revoked")}
               </Chip>
             ) : null}
@@ -160,7 +160,7 @@ function DevicesTable() {
                       {t("devices.revoked")}
                     </Chip>
                   ) : (
-                    <Chip tone="brand" dot>
+                    <Chip tone="positive" dot>
                       {t("devices.active")}
                     </Chip>
                   )}

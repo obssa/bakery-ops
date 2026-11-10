@@ -34,6 +34,7 @@ $noSoftDeletes = [
     'App\Modules\Notifications\Models\NotificationDelivery',  // history of what was sent outside the app: pending, then sent, failed or gone by status, never deleted
     'App\Modules\Payments\Models\Payment',  // never deleted: recorded, then verified, disputed or voided by status (Phase 4); the till's money trail
     'App\Modules\Payments\Models\PaymentRefund',  // step 4.3d: the append-only money rows of a refund (DB trigger + model guard): money given back is a new row
+    'App\Modules\Identity\Models\BrandProfile',  // one row per branch (unique branch_id), changed in place by PUT /brand and the logo writes, each audited; never deleted (no delete path), a branch that saved nothing shows the app's own name and mark
     'App\Modules\Payments\Models\ReceiptSettings',  // one row per branch (unique branch_id), changed in place by PUT /receipt-settings and audited; never deleted (no delete path), a branch that saved nothing reads the defaults
     'App\Modules\Production\Models\ProductionRequest',  // never deleted: requested, accepted, in progress, pending confirmation, then done or cancelled by status; a done one is the reason behind its batch's movements
     'App\Modules\Production\Models\ProductionBatch',  // never deleted: started, finished, then confirmed by status; a confirmed one names the production_output movement it wrote

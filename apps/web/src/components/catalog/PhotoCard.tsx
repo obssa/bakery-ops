@@ -457,7 +457,7 @@ function PlaceholderRow({ name, category }: { name: string; category: string | n
 }
 
 const QUALITY_LOOK: Record<PhotoQuality, { tone: string; icon: typeof Check; key: "quality_sharp" | "quality_soft" | "quality_small" }> = {
-  sharp: { tone: "bg-brand-50 text-brand-700", icon: Check, key: "quality_sharp" },
+  sharp: { tone: "bg-positive-50 text-positive-700", icon: Check, key: "quality_sharp" },
   soft: { tone: "bg-amber-50 text-amber-800", icon: TriangleAlert, key: "quality_soft" },
   too_small: { tone: "bg-red-50 text-red-700", icon: CircleAlert, key: "quality_small" },
 };
