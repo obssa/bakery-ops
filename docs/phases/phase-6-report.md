@@ -522,6 +522,12 @@ Claim restated at `671dbd2` (the merge of `main` after the fix that keeps the ti
 with the strict `gate-p6` green (now `gate_run_url`). Deploy 42891609052: 42 of 43 `@live` and 1 flaky (`p4-dashboards` "after a rebuild of
 today" passed on its retry); `admin-smoke` passed inside its new time.
 
+A choice is charcoal, never red (Ramin, 2026-11-10, of the till's chosen pay method: "red looks like an error"): the chosen pay
+method, the chosen kind card and its tick, the opened order and request cards, the till's chosen order, the ticked pills and filters, the
+pressed admin segments and the open or linked row are drawn in `ink` (`ink-50` or `ink-100` with `ink-900`); red keeps the mark, the
+current sidebar item and section tab, links, the focus ring and "New" (fresh-counter.md 1.2). Web only; the till's captures gain one with
+a method chosen at 1440 and 390.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
