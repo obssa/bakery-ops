@@ -22,7 +22,9 @@ final class DashboardQueries
 {
     public const array SUMMARIES = ['analytics_days', 'daily_sales', 'daily_hour_sales', 'daily_channel_totals', 'daily_item_metrics', 'daily_station_metrics', 'daily_user_metrics'];
 
-    public const array NAMES = ['items', 'units', 'categories', 'payment_channels', 'users', 'stations', 'user_station_assignments'];
+    // the names behind the contracts; brand_profiles is Identity's ClockPreference, the admin's international clock a printed report adds
+    // beside the Ethiopian one (the Ethiopian clock follow-up: its clock_also, one row per branch)
+    public const array NAMES = ['items', 'units', 'categories', 'payment_channels', 'users', 'stations', 'user_station_assignments', 'brand_profiles'];
 
     public const array FRAMEWORK = ['personal_access_tokens', 'roles', 'permissions', 'model_has_roles', 'model_has_permissions', 'role_has_permissions', 'idempotency_keys', 'cache', 'cache_locks'];
 
