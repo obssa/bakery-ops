@@ -202,15 +202,12 @@ export async function settleStation(admin: Api, station: StationRef): Promise<vo
 /**
  * Approves what an earlier run left waiting at the station (the approval queue, oldest first; a count that waits for a co-signature is
  * co-signed first): one count waiting at a place blocks the next count there (409 shifts.count.blocked_by_pending). The admin never
- * counted these, so the two-person rules hold. A co-signed count that differs in nothing is approved by the co-signature itself, so the
- * queue is read again and only what still waits for approval is approved.
+ * counted these, so the two-person rules hold.
  */
 export async function resolvePendingCounts(admin: Api, station: StationRef): Promise<void> {
-  const read = async () => (await admin.get<{ data: { id: number; status: string }[] }>("/stock-counts", { station_id: station.id })).data;
-  for (const row of await read()) {
+  const queue = (await admin.get<{ data: { id: number; status: string }[] }>("/stock-counts", { station_id: station.id })).data;
+  for (const row of queue) {
     if (row.status === "awaiting_cosign") await admin.post(`/stock-counts/${row.id}/cosign`, {});
-  }
-  for (const row of await read()) {
-    if (row.status === "pending_approval") await admin.post(`/stock-counts/${row.id}/approve`, {});
+    await admin.post(`/stock-counts/${row.id}/approve`, {});
   }
 }

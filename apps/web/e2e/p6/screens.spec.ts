@@ -1395,9 +1395,16 @@ test.describe("screens: the explain-itself help", () => {
       }
       await page.setViewportSize(DESKTOP);
     };
+    // the admin, who never counted these, co-signs; a count that differs in nothing is approved by the co-signature itself, so the queue is
+    // read again and only what still waits for approval is approved (resolvePendingCounts approves every row it co-signed)
+    const queue = async () => (await demo.admin.get<{ data: { id: number; status: string }[] }>("/stock-counts", { station_id: cakeRoom.id })).data;
+    const resolve = async () => {
+      for (const row of await queue()) if (row.status === "awaiting_cosign") await demo.admin.post(`/stock-counts/${row.id}/cosign`, {});
+      for (const row of await queue()) if (row.status === "pending_approval") await demo.admin.post(`/stock-counts/${row.id}/approve`, {});
+    };
     try {
       // a count to wait for: the cake room's shift closed (or a new one started) and its counts handed in as they stand by the cake baker
-      await resolvePendingCounts(demo.admin, cakeRoom);
+      await resolve();
       let shift = await currentShift(demo.admin, cakeRoom);
       if (shift?.status === "open") await baker.api.post(`/shifts/${shift.id}/close`, {});
       if (!shift) await baker.api.post(`/stations/${cakeRoom.id}/shifts/start`, { client_uuid: uuid() });
@@ -1442,7 +1449,7 @@ test.describe("screens: the explain-itself help", () => {
       }
     } finally {
       try {
-        await resolvePendingCounts(demo.admin, cakeRoom);
+        await resolve();
         await ensureOpenShift(demo.admin, cakeRoom);
       } catch (error) {
         console.warn(`[screens] the cake room's shift was not put back: ${error instanceof Error ? error.message : String(error)}`);
