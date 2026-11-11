@@ -550,7 +550,7 @@ current sidebar item and section tab, links, the focus ring and "New" (fresh-cou
 sheet inside itself on a 390 px phone: the row's fieldset took its method grid's widest content as its least width, so the right column and
 the amount ran past the sheet's edge (`min-w-0` on the fieldset and the Amount line, and a long method name wraps). Web only; the till's captures gain a method chosen at 1440
 (en) and 390 (en and am), and at 390 they assert nothing in the sheet scrolls sideways and every method card and field ends inside it.
-Claim restated at `a497538`; the tag stays on `2f6bbd9`.
+Claim restated at `ff250f4` (the merge of `main` after the Ethiopian clock: the Time card's segment and the template form's day pills are charcoal too); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
