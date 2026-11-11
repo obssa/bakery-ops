@@ -83,8 +83,8 @@ test.describe("screens: dragging a card along the production board", () => {
       // Requested -> In progress: accepted and started in one drop
       const asked = cardIn(baker, t.col_requested, cake);
       await expect(asked).toBeVisible({ timeout: 30_000 });
-      // nobody has it yet: the card says who takes it
-      await expect(asked).toContainText("accepts it.");
+      // nobody has it yet: the baker has its button (and its grip), so the card names no one else to move it
+      await expect(asked.getByRole("button", { name: `${t.action_accept}: ${cake}` })).toBeVisible();
       await dragTo(baker, asked, column(baker, t.col_in_progress));
       await expect(cardIn(baker, t.col_in_progress, cake)).toBeVisible({ timeout: 15_000 });
       await expect.poll(async () => (await requestById(f.admin, requestId)).status, { timeout: 30_000 }).toBe("in_progress");
