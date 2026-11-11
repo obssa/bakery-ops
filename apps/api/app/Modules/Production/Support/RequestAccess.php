@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Production\Support;
 
 use App\Modules\Identity\Contracts\People;
+use App\Modules\Identity\Contracts\Recipients;
+use App\Modules\Production\Enums\RequestStatus;
 use App\Modules\Production\Exceptions\ProductionError;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Shared\Actor\ActorContext;
@@ -22,6 +24,8 @@ use App\Shared\Models\Station;
  *   - mayCancel(): a planner (production.plan), or the person who asked.
  *   - assertMayConfirm(): production.confirm (admin, manager), or the overseer flagged at the batch's station (step 2.7c), 403
  *     production.confirm.forbidden.
+ *   - bakersFor(): for a planner looking at a request nobody has started, the people who can make it (the request card's "Give to"
+ *     list, Ramin 2026-11-11), as ids and names only.
  * Resolved per use: it reads the request-scoped ActorContext.
  */
 final class RequestAccess
@@ -29,6 +33,7 @@ final class RequestAccess
     public function __construct(
         private readonly People $people,
         private readonly ActorContext $actor,
+        private readonly Recipients $recipients,
     ) {}
 
     /**
@@ -94,5 +99,32 @@ final class RequestAccess
         $station = Station::query()->withTrashed()->find($request->station_id);
 
         return $station instanceof Station && $this->people->can($userId, 'production.fulfil', $station);
+    }
+
+    /**
+     * The people a planner may give this request to (AssignRequest): every active person of the branch holding production.fulfil at its
+     * station, by name. Null when the person looking is not a planner or the request is started or past that (nothing to give).
+     *
+     * @return list<array{id: int, name: string}>|null
+     */
+    public function bakersFor(ProductionRequest $request): ?array
+    {
+        $personId = $this->actor->effectiveUserId();
+        if ($personId === null || ! $this->people->can($personId, 'production.plan')
+            || ! in_array($request->status, [RequestStatus::Requested, RequestStatus::Accepted], true)) {
+            return null;
+        }
+        $station = Station::query()->withTrashed()->find($request->station_id);
+        if (! $station instanceof Station) {
+            return [];
+        }
+
+        $bakers = [];
+        foreach ($this->recipients->byPermission('production.fulfil', $station) as $person) {
+            $bakers[] = ['id' => (int) $person->getKey(), 'name' => (string) $person->getAttribute('name')];
+        }
+        usort($bakers, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+
+        return $bakers;
     }
 }

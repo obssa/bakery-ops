@@ -38,6 +38,18 @@ return [
             'title' => 'ለእርስዎ ተሰጥቷል፡ :item',
             'body' => ':qty :unit :item በ:station ያዘጋጁ።',
         ],
+        'production_overdue' => [
+            'waiting' => [
+                'title' => 'ገና አልተጀመረም፡ :item',
+                'body' => ':qty :unit :item በ:station :waited ጠብቋል፤ እስካሁን ማንም አልጀመረውም። ለጋጋሪ ይቀበሉት፣ ለሌላ ጋጋሪ ይስጡት ወይም ይሰርዙት።',
+            ],
+            'late' => [
+                'title' => 'ዘግይቷል፡ :item',
+                'body' => ':qty :unit :item በ:station የተጠየቀበት ሰዓት አልፏል (:waited ጠብቋል)፤ እስካሁን ማንም አልጀመረውም። ለጋጋሪ ይቀበሉት፣ ለሌላ ጋጋሪ ይስጡት ወይም ይሰርዙት።',
+            ],
+            'hours' => ':h ሰዓት :m ደቂቃ',
+            'minutes' => ':m ደቂቃ',
+        ],
         'batch_pending_confirmation' => [
             'title' => 'ማረጋገጫ ይጠብቃል፡ :item',
             'body' => ':produced :unit :item በ:station ተዘጋጅቷል፣ :waste :unit ባከነ። ያረጋግጡ ወይም ይመልሱ።',

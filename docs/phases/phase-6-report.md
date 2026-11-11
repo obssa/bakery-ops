@@ -618,6 +618,34 @@ Telebirr, no float left), no stock movement written; Bakery's closing count and 
 co-signature by someone other than the admin, and Cake room's closing count is prepared behind it. Each shift carries a handover note
 saying its counts were accepted at the expected figures and nobody counted.
 
+**The board moved by dragging, and requests that wait too long** (Ramin, 2026-11-11, with a screenshot of the live board: "we have two
+menus on top of each other", "how can a card move from Requested to In progress to Pending confirmation to Done today", "if a request stays
+in Requested for a long time what happens", "can we move a card from one state to the other and its status updates by itself"). The
+summary strip is gone: each step is named once, in its column head, which also carries what needs a look in amber (the requests waiting
+too long, else the urgent ones; the batches in the oven over a day). A card the viewer can move is dragged to its next column with
+`@dnd-kit/core` 6.3.1 (a mouse after 8 px, a 250 ms press on a tablet, or its grip with Space and the left and right arrows, a whole column
+per press; on a phone onto the column's tab), and the drop makes the same write as the card's button: Requested to In progress accepts and
+starts it, In progress to Pending confirmation (or Done today) opens the Done form, Pending confirmation to Done today confirms it, Pending
+confirmation to In progress opens Send back. While a card is dragged, a column it cannot go to is dimmed and says why (one step at a time,
+never back to Requested once started, only the baker who accepted or started it, an overseer or a manager and never the one who made it:
+`lib/productionBoard.ts` `dropMove`, mirroring AcceptRequest, StartBatch, FinishBatch, ConfirmBatch and SendBackBatch); the card moves at
+once and goes back with the server's reason if the write is refused, and the board reads itself again after every move. A card the viewer
+has no button on says who moves it next ("Abebe Girma, who accepted it, starts it", "An overseer or a manager confirms it, not Dawit
+Bekele, who made it"). A request nobody has started shows how long it has waited ("Waiting 25 min", "2 h 10"), an amber "Waiting too long"
+past 120 minutes (30 when urgent) and a red "Late by" with a clock past its due time. API: a planner can take an accepted request nobody
+started back from its baker and give it to another (`AssignRequest`, `accepted -> requested` with the new baker named and the acceptance
+cleared, audited `production_request.reassign`, ProductionAssigned announced; the request card lists the people who can make it, `bakers`,
+for a planner only), and `production:overdue` (every 15 minutes) raises ProductionOverdue for each request nobody started that waited past
+`production.waiting_too_long_minutes` (120; `urgent_minutes` 30) or its due time, which Notifications tells the station's planners once
+per request (type `production_overdue`, gated `production_overdue:{request_id}`; the inbox's CHECK widened by
+`2026_11_17_100000`). Tests: Pest for the reassign (the transition table, the audit row, replay, the repeat, refused once started, the new
+baker accepts), the baker list, the overdue rule (the limits, urgent, late, never once started, every branch with its own) and the command
+with its notice (the planners, once however often it runs, its text in both languages, scheduled every fifteen minutes);
+`screens-production-logic` for the waits, every drop and every next mover; `screens-board-drag` on the CI stack: the baker drags a new
+request to the oven (accepted and started), drags the batch with the columns captured mid-drag, drops it on Pending confirmation and sends
+the Done form, the overseer moves it to Done today with the keyboard and the baker's board follows by itself; captures at 1440 and 390 in
+en and am with axe and no sideways scroll. Claim restated on the branch; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the

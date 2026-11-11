@@ -11,6 +11,7 @@ use App\Shared\Events\LineReady;
 use App\Shared\Events\LineRejected;
 use App\Shared\Events\PaymentDisputed;
 use App\Shared\Events\ProductionAssigned;
+use App\Shared\Events\ProductionOverdue;
 use App\Shared\Events\ProductionRequested;
 use App\Shared\Events\RefundPaid;
 use App\Shared\Events\StockLow;
@@ -132,6 +133,19 @@ final class NotificationEvents
         return new ProductionRequested(
             $branchId, $requestId, 17, 'Black forest cake', 'ብላክ ፎረስት ኬክ', $a['qty'], $a['unit'],
             $a['stationId'], 'Cake room', 'የኬክ ክፍል', $a['reason'], $a['priority'], $a['dueAt'], $requesterId,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $over
+     */
+    public static function productionOverdue(int $branchId, int $requestId = 51, array $over = []): ProductionOverdue
+    {
+        $a = $over + ['stationId' => 1, 'qty' => '12.0000', 'unit' => 'pcs', 'status' => 'requested', 'priority' => 'normal', 'waited' => 130, 'late' => false];
+
+        return new ProductionOverdue(
+            $branchId, $requestId, 17, 'Black forest cake', 'ብላክ ፎረስት ኬክ', $a['qty'], $a['unit'],
+            $a['stationId'], 'Cake room', 'የኬክ ክፍል', $a['status'], $a['priority'], $a['waited'], $a['late'],
         );
     }
 

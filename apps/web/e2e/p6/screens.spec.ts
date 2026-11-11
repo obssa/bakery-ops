@@ -1524,13 +1524,16 @@ test.describe("screens: the production board", () => {
   test.use({ viewport: DESKTOP });
 
   for (const locale of ["en", "am"] as const) {
-    test(`the board with its summary, its columns and a stale batch at 1440 x 900, and its tabs at 390 x 844, in ${locale}`, async ({ page }) => {
+    test(`the board with its column heads and a stale batch at 1440 x 900, and its tabs at 390 x 844, in ${locale}`, async ({ page }) => {
       test.setTimeout(150_000);
       const t = MESSAGES[locale].production;
       const demo = await demoProduction();
       if (demo.inOven) await ageBatch(page, demo.inOven.id);
       await openBoard(page, locale);
-      await expect(page.getByRole("list", { name: t.summary })).toBeVisible();
+      // each step is named once, in its column head (the summary strip that repeated them is gone, phase-6/board-drag)
+      for (const column of ["requested", "in_progress", "pending_confirmation", "done_today"] as const) {
+        await expect(page.getByRole("heading", { level: 2, name: t[`col_${column}`], exact: true })).toHaveCount(1);
+      }
       if (demo.inOven) await expect(page.getByText(locale === "en" ? "Started 6 days ago" : "ከ6 ቀናት በፊት ተጀምሯል")).toBeVisible({ timeout: 30_000 });
       await capture(page, `production-board-1440x900-${locale}`);
       const deskTip = await openColumnTip(page, locale, "pending_confirmation");

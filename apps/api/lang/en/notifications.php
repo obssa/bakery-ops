@@ -40,6 +40,18 @@ return [
             'title' => 'Assigned to you: :item',
             'body' => 'Make :qty :unit of :item at :station.',
         ],
+        'production_overdue' => [
+            'waiting' => [
+                'title' => 'Not started yet: :item',
+                'body' => ':qty :unit of :item at :station has waited :waited and nobody has started it. Accept it for a baker, give it to another baker, or cancel it.',
+            ],
+            'late' => [
+                'title' => 'Late: :item',
+                'body' => ':qty :unit of :item at :station is past its due time after :waited and nobody has started it. Accept it for a baker, give it to another baker, or cancel it.',
+            ],
+            'hours' => ':h h :m min',
+            'minutes' => ':m min',
+        ],
         'batch_pending_confirmation' => [
             'title' => 'Waiting for sign-off: :item',
             'body' => ':produced :unit of :item made at :station, :waste :unit wasted. Confirm it or send it back.',

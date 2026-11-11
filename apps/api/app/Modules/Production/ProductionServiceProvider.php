@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Production;
 
+use App\Modules\Production\Console\OverdueCommand;
 use App\Modules\Production\Listeners\CreateAutoRequest;
 use App\Shared\Events\StockOut;
 use Illuminate\Support\Facades\Event;
@@ -24,5 +25,9 @@ final class ProductionServiceProvider extends ServiceProvider
         Event::listen(StockOut::class, [CreateAutoRequest::class, 'handle']);
 
         $this->loadRoutesFrom(base_path('routes/modules/production.php'));
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([OverdueCommand::class]);
+        }
     }
 }

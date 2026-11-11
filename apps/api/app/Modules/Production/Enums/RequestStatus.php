@@ -13,6 +13,8 @@ use App\Shared\StateMachine\StateMachine;
  *
  * - requested: someone asked; nobody has taken it (it may be assigned to a baker).
  * - accepted: a baker took it. Still cancellable, nothing has been started.
+ *   A planner can take it back to requested and name another baker (AssignRequest, Ramin 2026-11-11: an accepted request
+ *   nobody starts must not wait forever).
  * - in_progress: the batch is started. It is finished or sent back, never cancelled (production.request.in_progress).
  * - pending_confirmation: the batch is finished at a station that needs an overseer; nothing is in the ledger yet.
  *   An overseer's send back returns it to in_progress.
@@ -54,7 +56,7 @@ enum RequestStatus: string
     {
         return [
             self::Requested->value => [self::Accepted, self::Cancelled],
-            self::Accepted->value => [self::InProgress, self::Cancelled],
+            self::Accepted->value => [self::InProgress, self::Requested, self::Cancelled],
             self::InProgress->value => [self::PendingConfirmation, self::Done],
             self::PendingConfirmation->value => [self::Done, self::InProgress],
             self::Done->value => [],

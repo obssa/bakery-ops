@@ -95,6 +95,13 @@ return [
             'gate' => null,
             'deep_link' => '/production?request={request_id}',
         ],
+        'production_overdue' => [
+            'severity' => 'warning',
+            'channels' => ['in_app', 'push'],
+            'inbox_key' => 'production_overdue:{request_id}',
+            'gate' => 'production_overdue:{request_id}',
+            'deep_link' => '/production?request={request_id}',
+        ],
         'batch_pending_confirmation' => [
             'severity' => 'warning',
             'channels' => ['in_app', 'push', 'telegram'],

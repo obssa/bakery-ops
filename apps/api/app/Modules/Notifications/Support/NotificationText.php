@@ -63,6 +63,7 @@ final class NotificationText
             ],
             'variance_decided' => ['text.variance_decided.'.($this->str($type, $payload, 'decision') === 'rejected' ? 'rejected' : 'approved'), 'body'],
             'transfer_decided' => ['text.transfer_decided.'.($this->str($type, $payload, 'status') === 'rejected' ? 'rejected' : 'confirmed'), 'body'],
+            'production_overdue' => ['text.production_overdue.'.(($payload['late'] ?? false) === true ? 'late' : 'waiting'), 'body'],
             'chain_broken' => ['text.chain_broken', 'body'],
             'weekly_summary' => ['text.weekly_summary', is_string($payload['pdf_url_en'] ?? null) ? 'body' : 'body_no_link'],
             'print_failed' => ['text.print_failed.'.(($payload['order_number'] ?? null) === null ? 'unnumbered' : 'numbered'), 'body'],
@@ -115,6 +116,13 @@ final class NotificationText
                 'qty' => $this->quantity($this->str($type, $p, 'qty')),
                 'unit' => $this->str($type, $p, 'unit'),
                 'station' => $this->str($type, $p, $in('station_name')),
+            ],
+            'production_overdue' => [
+                'item' => $this->str($type, $p, $in('product_name')),
+                'qty' => $this->quantity($this->str($type, $p, 'qty')),
+                'unit' => $this->str($type, $p, 'unit'),
+                'station' => $this->str($type, $p, $in('station_name')),
+                'waited' => $this->waited($this->int($type, $p, 'waited_minutes'), $locale),
             ],
             'batch_pending_confirmation', 'batch_done' => [
                 'item' => $this->str($type, $p, $in('product_name')),
@@ -360,6 +368,18 @@ final class NotificationText
         $key = $this->str($type, $p, 'failure_key');
 
         return $this->template('print_failure.'.(in_array($key, self::PRINT_FAILURES, true) ? $key : 'unknown'), $locale);
+    }
+
+    /** How long a request has waited, "2 h 10 min" / "2 ሰዓት 10 ደቂቃ", from whole minutes (text.production_overdue.hours|minutes). */
+    private function waited(int $minutes, string $locale): string
+    {
+        $minutes = max(0, $minutes);
+        $hours = intdiv($minutes, 60);
+        $rest = $minutes % 60;
+
+        return $hours > 0
+            ? $this->fill($this->template('text.production_overdue.hours', $locale), ['h' => (string) $hours, 'm' => (string) $rest])
+            : $this->fill($this->template('text.production_overdue.minutes', $locale), ['m' => (string) $rest]);
     }
 
     private function template(string $key, string $locale): string

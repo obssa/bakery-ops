@@ -18,8 +18,10 @@ pest()->group('module:production', 'feature');
 /*
  * POST /production/requests/{request}/assign (step 2.7b; phase-2 plan section 4): a planner (production.plan) names the
  * baker who makes a request. The baker must be an active person of this branch who holds production.fulfil at the
- * request's station. Only a request nobody has taken yet can be assigned (to someone else again as often as needed); the
- * status does not change. Assigning the person already named is a repeat: 200 and nothing written. Emits ProductionAssigned.
+ * request's station. A request nobody has taken yet can be assigned (to someone else again as often as needed); the status
+ * does not change. An accepted request nobody started can be taken back and given to someone else (Ramin 2026-11-11): it is
+ * requested again with the new baker named. Assigning the person already named is a repeat: 200 and nothing written. Emits
+ * ProductionAssigned.
  */
 
 beforeEach(function () {
@@ -105,8 +107,47 @@ it('validates the body', function () {
     }
 });
 
-it('refuses a request somebody has already taken or that is past that, naming the status', function () {
-    foreach ([RequestStatus::Accepted, RequestStatus::InProgress, RequestStatus::PendingConfirmation, RequestStatus::Done, RequestStatus::Cancelled] as $status) {
+it('takes an accepted request back from its baker: requested again with the new baker named, audited as a reassign, announced', function () {
+    Event::fake([ProductionAssigned::class]);
+    $request = $this->f->request(['assigned_to_user_id' => $this->f->baker->id], RequestStatus::Accepted);
+
+    ($this->assign)($request, $this->f->baker2->id)->assertOk()
+        ->assertJsonPath('status', 'requested')
+        ->assertJsonPath('assigned_to.id', $this->f->baker2->id)
+        ->assertJsonPath('version', 3);
+    $row = $request->fresh();
+    expect($row->status)->toBe(RequestStatus::Requested)
+        ->and($row->assigned_to_user_id)->toBe($this->f->baker2->id)
+        ->and($row->accepted_at)->toBeNull()
+        ->and(AuditLog::query()->where('action', 'production_request.reassign')->where('subject_id', $request->id)->where('actor_id', $this->f->manager->id)->count())->toBe(1);
+    Event::assertDispatchedTimes(ProductionAssigned::class, 1);
+    expect(Event::dispatched(ProductionAssigned::class)->first()[0]->payload())->toMatchArray(['assigned_to_user_id' => $this->f->baker2->id, 'version' => 3]);
+
+    // the new baker accepts it as usual
+    loginAs($this->f->baker2);
+    $this->withHeaders(idempotencyKey())->postJson("/api/v1/production/requests/{$request->id}/accept")->assertOk()->assertJsonPath('status', 'accepted');
+});
+
+it('answers naming the baker who accepted it as a repeat: still accepted, nothing written', function () {
+    $request = $this->f->request(['assigned_to_user_id' => $this->f->baker->id], RequestStatus::Accepted);
+    $audits = AuditLog::query()->count();
+
+    ($this->assign)($request, $this->f->baker->id)->assertOk()->assertJsonPath('status', 'accepted')->assertJsonPath('version', 2);
+    expect(AuditLog::query()->count())->toBe($audits)->and($request->fresh()->status)->toBe(RequestStatus::Accepted);
+});
+
+it('replays a reassign with the same key: one audit row, one change', function () {
+    $request = $this->f->request(['assigned_to_user_id' => $this->f->baker->id], RequestStatus::Accepted);
+    $key = idempotencyKey();
+    $this->withHeaders($key)->postJson("/api/v1/production/requests/{$request->id}/assign", ['user_id' => $this->f->baker2->id])->assertOk();
+    $this->withHeaders($key)->postJson("/api/v1/production/requests/{$request->id}/assign", ['user_id' => $this->f->baker2->id])->assertOk()->assertJsonPath('version', 3);
+
+    expect(AuditLog::query()->where('action', 'production_request.reassign')->where('subject_id', $request->id)->count())->toBe(1)
+        ->and($request->fresh()->version)->toBe(3);
+});
+
+it('refuses a request that is started or past that, naming the status', function () {
+    foreach ([RequestStatus::InProgress, RequestStatus::PendingConfirmation, RequestStatus::Done, RequestStatus::Cancelled] as $status) {
         $request = $this->f->request([], $status);
 
         ($this->assign)($request, $this->f->baker2->id)->assertStatus(409)

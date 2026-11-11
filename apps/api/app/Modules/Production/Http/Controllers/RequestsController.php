@@ -15,6 +15,7 @@ use App\Modules\Production\Http\Requests\CancelProductionRequest;
 use App\Modules\Production\Http\Requests\ListProductionRequests;
 use App\Modules\Production\Http\Requests\StoreProductionRequest;
 use App\Modules\Production\Models\ProductionRequest;
+use App\Modules\Production\Support\RequestAccess;
 use App\Modules\Production\Support\RequestBoard;
 use App\Modules\Production\Support\RequestCard;
 use App\Modules\Production\Support\RequestPresenter;
@@ -67,9 +68,9 @@ final class RequestsController
         ]);
     }
 
-    public function show(Request $input, ProductionRequest $request, RequestCard $card): JsonResponse
+    public function show(Request $input, ProductionRequest $request, RequestCard $card, RequestAccess $access): JsonResponse
     {
-        return response()->json($this->presenter->one($request) + $card->build($request));
+        return response()->json($this->presenter->one($request) + $card->build($request) + ['bakers' => $access->bakersFor($request)]);
     }
 
     public function store(StoreProductionRequest $input, CreateRequest $create): JsonResponse

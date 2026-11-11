@@ -214,3 +214,22 @@ it('scales a finished batch to produced plus waste, which is what Confirm will c
         ->assertJsonPath('recipe.lines.0.needed', '600.0000')
         ->assertJsonPath('recipe.lines.1.needed', '300.0000');
 });
+
+it('lists the people a planner may give a request to while nobody has started it, and nothing for anyone else (Ramin 2026-11-11)', function () {
+    $request = $this->f->request();
+
+    ($this->card)($request)->assertOk()->assertJsonPath('bakers', null);
+
+    loginAs($this->f->manager);
+    $bakers = collect(($this->card)($request)->assertOk()->json('bakers'));
+    expect($bakers->pluck('id')->all())->toContain($this->f->baker->id)
+        ->and($bakers->pluck('id')->all())->toContain($this->f->baker2->id)
+        ->and($bakers->pluck('id')->all())->not->toContain($this->f->breadBaker->id, 'the bread baker does not work at the cake room')
+        ->and($bakers->pluck('id')->all())->not->toContain($this->f->cashier->id)
+        ->and($bakers->first())->toHaveKeys(['id', 'name']);
+
+    $accepted = $this->f->request(['assigned_to_user_id' => $this->f->baker->id], RequestStatus::Accepted);
+    expect(($this->card)($accepted)->json('bakers'))->toBeArray();
+    $started = $this->f->request([], RequestStatus::InProgress);
+    ($this->card)($started)->assertOk()->assertJsonPath('bakers', null);
+});

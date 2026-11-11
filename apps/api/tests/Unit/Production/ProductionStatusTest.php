@@ -16,7 +16,7 @@ use App\Shared\StateMachine\IllegalTransition;
 
 it('moves a request along the plan list and nowhere else', function () {
     expect(RequestStatus::Requested->nextStates())->toBe([RequestStatus::Accepted, RequestStatus::Cancelled])
-        ->and(RequestStatus::Accepted->nextStates())->toBe([RequestStatus::InProgress, RequestStatus::Cancelled])
+        ->and(RequestStatus::Accepted->nextStates())->toBe([RequestStatus::InProgress, RequestStatus::Requested, RequestStatus::Cancelled])
         ->and(RequestStatus::InProgress->nextStates())->toBe([RequestStatus::PendingConfirmation, RequestStatus::Done])
         ->and(RequestStatus::PendingConfirmation->nextStates())->toBe([RequestStatus::Done, RequestStatus::InProgress])
         ->and(RequestStatus::Done->isTerminal())->toBeTrue()

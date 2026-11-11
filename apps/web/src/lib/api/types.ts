@@ -1008,6 +1008,8 @@ export interface ProductionCard extends ProductionRequest {
   } | null;
   consume_location: CardPlace | null;
   output_location: CardPlace | null;
+  /** for a planner while nobody has started it: the people it can be given to (AssignRequest); null otherwise (Ramin 2026-11-11) */
+  bakers?: { id: number; name: string }[] | null;
 }
 
 /** The answer of Done, Confirm and Send back: the batch plus the request it belongs to in short. */

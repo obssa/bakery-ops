@@ -20,7 +20,7 @@ use App\Shared\StateMachine\StateMachine;
 $machines = [
     RequestStatus::class => [
         'requested' => ['accepted', 'cancelled'],
-        'accepted' => ['in_progress', 'cancelled'],
+        'accepted' => ['in_progress', 'requested', 'cancelled'],
         'in_progress' => ['pending_confirmation', 'done'],
         'pending_confirmation' => ['done', 'in_progress'],
         'done' => [],

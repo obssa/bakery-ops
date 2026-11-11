@@ -1,16 +1,36 @@
 "use client";
 
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  pointerWithin,
+  rectIntersection,
+  TouchSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragStartEvent,
+  type KeyboardCoordinateGetter,
+} from "@dnd-kit/core";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CircleCheckBig, ClipboardCheck, ClipboardList, Flame, Plus, Store, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCategories, useItems } from "@/lib/api/hooks";
+import { uuid } from "@/lib/api/idempotency";
+import { acceptRequest, confirmBatch, submitStartBatch } from "@/lib/api/production";
 import type { Collection, Locale, ProductionRequest, Station } from "@/lib/api/types";
+import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { boardColumns, COLUMNS, createProductionFeed, ownStationId, type Column } from "@/lib/live/production";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
-import { boardSummary, type BoardSummary } from "@/lib/productionBoard";
+import { boardSummary, dropMove, type BoardSummary, type DropRefusal, type DropVerdict } from "@/lib/productionBoard";
 import { useProductImages } from "@/lib/productImages";
 import { authed, can, useSession } from "@/lib/session";
 import { useStationHeader } from "@/lib/topBar";
@@ -41,6 +61,15 @@ import type { ProductionTwins } from "./twins";
 // the urgent requests waiting and the batches left in the oven over a day), the station filter as a segmented control when there are five
 // stations or fewer, each column under a tinted head with its icon, its step and a line saying what happens there, and an empty column
 // saying what lands in it. On a phone (under md) the columns are tabs with their counts, one column at a time, full width.
+//
+// phase-6/board-drag (Ramin 2026-11-11: "two menus on top of each other"; "can we move a card from one state to the other and its status
+// updates by itself"): the summary strip is gone, each step is named once, in its column head, which also carries what needs a look (the
+// requests waiting too long or urgent, the batches left in the oven over a day). A card the viewer can move is dragged to the next column
+// (mouse, a long press on a tablet, or its grip and the arrow keys; on a phone onto the column's tab) and the drop makes the same write as
+// the card's button: Requested -> In progress accepts and starts it, In progress -> Pending confirmation (or Done today) opens the Done form,
+// Pending confirmation -> Done today confirms it, Pending confirmation -> In progress opens Send back. While a card is dragged, a column it
+// cannot go to is dimmed and says why (lib/productionBoard.ts dropMove); the card moves at once and goes back with the reason if the
+// server refuses. The board reads itself again after every move, so the status updates by itself.
 
 const PRODUCTION_KINDS = ["cake_room", "bakery"] as const;
 
@@ -68,7 +97,7 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   const refresh = useCallback(() => feed.refresh(), [feed]);
 
   const [stationId, setStationId] = useState<number | "all">(() => ownStationId(me) ?? "all");
-  const [opened, setOpened] = useState<{ id: number; focus?: "finish" } | null>(() => {
+  const [opened, setOpened] = useState<{ id: number; focus?: "finish" | "send_back" } | null>(() => {
     const requested = Number(params.get("request"));
     return Number.isInteger(requested) && requested > 0 ? { id: requested } : null;
   });
@@ -114,6 +143,103 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   const openedRequest = opened !== null ? snapshot?.state.requests.find((request) => request.id === opened.id) : undefined;
   const open = useCallback((request: ProductionRequest, focus?: "finish") => setOpened((current) => (current?.id === request.id && !focus ? null : { id: request.id, focus })), []);
   const close = useCallback(() => setOpened(null), []);
+
+  // ---- drag and drop (phase-6/board-drag) ----
+  const [dragged, setDragged] = useState<ProductionRequest | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  // a card moved before the server answered: shown in its new column until the board's next read carries a newer version of it
+  const [moved, setMoved] = useState<Map<number, { column: Column; version: number }>>(() => new Map());
+  useEffect(() => {
+    const requests = snapshot?.state.requests;
+    if (!requests || moved.size === 0) return;
+    const next = new Map(moved);
+    for (const [id, move] of moved) {
+      const now = requests.find((request) => request.id === id);
+      if (!now || now.version !== move.version) next.delete(id);
+    }
+    if (next.size !== moved.size) setMoved(next);
+  }, [snapshot, moved]);
+  const shown = useMemo(() => (columns ? withMoves(columns, moved) : null), [columns, moved]);
+  const movable = useCallback((request: ProductionRequest) => COLUMNS.some((column) => (dropMove(me, request, column) as { move?: string } | null)?.move !== undefined), [me]);
+  const verdicts = useMemo(() => (dragged ? Object.fromEntries(COLUMNS.map((column) => [column, dropMove(me, dragged, column)])) as Record<Column, DropVerdict> : null), [dragged, me]);
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: columnJump }),
+  );
+  const nameOf = useCallback((request: ProductionRequest) => (locale === "am" ? request.product.name_am : request.product.name_en), [locale]);
+  const requestOf = useCallback((id: unknown) => snapshot?.state.requests.find((request) => `request-${request.id}` === id) ?? null, [snapshot]);
+  const columnName = useCallback((id: unknown) => {
+    const column = targetColumn(id);
+    return column ? t(`col_${column}` as "col_requested") : "";
+  }, [t]);
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => {
+      const request = requestOf(active.id);
+      return request ? t("drag_picked", { name: nameOf(request) }) : undefined;
+    },
+    onDragOver: ({ active, over }) => {
+      const request = requestOf(active.id);
+      return request && over ? t("drag_over", { name: nameOf(request), column: columnName(over.id) }) : undefined;
+    },
+    onDragEnd: ({ active, over }) => {
+      const request = requestOf(active.id);
+      return request && over ? t("drag_dropped", { name: nameOf(request), column: columnName(over.id) }) : undefined;
+    },
+    onDragCancel: ({ active }) => {
+      const request = requestOf(active.id);
+      return request ? t("drag_cancelled", { name: nameOf(request) }) : undefined;
+    },
+  };
+
+  function onDragStart(event: DragStartEvent) {
+    setMoveError(null);
+    setDragged(requestOf(event.active.id));
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    const request = dragged;
+    setDragged(null);
+    const target = event.over ? targetColumn(event.over.id) : null;
+    if (!request || !target) return;
+    const verdict = dropMove(me, request, target);
+    if (!verdict) return;
+    if ("refused" in verdict) {
+      setMoveError(refusalText(verdict.refused));
+      return;
+    }
+    void makeMove(request, verdict.move, target);
+  }
+
+  function refusalText(refusal: DropRefusal): string {
+    return "name" in refusal ? t(refusal.reason, { name: refusal.name }) : t(refusal.reason);
+  }
+
+  async function makeMove(request: ProductionRequest, move: "accept_start" | "start" | "finish" | "confirm" | "send_back", target: Column) {
+    // the two moves that need words open the request card on their form; the card moves when the form is sent
+    if (move === "finish") return open(request, "finish");
+    if (move === "send_back") return setOpened({ id: request.id, focus: "send_back" });
+    setMoved((current) => new Map(current).set(request.id, { column: target, version: request.version }));
+    try {
+      if (move === "accept_start") {
+        await acceptRequest(request.id, uuid());
+        await submitStartBatch(request.id, uuid(), uuid());
+      } else if (move === "start") {
+        await submitStartBatch(request.id, uuid(), uuid());
+      } else if (request.batch) {
+        await confirmBatch(request.batch.id, uuid());
+      }
+    } catch (failure) {
+      setMoved((current) => {
+        const next = new Map(current);
+        next.delete(request.id);
+        return next;
+      });
+      setMoveError(t("move_failed", { name: nameOf(request), reason: errorText.message(failure) }));
+    } finally {
+      refresh();
+    }
+  }
 
   // the station top bar names the board (the Production board's header): its name, its Amharic name on the English page, and the station
   // whose shift the strip follows with that shift ("Bakery oven · Morning shift")
@@ -207,25 +333,54 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
           <p role="status" className={total === 0 ? "text-[15px] text-neutral-600" : "sr-only"}>
             {total === 0 ? t("empty") : ""}
           </p>
-          {summary ? <SummaryStrip summary={summary} /> : null}
-          {summary ? <ColumnTabs summary={summary} tab={tab} onTab={setTab} /> : null}
-          <div role="group" aria-label={t("board")} className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {COLUMNS.map((column) => (
-              <BoardColumn key={column} column={column} twin={twins?.columns[column]} count={columns[column].length} phoneHidden={column !== tab}>
-                {columns[column].map((request) => (
-                  <RequestCard
-                    key={request.id}
-                    request={request}
-                    selected={request.id === opened?.id}
-                    image={images.get(request.product.id) ?? null}
-                    category={categoryOf.get(request.product.id) ?? null}
-                    onOpen={open}
-                    onChanged={refresh}
-                  />
-                ))}
-              </BoardColumn>
-            ))}
-          </div>
+          {moveError ? (
+            <Alert>
+              <div className="flex items-start justify-between gap-3">
+                <span>{moveError}</span>
+                <button type="button" onClick={() => setMoveError(null)} className={`shrink-0 rounded-md text-sm font-semibold underline ${focusRing}`}>
+                  {t("close")}
+                </button>
+              </div>
+            </Alert>
+          ) : null}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collision}
+            accessibility={{ announcements, screenReaderInstructions: { draggable: t("drag_hint") } }}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onDragCancel={() => setDragged(null)}
+          >
+            {summary ? <ColumnTabs summary={summary} tab={tab} onTab={setTab} verdicts={verdicts} /> : null}
+            <div role="group" aria-label={t("board")} className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {COLUMNS.map((column) => (
+                <BoardColumn
+                  key={column}
+                  column={column}
+                  twin={twins?.columns[column]}
+                  count={(shown ?? columns)[column].length}
+                  phoneHidden={column !== tab}
+                  attention={summary ? attentionOf(column, summary) : null}
+                  verdict={verdicts?.[column] ?? null}
+                >
+                  {(shown ?? columns)[column].map((request) => (
+                    <RequestCard
+                      key={request.id}
+                      request={request}
+                      selected={request.id === opened?.id}
+                      image={images.get(request.product.id) ?? null}
+                      category={categoryOf.get(request.product.id) ?? null}
+                      onOpen={open}
+                      onChanged={refresh}
+                      draggable={movable(request)}
+                      lifted={dragged?.id === request.id}
+                    />
+                  ))}
+                </BoardColumn>
+              ))}
+            </div>
+            <DragOverlay dropAnimation={null}>{dragged ? <CardLift request={dragged} locale={locale} /> : null}</DragOverlay>
+          </DndContext>
         </>
       )}
 
@@ -286,77 +441,100 @@ function CardPanel({ onClose, children }: { onClose: () => void; children: React
   );
 }
 
-/** Does the column hold something that needs a look: an urgent request waiting, or a batch left in the oven over a day? */
-function needsLook(column: Column, summary: BoardSummary): boolean {
-  return (column === "requested" && summary.urgent > 0) || (column === "in_progress" && summary.stale > 0);
+/** What a column head flags in amber: the requests waiting too long (or the urgent ones), the batches left in the oven over a day. */
+function attentionOf(column: Column, summary: BoardSummary): { key: "sum_waiting" | "sum_urgent" | "sum_stale"; count: number } | null {
+  if (column === "requested" && summary.waiting > 0) return { key: "sum_waiting", count: summary.waiting };
+  if (column === "requested" && summary.urgent > 0) return { key: "sum_urgent", count: summary.urgent };
+  if (column === "in_progress" && summary.stale > 0) return { key: "sum_stale", count: summary.stale };
+  return null;
 }
 
+/** The board's columns with the cards moved before the server answered put in their new column. */
+function withMoves(columns: Record<Column, ProductionRequest[]>, moved: Map<number, { column: Column; version: number }>): Record<Column, ProductionRequest[]> {
+  if (moved.size === 0) return columns;
+  const out: Record<Column, ProductionRequest[]> = { requested: [], in_progress: [], pending_confirmation: [], done_today: [] };
+  for (const column of COLUMNS) {
+    for (const request of columns[column]) out[moved.get(request.id)?.column ?? column].push(request);
+  }
+  return out;
+}
+
+/** The column a droppable stands for: a column itself ("requested") or its tab on a phone ("tab:requested"). */
+function targetColumn(id: unknown): Column | null {
+  const name = String(id).replace(/^tab:/, "");
+  return (COLUMNS as readonly string[]).includes(name) ? (name as Column) : null;
+}
+
+/** Drops onto what is under the pointer, else what the dragged card overlaps most (a keyboard move). */
+const collision: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  return within.length > 0 ? within : rectIntersection(args);
+};
+
 /**
- * The board at a glance, over the columns from md up: one tile per column with its icon, its count and a line, the urgent requests and the
- * batches left in the oven over a day in amber with a warning sign. A phone shows the counts on its column tabs instead.
+ * The keyboard moves a lifted card a whole column at a time: the left and right arrows jump to the centre of the next column (or tab, on a
+ * phone) on that side, so a drop needs two key presses, not twenty.
  */
-function SummaryStrip({ summary }: { summary: BoardSummary }) {
-  const t = useTranslations("production");
+const columnJump: KeyboardCoordinateGetter = (event, { currentCoordinates, context }) => {
+  if (event.code !== "ArrowRight" && event.code !== "ArrowLeft") return undefined;
+  event.preventDefault();
+  const rect = context.collisionRect;
+  if (!rect) return undefined;
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const targets: { x: number; y: number }[] = [];
+  for (const [, box] of context.droppableRects) {
+    if (box.width > 0 && box.height > 0) targets.push({ x: box.left + box.width / 2, y: box.top + Math.min(box.height / 2, 80) });
+  }
+  targets.sort((a, b) => a.x - b.x);
+  const next = event.code === "ArrowRight" ? targets.find((target) => target.x > cx + 1) : [...targets].reverse().find((target) => target.x < cx - 1);
+  return next ? { x: currentCoordinates.x + (next.x - cx), y: currentCoordinates.y + (next.y - cy) } : currentCoordinates;
+};
+
+/** What follows the pointer while a card is dragged: its name and quantity, raised. */
+function CardLift({ request, locale }: { request: ProductionRequest; locale: Locale }) {
   return (
-    <ul aria-label={t("summary")} className="hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
-      {COLUMNS.map((column) => {
-        const look = COLUMN_LOOK[column];
-        const Icon = look.icon;
-        const warn = needsLook(column, summary);
-        const note =
-          column === "requested" && warn
-            ? t("sum_urgent", { count: summary.urgent })
-            : column === "in_progress" && warn
-              ? t("sum_stale", { count: summary.stale })
-              : t(`sum_${column}` as "sum_requested");
-        return (
-          <li key={column} className="flex items-center gap-3.5 rounded-2xl border border-neutral-200 bg-white px-4 py-3.5">
-            <span aria-hidden="true" className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl border ${look.head}`}>
-              <Icon className={`size-[22px] ${look.ink}`} strokeWidth={ICON_STROKE} />
-            </span>
-            <span className="flex min-w-0 flex-col">
-              <span className="flex items-baseline gap-2">
-                <span className="text-[26px] font-bold leading-none tabular-nums text-neutral-900">{summary.counts[column]}</span>
-                <span className="truncate text-[15px] font-semibold text-neutral-900">{t(`col_${column}` as "col_requested")}</span>
-              </span>
-              <span className={`mt-1 flex items-center gap-1 text-[13px] ${warn ? "font-semibold text-amber-800" : "text-neutral-600"}`}>
-                {warn ? <AlertTriangle className="size-3.5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" /> : null}
-                <span className="truncate">{note}</span>
-              </span>
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex w-72 max-w-[80vw] cursor-grabbing items-center justify-between gap-3 rounded-2xl border border-ink-900 bg-white px-4 py-3 shadow-float">
+      <span className="truncate text-base font-semibold text-neutral-900">{locale === "am" ? request.product.name_am : request.product.name_en}</span>
+      <span className="shrink-0 text-xl font-bold tabular-nums text-neutral-900">{trimDecimal(request.requested_qty)}</span>
+    </div>
   );
 }
 
 /** The columns as tabs on a phone (under md): four equal tabs, each its short name over its count; the chosen one is charcoal. */
-function ColumnTabs({ summary, tab, onTab }: { summary: BoardSummary; tab: Column; onTab: (column: Column) => void }) {
+function ColumnTabs({ summary, tab, onTab, verdicts }: { summary: BoardSummary; tab: Column; onTab: (column: Column) => void; verdicts: Record<Column, DropVerdict> | null }) {
   const t = useTranslations("production");
   return (
     <div role="tablist" aria-label={t("tabs")} className="grid grid-cols-4 gap-1 rounded-2xl border border-neutral-200 bg-white p-1 md:hidden">
-      {COLUMNS.map((column) => {
-        const chosen = column === tab;
-        const warn = needsLook(column, summary);
-        return (
-          <button
-            key={column}
-            type="button"
-            role="tab"
-            aria-selected={chosen}
-            onClick={() => onTab(column)}
-            className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 motion-safe:transition-colors motion-safe:duration-150 ${chosen ? "bg-ink-900 text-white" : "text-neutral-700 hover:bg-neutral-100"} ${focusRing}`}
-          >
-            <span className="flex items-center gap-1 text-lg font-bold leading-none tabular-nums">
-              {summary.counts[column]}
-              {warn ? <AlertTriangle className={`size-3.5 ${chosen ? "text-amber-300" : "text-amber-700"}`} strokeWidth={ICON_STROKE} aria-hidden="true" /> : null}
-            </span>
-            <span className="max-w-full truncate text-xs font-semibold">{t(`tab_${column}` as "tab_requested")}</span>
-          </button>
-        );
-      })}
+      {COLUMNS.map((column) => (
+        <ColumnTab key={column} column={column} chosen={column === tab} summary={summary} onTab={onTab} verdict={verdicts?.[column] ?? null} />
+      ))}
     </div>
+  );
+}
+
+/** One tab; while a card is dragged it is also where the card is dropped on a phone (dimmed when the card cannot go there). */
+function ColumnTab({ column, chosen, summary, onTab, verdict }: { column: Column; chosen: boolean; summary: BoardSummary; onTab: (column: Column) => void; verdict: DropVerdict }) {
+  const t = useTranslations("production");
+  const { setNodeRef, isOver } = useDroppable({ id: `tab:${column}` });
+  const warn = attentionOf(column, summary) !== null;
+  const ok = verdict !== null && "move" in verdict;
+  const refused = verdict !== null && "refused" in verdict;
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      role="tab"
+      aria-selected={chosen}
+      onClick={() => onTab(column)}
+      className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 motion-safe:transition-colors motion-safe:duration-150 ${chosen ? "bg-ink-900 text-white" : "text-neutral-700 hover:bg-neutral-100"} ${ok ? "outline-2 outline-dashed outline-ink-900" : ""} ${ok && isOver && !chosen ? "bg-ink-100" : ""} ${refused ? "opacity-40" : ""} ${focusRing}`}
+    >
+      <span className="flex items-center gap-1 text-lg font-bold leading-none tabular-nums">
+        {summary.counts[column]}
+        {warn ? <AlertTriangle className={`size-3.5 ${chosen ? "text-amber-300" : "text-amber-700"}`} strokeWidth={ICON_STROKE} aria-hidden="true" /> : null}
+      </span>
+      <span className="max-w-full truncate text-xs font-semibold">{t(`tab_${column}` as "tab_requested")}</span>
+    </button>
   );
 }
 
@@ -365,14 +543,38 @@ function ColumnTabs({ summary, tab, onTab }: { summary: BoardSummary; tab: Colum
  * it on the English page) with its "?" (who acts there and what moves a card on, Ramin 2026-11-11), the count and a line saying what
  * happens there; then its cards, or an empty state saying what lands in it. On a phone only the chosen tab's column shows.
  */
-function BoardColumn({ column, twin, count, phoneHidden, children }: { column: Column; twin?: string; count: number; phoneHidden: boolean; children: ReactNode }) {
+function BoardColumn({
+  column,
+  twin,
+  count,
+  phoneHidden,
+  attention,
+  verdict,
+  children,
+}: {
+  column: Column;
+  twin?: string;
+  count: number;
+  phoneHidden: boolean;
+  attention: { key: "sum_waiting" | "sum_urgent" | "sum_stale"; count: number } | null;
+  /** while a card is dragged: what dropping it here does, or why it cannot come here (null: its own column, or nothing dragged) */
+  verdict: DropVerdict;
+  children: ReactNode;
+}) {
   const t = useTranslations("production");
   const title = t(`col_${column}` as "col_requested");
   const look = COLUMN_LOOK[column];
   const Icon = look.icon;
   const step = column === "done_today" ? t("step_done") : t("step", { n: COLUMNS.indexOf(column) + 1 });
+  const { setNodeRef, isOver } = useDroppable({ id: column });
+  const ok = verdict !== null && "move" in verdict;
+  const refusal = verdict !== null && "refused" in verdict ? verdict.refused : null;
   return (
-    <section aria-label={title} className={`min-w-0 flex-col gap-3 ${phoneHidden ? "hidden md:flex" : "flex"}`}>
+    <section
+      ref={setNodeRef}
+      aria-label={title}
+      className={`min-w-0 flex-col gap-3 rounded-2xl motion-safe:transition-opacity motion-safe:duration-150 ${phoneHidden ? "hidden md:flex" : "flex"} ${ok ? `outline-2 outline-offset-4 outline-dashed ${isOver ? "outline-ink-900" : "outline-ink-300"}` : ""} ${refusal ? "opacity-50" : ""}`}
+    >
       <div className={`flex flex-col gap-2 rounded-2xl border px-4 py-3 ${look.head}`}>
         <div className="flex items-center gap-3">
           <span aria-hidden="true" className={`inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white ${look.ink}`}>
@@ -394,7 +596,17 @@ function BoardColumn({ column, twin, count, phoneHidden, children }: { column: C
           <span className={`inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-white px-2.5 text-[15px] font-bold tabular-nums ${look.count}`}>{count}</span>
         </div>
         <p className="text-[13px] leading-snug text-neutral-700">{t(`help_${column}` as "help_requested")}</p>
+        {attention ? (
+          <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber-100 px-2.5 py-0.5 text-[13px] font-semibold text-amber-900">
+            <AlertTriangle className="size-3.5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />
+            {t(attention.key, { count: attention.count })}
+          </span>
+        ) : null}
       </div>
+      {ok ? (
+        <p className={`rounded-xl border border-dashed px-3 py-2 text-center text-[13px] font-semibold ${isOver ? "border-ink-900 bg-ink-50 text-ink-900" : "border-ink-300 text-neutral-700"}`}>{t("drop_here")}</p>
+      ) : null}
+      {refusal ? <p className="rounded-xl bg-neutral-100 px-3 py-2 text-[13px] font-medium text-neutral-800">{"name" in refusal ? t(refusal.reason, { name: refusal.name }) : t(refusal.reason)}</p> : null}
       {count === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-neutral-300 px-5 py-7 text-center">
           <Icon className="size-7 text-neutral-400" strokeWidth={ICON_STROKE} aria-hidden="true" />

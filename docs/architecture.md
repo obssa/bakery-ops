@@ -539,7 +539,7 @@ daily_item_metrics, daily_channel_totals.
   (reason + manager PIN) from any state before closed.
 - order_line: queued -> accepted -> ready -> served; rejected (reason) from queued/accepted.
 - production_request: requested -> accepted -> in_progress -> pending_confirmation (if
-  station requires overseer) -> done; cancelled.
+  station requires overseer) -> done; cancelled; a planner takes an accepted one nobody started back to requested (ADR 0024).
 - shift_instance: scheduled -> open (opening count confirmed) -> counting -> pending_approval
   (if variances) -> locked. Cannot lock with unresolved variances.
 - payment: recorded -> verified | disputed.

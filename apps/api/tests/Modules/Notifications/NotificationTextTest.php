@@ -43,6 +43,7 @@ function samplePayloads(): array
         'backup_failed' => (new BackupFailed(11, 'backup', 'backup.dump_failed', 30))->payload(),
         'backup_stale' => (new BackupStale(10, 'backup', 'backup.stale', 27))->payload(),
         'drill_failed' => (new DrillFailed(12, 'drill.ledger_mismatch', 3))->payload(),
+        'production_overdue' => NotificationEvents::productionOverdue(1)->payload(),
     ];
 }
 
@@ -172,7 +173,7 @@ it('refuses a type it does not know and a payload that lacks what the text needs
 })->group('module:notifications', 'unit');
 
 it('knows every type of the registry with a severity, channels and keys, and only the types the inbox table accepts', function () {
-    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary', 'order_refunded', 'print_failed', 'backup_failed', 'backup_stale', 'drill_failed'];
+    $accepted = ['stock_low', 'stock_out', 'production_requested', 'production_assigned', 'batch_pending_confirmation', 'batch_done', 'transfer_requested', 'transfer_decided', 'line_ready', 'line_rejected', 'count_submitted', 'variance_decided', 'chain_broken', 'payment_disputed', 'weekly_summary', 'order_refunded', 'print_failed', 'backup_failed', 'backup_stale', 'drill_failed', 'production_overdue'];
 
     foreach (NotificationTypes::all() as $type) {
         expect($accepted)->toContain($type)
@@ -238,4 +239,24 @@ it('registers the production types: informational, their channels, one inbox lin
         ->and(NotificationTypes::gateKey('production_assigned', $given))->toBeNull()
         ->and(NotificationTypes::deepLink('production_requested', $asked))->toBe('/production?request=51')
         ->and(NotificationTypes::deepLink('production_assigned', $given))->toBe('/production?request=51');
+})->group('module:notifications', 'unit');
+
+it('writes a request that waits too long or is late with how long it waited, in hours and minutes, once per request', function () {
+    $text = app(NotificationText::class);
+
+    $waiting = $text->render('production_overdue', NotificationEvents::productionOverdue(1, 51, ['waited' => 130])->payload());
+    expect($waiting->title->en)->toBe('Not started yet: Black forest cake')
+        ->and($waiting->body->en)->toContain('12 pcs of Black forest cake at Cake room has waited 2 h 10 min')
+        ->and($waiting->title->am)->toBe('ገና አልተጀመረም፡ ብላክ ፎረስት ኬክ')
+        ->and($waiting->body->am)->toContain('2 ሰዓት 10 ደቂቃ');
+
+    $late = $text->render('production_overdue', NotificationEvents::productionOverdue(1, 52, ['waited' => 45, 'late' => true])->payload());
+    expect($late->title->en)->toBe('Late: Black forest cake')
+        ->and($late->body->en)->toContain('after 45 min')
+        ->and($late->body->am)->toContain('45 ደቂቃ');
+
+    $payload = NotificationEvents::productionOverdue(1, 51)->payload();
+    expect(NotificationTypes::severity('production_overdue'))->toBe('warning')
+        ->and(NotificationTypes::inboxKey('production_overdue', $payload))->toBe('production_overdue:51')
+        ->and(NotificationTypes::gateKey('production_overdue', $payload))->toBe('production_overdue:51', 'told once per request');
 })->group('module:notifications', 'unit');

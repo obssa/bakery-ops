@@ -29,6 +29,11 @@ export function acceptRequest(id: number, idempotencyKey: string): Promise<Produ
   return authed<ProductionRequest>(`/production/requests/${id}/accept`, { method: "POST", body: {}, idempotencyKey });
 }
 
+/** POST /production/requests/{id}/assign: a planner gives the request to a baker; an accepted one nobody started is taken back for them. */
+export function assignRequest(id: number, userId: number, idempotencyKey: string): Promise<ProductionRequest> {
+  return authed<ProductionRequest>(`/production/requests/${id}/assign`, { method: "POST", body: { user_id: userId }, idempotencyKey });
+}
+
 export function confirmBatch(batchId: number, idempotencyKey: string): Promise<BatchAnswer> {
   return authed<BatchAnswer>(`/production/batches/${batchId}/confirm`, { method: "POST", body: {}, idempotencyKey });
 }

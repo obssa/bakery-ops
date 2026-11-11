@@ -57,3 +57,6 @@ Schedule::command('print:sweep')->everyMinute()->withoutOverlapping(5);
 // hour at a quarter past (BackupStale while the newest good backup is older than 26 hours; Notifications tells every admin once per period).
 Schedule::call(new SchedulerTick)->everyMinute()->name(SchedulerTick::CACHE_KEY);
 Schedule::command('backup:check-stale')->hourlyAt(15)->withoutOverlapping(10);
+
+// production requests nobody has started that wait too long or are past their due time: the planners are told once per request
+Schedule::command('production:overdue')->everyFifteenMinutes()->withoutOverlapping(10);

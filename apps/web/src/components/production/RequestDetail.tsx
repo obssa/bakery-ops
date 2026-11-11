@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
-import { acceptRequest, batchGroup, cancelRequest, confirmBatch, sendBackBatch, submitFinishBatch, submitStartBatch, useProductionCard } from "@/lib/api/production";
+import { acceptRequest, assignRequest, batchGroup, cancelRequest, confirmBatch, sendBackBatch, submitFinishBatch, submitStartBatch, useProductionCard } from "@/lib/api/production";
 import type { CardLine, IngredientShort, Locale, ProductImageView, ProductionRequest, RequestStatus } from "@/lib/api/types";
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
@@ -17,7 +17,7 @@ import { useDateFormat } from "@/lib/useDates";
 import { ICON_STROKE } from "../icons";
 import { RequestTransferSheet } from "../inventory/RequestTransferSheet";
 import { tableNum } from "../styles";
-import { Alert, Badge, Button, Field, IconButton, ProductImage, Table, TextInput, type Tone } from "../ui";
+import { Alert, Badge, Button, Field, IconButton, ProductImage, Select, Table, TextInput, type Tone } from "../ui";
 import { formatWhen } from "./RequestCard";
 import { useRequestRun } from "./useRequestRun";
 
@@ -120,8 +120,9 @@ export function RequestDetail({
   summary: ProductionRequest;
   image: ProductImageView | null;
   category: string | null;
-  /** `finish`: opened from the card's "Finish · count made", so the Done form takes the focus */
-  focus?: "finish";
+  /** `finish`: opened from the card's "Finish · count made" (or a card dragged to Pending confirmation), so the Done form takes the
+   * focus; `send_back`: a card dragged back to In progress, so the Send back form is open */
+  focus?: "finish" | "send_back";
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -147,7 +148,8 @@ export function RequestDetail({
   const [produced, setProduced] = useState(() => trimDecimal(batch?.planned_qty ?? request.requested_qty));
   const [waste, setWaste] = useState("0");
   const [invalid, setInvalid] = useState<"produced" | "waste" | "empty" | null>(null);
-  const [form, setForm] = useState<"send_back" | "cancel" | null>(null);
+  const [form, setForm] = useState<"send_back" | "cancel" | null>(() => (focus === "send_back" ? "send_back" : null));
+  const [giveTo, setGiveTo] = useState("");
   const [note, setNote] = useState("");
   const [noteMissing, setNoteMissing] = useState(false);
   const [reason, setReason] = useState("");
@@ -197,6 +199,9 @@ export function RequestDetail({
   const canFinish = status === "in_progress" && fulfils && mine && batch?.status === "started";
   const signOff = status === "pending_confirmation" && batch !== null && canSignOff(me, request.station.id);
   const cancellable = (status === "requested" || status === "accepted") && canCancel(me, request);
+  // a planner gives a request nobody has started to a baker, or takes it back from the one who accepted it (Ramin 2026-11-11)
+  const bakers = (status === "requested" || status === "accepted") && can(me, "production.plan") ? (card.data?.bakers ?? null) : null;
+  const others = (bakers ?? []).filter((baker) => baker.id !== request.assigned_to?.id);
   const recipe = card.data?.recipe ?? null;
   const consume = card.data?.consume_location ?? null;
   const output = card.data?.output_location ?? null;
@@ -355,6 +360,32 @@ export function RequestDetail({
               {t("keep")}
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {others.length > 0 ? (
+        <div className="space-y-3 rounded-2xl border border-neutral-200 p-4">
+          <Field label={status === "accepted" && request.assigned_to ? t("give_back_label", { name: request.assigned_to.name }) : t("give_label")} hint={status === "accepted" ? t("give_back_hint") : t("give_hint")}>
+            {(props) => (
+              <Select {...props} controlSize="lg" value={giveTo} onChange={(event) => setGiveTo(event.target.value)}>
+                <option value="">{t("give_choose")}</option>
+                {others.map((baker) => (
+                  <option key={baker.id} value={baker.id}>
+                    {baker.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            disabled={blocked || giveTo === ""}
+            onClick={() => void run("assign", giveTo, (key) => assignRequest(request.id, Number(giveTo), key)).then(() => setGiveTo(""))}
+          >
+            {busy === "assign" ? t("working") : t("give_submit")}
+          </Button>
         </div>
       ) : null}
 

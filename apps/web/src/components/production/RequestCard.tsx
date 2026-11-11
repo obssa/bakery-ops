@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { AlertTriangle, ClipboardCheck, Timer } from "lucide-react";
+import { useDraggable } from "@dnd-kit/core";
+import { AlertTriangle, ArrowRight, ClipboardCheck, Clock, GripVertical, Hourglass, Timer } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { uuid } from "@/lib/api/idempotency";
 import { acceptRequest, batchGroup, confirmBatch, submitStartBatch } from "@/lib/api/production";
@@ -11,7 +12,7 @@ import { trimDecimal, compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { cardMove, cardQty, columnOf, type CardMove } from "@/lib/live/production";
 import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
-import { ovenAge } from "@/lib/productionBoard";
+import { nextMover, ovenAge, requestWait } from "@/lib/productionBoard";
 import { useSession } from "@/lib/session";
 import { useClock, useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
@@ -29,6 +30,11 @@ import { useRequestRun } from "./useRequestRun";
 // "Made 78 of 80 asked" while it waits for its overseer, or who confirmed it and when. Last, the column's one action, full width in
 // charcoal, for the person whose move it is. The name opens the request card (RequestDetail) with the recipe and every other move. The
 // words carry the status; colour only adds to them.
+//
+// phase-6/board-drag (Ramin 2026-11-11): a request nobody has started shows how long it has waited, an amber "Waiting too long" past two
+// hours (half an hour when urgent) and a red "Late by" with a clock once its due time has passed; a card the viewer has no button on says
+// who moves it next; and a card the viewer can move to another column is dragged there (by mouse, by a long press on a tablet, or from its
+// grip with the keyboard). The board decides what a drop does (ProductionBoard, lib/productionBoard.ts dropMove).
 
 /** A due time or a publish time: "27 Oct, 1:50 ጠዋት", in the person's calendar with their date format (lib/dates.ts whenText). */
 export function formatWhen(iso: string, fmt: DateFormatLike): string {
@@ -88,9 +94,15 @@ export function RequestCard({
   category,
   onOpen,
   onChanged,
+  draggable = false,
+  lifted = false,
 }: {
   request: ProductionRequest;
   selected: boolean;
+  /** the viewer can drag it to another column (the board worked out that at least one drop is a move for them) */
+  draggable?: boolean;
+  /** it is being dragged: the card stays in place, faded, while its overlay follows the pointer */
+  lifted?: boolean;
   /** the product's photo from the catalog (useProductImages), or null for its placeholder */
   image: ProductImageView | null;
   /** the product's category name, for the placeholder's icon */
@@ -118,6 +130,15 @@ export function RequestCard({
   const move = cardMove(me, request);
   const column = columnOf(request) ?? "requested";
   const edge = ovenAge(request, now)?.stale ? EDGE.stale : EDGE[column];
+  const wait = requestWait(request, now);
+  const longWait = useWaitText();
+  // a request's wait in whole minutes under an hour ("25 min", never a "25:14" that reads like a time of day), then "2 h 05", "3 d"
+  const waitText = (seconds: number) => (seconds < 3600 ? t("wait_min", { minutes: Math.floor(seconds / 60) }) : longWait(seconds));
+  const next = move ? null : nextMover(me, request);
+  const stationName = locale === "am" ? request.station.name_am : request.station.name_en;
+  const drag = useDraggable({ id: `request-${request.id}`, data: { requestId: request.id }, disabled: !draggable });
+  // a mouse or a long touch anywhere on the card picks it up; the keyboard picks it up from its grip
+  const { onMouseDown, onTouchStart, onKeyDown } = (drag.listeners ?? {}) as Record<string, ((event: unknown) => void) | undefined>;
 
   // a Start saved offline waits in the outbox (step 5.2a): the card says so, and the board is read again once it was sent
   const group = batchGroup(request.id);
@@ -171,9 +192,13 @@ export function RequestCard({
 
   return (
     <article
-      className={`relative flex flex-col gap-3 overflow-hidden rounded-2xl border bg-white py-3.5 pl-5 pr-3.5 motion-safe:transition-colors motion-safe:duration-150 ${
+      ref={drag.setNodeRef}
+      onMouseDown={draggable ? onMouseDown : undefined}
+      onTouchStart={draggable ? onTouchStart : undefined}
+      data-request-card={request.id}
+      className={`relative flex flex-col gap-3 overflow-hidden rounded-2xl border bg-white py-3.5 pl-5 pr-3.5 motion-safe:transition-[opacity,border-color] motion-safe:duration-150 ${
         selected ? "border-ink-900 inset-ring-1 inset-ring-ink-900" : "border-neutral-200"
-      }`}
+      } ${lifted ? "opacity-40" : ""} ${draggable ? "touch-manipulation select-none" : ""}`}
     >
       <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1.5 ${edge}`} />
       {/* The button is named by its own text, "Open <product>" (the name the p2 specs read), which readers hear; what the card draws (the
@@ -208,6 +233,26 @@ export function RequestCard({
         </div>
       ) : null}
 
+      {wait ? (
+        <div className="flex flex-wrap items-center gap-2 text-[13px]">
+          <span className="inline-flex items-center gap-1.5 tabular-nums text-neutral-600">
+            <Hourglass className="size-4 shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />
+            {t("waiting_for", { time: waitText(wait.seconds) })}
+          </span>
+          {wait.lateSeconds !== null ? (
+            <Chip tone="red" className="text-xs">
+              <Clock className="size-3.5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+              {t("late_by", { time: waitText(wait.lateSeconds) })}
+            </Chip>
+          ) : wait.tooLong ? (
+            <Chip tone="amber" className="text-xs">
+              <AlertTriangle className="size-3.5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+              {t("waiting_long")}
+            </Chip>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* the oven's progress bar needs a planned duration, which no batch carries yet (phase-6 plan 10.2 Q5): the time baking shows instead */}
       {request.status === "in_progress" ? <Oven request={request} starter={starter} /> : null}
       {made ? (
@@ -229,12 +274,33 @@ export function RequestCard({
           {errorText.message(error)}
         </p>
       ) : null}
-      {move ? (
-        <Button type="button" variant="primary" size="lg" loading={busy !== null} disabled={waiting} onClick={() => act(move)} className="w-full">
-          {/* named by its text, "<action>: <product>", for readers; the action alone is what it shows */}
-          <span aria-hidden="true">{t(MOVE_LABEL[move])}</span>
-          <span className="sr-only">{t("action_of", { action: t(MOVE_LABEL[move]), name })}</span>
-        </Button>
+      {move || next || draggable ? (
+        <div className="flex items-center gap-2">
+          {draggable ? (
+            <button
+              type="button"
+              ref={drag.setActivatorNodeRef}
+              {...drag.attributes}
+              onKeyDown={onKeyDown}
+              aria-label={t("drag_handle", { name })}
+              className={`inline-flex size-11 shrink-0 cursor-grab items-center justify-center rounded-xl border border-neutral-200 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-800 active:cursor-grabbing ${focusRing}`}
+            >
+              <GripVertical className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
+            </button>
+          ) : null}
+          {move ? (
+            <Button type="button" variant="primary" size="lg" loading={busy !== null} disabled={waiting} onClick={() => act(move)} className="min-w-0 flex-1">
+              {/* named by its text, "<action>: <product>", for readers; the action alone is what it shows */}
+              <span aria-hidden="true">{t(MOVE_LABEL[move])}</span>
+              <span className="sr-only">{t("action_of", { action: t(MOVE_LABEL[move]), name })}</span>
+            </Button>
+          ) : next ? (
+            <p className="flex min-w-0 flex-1 items-start gap-1.5 text-[13px] font-medium text-neutral-700">
+              <ArrowRight className="mt-0.5 size-4 shrink-0 text-neutral-500" strokeWidth={ICON_STROKE} aria-hidden="true" />
+              <span>{next.key === "next_accept_any" ? t("next_accept_any", { station: stationName }) : next.key === "next_confirm_mine" ? t("next_confirm_mine") : t(next.key, { name: next.name })}</span>
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </article>
   );
