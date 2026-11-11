@@ -674,7 +674,7 @@ with its notice (the planners, once however often it runs, its text in both lang
 `screens-production-logic` for the waits, every drop and every next mover; `screens-board-drag` on the CI stack: the baker drags a new
 request to the oven (accepted and started), drags the batch with the columns captured mid-drag, drops it on Pending confirmation and sends
 the Done form, the overseer moves it to Done today with the keyboard and the baker's board follows by itself; captures at 1440 and 390 in
-en and am with axe and no sideways scroll. Claim restated at `0164e2a` (after the merge of `main` with the flat CI); the tag stays on `2f6bbd9`.
+en and am with axe and no sideways scroll. The first runs caught the test pressing the arrow key before the board had picked the card up (it now waits for each announcement, as a keyboard user hears it). Claim restated at `83370a9` (after the merge of `main` with the flat CI); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
