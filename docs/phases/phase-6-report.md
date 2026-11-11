@@ -618,6 +618,18 @@ Telebirr, no float left), no stock movement written; Bakery's closing count and 
 co-signature by someone other than the admin, and Cake room's closing count is prepared behind it. Each shift carries a handover note
 saying its counts were accepted at the expected figures and nobody counted.
 
+**Main reuses the pull request's run** (Ramin, 2026-11-11: "no more long waiting time"; a change took about four hours from push to
+live, the pull request's checks and then `main`'s full run again). Every pull request now runs the full graph and its `changes` job
+uploads the artifact `ci-full-run`; a pull request is merged by fast-forwarding `main` to its head, so a push to `main` asks the Actions
+API (`changes` holds `actions: read`) for a successful full `pull_request` run of this repository on the same SHA and, when there is
+one, selects no job: the test jobs skip, the gates run `--check-needs` and `gate_check` only, the run passes in minutes and the deploy
+starts (`deploy.yml` builds its own release and reads no artifact of the ci run, so nothing else changes). A push that changes only
+`docs/` runs `invariants` and the checks of the generated files it touches; any other push, a manual run, or any doubt (no token, the
+API unreachable) runs everything. `scripts/ci_affected.py` (`pick_reusable`, `docs_only_jobs`, `push_result`) has its tests in
+`scripts/tests/test_ci_affected.py`; the skill's copy of the script, `assets/ci/ci.yml` and `references/ci-cd.md` say the same. When
+`main` reused a run, `set-run-url` records the pull request run that ran the tests. Claim restated at `61f6bec`; the tag stays on
+`2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
