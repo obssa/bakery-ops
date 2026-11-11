@@ -601,7 +601,10 @@ captures scroll the open co-sign "?" into view at each size (at 390 it had been 
 E2E branch were looked at and left as they are: each run's handover flows close and lock the shifts the run before left open and the
 fixtures open the station's shift again (`e2e/support/shifts.ts`), so the stations end as they were found, one open shift each, and
 closing them at the end of a run would mean closing counts on live through `resolvePendingCounts`, which approves whatever waits at the
-station, counts the run did not make included. Claim restated at `355b523`; the tag stays on `2f6bbd9`.
+station, counts the run did not make included. The first CI run caught the "?" card swinging from frame to frame instead of
+settling (the loop wrote its transform and React wrote it again a frame late from a state; the loop is now the only writer), seen on
+analytics in Amharic where the not-calculated notice's "?" opened at 1440 stood past the edge at 390; the capture now waits for that
+notice. Claim restated at `91a89e8`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
