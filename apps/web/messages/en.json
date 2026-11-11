@@ -547,7 +547,8 @@
     "give_back_hint": "It goes back to Requested for the baker you choose to accept.",
     "give_choose": "Choose a baker",
     "give_submit": "Give it",
-    "wait_min": "{minutes} min"
+    "wait_min": "{minutes} min",
+    "showing_of": "Showing {shown} of {total}"
   },
   "transfer": {
     "title": "Request transfer: {name}",

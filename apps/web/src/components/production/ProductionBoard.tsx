@@ -28,7 +28,7 @@ import { acceptRequest, confirmBatch, submitStartBatch } from "@/lib/api/product
 import type { Collection, Locale, ProductionRequest, Station } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
-import { boardColumns, COLUMNS, createProductionFeed, ownStationId, type Column } from "@/lib/live/production";
+import { boardColumns, columnCount, COLUMNS, createProductionFeed, ownStationId, type Column } from "@/lib/live/production";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { boardSummary, dropMove, type BoardSummary, type DropRefusal, type DropVerdict } from "@/lib/productionBoard";
 import { useProductImages } from "@/lib/productImages";
@@ -360,6 +360,7 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
                   column={column}
                   twin={twins?.columns[column]}
                   count={(shown ?? columns)[column].length}
+                  cut={cutOf(columns[column].length, stationId === "all" && snapshot.state.counts ? columnCount(snapshot.state.counts, column) : null)}
                   phoneHidden={column !== tab}
                   attention={summary ? attentionOf(column, summary) : null}
                   verdict={verdicts?.[column] ?? null}
@@ -448,6 +449,11 @@ function attentionOf(column: Column, summary: BoardSummary): { key: "sum_waiting
   if (column === "requested" && summary.urgent > 0) return { key: "sum_urgent", count: summary.urgent };
   if (column === "in_progress" && summary.stale > 0) return { key: "sum_stale", count: summary.stale };
   return null;
+}
+
+/** A column the server's answer cut: fewer cards than its true count (compared on the server's own columns, before any card moved). */
+function cutOf(shown: number, total: number | null): { shown: number; total: number } | null {
+  return total !== null && total > shown ? { shown, total } : null;
 }
 
 /** The board's columns with the cards moved before the server answered put in their new column. */
@@ -551,11 +557,14 @@ function BoardColumn({
   phoneHidden,
   attention,
   verdict,
+  cut,
   children,
 }: {
   column: Column;
   twin?: string;
   count: number;
+  /** the board answer held fewer cards than the branch's true count for this column (all stations shown): say so */
+  cut: { shown: number; total: number } | null;
   phoneHidden: boolean;
   attention: { key: "sum_waiting" | "sum_urgent" | "sum_stale"; count: number } | null;
   /** while a card is dragged: what dropping it here does, or why it cannot come here (null: its own column, or nothing dragged) */
@@ -597,6 +606,11 @@ function BoardColumn({
           <span className={`inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-white px-2.5 text-[15px] font-bold tabular-nums ${look.count}`}>{count}</span>
         </div>
         <p className="text-[13px] leading-snug text-neutral-700">{t(`help_${column}` as "help_requested")}</p>
+        {cut ? (
+          <p role="status" className="text-[13px] font-semibold text-amber-900">
+            {t("showing_of", cut)}
+          </p>
+        ) : null}
         {attention ? (
           <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-amber-100 px-2.5 py-0.5 text-[13px] font-semibold text-amber-900">
             <AlertTriangle className="size-3.5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />

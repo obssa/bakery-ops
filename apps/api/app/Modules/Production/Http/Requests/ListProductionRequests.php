@@ -11,7 +11,8 @@ use Illuminate\Validation\Rule;
 /**
  * GET /production/requests?view=board&status=&station_id=&product_item_id=&mine=1&limit=: the requests of the caller's branch.
  * view=board is the open ones plus those done today, in the order a baker works them; without it the newest come first.
- * mine=1 keeps the ones assigned to the caller or asked for by them. limit is 1 to 200 (default 100).
+ * mine=1 keeps the ones assigned to the caller or asked for by them. limit is 1 to 200 (default 100), the size of the list
+ * view; the board view answers every open request and every one done today (up to RequestBoard::BOARD_CAP), so no open work is ever hidden.
  */
 final class ListProductionRequests extends FormRequest
 {

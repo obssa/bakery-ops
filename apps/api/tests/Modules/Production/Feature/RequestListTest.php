@@ -158,3 +158,20 @@ it('reads a fixed number of queries however many requests there are', function (
 
     expect($count())->toBe($few);
 });
+
+it('shows every open request on the board, past any page size: 250 open requests, the newest among them (2026-11-11, live)', function () {
+    $ids = [];
+    foreach (range(1, 250) as $i) {
+        $ids[] = $this->f->request([], $i % 2 === 0 ? RequestStatus::InProgress : RequestStatus::Requested)->id;
+    }
+    $newest = max($ids);
+
+    $board = ($this->get)('?view=board&limit=200')->assertOk();
+    $shown = ($this->ids)($board);
+    expect($shown)->toHaveCount(250)
+        ->and($shown)->toContain($newest)
+        ->and($board->json('counts.requested') + $board->json('counts.in_progress'))->toBe(250);
+
+    // the list view keeps its page size
+    expect(($this->ids)(($this->get)('?limit=200')->assertOk()))->toHaveCount(200);
+});

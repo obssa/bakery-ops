@@ -4,7 +4,7 @@ import { live, requireAdmin } from "../support/env";
 import { buildStationFixture, menuAvailable, sendOrder } from "../support/fixture";
 import { transfersOf } from "../support/inventory";
 import { chooseTable, ensureUnlocked, openAs, openPadAndUnlock } from "../support/pad";
-import { buildProductionFixture, stockAlertsOf, inboxOf, movementsOf, pushOffered, requestById, requestsOf, waitForQueue, type ProductionFixture } from "../support/production";
+import { buildProductionFixture, leaveProductionAsFound, stockAlertsOf, inboxOf, movementsOf, pushOffered, requestById, requestsOf, waitForQueue, type ProductionFixture } from "../support/production";
 
 // Phase 2 gate project p2-stockout-production (manifest phases.2.gate.criteria; docs/phases/phase-2-plan.md section 7),
 // step 2.8a. Three browser contexts, one per screen: the waiter pad, the cake baker's production board and the
@@ -19,6 +19,14 @@ import { buildProductionFixture, stockAlertsOf, inboxOf, movementsOf, pushOffere
 //
 // The fixture is built through the admin API inside the isolated "E2E Test Branch" (e2e/support/production.ts), so the
 // flow carries @live.
+//
+// Each test leaves the live board as it found it (2026-11-11: earlier runs had piled up requests there): its own cake's requests still
+// open are cancelled, a batch still in the oven is finished and one waiting for its overseer confirmed (leaveProductionAsFound).
+
+/** The run's own production work, settled through the API, whatever happened in the test. */
+function settle(f: ProductionFixture): Promise<void> {
+  return leaveProductionAsFound({ admin: f.admin, staff: [f.overseer, f.baker] }, [f.cake.id]);
+}
 
 const TABLET = { width: 1280, height: 800 };
 
@@ -162,6 +170,7 @@ test.describe("p2 stock-out to production", () => {
       throw error;
     } finally {
       await Promise.all(contexts.map((context) => context.close()));
+      await settle(fixture);
     }
   });
 });
@@ -236,6 +245,7 @@ test.describe("p2 stock-out, second case", () => {
       throw error;
     } finally {
       await context.close();
+      await settle(fixture);
     }
   });
 });

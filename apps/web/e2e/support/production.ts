@@ -232,3 +232,48 @@ export interface StockAlertView {
 export async function stockAlertsOf(api: Api): Promise<StockAlertView[]> {
   return (await api.get<{ data: StockAlertView[] }>("/stock-alerts", { active: 1, limit: 200 })).data;
 }
+
+/**
+ * Leaves the live E2E branch's production board as the run found it (2026-11-11: earlier @live runs had piled up 107 requested and 97 in
+ * progress there). Only the requests of the run's own products are touched (each fixture makes a product with the run's unique tag), and
+ * only through the normal API: a request still requested or accepted is cancelled; a batch still in the oven is finished by whoever
+ * started it (counted as asked, or as 1 when the shelf is short of the recipe, nothing wasted); a batch waiting for its overseer is
+ * confirmed by someone other than the one who made it. Whatever cannot be settled is logged, never forced.
+ */
+export async function leaveProductionAsFound(people: { admin: Api; staff?: { id: number; api: Api }[] }, productIds: number[]): Promise<void> {
+  const apiOf = (id: number | undefined): Api => people.staff?.find((person) => person.id === id)?.api ?? people.admin;
+  const note = (what: string, error: unknown) => console.warn(`[e2e clean-up] ${what}: ${error instanceof Error ? error.message : String(error)}`);
+  for (const productId of productIds) {
+    let requests: RequestView[];
+    try {
+      requests = await requestsOf(people.admin, productId);
+    } catch (error) {
+      note(`the requests of product ${productId} could not be read`, error);
+      continue;
+    }
+    for (const request of requests) {
+      try {
+        if (request.status === "requested" || request.status === "accepted") {
+          await people.admin.post(`/production/requests/${request.id}/cancel`, { reason: "e2e clean-up" });
+          continue;
+        }
+        if (request.status === "in_progress" && request.batch?.status === "started") {
+          const baker = apiOf(request.assigned_to?.id);
+          try {
+            await baker.post(`/production/batches/${request.batch.id}/done`, { produced_qty: request.requested_qty, waste_qty: "0" });
+          } catch {
+            await baker.post(`/production/batches/${request.batch.id}/done`, { produced_qty: "1", waste_qty: "0" });
+          }
+        }
+        const now = await requestById(people.admin, request.id);
+        if (now.status === "pending_confirmation" && now.batch) {
+          const maker = now.batch.finished_by?.id;
+          const confirmer = people.staff?.find((person) => person.id !== maker)?.api ?? people.admin;
+          await confirmer.post(`/production/batches/${now.batch.id}/confirm`, {});
+        }
+      } catch (error) {
+        note(`request ${request.id} (${request.status}) was left as it is`, error);
+      }
+    }
+  }
+}

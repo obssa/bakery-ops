@@ -1,8 +1,8 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { requireAdmin } from "../support/env";
 import { buildCatalogFixture, costOf, stationOf, versionsOf } from "../support/catalog";
 import { openAs } from "../support/pad";
-import { requestsOf, type RequestView } from "../support/production";
+import { leaveProductionAsFound, requestsOf, type RequestView } from "../support/production";
 
 // Phase 2 gate project p2-stockout-production (the file name lands in it), step 2.8d: the admin Catalog and planning flows.
 // Three @live tests, each building its fixture through the admin API of the isolated "E2E Test Branch"
@@ -82,45 +82,54 @@ test.describe("admin catalog and planning", () => {
 
   test("@live schedule and assign a request in the planner and see it on the board", async ({ page }) => {
     const f = await buildCatalogFixture(requireAdmin(test.skip));
-    const tomorrow = new Date(Date.now() + 24 * 3600 * 1000);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const due = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T04:00`;
-
-    await openAs(page, f.admin, "en/admin/planner/");
-    await expect(page.getByRole("heading", { level: 1, name: "Production planner" })).toBeVisible({ timeout: 30_000 });
-
-    const form = page.getByRole("region", { name: "Schedule a request" });
-    await form.getByLabel("Product").selectOption({ label: f.cake.name_en });
-    await form.getByLabel("Quantity").fill("6");
-    await form.getByLabel("Due").fill(due);
-    await form.getByLabel("Priority").selectOption({ label: "High" });
-    await form.getByLabel("Note").fill("for the morning rush");
-    await form.getByRole("button", { name: "Schedule request" }).click();
-
-    const row = page.getByRole("table", { name: "Open requests" }).getByRole("row").filter({ hasText: f.cake.name_en });
-    await expect(row).toBeVisible({ timeout: 15_000 });
-    await expect(row).toContainText("High");
-    await expect(row).toContainText("Requested");
-
-    // assign to the baker of the producing station
-    await row.getByLabel(`Baker for ${f.cake.name_en}`).selectOption({ value: String(f.baker.id) }); // by id: the live branch has other bakers at this station (and maybe the same name)
-    await row.getByRole("button", { name: `Assign ${f.cake.name_en}` }).click();
-    // the row's select shows the chosen baker at once, so it proves nothing: wait on the API for the saved assignment
-    await expect.poll(() => requestsOf(f.admin, f.cake.id).then((r) => r[0]?.assigned_to?.id), { timeout: 30_000 }).toBe(f.baker.id);
-
-    const requests = await requestsOf(f.admin, f.cake.id);
-    expect(requests).toHaveLength(1);
-    const made = requests[0] as RequestView & { priority: string; due_at: string | null };
-    expect(made).toMatchObject({ status: "requested", reason: "schedule", requested_qty: "6.0000", priority: "high" });
-    expect(made.assigned_to?.id).toBe(f.baker.id);
-    expect(made.due_at).not.toBeNull();
-
-    // it is on the production board with its reason, priority and baker
-    await openAs(page, f.admin, "en/production/");
-    const card = page.getByRole("region", { name: "Requested", exact: true }).getByRole("article").filter({ hasText: f.cake.name_en });
-    await expect(card).toBeVisible({ timeout: 30_000 });
-    await expect(card).toContainText("Scheduled");
-    await expect(card).toContainText("High priority");
-    await expect(card).toContainText(f.baker.name);
+    // the scheduled request is cancelled at the end, so the live board is left as the run found it (2026-11-11)
+    try {
+      await scheduleAndAssign(f, page);
+    } finally {
+      await leaveProductionAsFound({ admin: f.admin }, [f.cake.id]);
+    }
   });
 });
+
+async function scheduleAndAssign(f: Awaited<ReturnType<typeof buildCatalogFixture>>, page: Page): Promise<void> {
+  const tomorrow = new Date(Date.now() + 24 * 3600 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const due = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T04:00`;
+
+  await openAs(page, f.admin, "en/admin/planner/");
+  await expect(page.getByRole("heading", { level: 1, name: "Production planner" })).toBeVisible({ timeout: 30_000 });
+
+  const form = page.getByRole("region", { name: "Schedule a request" });
+  await form.getByLabel("Product").selectOption({ label: f.cake.name_en });
+  await form.getByLabel("Quantity").fill("6");
+  await form.getByLabel("Due").fill(due);
+  await form.getByLabel("Priority").selectOption({ label: "High" });
+  await form.getByLabel("Note").fill("for the morning rush");
+  await form.getByRole("button", { name: "Schedule request" }).click();
+
+  const row = page.getByRole("table", { name: "Open requests" }).getByRole("row").filter({ hasText: f.cake.name_en });
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await expect(row).toContainText("High");
+  await expect(row).toContainText("Requested");
+
+  // assign to the baker of the producing station
+  await row.getByLabel(`Baker for ${f.cake.name_en}`).selectOption({ value: String(f.baker.id) }); // by id: the live branch has other bakers at this station (and maybe the same name)
+  await row.getByRole("button", { name: `Assign ${f.cake.name_en}` }).click();
+  // the row's select shows the chosen baker at once, so it proves nothing: wait on the API for the saved assignment
+  await expect.poll(() => requestsOf(f.admin, f.cake.id).then((r) => r[0]?.assigned_to?.id), { timeout: 30_000 }).toBe(f.baker.id);
+
+  const requests = await requestsOf(f.admin, f.cake.id);
+  expect(requests).toHaveLength(1);
+  const made = requests[0] as RequestView & { priority: string; due_at: string | null };
+  expect(made).toMatchObject({ status: "requested", reason: "schedule", requested_qty: "6.0000", priority: "high" });
+  expect(made.assigned_to?.id).toBe(f.baker.id);
+  expect(made.due_at).not.toBeNull();
+
+  // it is on the production board with its reason, priority and baker
+  await openAs(page, f.admin, "en/production/");
+  const card = page.getByRole("region", { name: "Requested", exact: true }).getByRole("article").filter({ hasText: f.cake.name_en });
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await expect(card).toContainText("Scheduled");
+  await expect(card).toContainText("High priority");
+  await expect(card).toContainText(f.baker.name);
+}

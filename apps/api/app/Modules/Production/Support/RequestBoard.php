@@ -34,6 +34,13 @@ final class RequestBoard
 {
     public const string ETAG_SCOPE = 'production-requests';
 
+    /**
+     * The board answers every open request and every one done today, whatever `limit` says (the list's page size): a board that drops
+     * requests hides open work (2026-11-11, live: past 200 open requests the newest never showed). This is only a safety cap for a
+     * branch gone wrong; the counts stay true, and the web says "Showing n of m" on a column that was cut.
+     */
+    public const int BOARD_CAP = 1000;
+
     public function __construct(private readonly CurrentBranch $branch) {}
 
     /**
@@ -100,7 +107,7 @@ final class RequestBoard
                 });
         });
 
-        return $query->get()->sort(self::workingOrder(...))->take($filter['limit'])->values();
+        return $query->get()->sort(self::workingOrder(...))->take(self::BOARD_CAP)->values();
     }
 
     /**

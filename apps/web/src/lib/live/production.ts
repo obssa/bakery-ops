@@ -31,13 +31,15 @@ export function columnOf(request: ProductionRequest): Column | null {
 
 export interface BoardState {
   requests: ProductionRequest[];
+  /** the branch's true counts by status (ProductionBoardPage.counts): a column that holds fewer cards than its count was cut */
+  counts?: ProductionBoardPage["counts"];
 }
 
 export const boardSpec: FeedSpec<ProductionBoardPage, BoardState> = {
   initial: { requests: [] },
   cursorOf: () => null,
   // the answer is the whole board: whatever it does not list is no longer on it
-  merge: (_state, page) => ({ requests: page.data }),
+  merge: (_state, page) => ({ requests: page.data, counts: page.counts }),
 };
 
 export function createProductionFeed(): LiveFeed<ProductionBoardPage, BoardState> {
@@ -53,6 +55,20 @@ export function boardColumns(state: BoardState, stationId: number | "all"): Reco
     if (column) columns[column].push(request);
   }
   return columns;
+}
+
+/** A column's true number of cards from the branch's counts (Requested holds the accepted ones too). */
+export function columnCount(counts: ProductionBoardPage["counts"], column: Column): number {
+  switch (column) {
+    case "requested":
+      return counts.requested + counts.accepted;
+    case "in_progress":
+      return counts.in_progress;
+    case "pending_confirmation":
+      return counts.pending_confirmation;
+    default:
+      return counts.done_today;
+  }
 }
 
 /** The stations that make things which this person works at, or null when they work at none (then everything shows). */

@@ -547,7 +547,8 @@
     "give_back_hint": "የመረጡት ጋጋሪ እንዲቀበሉት ወደ «የተጠየቀ» ይመለሳል።",
     "give_choose": "ጋጋሪ ይምረጡ",
     "give_submit": "ይስጡ",
-    "wait_min": "{minutes} ደቂቃ"
+    "wait_min": "{minutes} ደቂቃ",
+    "showing_of": "ከ{total} {shown} ብቻ ይታያሉ"
   },
   "transfer": {
     "title": "ማስተላለፍ ጠይቅ፦ {name}",

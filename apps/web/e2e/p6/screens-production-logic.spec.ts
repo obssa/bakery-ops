@@ -11,6 +11,7 @@ import {
   URGENT_TOO_LONG_MINUTES,
   WAIT_TOO_LONG_MINUTES,
 } from "../../src/lib/productionBoard";
+import { columnCount } from "../../src/lib/live/production";
 
 // The production board's own arithmetic (phase-6/production-board, lib/productionBoard.ts): how long a batch has been in the oven, when it
 // counts as stale (a day or more: it was left on the board unfinished), and the summary strip's counts, urgent requests and stale batches.
@@ -240,4 +241,12 @@ test.describe("the production board's waits, drops and next movers", () => {
     expect(nextMover(baker, finished(6, baker))).toEqual({ key: "next_confirm_mine" });
     expect(nextMover(cashier, request({ status: "done" }))).toBeNull();
   });
+});
+
+test("a column's true count comes from the branch's counts, Requested holding the accepted ones too", () => {
+  const counts = { requested: 107, accepted: 3, in_progress: 97, pending_confirmation: 2, done_today: 5 };
+  expect(columnCount(counts, "requested")).toBe(110);
+  expect(columnCount(counts, "in_progress")).toBe(97);
+  expect(columnCount(counts, "pending_confirmation")).toBe(2);
+  expect(columnCount(counts, "done_today")).toBe(5);
 });

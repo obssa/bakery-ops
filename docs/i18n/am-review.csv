@@ -529,6 +529,7 @@ web:production.give_back_hint,/production,It goes back to Requested for the bake
 web:production.give_choose,/production,Choose a baker,ጋጋሪ ይምረጡ,,
 web:production.give_submit,/production,Give it,ይስጡ,,
 web:production.wait_min,/production,{minutes} min,{minutes} ደቂቃ,,
+web:production.showing_of,/production,Showing {shown} of {total},ከ{total} {shown} ብቻ ይታያሉ,,
 web:transfer.title,/admin/inventory/transfers,Request transfer: {name},ማስተላለፍ ጠይቅ፦ {name},,
 web:transfer.to,/admin/inventory/transfers,To: {place},ወደ፦ {place},,
 web:transfer.source_has,/admin/inventory/transfers,The store has {qty} {unit}.,በመጋዘን ውስጥ {qty} {unit} አለ።,,

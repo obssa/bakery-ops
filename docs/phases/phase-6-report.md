@@ -675,7 +675,15 @@ with its notice (the planners, once however often it runs, its text in both lang
 `screens-production-logic` for the waits, every drop and every next mover; `screens-board-drag` on the CI stack: the baker drags a new
 request to the oven (accepted and started), drags the batch with the columns captured mid-drag, drops it on Pending confirmation and sends
 the Done form, the overseer moves it to Done today with the keyboard and the baker's board follows by itself; captures at 1440 and 390 in
-en and am with axe and no sideways scroll. The first runs caught the test pressing the arrow key before the board had picked the card up (it now waits for each announcement, as a keyboard user hears it). Claim restated at `6fde5c5` (after the merge of `main` with the flat CI); the tag stays on `2f6bbd9`.
+en and am with axe and no sideways scroll. The live deploy of the flat CI (2026-11-11) failed `p2-stockout-production`: the live E2E branch held 107 requested and 97 in progress
+requests from earlier runs, and the board answer (`view=board&limit=200`) sorted them and kept 200, so the newest request never showed.
+The board view now answers every open request and every one done today whatever `limit` says (the list view keeps its page size), up to
+a safety cap of 1000 (`RequestBoard::BOARD_CAP`); a column holding fewer cards than the branch's true count says "Showing n of m" (Pest:
+250 open requests, the newest among them). The `@live` specs that make production work (both `p2-stockout-production` tests and the
+planner test of `stockout-catalog-planning`) now leave the board as they found it, in a `finally`, through the API and only for their own
+run's product (`leaveProductionAsFound`: cancel what is requested or accepted, finish what is in the oven as its baker, confirm what waits
+by someone other than its maker; anything that cannot be settled is logged, not forced). The 107 and 97 already on live are left as they
+are; they no longer hide anything. The first runs caught the test pressing the arrow key before the board had picked the card up (it now waits for each announcement, as a keyboard user hears it). Claim restated at `6fde5c5` (after the merge of `main` with the flat CI); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
