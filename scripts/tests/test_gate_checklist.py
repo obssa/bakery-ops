@@ -163,6 +163,19 @@ class CiJobWithJobs(Fixture):
         self.assertEqual(rows["checklist direct"][0], "PASS", rows["checklist direct"])
         self.assertEqual(rows["checklist through"][0], "PASS", rows["checklist through"])
 
+    def test_in_ci_a_lower_gate_counts_when_the_gate_needs_every_job_it_needs(self) -> None:
+        """Since 2026-11-12 the gates run side by side: gate-p5 needs gate-p4's jobs, not gate-p4."""
+        self.man["ci"]["gate_jobs"]["gate-p5"] = ["mod-a", "e2e-p5"]
+        self.checklist(item("gates-green", {"type": "ci_job", "jobs": ["gate-p4"]}))
+        state, detail = self.rows(ci=True)["checklist gates-green"]
+        self.assertEqual(state, "PASS", detail)
+        self.assertIn("gate-p4 (every job it needs)", detail)
+        self.man["ci"]["gate_jobs"]["gate-p5"] = ["e2e-p5"]
+        self.man["ci"]["e2e_jobs"]["e2e-p5"] = []
+        state, detail = self.rows(ci=True)["checklist gates-green"]
+        self.assertEqual(state, "FAIL")
+        self.assertIn("gate-p5 does not need every job gate-p4 needs (mod-a)", detail)
+
     def test_in_ci_a_job_the_gate_does_not_need_fails(self) -> None:
         self.checklist(item("load", {"type": "ci_job", "jobs": ["perf-load"]}))
         state, detail = self.rows(ci=True)["checklist load"]

@@ -454,6 +454,16 @@ class Checklist:
                     ok.append("self")
                 else:
                     bad.append(f"self: neither {gate_job} nor a {pest_job} job it needs runs a {group} step")
+            elif job not in needs and job in self.man.get("ci", {}).get("gate_jobs", {}):
+                # a lower gate: since 2026-11-12 the gates run side by side, so this gate needs every job that gate needs
+                # (and the lower gate is a required check of its own on the same commit)
+                missing = sorted(gate_needs(self.man, job) - needs)
+                if missing:
+                    bad.append(f"{job}: {gate_job} does not need every job {job} needs ({', '.join(missing)})")
+                elif job not in defined:
+                    bad.append(f"{job}: a gate in the manifest but no such job in {workflow}")
+                else:
+                    ok.append(f"{job} (every job it needs)")
             elif job not in needs:
                 bad.append(f"{job}: not a need of {gate_job}")
             elif job not in defined:

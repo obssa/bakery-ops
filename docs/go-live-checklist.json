@@ -5,7 +5,7 @@
   "items": [
     { "id": "gates-green", "title": "gate-p0 to gate-p4 still green",
       "required": true, "who": "CI", "verifier": { "type": "ci_job", "jobs": ["gate-p4"] },
-      "note": "gate-p4 needs gate-p3, which needs the earlier gates" },
+      "note": "since 2026-11-12 the gates run side by side: gate-p5 needs every job gate-p4 needs, which are every job of phases 0 to 4; gate-p4 is a required check of its own on the same commit" },
     { "id": "branch-protection", "title": "main requires gate-p0 to gate-p5",
       "required": true, "who": "CI",
       "verifier": { "type": "script", "run": ["python3", "scripts/ops/check_branch_protection.py", "--require", "gate-p0..gate-p5"] } },
