@@ -627,7 +627,19 @@ starts (`deploy.yml` builds its own release and reads no artifact of the ci run,
 `docs/` runs `invariants` and the checks of the generated files it touches; any other push, a manual run, or any doubt (no token, the
 API unreachable) runs everything. `scripts/ci_affected.py` (`pick_reusable`, `docs_only_jobs`, `push_result`) has its tests in
 `scripts/tests/test_ci_affected.py`; the skill's copy of the script, `assets/ci/ci.yml` and `references/ci-cd.md` say the same. When
-`main` reused a run, `set-run-url` records the pull request run that ran the tests. Claim restated at `61f6bec`; the tag stays on
+`main` reused a run, `set-run-url` records the pull request run that ran the tests.
+
+The same pull request makes the full run itself short. Run 43069114796 took 84 minutes, nearly all of it one chain that copied the
+module graph (api-arch, identity, catalog, inventory 22 minutes, orders, payments, shifts, analytics, the last e2e projects, then
+gate-p4 8, gate-p5 and gate-p6 one after another). Now every test job needs only what it consumes (an e2e project `web-build` and
+`docker-build`, a stack job `docker-build`, `web-errors` `web-build`; module and static jobs nothing but `changes` and `status`), so
+they start together; each `gate-pN` needs every job of its phase and of the phases below (exactly the closure the chain reached) and no
+other gate, so the verdict is the one the chain gave and the gates run side by side in about a minute each. The gates' Pest groups
+(`gate:p4` on 90 seeded days, `gate:p5`, `gate:p6`) moved into `pest-gate-p4` .. `pest-gate-p6`, stack jobs beside the others that
+the gate needs; `gate_check`'s checklist `self` accepts the group there when the gate needs that job. `mod-inventory` runs as three
+Pest shards (`--shard=N/3`, `module-tests.yml` input `shard`). The manifest's `ci.*_jobs` are ci.yml's graph again, and
+`test_ci_affected.py` checks it: no test job needs a module job, no gate needs a gate, each gate covers the one below, a gate's Pest
+group lives in its Pest job, inventory runs in three shards, the manifest names ci.yml's needs. Claim restated at `1dd18ac`; the tag stays on
 `2f6bbd9`.
 
 ## What stays open after the claim
