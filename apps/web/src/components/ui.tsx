@@ -2,7 +2,9 @@
 
 import {
   CakeSlice,
+  ChevronDown,
   CircleAlert,
+  CircleHelp,
   Coffee,
   GlassWater,
   Inbox,
@@ -16,6 +18,7 @@ import {
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -325,6 +328,163 @@ export function SegmentedControl<T extends string>({
   );
 }
 
+// ------------------------------------------------------------------ help
+
+/**
+ * A "?" beside something that needs a word of explanation (the explain-itself follow-up, Ramin 2026-11-10): a 44 px button that opens a
+ * small card under it saying what the thing is, why, and what to do. A disclosure, not a modal: the button carries aria-expanded and
+ * names the card; Esc closes it and gives the focus back, and so does a tap or a click anywhere else. The card is kept inside the window
+ * (16 px from each side), so on a phone it never makes the page scroll sideways.
+ */
+export function HelpTip({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [shift, setShift] = useState(0);
+  const wrap = useRef<HTMLSpanElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const card = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (wrap.current && !wrap.current.contains(event.target as Node)) setOpen(false);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      button.current?.focus();
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+
+  // measured after it is drawn: moved left or right so that the whole card stays 16 px inside the window
+  useLayoutEffect(() => {
+    if (!open || !card.current) {
+      setShift(0);
+      return;
+    }
+    const box = card.current.getBoundingClientRect();
+    const left = box.left - shift;
+    const right = left + box.width;
+    const room = document.documentElement.clientWidth - 16;
+    setShift(right > room ? Math.max(16 - left, room - right) : left < 16 ? 16 - left : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  return (
+    <span ref={wrap} className={`relative inline-flex align-middle ${className}`}>
+      <button
+        ref={button}
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((now) => !now)}
+        className={`-m-2.5 inline-flex size-11 shrink-0 items-center justify-center rounded-full text-neutral-500 hover:text-ink-900 ${open ? "text-ink-900" : ""} ${focusRing}`}
+      >
+        <CircleHelp className="size-5" strokeWidth={2} aria-hidden="true" />
+      </button>
+      {/* a span drawn as a block: the "?" sits inside paragraphs and headings, where a div may not go */}
+      <span
+        ref={card}
+        id={id}
+        role="note"
+        aria-label={label}
+        hidden={!open}
+        style={{ transform: shift ? `translateX(${shift}px)` : undefined }}
+        className="absolute left-0 top-full z-40 mt-3 block w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-4 text-left text-[15px] font-normal leading-relaxed tracking-normal whitespace-normal text-neutral-800 shadow-lg"
+      >
+        {children}
+      </span>
+    </span>
+  );
+}
+
+export interface HowStep {
+  title: string;
+  text: string;
+}
+
+/**
+ * How something works, as numbered steps in a strip (the explain-itself follow-up): a card whose title row folds it away. It starts open;
+ * once someone folds it, this browser remembers (`remember` names it in localStorage, which may be refused or empty: then it is open).
+ */
+export function HowItWorks({
+  title,
+  steps,
+  footer,
+  remember,
+  showLabel,
+  hideLabel,
+}: {
+  title: string;
+  steps: readonly HowStep[];
+  footer?: ReactNode;
+  remember: string;
+  showLabel: string;
+  hideLabel: string;
+}) {
+  const id = useId();
+  const key = `how:${remember}`;
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(key) === "closed") setOpen(false);
+    } catch {
+      // storage refused: the strip stays open
+    }
+  }, [key]);
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    try {
+      window.localStorage.setItem(key, next ? "open" : "closed");
+    } catch {
+      // storage refused: remembered for this page only
+    }
+  }
+  return (
+    <section aria-labelledby={`${id}-title`} className="rounded-[18px] border border-neutral-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-2.5">
+        <h2 id={`${id}-title`} className="text-[17px] font-semibold text-neutral-900">
+          {title}
+        </h2>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={toggle}
+          className={`-mr-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-neutral-700 hover:text-ink-900 ${focusRing}`}
+        >
+          {open ? hideLabel : showLabel}
+          <ChevronDown className={`size-4 ${open ? "rotate-180" : ""}`} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </div>
+      <div id={id} hidden={!open} className="space-y-4 border-t border-neutral-100 px-5 pb-5 pt-4">
+        <ol className="grid gap-x-5 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+          {steps.map((step, index) => (
+            <li key={step.title} className="flex min-w-0 gap-3">
+              <span aria-hidden="true" className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-ink-900 text-[13px] font-bold text-white">
+                {index + 1}
+              </span>
+              <span className="min-w-0 space-y-0.5">
+                <span className="block text-[15px] font-semibold text-neutral-900">{step.title}</span>
+                <span className="block text-[13px] leading-snug text-neutral-600">{step.text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        {footer ? <div className="text-[13px] text-neutral-700">{footer}</div> : null}
+      </div>
+    </section>
+  );
+}
+
 // ------------------------------------------------------------------ messages
 
 export function Alert({ children }: { children: ReactNode }) {
@@ -396,11 +556,14 @@ export function PageHeader({
   intro,
   actions,
   twin,
+  help,
 }: {
   title: string;
   intro?: string;
   actions?: ReactNode;
   twin?: { text: string; lang: "en" | "am" };
+  /** a HelpTip beside the title: what the page is for, in a line or two */
+  help?: { label: string; text: string };
 }) {
   // beside actions the title and intro take what the actions leave (at least 24rem before they wrap under), so a long intro wraps in its
   // column and the actions stay at the right of the row, as the boards draw them
@@ -412,6 +575,11 @@ export function PageHeader({
           <span lang={twin.lang} className="text-2xl font-semibold text-neutral-600">
             <span aria-hidden="true">· </span>
             {twin.text}
+          </span>
+        ) : null}
+        {help ? (
+          <span className="self-center">
+            <HelpTip label={help.label}>{help.text}</HelpTip>
           </span>
         ) : null}
       </div>

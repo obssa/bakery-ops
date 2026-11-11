@@ -45,7 +45,7 @@ import { useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
 import { addisStamp, saveBlob } from "../payments/shared";
 import { CARD, Notice, SectionTabs, Toolbar, ToolbarField } from "../admin/kit";
-import { Alert, Button, PageHeader, Skeleton, Status } from "../ui";
+import { Alert, Button, HelpTip, PageHeader, Skeleton, Status } from "../ui";
 import { focusRing } from "../styles";
 
 // Step 6.4d (fresh-counter.md 4.4, the Admin and CatalogList boards): the title row with its Amharic twin and the exports as its actions,
@@ -328,12 +328,19 @@ export function FreshnessChip({ state, asOf }: { state: Freshness; asOf?: string
   );
 }
 
-/** Under the toolbar: a rebuild that is running, a freshness feed that cannot be read, the days not built with the Rebuild button. */
+/**
+ * Under the toolbar: a rebuild that is running, a freshness feed that cannot be read, the days not calculated with the Rebuild button.
+ * Today alone is not a warning (the explain-itself follow-up, Ramin 2026-11-10: "Days not built" read like a fault): its figures are
+ * calculated about a minute after each sale, so it gets a calm blue line and no button; only past days are named as not calculated.
+ */
 export function FreshnessNotice({ state }: { state: Freshness }) {
   const t = useTranslations("analytics");
   const freshness = state.freshness;
   // said here, not in the notice: an inline rebuild builds the days, and the notice goes with the next look of the feed
   const [done, setDone] = useState<string | null>(null);
+  const today = businessToday();
+  const past = freshness ? freshness.stale_days.filter((day) => day !== today) : [];
+  const todayMissing = !!freshness && freshness.stale_days.includes(today);
   return (
     <>
       {freshness?.running ? (
@@ -342,7 +349,8 @@ export function FreshnessNotice({ state }: { state: Freshness }) {
         </Notice>
       ) : null}
       {state.error && state.loaded ? <Notice tone="amber">{t("fresh.stale_feed")}</Notice> : null}
-      {freshness && freshness.stale_days.length > 0 ? <NotBuilt days={freshness.stale_days} running={freshness.running} onRebuilt={state.refresh} onDone={setDone} /> : null}
+      {todayMissing && past.length === 0 && !freshness?.running ? <Notice tone="blue">{t("stale.today")}</Notice> : null}
+      {freshness && past.length > 0 ? <NotBuilt days={past} running={freshness.running} onRebuilt={state.refresh} onDone={setDone} /> : null}
       <Status>{done}</Status>
     </>
   );
@@ -399,16 +407,18 @@ function NotBuilt({ days, running, onRebuilt, onDone }: { days: string[]; runnin
     <section aria-labelledby={headingId} className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
       <CircleAlert className="mt-0.5 size-5 shrink-0" strokeWidth={2} aria-hidden="true" />
       <div className="min-w-0 flex-1 space-y-2.5">
-        <h2 id={headingId} className="text-[15px] font-semibold">
-          {t("stale.title")}
-        </h2>
+        <div className="flex items-center gap-1">
+          <h2 id={headingId} className="text-[15px] font-semibold">
+            {t("stale.title")}
+          </h2>
+          <HelpTip label={t("stale.help_label")}>{t("stale.help")}</HelpTip>
+        </div>
         <p className="text-[15px]">{t("stale.body", { count: days.length, days: runs.map((run) => spanLabel(run, dates)).join(", ") })}</p>
         {manager ? (
           <div className="flex flex-wrap items-center gap-3">
             <Button variant="secondary" size="md" disabled={busy || running} onClick={() => void rebuild()}>
               {busy || running ? t("stale.rebuilding") : t("stale.rebuild")}
             </Button>
-            <p className="text-[13px]">{t("stale.rebuild_hint")}</p>
           </div>
         ) : (
           <p className="text-[13px]">{t("stale.ask_admin")}</p>

@@ -15,9 +15,9 @@ import { useErrorText } from "@/lib/errors";
 import { authed, useSession } from "@/lib/session";
 import { useActiveStation } from "@/lib/station";
 import { useClock, useIsoDay } from "@/lib/useDates";
-import { CARD, TableCard } from "../admin/kit";
+import { CARD, Notice, TableCard } from "../admin/kit";
 import { HistoryLink } from "../audit/HistoryLink";
-import { Alert, Button, Chip, Field, Modal, PageHeader, Panel, Status, Textarea } from "../ui";
+import { Alert, Button, Chip, Field, HelpTip, Modal, PageHeader, Panel, Status, Textarea } from "../ui";
 import { OnlineOnlyButton } from "../OnlineOnly";
 import { buttonClass } from "../styles";
 import { AdminShiftsNav } from "./admin/common";
@@ -192,6 +192,11 @@ function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
             <Chip tone={STAGE_TONE[stage]} dot>
               {t(`stage_${stage}_badge`)}
             </Chip>
+            {count.status === "awaiting_cosign" || count.status === "pending_approval" ? (
+              <HelpTip label={t(count.status === "awaiting_cosign" ? "chip_cosign_label" : "chip_approval_label")}>
+                {t(count.status === "awaiting_cosign" ? "chip_cosign_help" : "chip_approval_help")}
+              </HelpTip>
+            ) : null}
             <Chip tone="neutral">{t(count.type === "opening" ? "type_opening" : "type_closing")}</Chip>
           </p>
           {count.counted_by || count.cosigned_by || (decided && count.decided_by) ? (
@@ -272,6 +277,12 @@ function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
         {actions.approve || actions.cosign || actions.reject || actions.unlock ? (
           <Panel title={t("decide_title")}>
             <div className="space-y-4">
+              {actions.approve || actions.cosign ? (
+                <Notice tone="blue">
+                  <p className="font-semibold">{t(actions.approve ? "approve_note_title" : "cosign_note_title")}</p>
+                  <p className="mt-1">{t(actions.approve ? "approve_note" : "cosign_note")}</p>
+                </Notice>
+              ) : null}
               {actions.approve || actions.cosign ? (
                 <div className="max-w-xl">
                   <Field label={t("decision_note")} optionalLabel={t("optional")}>

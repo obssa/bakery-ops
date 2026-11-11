@@ -6,13 +6,15 @@ import { Link } from "@/i18n/navigation";
 import type { Locale, QueueRow } from "@/lib/api/types";
 import { signedQuantity, varianceOf } from "@/lib/counts";
 import { trimDecimal } from "@/lib/decimal";
-import { createQueueFeed } from "@/lib/live/counts";
+import { createQueueFeed, type QueueState } from "@/lib/live/counts";
+import type { FeedSnapshot } from "@/lib/live/feed";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useClock, useIsoDay } from "@/lib/useDates";
+import { countWait } from "@/lib/waiting";
 import { Notice } from "../admin/kit";
-import { Chip, Skeleton } from "../ui";
+import { Chip, HelpTip, Skeleton } from "../ui";
 import { buttonClass } from "../styles";
-import { OverviewCard } from "./admin/Overview";
+import { HowShiftsWork, OverviewCard, RunningShifts, SetupCheck } from "./admin/Overview";
 import { itemName } from "./CountLines";
 
 // The admin's queue of counts that wait for a decision (step 3.7b): GET /stock-counts behind an ETag, polled every 5 s. A row says which
@@ -22,6 +24,11 @@ import { itemName } from "./CountLines";
 //
 // Step 6.4d (fresh-counter.md 4.4): a white card titled 17 / 600 with the totals as chips; each count a row on a hairline, its stage and type
 // as chips, "Review" the primary button at the row's end, the lines that differ under it in tabular figures.
+//
+// The explain-itself follow-up (Ramin 2026-11-10, "why someone must wait"): each stage chip has a "?" saying what it means, a line under
+// the row says why it waits and who can act (never the person who counted) and that the place's next count waits for it, and the button
+// says what the review is for: "Review and co-sign" or "Review and approve". The overview reads the queue once (ShiftsOverview below), and
+// the running shifts read it as well, to say what each of them waits for.
 
 const SHOWN_LINES = 4;
 
@@ -33,15 +40,21 @@ function Row({ row }: { row: QueueRow }) {
   const place = row.location ? (locale === "am" ? row.location.name_am || row.location.name_en : row.location.name_en) : "";
   const station = locale === "am" ? row.station.name_am : row.station.name_en;
   const lines = row.variance_lines;
+  const wait = countWait(row);
+  const cosign = wait?.kind === "cosign";
+  const why = wait ? t(`why_${wait.kind}${wait.counter ? "" : "_anon"}`, { station, place: place || t("this_place"), name: wait.counter ?? "" }) : null;
   return (
     <li className="space-y-2.5 py-4 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 space-y-0.5">
           <p className="flex flex-wrap items-center gap-2.5">
             <span className="text-[15px] font-semibold text-neutral-900">{t("count_number", { id: row.id })}</span>
-            <Chip tone="amber" dot>
-              {t(row.status === "awaiting_cosign" ? "stage_waiting_cosign_badge" : "stage_waiting_approval_badge")}
-            </Chip>
+            <span className="inline-flex items-center gap-1">
+              <Chip tone="amber" dot>
+                {t(cosign ? "stage_waiting_cosign_badge" : "stage_waiting_approval_badge")}
+              </Chip>
+              <HelpTip label={t(cosign ? "chip_cosign_label" : "chip_approval_label")}>{t(cosign ? "chip_cosign_help" : "chip_approval_help")}</HelpTip>
+            </span>
             <Chip tone="neutral">{t(row.type === "opening" ? "type_opening" : "type_closing")}</Chip>
           </p>
           <p className="text-[13px] text-neutral-600">
@@ -50,10 +63,15 @@ function Row({ row }: { row: QueueRow }) {
             {row.cosigned_by ? ` · ${t("cosigned_by", { name: row.cosigned_by.name })}` : ""}
           </p>
         </div>
-        <Link href={{ pathname: "/admin/shifts/review", query: { count: row.id } }} aria-label={t("review_link", { id: row.id })} className={buttonClass({ variant: "primary", size: "md" })}>
-          {t("review_open")}
+        <Link
+          href={{ pathname: "/admin/shifts/review", query: { count: row.id } }}
+          aria-label={t(cosign ? "review_link_cosign" : "review_link_approve", { id: row.id })}
+          className={buttonClass({ variant: "primary", size: "md" })}
+        >
+          {t(cosign ? "review_cosign" : "review_approve")}
         </Link>
       </div>
+      {why ? <p className="text-[13px] leading-snug text-amber-900">{why}</p> : null}
       {lines.length === 0 ? (
         <p className="text-[13px] text-neutral-600">{t("queue_no_variance")}</p>
       ) : (
@@ -74,10 +92,9 @@ function Row({ row }: { row: QueueRow }) {
   );
 }
 
-export function ApprovalQueue() {
+/** The counts waiting for a decision, from the queue feed the overview reads (ShiftsOverview). */
+export function ApprovalQueue({ snapshot }: { snapshot: FeedSnapshot<QueueState> | null }) {
   const t = useTranslations("counts");
-  const feed = useMemo(() => createQueueFeed(), []);
-  const snapshot = useLiveFeed(feed);
   const state = snapshot?.state;
   const loaded = !!snapshot?.loaded;
 
@@ -119,5 +136,24 @@ export function ApprovalQueue() {
         </ul>
       ) : null}
     </OverviewCard>
+  );
+}
+
+/**
+ * The admin shifts overview under its tabs: how shifts work (folded away once read), the shifts running now beside the setup check from
+ * 1280 px, and the counts waiting for a decision. The queue is read once here, for the queue itself and for what each running shift waits for.
+ */
+export function ShiftsOverview() {
+  const feed = useMemo(() => createQueueFeed(), []);
+  const snapshot = useLiveFeed(feed);
+  return (
+    <>
+      <HowShiftsWork />
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <RunningShifts queue={snapshot?.state.rows ?? []} />
+        <SetupCheck />
+      </div>
+      <ApprovalQueue snapshot={snapshot} />
+    </>
   );
 }

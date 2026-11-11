@@ -14,7 +14,10 @@ export default async function Page(props: LocaleProps) {
   const titleAm = await amharicTwin(locale, "adminShifts", "title_replay");
   return (
     <RequireAuth permission="shifts.replay">
-      <PageHeader title={t("title_replay")} intro={t("intro_replay")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
+      <PageHeader title={t("title_replay")} intro={t("intro_replay")}
+        twin={titleAm ? { text: titleAm, lang: "am" } : undefined}
+        help={{ label: t("page_help"), text: t("help_replay") }}
+      />
       <div className="flex flex-col gap-6">
         <AdminShiftsNav />
         <ReplayScreen />

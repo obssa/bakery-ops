@@ -14,7 +14,10 @@ export default async function Page(props: LocaleProps) {
   const titleAm = await amharicTwin(locale, "adminShifts", "title_notes");
   return (
     <RequireAuth permission="shifts.view">
-      <PageHeader title={t("title_notes")} intro={t("intro_notes")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
+      <PageHeader title={t("title_notes")} intro={t("intro_notes")}
+        twin={titleAm ? { text: titleAm, lang: "am" } : undefined}
+        help={{ label: t("page_help"), text: t("help_notes") }}
+      />
       <div className="flex flex-col gap-6">
         <AdminShiftsNav />
         <NotesScreen />

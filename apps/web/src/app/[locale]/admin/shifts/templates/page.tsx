@@ -16,7 +16,10 @@ export default async function Page(props: LocaleProps) {
   // the screen reads ?station= (the setup check's link) on the client; a static page needs it behind Suspense
   return (
     <RequireAuth permission="shifts.view">
-      <PageHeader title={t("title_templates")} intro={t("intro_templates")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
+      <PageHeader title={t("title_templates")} intro={t("intro_templates")}
+        twin={titleAm ? { text: titleAm, lang: "am" } : undefined}
+        help={{ label: t("page_help"), text: t("help_templates") }}
+      />
       <div className="flex flex-col gap-6">
         <AdminShiftsNav />
         <Suspense fallback={null}>

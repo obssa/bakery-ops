@@ -140,8 +140,8 @@ test.describe("p4 analytics dashboards", () => {
     await openAs(page, admin, `en/admin/analytics/?from=${from}&to=${to}`);
     await expect(page.getByRole("heading", { level: 1, name: "Analytics" })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Custom range", exact: true })).toHaveAttribute("aria-pressed", "true");
-    const notice = page.getByRole("region", { name: "Days not built" });
-    await expect(notice).toContainText("7 days of this range are not built yet", { timeout: 30_000 });
+    const notice = page.getByRole("region", { name: "Not calculated yet" });
+    await expect(notice).toContainText("7 days of this range are not calculated yet", { timeout: 30_000 });
     // nothing built is never shown as zero
     await expect(page.getByRole("group", { name: "Revenue", exact: true })).toContainText("—");
 

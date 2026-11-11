@@ -13,7 +13,9 @@ chain (see the [runbook](../runbook/server.md#nightly-chain-verification-phase-3
 
 ## Approving
 
-- Admin > Shifts > Review lists what waits for approval. A manager or the admin approves or rejects each difference.
+- Admin > Shifts lists the counts waiting for a decision. Each says why it waits and who can act; its button reads **Review and
+  co-sign** or **Review and approve**. A manager or the admin approves or sends back each difference. A shift started without a template
+  shows as **Unscheduled**.
 - **No one approves their own count**, the admin included (D4). A shop with one admin needs a second manager or admin.
 - An approved count is locked. To correct it, make a new count; a locked count never changes.
 

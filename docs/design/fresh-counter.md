@@ -174,6 +174,13 @@ Icons come from `lucide-react` at 1.75-2 px stroke, 18-22 px; an icon-only butto
   bad).
 - **Avatar.** A circle with initials on `neutral-900`, or the user's photo.
 - **EmptyState.** A 48 px icon in a `neutral-100` circle, a title, one line of help and at most one action.
+- **HelpTip (explain-itself follow-up).** A "?" (`CircleHelp`, `neutral-500`, `ink-900` on hover or open) in a 44 px round button beside
+  something that needs a word: a page title (`PageHeader`'s `help`), a status chip, a notice's heading. It opens a white card under it
+  (`rounded-xl`, the floating shadow, 15 px text, at most 22 rem and kept 16 px inside the window) saying what the thing is, why, and what
+  to do. A disclosure, not a dialog: `aria-expanded` on the button, the card a named `note`; Esc and a tap anywhere else close it.
+- **HowItWorks.** A white card whose title row folds it away: numbered steps (an `ink-900` circle with the number, a 15 / 600 title and
+  a 13 px line) in a strip of four columns from 1280 px, two from 640 px, and an optional line under them. It starts open; folding it is
+  remembered in this browser.
 - **Skeleton.** `neutral-100` blocks with a slow `motion-safe` pulse, used while a first load is pending.
 - **Modal / Drawer.** Dialog semantics stay as they are. Modals are `rounded-[20px]` with 24 px padding and the floating shadow; the
   drawer is 480 px from the right; the scrim is `neutral-900/40`.

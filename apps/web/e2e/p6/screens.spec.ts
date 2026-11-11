@@ -1325,3 +1325,89 @@ function around(message: string): RegExp {
   const [before, after = ""] = message.split(/\{\w+\}/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   return new RegExp(`^${before}.*${after}$`);
 }
+
+// --- phase-6/explain: the screens that explain themselves ---------------------------------------------------------------------------------
+//
+// The explain-itself follow-up (Ramin 2026-11-10: shifts are hard to understand, why someone must wait, what "Ad hoc" and "Review" mean,
+// "Days not built"): the Shifts overview with "How shifts work", a count of the cake room waiting for its co-signature (the cake baker hands
+// it in; the cake room needs a second person) and that count's "?" open; its review page with "What happens when you co-sign"; and the
+// analytics overview, where today alone is a calm blue line. At 1440 x 900 and 390 x 844, in English and in Amharic; at the phone's width the
+// page must not scroll sideways, and axe runs with the "?" open. The admin co-signs the count afterwards and the cake room's shift is open
+// again, whatever happened.
+
+test.describe("screens: the explain-itself help", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  test("the Shifts overview, a count waiting for its co-signature and its review, and analytics, at 1440 and 390, in en and am", async ({ page }) => {
+    test.setTimeout(300_000);
+    const demo = await demoProduction();
+    const cakeRoom = demo.stations.find((s) => s.code === "cake_room");
+    if (!cakeRoom) throw new Error("the demo bakery has no cake room");
+    const baker = await demoPerson(demo, "cake_baker");
+    const sizes = async (name: string) => {
+      for (const [size, viewport] of [["1440x900", DESKTOP], ["390x844", PHONE]] as const) {
+        await page.setViewportSize(viewport);
+        await capture(page, `${name}-${size}`);
+        if (size === "390x844") {
+          const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+          expect(scroll, `${name} at 390 x 844 scrolls sideways`).toBeLessThanOrEqual(client);
+        }
+      }
+      await page.setViewportSize(DESKTOP);
+    };
+    try {
+      // a count to wait for: the cake room's shift closed (or a new one started) and its counts handed in as they stand by the cake baker
+      await resolvePendingCounts(demo.admin, cakeRoom);
+      let shift = await currentShift(demo.admin, cakeRoom);
+      if (shift?.status === "open") await baker.api.post(`/shifts/${shift.id}/close`, {});
+      if (!shift) await baker.api.post(`/stations/${cakeRoom.id}/shifts/start`, { client_uuid: uuid() });
+      shift = await currentShift(demo.admin, cakeRoom);
+      if (!shift) throw new Error("the cake room has no running shift to count");
+      await finishClosingCounts(baker.api, shift.id);
+
+      for (const locale of ["en", "am"] as const) {
+        const t = MESSAGES[locale];
+        await openAdmin(page, `${locale}/admin/shifts/`, t.counts.admin_title);
+        await expect(page.getByRole("region", { name: t.adminShifts.how.title, exact: true })).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText(t.adminShifts.running.loading)).toHaveCount(0, { timeout: 30_000 });
+        const review = page.getByRole("link", { name: t.counts.review_cosign }).first();
+        await expect(review).toBeVisible({ timeout: 30_000 });
+        await sizes(`explain-shifts-${locale}`);
+
+        // the waiting chip's "?" open, by the count
+        const tip = page.getByRole("button", { name: t.counts.chip_cosign_label, exact: true }).first();
+        await tip.scrollIntoViewIfNeeded();
+        await tip.click();
+        await expect(tip).toHaveAttribute("aria-expanded", "true");
+        await expect(page.getByRole("note", { name: t.counts.chip_cosign_label })).toBeVisible();
+        await sizes(`explain-shifts-tip-${locale}`);
+        // the card is still open after the resizes; Esc closes it and gives the focus back
+        await expectAccessible(page, `Shifts overview with a "?" open (${locale})`);
+        await page.keyboard.press("Escape");
+        await expect(tip).toHaveAttribute("aria-expanded", "false");
+        await expect(tip).toBeFocused();
+
+        await review.click();
+        await expect(page.getByText(t.counts.cosign_note_title, { exact: true })).toBeVisible({ timeout: 30_000 });
+        await page.getByText(t.counts.cosign_note_title, { exact: true }).scrollIntoViewIfNeeded();
+        await sizes(`explain-review-${locale}`);
+        await expectAccessible(page, `the review of a count waiting for its co-signature (${locale})`);
+
+        await openAdmin(page, `${locale}/admin/analytics/`, t.analytics.overview.title);
+        await expect(page.getByRole("group", { name: t.analytics.kpi.revenue, exact: true })).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
+        const notCalculated = page.getByRole("region", { name: t.analytics.stale.title, exact: true });
+        if ((await notCalculated.count()) > 0) await notCalculated.getByRole("button", { name: t.analytics.stale.help_label, exact: true }).click();
+        await sizes(`explain-analytics-${locale}`);
+        await expectAccessible(page, `analytics with the days not calculated (${locale})`);
+      }
+    } finally {
+      try {
+        await resolvePendingCounts(demo.admin, cakeRoom);
+        await ensureOpenShift(demo.admin, cakeRoom);
+      } catch (error) {
+        console.warn(`[screens] the cake room's shift was not put back: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  });
+});

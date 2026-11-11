@@ -7,7 +7,9 @@ Staff, Shifts, and "Me" (a person's own figures). Each compares the chosen days 
 
 - **Today** is at most about three minutes behind the till: a payment asks for today to be rebuilt a minute later.
 - **Yesterday** is rebuilt after midnight, and again when a shift locks.
-- A day the server has not built yet shows as **"not built"**, never as zero. Wait a minute or two, or press **Rebuild**.
+- A day the server has not calculated yet shows as **"Not calculated yet"**, never as zero. Today alone gets a calm blue line instead
+  (its figures catch up within a few minutes of each sale); a past day can be calculated again with **Rebuild**. The "?" by the heading
+  says the same on the screen.
 
 The [runbook's "Dashboards and the cron"](../runbook/server.md#dashboards-and-the-cron) explains the rebuilds for whoever is on call.
 
