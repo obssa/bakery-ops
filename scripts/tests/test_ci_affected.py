@@ -240,5 +240,83 @@ class Workflow(unittest.TestCase):
                 self.assertNotIn("if:", check.group(0), where)
 
 
+SHA = "a" * 40
+GH_REPO = "obssa/bakery-ops"
+
+
+def pr_run(**over) -> dict:
+    run = {"id": 7, "head_sha": SHA, "event": "pull_request", "status": "completed", "conclusion": "success",
+           "head_repository": {"full_name": GH_REPO}, "created_at": "2026-11-11T20:00:00Z", "html_url": "https://x/runs/7"}
+    run.update(over)
+    return run
+
+
+class MainReusesThePullRequestRun(unittest.TestCase):
+    def main_out(self, argv: list[str], env: dict | None = None) -> str:
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, {"GITHUB_OUTPUT": "", "GITHUB_STEP_SUMMARY": "", **(env or {})}), contextlib.redirect_stdout(out):
+            self.assertEqual(ci_affected.main(argv), 0)
+        return out.getvalue()
+
+    def test_a_pull_request_always_runs_everything(self):
+        self.assertIn("full=true", self.main_out(["--event", "pull_request"]))
+        self.assertIn("full=true", self.main_out(["--event", "pull_request", "--base", "x", "--head", "y"]))
+
+    def test_the_same_commit_full_and_green_is_reused(self):
+        self.assertEqual(ci_affected.pick_reusable([pr_run()], SHA, GH_REPO, lambda r: True)["id"], 7)
+
+    def test_a_run_that_is_not_full_green_same_commit_or_ours_is_not(self):
+        always = lambda r: True  # noqa: E731
+        self.assertIsNone(ci_affected.pick_reusable([pr_run()], SHA, GH_REPO, lambda r: False))
+        self.assertIsNone(ci_affected.pick_reusable([pr_run(conclusion="failure")], SHA, GH_REPO, always))
+        self.assertIsNone(ci_affected.pick_reusable([pr_run(status="in_progress", conclusion=None)], SHA, GH_REPO, always))
+        self.assertIsNone(ci_affected.pick_reusable([pr_run(head_sha="b" * 40)], SHA, GH_REPO, always))
+        self.assertIsNone(ci_affected.pick_reusable([pr_run(event="push")], SHA, GH_REPO, always))
+        self.assertIsNone(ci_affected.pick_reusable([pr_run(head_repository={"full_name": "someone/fork"})], SHA, GH_REPO, always))
+        self.assertIsNone(ci_affected.pick_reusable([pr_run(head_repository=None)], SHA, GH_REPO, always))
+
+    def test_the_newest_reusable_run_wins(self):
+        runs = [pr_run(id=1, created_at="2026-11-11T10:00:00Z"), pr_run(id=2, created_at="2026-11-11T12:00:00Z")]
+        self.assertEqual(ci_affected.pick_reusable(runs, SHA, GH_REPO, lambda r: True)["id"], 2)
+
+    def test_a_push_with_a_reusable_run_selects_nothing(self):
+        with mock.patch.object(ci_affected, "reusable_run", return_value=pr_run()):
+            out = self.main_out(["--event", "push", "--sha", SHA, "--before", "b" * 40, "--repo", GH_REPO], {"GITHUB_TOKEN": "t"})
+        self.assertIn("full=false", out)
+        self.assertIn("jobs=[]", out)
+
+    def test_a_push_runs_everything_when_the_api_cannot_answer(self):
+        boom = mock.Mock(side_effect=ci_affected.urllib.error.URLError("down"))
+        with mock.patch.object(ci_affected, "reusable_run", boom), mock.patch.object(ci_affected, "changed_files", return_value=["apps/web/a.tsx"]):
+            out = self.main_out(["--event", "push", "--sha", SHA, "--before", "b" * 40, "--repo", GH_REPO], {"GITHUB_TOKEN": "t"})
+        self.assertIn("full=true", out)
+
+    def test_a_push_without_a_token_never_reuses(self):
+        with mock.patch.object(ci_affected, "reusable_run") as asked, mock.patch.object(ci_affected, "changed_files", return_value=["apps/web/a.tsx"]):
+            out = self.main_out(["--event", "push", "--sha", SHA, "--before", "b" * 40, "--repo", GH_REPO], {"GITHUB_TOKEN": ""})
+        asked.assert_not_called()
+        self.assertIn("full=true", out)
+
+    def test_a_docs_only_push_runs_the_doc_checks(self):
+        self.assertEqual(ci_affected.docs_only_jobs(["docs/phases/STATUS.json", "docs/phases/phase-6-report.md"]), ["invariants"])
+        self.assertEqual(ci_affected.docs_only_jobs(["docs/openapi.json", "docs/i18n/am-review.csv", "docs/erd.dbml"]),
+                         ["erd-check", "i18n-check", "invariants", "openapi-check"])
+        self.assertIsNone(ci_affected.docs_only_jobs(["docs/x.md", "apps/web/a.tsx"]))
+        self.assertIsNone(ci_affected.docs_only_jobs(["README.md"]))
+        self.assertIsNone(ci_affected.docs_only_jobs([]))
+        with mock.patch.object(ci_affected, "reusable_run", return_value=None),                 mock.patch.object(ci_affected, "changed_files", return_value=["docs/go-live/signoffs/x.md"]):
+            out = self.main_out(["--event", "push", "--sha", SHA, "--before", "b" * 40, "--repo", GH_REPO], {"GITHUB_TOKEN": "t"})
+        self.assertIn("full=false", out)
+        self.assertIn('jobs=["invariants"]', out)
+
+    def test_a_new_branch_push_runs_everything(self):
+        with mock.patch.object(ci_affected, "reusable_run", return_value=None):
+            out = self.main_out(["--event", "push", "--sha", SHA, "--before", "0" * 40, "--repo", GH_REPO], {"GITHUB_TOKEN": "t"})
+        self.assertIn("full=true", out)
+
+    def test_a_manual_run_runs_everything(self):
+        self.assertIn("full=true", self.main_out(["--event", "workflow_dispatch"]))
+
+
 if __name__ == "__main__":
     unittest.main()

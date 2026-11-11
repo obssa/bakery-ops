@@ -4,11 +4,14 @@
 # phase N relies on. Jobs for phases above docs/phases/STATUS.json current_phase are skipped.
 # Every job states its timeout-minutes (phase-5 plan 7.1, step 5.5d): 20 unless a measured run needs more, so a hung step cannot hold a
 # runner for six hours; a job that calls a reusable workflow gets the workflow's own (module-tests.yml 20 or its input, e2e.yml 30).
-# A pull request runs only the jobs its change can affect (the `changes` job, scripts/ci_affected.py: a module's job and every module job
-# downstream of it, the web jobs for the web, every e2e project for any app change); a push to main and a manual run run everything, so
-# main's full run stays the gate before the deploy. Each job's `if:` has two branches: the full run keeps `success()` (a failed or
-# skipped need skips the job, as before), and a selective run starts a selected job when every need it has passed or was not selected.
-# The gate jobs are the required checks: they always run, and fail when anything they wait for failed. The label full-ci runs everything.
+# Every pull request runs everything, and its `changes` job uploads the artifact ci-full-run. A pull request is merged by moving main to
+# its head, so a push to main reuses that run (the `changes` job, scripts/ci_affected.py): when the pushed commit has a successful full
+# pull request run from this repository, no job is selected, every test job is skipped, the gates run gate_check only, the run passes
+# and deploy.yml starts; nothing reaches the site that did not pass the full graph on that very commit. A push that changes only docs/
+# runs invariants and the checks of the generated files it touches; any other push, a manual run, or any doubt runs everything.
+# Each job's `if:` has two branches: the full run keeps `success()` (a failed or skipped need skips the job, as before), and a selective
+# run starts a selected job when every need it has passed or was not selected. The gate jobs are the required checks: they always run,
+# and fail when anything they wait for failed.
 name: ci
 
 on:
@@ -47,9 +50,14 @@ jobs:
   changes:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # actions: read lets a push to main find the pull request run it reuses (runs and their artifacts)
+    permissions:
+      contents: read
+      actions: read
     outputs:
       full: ${{ steps.c.outputs.full }}
       jobs: ${{ steps.c.outputs.jobs }}
+      reuse: ${{ steps.c.outputs.reuse }}
     steps:
       - uses: actions/checkout@v4
         # full history: the changed files are the diff between the pull request's base and its head
@@ -63,7 +71,19 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-        run: python3 scripts/ci_affected.py --event "$EVENT" --base "$BASE" --head "$HEAD" --labels-json "$LABELS"
+          SHA: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/ci_affected.py --event "$EVENT" --base "$BASE" --head "$HEAD" --labels-json "$LABELS"
+          --sha "$SHA" --before "$BEFORE"
+      # the mark a push to main looks for before it reuses this run: this pull request run selected everything
+      - name: Mark this run as a full run
+        if: github.event_name == 'pull_request' && steps.c.outputs.full == 'true'
+        run: echo "${{ github.event.pull_request.head.sha }}" > ci-full-run.txt
+      - if: github.event_name == 'pull_request' && steps.c.outputs.full == 'true'
+        uses: actions/upload-artifact@v4
+        with: { name: ci-full-run, path: ci-full-run.txt, retention-days: 30 }
 
   # ------------------------------------------------------------------ api static
   api-lint:

@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
-"""Which CI jobs a pull request's change can affect (the `changes` job of .github/workflows/ci.yml).
+"""Which CI jobs a change runs (the `changes` job of .github/workflows/ci.yml).
 
-  ci_affected.py --event pull_request --base <sha> --head <sha> [--labels-json '["full-ci"]']
-  ci_affected.py --files apps/web/src/a.tsx docs/x.md      # what a list of paths would run (no git)
+  ci_affected.py --event pull_request                                  # a pull request: always the full graph
+  ci_affected.py --event push --sha <sha> --before <sha> [--repo o/r]  # a push to main: reuse, docs only, or full
+  ci_affected.py --files apps/web/src/a.tsx docs/x.md                  # what a list of paths would select (no git)
 
-A push to main and a manual run always run everything: main's full run is the gate before the deploy. A pull request
-runs the jobs its changed files can affect, and anything it cannot place runs everything (the safe default):
+Every pull request runs everything (2026-11-11, Ramin: "no more long waiting time"). A pull request is merged by moving main to its
+head, so main's commit is the commit the pull request's full run tested; a push to main therefore reuses that run instead of running
+the graph a second time:
+
+  reuse      a push whose commit has a successful `ci` run of event pull_request from this repository that ran in full (its
+             `changes` job uploaded the artifact ci-full-run) selects no job: every test job is skipped, the gates run gate_check
+             only, the run concludes success and deploy.yml starts. The tested tree is main's tree: the pull request's merge ref is
+             its head merged into a base that is an ancestor of main (main is never force-pushed), and that merge is the head.
+  docs only  a push that changes nothing outside docs/ (Ramin's sign-offs in the web editor, the status and report commits) runs
+             invariants plus the check of each generated file it touches (openapi-check, erd-check, i18n-check); the gates still
+             run gate_check, which reads STATUS.json, the reports, the ADRs and the go-live checklist.
+  full       anything else, a manual run, or any doubt (no token, the API unreachable, the diff unreadable).
+
+`affected()` (the per-path selection, below) is kept for --files and its tests; it decided what a pull request ran between
+2026-11-10 and 2026-11-11:
 
   apps/api/app/Modules/<M>, tests/Modules/<M>, routes/modules/<m>.php
                       mod-<m> and every module job downstream of it (its consumers in the manifest's modules.*.depends_on
@@ -13,17 +27,15 @@ runs the jobs its changed files can affect, and anything it cannot place runs ev
                       interface_only), the static API jobs, and the jobs that run the whole app (below)
   any other apps/api  every API job (Shared, migrations, seeders, config, routes/api.php, tests/Support, tests/Gate, ...)
   apps/web            web-lint, i18n-check, web-build, web-errors
-  any apps/ change    docker-build and every e2e-p* project: the screens go through the API, and the e2e suite proves the
-                      flows end to end. An API change also runs every job with no rule of its own (rules-off-gates,
-                      files-s3, perf-*, backup-drill: they run the API as a whole) and the Pest steps of gate-p4 .. gate-p6
+  any apps/ change    docker-build and every e2e-p* project
   tools/print-bridge  print-bridge
   docs/openapi.json   openapi-check; docs/erd.dbml erd-check; docs/i18n/ i18n-check; any doc: invariants
-  full run            .github/, scripts/, docker/, compose files, Makefile, .claude/ (the manifest and the skill's scripts),
-                      docs/phases/ (STATUS.json and the reports gate_check reads), docs/adr/, docs/go-live*, an unknown path,
-                      or the label full-ci
+  full run            .github/, scripts/, docker/, compose files, Makefile, .claude/, docs/phases/, docs/adr/, docs/go-live*,
+                      an unknown path, or the label full-ci
 
 The gate jobs gate-p0 .. gate-p6 are the required checks: they always run, and a gate whose Pest step was not selected
-runs only gate_check. Outputs (to $GITHUB_OUTPUT when set): full=true|false and jobs=<JSON list of job ids>.
+runs only gate_check. Outputs (to $GITHUB_OUTPUT when set): full=true|false, jobs=<JSON list of job ids> and reuse=<run URL or
+empty>.
 Exit 0, or 2 on a usage error.
 """
 from __future__ import annotations
@@ -34,11 +46,15 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = ".claude/skills/bakery-ops-builder/assets/dependency-manifest.json"
 WORKFLOW = ".github/workflows/ci.yml"
 FULL_LABEL = "full-ci"
+FULL_MARKER = "ci-full-run"  # the artifact a pull request's full run uploads (ci.yml, changes job)
 
 STATIC_API = ["api-lint", "api-arch", "invariants", "openapi-check", "erd-check"]
 WEB = ["web-lint", "i18n-check", "web-build", "web-errors"]
@@ -226,6 +242,72 @@ def changed_files(root: str, base: str, head: str) -> list[str] | None:
     return [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
 
 
+def docs_only_jobs(files: list[str]) -> list[str] | None:
+    """The jobs a push to main that changes only docs/ runs, or None when a file lies outside docs/ (or nothing changed)."""
+    if not files or not all(f.startswith("docs/") for f in files):
+        return None
+    jobs = {"invariants"}
+    for f in files:
+        if f == "docs/openapi.json":
+            jobs.add("openapi-check")
+        elif f == "docs/erd.dbml":
+            jobs.add("erd-check")
+        elif f.startswith("docs/i18n/"):
+            jobs.add("i18n-check")
+    return sorted(jobs)
+
+
+def pick_reusable(runs: list[dict], sha: str, repo: str, ran_in_full) -> dict | None:
+    """The newest run in `runs` (the Actions API's workflow_runs) that main's push to `sha` may reuse: a successful run of event
+    pull_request on that very commit, from this repository, that ran in full (`ran_in_full(run)`: it carries the marker)."""
+    for run in sorted(runs, key=lambda r: r.get("created_at") or "", reverse=True):
+        if (run.get("head_sha") == sha and run.get("event") == "pull_request" and run.get("status") == "completed"
+                and run.get("conclusion") == "success"
+                and (run.get("head_repository") or {}).get("full_name") == repo
+                and ran_in_full(run)):
+            return run
+    return None
+
+
+def api_get(path: str, token: str) -> dict:
+    req = urllib.request.Request(f"https://api.github.com/{path}", headers={
+        "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
+def reusable_run(repo: str, sha: str, token: str) -> dict | None:
+    """Ask the Actions API for a pull request run main may reuse (None when there is none)."""
+    q = urllib.parse.urlencode({"head_sha": sha, "event": "pull_request", "status": "success", "per_page": 20})
+    runs = api_get(f"repos/{repo}/actions/workflows/ci.yml/runs?{q}", token).get("workflow_runs", [])
+
+    def ran_in_full(run: dict) -> bool:
+        arts = api_get(f"repos/{repo}/actions/runs/{run['id']}/artifacts?name={FULL_MARKER}", token)
+        return any(a.get("name") == FULL_MARKER and not a.get("expired") for a in arts.get("artifacts", []))
+
+    return pick_reusable(runs, sha, repo, ran_in_full)
+
+
+def push_result(root: str, sha: str | None, before: str | None, repo: str | None, token: str | None) -> dict:
+    """What a push to main runs: reuse a pull request's full run of the same commit, else docs only, else everything."""
+    if sha and repo and token:
+        try:
+            run = reusable_run(repo, sha, token)
+        except (urllib.error.URLError, OSError, ValueError, KeyError) as e:
+            print(f"::warning::cannot ask the Actions API for a run to reuse ({e}): running everything")
+            run = None
+        if run:
+            url = run.get("html_url") or f"https://github.com/{repo}/actions/runs/{run['id']}"
+            return {"full": False, "jobs": [], "reuse": url,
+                    "reasons": [(f"pull request run {run['id']}", f"reused: it ran everything on {sha[:12]} and passed")]}
+    if sha and before and not re.fullmatch(r"0+", before):
+        files = changed_files(root, before, sha)
+        jobs = docs_only_jobs(files or [])
+        if jobs is not None:
+            return {"full": False, "jobs": jobs, "reuse": "", "reasons": [(f, "docs only") for f in files]}
+    return {"full": True, "jobs": [], "reuse": "", "reasons": [("push to main", "full run (no pull request run to reuse)")]}
+
+
 def check_needs(needs: dict, full: str, jobs: list[str]) -> list[str]:
     """What is wrong with a gate's needs (toJSON(needs) of the gate job): every need passed, except, on a selective run, a
     job the change did not select, which is skipped. A gate, `status` and `changes` always run, so they must have passed."""
@@ -250,6 +332,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--base")
     ap.add_argument("--head")
     ap.add_argument("--labels-json", default="[]")
+    ap.add_argument("--sha", help="a push: the commit pushed")
+    ap.add_argument("--before", help="a push: the commit main pointed at before it")
+    ap.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY"))
     ap.add_argument("--files", nargs="*")
     ap.add_argument("--check-needs", action="store_true",
                     help="in a gate job: fail unless every need passed or was not selected (reads NEEDS, FULL and JOBS)")
@@ -272,19 +357,14 @@ def main(argv: list[str]) -> int:
     jobs, phases = read_workflow(a.root)
     phase = current_phase(a.root)
     labels = json.loads(a.labels_json or "[]") or []
-    if a.event != "pull_request":
-        result = {"full": True, "jobs": [], "reasons": [(f"event {a.event}", "full run")]}
-    elif a.files is not None:
+    if a.files is not None:
         result = affected(a.files, manifest, jobs, labels, phases, phase)
-    elif a.base and a.head:
-        files = changed_files(a.root, a.base, a.head)
-        if files is None:
-            result = {"full": True, "jobs": [], "reasons": [("git diff failed", "full run")]}
-        else:
-            result = affected(files, manifest, jobs, labels, phases, phase)
+    elif a.event == "pull_request":
+        result = {"full": True, "jobs": [], "reasons": [("pull request", "full run: every pull request runs everything, so main can reuse it")]}
+    elif a.event == "push":
+        result = push_result(a.root, a.sha, a.before, a.repo, os.environ.get("GITHUB_TOKEN"))
     else:
-        print("ci_affected: a pull request needs --base and --head (or --files)", file=sys.stderr)
-        return 2
+        result = {"full": True, "jobs": [], "reasons": [(f"event {a.event}", "full run")]}
     full = "true" if result["full"] else "false"
     print(f"full={full}")
     print(f"jobs={json.dumps(result['jobs'])}")
@@ -292,10 +372,12 @@ def main(argv: list[str]) -> int:
         print(f"  {path}: {what}")
     if os.environ.get("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-            f.write(f"full={full}\njobs={json.dumps(result['jobs'], separators=(',', ':'))}\n")
+            f.write(f"full={full}\njobs={json.dumps(result['jobs'], separators=(',', ':'))}\nreuse={result.get('reuse', '')}\n")
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
             f.write("### What this change runs\n\n")
+            if result.get("reuse"):
+                f.write(f"Nothing runs again: this commit's pull request run passed in full, {result['reuse']}\n\n")
             f.write("Everything (the full graph).\n\n" if result["full"] else f"{len(result['jobs'])} jobs: {', '.join(result['jobs'])}\n\n")
             f.write("| Path | Runs |\n|---|---|\n")
             for path, what in result["reasons"][:200]:

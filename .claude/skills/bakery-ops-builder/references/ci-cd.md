@@ -100,11 +100,25 @@ compose profile, `ws` (not part of `full`); `e2e.yml` sets `BROADCAST_CONNECTION
 Reverb); the Phase 5 plan settled `e2e-p5` on polling too (step 5.1b; it listed `full,ws` before). When a WebSocket transport is switched on, Reverb inside compose: the app container reaches `ws:8080`;
 the browser reaches `localhost:8080`. These are two env vars (`REVERB_HOST` vs `NEXT_PUBLIC_REVERB_HOST`), never one.
 
-## Pull requests run what their change can affect (Ramin, 2026-11-10)
+## Pull requests run everything; main reuses that run (Ramin, 2026-11-11)
 
-A push to `main` and a manual run run the whole graph above: main's full run is the gate before the deploy (`deploy.yml` deploys only
-after a green `push` run). A pull request runs only the jobs its change can affect. The `changes` job (beside `status`) reads the
-diff between the PR's base and head (`git diff --name-only --no-renames base...head`) and `scripts/ci_affected.py` maps it:
+Every pull request runs the whole graph, and its `changes` job uploads the artifact `ci-full-run`. A pull request is merged by
+fast-forwarding `main` to its head, so `main`'s commit is the very commit that run tested. A push to `main` therefore does not run the
+graph a second time: the `changes` job (`permissions: actions: read`) asks the Actions API for a successful `ci` run of event
+`pull_request` on the pushed SHA, from this repository, that carries `ci-full-run`. When there is one, it selects no job (`full=false`,
+`jobs=[]`, `reuse=<run url>` in the step summary): every test job is skipped, the gates run `--check-needs` and `gate_check` only, the
+run concludes success within a few minutes and `deploy.yml` (which builds its own release and reads no artifact of the ci run) starts.
+The tested tree is main's tree: the PR's merge ref is its head merged into a base that is an ancestor of `main` (never force-pushed),
+which is the head itself. A push that changes only `docs/` (Ramin's sign-offs, the status and report commits) runs `invariants` plus
+`openapi-check` / `erd-check` / `i18n-check` for the generated files it touches; any other push, a manual run, a missing token or an
+unreachable API runs everything. When `main`'s run reused a PR run, `phase_status.py set-run-url` records the PR run (the run that ran
+the tests); `gate_check` never reads `gate_run_url`.
+
+Push to live is then the PR's full run (about 1 h 40 m) plus the deploy and `@live` (about 40 m), instead of both full runs.
+
+### The per-path selection (pull requests, 2026-11-10 to 2026-11-11; kept for `--files` and docs-only pushes)
+
+`scripts/ci_affected.py --files <paths>` still answers what a set of paths would select:
 
 | Changed path | Runs |
 |---|---|
@@ -117,7 +131,7 @@ diff between the PR's base and head (`git diff --name-only --no-renames base...h
 | any other doc (`docs/`, a root `*.md`) | `invariants` |
 | `.github/`, `scripts/`, `docker/`, compose files, `Makefile`, `.claude/`, `.githooks/`, `docs/phases/`, `docs/adr/`, `docs/go-live*`, an unknown path | everything |
 
-The label `full-ci` runs everything on a PR (adding it restarts the run). A job of a phase not reached yet is left out of the selection.
+A job of a phase not reached yet is left out of the selection.
 
 How ci.yml carries it: every job needs `changes`, and its `if:` has two branches. The full run keeps `success()`, so a failed or
 skipped need skips the job exactly as before. A selective run starts a selected job when every need it has passed or was not selected,
@@ -165,9 +179,10 @@ another PR has merged, they prove nothing about the combination. So for every PR
 2. Never hand-merge the generated docs. On a conflict in `docs/openapi.json` take either side and re-export it the way the
    `openapi-check` job prints (`scripts/artisan scramble:export --path=../../docs/openapi.json`, against a migrated database);
    in `docs/erd.dbml` add every table `erd-check` (`scripts/erd_check.py`) lists as missing. Commit the result with the merge.
-3. Push and let CI run on the merged head; only that run counts. It runs what the PR's own change can affect (the section above),
-   now on top of the other PR's code; the full graph runs again on `main` before the deploy, and the label `full-ci` runs it on the PR.
-4. Fast-forward `main` to that head (`git merge --ff-only`), so main gets the very commit that was green.
+3. Push and let CI run on the merged head; only that run counts. It runs the full graph on top of the other PR's code.
+4. Fast-forward `main` to that head (`git merge --ff-only`), so main gets the very commit that was green and its push reuses that run.
+   Anything pushed to `main` in between (a status commit) moves `main` past the PR's base: merge it in again and let the PR run again.
+   So status and report commits go onto the next PR's branch, not straight onto `main`.
 
 The next PR in line then merges the new `main` the same way.
 
