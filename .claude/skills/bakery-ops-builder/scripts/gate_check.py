@@ -25,12 +25,14 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import http.client
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -240,11 +242,22 @@ def api_get(path: str) -> dict:
         req = urllib.request.Request(f"{base}/{path}", headers={
             "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "bakery-ops-gate-check"})
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, ValueError) as e:
-            raise ApiError(str(e)) from e
+        # a dropped answer (http.client.IncompleteRead, a reset, a timeout: seen during GitHub's incident of 2026-11-11, when it
+        # crashed gate-p5 with a traceback) is asked again, twice, before it counts as the API's failure
+        last: Exception | None = None
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code < 500:
+                    raise ApiError(str(e)) from e
+                last = e
+            except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as e:
+                last = e
+            if attempt < 2:
+                time.sleep(2 + 3 * attempt)
+        raise ApiError(str(last)) from last
     gh = shutil.which("gh")
     if not gh:
         raise ApiError("no GH_TOKEN and no gh CLI to read the Actions API")

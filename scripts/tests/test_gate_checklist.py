@@ -673,5 +673,45 @@ class BranchProtection(unittest.TestCase):
         self.assertEqual((code, out), (1, "cannot read main: HTTP 401"))
 
 
+
+class ApiGetRetries(unittest.TestCase):
+    """A dropped Actions API answer is asked again (GitHub's incident of 2026-11-11 crashed gate-p5 with IncompleteRead)."""
+
+    class Resp:
+        def __init__(self, body: bytes) -> None:
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return self.body
+
+    def test_a_dropped_answer_is_asked_again(self) -> None:
+        import http.client
+        calls = [http.client.IncompleteRead(b"", 9424), self.Resp(b'{"ok": true}')]
+
+        def urlopen(req, timeout=30):
+            got = calls.pop(0)
+            if isinstance(got, Exception):
+                raise got
+            return got
+
+        with mock.patch.dict(os.environ, {"GH_TOKEN": "t"}), mock.patch.object(gate_check.urllib.request, "urlopen", urlopen),                 mock.patch.object(gate_check.time, "sleep"):
+            self.assertEqual(gate_check.api_get("repos/o/r/actions/runs/1/jobs"), {"ok": True})
+
+    def test_three_dropped_answers_are_the_apis_failure_not_a_traceback(self) -> None:
+        import http.client
+
+        def urlopen(req, timeout=30):
+            raise http.client.IncompleteRead(b"", 10)
+
+        with mock.patch.dict(os.environ, {"GH_TOKEN": "t"}), mock.patch.object(gate_check.urllib.request, "urlopen", urlopen),                 mock.patch.object(gate_check.time, "sleep"):
+            with self.assertRaises(gate_check.ApiError):
+                gate_check.api_get("repos/o/r/actions/runs/1/jobs")
+
 if __name__ == "__main__":
     unittest.main()
