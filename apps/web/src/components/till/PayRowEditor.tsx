@@ -124,15 +124,16 @@ export function PayRowEditor({
           </p>
           {single ? (
             // one payment: its amount (the whole balance unless changed) sits on the method's line, out of the board's way
-            <div className="flex items-center gap-2.5">
-              <label htmlFor={amountId} className="text-sm font-semibold text-neutral-600">
+            // min-w-0 on the line and the field: on a phone the line wraps under the title and the field shrinks to what is left
+            <div className="flex min-w-0 max-w-full items-center gap-2.5">
+              <label htmlFor={amountId} className="shrink-0 text-sm font-semibold text-neutral-600">
                 {t("amount")}
               </label>
               <MoneyInput
                 id={amountId}
                 currency={currency}
                 controlSize="md"
-                className="w-44"
+                className="w-44 min-w-0"
                 aria-invalid={amountError ? true : undefined}
                 aria-describedby={amountError ? `${amountId}-error` : undefined}
                 value={row.amount}
