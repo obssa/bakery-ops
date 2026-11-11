@@ -543,6 +543,17 @@ The same pull request makes a table card's scroll box hold its visually hidden h
 Claim restated at `a4912c8` (after the merge of `main` and the fixes to the audit dictionary test, the dashboards' read check, that scroll
 box and the Amharic 12-hour label); the tag stays on `2f6bbd9`.
 
+**The production board redrawn** (Ramin, 2026-11-10: "the production board design is too basic"). A summary strip over the columns
+(each column's count with its icon; the urgent requests waiting and the batches in the oven for more than a day in amber), the station
+filter as a segmented control up to five stations, each column under a tinted head with its icon, its step and a line saying what
+happens there, and an empty column saying what lands in it. The cards have a status edge, an 80 px photo, a 28 px quantity, priority,
+reason and due chips (the due time in Ethiopian time), "Baking for 1 h 05" while in the oven, "Made 78 of 80 asked" while the batch waits
+for its overseer, and one full-width charcoal action. A batch in the oven for a day or more says "Started 6 days ago" and asks for it to
+be finished and counted (a started batch is finished or sent back, never cancelled: `production.request.in_progress`). On a phone the
+columns are tabs with their counts, one column at a time. The e2e demo finishes the admin's batch left in the oven over a day before it
+starts a new one, so the board never shows the same batch run after run; the stale card in the captures is drawn from an aged copy of the
+board's answer. `lib/productionBoard.ts` (ages, the stale rule, the summary) has its logic spec (`screens-production-logic`). Web only. Claim restated at `2178d4d`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
