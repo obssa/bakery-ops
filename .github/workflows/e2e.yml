@@ -86,12 +86,9 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Chromium ready (no apt unless the runner lacks its libraries)
+        run: bash ../../scripts/ci/playwright-browsers.sh
         working-directory: apps/web
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-      - run: pnpm exec playwright install-deps chromium
-        working-directory: apps/web
-        if: steps.pw-cache.outputs.cache-hit == 'true'
 
       # A project p<N>-<flow> belongs to phase N. While phase N has not started (STATUS.json todo, planning or
       # plan_approved) its specs may not exist yet, so an empty project passes (--pass-with-no-tests). Once the phase is

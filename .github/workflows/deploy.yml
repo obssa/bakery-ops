@@ -199,7 +199,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Chromium ready (no apt unless the runner lacks its libraries)
+        run: bash ../../scripts/ci/playwright-browsers.sh
         working-directory: apps/web
       - name: Run the @live tests against the deployed URL
         working-directory: apps/web

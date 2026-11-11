@@ -485,12 +485,9 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: pw-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Chromium ready (no apt unless the runner lacks its libraries)
+        run: bash ../../scripts/ci/playwright-browsers.sh
         working-directory: apps/web
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-      - run: pnpm exec playwright install-deps chromium
-        working-directory: apps/web
-        if: steps.pw-cache.outputs.cache-hit == 'true'
       - name: Without a DSN (web-build's artifact) the SDK is not in the build and nothing is sent
         working-directory: apps/web
         env: { CI: "true" }
