@@ -639,8 +639,12 @@ other gate, so the verdict is the one the chain gave and the gates run side by s
 the gate needs; `gate_check`'s checklist `self` accepts the group there when the gate needs that job. `mod-inventory` runs as three
 Pest shards (`--shard=N/3`, `module-tests.yml` input `shard`). The manifest's `ci.*_jobs` are ci.yml's graph again, and
 `test_ci_affected.py` checks it: no test job needs a module job, no gate needs a gate, each gate covers the one below, a gate's Pest
-group lives in its Pest job, inventory runs in three shards, the manifest names ci.yml's needs. Claim restated at `1dd18ac`; the tag stays on
-`2f6bbd9`.
+group lives in its Pest job, inventory runs in three shards, the manifest names ci.yml's needs. The first flat run (43109725167)
+finished its jobs 17 minutes after the first started (31 minutes with the queue during GitHub's incident; the longest jobs perf-dashboards
+15.4 minutes after docker-build, mod-shifts 15.2, perf-load 14.6, pest-gate-p4 13.6, the inventory shards about 12, every gate under a
+minute) and failed only in gate-p5's checklist, on an Actions API answer cut off by the incident (`http.client.IncompleteRead`, a
+traceback): `gate_check`'s `api_get` now asks again twice and then reports the API's failure as a FAIL row. Claim restated at `e6c19bf`;
+the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
