@@ -163,6 +163,19 @@ class CiJobWithJobs(Fixture):
         self.assertEqual(rows["checklist direct"][0], "PASS", rows["checklist direct"])
         self.assertEqual(rows["checklist through"][0], "PASS", rows["checklist through"])
 
+    def test_in_ci_a_lower_gate_counts_when_the_gate_needs_every_job_it_needs(self) -> None:
+        """Since 2026-11-12 the gates run side by side: gate-p5 needs gate-p4's jobs, not gate-p4."""
+        self.man["ci"]["gate_jobs"]["gate-p5"] = ["mod-a", "e2e-p5"]
+        self.checklist(item("gates-green", {"type": "ci_job", "jobs": ["gate-p4"]}))
+        state, detail = self.rows(ci=True)["checklist gates-green"]
+        self.assertEqual(state, "PASS", detail)
+        self.assertIn("gate-p4 (every job it needs)", detail)
+        self.man["ci"]["gate_jobs"]["gate-p5"] = ["e2e-p5"]
+        self.man["ci"]["e2e_jobs"]["e2e-p5"] = []
+        state, detail = self.rows(ci=True)["checklist gates-green"]
+        self.assertEqual(state, "FAIL")
+        self.assertIn("gate-p5 does not need every job gate-p4 needs (mod-a)", detail)
+
     def test_in_ci_a_job_the_gate_does_not_need_fails(self) -> None:
         self.checklist(item("load", {"type": "ci_job", "jobs": ["perf-load"]}))
         state, detail = self.rows(ci=True)["checklist load"]
@@ -181,7 +194,19 @@ class CiJobWithJobs(Fixture):
         self.write(".github/workflows/ci.yml", CI_YML.replace("      - run: vendor/bin/pest --group=gate:p5\n", ""))
         state, detail = self.rows(ci=True)["checklist own"]
         self.assertEqual(state, "FAIL")
-        self.assertIn("runs no --group=gate:p5 step", detail)
+        self.assertIn("neither gate-p5 nor a pest-gate-p5 job it needs runs a --group=gate:p5 step", detail)
+
+    def test_self_may_be_the_pest_job_beside_the_gate_that_the_gate_needs(self) -> None:
+        self.checklist(item("own", {"type": "ci_job", "jobs": ["self"]}))
+        moved = CI_YML.replace("      - run: vendor/bin/pest --group=gate:p5\n", "").replace(
+            "  gate-p5:\n    needs: [status, gate-p4, e2e-p5]\n",
+            "  pest-gate-p5:\n    needs: [status]\n    runs-on: ubuntu-24.04\n    steps:\n      - run: vendor/bin/pest --group=gate:p5\n"
+            "  gate-p5:\n    needs: [status, gate-p4, e2e-p5, pest-gate-p5]\n")
+        self.write(".github/workflows/ci.yml", moved)
+        self.assertEqual(self.rows(ci=True)["checklist own"][0], "PASS")
+        # a pest-gate-p5 job the gate does not wait for proves nothing to the gate
+        self.write(".github/workflows/ci.yml", moved.replace("[status, gate-p4, e2e-p5, pest-gate-p5]", "[status, gate-p4, e2e-p5]"))
+        self.assertEqual(self.rows(ci=True)["checklist own"][0], "FAIL")
 
     def test_locally_it_is_trusted_to_ci(self) -> None:
         self.checklist(item("local", {"type": "ci_job", "jobs": ["perf-load"]}))
@@ -660,6 +685,46 @@ class BranchProtection(unittest.TestCase):
         code, out, _ = self.run_main(check_branch_protection.ApiError("HTTP 401"), "--require", "gate-p0")
         self.assertEqual((code, out), (1, "cannot read main: HTTP 401"))
 
+
+
+class ApiGetRetries(unittest.TestCase):
+    """A dropped Actions API answer is asked again (GitHub's incident of 2026-11-11 crashed gate-p5 with IncompleteRead)."""
+
+    class Resp:
+        def __init__(self, body: bytes) -> None:
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return self.body
+
+    def test_a_dropped_answer_is_asked_again(self) -> None:
+        import http.client
+        calls = [http.client.IncompleteRead(b"", 9424), self.Resp(b'{"ok": true}')]
+
+        def urlopen(req, timeout=30):
+            got = calls.pop(0)
+            if isinstance(got, Exception):
+                raise got
+            return got
+
+        with mock.patch.dict(os.environ, {"GH_TOKEN": "t"}), mock.patch.object(gate_check.urllib.request, "urlopen", urlopen),                 mock.patch.object(gate_check.time, "sleep"):
+            self.assertEqual(gate_check.api_get("repos/o/r/actions/runs/1/jobs"), {"ok": True})
+
+    def test_three_dropped_answers_are_the_apis_failure_not_a_traceback(self) -> None:
+        import http.client
+
+        def urlopen(req, timeout=30):
+            raise http.client.IncompleteRead(b"", 10)
+
+        with mock.patch.dict(os.environ, {"GH_TOKEN": "t"}), mock.patch.object(gate_check.urllib.request, "urlopen", urlopen),                 mock.patch.object(gate_check.time, "sleep"):
+            with self.assertRaises(gate_check.ApiError):
+                gate_check.api_get("repos/o/r/actions/runs/1/jobs")
 
 if __name__ == "__main__":
     unittest.main()

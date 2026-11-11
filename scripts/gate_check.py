@@ -25,12 +25,14 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import http.client
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -240,11 +242,22 @@ def api_get(path: str) -> dict:
         req = urllib.request.Request(f"{base}/{path}", headers={
             "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "bakery-ops-gate-check"})
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, OSError, ValueError) as e:
-            raise ApiError(str(e)) from e
+        # a dropped answer (http.client.IncompleteRead, a reset, a timeout: seen during GitHub's incident of 2026-11-11, when it
+        # crashed gate-p5 with a traceback) is asked again, twice, before it counts as the API's failure
+        last: Exception | None = None
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code < 500:
+                    raise ApiError(str(e)) from e
+                last = e
+            except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as e:
+                last = e
+            if attempt < 2:
+                time.sleep(2 + 3 * attempt)
+        raise ApiError(str(last)) from last
     gh = shutil.which("gh")
     if not gh:
         raise ApiError("no GH_TOKEN and no gh CLI to read the Actions API")
@@ -432,11 +445,25 @@ class Checklist:
         ok, bad = [], []
         for job in v["jobs"]:
             if job == "self":
-                # the gate job's own Pest step runs before gate_check, so a gate_check that runs at all saw it pass
-                if f"--group={self.gate['pest_group']}" in defined.get(gate_job, ""):
+                # the gate's own Pest group: a step of the gate job (before gate_check), or, since 2026-11-12, the job
+                # pest-<gate> that runs beside the other test jobs and that the gate needs (a gate fails when a need failed)
+                group, pest_job = f"--group={self.gate['pest_group']}", f"pest-{gate_job}"
+                own_needs = re.search(r"^    needs:\s*\[([^\]]*)\]", defined.get(gate_job, ""), re.M)
+                if group in defined.get(gate_job, "") or (
+                        group in defined.get(pest_job, "") and own_needs and pest_job in [x.strip() for x in own_needs.group(1).split(",")]):
                     ok.append("self")
                 else:
-                    bad.append(f"self: the {gate_job} job runs no --group={self.gate['pest_group']} step")
+                    bad.append(f"self: neither {gate_job} nor a {pest_job} job it needs runs a {group} step")
+            elif job not in needs and job in self.man.get("ci", {}).get("gate_jobs", {}):
+                # a lower gate: since 2026-11-12 the gates run side by side, so this gate needs every job that gate needs
+                # (and the lower gate is a required check of its own on the same commit)
+                missing = sorted(gate_needs(self.man, job) - needs)
+                if missing:
+                    bad.append(f"{job}: {gate_job} does not need every job {job} needs ({', '.join(missing)})")
+                elif job not in defined:
+                    bad.append(f"{job}: a gate in the manifest but no such job in {workflow}")
+                else:
+                    ok.append(f"{job} (every job it needs)")
             elif job not in needs:
                 bad.append(f"{job}: not a need of {gate_job}")
             elif job not in defined:

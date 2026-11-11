@@ -618,6 +618,36 @@ Telebirr, no float left), no stock movement written; Bakery's closing count and 
 co-signature by someone other than the admin, and Cake room's closing count is prepared behind it. Each shift carries a handover note
 saying its counts were accepted at the expected figures and nobody counted.
 
+**Main reuses the pull request's run** (Ramin, 2026-11-11: "no more long waiting time"; a change took about four hours from push to
+live, the pull request's checks and then `main`'s full run again). Every pull request now runs the full graph and its `changes` job
+uploads the artifact `ci-full-run`; a pull request is merged by fast-forwarding `main` to its head, so a push to `main` asks the Actions
+API (`changes` holds `actions: read`) for a successful full `pull_request` run of this repository on the same SHA and, when there is
+one, selects no job: the test jobs skip, the gates run `--check-needs` and `gate_check` only, the run passes in minutes and the deploy
+starts (`deploy.yml` builds its own release and reads no artifact of the ci run, so nothing else changes). A push that changes only
+`docs/` runs `invariants` and the checks of the generated files it touches; any other push, a manual run, or any doubt (no token, the
+API unreachable) runs everything. `scripts/ci_affected.py` (`pick_reusable`, `docs_only_jobs`, `push_result`) has its tests in
+`scripts/tests/test_ci_affected.py`; the skill's copy of the script, `assets/ci/ci.yml` and `references/ci-cd.md` say the same. When
+`main` reused a run, `set-run-url` records the pull request run that ran the tests.
+
+The same pull request makes the full run itself short. Run 43069114796 took 84 minutes, nearly all of it one chain that copied the
+module graph (api-arch, identity, catalog, inventory 22 minutes, orders, payments, shifts, analytics, the last e2e projects, then
+gate-p4 8, gate-p5 and gate-p6 one after another). Now every test job needs only what it consumes (an e2e project `web-build` and
+`docker-build`, a stack job `docker-build`, `web-errors` `web-build`; module and static jobs nothing but `changes` and `status`), so
+they start together; each `gate-pN` needs every job of its phase and of the phases below (exactly the closure the chain reached) and no
+other gate, so the verdict is the one the chain gave and the gates run side by side in about a minute each. The gates' Pest groups
+(`gate:p4` on 90 seeded days, `gate:p5`, `gate:p6`) moved into `pest-gate-p4` .. `pest-gate-p6`, stack jobs beside the others that
+the gate needs; `gate_check`'s checklist `self` accepts the group there when the gate needs that job. `mod-inventory` runs as three
+Pest shards (`--shard=N/3`, `module-tests.yml` input `shard`). The manifest's `ci.*_jobs` are ci.yml's graph again, and
+`test_ci_affected.py` checks it: no test job needs a module job, no gate needs a gate, each gate covers the one below, a gate's Pest
+group lives in its Pest job, inventory runs in three shards, the manifest names ci.yml's needs. The first flat run (43109725167)
+finished its jobs 17 minutes after the first started (31 minutes with the queue during GitHub's incident; the longest jobs perf-dashboards
+15.4 minutes after docker-build, mod-shifts 15.2, perf-load 14.6, pest-gate-p4 13.6, the inventory shards about 12, every gate under a
+minute) and failed only in gate-p5's checklist, on an Actions API answer cut off by the incident (`http.client.IncompleteRead`, a
+traceback): `gate_check`'s `api_get` now asks again twice and then reports the API's failure as a FAIL row. The next run failed
+the checklist's `gates-green` ("gate-p4: not a need of gate-p5"): a lower gate named in an item now counts when the gate needs every
+job that gate needs (`gate_check` `ci_jobs`, with its test), and the item's note says so. Claim restated at `9c0e403`; the tag stays on
+`2f6bbd9`.
+
 **The board moved by dragging, and requests that wait too long** (Ramin, 2026-11-11, with a screenshot of the live board: "we have two
 menus on top of each other", "how can a card move from Requested to In progress to Pending confirmation to Done today", "if a request stays
 in Requested for a long time what happens", "can we move a card from one state to the other and its status updates by itself"). The

@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Run Pest for a comma-separated list of groups. A group with no tests yet is a failure by default
 # (a module job that runs nothing proves nothing); pass --allow-empty for consumer-contract groups,
-# which legitimately do not exist before their consumer's phase.
+# which legitimately do not exist before their consumer's phase. PEST_SHARD (for example 1/3) runs one shard of the groups' tests;
+# a shard of the consumer contracts may hold none of them, which --allow-empty already allows.
 set -uo pipefail
 groups="$1"; allow_empty="${2:-}"
 cd "$(dirname "$0")/../../apps/api"
 args=""; IFS="," ; for g in $groups; do args="$args --group=$g"; done; unset IFS
+if [ -n "${PEST_SHARD:-}" ]; then args="$args --shard=$PEST_SHARD"; fi
 out=$(vendor/bin/pest $args --colors=never 2>&1); code=$?
 echo "$out" | grep -E "^ +FAILED" | sort | uniq | head -150
 echo "$out" | tail -40

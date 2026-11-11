@@ -105,7 +105,7 @@ depended on by the next step.
 
 ## Where tests run
 
-GitHub Actions is the gate: every push and PR runs the module chain, e2e on the compose stack and the gate
+GitHub Actions is the gate: every PR runs the module jobs side by side, e2e on the compose stack and the gate
 jobs; every deploy runs the `@live` Playwright tests against https://bakery-ops.orcamind.dev. The developer
 PC is not a test target (ADR 0006); `python scripts/task.py ci` remains for local debugging inside Docker.
 

@@ -1,4 +1,4 @@
-# CI from commit one, and how the pipeline mirrors the dependency graph
+# CI from commit one, and how the gates carry the dependency graph
 
 Canonical files: `assets/ci/ci.yml`, `assets/ci/setup-api-action.yml`, `assets/ci/compose.ci.yml`.
 Phase 0 installs them as `.github/workflows/ci.yml`, `.github/actions/setup-api/action.yml` and
@@ -7,15 +7,23 @@ they bolt on later.
 
 ## Principles
 
-1. **Job dependencies = module dependencies.** `mod-inventory` needs `mod-catalog` needs `mod-identity`
-   needs `api-arch`. A broken Catalog never lets Inventory tests run, so the failing job in the PR
-   checks list names the lowest broken module.
+1. **The gates carry the module dependencies; the test jobs run side by side** (since 2026-11-12, Ramin: "no more long waiting
+   time"). Until then the job graph copied the module graph (`mod-inventory` needed `mod-catalog` needed `mod-identity` needed
+   `api-arch`), so a run was one long chain (84 minutes on run 43069114796, almost all of it waiting). Now a test job needs only
+   the jobs whose output it uses: an e2e project `web-build` (the Next build) and `docker-build` (the API image), a stack job
+   (`files-s3`, `perf-*`, `backup-drill`, `pest-gate-pN`) `docker-build`, `web-errors` `web-build`; every module job and every
+   static job needs nothing but `changes` (and `status` for its phase). The rule "nothing passes on top of something red" stays
+   where it decides: each `gate-pN` needs every job of its phase and of the phases below (the closure the old chain reached) and
+   fails when any of them failed. The verdict is the same; only the waiting is gone. To find the lowest broken module in a red
+   run, read the module jobs in the manifest's dependency order (`modules.*.depends_on`), not the order they finished.
 2. **A module job runs its own tests and its consumers' contract tests against it.** `mod-inventory`
    runs `module:inventory, property, concurrency` and then
    `contract:orders->inventory, contract:production->inventory, contract:shifts->inventory`.
-3. **Gate jobs are fan-in required checks.** `gate-p<N>` needs everything the phase depends on plus
-   `gate-p<N-1>`, and runs `gate_check.py --mode done --phase N --ci`. All gates ≤ `current_phase`
-   always run, so Phase 3 work cannot silently break the Phase 1 gate.
+3. **Gate jobs are fan-in required checks.** `gate-p<N>` needs every job of phases 0..N (not the gate below it, so the gates run
+   side by side once their jobs are done), checks them (`ci_affected.py --check-needs`) and runs `gate_check.py --mode done
+   --phase N --ci`, about a minute. A gate's own Pest group (`gate:p4` on 90 seeded days, `gate:p5`, `gate:p6`) runs in
+   `pest-gate-pN`, a stack job beside the others that the gate needs; the checklist's `self` accepts it there. All gates ≤
+   `current_phase` always run, so Phase 3 work cannot silently break the Phase 1 gate.
 4. **Future-phase jobs exist but skip.** A `status` job reads `docs/phases/STATUS.json` and every
    phase-scoped job has `if: fromJSON(needs.status.outputs.phase) >= N`. Adding a phase is a STATUS
    change, not a YAML rewrite.
@@ -25,44 +33,42 @@ they bolt on later.
    production) and runs Playwright natively against the built Next app.
 6. **Local parity.** `make ci` runs the same steps in the same order inside Docker. If local and CI
    disagree, fix the Makefile.
-7. **Every job states `timeout-minutes`** (since 5.5d): 20 unless a measured run needs more (`mod-inventory` and `mod-shifts` 30,
-   `perf-dashboards` 40, `gate-p4` 45, `backup-drill`, `gate-p5` and `gate-p6` 25, `perf-load` 30), so a hung step cannot hold a runner
+7. **Every job states `timeout-minutes`** (since 5.5d): 20 unless a measured run needs more (`mod-inventory` (each of its three
+   shards) and `mod-shifts` 30, `perf-dashboards` 40, `pest-gate-p4` 45, `backup-drill`, `pest-gate-p5` and `pest-gate-p6` 25, `perf-load`
+   30), so a hung step cannot hold a runner
    for six hours. A job that calls a reusable workflow cannot set its own: the reusable workflow's job does (`e2e.yml` 30,
    `module-tests.yml` its `timeout_minutes` input).
 
 ## Job graph
 
 ```
-status ─┬─ api-lint → api-arch ─┬→ mod-identity → mod-catalog → mod-inventory ─┬→ mod-orders → mod-payments ─┐
-        │                       │                                               ├→ mod-production ──────────────┤
-        │                       │                                               └→ mod-notifications ──────────┤
-        │                       │                 mod-shifts ◄ [mod-orders, mod-inventory, mod-payments]         │
-        │                       │                 mod-analytics ◄ [mod-shifts, mod-production, mod-notifications]│
-        │                       ├→ openapi-check   ├→ erd-check   └→ invariants                                  │
-        ├─ web-lint → web-build  ─ i18n-check                                                                    │
-        ├─ docker-build (api image → artifact)                                                                   │
-        ├─ e2e-p0 ◄ [mod-catalog, web-build, docker-build]      e2e-p1 ◄ [mod-payments, web-build, docker-build]
-        │  rules-off-gates ◄ [mod-payments, mod-production, mod-notifications]   (gate:p0..p2 with the three shift rules off)
-        │  e2e-p2 ◄ [mod-production, mod-notifications, …]     e2e-p3 ◄ [mod-shifts, …]
-        │  e2e-p4 + perf-dashboards ◄ [mod-analytics, …]        e2e-p5 ◄ [mod-analytics, web-build, docker-build] (beside e2e-p4)
-        │  e2e-p6 ◄ [mod-analytics, web-build, docker-build] (beside e2e-p5, step 6.0)
-        │  web-errors ◄ [web-build]    backup-drill ◄ [docker-build, mod-inventory]    perf-load ◄ [docker-build, mod-analytics]
-        │  print-bridge ◄ [status] (Node only, no Docker)
-        └─ gate-p0 ◄ [api-arch, mod-inventory, mod-catalog, e2e-p0, openapi-check, erd-check, invariants]
-           gate-p1 ◄ [gate-p0, mod-orders, mod-payments, e2e-p1]
-           gate-p2 ◄ [gate-p1, mod-production, mod-notifications, e2e-p2]
-           gate-p3 ◄ [gate-p2, mod-shifts, rules-off-gates, e2e-p3]
-           gate-p4 ◄ [gate-p3, mod-analytics, e2e-p4, perf-dashboards] (+ files-s3 ◄ [mod-payments, docker-build], the S3 proof); seeds 90 days, runs gate:p4
-           gate-p5 ◄ [gate-p4, e2e-p5, i18n-check (strict), backup-drill, perf-load, print-bridge]; runs gate:p5, then the go-live checklist
-           gate-p6 ◄ [gate-p5, mod-catalog, mod-orders, e2e-p6, i18n-check]; runs gate:p6 (step 6.5), then gate_check
+changes ─┬─ api-lint   api-arch   openapi-check   erd-check   invariants                 (each needs only changes)
+status ──┼─ mod-identity  mod-catalog  mod-inventory ×3 shards  mod-orders  mod-payments  mod-production
+         │  mod-notifications  mod-shifts  rules-off-gates  mod-analytics                  (all start at once)
+         ├─ web-lint   i18n-check   web-build ─→ web-errors
+         ├─ docker-build ─┬→ files-s3  perf-dashboards  perf-load  backup-drill
+         │                ├→ pest-gate-p4 (90 seeded days, gate:p4)  pest-gate-p5 (gate:p5)  pest-gate-p6 (gate:p6)
+         │  web-build + docker-build ─→ e2e-p0 … e2e-p6                                    (side by side)
+         ├─ print-bridge (Node only)
+         └─ gate-p0 ◄ every job of phase 0 and what it builds on (api-lint, api-arch, mod-identity, mod-catalog, mod-inventory,
+                      e2e-p0, openapi-check, erd-check, invariants, web-lint, web-build, docker-build)
+            gate-p1 ◄ gate-p0's needs + mod-orders, mod-payments, e2e-p1
+            gate-p2 ◄ gate-p1's needs + mod-production, mod-notifications, e2e-p2
+            gate-p3 ◄ gate-p2's needs + mod-shifts, rules-off-gates, e2e-p3
+            gate-p4 ◄ gate-p3's needs + mod-analytics, e2e-p4, perf-dashboards, files-s3, pest-gate-p4
+            gate-p5 ◄ gate-p4's needs + e2e-p5, i18n-check (strict), backup-drill, perf-load, print-bridge, pest-gate-p5; then the go-live checklist
+            gate-p6 ◄ gate-p5's needs + e2e-p6, pest-gate-p6
+            (no gate needs another gate: they run side by side, each about a minute)
 
+Critical path: the longest single test job (an e2e project, about 14 minutes, after docker-build and web-build) plus a gate.
 uptime.yml (5.5c) is a workflow of its own on a schedule, outside this graph.
 ```
 
-The exact `needs:` lists are in the manifest (`ci.module_jobs`, `ci.e2e_jobs`, `ci.gate_jobs`).
-Trade-off: ten module jobs each boot Postgres (~40 s). If a run exceeds ~12 minutes, collapse `mod-*`
-into one fail-fast `api-modules` job that runs the same groups in the same order; dependency semantics
-survive, only parallelism is lost.
+The exact `needs:` lists are in the manifest (`ci.module_jobs`, `ci.e2e_jobs`, `ci.gate_jobs`), and
+`scripts/tests/test_ci_affected.py` checks they are ci.yml's: no test job needs a module job, no gate needs a gate, each gate's needs
+cover the gate below it, a gate's Pest group lives in its `pest-gate-pN` job. `mod-inventory` (22 minutes alone) runs as a matrix of
+three Pest shards (`module-tests.yml` input `shard`, `PEST_SHARD` → `--shard=1/3` in `scripts/ci/pest-groups.sh`); the gates read
+`mod-inventory`'s result, which passes only when all three passed.
 
 ## Per-job essentials
 
@@ -93,6 +99,8 @@ survive, only parallelism is lost.
 | `gate-p6` (6.0, 6.5) | needs `status`, `gate-p5`, `mod-catalog`, `mod-orders`, `e2e-p6`, `i18n-check`, 25 min, `fetch-depth: 0`. Loads the image, starts `app` on the compose stack, puts an empty `.env` in it and runs `pest --group=gate:p6` (`tests/Gate/Phase6GateTest.php`) with `IDENTITY_REQUIRE_DEVICE=false`, failing when it ran nothing or on a skip or a warning, as `gate-p5`; it needs no repository files in the container and no token (phase 6 has no checklist). Then `gate_check.py --mode done --phase 6 --ci`, informational while the phase is open (every FAIL a WARN), strict once STATUS claims it; the Pest step fails the job either way. The coordinator added it to `main`'s required checks after the plan PR merged |
 | `uptime` (workflow `uptime.yml`, 5.5c) | not part of `ci`: schedule `*/15 * * * *` and `workflow_dispatch`, `contents: read`, 5 min, skipped while the repository variable `DEPLOY_URL` is unset (the URL is never written in the file); one `GET /api/v1/health` (a query string per read so no cache answers), a second 60 s later when it is not ok, and the job fails only when both are not ok: GitHub's email about the failed run is the alert. No checkout, no secret, no write |
 
+Since 2026-11-12 the rows above for `gate-p4`, `gate-p5` and `gate-p6` describe two jobs: the stack, the seed and the Pest group run in `pest-gate-p4` / `pest-gate-p5` / `pest-gate-p6` (needs `status`, `changes`, `docker-build`; the same steps and timeouts), and the gate keeps its needs check and `gate_check` (20 minutes, about one), needing its Pest job and every job of the phases up to its own instead of the gate below it. `mod-inventory` is three shards (`1/3`, `2/3`, `3/3`).
+
 Live updates in e2e (ADR 0009): `e2e-p1` and later run the polling transport, as the live host does
 (`BROADCAST_CONNECTION=null`, `NEXT_PUBLIC_LIVE_TRANSPORT=poll`), so no `ws` service is needed. Reverb is its own
 compose profile, `ws` (not part of `full`); `e2e.yml` sets `BROADCAST_CONNECTION=reverb` and
@@ -100,24 +108,38 @@ compose profile, `ws` (not part of `full`); `e2e.yml` sets `BROADCAST_CONNECTION
 Reverb); the Phase 5 plan settled `e2e-p5` on polling too (step 5.1b; it listed `full,ws` before). When a WebSocket transport is switched on, Reverb inside compose: the app container reaches `ws:8080`;
 the browser reaches `localhost:8080`. These are two env vars (`REVERB_HOST` vs `NEXT_PUBLIC_REVERB_HOST`), never one.
 
-## Pull requests run what their change can affect (Ramin, 2026-11-10)
+## Pull requests run everything; main reuses that run (Ramin, 2026-11-11)
 
-A push to `main` and a manual run run the whole graph above: main's full run is the gate before the deploy (`deploy.yml` deploys only
-after a green `push` run). A pull request runs only the jobs its change can affect. The `changes` job (beside `status`) reads the
-diff between the PR's base and head (`git diff --name-only --no-renames base...head`) and `scripts/ci_affected.py` maps it:
+Every pull request runs the whole graph, and its `changes` job uploads the artifact `ci-full-run`. A pull request is merged by
+fast-forwarding `main` to its head, so `main`'s commit is the very commit that run tested. A push to `main` therefore does not run the
+graph a second time: the `changes` job (`permissions: actions: read`) asks the Actions API for a successful `ci` run of event
+`pull_request` on the pushed SHA, from this repository, that carries `ci-full-run`. When there is one, it selects no job (`full=false`,
+`jobs=[]`, `reuse=<run url>` in the step summary): every test job is skipped, the gates run `--check-needs` and `gate_check` only, the
+run concludes success within a few minutes and `deploy.yml` (which builds its own release and reads no artifact of the ci run) starts.
+The tested tree is main's tree: the PR's merge ref is its head merged into a base that is an ancestor of `main` (never force-pushed),
+which is the head itself. A push that changes only `docs/` (Ramin's sign-offs, the status and report commits) runs `invariants` plus
+`openapi-check` / `erd-check` / `i18n-check` for the generated files it touches; any other push, a manual run, a missing token or an
+unreachable API runs everything. When `main`'s run reused a PR run, `phase_status.py set-run-url` records the PR run (the run that ran
+the tests); `gate_check` never reads `gate_run_url`.
+
+Push to live is then the PR's full run (about 1 h 40 m) plus the deploy and `@live` (about 40 m), instead of both full runs.
+
+### The per-path selection (pull requests, 2026-11-10 to 2026-11-11; kept for `--files` and docs-only pushes)
+
+`scripts/ci_affected.py --files <paths>` still answers what a set of paths would select:
 
 | Changed path | Runs |
 |---|---|
 | `apps/api/app/Modules/<M>`, `apps/api/tests/Modules/<M>`, `apps/api/routes/modules/<m>.php` | `mod-<m>` and every module job downstream of it (its consumers in the manifest's `modules.*.depends_on` and in ci.yml's needs between `mod-*` jobs, transitively, plus one hop over `event_only` / `interface_only`), `api-lint`, `api-arch`, `invariants`, `openapi-check`, `erd-check` |
 | any other `apps/api/` path (Shared, Ops, migrations, seeders, config, `routes/api.php`, `tests/Support`, `tests/Contract`, `tests/Gate`, composer) | every API job |
 | `apps/web/` | `web-lint`, `i18n-check`, `web-build`, `web-errors` |
-| any `apps/` change | also `docker-build` and every `e2e-p*` project; an API change also every job with no rule of its own (`rules-off-gates`, `files-s3`, `perf-*`, `backup-drill`) and the Pest steps of `gate-p4` .. `gate-p6` |
+| any `apps/` change | also `docker-build` and every `e2e-p*` project; an API change also every job with no rule of its own (`rules-off-gates`, `files-s3`, `perf-*`, `backup-drill`) and the gates' Pest jobs `pest-gate-p4` .. `pest-gate-p6` |
 | `tools/print-bridge/` | `print-bridge` |
 | `docs/openapi.json` / `docs/erd.dbml` / `docs/i18n/` | `openapi-check` / `erd-check` / `i18n-check`, and `invariants` |
 | any other doc (`docs/`, a root `*.md`) | `invariants` |
 | `.github/`, `scripts/`, `docker/`, compose files, `Makefile`, `.claude/`, `.githooks/`, `docs/phases/`, `docs/adr/`, `docs/go-live*`, an unknown path | everything |
 
-The label `full-ci` runs everything on a PR (adding it restarts the run). A job of a phase not reached yet is left out of the selection.
+A job of a phase not reached yet is left out of the selection.
 
 How ci.yml carries it: every job needs `changes`, and its `if:` has two branches. The full run keeps `success()`, so a failed or
 skipped need skips the job exactly as before. A selective run starts a selected job when every need it has passed or was not selected,
@@ -165,9 +187,10 @@ another PR has merged, they prove nothing about the combination. So for every PR
 2. Never hand-merge the generated docs. On a conflict in `docs/openapi.json` take either side and re-export it the way the
    `openapi-check` job prints (`scripts/artisan scramble:export --path=../../docs/openapi.json`, against a migrated database);
    in `docs/erd.dbml` add every table `erd-check` (`scripts/erd_check.py`) lists as missing. Commit the result with the merge.
-3. Push and let CI run on the merged head; only that run counts. It runs what the PR's own change can affect (the section above),
-   now on top of the other PR's code; the full graph runs again on `main` before the deploy, and the label `full-ci` runs it on the PR.
-4. Fast-forward `main` to that head (`git merge --ff-only`), so main gets the very commit that was green.
+3. Push and let CI run on the merged head; only that run counts. It runs the full graph on top of the other PR's code.
+4. Fast-forward `main` to that head (`git merge --ff-only`), so main gets the very commit that was green and its push reuses that run.
+   Anything pushed to `main` in between (a status commit) moves `main` past the PR's base: merge it in again and let the PR run again.
+   So status and report commits go onto the next PR's branch, not straight onto `main`.
 
 The next PR in line then merges the new `main` the same way.
 
@@ -224,7 +247,7 @@ by Ramin; that is how "wait for my OK" survives an unattended agent.
 | `--mode module --module X` | `module:X` + all `contract:*->X` + the arch boundary test for X green → eligible for `stable` |
 | `--mode done --phase N` | all groups incl. `gate:pN` green; the phase's Playwright projects green (CI: by `needs`; local: run them); regenerated OpenAPI equals committed; ERD covers every table; at least one new ADR (or an explicit waiver); `phase-N-report.md` exists; migration-lint clean; route-permission coverage 100 %; no `TODO(p<N>)` markers; no `->skip(` in tests tagged `module:` for this phase's modules; `STATUS.json` `done_commit == HEAD` (no app code after `done_commit` until phase N+1 is `in_progress`; from then on the gate proves phase N by its tests) |
 
-`--ci` switches test checks from "run them now" to "trust the `needs` chain" and makes output GitHub-annotation friendly.
+`--ci` switches test checks from "run them now" to "trust the gate's `needs`" and makes output GitHub-annotation friendly.
 
 **The go-live checklist (from Phase 5, step 5.6a).** A phase whose manifest gate names a `checklist`
 (`docs/go-live-checklist.json`) gets one `checklist <id>` row per item in `--mode done`: PASS, FAIL, SKIP (a `ci_job` row run
