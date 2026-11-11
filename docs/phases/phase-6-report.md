@@ -590,6 +590,19 @@ merge of `main` after the chosen states in charcoal and the production board red
 `screens.spec.ts`); the tag stays on `2f6bbd9`. `main`'s run 42992589637 passed with the strict `gate-p6` green
 (now `gate_run_url`). Deploy 43005505605: 43 of 43 `@live`.
 
+**The explanations trimmed, and a "?" on the board's columns** (Ramin, 2026-11-11). An open shift with nothing waiting is the normal
+course of a day, so the overview no longer writes "Open: sales and stock moves are recorded on this shift..." under each one (with four
+open shifts the line only repeated itself): `shiftWait` returns null for it and its key is gone; the waiting lines (opening count, closing
+count, co-signature, approval, "Closing for N days") are unchanged. Each production column's head has a "?" beside its heading, outside
+the `h2` so the heading keeps the column's name: who acts there and what moves a card on (a station without an overseer goes straight
+from the oven to Done today, as `FinishBatch` does). Web only, en and am. The captures open the Pending confirmation "?" at 1440 and in
+the phone's To check tab, scroll it into view, check its card ends 16 px inside the window, and run axe with it open; the explain
+captures scroll the open co-sign "?" into view at each size (at 390 it had been below the fold). The `@live` suite's shifts on the live
+E2E branch were looked at and left as they are: each run's handover flows close and lock the shifts the run before left open and the
+fixtures open the station's shift again (`e2e/support/shifts.ts`), so the stations end as they were found, one open shift each, and
+closing them at the end of a run would mean closing counts on live through `resolvePendingCounts`, which approves whatever waits at the
+station, counts the run did not make included. Claim restated at `355b523`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
