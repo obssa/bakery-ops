@@ -643,8 +643,10 @@ group lives in its Pest job, inventory runs in three shards, the manifest names 
 finished its jobs 17 minutes after the first started (31 minutes with the queue during GitHub's incident; the longest jobs perf-dashboards
 15.4 minutes after docker-build, mod-shifts 15.2, perf-load 14.6, pest-gate-p4 13.6, the inventory shards about 12, every gate under a
 minute) and failed only in gate-p5's checklist, on an Actions API answer cut off by the incident (`http.client.IncompleteRead`, a
-traceback): `gate_check`'s `api_get` now asks again twice and then reports the API's failure as a FAIL row. Claim restated at `e6c19bf`;
-the tag stays on `2f6bbd9`.
+traceback): `gate_check`'s `api_get` now asks again twice and then reports the API's failure as a FAIL row. The next run failed
+the checklist's `gates-green` ("gate-p4: not a need of gate-p5"): a lower gate named in an item now counts when the gate needs every
+job that gate needs (`gate_check` `ci_jobs`, with its test), and the item's note says so. Claim restated at `9c0e403`; the tag stays on
+`2f6bbd9`.
 
 ## What stays open after the claim
 
