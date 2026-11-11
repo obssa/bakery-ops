@@ -604,7 +604,11 @@ closing them at the end of a run would mean closing counts on live through `reso
 station, counts the run did not make included. The first CI run caught the "?" card swinging from frame to frame instead of
 settling (the loop wrote its transform and React wrote it again a frame late from a state; the loop is now the only writer), seen on
 analytics in Amharic where the not-calculated notice's "?" opened at 1440 stood past the edge at 390; the capture now waits for that
-notice. Claim restated at `91a89e8`; the tag stays on `2f6bbd9`.
+notice. Its second and third runs failed in no test: every e2e job stopped in `playwright install-deps`, whose `apt-get update` could
+not resolve the runner's Ubuntu mirror. `scripts/ci/playwright-browsers.sh` now makes Chromium ready in `ci.yml`, `e2e.yml` and
+`deploy.yml`: the browser comes from Playwright's own download (cached as before), one launch shows whether the runner's image already
+has its libraries, and apt runs only when it does not, retried, with `archive.ubuntu.com` as a second mirror. Claim restated at
+`e778aa6`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
