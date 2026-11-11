@@ -608,7 +608,15 @@ notice. Its second and third runs failed in no test: every e2e job stopped in `p
 not resolve the runner's Ubuntu mirror. `scripts/ci/playwright-browsers.sh` now makes Chromium ready in `ci.yml`, `e2e.yml` and
 `deploy.yml`: the browser comes from Playwright's own download (cached as before), one launch shows whether the runner's image already
 has its libraries, and apt runs only when it does not, retried, with `archive.ubuntu.com` as a second mirror. Claim restated at
-`e778aa6`; the tag stays on `2f6bbd9`.
+`e778aa6`; the tag stays on `2f6bbd9`. `main`'s run 43069114796 passed with the strict `gate-p6` green (now `gate_run_url`), every e2e job's
+Chromium starting without apt. Deploy 43082438918: 43 of 43 `@live`.
+
+On the live Demo Bakery, with Ramin's approval (2026-11-11), the five shifts left running since 23 October to 5 November by earlier
+testing were closed through the app's own actions as the admin (a shift that has opened cannot be cancelled): Bar, Kitchen and Till
+locked, their closing counts accepted at the expected figures (the Till's drawer declared at its expected 1,735.00 ETB cash and 730.00
+Telebirr, no float left), no stock movement written; Bakery's closing count and Cake room's October opening count wait for a
+co-signature by someone other than the admin, and Cake room's closing count is prepared behind it. Each shift carries a handover note
+saying its counts were accepted at the expected figures and nobody counted.
 
 ## What stays open after the claim
 
