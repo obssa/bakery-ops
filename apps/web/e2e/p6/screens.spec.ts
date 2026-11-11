@@ -1325,3 +1325,66 @@ function around(message: string): RegExp {
   const [before, after = ""] = message.split(/\{\w+\}/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   return new RegExp(`^${before}.*${after}$`);
 }
+
+// --- phase-6/production-board -------------------------------------------------------------------------------------------------------------
+
+// The production board redrawn (Ramin 2026-11-10: "too basic"): the summary strip, the tinted column heads with their steps and help lines,
+// the cards with their edges, photos and one charcoal action, at 1440 x 900; at 390 x 844 the columns as tabs: Requested, Baking and To
+// check. The admin's batch in the oven is shown as if it had been started six days ago, from an aged copy of the board's answer
+// (page.route), so the stale warning is drawn without leaving a stale batch on the bakery's board. At the phone's width the page must not
+// scroll sideways, and the phone's board passes axe.
+
+/** The board's answers with the batch of request `id` started six days ago (no ETag, so every look is a full answer). */
+async function ageBatch(page: Page, id: number): Promise<void> {
+  await page.route(
+    (url) => url.pathname.endsWith("/production/requests") && url.searchParams.get("view") === "board",
+    async (route) => {
+      const headers = { ...route.request().headers() };
+      delete headers["if-none-match"];
+      const response = await route.fetch({ headers });
+      const body = (await response.json()) as { data: { id: number; batch: { started_at: string } | null }[] };
+      const aged = new Date(Date.now() - 6 * 86_400_000 - 3_600_000).toISOString();
+      for (const request of body.data) if (request.id === id && request.batch) request.batch.started_at = aged;
+      const answer = { ...response.headers() };
+      delete answer.etag;
+      delete answer["content-length"];
+      delete answer["content-encoding"];
+      await route.fulfill({ status: 200, headers: answer, body: JSON.stringify(body) });
+    },
+  );
+}
+
+test.describe("screens: the production board", () => {
+  test.skip(live, "CI only: the captures read the seeded demo bakery");
+  test.use({ viewport: DESKTOP });
+
+  for (const locale of ["en", "am"] as const) {
+    test(`the board with its summary, its columns and a stale batch at 1440 x 900, and its tabs at 390 x 844, in ${locale}`, async ({ page }) => {
+      test.setTimeout(150_000);
+      const t = MESSAGES[locale].production;
+      const demo = await demoProduction();
+      if (demo.inOven) await ageBatch(page, demo.inOven.id);
+      await openBoard(page, locale);
+      await expect(page.getByRole("list", { name: t.summary })).toBeVisible();
+      if (demo.inOven) await expect(page.getByText(locale === "en" ? "Started 6 days ago" : "ከ6 ቀናት በፊት ተጀምሯል")).toBeVisible({ timeout: 30_000 });
+      await capture(page, `production-board-1440x900-${locale}`);
+
+      await page.setViewportSize(PHONE);
+      const tabs = page.getByRole("tablist", { name: t.tabs });
+      await expect(tabs).toBeVisible();
+      for (const [column, shot] of [
+        ["requested", "production-board-390x844"],
+        ["in_progress", "production-board-baking-390x844"],
+        ["pending_confirmation", "production-board-check-390x844"],
+      ] as const) {
+        await tabs.getByRole("tab", { name: new RegExp(t[`tab_${column}`]) }).click();
+        await expect(page.getByRole("region", { name: t[`col_${column}`], exact: true })).toBeVisible();
+        await capture(page, `${shot}-${locale}`);
+        const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+        expect(scroll, `${shot} in ${locale} scrolls sideways`).toBeLessThanOrEqual(client);
+      }
+      await expectAccessible(page, `${locale}/production/ at 390 x 844 (${t.tab_pending_confirmation})`);
+      await page.setViewportSize(DESKTOP);
+    });
+  }
+});

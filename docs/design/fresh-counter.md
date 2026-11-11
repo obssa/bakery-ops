@@ -285,13 +285,26 @@ Three zones from left to right.
 
 ### 3.5 Production board
 
-- Four columns: Requested, In the oven, Check and confirm, Done today.
+- Four columns: Requested, In progress (baking), Pending confirmation, Done today.
+- A summary strip over them (from md up): one tile per column with its icon, its count and a line; the urgent requests waiting and the
+  batches in the oven for more than a day show in amber with a warning sign.
+- The station filter is a segmented control (`station` tone, the chosen one ink) when there are five stations or fewer, a select beyond.
+- Each column sits under a tinted head: its icon on a white tile, "Step 1/2/3" (Done today: "Today"), the name with its Amharic under it on
+  the English page, the count, and one line saying what happens there. Requested is `ink`, In progress `blue`, Pending confirmation
+  `amber`, Done today `positive`. An empty column shows its icon and what lands in it.
 - Cards show:
-  - a 56 × 42 (4:3) thumb of the product on the left of the name, with the Amharic name under it and the quantity (22 / 700) right;
-  - a reason chip ("Sold out · asked automatically" amber, "Asked by the manager" blue);
-  - for batches in the oven, a progress bar (8 px, `brand-600` on `neutral-100`) with "22 of 35 min";
+  - a 6 px edge on the left in the column's colour (amber for a batch in the oven over a day);
+  - an 80 × 60 (4:3) photo of the product on the left of the name, with the Amharic name under it and the quantity (28 / 700) right;
+  - while it waits for a baker: priority, reason ("Stock out · asked automatically" amber, "Asked by the manager" blue) and due chips,
+    the due time in Ethiopian time;
+  - in the oven: "Baking for 1 h 05" in blue with a timer icon and who started it when (no progress bar: no batch carries a planned
+    duration yet). A batch in for a day or more says "Started 6 days ago" with "Finish it and count what was made" in an amber box: a
+    started batch is finished or sent back, never cancelled;
+  - waiting for its overseer: "Made 78 of 80 asked" (and what was wasted);
   - a meta line;
-  - the column's one action at 48 px.
+  - the column's one action, full width, 52 px, charcoal (`primary`).
+- On a phone (under md) the columns are four tabs (the short names "Requested", "Baking", "To check", "Done" under their counts, the chosen
+  tab ink with white text) and one column shows at a time, full width.
 
 ## 4. Admin (fluid page)
 
