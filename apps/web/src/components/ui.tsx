@@ -362,25 +362,36 @@ export function HelpTip({ label, children, className = "" }: { label: string; ch
     };
   }, [open]);
 
-  // measured after it is drawn, and again when the window changes size (a tablet turned, a phone's width): moved left or right so that the
-  // whole card stays 16 px inside the window. The shift is set on the element first, so the next measure starts from where it stands.
+  // moved left or right so that the whole card stays 16 px inside the window, measured when it opens and then on every frame while it is
+  // open: the page around it may reflow at any time (the window turned or resized, a row wrapping, a list arriving), and a card left where
+  // it was would make a phone's page scroll sideways. The place is read from where the card stands minus its shift, and written only when
+  // it changes.
   useLayoutEffect(() => {
     const element = card.current;
     if (!open || !element) {
       setShift(0);
       return;
     }
+    let current = 0;
+    let frame = 0;
     const place = () => {
-      element.style.transform = "";
       const box = element.getBoundingClientRect();
+      const left = box.left - current;
+      const right = left + box.width;
       const room = document.documentElement.clientWidth - 16;
-      const next = box.right > room ? Math.max(16 - box.left, room - box.right) : box.left < 16 ? 16 - box.left : 0;
-      element.style.transform = next ? `translateX(${next}px)` : "";
-      setShift(next);
+      const next = Math.round(right > room ? Math.max(16 - left, room - right) : left < 16 ? 16 - left : 0);
+      if (next !== current) {
+        current = next;
+        element.style.transform = next ? `translateX(${next}px)` : "";
+        setShift(next);
+      }
     };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
+    const loop = () => {
+      place();
+      frame = window.requestAnimationFrame(loop);
+    };
+    loop();
+    return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
   return (
