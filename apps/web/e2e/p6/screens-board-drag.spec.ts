@@ -117,8 +117,11 @@ test.describe("screens: dragging a card along the production board", () => {
       await expect(waiting).toBeVisible({ timeout: 30_000 });
       const grip = waiting.getByRole("button", { name: t.drag_handle.replace("{name}", cake) });
       await grip.focus();
+      // each key waits for what the board announces to a screen reader, as a keyboard user hears it before the next key
       await overseer.keyboard.press("Space");
+      await expect(overseer.getByText(t.drag_picked.replace("{name}", cake), { exact: true })).toBeAttached();
       await overseer.keyboard.press("ArrowRight");
+      await expect(overseer.getByText(t.drag_over.replace("{name}", cake).replace("{column}", t.col_done_today), { exact: true })).toBeAttached();
       await overseer.keyboard.press("Space");
       await expect(cardIn(overseer, t.col_done_today, cake)).toBeVisible({ timeout: 15_000 });
       await expect.poll(async () => (await requestById(f.admin, requestId)).status, { timeout: 30_000 }).toBe("done");
