@@ -222,7 +222,7 @@
       "plan_approved_by": "Ramin, 2026-11-03 ('check and then implement')",
       "report": "docs/phases/phase-6-report.md",
       "gate_job": "gate-p6",
-      "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/42876523051",
+      "gate_run_url": "https://github.com/obssa/bakery-ops/actions/runs/42963369960",
       "done_commit": "ff250f4",
       "done_at": "2026-11-11T01:28:47Z",
       "adrs": [
