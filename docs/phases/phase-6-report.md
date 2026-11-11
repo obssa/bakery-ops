@@ -561,7 +561,7 @@ for its overseer, and one full-width charcoal action. A batch in the oven for a 
 be finished and counted (a started batch is finished or sent back, never cancelled: `production.request.in_progress`). On a phone the
 columns are tabs with their counts, one column at a time. The e2e demo finishes the admin's batch left in the oven over a day before it
 starts a new one, so the board never shows the same batch run after run; the stale card in the captures is drawn from an aged copy of the
-board's answer. `lib/productionBoard.ts` (ages, the stale rule, the summary) has its logic spec (`screens-production-logic`). Web only. Claim restated after the merge of `main` (the chosen states in charcoal); the tag stays on `2f6bbd9`.
+board's answer. `lib/productionBoard.ts` (ages, the stale rule, the summary) has its logic spec (`screens-production-logic`). Web only. Claim restated at `3a8afae` (the merge of `main` after the chosen states in charcoal); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
