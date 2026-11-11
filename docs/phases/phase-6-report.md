@@ -566,7 +566,7 @@ for its overseer, and one full-width charcoal action. A batch in the oven for a 
 be finished and counted (a started batch is finished or sent back, never cancelled: `production.request.in_progress`). On a phone the
 columns are tabs with their counts, one column at a time. The e2e demo finishes the admin's batch left in the oven over a day before it
 starts a new one, so the board never shows the same batch run after run; the stale card in the captures is drawn from an aged copy of the
-board's answer. `lib/productionBoard.ts` (ages, the stale rule, the summary) has its logic spec (`screens-production-logic`). Web only. Claim restated at `3a8afae` (the merge of `main` after the chosen states in charcoal); the tag stays on `2f6bbd9`.
+board's answer. `lib/productionBoard.ts` (ages, the stale rule, the summary) has its logic spec (`screens-production-logic`). Web only. Claim restated at `3a8afae` (the merge of `main` after the chosen states in charcoal); the tag stays on `2f6bbd9`. `main`'s run 42978474299 passed with the strict `gate-p6` green. Deploy 42989655884: 43 of 43 `@live`.
 
 **The screens explain themselves** (Ramin, 2026-11-10: shifts are hard to understand, why someone must wait, what "Ad hoc" and "Review"
 mean; anything confusing must say what it does and how, "Days not built" included). Two primitives in `ui.tsx`: `HelpTip`, a "?" in a 44 px
@@ -587,7 +587,8 @@ row reflowed (it now follows the page on every frame while it is open, writing o
 what still waits (`resolvePendingCounts` approves every row it co-signed, which a count that differs in nothing refuses; the shared helper
 stays as it is, because the production strip's capture relies on where it leaves the cake room). Claim restated at `965d9bc` (after the
 merge of `main` after the chosen states in charcoal and the production board redrawn, whose captures follow this one's in
-`screens.spec.ts`); the tag stays on `2f6bbd9`.
+`screens.spec.ts`); the tag stays on `2f6bbd9`. `main`'s run 42992589637 passed with the strict `gate-p6` green
+(now `gate_run_url`). Deploy 43005505605: 43 of 43 `@live`.
 
 ## What stays open after the claim
 
