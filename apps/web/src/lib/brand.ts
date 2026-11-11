@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import type { Brand, Locale } from "./api/types";
 import { upload } from "./api/upload";
+import type { ClockAlso } from "./clock";
 import { rememberBrand, rememberedBrand } from "./brandMemory";
 import { mediaUrl } from "./images/productImage";
 import { authed, useSession } from "./session";
@@ -71,6 +72,15 @@ export function useSaveBrandName() {
   return useMutation({
     mutationFn: ({ nameEn, nameAm, idempotencyKey }: { nameEn: string; nameAm: string; idempotencyKey: string }) =>
       authed<{ data: Brand }>("/brand", { method: "PUT", body: { name_en: nameEn.trim() || null, name_am: nameAm.trim() || null }, idempotencyKey }),
+    onSuccess: (answer) => adopt(answer.data),
+  });
+}
+
+/** PUT /brand/clock: the international clock shown beside the Ethiopian one (none, h12, h24), for everyone at once. */
+export function useSaveClock() {
+  return useMutation({
+    mutationFn: ({ also, idempotencyKey }: { also: ClockAlso; idempotencyKey: string }) =>
+      authed<{ data: Brand }>("/brand/clock", { method: "PUT", body: { clock_also: also }, idempotencyKey }),
     onSuccess: (answer) => adopt(answer.data),
   });
 }

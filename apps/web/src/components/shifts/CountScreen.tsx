@@ -10,10 +10,9 @@ import type { Count, HandoverNote, Locale, Shift, ShiftStatus } from "@/lib/api/
 import { currentCounts, phaseOf } from "@/lib/counts";
 import { useErrorText } from "@/lib/errors";
 import { authed, useSession } from "@/lib/session";
-import { addisClock } from "@/lib/shifts";
 import { useActiveStation } from "@/lib/station";
 import { useStationHeader } from "@/lib/topBar";
-import { useIsoDay } from "@/lib/useDates";
+import { useClock, useIsoDay } from "@/lib/useDates";
 import { ICON_STROKE } from "../icons";
 import { StationHeaderActions } from "../StationHeaderActions";
 import { focusRing } from "../styles";
@@ -59,6 +58,7 @@ export function CountScreen({ titleAm }: { titleAm?: string }) {
 }
 
 function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
+  const clock = useClock();
   const isoDay = useIsoDay();
   const t = useTranslations("counts");
   const ts = useTranslations("shifts");
@@ -162,7 +162,7 @@ function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
     stationName,
     t(`shift_${shift.status}`),
     t("shift_date", { date: isoDay(shift.date) }),
-    shift.opened_at ? ts("open_since", { time: addisClock(shift.opened_at) }) : null,
+    shift.opened_at ? ts("open_since", { time: clock(shift.opened_at) }) : null,
   ]
     .filter(Boolean)
     .join(" · ");

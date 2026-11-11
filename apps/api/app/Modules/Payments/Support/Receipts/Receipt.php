@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Payments\Support\Receipts;
 
+use App\Shared\Time\EthiopianClock;
 use App\Shared\Time\EthiopianDate;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 
 /**
  * What one receipt prints (phase-4 plan section 4.5, step 4.3e), built by ReceiptBuilder and printed by ReceiptRenderer. Money and
@@ -19,7 +21,10 @@ use Carbon\CarbonImmutable;
  *   money     subtotal, discount, tax, total, paid, balance, change (handed back on cash), refunded, net_paid (paid - refunded), currency
  *   payments  the payments that are not voided, oldest first: the channel in both languages, the amount, the reference's tail, and for
  *             cash the tendered amount and the change
- *   refunds   the money paid back, oldest first: the channel in both languages, the amount, when (local)
+ *   refunds   the money paid back, oldest first: the channel in both languages, the amount, when (local, Y-m-d H:i)
+ *   clockAlso the international clock printed beside the Ethiopian one (none, h12, h24: Identity's ClockPreference)
+ *
+ * Every time prints on the Ethiopian clock (stamp(): "2026-10-26 3:15 morning"), in the receipt's language.
  */
 final readonly class Receipt
 {
@@ -44,13 +49,20 @@ final readonly class Receipt
         public array $money,
         public array $payments,
         public array $refunds,
+        public string $clockAlso = 'none',
     ) {}
 
     /** The same receipt in another locale (step 5.3a: the printer's own font has no Ethiopic, so its fallback prints English only). */
     public function inLocale(string $locale): self
     {
         return new self($this->business, $locale, $this->proforma, $this->orderNo, $this->businessDate, $this->orderType, $this->tableCode,
-            $this->issuedAt, $this->ethiopianDate, $this->lines, $this->money, $this->payments, $this->refunds);
+            $this->issuedAt, $this->ethiopianDate, $this->lines, $this->money, $this->payments, $this->refunds, $this->clockAlso);
+    }
+
+    /** A local time as the receipt prints it: the date, then the Ethiopian clock in the receipt's language ("2026-10-26 3:15 ጠዋት"). */
+    public function stamp(CarbonInterface|string $local): string
+    {
+        return EthiopianClock::stamp(is_string($local) ? CarbonImmutable::parse($local) : $local, $this->locale, $this->clockAlso);
     }
 
     /** The file name a receipt is offered under: receipt-<number>-<business date>.pdf (pro-forma-... for a pro-forma). */

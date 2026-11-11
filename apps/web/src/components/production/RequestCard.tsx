@@ -11,8 +11,7 @@ import { useErrorText } from "@/lib/errors";
 import { cardMove, cardQty, type CardMove } from "@/lib/live/production";
 import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
 import { useSession } from "@/lib/session";
-import { addisClock } from "@/lib/shifts";
-import { useDateFormat } from "@/lib/useDates";
+import { useClock, useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
 import { useWaitText } from "@/lib/useWaitText";
 import { Button, Chip, ProductImage } from "../ui";
@@ -69,6 +68,7 @@ export function RequestCard({
   onOpen: (request: ProductionRequest, focus?: "finish") => void;
   onChanged: () => void;
 }) {
+  const clock = useClock();
   const t = useTranslations("production");
   const o = useTranslations("outbox");
   const locale = useLocale() as Locale;
@@ -118,13 +118,13 @@ export function RequestCard({
     if (request.due_at) meta.push(t("due", { time: formatWhen(request.due_at, dates) }));
     if (request.assigned_to) meta.push(request.status === "accepted" ? t("accepted_by", { name: request.assigned_to.name }) : t("baker", { name: request.assigned_to.name }));
   } else if (request.status === "in_progress" && batch) {
-    const time = addisClock(batch.started_at);
+    const time = clock(batch.started_at);
     meta.push(request.assigned_to ? t("meta_started", { name: request.assigned_to.name, time }) : t("meta_started_anon", { time }));
   } else if (request.status === "pending_confirmation" && batch) {
     meta.push(t("meta_overseer", { name: batch.finished_by?.name ?? request.assigned_to?.name ?? "" }));
   } else if (request.status === "done") {
     const at = batch?.confirmed_at ?? request.done_at;
-    if (at) meta.push(batch?.confirmed_by ? t("meta_confirmed", { time: addisClock(at) }) : t("meta_done", { time: addisClock(at) }));
+    if (at) meta.push(batch?.confirmed_by ? t("meta_confirmed", { time: clock(at) }) : t("meta_done", { time: clock(at) }));
     const who = batch?.confirmed_by ?? batch?.finished_by ?? null;
     if (who) meta.push(who.name);
   }

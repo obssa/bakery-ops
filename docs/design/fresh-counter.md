@@ -82,6 +82,12 @@ Never tell two states apart by hue alone. Each one also carries a word ("Low", "
   glyphs fall through to Noto, so mixed lines render in both scripts.
 - `font-variant-numeric: tabular-nums` on every amount, count, timer and table number (Tailwind `tabular-nums`).
 - Amharic keeps `:lang(am) { line-height: 1.65 }`.
+- **Times of day read on the Ethiopian clock** (Ethiopian clock follow-up, `lib/clock.ts`; the API's `Shared/Time/EthiopianClock.php`
+  prints the same on receipts and PDFs): the hour, two-digit minutes and the part of the day, "1:50 ጠዋት" / "1:50 morning" for 07:50,
+  never a 24-hour "07:50" on its own. Four parts: ጠዋት 06:00-11:59, ከሰዓት 12:00-17:59, ማታ 18:00-23:59, ሌሊት 00:00-05:59. When the
+  admin turns on the international clock (System > Time) it follows after " · ": "1:50 ጠዋት · 7:50 AM" or "· 07:50". A chart's hour
+  ticks give the hour alone with the part's word under the first hour of each part. Durations ("5:07", "4 d") are not times of day
+  and keep their own form; every value sent to the API, a template's window and a spreadsheet export stay 24-hour.
 
 | Role | Size / weight | Tailwind |
 |---|---|---|

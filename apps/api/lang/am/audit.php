@@ -12,6 +12,7 @@ return [
         'columns' => [
             'id' => 'መለያ',
             'at' => 'ሰዓት',
+            'at_ethiopian' => 'ሰዓት (በኢትዮጵያ አቆጣጠር)',
             'actor_id' => 'የፈጻሚው መለያ',
             'actor' => 'ፈጻሚ',
             'acting_user_id' => 'በጋራ መሣሪያ የሠራው ሰው መለያ',

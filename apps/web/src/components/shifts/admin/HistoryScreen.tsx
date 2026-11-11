@@ -9,9 +9,8 @@ import type { ChainLink, ShiftStatus, StockPlace } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
 import { shortHash } from "@/lib/counts";
 import { can, useSession } from "@/lib/session";
-import { addisClock } from "@/lib/shifts";
 import { verifySummary, type VerifySummary } from "@/lib/shiftsAdmin";
-import { useIsoDay } from "@/lib/useDates";
+import { useClock, useIsoDay } from "@/lib/useDates";
 import { ACTIONS_CELL, CARD, EmptyRow, InnerTable, TableCard, Toolbar, ToolbarSelect } from "../../admin/kit";
 import { QueryRows } from "../../admin/rows";
 import { Alert, Button, Chip, Skeleton } from "../../ui";
@@ -132,6 +131,7 @@ function ChainBody({ placeId, placeName, head, picker, children }: { placeId: nu
 
 /** The place's locked counts, newest link first as the API lists them, each with its fingerprint and a link to its review. */
 function ChainTable({ links }: { links: ChainLink[] }) {
+  const clock = useClock();
   const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   return (
@@ -165,7 +165,7 @@ function ChainTable({ links }: { links: ChainLink[] }) {
                   </span>
                 </td>
                 <td className="whitespace-nowrap tabular-nums">{isoDay(link.shift_date)}</td>
-                <td className="tabular-nums">{addisClock(link.locked_at)}</td>
+                <td className="tabular-nums">{clock(link.locked_at)}</td>
                 <td className="font-mono text-sm text-neutral-700" title={link.payload_hash}>
                   {shortHash(link.payload_hash)}
                 </td>
@@ -188,6 +188,7 @@ function ChainTable({ links }: { links: ChainLink[] }) {
 }
 
 function ShiftHistory() {
+  const clock = useClock();
   const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   const name = useName();
@@ -263,8 +264,8 @@ function ShiftHistory() {
                   <td>
                     <ShiftStatusBadge status={shift.status} />
                   </td>
-                  <td className="tabular-nums text-neutral-700">{addisClock(shift.opened_at ?? shift.started_at) || "—"}</td>
-                  <td className="tabular-nums text-neutral-700">{addisClock(shift.locked_at) || "—"}</td>
+                  <td className="tabular-nums text-neutral-700">{clock(shift.opened_at ?? shift.started_at) || "—"}</td>
+                  <td className="tabular-nums text-neutral-700">{clock(shift.locked_at) || "—"}</td>
                 </tr>
               ))
             )

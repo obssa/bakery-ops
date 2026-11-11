@@ -12,7 +12,9 @@ import { can, useSession } from "@/lib/session";
 import { crossesMidnight, emptyTemplateForm, formOf, templateBody, templateIssues, type TemplateForm, type TemplateIssue } from "@/lib/shiftsAdmin";
 import { ACTIONS_CELL, EmptyRow, FORM_GRID, TableCard } from "../../admin/kit";
 import { QueryRows } from "../../admin/rows";
+import { useHhmm } from "@/lib/useDates";
 import { Alert, Button, Chip, Field, Modal, Panel, Status, TextInput } from "../../ui";
+import { EthiopianTimeField } from "./EthiopianTimeField";
 import { useName } from "./common";
 
 // Admin > Shifts > Templates (step 3.7c): the named windows of the day that shifts are scheduled from (Day, Night). Everyone who reads
@@ -78,6 +80,7 @@ export function TemplatesScreen() {
 function TemplateRows({ rows, stations, manage, onEdit }: { rows: ShiftTemplate[]; stations: WorkStation[]; manage: boolean; onEdit: (row: ShiftTemplate) => void }) {
   const t = useTranslations("adminShifts");
   const name = useName();
+  const hhmm = useHhmm();
   const errorText = useErrorText();
   const retire = useRetireTemplate();
   const idempotency = useIdempotencyKey();
@@ -104,8 +107,8 @@ function TemplateRows({ rows, stations, manage, onEdit }: { rows: ShiftTemplate[
           <th scope="row" className="font-semibold text-neutral-900">
             {name(row)}
           </th>
-          <td className="whitespace-nowrap tabular-nums">
-            {row.start_time}–{row.end_time}
+          <td className="tabular-nums">
+            <span className="whitespace-nowrap">{hhmm(row.start_time)}</span> – <span className="whitespace-nowrap">{hhmm(row.end_time)}</span>
             {crossesMidnight(row.start_time, row.end_time) ? <span className="block text-[13px] text-neutral-600">{t("templates.through_midnight")}</span> : null}
           </td>
           <td className="text-neutral-700">
@@ -222,13 +225,11 @@ function TemplateForm({ editing, stations, presetStation, onDone }: { editing: S
             <Field label={t("templates.name_am")} error={issue("name_am") ?? fieldError("name_am")}>
               {(props) => <TextInput {...props} controlSize="md" lang="am" value={form.name_am} maxLength={80} onChange={(event) => setForm({ ...form, name_am: event.target.value })} />}
             </Field>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label={t("templates.start")} error={issue("times")}>
-                {(props) => <TextInput {...props} controlSize="md" type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} />}
-              </Field>
-              <Field label={t("templates.end")}>
-                {(props) => <TextInput {...props} controlSize="md" type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} />}
-              </Field>
+            {/* the window on the Ethiopian clock (12 in the morning is sunrise, 06:00); the API keeps the 24-hour HH:MM */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+              <EthiopianTimeField label={t("templates.start")} value={form.start_time} error={issue("times")} onChange={(start_time) => setForm({ ...form, start_time })} />
+              <EthiopianTimeField label={t("templates.end")} value={form.end_time} onChange={(end_time) => setForm({ ...form, end_time })} />
+              <p className="text-[13px] text-neutral-600 sm:col-span-2">{t("templates.time_hint")}</p>
             </div>
             <div className="flex flex-col justify-end gap-2">
               {crossesMidnight(form.start_time, form.end_time) ? <p className="text-[13px] text-neutral-600">{t("templates.midnight_hint")}</p> : null}

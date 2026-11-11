@@ -282,8 +282,10 @@ export function TableCard({
   children: ReactNode;
 }) {
   const id = useId();
+  // relative: a header's visually hidden label (sr-only, absolutely placed) stays inside the scroll box; without it, it is placed by the
+  // page and pushes a narrow window into a sideways scroll (Templates at 390 px: 757 px wide)
   const table = (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <Table className={`${minWidth} ${compact ? `${COMPACT} [&_tr>*:first-child]:pl-5 [&_tr>*:last-child]:pr-5 ${ROWS}` : `${EDGES} ${ONE_LINE_HEAD}`}`}>
         <caption className="sr-only">{caption}</caption>
         {children}

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Analytics\Export;
 
+use App\Modules\Identity\Contracts\ClockPreference;
 use App\Shared\Exports\DecimalCell;
 use App\Shared\Exports\XlsxFile;
 use App\Shared\Pdf\PdfRenderer;
+use App\Shared\Time\EthiopianClock;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\Factory as ViewFactory;
 use LogicException;
@@ -34,6 +36,7 @@ final class ReportFiles
     public function __construct(
         private readonly PdfRenderer $pdf,
         private readonly ViewFactory $views,
+        private readonly ClockPreference $clock,
     ) {}
 
     public function xlsx(Report $report, string $path): void
@@ -147,12 +150,16 @@ final class ReportFiles
     private function html(Report $report, Labels $labels, array $rows, int $more): string
     {
         $built = count($report->range->days()) - count($report->freshness['stale_days']);
+        // the printed page says the time as people read it (the Ethiopian clock); the spreadsheets keep the 24-hour stamp (about())
+        $also = $this->clock->also();
+        $said = static fn (CarbonImmutable $local): string => EthiopianClock::stamp($local, $report->locale, $also);
+        $asOf = $report->freshness['as_of'] === null ? '' : $said(CarbonImmutable::parse($report->freshness['as_of'])->setTimezone($report->timezone));
 
         return $this->views->make('analytics.report', [
             'am' => $report->locale === 'am',
             'title' => $labels->text('titles.'.$report->name),
             'range' => $labels->with('pdf.range', ['from' => $report->range->from, 'to' => $report->range->to, 'timezone' => $report->timezone]),
-            'stamp' => $built === 0 ? $labels->text('pdf.none_built') : $labels->with('pdf.as_of', ['as_of' => $this->local($report->freshness['as_of'], $report->timezone)]),
+            'stamp' => $built === 0 ? $labels->text('pdf.none_built') : $labels->with('pdf.as_of', ['as_of' => $asOf]),
             'stale' => $built === 0 ? null : ($report->freshness['stale_days'] === [] ? $labels->text('pdf.all_built') : $labels->count('pdf.not_built', count($report->freshness['stale_days']))),
             'totalsTitle' => $labels->text('pdf.totals'),
             'totals' => array_map(static fn (array $total): array => [$labels->text('columns.'.$total[0]), $total[2] === null ? '-' : (string) $total[2]], $report->totals),
@@ -160,7 +167,7 @@ final class ReportFiles
             'rows' => $rows,
             'more' => $more > 0 ? $labels->with('pdf.more', ['count' => $more]) : null,
             'empty' => $labels->text('pdf.empty'),
-            'printed' => $labels->with('pdf.printed', ['at' => CarbonImmutable::now($report->timezone)->format('Y-m-d H:i')]),
+            'printed' => $labels->with('pdf.printed', ['at' => $said(CarbonImmutable::now($report->timezone))]),
         ])->render();
     }
 

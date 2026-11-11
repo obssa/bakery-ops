@@ -13,9 +13,8 @@ import { useErrorText } from "@/lib/errors";
 import { createRunningFeed } from "@/lib/live/running";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { can, useSession } from "@/lib/session";
-import { addisClock } from "@/lib/shifts";
 import { setupCheck } from "@/lib/shiftsAdmin";
-import { useIsoDay } from "@/lib/useDates";
+import { useClock, useIsoDay } from "@/lib/useDates";
 import { CARD, Notice, TEXT_LINK } from "../../admin/kit";
 import { Alert, Button, Chip, Skeleton } from "../../ui";
 import { buttonClass } from "../../styles";
@@ -110,6 +109,7 @@ export function SetupCheck() {
 }
 
 function Running({ shift }: { shift: ShiftSummary }) {
+  const clock = useClock();
   const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   const name = useName();
@@ -149,7 +149,7 @@ function Running({ shift }: { shift: ShiftSummary }) {
           <p className="text-[13px] text-neutral-600">
             {t("running.line", { name: label, date: isoDay(shift.date) })}
             {" · "}
-            {shift.started_by ? t("running.started_by", { name: shift.started_by.name, time: addisClock(since) }) : t("running.since", { time: addisClock(since) })}
+            {shift.started_by ? t("running.started_by", { name: shift.started_by.name, time: clock(since) }) : t("running.since", { time: clock(since) })}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

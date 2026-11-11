@@ -44,7 +44,7 @@ final class ReceiptLayout
         $rows[] = ReceiptRow::gap();
         $rows[] = ReceiptRow::center($l($receipt->proforma ? 'proforma' : 'title'), ReceiptRow::BOLD);
         $rows[] = ReceiptRow::pair($l('order').' #'.($receipt->orderNo ?? '-'), $l('type.'.$receipt->orderType).($receipt->tableCode !== null ? ' - '.$l('table').' '.$receipt->tableCode : ''));
-        $rows[] = ReceiptRow::left($l('date').': '.$receipt->issuedAt->format('Y-m-d H:i'), ReceiptRow::SMALL);
+        $rows[] = ReceiptRow::left($l('date').': '.$receipt->stamp($receipt->issuedAt), ReceiptRow::SMALL);
         if ($receipt->ethiopianDate !== null) {
             $rows[] = ReceiptRow::left($l('ethiopian_date').': '.$n($receipt->ethiopianDate->format('en'), $receipt->ethiopianDate->format('am')), ReceiptRow::SMALL);
         }
@@ -105,7 +105,7 @@ final class ReceiptLayout
         if ($receipt->refunds !== []) {
             $rows[] = ReceiptRow::left($l('refunds'), ReceiptRow::BOLD);
             foreach ($receipt->refunds as $refund) {
-                $rows[] = ReceiptRow::pair($n($refund['channel_en'], $refund['channel_am']).', '.$refund['refunded_at'], '-'.$refund['amount'], ReceiptRow::SMALL);
+                $rows[] = ReceiptRow::pair($n($refund['channel_en'], $refund['channel_am']).', '.$receipt->stamp($refund['refunded_at']), '-'.$refund['amount'], ReceiptRow::SMALL);
             }
         }
 

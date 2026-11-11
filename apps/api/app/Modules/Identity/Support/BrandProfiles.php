@@ -24,7 +24,7 @@ use Illuminate\Support\Str;
  * file; a refusal is its FilesError, files.*), drawn whole and centred on a white square of LOGO_SIZE (a transparent logo stays on white, never
  * black) and encoded as WebP where gd has it, else JPEG, with no metadata; the file is written under its sha256 before any lock, then the row
  * names it in one AuditedAction identity.brand.logo_set. removeLogo(): the row forgets it (identity.brand.logo_removed); a branch without a
- * logo writes nothing. Files are content-addressed and never deleted here: a replaced logo's file stays, so a cached page never breaks.
+ * logo writes nothing. saveClock(): the international clock shown beside the Ethiopian one (none, h12, h24), identity.brand.clock. Files are content-addressed and never deleted here: a replaced logo's file stays, so a cached page never breaks.
  *
  * Every first write creates the branch's one row without ever locking a missing row: a no-op insert (INSERT IGNORE) makes sure it exists,
  * then it is locked (traps.md, "First-row race").
@@ -59,6 +59,20 @@ final class BrandProfiles
 
             return $row;
         }, $this->current(), 'identity.brand.update');
+    }
+
+    /** none, h12 or h24 (UpdateBrandClockRequest checked it). */
+    public function saveClock(string $also): BrandProfile
+    {
+        return $this->audit->run(function (?BrandProfile $row) use ($also): BrandProfile {
+            $row = $this->locked($row);
+            $row->forceFill(['clock_also' => $also]);
+            if ($row->isDirty()) {
+                $row->save();
+            }
+
+            return $row;
+        }, $this->current(), 'identity.brand.clock');
     }
 
     /**

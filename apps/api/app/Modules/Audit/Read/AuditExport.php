@@ -7,6 +7,7 @@ namespace App\Modules\Audit\Read;
 use App\Modules\Audit\Models\AuditLog;
 use App\Shared\Exports\XlsxFile;
 use App\Shared\Tenancy\CurrentBranch;
+use App\Shared\Time\EthiopianClock;
 use Generator;
 
 /**
@@ -26,9 +27,12 @@ final class AuditExport
     /** @var list<string> */
     public const array FORMATS = ['csv', 'xlsx'];
 
-    /** @var list<string> the columns, in order; their headers are lang/{en,am}/audit.php export.columns.* */
+    /**
+     * @var list<string> the columns, in order; their headers are lang/{en,am}/audit.php export.columns.*. at stays the 24-hour local stamp a
+     *                   spreadsheet can sort; at_ethiopian says it as people read it ("8:10 morning", the Ethiopian clock)
+     */
     public const array COLUMNS = [
-        'id', 'at', 'actor_id', 'actor', 'acting_user_id', 'acting_user', 'action', 'subject_type', 'subject_id', 'station_id', 'shift_id',
+        'id', 'at', 'at_ethiopian', 'actor_id', 'actor', 'acting_user_id', 'acting_user', 'action', 'subject_type', 'subject_id', 'station_id', 'shift_id',
         'device_id', 'ip', 'changed', 'reason', 'before', 'after', 'context',
     ];
 
@@ -78,7 +82,7 @@ final class AuditExport
     {
         fwrite($out, "\xEF\xBB\xBF");
         fputcsv($out, self::header($locale), ',', '"', '');
-        foreach ($this->lines($filters, $upTo) as $line) {
+        foreach ($this->lines($filters, $upTo, $locale) as $line) {
             fputcsv($out, array_map(static fn (int|string|null $value): string => is_string($value) ? self::guarded($value) : (string) $value, $line), ',', '"', '');
         }
     }
@@ -93,7 +97,7 @@ final class AuditExport
         $file = XlsxFile::open($path);
         try {
             $file->sheet('Audit log', self::header($locale));
-            foreach ($this->lines($filters, $upTo) as $line) {
+            foreach ($this->lines($filters, $upTo, $locale) as $line) {
                 foreach (self::JSON as $column) {
                     $value = $line[$column];
                     if (is_string($value) && mb_strlen($value) > self::XLSX_CELL_MAX) {
@@ -121,18 +125,18 @@ final class AuditExport
      * @param  array<string, string>  $filters
      * @return Generator<array<string, int|string|null>>
      */
-    private function lines(array $filters, int $upTo): Generator
+    private function lines(array $filters, int $upTo, string $locale): Generator
     {
         $chunk = [];
         foreach ($this->log->query($filters)->where('audit_log.id', '<=', $upTo)->lazyById(self::CHUNK, 'audit_log.id', 'id') as $row) {
             $chunk[] = $row;
             if (count($chunk) === self::CHUNK) {
-                yield from $this->chunk($chunk);
+                yield from $this->chunk($chunk, $locale);
                 $chunk = [];
             }
         }
         if ($chunk !== []) {
-            yield from $this->chunk($chunk);
+            yield from $this->chunk($chunk, $locale);
         }
     }
 
@@ -140,7 +144,7 @@ final class AuditExport
      * @param  list<AuditLog>  $rows
      * @return Generator<array<string, int|string|null>>
      */
-    private function chunk(array $rows): Generator
+    private function chunk(array $rows, string $locale): Generator
     {
         $names = $this->entries->namesOf($rows);
         $zone = $this->branch->timezone();
@@ -149,6 +153,7 @@ final class AuditExport
             yield [
                 'id' => $row->id,
                 'at' => $row->at->setTimezone($zone)->format('Y-m-d H:i:s'),
+                'at_ethiopian' => EthiopianClock::of($row->at->setTimezone($zone))->format($locale === 'am' ? 'am' : 'en'),
                 'actor_id' => $row->actor_id,
                 'actor' => $names[$row->actor_id] ?? null,
                 'acting_user_id' => $row->acting_user_id,

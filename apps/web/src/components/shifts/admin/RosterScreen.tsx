@@ -19,6 +19,7 @@ import { ApiError } from "@/lib/api/client";
 import type { ShiftSummary, ShiftTemplate, User, WorkStation } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
+import { useHhmm } from "@/lib/useDates";
 import { addDays, candidatesFor, canStartNow, cellKey, isoWeekday, shiftsByCell, templatesOn, weekOf } from "@/lib/shiftsAdmin";
 import { Toolbar, ToolbarField, TableCard } from "../../admin/kit";
 import { Alert, Button, Modal, Panel, Skeleton } from "../../ui";
@@ -121,6 +122,7 @@ function StationWeek({
 }) {
   const t = useTranslations("adminShifts");
   const name = useName();
+  const hhmm = useHhmm();
   const rows = templates.filter((template) => template.is_active && template.station_ids.includes(station.station_id)).sort((a, b) => a.start_time.localeCompare(b.start_time));
   if (rows.length === 0) {
     return (
@@ -150,7 +152,7 @@ function StationWeek({
             <th scope="row" className="align-top font-semibold text-neutral-900">
               {name(template)}
               <span className="block text-[13px] font-normal tabular-nums text-neutral-600">
-                {template.start_time}–{template.end_time}
+                {hhmm(template.start_time)} – {hhmm(template.end_time)}
               </span>
             </th>
             {days.map((date) => (

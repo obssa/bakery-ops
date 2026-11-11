@@ -15,7 +15,7 @@ it('has an English and an Amharic text for every Audit message and header, with 
     $am = Arr::dot(require base_path('lang/am/audit.php'));
 
     expect(array_keys($am))->toEqualCanonicalizing(array_keys($en));
-    $columns = ['id', 'at', 'actor_id', 'actor', 'acting_user_id', 'acting_user', 'action', 'subject_type', 'subject_id', 'station_id', 'shift_id',
+    $columns = ['id', 'at', 'at_ethiopian', 'actor_id', 'actor', 'acting_user_id', 'acting_user', 'action', 'subject_type', 'subject_id', 'station_id', 'shift_id',
         'device_id', 'ip', 'changed', 'reason', 'before', 'after', 'context'];
     $keys = array_merge(['export.too_large', 'export.too_long'], array_map(fn (string $c): string => "export.columns.{$c}", $columns));
     expect(array_keys($en))->toEqualCanonicalizing($keys);

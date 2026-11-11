@@ -290,6 +290,19 @@ return [
         },
         'payload' => fn (): array => ['name_en' => 'Idempotent Bakery', 'name_am' => 'ዳቦ ቤት'],
     ],
+    // the international clock beside the Ethiopian one (the Ethiopian clock follow-up): the first save writes the branch's row
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/brand/clock',
+        'module' => 'identity',
+        'table' => 'brand_profiles',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $admin();
+
+            return [];
+        },
+        'payload' => fn (): array => ['clock_also' => 'h12'],
+    ],
     [
         'method' => 'POST',
         'uri' => '/api/v1/brand/logo',

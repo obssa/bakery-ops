@@ -27,7 +27,7 @@ import type { Item, Unit } from "@/lib/api/types";
 import { addDecimal, compareDecimal, isQuantityText, multiplyDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
-import { InventoryNav, Pager, QueryBox, qtyFigure, stamp, useNamer } from "./shared";
+import { InventoryNav, Pager, QueryBox, qtyFigure, useStamp, useNamer } from "./shared";
 
 // Admin > Inventory > Purchases (step 2.2b): a purchase is a draft with lines (item, quantity, unit, unit cost) until it
 // is confirmed, which puts the stock in the receiving place and moves each item's moving average; a draft may be cancelled,
@@ -571,6 +571,7 @@ function PurchaseCard({
   onClosed: () => void;
   closeText: string;
 }) {
+  const stamp = useStamp();
   const t = useTranslations("inventory");
   const name = useNamer();
   const errorText = useErrorText();

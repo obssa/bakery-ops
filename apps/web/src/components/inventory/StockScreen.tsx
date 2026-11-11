@@ -6,7 +6,7 @@ import { useState } from "react";
 import { EmptyRow, Notice, SearchBox, TableCard, Toolbar, ToolbarSelect } from "@/components/admin/kit";
 import { Button, Chip, PageHeader } from "@/components/ui";
 import { useLocations, useStock, useStockAlerts, type StockAlert } from "@/lib/api/inventory";
-import { InventoryNav, QueryBox, qty, stamp, useNamer } from "./shared";
+import { InventoryNav, QueryBox, qty, useStamp, useNamer } from "./shared";
 
 // Admin > Inventory > Stock (Phase 2, step 2.8b): the balances of one place (on hand, reserved, available, in the base
 // unit), a filter by item, the low and out flags from the active alerts, and those alerts. A stock alert or transfer
@@ -38,6 +38,7 @@ function StateChip({ state }: { state: StockAlert["type"] | null }) {
 }
 
 export function StockScreen({ titleAm }: { titleAm?: string }) {
+  const stamp = useStamp();
   const t = useTranslations("inventory");
   const params = useSearchParams();
   const [location, setLocation] = useState<number | null>(numberParam(params.get("location")));

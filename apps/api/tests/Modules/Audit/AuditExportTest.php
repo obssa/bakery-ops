@@ -27,7 +27,7 @@ use Tests\Support\AuditRows;
 pest()->group('module:audit', 'feature');
 
 const AUDIT_EXPORT_COLUMNS = [
-    'id', 'at', 'actor_id', 'actor', 'acting_user_id', 'acting_user', 'action', 'subject_type', 'subject_id', 'station_id', 'shift_id',
+    'id', 'at', 'at_ethiopian', 'actor_id', 'actor', 'acting_user_id', 'acting_user', 'action', 'subject_type', 'subject_id', 'station_id', 'shift_id',
     'device_id', 'ip', 'changed', 'reason', 'before', 'after', 'context',
 ];
 
@@ -94,11 +94,11 @@ it('exports one line per row, oldest first, as CSV and as XLSX, with the same li
         ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff');
     $rows = ($this->rows)($response, $format);
     expect($rows)->toHaveCount(3)
-        ->and($rows[0])->toBe(['ID', 'Time', 'Actor ID', 'Actor', 'Acting user ID', 'Acting user', 'Action', 'Subject type', 'Subject ID', 'Station ID',
+        ->and($rows[0])->toBe(['ID', 'Time', 'Ethiopian time', 'Actor ID', 'Actor', 'Acting user ID', 'Acting user', 'Action', 'Subject type', 'Subject ID', 'Station ID',
             'Shift ID', 'Device ID', 'IP address', 'Changed fields', 'Reason', 'Before', 'After', 'Context']);
     $line = fn (int $i): array => array_combine(AUDIT_EXPORT_COLUMNS, $rows[$i]);
     expect($line(1))->toBe([
-        'id' => (string) $first->id, 'at' => '2026-10-20 08:10:00', 'actor_id' => (string) $this->admin->id, 'actor' => 'Almaz',
+        'id' => (string) $first->id, 'at' => '2026-10-20 08:10:00', 'at_ethiopian' => '2:10 morning', 'actor_id' => (string) $this->admin->id, 'actor' => 'Almaz',
         'acting_user_id' => '', 'acting_user' => '', 'action' => 'payment.verify', 'subject_type' => 'payment', 'subject_id' => '41',
         'station_id' => '4', 'shift_id' => '7', 'device_id' => '3', 'ip' => '10.0.0.8', 'changed' => 'status', 'reason' => '',
         'before' => '{"status":"recorded","amount":"70.00"}', 'after' => '{"status":"verified","amount":"70.00"}', 'context' => '{"note":"on the statement"}',

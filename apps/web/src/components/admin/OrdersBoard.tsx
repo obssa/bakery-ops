@@ -16,6 +16,7 @@ import { visibleLines } from "@/lib/live/pad";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { useSession } from "@/lib/session";
 import { kindLabelKey } from "@/lib/orderRecord";
+import { useClock } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
 import { useTables } from "../pad/TablesPanel";
 import { HistoryLink } from "../audit/HistoryLink";
@@ -164,6 +165,7 @@ function OrderCard({ order, now, selected, look, onOpen }: { order: Order; now: 
 }
 
 function Timeline({ order, onClose, onVoid }: { order: Order; onClose: () => void; onVoid: (order: Order) => void }) {
+  const clock = useClock();
   const t = useTranslations("adminOrders");
   const locale = useLocale() as Locale;
   const errorText = useErrorText();
@@ -202,7 +204,7 @@ function Timeline({ order, onClose, onVoid }: { order: Order; onClose: () => voi
                 <span className="font-semibold">{label}</span>
                 {line ? <span className="text-neutral-700"> · {locale === "am" ? line.item.name_am : line.item.name_en}</span> : null}
                 <time dateTime={event.at} className="block text-[13px] tabular-nums text-neutral-600">
-                  {Number.isNaN(at.getTime()) ? event.at : at.toLocaleTimeString(locale === "am" ? "am-ET" : "en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  {Number.isNaN(at.getTime()) ? event.at : clock(event.at, { seconds: true })}
                 </time>
               </li>
             );

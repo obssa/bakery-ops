@@ -940,6 +940,73 @@ test.describe("screens: team, insight and system", () => {
       await reset();
     }
   });
+
+  // The Ethiopian clock follow-up: System's Time card (how the clock reads, with examples across the day, and the international clock
+  // beside it), the shift template form's Ethiopian time picker, and the Shifts overview in Amharic, whose times read "1:50 ጠዋት". The
+  // international clock is turned on (12-hour) through the card and put back off at the end, whatever happened.
+  test("System's Time card and the template time picker, off and with the 12-hour clock, at 1440 and 390, in en and am", async ({ page }) => {
+    test.setTimeout(240_000);
+    const demo = await demoBakery();
+    const reset = () => demo.admin.put("/brand/clock", { clock_also: "none" });
+    const sizes = async (name: string, what: Locator) => {
+      for (const [size, viewport] of [["1440x900", DESKTOP], ["390x844", PHONE]] as const) {
+        await page.setViewportSize(viewport);
+        await what.scrollIntoViewIfNeeded();
+        await capture(page, `${name}-${size}`);
+        if (size === "390x844") {
+          const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+          expect(scroll, `${name} at 390 x 844 scrolls sideways`).toBeLessThanOrEqual(client);
+        }
+      }
+      await page.setViewportSize(DESKTOP);
+    };
+    const templates = async (locale: keyof typeof MESSAGES) => {
+      const t = MESSAGES[locale];
+      await openAdmin(page, `${locale}/admin/shifts/templates/`, t.adminShifts.title_templates);
+      const form = page.getByRole("region", { name: t.adminShifts.templates.new });
+      await expect(form.getByRole("group", { name: t.adminShifts.templates.start }).getByLabel(t.adminShifts.templates.time_hour)).toBeVisible({ timeout: 30_000 });
+      return form;
+    };
+    await reset();
+    try {
+      for (const locale of ["en", "am"] as const) {
+        const t = MESSAGES[locale];
+        await openAdmin(page, `${locale}/admin/system/`, t.system.title);
+        const card = page.getByTestId("system-clock");
+        // 07:00 reads 1:00 in the morning
+        await expect(card.getByText(`1:00 ${locale === "am" ? "ጠዋት" : "morning"}`, { exact: true })).toBeVisible({ timeout: 30_000 });
+        await sizes(`system-clock-${locale}`, card);
+        await expectAccessible(page, `System > Time (${locale})`);
+
+        const form = await templates(locale);
+        // the form's default window, 06:00 to 14:00: 12 in the morning to 8 in the afternoon
+        await expect(form.getByRole("group", { name: t.adminShifts.templates.start }).getByLabel(t.adminShifts.templates.time_hour)).toHaveValue("6");
+        await sizes(`shifts-templates-${locale}`, form);
+        await expectAccessible(page, `Shifts > Templates, the time picker (${locale})`);
+      }
+
+      const t = MESSAGES.en;
+      await openAdmin(page, "en/admin/system/", t.system.title);
+      const card = page.getByTestId("system-clock");
+      await card.getByRole("button", { name: t.system.clock.also_h12, exact: true }).click();
+      await expect(card.getByRole("status")).toHaveText(t.system.clock.saved_h12, { timeout: 30_000 });
+      await expect(card.getByText("10:10 afternoon · 4:10 PM", { exact: true })).toBeVisible();
+      await sizes("system-clock-h12-en", card);
+      await expectAccessible(page, "System > Time, 12-hour on (en)");
+      const form = await templates("en");
+      await expect(form.getByText("International time: 6:00 AM")).toBeVisible();
+      await sizes("shifts-templates-h12-en", form);
+
+      await reset();
+      await shoot(page, "shifts-1440x900-am", async () => {
+        await openAdmin(page, "am/admin/shifts/", MESSAGES.am.counts.admin_title);
+        await expect(page.getByRole("region", { name: MESSAGES.am.adminShifts.setup.title }).getByText(MESSAGES.am.adminShifts.setup.checking)).toHaveCount(0, { timeout: 30_000 });
+        await expect(page.getByText(MESSAGES.am.adminShifts.running.loading)).toHaveCount(0, { timeout: 30_000 });
+      });
+    } finally {
+      await reset();
+    }
+  });
 });
 
 // Step 6.4b: the product page (ProductPhoto.dc.html and PhotoStates.dc.html) at 1440 x 900, an admin's size. A demo product with its demo

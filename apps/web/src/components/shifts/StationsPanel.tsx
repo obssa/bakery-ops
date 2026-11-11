@@ -5,9 +5,9 @@ import { Link } from "@/i18n/navigation";
 import { useWorkStations } from "@/lib/api/adminShifts";
 import type { Locale, ShiftStatus, StationCode, WorkStation } from "@/lib/api/types";
 import { can, useSession } from "@/lib/session";
-import { addisClock } from "@/lib/shifts";
 import { Badge, Panel } from "../ui";
 import { focusRing } from "../styles";
+import { useClock } from "@/lib/useDates";
 
 // The stations of the branch and the shift running at each, for the people who work any station (admin, manager: stations.all), from
 // GET /me work_stations (step 3.7a). A row opens the screen of its station. Looked at again every 15 s; the full roster calendar and the
@@ -33,6 +33,7 @@ const TONE: Record<ShiftStatus, "neutral" | "blue" | "green" | "amber"> = {
 };
 
 function StatusBadge({ station }: { station: WorkStation }) {
+  const clock = useClock();
   const t = useTranslations("shifts");
   if (!station.tracks_shifts) return <span className="text-base text-neutral-600">{t("station_no_tracking")}</span>;
   const shift = station.current_shift;
@@ -41,7 +42,7 @@ function StatusBadge({ station }: { station: WorkStation }) {
   return (
     <span className="flex items-center gap-2">
       <Badge tone={TONE[shift.status]}>{t(key)}</Badge>
-      {shift.opened_at ? <span className="text-base text-neutral-600">{t("open_since", { time: addisClock(shift.opened_at) })}</span> : null}
+      {shift.opened_at ? <span className="text-base text-neutral-600">{t("open_since", { time: clock(shift.opened_at) })}</span> : null}
     </span>
   );
 }

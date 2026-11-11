@@ -7,9 +7,8 @@ import type { Replay } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { shortHash } from "@/lib/counts";
-import { addisClock } from "@/lib/shifts";
 import { addisDate, addisLocalInput, addisToIso } from "@/lib/shiftsAdmin";
-import { useIsoDay } from "@/lib/useDates";
+import { useClock, useIsoDay } from "@/lib/useDates";
 import { EmptyRow, TableCard, Toolbar, ToolbarField, ToolbarSelect } from "../../admin/kit";
 import { Alert, Avatar, Button, Chip, type Tone } from "../../ui";
 import { OverviewCard } from "./Overview";
@@ -85,13 +84,14 @@ export function ReplayScreen() {
 }
 
 function ReplayView({ replay }: { replay: Replay }) {
+  const clock = useClock();
   const isoDay = useIsoDay();
   const t = useTranslations("adminShifts");
   const name = useName();
   const shift = replay.shift;
   return (
     <div className="flex flex-col gap-6">
-      <OverviewCard title={t("replay.shift_title", { station: name(replay.station), time: `${addisDate(new Date(replay.at))} ${addisClock(replay.at)}` })} aside={shift ? <ShiftStatusBadge status={shift.status} /> : null}>
+      <OverviewCard title={t("replay.shift_title", { station: name(replay.station), time: `${addisDate(new Date(replay.at))} ${clock(replay.at)}` })} aside={shift ? <ShiftStatusBadge status={shift.status} /> : null}>
         <p className="-mt-2 text-[15px] text-neutral-700">
           {shift ? t("running.line", { name: shift.template ? name(shift.template) : t("running.ad_hoc"), date: isoDay(shift.date) }) : t("replay.no_shift")}
         </p>
@@ -105,7 +105,7 @@ function ReplayView({ replay }: { replay: Replay }) {
                 <li key={row.user.id} className="inline-flex items-center gap-2.5 rounded-full border border-neutral-200 py-1 pl-1 pr-3.5">
                   <Avatar name={row.user.name} size="sm" />
                   <span className="text-[15px] font-medium text-neutral-900">{row.user.name}</span>
-                  {row.joined_at ? <span className="text-[13px] tabular-nums text-neutral-600">{t("replay.joined", { time: addisClock(row.joined_at) })}</span> : null}
+                  {row.joined_at ? <span className="text-[13px] tabular-nums text-neutral-600">{t("replay.joined", { time: clock(row.joined_at) })}</span> : null}
                 </li>
               ))}
             </ul>
@@ -122,7 +122,7 @@ function ReplayView({ replay }: { replay: Replay }) {
             title={title}
             intro={
               place.last_locked
-                ? t("replay.last_locked", { seq: place.last_locked.chain_seq, hash: shortHash(place.last_locked.payload_hash), time: addisClock(place.last_locked.locked_at) })
+                ? t("replay.last_locked", { seq: place.last_locked.chain_seq, hash: shortHash(place.last_locked.payload_hash), time: clock(place.last_locked.locked_at) })
                 : t("replay.never_locked")
             }
             minWidth="min-w-[520px]"
@@ -173,7 +173,7 @@ function ReplayView({ replay }: { replay: Replay }) {
                     {t("replay.order_line", { no: order.order_no, table: order.table_code ?? t("replay.no_table"), owner: order.owner.name })}
                   </p>
                   <p className="text-[13px] tabular-nums text-neutral-600">
-                    {order.sent_at ? t("replay.sent", { time: addisClock(order.sent_at) }) : t("replay.not_sent")} · {t("replay.lines", { count: order.lines.length })}
+                    {order.sent_at ? t("replay.sent", { time: clock(order.sent_at) }) : t("replay.not_sent")} · {t("replay.lines", { count: order.lines.length })}
                   </p>
                 </li>
               ))}

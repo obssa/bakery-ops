@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
+import { hourTick } from "@/lib/clock";
 import { addDays, agoOf, differenceOf, exportFileName, groupDigits, hourLabel, percentChange, type AnalyticsRange } from "@/lib/analytics";
 import { useWorkStations } from "@/lib/api/adminShifts";
 import { analyticsExport, useHourly, useOverview, type Answer, type HourlySales, type Overview } from "@/lib/api/analytics";
@@ -16,9 +17,8 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { businessToday } from "@/lib/orderNo";
 import { useProductImages } from "@/lib/productImages";
 import { can, useSession } from "@/lib/session";
-import { addisClock } from "@/lib/shifts";
 import { backupState, heartbeatState, type SystemStatus } from "@/lib/system";
-import { useDateFormat } from "@/lib/useDates";
+import { useClock, useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
 import { useFreshness, useNames } from "../analytics/shared";
 import { saveBlob } from "../payments/shared";
@@ -326,6 +326,7 @@ function hourWindow(hours: HourlySales["hours"], nowHour: number): number[] {
 
 function SalesByHour({ range }: { range: AnalyticsRange }) {
   const t = useTranslations("today");
+  const dates = useDateFormat();
   const hourly = useHourly(range);
   const now = useNow(60_000);
   const nowHour = addisHour(now);
@@ -339,7 +340,7 @@ function SalesByHour({ range }: { range: AnalyticsRange }) {
   const columns = { gridTemplateColumns: `repeat(${shown.length}, minmax(0, 1fr))` };
 
   return (
-    <TodayCard title={t("hourly_title")} aside={<CardNote>{t("hourly_meta", { from: hourLabel(shown[0]), to: hourLabel(shown[shown.length - 1]) })}</CardNote>}>
+    <TodayCard title={t("hourly_title")} aside={<CardNote>{t("hourly_meta", { from: hourLabel(shown[0], dates), to: hourLabel(shown[shown.length - 1], dates) })}</CardNote>}>
       {answer === undefined ? (
         hourly.error ? (
           <Empty>{t("hourly_error")}</Empty>
@@ -350,7 +351,7 @@ function SalesByHour({ range }: { range: AnalyticsRange }) {
         <>
           <div
             role="img"
-            aria-label={peak === null || max === null ? t("hourly_label_empty") : t("hourly_label", { hour: hourLabel(peak), amount: amountText(max) })}
+            aria-label={peak === null || max === null ? t("hourly_label_empty") : t("hourly_label", { hour: hourLabel(peak, dates), amount: amountText(max) })}
             className="grid h-45 items-end gap-2 border-b border-neutral-200 pb-1"
             style={columns}
           >
@@ -367,9 +368,16 @@ function SalesByHour({ range }: { range: AnalyticsRange }) {
             })}
           </div>
           <div aria-hidden="true" className="mt-2 grid gap-2 text-center text-xs tabular-nums text-neutral-600" style={columns}>
-            {shown.map((hour) => (
-              <span key={hour}>{hour}</span>
-            ))}
+            {shown.map((hour, index) => {
+              // the Ethiopian hour, and under it the part of the day where a part starts (lib/clock.ts hourTick)
+              const [number, part] = hourTick(hour, dates.locale, index === 0 ? undefined : shown[index - 1]).split("\n");
+              return (
+                <span key={hour} className="min-w-0">
+                  <span className="block">{number}</span>
+                  {part ? <span className="block truncate text-[11px] leading-tight">{part}</span> : null}
+                </span>
+              );
+            })}
           </div>
         </>
       )}
@@ -522,6 +530,7 @@ function shiftChip(station: WorkStation): { tone: Tone; key: string } | null {
 }
 
 function Shifts({ twin }: { twin?: string }) {
+  const clock = useClock();
   const t = useTranslations("today");
   const ts = useTranslations("shifts");
   const locale = useLocale() as Locale;
@@ -551,7 +560,7 @@ function Shifts({ twin }: { twin?: string }) {
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate text-[15px] font-semibold text-neutral-900">{locale === "am" ? station.name_am : station.name_en}</span>
                   <span className="truncate text-[13px] text-neutral-600">
-                    {!station.tracks_shifts ? ts("station_no_tracking") : opened ? ts("open_since", { time: addisClock(opened) }) : t("shifts_none_open")}
+                    {!station.tracks_shifts ? ts("station_no_tracking") : opened ? ts("open_since", { time: clock(opened) }) : t("shifts_none_open")}
                   </span>
                 </span>
                 {chip ? (

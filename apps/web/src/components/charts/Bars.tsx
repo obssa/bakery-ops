@@ -124,8 +124,15 @@ function Vertical({
       {ticks === "all" && points.length > 0 ? (
         <div aria-hidden="true" className="mt-2 grid text-center text-xs tabular-nums text-neutral-600" style={{ gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))` }}>
           {points.map((point) => (
-            <span key={point.key} className="truncate">
-              {tick(point)}
+            <span key={point.key} className="min-w-0">
+              {/* a tick of two lines (an hour with its part of the day, lib/clock.ts hourTick): the second smaller */}
+              {tick(point)
+                .split("\n")
+                .map((line, index) => (
+                  <span key={index} className={`block truncate ${index > 0 ? "text-[11px] leading-tight" : ""}`}>
+                    {line}
+                  </span>
+                ))}
             </span>
           ))}
         </div>

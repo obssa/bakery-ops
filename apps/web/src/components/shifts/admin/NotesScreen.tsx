@@ -5,8 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useShiftList, useShiftNotes, useWorkStations } from "@/lib/api/adminShifts";
 import type { ShiftSummary } from "@/lib/api/types";
-import { addisClock } from "@/lib/shifts";
-import { useIsoDay } from "@/lib/useDates";
+import { useClock, useIsoDay } from "@/lib/useDates";
 import { ToolbarSelect } from "../../admin/kit";
 import { Button, Skeleton } from "../../ui";
 import { Pager, QueryBox } from "../../inventory/shared";
@@ -98,6 +97,7 @@ function ShiftNotes({ shift }: { shift: ShiftSummary }) {
 }
 
 function NoteList({ shiftId }: { shiftId: number }) {
+  const clock = useClock();
   const t = useTranslations("adminShifts");
   const notes = useShiftNotes(shiftId);
   if (notes.isPending) return <Skeleton className="h-12" />;
@@ -111,7 +111,7 @@ function NoteList({ shiftId }: { shiftId: number }) {
             {rows.map((note) => (
               <li key={note.id} className="space-y-1 py-3">
                 <p className="text-[13px] text-neutral-600">
-                  {t("notes.by", { name: note.from?.name ?? "—", time: addisClock(note.created_at) })}
+                  {t("notes.by", { name: note.from?.name ?? "—", time: clock(note.created_at) })}
                   {note.to ? ` · ${t("notes.for", { name: note.to.name })}` : ` · ${t("notes.everyone")}`}
                 </p>
                 <p className="whitespace-pre-wrap text-[15px] text-neutral-900">{note.body}</p>
