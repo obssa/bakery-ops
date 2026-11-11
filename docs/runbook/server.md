@@ -43,9 +43,12 @@ Status: **provisioned 2026-10-19** (steps 1-10 done from the owner's PC over SSH
 ### Cron entries
 
 ```
-* * * * * sleep $((RANDOM \% 60)) && cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan schedule:run >> /dev/null 2>&1
 * * * * * cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan queue:work --stop-when-empty --max-time=50 >> /dev/null 2>&1
 ```
+
+The scheduler's line has no random sleep: `schedule:run` must start inside the minute a `dailyAt` task is due, and a sleep of up to
+59 s plus PHP's start could push it into the next minute and skip the task (the 02:30 backup of 2026-11-11 was skipped that way).
 
 ## Queued work (Phase 2)
 
