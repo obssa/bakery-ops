@@ -568,7 +568,7 @@ calculated yet" with a "?" that holds the rebuild's explanation and the 7-day se
 "?", the review page and analytics at 1440 and 390 in en and am with axe and no sideways scroll; `dashboards-live` reads the new heading.
 The first CI run caught the "?" card keeping the place it measured at 1440 px after the window shrank to 390 (it now measures again on
 every resize), the p3 flows' old "Review count" and setup-check words, and `resolvePendingCounts` approving a count its co-signature had
-already approved. Claim restated at the merge (the merge of `main` after the chosen states in charcoal, and those fixes); the tag stays on
+already approved. Claim restated at `b0b7e98` (the merge of `main` after the chosen states in charcoal, and those fixes); the tag stays on
 `2f6bbd9`.
 
 ## What stays open after the claim
