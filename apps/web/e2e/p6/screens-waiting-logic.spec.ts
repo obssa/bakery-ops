@@ -16,7 +16,8 @@ test.describe("what a shift waits for", () => {
   test("with nothing in the queue, the status says it", () => {
     const cases: [ShiftStatus, string | null][] = [
       ["opening", "opening_count"],
-      ["open", "selling"],
+      // an open shift is the normal course of a day: no line
+      ["open", null],
       ["counting", "closing_count"],
       ["scheduled", null],
       ["pending_approval", null],
@@ -36,7 +37,7 @@ test.describe("what a shift waits for", () => {
   test("then one that waits for approval; the counts of other shifts are not this shift's", () => {
     const queue = [count(2, "closing", "awaiting_cosign"), count(1, "opening", "pending_approval", "Hana")];
     expect(shiftWait({ id: 1, status: "open" }, queue)).toEqual({ kind: "approval", type: "opening", counter: "Hana" });
-    expect(shiftWait({ id: 3, status: "open" }, queue)).toEqual({ kind: "selling" });
+    expect(shiftWait({ id: 3, status: "open" }, queue)).toBeNull();
   });
 
   test("a draft, an approved, a locked or a sent-back count waits for nobody", () => {
@@ -53,7 +54,7 @@ test.describe("what a shift waits for", () => {
   test("only a co-signature or an approval needs someone other than the people on duty", () => {
     expect(needsSomeone({ kind: "cosign", type: "closing", counter: null })).toBe(true);
     expect(needsSomeone({ kind: "approval", type: "closing", counter: null })).toBe(true);
-    for (const kind of ["opening_count", "selling", "closing_count"] as const) expect(needsSomeone({ kind }), kind).toBe(false);
+    for (const kind of ["opening_count", "closing_count"] as const) expect(needsSomeone({ kind }), kind).toBe(false);
   });
 });
 

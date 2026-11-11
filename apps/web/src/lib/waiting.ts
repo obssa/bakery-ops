@@ -13,7 +13,7 @@ import type { CountSummary, ShiftSummary } from "./api/types";
 
 export type CountWait = { kind: "cosign" | "approval"; type: "opening" | "closing"; counter: string | null };
 
-export type ShiftWait = { kind: "opening_count" } | { kind: "selling" } | { kind: "closing_count" } | CountWait;
+export type ShiftWait = { kind: "opening_count" } | { kind: "closing_count" } | CountWait;
 
 type QueuedCount = Pick<CountSummary, "shift_id" | "type" | "status" | "counted_by">;
 
@@ -26,7 +26,8 @@ export function countWait(count: QueuedCount): CountWait | null {
 
 /**
  * What a running shift waits for: a count of it that waits for a co-signature first (somebody has to come and sign), then one that waits
- * for approval, then what its status asks for. Null for a shift that is not running.
+ * for approval, then what its status asks for. Null for a shift that waits for nothing: an open shift with nothing in the queue is the
+ * normal course of a day (Ramin 2026-11-11: the same "Open: ..." line under every open shift only repeated itself), or one not running.
  */
 export function shiftWait(shift: Pick<ShiftSummary, "id" | "status">, queue: readonly QueuedCount[]): ShiftWait | null {
   const mine = queue.filter((count) => count.shift_id === shift.id);
@@ -35,7 +36,6 @@ export function shiftWait(shift: Pick<ShiftSummary, "id" | "status">, queue: rea
   const approval = mine.find((count) => count.status === "pending_approval");
   if (approval) return countWait(approval);
   if (shift.status === "opening") return { kind: "opening_count" };
-  if (shift.status === "open") return { kind: "selling" };
   if (shift.status === "counting") return { kind: "closing_count" };
   return null;
 }

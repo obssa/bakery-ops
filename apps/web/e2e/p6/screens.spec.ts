@@ -1384,9 +1384,11 @@ test.describe("screens: the explain-itself help", () => {
     const cakeRoom = demo.stations.find((s) => s.code === "cake_room");
     if (!cakeRoom) throw new Error("the demo bakery has no cake room");
     const baker = await demoPerson(demo, "cake_baker");
-    const sizes = async (name: string) => {
+    // `shown`, when given, is scrolled into view at each size (the open "?" card sat below the fold at 390 once the page reflowed)
+    const sizes = async (name: string, shown?: Locator) => {
       for (const [size, viewport] of [["1440x900", DESKTOP], ["390x844", PHONE]] as const) {
         await page.setViewportSize(viewport);
+        if (shown) await shown.scrollIntoViewIfNeeded();
         await capture(page, `${name}-${size}`);
         if (size === "390x844") {
           const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
@@ -1426,8 +1428,9 @@ test.describe("screens: the explain-itself help", () => {
         await tip.scrollIntoViewIfNeeded();
         await tip.click();
         await expect(tip).toHaveAttribute("aria-expanded", "true");
-        await expect(page.getByRole("note", { name: t.counts.chip_cosign_label })).toBeVisible();
-        await sizes(`explain-shifts-tip-${locale}`);
+        const note = page.getByRole("note", { name: t.counts.chip_cosign_label });
+        await expect(note).toBeVisible();
+        await sizes(`explain-shifts-tip-${locale}`, note);
         // the card is still open after the resizes; Esc closes it and gives the focus back
         await expectAccessible(page, `Shifts overview with a "?" open (${locale})`);
         await page.keyboard.press("Escape");
@@ -1464,7 +1467,30 @@ test.describe("screens: the explain-itself help", () => {
 // the cards with their edges, photos and one charcoal action, at 1440 x 900; at 390 x 844 the columns as tabs: Requested, Baking and To
 // check. The admin's batch in the oven is shown as if it had been started six days ago, from an aged copy of the board's answer
 // (page.route), so the stale warning is drawn without leaving a stale batch on the bakery's board. At the phone's width the page must not
-// scroll sideways, and the phone's board passes axe.
+// scroll sideways, and the phone's board passes axe. The "?" of Pending confirmation (who checks, what Confirm and Send back do; Ramin
+// 2026-11-11) is drawn open at 1440 and in the phone's To check tab, scrolled into view, and must stay inside the window.
+
+/** Opens the "?" by a column's heading, scrolls its card into view and returns the button (to close it with Esc afterwards). */
+async function openColumnTip(page: Page, locale: keyof typeof MESSAGES, column: "pending_confirmation"): Promise<Locator> {
+  const t = MESSAGES[locale].production;
+  const label = t.tip_label.replace("{column}", t[`col_${column}`]);
+  const region = page.getByRole("region", { name: t[`col_${column}`], exact: true });
+  const tip = region.getByRole("button", { name: label, exact: true });
+  await tip.scrollIntoViewIfNeeded();
+  await tip.click();
+  await expect(tip).toHaveAttribute("aria-expanded", "true");
+  const note = region.getByRole("note", { name: label });
+  await expect(note).toBeVisible();
+  await expect(note).toContainText(t[`tip_${column}`].slice(0, 20));
+  await note.scrollIntoViewIfNeeded();
+  // the card stays 16 px inside the window
+  const box = await note.boundingBox();
+  const width = await page.evaluate(() => document.documentElement.clientWidth);
+  if (!box) throw new Error("the column's help card has no box");
+  expect(box.x, `the ${column} help card starts outside the window`).toBeGreaterThanOrEqual(15);
+  expect(box.x + box.width, `the ${column} help card ends outside the window`).toBeLessThanOrEqual(width - 15);
+  return tip;
+}
 
 /** The board's answers with the batch of request `id` started six days ago (no ETag, so every look is a full answer). */
 async function ageBatch(page: Page, id: number): Promise<void> {
@@ -1500,6 +1526,11 @@ test.describe("screens: the production board", () => {
       await expect(page.getByRole("list", { name: t.summary })).toBeVisible();
       if (demo.inOven) await expect(page.getByText(locale === "en" ? "Started 6 days ago" : "ከ6 ቀናት በፊት ተጀምሯል")).toBeVisible({ timeout: 30_000 });
       await capture(page, `production-board-1440x900-${locale}`);
+      const deskTip = await openColumnTip(page, locale, "pending_confirmation");
+      await capture(page, `production-board-tip-1440x900-${locale}`);
+      await page.keyboard.press("Escape");
+      await expect(deskTip).toHaveAttribute("aria-expanded", "false");
+      await page.evaluate(() => window.scrollTo(0, 0));
 
       await page.setViewportSize(PHONE);
       const tabs = page.getByRole("tablist", { name: t.tabs });
@@ -1516,6 +1547,14 @@ test.describe("screens: the production board", () => {
         expect(scroll, `${shot} in ${locale} scrolls sideways`).toBeLessThanOrEqual(client);
       }
       await expectAccessible(page, `${locale}/production/ at 390 x 844 (${t.tab_pending_confirmation})`);
+      // the To check tab's "?" open on the phone
+      const phoneTip = await openColumnTip(page, locale, "pending_confirmation");
+      await capture(page, `production-board-tip-390x844-${locale}`);
+      const { scroll, client } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
+      expect(scroll, `the To check tab with its "?" open in ${locale} scrolls sideways`).toBeLessThanOrEqual(client);
+      await expectAccessible(page, `${locale}/production/ at 390 x 844 with the "?" of ${t.col_pending_confirmation} open`);
+      await page.keyboard.press("Escape");
+      await expect(phoneTip).toHaveAttribute("aria-expanded", "false");
       await page.setViewportSize(DESKTOP);
     });
   }

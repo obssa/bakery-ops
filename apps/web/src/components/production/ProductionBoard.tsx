@@ -19,7 +19,7 @@ import { ICON_STROKE } from "../icons";
 import { StationHeaderActions } from "../StationHeaderActions";
 import { focusRing } from "../styles";
 import { DisplayCasePanel } from "../till/DisplayCasePanel";
-import { Alert, Button, Drawer, SegmentedControl, Select } from "../ui";
+import { Alert, Button, Drawer, HelpTip, SegmentedControl, Select } from "../ui";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
 import { NewBatchDialog } from "./NewBatchDialog";
@@ -362,8 +362,8 @@ function ColumnTabs({ summary, tab, onTab }: { summary: BoardSummary; tab: Colum
 
 /**
  * One column of the board under its tinted head: the icon, the step ("Step 1", "Today" over Done today), its name (the Amharic name under
- * it on the English page), the count and a line saying what happens there; then its cards, or an empty state saying what lands in it. On a
- * phone only the chosen tab's column shows.
+ * it on the English page) with its "?" (who acts there and what moves a card on, Ramin 2026-11-11), the count and a line saying what
+ * happens there; then its cards, or an empty state saying what lands in it. On a phone only the chosen tab's column shows.
  */
 function BoardColumn({ column, twin, count, phoneHidden, children }: { column: Column; twin?: string; count: number; phoneHidden: boolean; children: ReactNode }) {
   const t = useTranslations("production");
@@ -380,7 +380,11 @@ function BoardColumn({ column, twin, count, phoneHidden, children }: { column: C
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-xs font-semibold uppercase tracking-wide text-neutral-600">{step}</span>
-            <h2 className="text-base font-semibold leading-tight text-neutral-900">{title}</h2>
+            {/* the "?" beside the heading, not in it: the heading's name stays the column's name */}
+            <span className="flex items-center gap-2">
+              <h2 className="text-base font-semibold leading-tight text-neutral-900">{title}</h2>
+              <HelpTip label={t("tip_label", { column: title })}>{t(`tip_${column}` as "tip_requested")}</HelpTip>
+            </span>
             {twin ? (
               <span lang="am" className="text-[13px] font-medium text-neutral-600">
                 {twin}
