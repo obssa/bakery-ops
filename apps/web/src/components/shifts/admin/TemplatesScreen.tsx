@@ -23,14 +23,14 @@ import { useName } from "./common";
 //
 // Step 6.4d (fresh-counter.md 4.4, the CatalogList board's table): the templates a table card the width of the page (the window in
 // tabular figures, the days, the stations, the state as a chip, Edit and Retire at the row's end); the form a white card under it in two
-// columns, its days and stations as pill checkboxes (checked brand-50 on a brand-600 line), brought into view by Edit.
+// columns, its days and stations as pill checkboxes (checked ink-50 on an ink-900 line), brought into view by Edit.
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 
-/** A checkbox drawn as a 44 px pill (a day, a station): checked in brand-50 on a brand-600 line; its label names the checkbox. */
+/** A checkbox drawn as a 44 px pill (a day, a station): checked in ink-50 on an ink-900 line; its label names the checkbox. */
 const PILL =
   "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-neutral-300 bg-white px-3.5 text-[15px] font-medium text-neutral-900 hover:bg-neutral-50 " +
-  "has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-600/35 has-[:focus-visible]:ring-offset-1";
+  "has-[:checked]:border-ink-900 has-[:checked]:bg-ink-50 has-[:checked]:text-ink-900 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-600/35 has-[:focus-visible]:ring-offset-1";
 
 function DaysText({ days }: { days: number[] }) {
   const t = useTranslations("adminShifts");

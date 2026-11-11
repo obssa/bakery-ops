@@ -72,7 +72,7 @@ export interface Segment<T extends string> {
   count?: number | null;
 }
 
-/** One choice among a few, as the catalog's segments: pressed buttons in a white track, the pressed one brand-50 with brand-700 text. */
+/** One choice among a few, as the catalog's segments: pressed buttons in a white track, the pressed one ink-100 with ink-900 text (a choice is charcoal, never red). */
 export function ToolbarSegments<T extends string>({
   label,
   segments,
@@ -95,7 +95,7 @@ export function ToolbarSegments<T extends string>({
             aria-pressed={pressed}
             onClick={() => onChange(segment.value)}
             className={`inline-flex h-9 items-center gap-1 rounded-[9px] px-3.5 text-sm font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
-              pressed ? "bg-brand-50 text-brand-700" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
+              pressed ? "bg-ink-100 text-ink-900" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
             } ${focusRing}`}
           >
             {segment.label}
@@ -231,7 +231,7 @@ export function ToolbarField({
 /** A filter that is on or off, in a 44 px pill with its box at the left (the label names the checkbox, and getByLabel finds it). */
 export function ToolbarCheck({ label, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: string }) {
   return (
-    <label className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-neutral-300 bg-white px-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-50 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-700 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-600/35 has-[:focus-visible]:ring-offset-1">
+    <label className="inline-flex h-11 cursor-pointer items-center gap-2.5 rounded-xl border border-neutral-300 bg-white px-3.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-50 has-[:checked]:border-ink-900 has-[:checked]:bg-ink-50 has-[:checked]:text-ink-900 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-600/35 has-[:focus-visible]:ring-offset-1">
       <input type="checkbox" className="size-[18px] accent-ink-900 outline-none" {...props} />
       {label}
     </label>

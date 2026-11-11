@@ -103,7 +103,9 @@ export function PayRowEditor({
   }
 
   return (
-    <fieldset aria-labelledby={titleId} className={`space-y-4 ${single ? "" : "rounded-2xl border border-neutral-200 bg-white p-4"}`}>
+    // min-w-0: a fieldset is never narrower than its content by default, and its two-column method grid's content is the cards at their
+    // widest, so on a 390 px phone the sheet ran past its right edge
+    <fieldset aria-labelledby={titleId} className={`min-w-0 space-y-4 ${single ? "" : "rounded-2xl border border-neutral-200 bg-white p-4"}`}>
       <div className={single ? "sr-only" : "flex flex-wrap items-center justify-between gap-2"}>
         <h3 id={titleId} className="text-base font-semibold text-neutral-900">
           {t("row_title", { n })}
@@ -122,15 +124,16 @@ export function PayRowEditor({
           </p>
           {single ? (
             // one payment: its amount (the whole balance unless changed) sits on the method's line, out of the board's way
-            <div className="flex items-center gap-2.5">
-              <label htmlFor={amountId} className="text-sm font-semibold text-neutral-600">
+            // min-w-0 on the line and the field: on a phone the line wraps under the title and the field shrinks to what is left
+            <div className="flex min-w-0 max-w-full items-center gap-2.5">
+              <label htmlFor={amountId} className="shrink-0 text-sm font-semibold text-neutral-600">
                 {t("amount")}
               </label>
               <MoneyInput
                 id={amountId}
                 currency={currency}
                 controlSize="md"
-                className="w-44"
+                className="w-44 min-w-0"
                 aria-invalid={amountError ? true : undefined}
                 aria-describedby={amountError ? `${amountId}-error` : undefined}
                 value={row.amount}
@@ -156,13 +159,13 @@ export function PayRowEditor({
                 aria-pressed={selected}
                 disabled={!usable}
                 onClick={() => onChange({ channel: c.code })}
-                className={`flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-[14px] px-3 py-2 text-center text-base font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
-                  selected ? "border-2 border-brand-600 bg-brand-50 text-brand-700" : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
+                className={`flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[14px] px-3 py-2 text-center [overflow-wrap:anywhere] text-base font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
+                  selected ? "border-2 border-ink-900 bg-ink-50 text-ink-900" : "border border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-100"
                 } disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-50 disabled:text-neutral-400 ${focusRing}`}
               >
                 <span>{name(c)}</span>
                 {needs ? (
-                  <span aria-hidden="true" className={`text-xs font-medium ${selected ? "text-brand-700" : "text-neutral-600"}`}>
+                  <span aria-hidden="true" className={`text-xs font-medium ${selected ? "text-ink-700" : "text-neutral-600"}`}>
                     {needs}
                   </span>
                 ) : null}

@@ -35,7 +35,7 @@ import { CARD, Notice, Toolbar, ToolbarSelect, useProductLook, type ProductLook 
 // Step 6.4c (fresh-counter.md 4.4, the patterns of the catalog list and of the production board): the title row with its Amharic twin;
 // the toolbar of the two filters (44 px selects, still labelled "Status" and "Table"); the columns as the production board draws them, a
 // title and its count pill over white 16 px cards, no grey track; each card the order and where it is, its waiter and age, a stack of its
-// products' photos (as the till's waiting list), its lines with their state chips and its total; the opened card held in a brand-600 line;
+// products' photos (as the till's waiting list), its lines with their state chips and its total; the opened card held in an ink-900 line;
 // the timeline a white card at the right from 1280 px (two board columns beside it, three without it).
 
 const LINE_TONE: Record<LineStatus, Tone> = {
@@ -115,7 +115,7 @@ function OrderCard({ order, now, selected, look, onOpen }: { order: Order; now: 
   return (
     <article
       className={`flex flex-col gap-2.5 rounded-2xl border bg-white p-3.5 motion-safe:transition-colors motion-safe:duration-150 ${
-        selected ? "border-brand-600 inset-ring-1 inset-ring-brand-600" : "border-neutral-200"
+        selected ? "border-ink-900 inset-ring-1 inset-ring-ink-900" : "border-neutral-200"
       }`}
     >
       {/* the whole head opens the timeline, but the button holds only the order's name, so its name ("Open order 12") holds what it shows */}

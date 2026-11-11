@@ -39,21 +39,25 @@ Ramin, 2026-11-10: the colours come from the bakery's logo, a warm red and charc
 current place; the main buttons are charcoal ink, so a red control never reads as "danger", and red as a status (out, late, an error)
 keeps its meaning beside its word or icon. The calm green-teal that was the brand before became its own `positive` scale: a good or
 "on" state, never the brand. The bakery's name and logo themselves are not in the repository: the admin sets them on the live site
-(Admin > System > Brand), and until then the app shows its own name and the croissant mark on red.
+(Admin > System > Brand), and until then the app shows its own name and the croissant mark on red. A choice is charcoal, never red
+(Ramin, 2026-11-10: "red looks like an error"): a chosen card, a pressed segment, a ticked pill and an open row are drawn in `ink`; red
+marks only the current place (the sidebar item, a section tab), links, the focus ring and "New".
 
 | Token | Hex | Use |
 |---|---|---|
-| `brand-50` | `#FDF1F1` | the current sidebar item, tab and segment; a chosen card; a highlighted row |
+| `brand-50` | `#FDF1F1` | the current sidebar item and section tab |
 | `brand-100` | `#FBE0E1` | |
 | `brand-200` | `#F6BFC2` | hover border of a start-page tile |
 | `brand-300` .. `500` | `#EE8F94` `#E35D64` `#D3313A` | |
-| `brand-600` | `#C41E2A` | the app's mark, a chosen card's border, links, the focus ring, "New" badges (white text 5.9:1; as text 5.4:1 on the ground) |
+| `brand-600` | `#C41E2A` | the app's mark, links, the focus ring, "New" badges (white text 5.9:1; as text 5.4:1 on the ground) |
 | `brand-700` | `#A3141F` | link hover; text on `brand-50` (7.1:1) |
 | `brand-800` / `900` | `#84121B` / `#6B1219` | |
 | `ink-900` | `#1F1F1F` | primary and dark buttons (white text 16.5:1), the station's selected segment, a focused input's border, ticked checkboxes |
 | `ink-800` | `#2B2B2B` | button hover; the lit chart bar, a chart's line |
 | `ink-200` | `#D6D6D6` | the other chart bars |
-| `ink-50` .. `700` | `#F6F6F6` .. `#3B3B3B` | |
+| `ink-100` | `#EBEBEB` | the pressed admin segment (`ink-900` text), an open or linked row |
+| `ink-50` | `#F6F6F6` | a chosen card or ticked pill, on a 2 px (or 1 px with an inset ring) `ink-900` border |
+| `ink-300` .. `700` | `#B8B8B8` .. `#3B3B3B` | `ink-700` the secondary text on a chosen card |
 | `positive-50` / `700` | `#E6F4F0` / `#0A5F4E` | a good or "on" chip and a success message (6.7:1) |
 | `positive-600` | `#0E7C66` | its dot; a switch that is on |
 | `positive-100` | `#CDE9E1` | the border of a positive box |
@@ -164,7 +168,7 @@ Icons come from `lucide-react` at 1.75-2 px stroke, 18-22 px; an icon-only butto
 - **Chip / Badge.** A 26-30 px pill with an optional 8 px dot. Tones are `neutral`, `brand`, `amber`, `red` and `blue`.
 - **TextInput / Select / Textarea.** 44 px (admin) or 52 px (station), `neutral-300` border, `rounded-xl`, a 2 px `brand-600` border on
   focus. An error shows a `red-700` border plus the message under it. A money input shows an "ETB" prefix in `neutral-600`.
-- **Switch.** 52x32 track, `brand-600` when on, `neutral-300` when off. It is a real `<button role="switch" aria-checked>` with a
+- **Switch.** 52x32 track, `positive-600` when on, `neutral-300` when off. It is a real `<button role="switch" aria-checked>` with a
   visible label beside it.
 - **Segmented control / Tabs.** A white track with a `neutral-200` border. The selected segment is `neutral-900` with white text
   (stations) or `brand-50` with `brand-700` text (admin).
@@ -283,7 +287,7 @@ Three zones from left to right.
 - Centre:
   - "Amount due" (caps label) and the amount (48 / 700);
   - "Pay with": channel buttons, 64 px, in a 3-column grid, with the channel name and the hint of what it needs ("Photo of the slip",
-    "Reference number"); the selected one is `brand-50` with a 2 px `brand-600` border;
+    "Reference number"); the selected one is `ink-50` with a 2 px `ink-900` border (charcoal: red reads as an error);
   - "Received" money input and "Change" (`neutral-900` block with white amount);
   - quick cash keys (300, 500, 1,000, Exact) and a "Split payment" ghost button;
   - the primary `xl` "Complete payment".
@@ -343,7 +347,7 @@ Three zones from left to right.
   controls) and the forms rule of 4.4 (two columns from 1024 px, one below). Under the breadcrumb and the title ("New product" or "New
   ingredient", following the choice), one column of cards, at most 960 px wide:
   1. "What are you adding?": Product and Ingredient as two choice cards (a 44 px icon well, the name, one plain sentence; the chosen one
-     `brand-50` with a 2 px `brand-600` border and a check), one radio group named "Kind";
+     `ink-50` with a 2 px `ink-900` border and a check), one radio group named "Kind";
   2. Basics: the two names side by side, then the category (with a secondary "New category" that opens a small dialog for one of the
      kind being added, chosen once it exists) and the unit (its common ones first);
   3. "How it's sold", products only: Made to order, Made in batches, Bought in, three choice cards with a sentence each (the radio

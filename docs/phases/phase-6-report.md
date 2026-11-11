@@ -543,6 +543,15 @@ The same pull request makes a table card's scroll box hold its visually hidden h
 Claim restated at `a4912c8` (after the merge of `main` and the fixes to the audit dictionary test, the dashboards' read check, that scroll
 box and the Amharic 12-hour label); the tag stays on `2f6bbd9`.
 
+A choice is charcoal, never red (Ramin, 2026-11-10, of the till's chosen pay method: "red looks like an error"): the chosen pay
+method, the chosen kind card and its tick, the opened order and request cards, the till's chosen order, the ticked pills and filters, the
+pressed admin segments and the open or linked row are drawn in `ink` (`ink-50` or `ink-100` with `ink-900`); red keeps the mark, the
+current sidebar item and section tab, links, the focus ring and "New" (fresh-counter.md 1.2). The same pull request keeps the till's pay
+sheet inside itself on a 390 px phone: the row's fieldset took its method grid's widest content as its least width, so the right column and
+the amount ran past the sheet's edge (`min-w-0` on the fieldset and the Amount line, and a long method name wraps). Web only; the till's captures gain a method chosen at 1440
+(en) and 390 (en and am), and at 390 they assert nothing in the sheet scrolls sideways and every method card and field ends inside it.
+Claim restated at `ff250f4` (the merge of `main` after the Ethiopian clock: the Time card's segment and the template form's day pills are charcoal too); the tag stays on `2f6bbd9`.
+
 **The screens explain themselves** (Ramin, 2026-11-10: shifts are hard to understand, why someone must wait, what "Ad hoc" and "Review"
 mean; anything confusing must say what it does and how, "Days not built" included). Two primitives in `ui.tsx`: `HelpTip`, a "?" in a 44 px
 button that opens a card under it (a disclosure: `aria-expanded`, a named note, Esc and a tap elsewhere close it, kept 16 px inside the
@@ -557,7 +566,10 @@ wrong until each fix is made. Analytics: today alone is a calm blue line (its fi
 calculated yet" with a "?" that holds the rebuild's explanation and the 7-day sentence. Web only, en and am. Tests:
 `screens-waiting-logic` (every status, the queue's order, a counter without a name, the days closing), captures of the overview, the open
 "?", the review page and analytics at 1440 and 390 in en and am with axe and no sideways scroll; `dashboards-live` reads the new heading.
-Claim restated at `8cc764a`; the tag stays on `2f6bbd9`.
+The first CI run caught the "?" card keeping the place it measured at 1440 px after the window shrank to 390 (it now measures again on
+every resize), the p3 flows' old "Review count" and setup-check words, and `resolvePendingCounts` approving a count its co-signature had
+already approved. Claim restated at the merge (the merge of `main` after the chosen states in charcoal, and those fixes); the tag stays on
+`2f6bbd9`.
 
 ## What stays open after the claim
 

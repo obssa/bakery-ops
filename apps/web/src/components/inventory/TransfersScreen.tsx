@@ -19,7 +19,7 @@ import { InventoryNav, QueryBox, qty, useStamp, useNamer } from "./shared";
 //
 // Step 6.4c (fresh-counter.md 4.4, the CatalogList board): the title row with its Amharic twin, the section's tabs, the status as the
 // toolbar's segments (Requested, Confirmed, Rejected, All), the transfers a table card (Requested amber, Confirmed brand, Rejected red; the
-// linked row brand-50; Confirm the primary button and Reject the secondary one, named by the item as before).
+// linked row ink-100; Confirm the primary button and Reject the secondary one, named by the item as before).
 
 const STATUSES: readonly TransferStatus[] = ["requested", "confirmed", "rejected"];
 
@@ -118,7 +118,7 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
               const short = transfer.source_available !== undefined && compareDecimal(transfer.source_available, transfer.qty) < 0;
               const itemName = name(transfer.item);
               const cells = (
-                <tr key={transfer.id} className={linked === transfer.id ? "bg-brand-50 hover:bg-brand-50" : ""}>
+                <tr key={transfer.id} className={linked === transfer.id ? "bg-ink-100 hover:bg-ink-100" : ""}>
                   <th scope="row" className="min-w-44 font-semibold text-neutral-900">
                     {itemName}
                     {transfer.note ? <span className="block text-[13px] font-normal text-neutral-600">{transfer.note}</span> : null}
