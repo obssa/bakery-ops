@@ -543,6 +543,22 @@ The same pull request makes a table card's scroll box hold its visually hidden h
 Claim restated at `a4912c8` (after the merge of `main` and the fixes to the audit dictionary test, the dashboards' read check, that scroll
 box and the Amharic 12-hour label); the tag stays on `2f6bbd9`.
 
+**The screens explain themselves** (Ramin, 2026-11-10: shifts are hard to understand, why someone must wait, what "Ad hoc" and "Review"
+mean; anything confusing must say what it does and how, "Days not built" included). Two primitives in `ui.tsx`: `HelpTip`, a "?" in a 44 px
+button that opens a card under it (a disclosure: `aria-expanded`, a named note, Esc and a tap elsewhere close it, kept 16 px inside the
+window), and `HowItWorks`, numbered steps that fold away and stay folded in that browser; `PageHeader` takes a `help`. The Shifts overview
+opens with "How shifts work" (start, opening count, open, close, closing count, co-sign, approve, locked, and why a place waits); each
+running shift says what it waits for and who can act, from the approval queue the page now reads once (`lib/waiting.ts`: a co-signature
+first, naming who counted as the one who cannot sign, then an approval, then the status); a shift closing for over a day gets an amber
+"Closing for N days" with its "?"; "Ad hoc" reads "Unscheduled" (ያልታቀደ) with a "?". The queue's chips carry a "?", each row a "why
+waiting" line, and its button reads "Review and co-sign" or "Review and approve"; the review page says what happens when you co-sign or
+approve. Templates, Roster, History, Handover notes, Replay and Variance reasons have a "?" by their title; the setup check says what goes
+wrong until each fix is made. Analytics: today alone is a calm blue line (its figures catch up within minutes), past days are "Not
+calculated yet" with a "?" that holds the rebuild's explanation and the 7-day sentence. Web only, en and am. Tests:
+`screens-waiting-logic` (every status, the queue's order, a counter without a name, the days closing), captures of the overview, the open
+"?", the review page and analytics at 1440 and 390 in en and am with axe and no sideways scroll; `dashboards-live` reads the new heading.
+Claim restated at `8cc764a`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
