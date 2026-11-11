@@ -585,8 +585,9 @@ calculated yet" with a "?" that holds the rebuild's explanation and the 7-day se
 The first CI run caught the "?" card keeping the place it measured at 1440 px after the window shrank to 390 (it now measures again on
 every resize), the p3 flows' old "Review count" and setup-check words, and the capture's own clean-up, which now co-signs and then approves only
 what still waits (`resolvePendingCounts` approves every row it co-signed, which a count that differs in nothing refuses; the shared helper
-stays as it is, because the production strip's capture relies on where it leaves the cake room). Claim restated at `eebe705` (after the
-merge of `main` with the chosen states in charcoal, and those fixes); the tag stays on `2f6bbd9`.
+stays as it is, because the production strip's capture relies on where it leaves the cake room). Claim restated at `6cc1db5` (the
+merge of `main` after the chosen states in charcoal and the production board redrawn, whose captures follow this one's in
+`screens.spec.ts`); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
