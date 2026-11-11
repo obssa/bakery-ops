@@ -536,6 +536,8 @@
     "drop_given_to": "It was given to {name}: only they can take it.",
     "drop_not_yours_start": "Only {name}, who accepted it, can start it.",
     "drop_not_yours_finish": "Only {name}, who started it, can finish it.",
+    "drop_finish_first": "Finish it first: someone other than the baker then confirms it here.",
+    "drop_no_overseer": "This station needs no overseer: a finished batch goes straight to Done today.",
     "drop_not_overseer": "Only an overseer or a manager can confirm it or send it back.",
     "drop_own_batch": "Someone other than {name}, who made it, confirms it.",
     "move_failed": "{name} could not be moved: {reason}",

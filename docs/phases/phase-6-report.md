@@ -655,7 +655,8 @@ summary strip is gone: each step is named once, in its column head, which also c
 too long, else the urgent ones; the batches in the oven over a day). A card the viewer can move is dragged to its next column with
 `@dnd-kit/core` 6.3.1 (a mouse after 8 px, a 250 ms press on a tablet, or its grip with Space and the left and right arrows, a whole column
 per press; on a phone onto the column's tab), and the drop makes the same write as the card's button: Requested to In progress accepts and
-starts it, In progress to Pending confirmation (or Done today) opens the Done form, Pending confirmation to Done today confirms it, Pending
+starts it, In progress to Pending confirmation opens the Done form (to Done today instead at a station that needs no overseer, where
+FinishBatch puts the batch straight there; the other of the two columns is dimmed with its reason), Pending confirmation to Done today confirms it, Pending
 confirmation to In progress opens Send back. While a card is dragged, a column it cannot go to is dimmed and says why (one step at a time,
 never back to Requested once started, only the baker who accepted or started it, an overseer or a manager and never the one who made it:
 `lib/productionBoard.ts` `dropMove`, mirroring AcceptRequest, StartBatch, FinishBatch, ConfirmBatch and SendBackBatch); the card moves at

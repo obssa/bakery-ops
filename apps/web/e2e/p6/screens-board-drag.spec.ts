@@ -12,8 +12,8 @@ import { buildProductionFixture, requestById, type ProductionFixture } from "../
 // phase-6/board-drag (Ramin 2026-11-11: "can we move a card from one state to the other and its status updates by itself"). On the CI stack,
 // in the E2E Test Branch (e2e/support/production.ts: a cake room that needs an overseer, its cake baker and its overseer):
 //   - the baker drags a new request from Requested to In progress: it is accepted and started in one drop, and the card stays there;
-//   - while the baker drags the batch, the columns say where it can go: Requested is dimmed with its reason, Pending confirmation and Done
-//     today say "Drop here" (captured mid-drag);
+//   - while the baker drags the batch, the columns say where it can go: Pending confirmation says "Drop here"; Requested and Done today are
+//     dimmed with their reasons (the cake room needs an overseer, so confirming is someone else's step) (captured mid-drag);
 //   - the drop on Pending confirmation opens the Done form; once it is sent the card waits in Pending confirmation;
 //   - the overseer moves it to Done today with the keyboard (the grip, Space, the right arrow, Space), and the baker's board shows it there
 //     by itself (it polls);
@@ -95,6 +95,8 @@ test.describe("screens: dragging a card along the production board", () => {
       await dragTo(baker, baking, column(baker, t.col_done_today), false);
       await expect(column(baker, t.col_requested).getByText(t.drop_no_back)).toBeVisible();
       await expect(column(baker, t.col_pending_confirmation).getByText(t.drop_here, { exact: true })).toBeVisible();
+      // the cake room needs an overseer: Done today is someone else's second step
+      await expect(column(baker, t.col_done_today).getByText(t.drop_finish_first)).toBeVisible();
       await capture(baker, "production-drag-1440x900-en");
       // over Pending confirmation, then dropped: the Done form opens
       const pendingBox = await column(baker, t.col_pending_confirmation).boundingBox();

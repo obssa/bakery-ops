@@ -200,12 +200,22 @@ test.describe("the production board's waits, drops and next movers", () => {
     expect(dropMove(manager, finished(6, baker), "requested")).toEqual({ refused: { reason: "drop_no_back" } });
   });
 
-  test("the baker who started a batch finishes it on Pending confirmation or Done today; nobody else does", () => {
+  test("where an overseer is needed, the baker who started a batch finishes it on Pending confirmation; Done today is a second step", () => {
     const mine = { ...inOven(5, 600), assigned_to: ref(baker) };
+    expect(mine.station.requires_overseer).toBe(true);
     expect(dropMove(baker, mine, "pending_confirmation")).toEqual({ move: "finish" });
-    expect(dropMove(baker, mine, "done_today")).toEqual({ move: "finish" });
+    expect(dropMove(baker, mine, "done_today")).toEqual({ refused: { reason: "drop_finish_first" } });
+    expect(dropMove(manager, mine, "done_today")).toEqual({ refused: { reason: "drop_finish_first" } });
     expect(dropMove(otherBaker, mine, "pending_confirmation")).toEqual({ refused: { reason: "drop_not_yours_finish", name: "Person 10" } });
     expect(dropMove(manager, mine, "pending_confirmation")).toEqual({ refused: { reason: "drop_not_yours_finish", name: "Person 10" } });
+  });
+
+  test("where no overseer is needed, finishing goes straight to Done today and Pending confirmation is never used", () => {
+    const oven = inOven(8, 600);
+    const mine = { ...oven, assigned_to: ref(baker), station: { ...oven.station, requires_overseer: false } };
+    expect(dropMove(baker, mine, "done_today")).toEqual({ move: "finish" });
+    expect(dropMove(baker, mine, "pending_confirmation")).toEqual({ refused: { reason: "drop_no_overseer" } });
+    expect(dropMove(otherBaker, mine, "done_today")).toEqual({ refused: { reason: "drop_not_yours_finish", name: "Person 10" } });
   });
 
   test("an overseer or a manager confirms a batch someone else made, or sends it back; never their own", () => {

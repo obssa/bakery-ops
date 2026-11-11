@@ -517,6 +517,8 @@ web:production.drop_not_baker,/production,Only a baker at this station can start
 web:production.drop_given_to,/production,It was given to {name}: only they can take it.,ለ{name} ተሰጥቷል፤ ሊወስዱት የሚችሉት እነሱ ብቻ ናቸው።,,
 web:production.drop_not_yours_start,/production,"Only {name}, who accepted it, can start it.",ሊጀምሩት የሚችሉት የተቀበሉት {name} ብቻ ናቸው።,,
 web:production.drop_not_yours_finish,/production,"Only {name}, who started it, can finish it.",ሊጨርሱት የሚችሉት የጀመሩት {name} ብቻ ናቸው።,,
+web:production.drop_finish_first,/production,Finish it first: someone other than the baker then confirms it here.,መጀመሪያ ይጨርሱት፤ ከዚያ ከጋጋሪው ሌላ ሰው እዚህ ያረጋግጠዋል።,,
+web:production.drop_no_overseer,/production,This station needs no overseer: a finished batch goes straight to Done today.,ይህ ጣቢያ ተቆጣጣሪ አያስፈልገውም፤ የተጠናቀቀ ምርት በቀጥታ ወደ «ዛሬ የተጠናቀቀ» ይሄዳል።,,
 web:production.drop_not_overseer,/production,Only an overseer or a manager can confirm it or send it back.,ሊያረጋግጡት ወይም ሊመልሱት የሚችሉት ተቆጣጣሪ ወይም ሥራ አስኪያጅ ብቻ ናቸው።,,
 web:production.drop_own_batch,/production,"Someone other than {name}, who made it, confirms it.",ያዘጋጁት {name} ሳይሆኑ ሌላ ሰው ያረጋግጠዋል።,,
 web:production.move_failed,/production,{name} could not be moved: {reason},{name} ሊንቀሳቀስ አልቻለም፦ {reason},,

@@ -66,7 +66,8 @@ import type { ProductionTwins } from "./twins";
 // updates by itself"): the summary strip is gone, each step is named once, in its column head, which also carries what needs a look (the
 // requests waiting too long or urgent, the batches left in the oven over a day). A card the viewer can move is dragged to the next column
 // (mouse, a long press on a tablet, or its grip and the arrow keys; on a phone onto the column's tab) and the drop makes the same write as
-// the card's button: Requested -> In progress accepts and starts it, In progress -> Pending confirmation (or Done today) opens the Done form,
+// the card's button: Requested -> In progress accepts and starts it, In progress -> Pending confirmation opens the Done form (Done today at a
+// station that needs no overseer, where a finished batch goes straight there),
 // Pending confirmation -> Done today confirms it, Pending confirmation -> In progress opens Send back. While a card is dragged, a column it
 // cannot go to is dimmed and says why (lib/productionBoard.ts dropMove); the card moves at once and goes back with the reason if the
 // server refuses. The board reads itself again after every move, so the status updates by itself.

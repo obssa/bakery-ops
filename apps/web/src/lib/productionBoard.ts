@@ -106,6 +106,8 @@ export type DropRefusal =
   | { reason: "drop_given_to"; name: string }
   | { reason: "drop_not_yours_start"; name: string }
   | { reason: "drop_not_yours_finish"; name: string }
+  | { reason: "drop_finish_first" }
+  | { reason: "drop_no_overseer" }
   | { reason: "drop_not_overseer" }
   | { reason: "drop_own_batch"; name: string };
 
@@ -133,7 +135,10 @@ export function dropMove(me: Me | null, request: ProductionRequest, target: Colu
 
   if (from === "in_progress") {
     if (target === "requested") return { refused: { reason: "drop_no_back" } };
-    // a finished batch goes to Pending confirmation or, where no overseer is needed, straight to Done today: either column finishes it
+    // finishing lands where FinishBatch puts the batch: Pending confirmation at a station that needs an overseer (Done today is then a
+    // second step, someone else's), straight to Done today at a station that does not (Pending confirmation is then never used)
+    const lands: Column = request.station.requires_overseer ? "pending_confirmation" : "done_today";
+    if (target !== lands) return { refused: { reason: request.station.requires_overseer ? "drop_finish_first" : "drop_no_overseer" } };
     if (fulfils && mine && request.batch?.status === "started") return { move: "finish" };
     return { refused: { reason: "drop_not_yours_finish", name: baker } };
   }
