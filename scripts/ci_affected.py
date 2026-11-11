@@ -33,8 +33,8 @@ the graph a second time:
   full run            .github/, scripts/, docker/, compose files, Makefile, .claude/, docs/phases/, docs/adr/, docs/go-live*,
                       an unknown path, or the label full-ci
 
-The gate jobs gate-p0 .. gate-p6 are the required checks: they always run, and a gate whose Pest step was not selected
-runs only gate_check. Outputs (to $GITHUB_OUTPUT when set): full=true|false, jobs=<JSON list of job ids> and reuse=<run URL or
+The gate jobs gate-p0 .. gate-p6 are the required checks: they always run (each checks its needs and runs gate_check);
+a gate's Pest group runs in its own job pest-gate-pN, which an API change selects. Outputs (to $GITHUB_OUTPUT when set): full=true|false, jobs=<JSON list of job ids> and reuse=<run URL or
 empty>.
 Exit 0, or 2 on a usage error.
 """
@@ -64,7 +64,7 @@ OWN_RULE = set(STATIC_API) | set(WEB) | {"docker-build", "print-bridge", *ALWAYS
 
 def whole_api(jobs: dict[str, list[str]]) -> list[str]:
     """The jobs that run the API as a whole, which any API change runs: every job with no rule of its own (in this repository
-    rules-off-gates, files-s3, perf-dashboards, perf-load, backup-drill) and the gates, whose Pest step runs when selected."""
+    rules-off-gates, files-s3, perf-dashboards, perf-load, backup-drill), the gates' Pest jobs pest-gate-pN and the gates."""
     return sorted(j for j in jobs if j not in OWN_RULE and not j.startswith(("mod-", "e2e-")))
 
 FULL_PREFIXES = (".github/", "scripts/", "docker/", ".claude/", ".githooks/", "docs/phases/", "docs/adr/", "docs/go-live")

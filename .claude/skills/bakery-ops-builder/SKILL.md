@@ -131,8 +131,9 @@ need Ramin's accounts or money wait for him.
 - **"Add / build module X"** → find X in the manifest. If its phase is not current, say so and stop. If
   it is, run step 2 for the phase, then step 4 for X only.
 - **"Set up CI" / "CI is red"** → `references/ci-cd.md`; install or diff against `assets/ci/`; the job
-  graph must keep mirroring `ci.module_jobs` / `gate_jobs` in the manifest. For a red run, name the
-  lowest failing job in the dependency chain first; everything downstream is noise.
+  graph must keep matching `ci.module_jobs` / `gate_jobs` in the manifest (test jobs side by side, each gate needing every job
+  of its phase and the phases below). For a red run, name the lowest failing module in the dependency order first; a failure
+  in a module that builds on it may be the same fault.
 - **"Write the plan for phase N"** → step 3.
 - **"Review this PR"** → check: contract tests exist and were committed before consumer code (git
   history), every new endpoint has feature test + registry entries, NUMERIC scales, `branch_id`, actor

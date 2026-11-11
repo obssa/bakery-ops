@@ -1,6 +1,6 @@
 # Reusable job: run one module's Pest groups, then the contract tests its consumers wrote against it.
-# A module job only runs after the jobs of the modules it depends on (see ci.yml `needs:`), so the
-# first red job in a run names the lowest broken module.
+# Since 2026-11-12 every module job starts at once (ci.yml): the dependency rule is kept by the gates, each of which needs every
+# job of its phase and the phases below and fails when one of them failed. With `shard` ("1/3"), Pest runs one third of the tests.
 name: module-tests
 
 on:
@@ -23,6 +23,11 @@ on:
         required: false
         type: number
         default: 20
+      shard:
+        description: Pest --shard (for example 1/3) when the module's job runs as several shards side by side; empty runs everything
+        required: false
+        type: string
+        default: ""
       env:
         description: Extra environment for the Pest steps, one KEY=VALUE per line (the rules-off-gates job turns the three shift rules off)
         required: false
@@ -31,7 +36,7 @@ on:
 
 jobs:
   pest:
-    name: ${{ inputs.module }}
+    name: ${{ inputs.module }}${{ inputs.shard != '' && format(' {0}', inputs.shard) || '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.timeout_minutes }}
     services:
@@ -58,6 +63,7 @@ jobs:
       CACHE_STORE: array
       QUEUE_CONNECTION: sync
       SESSION_DRIVER: array
+      PEST_SHARD: ${{ inputs.shard }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-api

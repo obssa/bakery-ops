@@ -432,11 +432,15 @@ class Checklist:
         ok, bad = [], []
         for job in v["jobs"]:
             if job == "self":
-                # the gate job's own Pest step runs before gate_check, so a gate_check that runs at all saw it pass
-                if f"--group={self.gate['pest_group']}" in defined.get(gate_job, ""):
+                # the gate's own Pest group: a step of the gate job (before gate_check), or, since 2026-11-12, the job
+                # pest-<gate> that runs beside the other test jobs and that the gate needs (a gate fails when a need failed)
+                group, pest_job = f"--group={self.gate['pest_group']}", f"pest-{gate_job}"
+                own_needs = re.search(r"^    needs:\s*\[([^\]]*)\]", defined.get(gate_job, ""), re.M)
+                if group in defined.get(gate_job, "") or (
+                        group in defined.get(pest_job, "") and own_needs and pest_job in [x.strip() for x in own_needs.group(1).split(",")]):
                     ok.append("self")
                 else:
-                    bad.append(f"self: the {gate_job} job runs no --group={self.gate['pest_group']} step")
+                    bad.append(f"self: neither {gate_job} nor a {pest_job} job it needs runs a {group} step")
             elif job not in needs:
                 bad.append(f"{job}: not a need of {gate_job}")
             elif job not in defined:

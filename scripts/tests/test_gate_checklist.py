@@ -181,7 +181,19 @@ class CiJobWithJobs(Fixture):
         self.write(".github/workflows/ci.yml", CI_YML.replace("      - run: vendor/bin/pest --group=gate:p5\n", ""))
         state, detail = self.rows(ci=True)["checklist own"]
         self.assertEqual(state, "FAIL")
-        self.assertIn("runs no --group=gate:p5 step", detail)
+        self.assertIn("neither gate-p5 nor a pest-gate-p5 job it needs runs a --group=gate:p5 step", detail)
+
+    def test_self_may_be_the_pest_job_beside_the_gate_that_the_gate_needs(self) -> None:
+        self.checklist(item("own", {"type": "ci_job", "jobs": ["self"]}))
+        moved = CI_YML.replace("      - run: vendor/bin/pest --group=gate:p5\n", "").replace(
+            "  gate-p5:\n    needs: [status, gate-p4, e2e-p5]\n",
+            "  pest-gate-p5:\n    needs: [status]\n    runs-on: ubuntu-24.04\n    steps:\n      - run: vendor/bin/pest --group=gate:p5\n"
+            "  gate-p5:\n    needs: [status, gate-p4, e2e-p5, pest-gate-p5]\n")
+        self.write(".github/workflows/ci.yml", moved)
+        self.assertEqual(self.rows(ci=True)["checklist own"][0], "PASS")
+        # a pest-gate-p5 job the gate does not wait for proves nothing to the gate
+        self.write(".github/workflows/ci.yml", moved.replace("[status, gate-p4, e2e-p5, pest-gate-p5]", "[status, gate-p4, e2e-p5]"))
+        self.assertEqual(self.rows(ci=True)["checklist own"][0], "FAIL")
 
     def test_locally_it_is_trusted_to_ci(self) -> None:
         self.checklist(item("local", {"type": "ci_job", "jobs": ["perf-load"]}))

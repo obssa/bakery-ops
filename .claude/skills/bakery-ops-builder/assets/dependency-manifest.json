@@ -1646,98 +1646,52 @@
     "workflow": ".github/workflows/ci.yml",
     "module_jobs": {
       "api-lint": [],
-      "api-arch": [
-        "api-lint"
-      ],
-      "mod-identity": [
-        "api-arch"
-      ],
-      "mod-catalog": [
-        "mod-identity"
-      ],
-      "mod-inventory": [
-        "mod-catalog"
-      ],
-      "mod-orders": [
-        "mod-inventory"
-      ],
-      "mod-payments": [
-        "mod-orders"
-      ],
-      "mod-production": [
-        "mod-inventory"
-      ],
-      "mod-notifications": [
-        "mod-inventory"
-      ],
-      "mod-shifts": [
-        "mod-orders",
-        "mod-inventory",
-        "mod-payments"
-      ],
-      "rules-off-gates": [
-        "mod-payments",
-        "mod-production",
-        "mod-notifications"
-      ],
-      "mod-analytics": [
-        "mod-shifts",
-        "mod-production",
-        "mod-notifications"
-      ],
+      "api-arch": [],
+      "mod-identity": [],
+      "mod-catalog": [],
+      "mod-inventory": [],
+      "mod-orders": [],
+      "mod-payments": [],
+      "mod-production": [],
+      "mod-notifications": [],
+      "mod-shifts": [],
+      "rules-off-gates": [],
+      "mod-analytics": [],
       "web-lint": [],
-      "web-build": [
-        "web-lint"
-      ],
+      "web-build": [],
       "docker-build": [],
-      "openapi-check": [
-        "api-arch"
-      ],
-      "erd-check": [
-        "api-arch"
-      ],
-      "invariants": [
-        "api-arch"
-      ],
-      "i18n-check": [
-        "web-lint"
-      ],
+      "openapi-check": [],
+      "erd-check": [],
+      "invariants": [],
+      "i18n-check": [],
       "print-bridge": []
     },
     "e2e_jobs": {
       "e2e-p0": [
-        "mod-catalog",
         "web-build",
         "docker-build"
       ],
       "e2e-p1": [
-        "mod-payments",
         "web-build",
         "docker-build"
       ],
       "e2e-p2": [
-        "mod-production",
-        "mod-notifications",
         "web-build",
         "docker-build"
       ],
       "e2e-p3": [
-        "mod-shifts",
         "web-build",
         "docker-build"
       ],
       "e2e-p4": [
-        "mod-analytics",
         "web-build",
         "docker-build"
       ],
       "e2e-p5": [
-        "mod-analytics",
         "web-build",
         "docker-build"
       ],
       "e2e-p6": [
-        "mod-analytics",
         "web-build",
         "docker-build"
       ]
@@ -1745,51 +1699,175 @@
     "gate_jobs": {
       "gate-p0": [
         "api-arch",
-        "mod-inventory",
-        "mod-catalog",
+        "api-lint",
+        "docker-build",
         "e2e-p0",
-        "openapi-check",
         "erd-check",
-        "invariants"
+        "invariants",
+        "mod-catalog",
+        "mod-identity",
+        "mod-inventory",
+        "openapi-check",
+        "web-build",
+        "web-lint"
       ],
       "gate-p1": [
-        "gate-p0",
+        "api-arch",
+        "api-lint",
+        "docker-build",
+        "e2e-p0",
+        "e2e-p1",
+        "erd-check",
+        "invariants",
+        "mod-catalog",
+        "mod-identity",
+        "mod-inventory",
         "mod-orders",
         "mod-payments",
-        "e2e-p1"
+        "openapi-check",
+        "web-build",
+        "web-lint"
       ],
       "gate-p2": [
-        "gate-p1",
-        "mod-production",
+        "api-arch",
+        "api-lint",
+        "docker-build",
+        "e2e-p0",
+        "e2e-p1",
+        "e2e-p2",
+        "erd-check",
+        "invariants",
+        "mod-catalog",
+        "mod-identity",
+        "mod-inventory",
         "mod-notifications",
-        "e2e-p2"
+        "mod-orders",
+        "mod-payments",
+        "mod-production",
+        "openapi-check",
+        "web-build",
+        "web-lint"
       ],
       "gate-p3": [
-        "gate-p2",
+        "api-arch",
+        "api-lint",
+        "docker-build",
+        "e2e-p0",
+        "e2e-p1",
+        "e2e-p2",
+        "e2e-p3",
+        "erd-check",
+        "invariants",
+        "mod-catalog",
+        "mod-identity",
+        "mod-inventory",
+        "mod-notifications",
+        "mod-orders",
+        "mod-payments",
+        "mod-production",
         "mod-shifts",
+        "openapi-check",
         "rules-off-gates",
-        "e2e-p3"
+        "web-build",
+        "web-lint"
       ],
       "gate-p4": [
-        "gate-p3",
-        "mod-analytics",
+        "api-arch",
+        "api-lint",
+        "docker-build",
+        "e2e-p0",
+        "e2e-p1",
+        "e2e-p2",
+        "e2e-p3",
         "e2e-p4",
-        "perf-dashboards"
+        "erd-check",
+        "files-s3",
+        "invariants",
+        "mod-analytics",
+        "mod-catalog",
+        "mod-identity",
+        "mod-inventory",
+        "mod-notifications",
+        "mod-orders",
+        "mod-payments",
+        "mod-production",
+        "mod-shifts",
+        "openapi-check",
+        "perf-dashboards",
+        "rules-off-gates",
+        "web-build",
+        "web-lint",
+        "pest-gate-p4"
       ],
       "gate-p5": [
-        "gate-p4",
-        "e2e-p5",
-        "i18n-check",
+        "api-arch",
+        "api-lint",
         "backup-drill",
+        "docker-build",
+        "e2e-p0",
+        "e2e-p1",
+        "e2e-p2",
+        "e2e-p3",
+        "e2e-p4",
+        "e2e-p5",
+        "erd-check",
+        "files-s3",
+        "i18n-check",
+        "invariants",
+        "mod-analytics",
+        "mod-catalog",
+        "mod-identity",
+        "mod-inventory",
+        "mod-notifications",
+        "mod-orders",
+        "mod-payments",
+        "mod-production",
+        "mod-shifts",
+        "openapi-check",
+        "perf-dashboards",
         "perf-load",
-        "print-bridge"
+        "print-bridge",
+        "rules-off-gates",
+        "web-build",
+        "web-lint",
+        "pest-gate-p5",
+        "pest-gate-p4"
       ],
       "gate-p6": [
-        "gate-p5",
-        "mod-catalog",
-        "mod-orders",
+        "api-arch",
+        "api-lint",
+        "backup-drill",
+        "docker-build",
+        "e2e-p0",
+        "e2e-p1",
+        "e2e-p2",
+        "e2e-p3",
+        "e2e-p4",
+        "e2e-p5",
         "e2e-p6",
-        "i18n-check"
+        "erd-check",
+        "files-s3",
+        "i18n-check",
+        "invariants",
+        "mod-analytics",
+        "mod-catalog",
+        "mod-identity",
+        "mod-inventory",
+        "mod-notifications",
+        "mod-orders",
+        "mod-payments",
+        "mod-production",
+        "mod-shifts",
+        "openapi-check",
+        "perf-dashboards",
+        "perf-load",
+        "print-bridge",
+        "rules-off-gates",
+        "web-build",
+        "web-lint",
+        "pest-gate-p6",
+        "pest-gate-p4",
+        "pest-gate-p5"
       ]
     }
   }

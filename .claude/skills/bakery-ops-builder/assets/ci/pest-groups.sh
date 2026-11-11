@@ -6,6 +6,8 @@ set -uo pipefail
 groups="$1"; allow_empty="${2:-}"
 cd "$(dirname "$0")/../../apps/api"
 args=""; IFS="," ; for g in $groups; do args="$args --group=$g"; done; unset IFS
+# PEST_SHARD (for example 1/3) runs one shard of the groups' tests
+if [ -n "${PEST_SHARD:-}" ]; then args="$args --shard=$PEST_SHARD"; fi
 out=$(vendor/bin/pest $args --colors=never 2>&1); code=$?
 echo "$out" | tail -40
 if echo "$out" | grep -Eq "No tests (found|executed)"; then

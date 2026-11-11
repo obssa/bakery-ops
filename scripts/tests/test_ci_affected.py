@@ -49,7 +49,7 @@ class Selection(unittest.TestCase):
         self.assertEqual([j for j in r["jobs"] if j.startswith("mod-")], [])
         for job in E2E_JOBS + ["web-lint", "web-build", "web-errors", "i18n-check", "docker-build", "invariants"]:
             self.assertIn(job, r["jobs"])
-        for job in ["api-lint", "api-arch", "perf-dashboards", "perf-load", "gate-p4", "backup-drill", "files-s3"]:
+        for job in ["api-lint", "api-arch", "perf-dashboards", "perf-load", "pest-gate-p4", "backup-drill", "files-s3"]:
             self.assertNotIn(job, r["jobs"])
 
     def test_an_orders_change_runs_orders_and_everything_downstream_of_it_not_what_it_stands_on(self):
@@ -58,7 +58,7 @@ class Selection(unittest.TestCase):
         mods = {j for j in r["jobs"] if j.startswith("mod-")}
         self.assertTrue({"mod-orders", "mod-payments", "mod-shifts", "mod-analytics"} <= mods, mods)
         self.assertFalse({"mod-identity", "mod-catalog", "mod-inventory"} & mods, mods)
-        for job in ["api-lint", "api-arch", "invariants", "openapi-check", "erd-check", "docker-build", "web-build", "gate-p4"] + E2E_JOBS:
+        for job in ["api-lint", "api-arch", "invariants", "openapi-check", "erd-check", "docker-build", "web-build", "pest-gate-p4"] + E2E_JOBS:
             self.assertIn(job, r["jobs"])
         self.assertNotIn("web-lint", r["jobs"])
 
@@ -226,19 +226,59 @@ class Workflow(unittest.TestCase):
                     self.assertRegex(block, r"    if: \$\{\{ !cancelled\(\)", f"{wf}: {job}")
                     self.assertIn("run: python3 scripts/ci_affected.py --check-needs", block, f"{wf}: {job}")
 
-    def test_a_gate_with_a_pest_step_runs_it_only_when_selected_and_gate_check_always(self):
+    def test_a_gates_pest_group_runs_in_its_own_job_beside_the_others_and_the_gate_needs_it(self):
+        for wf in WORKFLOWS:
+            blocks = job_blocks(wf)
+            pest_jobs = [j for j, b in blocks.items() if re.search(r"- name: Pest group gate:p", b)]
+            self.assertTrue(pest_jobs, wf)
+            for job in pest_jobs:
+                self.assertRegex(job, r"^pest-gate-p\d+$", f"{wf}: a gate's Pest group belongs in pest-gate-pN, not in {job}")
+                self.assertIn(job, needs_of(blocks[job[len("pest-"):]]), f"{wf}: {job}")
+                self.assertNotIn("GATE_PEST", blocks[job], f"{wf}: {job}")
+
+    def test_a_gate_only_checks_and_runs_gate_check(self):
         for wf in WORKFLOWS:
             for job, block in job_blocks(wf).items():
-                if not (job.startswith("gate-p") and re.search(r"- name: Pest group gate:p", block)):
+                if not re.fullmatch(r"gate-p\d+", job):
                     continue
                 where = f"{wf}: {job}"
-                self.assertIn(f"GATE_PEST: ${{{{ needs.changes.outputs.full == 'true' || contains(fromJSON(needs.changes.outputs.jobs || '[]'), '{job}') }}}}", block, where)
-                self.assertRegex(block, r"- name: Pest group gate:p\d[^\n]*\n        if: env\.GATE_PEST == 'true'", where)
-                check = re.search(r"      - name: gate_check.*?(?=\n      - |\Z)", block, re.S)
-                self.assertTrue(check, where)
-                self.assertIn("python3 scripts/gate_check.py --mode done", check.group(0), where)
-                self.assertNotIn("if:", check.group(0), where)
+                self.assertNotIn("GATE_PEST", block, where)
+                self.assertNotIn("docker compose", block, where)
+                steps = [st for st in block.split("\n      - ") if "scripts/gate_check.py --mode done" in st]
+                self.assertEqual(len(steps), 1, where)
+                self.assertNotIn("if:", steps[0], where)
 
+    def test_the_gates_run_side_by_side_and_each_covers_the_one_below(self):
+        """No gate waits for another gate; instead gate-pN needs every job gate-p(N-1) needs (the closure of the phases below)."""
+        for wf in WORKFLOWS:
+            blocks = job_blocks(wf)
+            gates = sorted((int(j[6:]), j) for j in blocks if re.fullmatch(r"gate-p\d+", j))
+            for _, g in gates:
+                self.assertFalse([n for n in needs_of(blocks[g]) if re.fullmatch(r"gate-p\d+", n)], f"{wf}: {g} waits for a gate")
+            for (_, lower), (_, upper) in zip(gates, gates[1:]):
+                missing = set(needs_of(blocks[lower])) - set(needs_of(blocks[upper])) - {"status"}
+                self.assertFalse(missing, f"{wf}: {upper} does not cover {lower}: {sorted(missing)}")
+
+    def test_no_test_job_waits_for_a_module_job(self):
+        """The module, e2e and stack jobs start together; only the gates hold the dependency rule."""
+        for wf in WORKFLOWS:
+            for job, block in job_blocks(wf).items():
+                if re.fullmatch(r"gate-p\d+", job):
+                    continue
+                waits = [n for n in needs_of(block) if n.startswith(("mod-", "e2e-")) or n in ("rules-off-gates", "enforced-gates")]
+                self.assertFalse(waits, f"{wf}: {job} waits for {waits}")
+
+    def test_the_manifest_names_the_same_needs_as_ci_yml(self):
+        """dependency-manifest.json ci.*_jobs is what gate_check reads (gate_needs, the checklist's `jobs`): it must be ci.yml's graph."""
+        for key in ("module_jobs", "e2e_jobs", "gate_jobs"):
+            for job, needs in MANIFEST["ci"][key].items():
+                self.assertIn(job, JOBS, f"{key}: {job}")
+                self.assertEqual(sorted(needs), sorted(n for n in JOBS[job] if n not in ("status", "changes")), f"{key}: {job}")
+
+    def test_mod_inventory_runs_in_three_shards(self):
+        block = job_blocks(".github/workflows/ci.yml")["mod-inventory"]
+        self.assertIn('matrix: { shard: ["1/3", "2/3", "3/3"] }', block)
+        self.assertIn('shard: "${{ matrix.shard }}"', block)
 
 SHA = "a" * 40
 GH_REPO = "obssa/bakery-ops"
