@@ -88,7 +88,7 @@ function QueueCard({
     // tap area covers the card; the rest is read as the card's text. The button's visible words are part of its name (WCAG 2.5.3)
     <div
       className={`relative flex flex-col gap-1.5 rounded-2xl border bg-white px-4 py-3.5 text-neutral-900 motion-safe:transition-colors motion-safe:duration-150 has-[button:focus-visible]:ring-4 has-[button:focus-visible]:ring-brand-600/35 has-[button:focus-visible]:ring-offset-1 ${
-        selected ? "border-brand-600 ring-1 ring-inset ring-brand-600" : "border-neutral-200 has-[button:enabled:hover]:border-neutral-300"
+        selected ? "border-ink-900 ring-1 ring-inset ring-ink-900" : "border-neutral-200 has-[button:enabled:hover]:border-neutral-300"
       } ${waiting ? "opacity-70" : ""}`}
     >
       <div className="flex items-baseline justify-between gap-3">

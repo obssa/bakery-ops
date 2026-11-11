@@ -522,8 +522,8 @@ interface Choice<T extends string> {
 
 /**
  * One choice among a few, as cards: a radio group named `label`, each card a real radio (named by its title, described by its sentence)
- * spread over the whole card, so a tap anywhere chooses it and the arrow keys move between them. The chosen card is brand-50 with a 2 px
- * brand-600 border and a check; the focus ring goes round the card.
+ * spread over the whole card, so a tap anywhere chooses it and the arrow keys move between them. The chosen card is ink-50 with a 2 px
+ * ink-900 border and a check; the focus ring goes round the card.
  */
 function ChoiceGroup<T extends string>({
   label,
@@ -581,7 +581,7 @@ function ChoiceCard<T extends string>({
   return (
     <label
       className={`relative flex min-h-20 items-start gap-3.5 rounded-2xl border p-4 motion-safe:transition-colors motion-safe:duration-150 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-600/35 has-[:focus-visible]:ring-offset-1 ${
-        checked ? "border-brand-600 bg-brand-50 inset-ring-1 inset-ring-brand-600" : "border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50"
+        checked ? "border-ink-900 bg-ink-50 inset-ring-1 inset-ring-ink-900" : "border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50"
       } ${disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
     >
       <input
@@ -597,12 +597,12 @@ function ChoiceCard<T extends string>({
       />
       <span
         aria-hidden="true"
-        className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl ${checked ? "bg-white text-brand-700" : "bg-neutral-100 text-neutral-700"}`}
+        className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl ${checked ? "bg-white text-ink-900" : "bg-neutral-100 text-neutral-700"}`}
       >
         <Icon className="size-[22px]" strokeWidth={1.75} aria-hidden="true" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5 pr-7">
-        <span id={titleId} className={`text-[15px] font-semibold ${checked ? "text-brand-700" : "text-neutral-900"}`}>
+        <span id={titleId} className={`text-[15px] font-semibold ${checked ? "text-ink-900" : "text-neutral-900"}`}>
           {option.title}
         </span>
         <span id={hintId} className="text-[13px] leading-snug text-neutral-600">
@@ -611,7 +611,7 @@ function ChoiceCard<T extends string>({
       </span>
       <span
         aria-hidden="true"
-        className={`absolute right-4 top-4 inline-flex size-5 items-center justify-center rounded-full border ${checked ? "border-brand-600 bg-brand-600 text-white" : "border-neutral-300 bg-white"}`}
+        className={`absolute right-4 top-4 inline-flex size-5 items-center justify-center rounded-full border ${checked ? "border-ink-900 bg-ink-900 text-white" : "border-neutral-300 bg-white"}`}
       >
         {checked ? <Check className="size-3.5" strokeWidth={3} aria-hidden="true" /> : null}
       </span>

@@ -192,10 +192,10 @@ export function AnalyticsGate({ children }: { children: ReactNode }) {
 
 // --- the range ----------------------------------------------------------------------------------------------------------------------------
 
-/** A pressed button of a segment track (the catalog's segments: 36 px in a 46 px white track, the pressed one brand-50). */
+/** A pressed button of a segment track (the catalog's segments: 36 px in a 46 px white track, the pressed one ink-100). */
 function segmentClass(pressed: boolean): string {
   return `inline-flex h-9 items-center gap-1 rounded-[9px] px-3.5 text-sm font-semibold motion-safe:transition-colors motion-safe:duration-150 ${
-    pressed ? "bg-brand-50 text-brand-700" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
+    pressed ? "bg-ink-100 text-ink-900" : "text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
   } ${focusRing}`;
 }
 

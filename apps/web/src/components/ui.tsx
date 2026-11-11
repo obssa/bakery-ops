@@ -277,12 +277,12 @@ export interface SegmentOption<T extends string> {
 
 const SEGMENT_SELECTED = {
   station: "bg-ink-900 text-white",
-  admin: "bg-brand-50 text-brand-700",
+  admin: "bg-ink-100 text-ink-900",
 } as const;
 
 /**
- * One choice among a few, on a white track: the selected segment is ink with white text on a station, brand-50 with brand-700 text on
- * admin. A group of pressed buttons by default; `tabs` makes it a tablist of tabs (aria-selected), as the pad's and the till's views are.
+ * One choice among a few, on a white track: the selected segment is ink with white text on a station, ink-100 with ink-900 text on
+ * admin (a choice is charcoal, never red). A group of pressed buttons by default; `tabs` makes it a tablist of tabs (aria-selected), as the pad's and the till's views are.
  */
 export function SegmentedControl<T extends string>({
   label,
