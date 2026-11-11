@@ -541,7 +541,11 @@ way back), Pest `EthiopianClockTest`, the clock endpoint in `BrandProfileTest`, 
 The same pull request makes a table card's scroll box hold its visually hidden header labels: the Templates page scrolled sideways at
 390 px because the Actions column's hidden label was placed by the page (757 px), which any table card with one could do on a phone.
 Claim restated at `a4912c8` (after the merge of `main` and the fixes to the audit dictionary test, the dashboards' read check, that scroll
-box and the Amharic 12-hour label); the tag stays on `2f6bbd9`.
+box and the Amharic 12-hour label); the tag stays on `2f6bbd9`. `main`'s run 42939073294 passed with the strict `gate-p6` green.
+Deploy 42949734513: 42 of 43 `@live`; `p5-device` ops-live failed on "the last good backup is younger than 26 hours": the 02:30 backup of
+2026-11-11 never started (no `ops_runs` row). The cron line's random sleep of up to 59 s plus PHP's start could begin `schedule:run` in
+the next minute, and a `dailyAt` task is due only in its own minute. With Ramin's OK (2026-11-11) one backup was run by hand (backup 10,
+ok) and the sleep removed from the scheduler's cron line (`docs/runbook/server.md`); the other sites' lines are untouched.
 
 A choice is charcoal, never red (Ramin, 2026-11-10, of the till's chosen pay method: "red looks like an error"): the chosen pay
 method, the chosen kind card and its tick, the opened order and request cards, the till's chosen order, the ticked pills and filters, the
@@ -550,7 +554,19 @@ current sidebar item and section tab, links, the focus ring and "New" (fresh-cou
 sheet inside itself on a 390 px phone: the row's fieldset took its method grid's widest content as its least width, so the right column and
 the amount ran past the sheet's edge (`min-w-0` on the fieldset and the Amount line, and a long method name wraps). Web only; the till's captures gain a method chosen at 1440
 (en) and 390 (en and am), and at 390 they assert nothing in the sheet scrolls sideways and every method card and field ends inside it.
-Claim restated at `ff250f4` (the merge of `main` after the Ethiopian clock: the Time card's segment and the template form's day pills are charcoal too); the tag stays on `2f6bbd9`.
+Claim restated at `ff250f4` (the merge of `main` after the Ethiopian clock: the Time card's segment and the template form's day pills are charcoal too); the tag stays on `2f6bbd9`. `main`'s run 42963369960 passed with the strict `gate-p6` green
+(now `gate_run_url`). Deploy 42973956276: 43 of 43 `@live`.
+
+**The production board redrawn** (Ramin, 2026-11-10: "the production board design is too basic"). A summary strip over the columns
+(each column's count with its icon; the urgent requests waiting and the batches in the oven for more than a day in amber), the station
+filter as a segmented control up to five stations, each column under a tinted head with its icon, its step and a line saying what
+happens there, and an empty column saying what lands in it. The cards have a status edge, an 80 px photo, a 28 px quantity, priority,
+reason and due chips (the due time in Ethiopian time), "Baking for 1 h 05" while in the oven, "Made 78 of 80 asked" while the batch waits
+for its overseer, and one full-width charcoal action. A batch in the oven for a day or more says "Started 6 days ago" and asks for it to
+be finished and counted (a started batch is finished or sent back, never cancelled: `production.request.in_progress`). On a phone the
+columns are tabs with their counts, one column at a time. The e2e demo finishes the admin's batch left in the oven over a day before it
+starts a new one, so the board never shows the same batch run after run; the stale card in the captures is drawn from an aged copy of the
+board's answer. `lib/productionBoard.ts` (ages, the stale rule, the summary) has its logic spec (`screens-production-logic`). Web only. Claim restated at `3a8afae` (the merge of `main` after the chosen states in charcoal); the tag stays on `2f6bbd9`.
 
 **The screens explain themselves** (Ramin, 2026-11-10: shifts are hard to understand, why someone must wait, what "Ad hoc" and "Review"
 mean; anything confusing must say what it does and how, "Days not built" included). Two primitives in `ui.tsx`: `HelpTip`, a "?" in a 44 px

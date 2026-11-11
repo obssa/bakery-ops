@@ -11,6 +11,11 @@ import { loginOnce } from "./fixture";
 // run (a second call finds it). The board is seen as the demo admin, so the head shows the station filter, Display case stock and New
 // batch, and the columns their one action: Accept request on the baguettes, Finish · count made on the admin's batch, Confirm batch on the
 // rolls the bread baker made.
+//
+// A batch of the admin's found in the oven for more than a day (a database that was not seeded afresh) is finished first, counted as asked
+// with nothing wasted, and a new one started, so the board never shows the same batch "6 d so far" run after run (phase-6/production-board;
+// a started batch is finished or sent back, never cancelled). The stale card itself is drawn by the screenshots from an aged copy of the
+// board's answer, not left on the bakery's board.
 
 export interface DemoProduction {
   /** the demo admin, on the tablet below */
@@ -27,9 +32,14 @@ export interface DemoProduction {
 interface Row {
   id: number;
   status: string;
+  requested_qty: string;
   assigned_to: { id: number } | null;
   product: { id: number; name_en: string; name_am: string };
+  batch: { id: number; status: string; started_at: string } | null;
 }
+
+/** A batch in the oven longer than this (ms) is stale: it is finished before the run puts a new one in. */
+const STALE_MS = 86_400_000;
 
 let built: Promise<DemoProduction> | null = null;
 
@@ -48,7 +58,15 @@ export function demoProduction(): Promise<DemoProduction> {
     const cakeRoom = stations.find((s) => s.code === "cake_room");
     const board = async () => (await admin.get<{ data: Row[] }>("/production/requests", { view: "board", limit: 200 })).data;
 
-    const mine = (await board()).find((r) => r.status === "in_progress" && r.assigned_to?.id === me.id);
+    let mine = (await board()).find((r) => r.status === "in_progress" && r.assigned_to?.id === me.id);
+    if (mine?.batch && mine.batch.status === "started" && Date.now() - Date.parse(mine.batch.started_at) > STALE_MS) {
+      try {
+        await admin.post(`/production/batches/${mine.batch.id}/done`, { produced_qty: mine.requested_qty, waste_qty: "0" });
+        mine = undefined;
+      } catch (error) {
+        console.warn(`[demo production] the stale batch could not be finished: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     let inOven = mine ? { id: mine.id, name_en: mine.product.name_en, name_am: mine.product.name_am } : null;
     if (!inOven) {
       try {

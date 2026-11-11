@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Store } from "lucide-react";
+import { AlertTriangle, CircleCheckBig, ClipboardCheck, ClipboardList, Flame, Plus, Store, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -10,13 +10,16 @@ import type { Collection, Locale, ProductionRequest, Station } from "@/lib/api/t
 import { useErrorText } from "@/lib/errors";
 import { boardColumns, COLUMNS, createProductionFeed, ownStationId, type Column } from "@/lib/live/production";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
+import { boardSummary, type BoardSummary } from "@/lib/productionBoard";
 import { useProductImages } from "@/lib/productImages";
 import { authed, can, useSession } from "@/lib/session";
 import { useStationHeader } from "@/lib/topBar";
+import { useNow } from "@/lib/useNow";
 import { ICON_STROKE } from "../icons";
 import { StationHeaderActions } from "../StationHeaderActions";
+import { focusRing } from "../styles";
 import { DisplayCasePanel } from "../till/DisplayCasePanel";
-import { Alert, Button, Drawer, Select } from "../ui";
+import { Alert, Button, Drawer, SegmentedControl, Select } from "../ui";
 import { ShiftBar } from "../shifts/ShiftBar";
 import { useShiftStation } from "../shifts/useShiftStation";
 import { NewBatchDialog } from "./NewBatchDialog";
@@ -33,8 +36,24 @@ import type { ProductionTwins } from "./twins";
 // production station sees that station first; everyone can widen the board to all stations. A card's name opens the request card in a
 // drawer from the right, and ?request=<id> (a notification link) opens it at once. The product thumbs are the catalog's photos
 // (useProductImages, phase-6 plan 10.2 Q7); offline they are the placeholders.
+//
+// phase-6/production-board (Ramin 2026-11-10: the board was too basic): a summary strip over the columns (each column's count with its icon,
+// the urgent requests waiting and the batches left in the oven over a day), the station filter as a segmented control when there are five
+// stations or fewer, each column under a tinted head with its icon, its step and a line saying what happens there, and an empty column
+// saying what lands in it. On a phone (under md) the columns are tabs with their counts, one column at a time, full width.
 
 const PRODUCTION_KINDS = ["cake_room", "bakery"] as const;
+
+/** A segmented station filter up to this many stations; a select beyond. */
+const SEGMENTED_STATIONS = 5;
+
+/** Each column's look: its icon and its tint (the head, the icon tile, the count). Requested is ink, baking blue, waiting amber, done green-teal. */
+const COLUMN_LOOK: Record<Column, { icon: LucideIcon; head: string; ink: string; count: string }> = {
+  requested: { icon: ClipboardList, head: "border-ink-200 bg-ink-50", ink: "text-ink-800", count: "text-ink-900" },
+  in_progress: { icon: Flame, head: "border-blue-200 bg-blue-50", ink: "text-blue-700", count: "text-blue-800" },
+  pending_confirmation: { icon: ClipboardCheck, head: "border-amber-200 bg-amber-50", ink: "text-amber-700", count: "text-amber-900" },
+  done_today: { icon: CircleCheckBig, head: "border-positive-200 bg-positive-50", ink: "text-positive-700", count: "text-positive-800" },
+};
 
 export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   const t = useTranslations("production");
@@ -88,6 +107,10 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
 
   const columns = useMemo(() => (snapshot ? boardColumns(snapshot.state, stationId) : null), [snapshot, stationId]);
   const total = columns ? COLUMNS.reduce((n, column) => n + columns[column].length, 0) : 0;
+  const now = useNow(60_000);
+  const summary = useMemo(() => (columns ? boardSummary(columns, now) : null), [columns, now]);
+  // the column a phone shows (the columns are tabs under md)
+  const [tab, setTab] = useState<Column>("requested");
   const openedRequest = opened !== null ? snapshot?.state.requests.find((request) => request.id === opened.id) : undefined;
   const open = useCallback((request: ProductionRequest, focus?: "finish") => setOpened((current) => (current?.id === request.id && !focus ? null : { id: request.id, focus })), []);
   const close = useCallback(() => setOpened(null), []);
@@ -135,13 +158,23 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
         ) : null}
       </StationHeaderActions>
 
-      {/* the board's station filter, compact, at the right above the column heads (only when there is a choice) */}
-      {choices.length > 1 ? (
-        <div className="-mb-2 flex justify-end">
+      {/* the board's station filter (only when there is a choice): a segmented control for a few stations, a select for more */}
+      {choices.length > 1 && choices.length <= SEGMENTED_STATIONS ? (
+        <SegmentedControl
+          label={t("station")}
+          tone="station"
+          className="self-start"
+          value={String(stationId)}
+          onChange={(value) => setStationId(value === "all" ? "all" : Number(value))}
+          options={[{ value: "all", label: t("all_stations") }, ...choices.map((choice) => ({ value: String(choice.id), label: locale === "am" ? choice.name_am : choice.name_en }))]}
+        />
+      ) : null}
+      {choices.length > SEGMENTED_STATIONS ? (
+        <div className="flex">
           <label htmlFor="production-station" className="sr-only">
             {t("station")}
           </label>
-          <div className="w-48">
+          <div className="w-56">
             <Select id="production-station" controlSize="md" value={String(stationId)} onChange={(event) => setStationId(event.target.value === "all" ? "all" : Number(event.target.value))}>
               <option value="all">{t("all_stations")}</option>
               {choices.map((choice) => (
@@ -174,9 +207,11 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
           <p role="status" className={total === 0 ? "text-[15px] text-neutral-600" : "sr-only"}>
             {total === 0 ? t("empty") : ""}
           </p>
+          {summary ? <SummaryStrip summary={summary} /> : null}
+          {summary ? <ColumnTabs summary={summary} tab={tab} onTab={setTab} /> : null}
           <div role="group" aria-label={t("board")} className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-4">
             {COLUMNS.map((column) => (
-              <BoardColumn key={column} column={column} twin={twins?.columns[column]} count={columns[column].length}>
+              <BoardColumn key={column} column={column} twin={twins?.columns[column]} count={columns[column].length} phoneHidden={column !== tab}>
                 {columns[column].map((request) => (
                   <RequestCard
                     key={request.id}
@@ -251,26 +286,119 @@ function CardPanel({ onClose, children }: { onClose: () => void; children: React
   );
 }
 
-/** One column of the board: its name (the Amharic name under it on the English page) and a count pill, then its cards or "Nothing here". */
-function BoardColumn({ column, twin, count, children }: { column: Column; twin?: string; count: number; children: ReactNode }) {
+/** Does the column hold something that needs a look: an urgent request waiting, or a batch left in the oven over a day? */
+function needsLook(column: Column, summary: BoardSummary): boolean {
+  return (column === "requested" && summary.urgent > 0) || (column === "in_progress" && summary.stale > 0);
+}
+
+/**
+ * The board at a glance, over the columns from md up: one tile per column with its icon, its count and a line, the urgent requests and the
+ * batches left in the oven over a day in amber with a warning sign. A phone shows the counts on its column tabs instead.
+ */
+function SummaryStrip({ summary }: { summary: BoardSummary }) {
+  const t = useTranslations("production");
+  return (
+    <ul aria-label={t("summary")} className="hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
+      {COLUMNS.map((column) => {
+        const look = COLUMN_LOOK[column];
+        const Icon = look.icon;
+        const warn = needsLook(column, summary);
+        const note =
+          column === "requested" && warn
+            ? t("sum_urgent", { count: summary.urgent })
+            : column === "in_progress" && warn
+              ? t("sum_stale", { count: summary.stale })
+              : t(`sum_${column}` as "sum_requested");
+        return (
+          <li key={column} className="flex items-center gap-3.5 rounded-2xl border border-neutral-200 bg-white px-4 py-3.5">
+            <span aria-hidden="true" className={`inline-flex size-11 shrink-0 items-center justify-center rounded-xl border ${look.head}`}>
+              <Icon className={`size-[22px] ${look.ink}`} strokeWidth={ICON_STROKE} />
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="flex items-baseline gap-2">
+                <span className="text-[26px] font-bold leading-none tabular-nums text-neutral-900">{summary.counts[column]}</span>
+                <span className="truncate text-[15px] font-semibold text-neutral-900">{t(`col_${column}` as "col_requested")}</span>
+              </span>
+              <span className={`mt-1 flex items-center gap-1 text-[13px] ${warn ? "font-semibold text-amber-800" : "text-neutral-600"}`}>
+                {warn ? <AlertTriangle className="size-3.5 shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" /> : null}
+                <span className="truncate">{note}</span>
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** The columns as tabs on a phone (under md): four equal tabs, each its short name over its count; the chosen one is charcoal. */
+function ColumnTabs({ summary, tab, onTab }: { summary: BoardSummary; tab: Column; onTab: (column: Column) => void }) {
+  const t = useTranslations("production");
+  return (
+    <div role="tablist" aria-label={t("tabs")} className="grid grid-cols-4 gap-1 rounded-2xl border border-neutral-200 bg-white p-1 md:hidden">
+      {COLUMNS.map((column) => {
+        const chosen = column === tab;
+        const warn = needsLook(column, summary);
+        return (
+          <button
+            key={column}
+            type="button"
+            role="tab"
+            aria-selected={chosen}
+            onClick={() => onTab(column)}
+            className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 motion-safe:transition-colors motion-safe:duration-150 ${chosen ? "bg-ink-900 text-white" : "text-neutral-700 hover:bg-neutral-100"} ${focusRing}`}
+          >
+            <span className="flex items-center gap-1 text-lg font-bold leading-none tabular-nums">
+              {summary.counts[column]}
+              {warn ? <AlertTriangle className={`size-3.5 ${chosen ? "text-amber-300" : "text-amber-700"}`} strokeWidth={ICON_STROKE} aria-hidden="true" /> : null}
+            </span>
+            <span className="max-w-full truncate text-xs font-semibold">{t(`tab_${column}` as "tab_requested")}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * One column of the board under its tinted head: the icon, the step ("Step 1", "Today" over Done today), its name (the Amharic name under
+ * it on the English page), the count and a line saying what happens there; then its cards, or an empty state saying what lands in it. On a
+ * phone only the chosen tab's column shows.
+ */
+function BoardColumn({ column, twin, count, phoneHidden, children }: { column: Column; twin?: string; count: number; phoneHidden: boolean; children: ReactNode }) {
   const t = useTranslations("production");
   const title = t(`col_${column}` as "col_requested");
+  const look = COLUMN_LOOK[column];
+  const Icon = look.icon;
+  const step = column === "done_today" ? t("step_done") : t("step", { n: COLUMNS.indexOf(column) + 1 });
   return (
-    <section aria-label={title} className="flex min-w-0 flex-col gap-3">
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div className="flex min-w-0 flex-col">
-          <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
-          {twin ? (
-            <span lang="am" className="text-[13px] font-medium text-neutral-600">
-              {twin}
-            </span>
-          ) : null}
+    <section aria-label={title} className={`min-w-0 flex-col gap-3 ${phoneHidden ? "hidden md:flex" : "flex"}`}>
+      <div className={`flex flex-col gap-2 rounded-2xl border px-4 py-3 ${look.head}`}>
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className={`inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-white ${look.ink}`}>
+            <Icon className="size-5" strokeWidth={ICON_STROKE} />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-600">{step}</span>
+            <h2 className="text-base font-semibold leading-tight text-neutral-900">{title}</h2>
+            {twin ? (
+              <span lang="am" className="text-[13px] font-medium text-neutral-600">
+                {twin}
+              </span>
+            ) : null}
+          </div>
+          <span className={`inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-white px-2.5 text-[15px] font-bold tabular-nums ${look.count}`}>{count}</span>
         </div>
-        <span className="inline-flex h-[30px] min-w-[30px] shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white px-2.5 text-sm font-semibold tabular-nums text-neutral-900">
-          {count}
-        </span>
+        <p className="text-[13px] leading-snug text-neutral-700">{t(`help_${column}` as "help_requested")}</p>
       </div>
-      {count === 0 ? <p className="rounded-2xl border border-dashed border-neutral-300 px-4 py-5 text-center text-[13px] text-neutral-600">{t("col_empty")}</p> : children}
+      {count === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-neutral-300 px-5 py-7 text-center">
+          <Icon className="size-7 text-neutral-400" strokeWidth={ICON_STROKE} aria-hidden="true" />
+          <p className="text-[13px] text-neutral-600">{t(`empty_${column}` as "empty_requested")}</p>
+        </div>
+      ) : (
+        children
+      )}
     </section>
   );
 }
