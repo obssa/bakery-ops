@@ -339,7 +339,6 @@ export function SegmentedControl<T extends string>({
 export function HelpTip({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   const id = useId();
   const [open, setOpen] = useState(false);
-  const [shift, setShift] = useState(0);
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const card = useRef<HTMLSpanElement>(null);
@@ -365,13 +364,17 @@ export function HelpTip({ label, children, className = "" }: { label: string; ch
   // moved left or right so that the whole card stays 16 px inside the window, measured when it opens and then on every frame while it is
   // open: the page around it may reflow at any time (the window turned or resized, a row wrapping, a list arriving), and a card left where
   // it was would make a phone's page scroll sideways. The place is read from where the card stands minus its shift, and written only when
-  // it changes.
+  // it changes. Only this loop writes the card's transform: when React wrote it too (from a state set here), its render landed a frame
+  // late with the frame before's value, the loop's idea of the shift went wrong and the card swung from frame to frame instead of
+  // settling (the analytics "?" opened at 1440 and left past the edge at 390, PR 136's first run).
   useLayoutEffect(() => {
     const element = card.current;
-    if (!open || !element) {
-      setShift(0);
+    if (!element) return;
+    if (!open) {
+      element.style.transform = "";
       return;
     }
+    element.style.transform = "";
     let current = 0;
     let frame = 0;
     const place = () => {
@@ -383,7 +386,6 @@ export function HelpTip({ label, children, className = "" }: { label: string; ch
       if (next !== current) {
         current = next;
         element.style.transform = next ? `translateX(${next}px)` : "";
-        setShift(next);
       }
     };
     const loop = () => {
@@ -414,7 +416,6 @@ export function HelpTip({ label, children, className = "" }: { label: string; ch
         role="note"
         aria-label={label}
         hidden={!open}
-        style={{ transform: shift ? `translateX(${shift}px)` : undefined }}
         className="absolute left-0 top-full z-40 mt-3 block w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-neutral-200 bg-white p-4 text-left text-[15px] font-normal leading-relaxed tracking-normal whitespace-normal text-neutral-800 shadow-lg"
       >
         {children}

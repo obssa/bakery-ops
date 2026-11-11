@@ -1446,8 +1446,15 @@ test.describe("screens: the explain-itself help", () => {
         await openAdmin(page, `${locale}/admin/analytics/`, t.analytics.overview.title);
         await expect(page.getByRole("group", { name: t.analytics.kpi.revenue, exact: true })).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 });
         const notCalculated = page.getByRole("region", { name: t.analytics.stale.title, exact: true });
-        if ((await notCalculated.count()) > 0) await notCalculated.getByRole("button", { name: t.analytics.stale.help_label, exact: true }).click();
-        await sizes(`explain-analytics-${locale}`);
+        // the days' freshness answers after the figures: give the notice a moment to arrive before deciding it is not there
+        await notCalculated.waitFor({ timeout: 10_000 }).catch(() => undefined);
+        let staleNote: Locator | undefined;
+        if ((await notCalculated.count()) > 0) {
+          await notCalculated.getByRole("button", { name: t.analytics.stale.help_label, exact: true }).click();
+          staleNote = page.getByRole("note", { name: t.analytics.stale.help_label });
+          await expect(staleNote).toBeVisible();
+        }
+        await sizes(`explain-analytics-${locale}`, staleNote);
         await expectAccessible(page, `analytics with the days not calculated (${locale})`);
       }
     } finally {
