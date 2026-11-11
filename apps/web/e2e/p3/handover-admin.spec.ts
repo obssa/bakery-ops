@@ -123,7 +123,7 @@ test.describe("p3 admin shifts", () => {
     );
     const setup = page.getByRole("region", { name: "Setup check" });
     // the setup check answers once the stations and the templates are both in: the step that threw
-    const answered = setup.getByText(/^(Everything is in place|Shifts work best when these are fixed)/);
+    const answered = setup.getByText(/^(Everything is in place|Fix these so shifts can be planned)/);
     try {
       await page.getByRole("navigation", { name: "Admin sections" }).getByRole("link", { name: "Shifts", exact: true }).click();
       await expect(page).toHaveURL(/\/app\/en\/admin\/shifts\/?$/, { timeout: 30_000 });

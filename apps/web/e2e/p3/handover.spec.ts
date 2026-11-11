@@ -153,7 +153,8 @@ test.describe("p3 handover", () => {
       await expect(queue).toBeVisible({ timeout: 30_000 });
       const entry = queue.getByRole("listitem").filter({ hasText: new RegExp(`Count #${countId}(?!\\d)`) });
       await expect(entry).toContainText(ingredient.name_en, { timeout: 30_000 });
-      await entry.getByRole("link", { name: `Review count #${countId}`, exact: true }).click();
+      // the button says what the review is for (the explain-itself follow-up): a count that differs waits for approval
+      await entry.getByRole("link", { name: `Review and approve count #${countId}`, exact: true }).click();
 
       await expect(boss.getByRole("heading", { name: `Count #${countId}`, level: 1, exact: true })).toBeVisible({ timeout: 30_000 });
       const side = boss.getByRole("row").filter({ hasText: ingredient.name_en });
@@ -366,7 +367,7 @@ test.describe("p3 handover", () => {
       await expect(queue).toBeVisible({ timeout: 30_000 });
       const entry = queue.getByRole("listitem").filter({ hasText: new RegExp(`Count #${closingId}(?!\\d)`) });
       await expect(entry).toBeVisible({ timeout: 30_000 });
-      await entry.getByRole("link", { name: `Review count #${closingId}`, exact: true }).click();
+      await entry.getByRole("link", { name: `Review and approve count #${closingId}`, exact: true }).click();
       await expect(boss.getByRole("heading", { name: `Count #${closingId}`, level: 1, exact: true })).toBeVisible({ timeout: 30_000 });
       const side = boss.getByRole("region", { name: "Cash, side by side" });
       await expect(side).toContainText(countedTotal);

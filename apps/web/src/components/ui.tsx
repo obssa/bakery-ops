@@ -362,18 +362,25 @@ export function HelpTip({ label, children, className = "" }: { label: string; ch
     };
   }, [open]);
 
-  // measured after it is drawn: moved left or right so that the whole card stays 16 px inside the window
+  // measured after it is drawn, and again when the window changes size (a tablet turned, a phone's width): moved left or right so that the
+  // whole card stays 16 px inside the window. The shift is set on the element first, so the next measure starts from where it stands.
   useLayoutEffect(() => {
-    if (!open || !card.current) {
+    const element = card.current;
+    if (!open || !element) {
       setShift(0);
       return;
     }
-    const box = card.current.getBoundingClientRect();
-    const left = box.left - shift;
-    const right = left + box.width;
-    const room = document.documentElement.clientWidth - 16;
-    setShift(right > room ? Math.max(16 - left, room - right) : left < 16 ? 16 - left : 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const place = () => {
+      element.style.transform = "";
+      const box = element.getBoundingClientRect();
+      const room = document.documentElement.clientWidth - 16;
+      const next = box.right > room ? Math.max(16 - box.left, room - box.right) : box.left < 16 ? 16 - box.left : 0;
+      element.style.transform = next ? `translateX(${next}px)` : "";
+      setShift(next);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
   }, [open]);
 
   return (
