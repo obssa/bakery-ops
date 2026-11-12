@@ -41,7 +41,8 @@ interface SessionState {
   /** /me could not be reached (network): the token is kept, the guard offers a retry */
   unreachable: boolean;
   init: () => Promise<void>;
-  signIn: (login: LoginResponse) => void;
+  /** keeps the session; resolves with the person once /me is read again (its work_stations), or with the sign-in answer if that fails */
+  signIn: (login: LoginResponse) => Promise<Me>;
   signOut: () => Promise<void>;
   expire: () => void;
 }
@@ -99,19 +100,15 @@ export const useSession = create<SessionState>()((set, get) => ({
 
   signIn: (login) => {
     storeToken(login.token);
-    set({
-      token: login.token,
-      me: { user: login.user, permissions: login.permissions, locale: login.locale, acting: null, device: null, work_stations: [] },
-      status: "signed-in",
-      expired: false,
-      unreachable: false,
-    });
-    // the sign-in answer has no work_stations: read /me once more so the station screens know where this person works
-    void readMe(login.token)
+    const first: Me = { user: login.user, permissions: login.permissions, locale: login.locale, acting: null, device: null, work_stations: [] };
+    set({ token: login.token, me: first, status: "signed-in", expired: false, unreachable: false });
+    // the sign-in answer has no work_stations: read /me once more so the station screens (and where the person lands) know where they work
+    return readMe(login.token)
       .then((me) => {
         if (get().token === login.token) set({ me });
+        return me;
       })
-      .catch(() => {});
+      .catch(() => first);
   },
 
   signOut: async () => {

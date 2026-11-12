@@ -3,7 +3,7 @@
 import { CircleCheck, Hourglass } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { useWorkStations, usePlaces, useTemplates } from "@/lib/api/adminShifts";
 import { uuid } from "@/lib/api/idempotency";
 import { ApiError } from "@/lib/api/client";
@@ -103,9 +103,9 @@ export function SetupCheck() {
                     {t("setup.no_template", { station: name(station) })}
                   </span>
                   {can(me, "shifts.manage") ? (
-                    <Link href={{ pathname: "/admin/shifts/templates", query: { station: station.station_id } }} className={TEXT_LINK}>
+                    <CanLink href={{ pathname: "/admin/shifts/templates", query: { station: station.station_id } }} className={TEXT_LINK}>
                       {t("setup.add_template")}
-                    </Link>
+                    </CanLink>
                   ) : null}
                 </li>
               ))}
@@ -119,9 +119,9 @@ export function SetupCheck() {
                     <span aria-hidden="true" className="mt-2 size-2 shrink-0 rounded-full bg-amber-700" />
                     {t("setup.no_station", { place: name(place), type: place.type })}
                   </span>
-                  <Link href="/admin/inventory" className={TEXT_LINK}>
+                  <CanLink href="/admin/inventory" className={TEXT_LINK}>
                     {t("setup.open_inventory")}
-                  </Link>
+                  </CanLink>
                 </li>
               ))}
             </ul>
@@ -210,13 +210,13 @@ function Running({ shift, queue }: { shift: ShiftSummary; queue: readonly QueueR
         </div>
         <div className="flex flex-wrap gap-2">
           {shift.status === "opening" || shift.status === "counting" ? (
-            <Link
+            <CanLink
               href={{ pathname: "/shifts/count", query: { shift: shift.id } }}
               className={buttonClass({ variant: "secondary", size: "md" })}
               aria-label={t("running.open_count_named", { station: name(shift.station) })}
             >
               {t("running.open_count")}
-            </Link>
+            </CanLink>
           ) : null}
           {canCancel ? (
             <Button type="button" variant="ghost" size="md" disabled={busy} onClick={() => void cancel()}>

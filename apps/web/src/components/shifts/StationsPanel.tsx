@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { useWorkStations } from "@/lib/api/adminShifts";
 import type { Locale, ShiftStatus, StationCode, WorkStation } from "@/lib/api/types";
 import { can, useSession } from "@/lib/session";
@@ -75,13 +75,13 @@ export function StationsPanel() {
                   <StatusBadge station={station} />
                 </div>
                 {href ? (
-                  <Link
+                  <CanLink
                     href={href}
                     aria-label={`${t("station_open_screen")}: ${name}`}
                     className={`inline-flex min-h-12 items-center rounded-md border border-neutral-300 bg-white px-5 text-base font-medium text-neutral-900 hover:bg-neutral-100 ${focusRing}`}
                   >
                     {t("station_open_screen")}
-                  </Link>
+                  </CanLink>
                 ) : null}
               </li>
             );

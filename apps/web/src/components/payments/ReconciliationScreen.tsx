@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useMemo, useState, type FormEvent } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { useAllChannels } from "@/lib/api/adminPayments";
 import { usePaymentChannels } from "@/lib/api/till";
 import type { ReconciliationCell, ReconciliationChannelRow } from "@/lib/api/types";
@@ -182,13 +182,14 @@ function Cells({ cell, drill }: { cell: ReconciliationCell; drill?: { href: { pa
         return (
           <td key={column} className={`text-right tabular-nums ${money ? "whitespace-nowrap font-semibold" : ""}`}>
             {column === "without_photo" && drill ? (
-              <Link
+              <CanLink
+                otherwise="text"
                 href={drill.href}
                 aria-label={drill.label}
                 className={`-my-1 inline-flex min-h-11 min-w-11 items-center justify-end rounded-lg px-2 font-semibold text-brand-600 underline underline-offset-2 hover:bg-brand-50 hover:text-brand-700 ${focusRing}`}
               >
                 {String(value)}
-              </Link>
+              </CanLink>
             ) : (
               String(value)
             )}

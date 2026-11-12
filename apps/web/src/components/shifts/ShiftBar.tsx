@@ -3,7 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { ApiError } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
 import { closeShift, joinShift, leaveShift, cancelShift, startShift } from "@/lib/api/shifts";
@@ -141,12 +141,12 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
   };
 
   const count = (
-    <Link
+    <CanLink
       href={{ pathname: "/shifts/count", query: { shift: shift?.id ?? "" } }}
       className={buttonClass({ variant: "primary", size })}
     >
       {t("open_count")}
-    </Link>
+    </CanLink>
   );
 
   let headline: ReactNode = null;
@@ -410,12 +410,12 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
                       {busy === "start" ? t("working") : t("start")}
                     </Button>
                   ) : main === "count" ? (
-                    <Link
+                    <CanLink
                       href={{ pathname: "/shifts/count", query: { shift: shift?.id ?? "" } }}
                       className={`${buttonClass({ variant: "primary", size: "md" })} ${actionPlace} ${open ? "invisible" : ""}`}
                     >
                       {t("open_count")}
-                    </Link>
+                    </CanLink>
                   ) : refusal !== null ? (
                     // nothing here answers it (the shift is open, or the count is this screen): it goes once it has been read
                     <Button

@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
+import { canOpen } from "@/lib/access";
 import { readAllNotifications, readNotification, useNotificationChannels } from "@/lib/api/notifications";
 import { uuid } from "@/lib/api/idempotency";
 import type { AppNotification, Locale } from "@/lib/api/types";
@@ -31,7 +32,10 @@ function Line({ line, locale, onRead, onFollow }: { line: AppNotification; local
   const title = locale === "am" ? line.title_am : line.title_en;
   const body = locale === "am" ? line.body_am : line.body_en;
   const unread = line.read_at === null;
-  const target = resolveDeepLink(line.deep_link);
+  const me = useSession((s) => s.me);
+  // a line whose page this person cannot open is shown without a link (ADR 0027)
+  const resolved = resolveDeepLink(line.deep_link);
+  const target = resolved && canOpen(me, resolved.pathname) ? resolved : null;
   const content = (
     <>
       <span className="flex flex-wrap items-center gap-2">

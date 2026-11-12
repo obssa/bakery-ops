@@ -41,10 +41,12 @@ import { useLiveFeed } from "@/lib/live/useLiveFeed";
 import { businessToday } from "@/lib/orderNo";
 import { keepsKey } from "@/lib/paySheet";
 import { can, useSession } from "@/lib/session";
+import { canOpen } from "@/lib/access";
 import { useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";
 import { addisStamp, saveBlob } from "../payments/shared";
 import { CARD, Notice, SectionTabs, Toolbar, ToolbarField } from "../admin/kit";
+import { NoAccess } from "../RequireAuth";
 import { Alert, Button, HelpTip, PageHeader, Skeleton, Status } from "../ui";
 import { focusRing } from "../styles";
 
@@ -97,14 +99,14 @@ export function pageQuery(range: AnalyticsRange, options: Record<string, string 
 // --- the pills ----------------------------------------------------------------------------------------------------------------------------
 
 const SECTIONS = [
-  { href: "/admin/analytics", key: "overview", permission: "analytics.view" },
-  { href: "/admin/analytics/sales", key: "sales", permission: "analytics.view" },
-  { href: "/admin/analytics/channels", key: "channels", permission: "analytics.view" },
-  { href: "/admin/analytics/products", key: "products", permission: "analytics.view" },
-  { href: "/admin/analytics/stations", key: "stations", permission: "analytics.view" },
-  { href: "/admin/analytics/staff", key: "staff", permission: "analytics.view" },
-  { href: "/admin/analytics/shifts", key: "shifts", permission: "analytics.view" },
-  { href: "/admin/analytics/me", key: "me", permission: "analytics.view_own" },
+  { href: "/admin/analytics", key: "overview" },
+  { href: "/admin/analytics/sales", key: "sales" },
+  { href: "/admin/analytics/channels", key: "channels" },
+  { href: "/admin/analytics/products", key: "products" },
+  { href: "/admin/analytics/stations", key: "stations" },
+  { href: "/admin/analytics/staff", key: "staff" },
+  { href: "/admin/analytics/shifts", key: "shifts" },
+  { href: "/admin/analytics/me", key: "me" },
 ] as const;
 
 /**
@@ -117,7 +119,7 @@ export function AnalyticsNav() {
   const pathname = usePathname().replace(/\/+$/, "");
   const params = useSearchParams();
   const query = new URLSearchParams(rangeParams(rangeFromParams(params, businessToday()))).toString();
-  const tabs = SECTIONS.filter((section) => can(me, section.permission)).map(({ href, key }) => ({
+  const tabs = SECTIONS.filter((section) => canOpen(me, section.href)).map(({ href, key }) => ({
     href: query ? `${href}?${query}` : href,
     label: t(`nav.${key}`),
     current: pathname === href || (key === "products" && pathname === "/admin/analytics/product"),
@@ -183,11 +185,7 @@ export function AnalyticsGate({ children }: { children: ReactNode }) {
         {t("analytics.opening_own")}
       </p>
     );
-  return (
-    <div className="max-w-xl">
-      <Alert>{t("admin.no_access")}</Alert>
-    </div>
-  );
+  return <NoAccess />;
 }
 
 // --- the range ----------------------------------------------------------------------------------------------------------------------------

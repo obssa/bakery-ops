@@ -3,7 +3,7 @@
 import { CircleCheck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { useChain, usePlaces, useShiftList, useVerifyChain, useWorkStations } from "@/lib/api/adminShifts";
 import type { ChainLink, ShiftStatus, StockPlace } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
@@ -170,13 +170,13 @@ function ChainTable({ links }: { links: ChainLink[] }) {
                   {shortHash(link.payload_hash)}
                 </td>
                 <td className={ACTIONS_CELL}>
-                  <Link
+                  <CanLink
                     href={{ pathname: "/admin/shifts/review", query: { count: link.count_id } }}
                     aria-label={t("history.review_named", { id: link.count_id })}
                     className={buttonClass({ variant: "secondary", size: "md", compact: true })}
                   >
                     {t("history.review")}
-                  </Link>
+                  </CanLink>
                 </td>
               </tr>
             ))}

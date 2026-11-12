@@ -4,10 +4,11 @@ import { Croissant, LayoutGrid, LogOut } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { screensFor } from "@/lib/access";
 import { useActing } from "@/lib/acting";
 import { useBrand, useBrandTitle } from "@/lib/brand";
 import type { Locale } from "@/lib/api/types";
-import { frameOf, isCurrent, isNightScreen, SCREENS } from "@/lib/screens";
+import { frameOf, isCurrent, isNightScreen } from "@/lib/screens";
 import { useSession } from "@/lib/session";
 import { barMode, type BarMode } from "@/lib/shifts";
 import { useStationChrome } from "@/lib/station";
@@ -62,60 +63,6 @@ export function AppMark({ size = "md" }: { size?: "md" | "lg" }) {
 export function BrandName({ className = "" }: { className?: string }) {
   const { name } = useBrand();
   return <span className={className}>{name}</span>;
-}
-
-/**
- * The "Screens" navigation (its name and link names are what the earlier specs read, phase-6 plan 6.0.2): tabs under the station top bar
- * (the current screen underlined in brand red), or a row of plain links in the sign-in screen's footer.
- */
-export function ScreensNav({ look = "tabs" }: { look?: "tabs" | "links" }) {
-  const t = useTranslations("nav");
-  const pathname = usePathname();
-
-  if (look === "links") {
-    return (
-      <nav aria-label={t("main")}>
-        <ul className="flex flex-wrap items-center gap-1">
-          {SCREENS.map(({ href, key }) => {
-            const Icon = SCREEN_ICONS[key];
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 ${focusRing}`}
-                >
-                  <Icon className="size-4 shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />
-                  {t(key)}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-    );
-  }
-
-  return (
-    <nav aria-label={t("main")} className="flex gap-1 overflow-x-auto px-2 sm:px-4">
-      {SCREENS.map(({ href, key }) => {
-        const current = isCurrent(pathname, href);
-        const Icon = SCREEN_ICONS[key];
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={current ? "page" : undefined}
-            className={`inline-flex min-h-12 shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 text-[15px] font-semibold motion-safe:transition-colors motion-safe:duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-brand-600/35 ${
-              current ? "border-brand-600 text-brand-700" : "border-transparent text-neutral-600 hover:border-neutral-300 hover:text-neutral-900"
-            }`}
-          >
-            <Icon className="size-[18px] shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" />
-            {t(key)}
-          </Link>
-        );
-      })}
-    </nav>
-  );
 }
 
 // The shift's tone and word in each state of the shift bar (the shift bar's own badge, ShiftBar.tsx): amber while none runs, blue for a
@@ -241,6 +188,10 @@ function ScreensMenu({ night }: { night: boolean }) {
   const pathname = usePathname();
   const id = useId();
   const { open, setOpen, box } = useMenu();
+  const me = useSession((s) => s.me);
+  // only the screens this person can open (ADR 0027); a person with one screen, or none, has nothing to switch to
+  const screens = screensFor(me);
+  if (screens.length < 2) return null;
   return (
     <div ref={box} className="relative">
       <button
@@ -257,7 +208,7 @@ function ScreensMenu({ night }: { night: boolean }) {
       {open ? (
         <nav id={id} aria-label={t("main")} className={`${MENU_PANEL} w-64`}>
           <ul className="space-y-0.5">
-            {SCREENS.map(({ href, key }) => {
+            {screens.map(({ href, key }) => {
               const current = isCurrent(pathname, href);
               const Icon = SCREEN_ICONS[key];
               return (

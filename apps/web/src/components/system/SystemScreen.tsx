@@ -3,7 +3,7 @@
 import { ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useId, useMemo, type ReactNode } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { stampText } from "@/lib/dates";
 import { useErrorText } from "@/lib/errors";
 import { createSystemFeed } from "@/lib/live/system";
@@ -204,10 +204,10 @@ function DevicesCard({ status }: { status: SystemStatus }) {
         <Row label={t("devices.revoked")}>{devices.revoked}</Row>
       </dl>
       <p>
-        <Link href="/admin/people/devices" className={`inline-flex min-h-11 items-center gap-1 ${TEXT_LINK}`}>
+        <CanLink href="/admin/people/devices" className={`inline-flex min-h-11 items-center gap-1 ${TEXT_LINK}`}>
           {t("devices.manage")}
           <ChevronRight className="size-4" strokeWidth={2} aria-hidden="true" />
-        </Link>
+        </CanLink>
       </p>
     </SystemCard>
   );

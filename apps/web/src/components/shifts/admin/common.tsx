@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { usePathname } from "@/i18n/navigation";
+import { canOpen } from "@/lib/access";
 import type { Locale, ShiftStatus } from "@/lib/api/types";
 import { adminSections } from "@/lib/shiftsAdmin";
 import { addisDate } from "@/lib/shiftsAdmin";
@@ -22,7 +23,7 @@ export function AdminShiftsNav() {
   const t = useTranslations("adminShifts");
   const me = useSession((s) => s.me);
   const pathname = usePathname().replace(/\/+$/, "");
-  const tabs = adminSections(me?.permissions ?? []).map(({ href, key }) => ({
+  const tabs = adminSections(me?.permissions ?? []).filter(({ href }) => canOpen(me, href)).map(({ href, key }) => ({
     href,
     label: t(`nav.${key}`),
     current: pathname === href || (key === "overview" && pathname === "/admin/shifts/review"),

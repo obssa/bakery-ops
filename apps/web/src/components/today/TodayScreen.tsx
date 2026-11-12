@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { hourTick } from "@/lib/clock";
 import { addDays, agoOf, differenceOf, exportFileName, groupDigits, hourLabel, percentChange, type AnalyticsRange } from "@/lib/analytics";
 import { useWorkStations } from "@/lib/api/adminShifts";
@@ -216,9 +216,9 @@ function DayActions({ range, weekday, today }: { range: AnalyticsRange; weekday:
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap gap-2.5">
-        <Link href={{ pathname: "/admin/analytics/sales", query: { from: addDays(today, -7), to: today } }} className={buttonClass({ variant: "secondary", size: "md" })}>
+        <CanLink href={{ pathname: "/admin/analytics/sales", query: { from: addDays(today, -7), to: today } }} className={buttonClass({ variant: "secondary", size: "md" })}>
           {t("compare", { weekday })}
-        </Link>
+        </CanLink>
         <button type="button" disabled={busy} onClick={() => void exportDay()} className={buttonClass({ variant: "dark", size: "md", loading: busy })} aria-busy={busy || undefined}>
           {busy ? t("export_busy") : t("export")}
         </button>
@@ -396,9 +396,9 @@ function TopSellers({ answer, today }: { answer: Answer<Overview> | undefined; t
     <TodayCard
       title={t("top_title")}
       aside={
-        <Link href={{ pathname: "/admin/analytics/products", query: { from: today, to: today } }} className={LINK}>
+        <CanLink href={{ pathname: "/admin/analytics/products", query: { from: today, to: today } }} className={LINK}>
           {t("top_all")}
-        </Link>
+        </CanLink>
       }
     >
       {answer === undefined ? (
@@ -480,9 +480,9 @@ function StockAlerts() {
     <TodayCard
       title={t("stock_title")}
       aside={
-        <Link href="/admin/inventory/reorder" className={LINK}>
+        <CanLink href="/admin/inventory/reorder" className={LINK}>
           {t("stock_plan")}
-        </Link>
+        </CanLink>
       }
     >
       {list.isPending ? (
@@ -543,9 +543,9 @@ function Shifts({ twin }: { twin?: string }) {
       title={t("shifts_title")}
       twin={twin ? { text: twin, lang: "am" } : undefined}
       aside={
-        <Link href="/admin/shifts/roster" className={LINK}>
+        <CanLink href="/admin/shifts/roster" className={LINK}>
           {t("shifts_roster")}
-        </Link>
+        </CanLink>
       }
     >
       {stations.length === 0 ? (
@@ -612,9 +612,9 @@ function SystemCard() {
     <TodayCard
       title={t("system_title")}
       aside={
-        <Link href="/admin/system" className={LINK}>
+        <CanLink href="/admin/system" className={LINK}>
           {t("system_open")}
-        </Link>
+        </CanLink>
       }
     >
       {status === null ? (
@@ -653,9 +653,9 @@ function OwnFigures() {
     <TodayCard title={t("own_title")}>
       <p className="text-[15px] text-neutral-600">{t("own_body")}</p>
       <div className="mt-4">
-        <Link href="/admin/analytics/me" className={buttonClass({ variant: "secondary", size: "md" })}>
+        <CanLink href="/admin/analytics/me" className={buttonClass({ variant: "secondary", size: "md" })}>
           {t("own_open")}
-        </Link>
+        </CanLink>
       </div>
     </TodayCard>
   );

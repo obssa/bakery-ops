@@ -6,7 +6,8 @@ import type { Locale, PaymentListRow, PaymentStatus, PaymentView } from "@/lib/a
 import { chipsOf, type PaymentChip } from "@/lib/adminPayments";
 import { stampText, type DateFormatLike } from "@/lib/dates";
 import { otherDayLabel } from "@/lib/orderNo";
-import { can, useSession } from "@/lib/session";
+import { canOpen } from "@/lib/access";
+import { useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { SectionTabs } from "../admin/kit";
 import { Chip, type Tone } from "../ui";
@@ -15,10 +16,10 @@ import { Chip, type Tone } from "../ui";
 // label and a money amount.
 
 const SECTIONS = [
-  { href: "/admin/payments", key: "payments", permission: "payments.view" },
-  { href: "/admin/payments/reconciliation", key: "reconciliation", permission: "payments.verify" },
-  { href: "/admin/payments/channels", key: "channels", permission: "channels.manage" },
-  { href: "/admin/payments/receipts", key: "receipts", permission: "payments.take" },
+  { href: "/admin/payments", key: "payments" },
+  { href: "/admin/payments/reconciliation", key: "reconciliation" },
+  { href: "/admin/payments/channels", key: "channels" },
+  { href: "/admin/payments/receipts", key: "receipts" },
 ] as const;
 
 /**
@@ -29,7 +30,7 @@ export function PaymentsNav() {
   const t = useTranslations("adminPayments");
   const me = useSession((s) => s.me);
   const pathname = usePathname().replace(/\/+$/, "");
-  const tabs = SECTIONS.filter((section) => can(me, section.permission)).map(({ href, key }) => ({ href, label: t(`nav.${key}`), current: pathname === href }));
+  const tabs = SECTIONS.filter((section) => canOpen(me, section.href)).map(({ href, key }) => ({ href, label: t(`nav.${key}`), current: pathname === href }));
   return <SectionTabs label={t("sections")} tabs={tabs} />;
 }
 

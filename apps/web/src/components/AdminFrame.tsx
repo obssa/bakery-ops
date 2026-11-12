@@ -4,9 +4,10 @@ import { ChevronsUpDown, LogOut, Menu, WifiOff, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Suspense, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { canOpen, stationScreensFor } from "@/lib/access";
 import type { Me } from "@/lib/api/types";
-import { isCurrent, SCREENS } from "@/lib/screens";
-import { can, useSession } from "@/lib/session";
+import { isCurrent } from "@/lib/screens";
+import { useSession } from "@/lib/session";
 import { useOnline } from "@/lib/useOnline";
 import { AppMark, BrandName, SyncChip } from "./AppShell";
 import { DateDisplaySwitch } from "./DateDisplaySwitch";
@@ -41,12 +42,15 @@ import { Avatar, IconButton } from "./ui";
 interface Section {
   href: string;
   key: string;
-  anyOf?: readonly string[];
-  own?: { unless: string; href: string };
+  /** the page the row opens instead when the person cannot open `href` but can open this one */
+  fallback?: string;
   /** current on this page only, not on the pages under it (Today is /admin, the console's first page) */
   exact?: boolean;
 }
 
+// Who sees a section is who can open it (ADR 0027, lib/access.ts canOpen): the page's own guard decides, so no row ends on "Your account
+// cannot open this page". Analytics opens the dashboards for analytics.view and a person's own figures for analytics.view_own; Payments
+// opens the channels for a holder of channels.manage without payments.view.
 const SECTIONS: readonly Section[] = [
   { href: "/admin", key: "today", exact: true },
   { href: "/admin/catalog", key: "catalog" },
@@ -55,11 +59,11 @@ const SECTIONS: readonly Section[] = [
   { href: "/admin/inventory", key: "inventory" },
   { href: "/admin/planner", key: "planner" },
   { href: "/admin/shifts", key: "shifts" },
-  { href: "/admin/payments", key: "payments", anyOf: ["payments.view", "channels.manage"] },
-  { href: "/admin/tables", key: "tables", anyOf: ["tables.manage"] },
-  { href: "/admin/analytics", key: "analytics", anyOf: ["analytics.view", "analytics.view_own"], own: { unless: "analytics.view", href: "/admin/analytics/me" } },
-  { href: "/admin/audit", key: "audit", anyOf: ["audit.view"] },
-  { href: "/admin/system", key: "system", anyOf: ["system.view"] },
+  { href: "/admin/payments", key: "payments", fallback: "/admin/payments/channels" },
+  { href: "/admin/tables", key: "tables" },
+  { href: "/admin/analytics", key: "analytics", fallback: "/admin/analytics/me" },
+  { href: "/admin/audit", key: "audit" },
+  { href: "/admin/system", key: "system" },
 ];
 
 /** The sidebar's groups (fresh-counter.md 4.1), each a list of section keys; Today and System have no heading. */
@@ -72,15 +76,19 @@ const GROUPS: readonly { label: string | null; keys: readonly string[] }[] = [
   { label: null, keys: ["system"] },
 ];
 
-/** The station screens of "Screens" (the console itself is the page the person is on). */
-const STATION_SCREENS = SCREENS.filter(({ key }) => key !== "admin");
+/** Where a section's row leads for this person: its page, else its fallback; null when they can open neither. */
+function targetOf(me: Me | null, { href, fallback }: Section): string | null {
+  if (canOpen(me, href)) return href;
+  return fallback && canOpen(me, fallback) ? fallback : null;
+}
 
-/** The sections this person sees, grouped; a group whose sections are all hidden is left out. */
-function groupsFor(me: Me | null) {
-  const shown = SECTIONS.filter(({ anyOf }) => !anyOf || anyOf.some((permission) => can(me, permission)));
-  return GROUPS.map(({ label, keys }) => ({ label, sections: keys.map((key) => shown.find((s) => s.key === key)).filter((s): s is Section => !!s) })).filter(
-    (group) => group.sections.length > 0,
-  );
+/** The sections this person sees, grouped, each with where it leads; a group whose sections are all hidden is left out. */
+export function groupsFor(me: Me | null) {
+  const shown = SECTIONS.flatMap((section) => {
+    const target = targetOf(me, section);
+    return target ? [{ ...section, target }] : [];
+  });
+  return GROUPS.map(({ label, keys }) => ({ label, sections: keys.flatMap((key) => shown.filter((s) => s.key === key)) })).filter((group) => group.sections.length > 0);
 }
 
 const GROUP_LABEL = "px-3 pb-1 pt-2.5 text-xs font-semibold uppercase tracking-[0.08em] text-neutral-600";
@@ -107,13 +115,13 @@ function SectionsNav({ onFollow }: { onFollow?: () => void }) {
             </p>
           ) : null}
           <ul aria-labelledby={label ? `${id}-${label}` : undefined} className="flex flex-col gap-0.5">
-            {sections.map(({ href, key, own, exact }) => {
+            {sections.map(({ href, key, target, exact }) => {
               const path = pathname.replace(/\/+$/, "") || "/";
               const current = exact ? path === href : isCurrent(pathname, href);
               const Icon = SECTION_ICONS[key];
               return (
                 <li key={href}>
-                  <Link href={own && !can(me, own.unless) ? own.href : href} aria-current={current ? "page" : undefined} onClick={onFollow} className={rowClass(current)}>
+                  <Link href={target} aria-current={current ? "page" : undefined} onClick={onFollow} className={rowClass(current)}>
                     {Icon ? <Icon className="size-[18px] shrink-0" strokeWidth={ICON_STROKE} aria-hidden="true" /> : null}
                     {t(key)}
                   </Link>
@@ -133,12 +141,15 @@ function SectionsNav({ onFollow }: { onFollow?: () => void }) {
  */
 function StationsNav({ onFollow }: { onFollow?: () => void }) {
   const t = useTranslations();
+  const me = useSession((s) => s.me);
+  const screens = stationScreensFor(me);
+  if (screens.length === 0) return null;
   return (
     <div className="mt-1.5 flex flex-col gap-0.5">
       <p className={GROUP_LABEL}>{t("admin.group_stations")}</p>
       <nav aria-label={t("nav.main")}>
         <ul className="flex flex-col gap-0.5">
-          {STATION_SCREENS.map(({ href, key }) => {
+          {screens.map(({ href, key }) => {
             const Icon = SCREEN_ICONS[key];
             return (
               <li key={href}>

@@ -9,7 +9,8 @@ import { groupDigits } from "@/lib/analytics";
 import { stampText } from "@/lib/dates";
 import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
-import { can, useSession } from "@/lib/session";
+import { canOpen } from "@/lib/access";
+import { useSession } from "@/lib/session";
 import type { Locale } from "@/lib/api/types";
 import { useDateFormat } from "@/lib/useDates";
 import { SectionTabs } from "../admin/kit";
@@ -20,12 +21,12 @@ import { Alert, Button, Skeleton } from "../ui";
 // title row (components/admin/kit.tsx SectionTabs), a first load shows grey blocks where the content will be, the pager is the admin size.
 
 const SECTIONS = [
-  { href: "/admin/inventory", key: "stock", permission: "inventory.view" },
-  { href: "/admin/inventory/ledger", key: "ledger", permission: "inventory.view" },
-  { href: "/admin/inventory/purchases", key: "purchases", permission: "purchases.record" },
-  { href: "/admin/inventory/suppliers", key: "suppliers", permission: "purchases.record" },
-  { href: "/admin/inventory/transfers", key: "transfers", permission: "inventory.view" },
-  { href: "/admin/inventory/reorder", key: "reorder", permission: "inventory.view" },
+  { href: "/admin/inventory", key: "stock" },
+  { href: "/admin/inventory/ledger", key: "ledger" },
+  { href: "/admin/inventory/purchases", key: "purchases" },
+  { href: "/admin/inventory/suppliers", key: "suppliers" },
+  { href: "/admin/inventory/transfers", key: "transfers" },
+  { href: "/admin/inventory/reorder", key: "reorder" },
 ] as const;
 
 /** The Inventory screens the person may open: the navigation "Inventory sections" with the same link names, as segmented tabs. */
@@ -33,7 +34,7 @@ export function InventoryNav() {
   const t = useTranslations("inventory");
   const me = useSession((s) => s.me);
   const pathname = usePathname().replace(/\/+$/, "");
-  const tabs = SECTIONS.filter((section) => can(me, section.permission)).map(({ href, key }) => ({ href, label: t(`nav.${key}`), current: pathname === href }));
+  const tabs = SECTIONS.filter((section) => canOpen(me, section.href)).map(({ href, key }) => ({ href, label: t(`nav.${key}`), current: pathname === href }));
   return <SectionTabs label={t("sections")} tabs={tabs} />;
 }
 

@@ -49,7 +49,7 @@ export function DemoLogins() {
     setError(null);
     try {
       const login = await request<LoginResponse>("/demo-login", { method: "POST", body: { role }, idempotencyKey: uuid(), deviceGate: false });
-      finish(login);
+      await finish(login);
     } catch (e) {
       setError(e);
       setPending(null);

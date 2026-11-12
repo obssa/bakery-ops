@@ -5,7 +5,7 @@ import { ChevronLeft, RefreshCw } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useState, type ReactNode } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { usePayment } from "@/lib/api/adminPayments";
 import { useRosterPeople } from "@/lib/api/adminShifts";
 import { ApiError } from "@/lib/api/client";
@@ -104,10 +104,10 @@ export function OrderRecordScreen({ titleAm }: { titleAm?: string }) {
 function BackToBoard() {
   const t = useTranslations("orderRecord");
   return (
-    <Link href="/admin/orders" className={buttonClass({ variant: "ghost", size: "md", compact: true })}>
+    <CanLink href="/admin/orders" className={buttonClass({ variant: "ghost", size: "md", compact: true })}>
       <ChevronLeft className="size-[18px]" strokeWidth={2} aria-hidden="true" />
       {t("back")}
-    </Link>
+    </CanLink>
   );
 }
 
@@ -617,9 +617,9 @@ function PaymentCard({
         ) : null}
       </dl>
       <div className="flex flex-wrap gap-2">
-        <Link href={{ pathname: "/admin/payments", query: { payment: String(payment.id) } }} className={buttonClass({ variant: "secondary", size: "md", compact: true })}>
+        <CanLink href={{ pathname: "/admin/payments", query: { payment: String(payment.id) } }} className={buttonClass({ variant: "secondary", size: "md", compact: true })}>
           {t("open_payment", { id: payment.id })}
-        </Link>
+        </CanLink>
         <HistoryLink kind="payment" id={payment.id} label={t("history_payment", { id: payment.id })} />
         {voidable ? (
           <Button type="button" variant="danger" size="md" compact onClick={onVoid}>

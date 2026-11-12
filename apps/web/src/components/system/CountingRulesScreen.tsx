@@ -3,7 +3,7 @@
 import { BadgeCheck, ChevronLeft, ClipboardList, Signature, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import { useCountingRules, useSaveCountingRules } from "@/lib/api/countingRules";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import type { CountingRule, CountingRulesView } from "@/lib/api/types";
@@ -29,10 +29,10 @@ export function CountingRulesScreen({ titleAm }: { titleAm?: string }) {
 
   return (
     <>
-      <Link href="/admin/system" className={`${TEXT_LINK} mb-3 inline-flex min-h-11 items-center gap-1`}>
+      <CanLink href="/admin/system" className={`${TEXT_LINK} mb-3 inline-flex min-h-11 items-center gap-1`}>
         <ChevronLeft className="size-4" strokeWidth={ICON_STROKE} aria-hidden="true" />
         {t("back")}
-      </Link>
+      </CanLink>
       <PageHeader title={t("title")} intro={t("intro")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
       {view === null ? (
         rules.error ? (
@@ -71,9 +71,9 @@ function Waiting({ view }: { view: CountingRulesView }) {
   return (
     <Notice tone="amber">
       <span>{t("waiting", { cosign, approval })} </span>
-      <Link href="/admin/shifts" className={TEXT_LINK}>
+      <CanLink href="/admin/shifts" className={TEXT_LINK}>
         {t("waiting_link")}
-      </Link>
+      </CanLink>
     </Notice>
   );
 }

@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 import { Alert, Button, Field, TextInput } from "@/components/ui";
 import { useRouter } from "@/i18n/navigation";
+import { canOpen, homeOf } from "@/lib/access";
 import { request } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
 import type { LoginResponse } from "@/lib/api/types";
@@ -17,19 +18,19 @@ function safeNext(raw: string | null): string | null {
 }
 
 /**
- * What a sign-in does once the API answers: keep the session, then go back where the person came from, or to the admin console for an
- * admin and the start page for everyone else, in the person's own language. The form and the demo buttons (DemoLogins) share it.
+ * What a sign-in does once the API answers: keep the session, then go back where the person came from when their role opens that page,
+ * else to their own screen (ADR 0027, lib/access.ts homeOf: the console for the admin and the manager, the till for a cashier, the pad
+ * for a waiter, the kitchen or bar display where a chef or barista works, the production board for the bakers), in the person's own
+ * language. The form and the demo buttons (DemoLogins) share it.
  */
-export function useFinishSignIn(): (login: LoginResponse) => void {
+export function useFinishSignIn(): (login: LoginResponse) => Promise<void> {
   const router = useRouter();
   const signIn = useSession((s) => s.signIn);
-  return (login) => {
-    signIn(login);
-    const admin = login.permissions.includes("catalog.manage") || login.permissions.includes("people.manage");
-    const fallback = admin ? "/admin" : "/";
-    const next = safeNext(new URLSearchParams(window.location.search).get("next")) ?? fallback;
+  return async (login) => {
+    const me = await signIn(login);
+    const next = safeNext(new URLSearchParams(window.location.search).get("next"));
     // the user's own language from now on (GET /me and the login answer carry it)
-    router.replace(next, { locale: login.locale });
+    router.replace(next && canOpen(me, next) ? next : homeOf(me), { locale: login.locale });
   };
 }
 
@@ -53,7 +54,7 @@ export function LoginForm() {
         body: { phone: phone.trim(), password },
         idempotencyKey: uuid(),
       });
-      finish(login);
+      await finish(login);
     } catch (e) {
       setError(e);
       setPending(false);

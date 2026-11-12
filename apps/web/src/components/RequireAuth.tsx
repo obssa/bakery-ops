@@ -2,8 +2,10 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, type ReactNode } from "react";
-import { usePathname, useRouter } from "@/i18n/navigation";
+import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { homeOf } from "@/lib/access";
 import { can, useSession } from "@/lib/session";
+import { buttonClass } from "./styles";
 import { Alert, Button } from "./ui";
 
 /**
@@ -42,13 +44,26 @@ export function RequireAuth({ permission, children }: { permission?: string; chi
     );
   }
 
-  if (permission && !can(me, permission)) {
-    return (
-      <div className="max-w-xl">
-        <Alert>{t("admin.no_access")}</Alert>
-      </div>
-    );
-  }
+  if (permission && !can(me, permission)) return <NoAccess />;
 
   return <>{children}</>;
+}
+
+/**
+ * A page this person's role does not open, reached by a typed or old address (no menu or link leads here any more, ADR 0027): the page
+ * says so and offers the way to the person's own screen (lib/access.ts homeOf, where they land after signing in).
+ */
+export function NoAccess() {
+  const t = useTranslations();
+  const me = useSession((s) => s.me);
+  return (
+    <div className="max-w-xl space-y-4">
+      <Alert>{t("admin.no_access")}</Alert>
+      {me ? (
+        <Link href={homeOf(me)} className={buttonClass({ variant: "secondary", size: "md" })}>
+          {t("admin.go_home")}
+        </Link>
+      ) : null}
+    </div>
+  );
 }

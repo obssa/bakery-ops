@@ -1,7 +1,7 @@
 import { Smartphone } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
-import { AppMark, BrandName, ScreensNav } from "@/components/AppShell";
+import { AppMark, BrandName } from "@/components/AppShell";
 import { LanguageSwitcher, LanguageSwitcherWithQuery } from "@/components/LanguageSwitcher";
 import { PageHeader } from "@/components/ui";
 import { enterLocale, titledBy, type LocaleProps } from "@/lib/page";
@@ -15,9 +15,10 @@ const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 // The sign-in screen (step 6.2b, fresh-counter.md 3.1): a split screen without the station top bar. On the left, 45 % of the width, the
 // bakery's photo (public/images/login-counter.webp, its licence beside it in LICENSES.json) with the app's name and one line over a band at
 // its foot; on a phone the photo is a 160 px header. On the right, a white column: the language switch at the top right, the form (at most
-// 420 px) with its 52 px fields and the 64 px button, the errors in the form, never a toast; at the foot, where to get a password and the
-// "Screens" navigation, which keeps its name and its link names here (phase-6 plan 6.0.2). Phone and password only: the "Staff code" tab
-// waits (plan 10.2 Q1; a short code unlocks a pad that is already signed in).
+// 420 px) with its 52 px fields and the 64 px button, the errors in the form, never a toast; at the foot, where to get a password. The
+// screens are not listed here (ADR 0027): a signed-out person can open none of them, and after signing in each person lands on their own
+// screen and sees only the screens their role opens. Phone and password only: the "Staff code" tab waits (plan 10.2 Q1; a short code
+// unlocks a pad that is already signed in).
 export default async function LoginPage(props: LocaleProps) {
   await enterLocale(props);
   const t = await getTranslations();
@@ -63,11 +64,8 @@ export default async function LoginPage(props: LocaleProps) {
           <DemoLogins />
         </div>
 
-        <footer className="flex flex-col gap-2 border-t border-neutral-200 pt-4">
+        <footer className="border-t border-neutral-200 pt-4">
           <p className="text-[13px] text-neutral-600">{t("login.forgot")}</p>
-          <div className="-mx-2.5">
-            <ScreensNav look="links" />
-          </div>
         </footer>
       </div>
     </div>

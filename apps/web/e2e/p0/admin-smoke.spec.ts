@@ -87,12 +87,14 @@ test.describe("p0 admin smoke", () => {
     await page.goto("en/login/");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Admin console" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+    // ADR 0027: a signed-out visitor opens no screen, so the sign-in page lists none
+    await expect(page.getByRole("navigation", { name: "Screens" })).toHaveCount(0);
 
     await page.goto("am/login/");
     await expect(page.locator("html")).toHaveAttribute("lang", "am");
     await expect(page.getByRole("heading", { level: 1, name: "ግባ" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "የአስተዳዳሪ ኮንሶል" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "ግባ" })).toBeVisible();
   });
 
   test("the start page sends a signed-out visitor to the browser's language @live", async ({ browser, baseURL }) => {

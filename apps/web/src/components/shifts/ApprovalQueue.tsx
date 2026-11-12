@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo } from "react";
-import { Link } from "@/i18n/navigation";
+import { CanLink } from "@/components/CanLink";
 import type { Locale, QueueRow } from "@/lib/api/types";
 import { signedQuantity, varianceOf } from "@/lib/counts";
 import { trimDecimal } from "@/lib/decimal";
@@ -63,13 +63,13 @@ function Row({ row }: { row: QueueRow }) {
             {row.cosigned_by ? ` · ${t("cosigned_by", { name: row.cosigned_by.name })}` : ""}
           </p>
         </div>
-        <Link
+        <CanLink
           href={{ pathname: "/admin/shifts/review", query: { count: row.id } }}
           aria-label={t(cosign ? "review_link_cosign" : "review_link_approve", { id: row.id })}
           className={buttonClass({ variant: "primary", size: "md" })}
         >
           {t(cosign ? "review_cosign" : "review_approve")}
-        </Link>
+        </CanLink>
       </div>
       {why ? <p className="text-[13px] leading-snug text-amber-900">{why}</p> : null}
       {lines.length === 0 ? (
