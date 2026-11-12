@@ -697,7 +697,8 @@ people are reachable, the list carries no phone number, and both routes are thro
 sign-in per role, the refusals (unknown role, switched off, role taken away, the pad's account, another branch, a branch no longer marked
 demo), the throttle and the seeder's people; e2e-p6 runs its stack with the switch on (`e2e.yml` input `demo_login`), signs the admin in
 with one tap and captures the page at 1440 and 390 in both languages under axe; the `@live` check passes with the switch on or off.
-While it is on, anyone who opens the site can sign in as any demo person; the runbook has the line and how to turn it off.
+While it is on, anyone who opens the site can sign in as any demo person; the runbook has the line and how to turn it off. Claim restated
+at `6082d3b`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
