@@ -361,26 +361,25 @@ export function HelpTip({ label, children, className = "" }: { label: string; ch
     };
   }, [open]);
 
-  // moved left or right so that the whole card stays 16 px inside the window, measured when it opens and then on every frame while it is
+  // moved left or right so that the whole card stays 16 px inside the window, worked out when it opens and then on every frame while it is
   // open: the page around it may reflow at any time (the window turned or resized, a row wrapping, a list arriving), and a card left where
-  // it was would make a phone's page scroll sideways. The place is read from where the card stands minus its shift, and written only when
-  // it changes. Only this loop writes the card's transform: when React wrote it too (from a state set here), its render landed a frame
-  // late with the frame before's value, the loop's idea of the shift went wrong and the card swung from frame to frame instead of
-  // settling (the analytics "?" opened at 1440 and left past the edge at 390, PR 136's first run).
+  // it was would make a phone's page scroll sideways. The card's own place is read from what does not move with it (it hangs at the left
+  // edge of its wrapper, so its unshifted left is the wrapper's left, and its width is its layout width), never from its own shifted box:
+  // reading the shifted box and taking the last shift off drifted from frame to frame whenever a frame was missed (the analytics "?" at 390
+  // ended 400 px off the window, 2026-11-12). Only this loop writes the card's transform, and only when the shift changes.
   useLayoutEffect(() => {
     const element = card.current;
-    if (!element) return;
+    const anchor = wrap.current;
+    if (!element || !anchor) return;
     if (!open) {
       element.style.transform = "";
       return;
     }
-    element.style.transform = "";
-    let current = 0;
+    let current: number | null = null;
     let frame = 0;
     const place = () => {
-      const box = element.getBoundingClientRect();
-      const left = box.left - current;
-      const right = left + box.width;
+      const left = anchor.getBoundingClientRect().left;
+      const right = left + element.offsetWidth;
       const room = document.documentElement.clientWidth - 16;
       const next = Math.round(right > room ? Math.max(16 - left, room - right) : left < 16 ? 16 - left : 0);
       if (next !== current) {

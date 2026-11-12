@@ -491,13 +491,18 @@ const columnJump: KeyboardCoordinateGetter = (event, { currentCoordinates, conte
   const cy = rect.top + rect.height / 2;
   // the drop targets are measured now, from their nodes: right after a card is lifted the library may not have measured them yet, and a
   // first arrow press must still move the card (a hidden column or tab measures 0 x 0 and is left out)
-  const targets: { x: number; y: number }[] = [];
+  const targets: { id: unknown; x: number; y: number }[] = [];
   for (const container of context.droppableContainers.getEnabled()) {
     const box = container.node.current?.getBoundingClientRect();
-    if (box && box.width > 0 && box.height > 0) targets.push({ x: box.left + box.width / 2, y: box.top + Math.min(box.height / 2, 80) });
+    if (box && box.width > 0 && box.height > 0) targets.push({ id: container.id, x: box.left + box.width / 2, y: box.top + Math.min(box.height / 2, 80) });
   }
+  if (targets.length === 0) return currentCoordinates;
   targets.sort((a, b) => a.x - b.x);
-  const next = event.code === "ArrowRight" ? targets.find((target) => target.x > cx + 1) : [...targets].reverse().find((target) => target.x < cx - 1);
+  // step from the column the card is over (the lifted card is narrower than a column, so its centre is no guide to which one it is in),
+  // else from the nearest one
+  let at = targets.findIndex((target) => target.id === context.over?.id);
+  if (at < 0) at = targets.reduce((best, target, i) => (Math.abs(target.x - cx) < Math.abs(targets[best].x - cx) ? i : best), 0);
+  const next = targets[event.code === "ArrowRight" ? at + 1 : at - 1];
   return next ? { x: currentCoordinates.x + (next.x - cx), y: currentCoordinates.y + (next.y - cy) } : currentCoordinates;
 };
 
