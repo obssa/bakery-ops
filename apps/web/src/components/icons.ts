@@ -1,9 +1,13 @@
 import {
+  BriefcaseBusiness,
+  CakeSlice,
   ChartColumn,
   ChefHat,
   Clock,
+  Coffee,
   CreditCard,
   CalendarDays,
+  Croissant,
   FileText,
   Flame,
   HandPlatter,
@@ -11,6 +15,7 @@ import {
   Package,
   ReceiptText,
   Server,
+  ShieldCheck,
   Tag,
   UsersRound,
   UtensilsCrossed,
@@ -18,6 +23,7 @@ import {
   Wine,
   type LucideIcon,
 } from "lucide-react";
+import type { Role } from "@/lib/api/types";
 import type { ScreenNavKey } from "@/lib/screens";
 
 // The line icons of the shell (fresh-counter.md 2: lucide-react, 1.75-2 px stroke, 18-22 px), in a plain module so a server page (the
@@ -47,6 +53,18 @@ export const SECTION_ICONS: Record<string, LucideIcon> = {
   analytics: ChartColumn,
   audit: FileText,
   system: Server,
+};
+
+/** A role (the sign-in page's demo buttons, TEMPORARY, ADR 0025). */
+export const ROLE_ICONS: Record<Role, LucideIcon> = {
+  admin: ShieldCheck,
+  manager: BriefcaseBusiness,
+  cashier: Wallet,
+  waiter: HandPlatter,
+  chef: ChefHat,
+  barista: Coffee,
+  cake_baker: CakeSlice,
+  bread_baker: Croissant,
 };
 
 /** The stroke of every shell icon. */

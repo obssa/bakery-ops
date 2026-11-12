@@ -142,6 +142,15 @@ them.
 Running it again (for example after a later phase adds its seeder: `--phase=<n>` stops at a phase) only adds what is
 missing; existing rows, passwords and short codes stay as they are.
 
+**One-click demo sign-in (TEMPORARY, ADR 0025).** To put one button per role of the demo bakery on the sign-in page (no password), add
+this line to `~/bakery-ops.orcamind.dev/.env` and refresh the cached configuration:
+```
+BAKERY_DEMO_LOGIN=true
+```
+`cd ~/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan config:cache`. While it is on, **anyone who opens the site can sign
+in as any demo person, the demo admin included** (only in the demo branch). Turn it off before the bakery uses the site: delete the line
+and run `config:cache` again; both routes then answer 404 and the buttons disappear. ADR 0025 lists what to delete to remove the feature.
+
 **Phase 1 (ordering).** After the release that ships Phase 1, run the same command again on the branch that already
 holds Phase 0 (`php artisan bakery:seed-demo --force`; `--phase=1` is the same while Phase 1 is the last seeder). It
 adds only what Phase 1 brings and changes nothing of Phase 0 (a test seeds Phase 0, then Phase 1, and compares every

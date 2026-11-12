@@ -9,6 +9,9 @@ return [
     'login' => [
         'invalid' => 'የስልክ ቁጥሩ ወይም የይለፍ ቃሉ ትክክል አይደለም።',
     ],
+    'demo_login' => [
+        'unavailable' => 'ለዚህ ሚና የማሳያ መለያ የለም።',
+    ],
     'branch' => [
         'required' => 'የትኛውን ቅርንጫፍ እንደሆነ ይግለጹ (branch_id)።',
     ],

@@ -16,11 +16,27 @@ function safeNext(raw: string | null): string | null {
   return raw;
 }
 
+/**
+ * What a sign-in does once the API answers: keep the session, then go back where the person came from, or to the admin console for an
+ * admin and the start page for everyone else, in the person's own language. The form and the demo buttons (DemoLogins) share it.
+ */
+export function useFinishSignIn(): (login: LoginResponse) => void {
+  const router = useRouter();
+  const signIn = useSession((s) => s.signIn);
+  return (login) => {
+    signIn(login);
+    const admin = login.permissions.includes("catalog.manage") || login.permissions.includes("people.manage");
+    const fallback = admin ? "/admin" : "/";
+    const next = safeNext(new URLSearchParams(window.location.search).get("next")) ?? fallback;
+    // the user's own language from now on (GET /me and the login answer carry it)
+    router.replace(next, { locale: login.locale });
+  };
+}
+
 export function LoginForm() {
   const t = useTranslations();
-  const router = useRouter();
   const errorText = useErrorText();
-  const signIn = useSession((s) => s.signIn);
+  const finish = useFinishSignIn();
   const expired = useSession((s) => s.expired);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -37,12 +53,7 @@ export function LoginForm() {
         body: { phone: phone.trim(), password },
         idempotencyKey: uuid(),
       });
-      signIn(login);
-      const admin = login.permissions.includes("catalog.manage") || login.permissions.includes("people.manage");
-      const fallback = admin ? "/admin" : "/";
-      const next = safeNext(new URLSearchParams(window.location.search).get("next")) ?? fallback;
-      // the user's own language from now on (GET /me and the login answer carry it)
-      router.replace(next, { locale: login.locale });
+      finish(login);
     } catch (e) {
       setError(e);
       setPending(false);

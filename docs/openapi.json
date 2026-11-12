@@ -3597,6 +3597,121 @@
                 }
             }
         },
+        "/v1/demo-logins": {
+            "get": {
+                "operationId": "identity.demo-logins.index",
+                "tags": [
+                    "DemoLogin"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "role": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_en": {
+                                                        "type": "string"
+                                                    },
+                                                    "name_am": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "role",
+                                                    "name_en",
+                                                    "name_am"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    }
+                }
+            }
+        },
+        "/v1/demo-login": {
+            "post": {
+                "operationId": "identity.demo-login",
+                "tags": [
+                    "DemoLogin"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DemoLoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "token": {
+                                            "type": "string"
+                                        },
+                                        "token_type": {
+                                            "type": "string",
+                                            "const": "Bearer"
+                                        },
+                                        "user": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "permissions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "locale": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "token",
+                                        "token_type",
+                                        "user",
+                                        "permissions",
+                                        "locale"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/devices": {
             "get": {
                 "operationId": "identity.devices.index",
@@ -17076,6 +17191,20 @@
                     }
                 },
                 "title": "CosignCountRequest"
+            },
+            "DemoLoginRequest": {
+                "type": "object",
+                "description": "TEMPORARY (ADR 0025): POST /demo-login {role}. Which roles have a demo account is DemoLogins' answer, not a validation rule.",
+                "properties": {
+                    "role": {
+                        "type": "string",
+                        "maxLength": 32
+                    }
+                },
+                "required": [
+                    "role"
+                ],
+                "title": "DemoLoginRequest"
             },
             "DeviceResource": {
                 "type": "object",

@@ -5,6 +5,7 @@ import { AppMark, BrandName, ScreensNav } from "@/components/AppShell";
 import { LanguageSwitcher, LanguageSwitcherWithQuery } from "@/components/LanguageSwitcher";
 import { PageHeader } from "@/components/ui";
 import { enterLocale, titledBy, type LocaleProps } from "@/lib/page";
+import { DemoLogins } from "./DemoLogins";
 import { LoginForm } from "./LoginForm";
 
 export const generateMetadata = titledBy("login", "title");
@@ -58,6 +59,8 @@ export default async function LoginPage(props: LocaleProps) {
             <Smartphone className="mt-0.5 size-5 shrink-0 text-neutral-600" strokeWidth={1.75} aria-hidden="true" />
             <span>{t("login.station_hint")}</span>
           </p>
+          {/* TEMPORARY (ADR 0025): drawn only while the server's BAKERY_DEMO_LOGIN is on */}
+          <DemoLogins />
         </div>
 
         <footer className="flex flex-col gap-2 border-t border-neutral-200 pt-4">

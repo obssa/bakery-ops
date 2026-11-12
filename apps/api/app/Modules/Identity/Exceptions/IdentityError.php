@@ -32,6 +32,12 @@ final class IdentityError extends RuntimeException implements DomainRefusal
         return new self('identity.login.invalid', 401);
     }
 
+    /** The temporary demo sign-in (ADR 0025): a role with no active demo account in the demo branch. */
+    public static function demoAccountUnavailable(): self
+    {
+        return new self('identity.demo_login.unavailable', 422);
+    }
+
     public static function branchRequired(): self
     {
         return new self('identity.branch.required', 422);
