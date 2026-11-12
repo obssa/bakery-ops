@@ -73,6 +73,21 @@ export interface Brand {
 
 export type ShiftStatus = "scheduled" | "opening" | "open" | "counting" | "pending_approval" | "locked" | "cancelled";
 
+/** A station's counting rules (ADR 0025): a shift starts by counting, a handed-in count waits for a co-signature, a count that differs waits for a manager. */
+export interface CountingRules {
+  opening_count: boolean;
+  cosign: boolean;
+  approval: boolean;
+}
+
+export type CountingRule = keyof CountingRules;
+
+/** GET and PUT /counting-rules (the admin's): the stations that run shifts with their rules, and how many counts wait now. */
+export interface CountingRulesView {
+  stations: (CountingRules & { id: number; code: StationCode; name_en: string; name_am: string })[];
+  waiting: { awaiting_cosign: number; pending_approval: number };
+}
+
 /** GET /me work_stations: a station the person works at and, when it tracks shifts, the one running there. */
 export interface WorkStation {
   station_id: number;
@@ -81,6 +96,8 @@ export interface WorkStation {
   name_am: string;
   tracks_shifts: boolean;
   requires_overseer: boolean;
+  /** absent from an API older than the counting rules */
+  counting_rules?: CountingRules;
   current_shift: null | { id: number; status: ShiftStatus; date: string; opened_at: string | null };
 }
 
@@ -103,7 +120,7 @@ export interface ShiftCountSummary {
 export interface Shift {
   id: number;
   client_uuid: string;
-  station: { id: number; code: StationCode; name_en: string; name_am: string; tracks_shifts: boolean; requires_overseer: boolean };
+  station: { id: number; code: StationCode; name_en: string; name_am: string; tracks_shifts: boolean; requires_overseer: boolean; counting_rules?: CountingRules };
   template: { id: number; name_en: string; name_am: string; start_time: string; end_time: string } | null;
   date: string;
   status: ShiftStatus;

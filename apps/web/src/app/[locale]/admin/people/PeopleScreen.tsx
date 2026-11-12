@@ -3,7 +3,7 @@
 import { Smartphone } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
-import { CARD, EmptyRow, FORM_GRID, TableCard } from "@/components/admin/kit";
+import { CARD, EmptyRow, FORM_GRID, TableCard, TEXT_LINK } from "@/components/admin/kit";
 import { Alert, Avatar, Button, Chip, Field, PageHeader, Select, Skeleton, Status, TextInput } from "@/components/ui";
 import { usePatchStation, useStations } from "@/lib/api/catalog";
 import { useCreateUser, usePatchUserOnCall, useUsers } from "@/lib/api/hooks";
@@ -305,7 +305,20 @@ function StationsTable() {
   const [saved, setSaved] = useState<string | null>(null);
 
   return (
-    <TableCard caption={t("stations")} title={t("stations")} intro={t("stations_intro")} action={<Status>{saved}</Status>}>
+    <TableCard
+      caption={t("stations")}
+      title={t("stations")}
+      intro={
+        <>
+          {t("stations_intro")}{" "}
+          {/* the counts' co-signature has its own switch since the counting rules (ADR 0025); this one is the batches' only */}
+          <Link href="/admin/system/counting" className={TEXT_LINK}>
+            {t("cosign_moved")}
+          </Link>
+        </>
+      }
+      action={<Status>{saved}</Status>}
+    >
       <thead>
         <tr>
           <th scope="col">{t("col_station")}</th>

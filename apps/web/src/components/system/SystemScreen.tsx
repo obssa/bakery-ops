@@ -16,6 +16,7 @@ import { CARD, Notice, TEXT_LINK } from "../admin/kit";
 import { Alert, Button, Chip, PageHeader, Skeleton, type Tone } from "../ui";
 import { BrandCard } from "./BrandCard";
 import { ClockCard } from "./ClockCard";
+import { CountingRulesLink } from "./CountingRulesLink";
 
 // Admin > System (step 5.5c, phase-5 plan 4.4; system.view, the admin): the health of the host the bakery runs on, polled every 30 s with
 // an ETag (lib/live/system.ts). The scheduler's heartbeat, the backups and the weekly restore drill, the queue, the disk the receipt photos
@@ -47,6 +48,7 @@ export function SystemScreen({ titleAm }: { titleAm?: string }) {
       <div className="flex flex-col gap-6">
         <BrandCard />
         <ClockCard />
+        <CountingRulesLink />
         {snapshot?.error && snapshot.loaded ? <Notice tone="amber">{t("stale")}</Notice> : null}
         {status === null ? (
           snapshot?.error ? (

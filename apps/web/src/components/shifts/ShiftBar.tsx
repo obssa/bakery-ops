@@ -9,6 +9,7 @@ import { uuid } from "@/lib/api/idempotency";
 import { closeShift, joinShift, leaveShift, cancelShift, startShift } from "@/lib/api/shifts";
 import type { Locale, Shift } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
+import { countsAtOpening } from "@/lib/countingRules";
 import { barActions, onDuty, stripAction, stripShown, type BarMode } from "@/lib/shifts";
 import { can, useSession } from "@/lib/session";
 import { useShiftNotice } from "@/lib/station";
@@ -97,7 +98,9 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
 
   const userId = me?.user.id ?? 0;
   const powers = { canCount: can(me, "shifts.count"), canManage: can(me, "shifts.manage") };
-  const actions = barActions(shift, userId, powers);
+  // the counting rule (ADR 0025): where the opening count is off, a start opens the shift at once, so "start without counting" is the only start
+  const opensCounting = countsAtOpening(station);
+  const actions = { ...barActions(shift, userId, powers), ...(opensCounting ? {} : { startCarried: false }) };
   const crew = onDuty(shift);
   const stationName = locale === "am" ? station.name_am : station.name_en;
   const showNotice = notice !== null && (notice.stationId === null || notice.stationId === station.station_id) && actions.mode !== "open";
@@ -200,7 +203,7 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
             </div>
           ) : null}
           {loaded && actions.mode === "idle" && !showNotice && powers.canCount ? (
-            <p className={strip ? "basis-full text-sm text-neutral-600" : "max-w-2xl text-base text-neutral-600"}>{t("idle_hint")}</p>
+            <p className={strip ? "basis-full text-sm text-neutral-600" : "max-w-2xl text-base text-neutral-600"}>{t(opensCounting ? "idle_hint" : "idle_hint_carried")}</p>
           ) : null}
         </div>
 

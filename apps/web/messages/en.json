@@ -773,6 +773,47 @@
       "saved_h24": "Saved: the 24-hour international time shows beside Ethiopian time."
     }
   },
+  "counting_rules": {
+    "title": "Counting rules",
+    "intro": "Choose how each station counts its stock: whether a shift counts when it opens, whether a second person checks a count, and whether a manager approves a count that differs. A change applies from the next shift or count.",
+    "back": "System",
+    "retry": "Try again",
+    "link_intro": "Opening count, co-signature and manager approval, for each station.",
+    "summary_part": "{rule}: {state, select, on {on} off {off} other {some stations}}",
+    "waiting": "Waiting now: {cosign, plural, one {# count for a co-signature} other {# counts for a co-signature}} and {approval, plural, one {# for a decision} other {# for a decision}}. Switching a rule does not release them: each is still checked or decided.",
+    "waiting_link": "See the waiting counts",
+    "help_label": "About {rule}",
+    "state_on": "On at every station",
+    "state_off": "Off at every station",
+    "state_some": "On at {on} of {total} stations",
+    "on_label": "On:",
+    "off_label": "Off:",
+    "all_stations": "All stations",
+    "all_hint_some": "On at some stations only. Switch it on to turn it on everywhere.",
+    "stations_label": "{rule} at each station",
+    "saved_on": "{rule} is now on at {station}.",
+    "saved_off": "{rule} is now off at {station}.",
+    "saved_all_on": "{rule} is now on at every station.",
+    "saved_all_off": "{rule} is now off at every station.",
+    "opening_count": {
+      "title": "Opening count",
+      "on": "A shift starts by counting the stock, and the stock is counted again when it closes.",
+      "off": "A shift opens at once and starts from the last closing count, so the stock is counted only once, when the shift closes.",
+      "help": "Counting at both ends of a shift shows exactly which shift a difference happened in. With it off, a difference found at closing may have started before the shift, but every shift starts sooner."
+    },
+    "cosign": {
+      "title": "Co-signature",
+      "on": "A handed-in count waits until a second person, an overseer or a manager, checks it. Never the person who counted.",
+      "off": "A handed-in count goes straight on, without a second person checking it.",
+      "help": "A second pair of eyes catches counting mistakes before they change the stock. This switch is for counts only: whether a finished baking batch waits for an overseer is set under People."
+    },
+    "approval": {
+      "title": "Manager approval",
+      "on": "A count that differs from what was expected waits for a manager to approve it before the stock is corrected.",
+      "off": "A count that differs is approved by itself: the stock is corrected and the count is locked. A reason is still needed for every difference.",
+      "help": "The manager sees every difference and its reason before the stock changes. With it off the reasons are still kept and the count is locked as usual, but nobody looks at it first. If the correction cannot be made, the count waits for a manager."
+    }
+  },
   "adminOrders": {
     "title": "Orders",
     "intro": "Every active order of the branch, live. Open one to read its timeline.",
@@ -1003,6 +1044,7 @@
     "require_overseer": "Require an overseer at {name}",
     "overseer_required": "An overseer signs off batches",
     "overseer_not_required": "The baker's Done is final",
+    "cosign_moved": "Co-signing counts is set in System, Counting rules.",
     "station_saved": "Overseer rule saved for {name}.",
     "devices_link": "Devices",
     "devices_desc": "Enrol and revoke the computers and tablets that use Bakery Ops, and add print bridges."
@@ -1572,6 +1614,7 @@
     "badge_counting": "Closing",
     "idle": "No shift is running",
     "idle_hint": "Start the shift and count the stock first, or start without counting when last night's count is not approved yet.",
+    "idle_hint_carried": "Start the shift: it opens at once from the last closing count, and the stock is counted when it closes.",
     "opening": "Opening count in progress",
     "opening_by": "Started by {name} at {time}",
     "open": "Shift open",

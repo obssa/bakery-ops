@@ -108,7 +108,7 @@ function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
       userId: me.user.id,
       permissions: me.permissions,
       worksAtStation: shift !== null && (me.work_stations ?? []).some((station) => station.station_id === shift.station.id),
-      requiresOverseer: shift?.station.requires_overseer ?? false,
+      requiresOverseer: shift?.station.counting_rules?.cosign ?? shift?.station.requires_overseer ?? false,
     });
   }, [count, me, shift]);
 
