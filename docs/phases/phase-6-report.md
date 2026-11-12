@@ -730,7 +730,12 @@ what still waits after a co-signature. Tests:
 - `screens-counting-rules` runs on the CI stack: the admin switches the kitchen's opening count off on the page and its next shift opens
   carried with no count. It captures at 1440 and 390 in en and am, with axe and no sideways scroll, and puts the rules back.
 
-Claim restated at `f76ab8b` (after `main` brought the demo sign-in, ADR 0025, so the counting rules are ADR 0026); the tag stays on `2f6bbd9`.
+The first full run (43228209370) caught two things. First, the two routes were missing from the station-route classification; they
+are back office (`non_station_routes.php`). Second, the strip capture of the demo cake room settled the station as the admin, so the
+admin closed and counted it, and then asked the admin to co-sign that same count, which is refused (`shifts.count.cosign_self`). It had
+passed only because the old `resolvePendingCounts` threw earlier, in the count screen's clean-up, and left the cake room with no shift.
+`settleStation` now takes who counts, and the capture has the cake baker count. Claim restated at `ee8de81` (after `main` brought the
+demo sign-in, ADR 0025, so the counting rules are ADR 0026); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
