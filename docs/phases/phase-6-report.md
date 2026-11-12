@@ -730,6 +730,8 @@ what still waits after a co-signature. Tests:
 - `screens-counting-rules` runs on the CI stack: the admin switches the kitchen's opening count off on the page and its next shift opens
   carried with no count. It captures at 1440 and 390 in en and am, with axe and no sideways scroll, and puts the rules back.
 
+Claim restated at `f76ab8b` (after `main` brought the demo sign-in, ADR 0025, so the counting rules are ADR 0026); the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
