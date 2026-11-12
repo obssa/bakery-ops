@@ -173,6 +173,12 @@ Every workflow below ends in a stock movement, an order event or an approval, so
 7. Once approved, the closing count is **locked** (immutable, hash-stamped). Only an admin can unlock it, which creates a new version and keeps the old one visible.
 8. The incoming shift's opening count is pre-filled from this locked value. Overnight leftovers (yesterday's bread) are therefore confirmed twice: closed by night, opened by morning.
 9. Handover notes travel with the shift ("oven 2 thermostat drifting", "3 custom cake orders due at 11:00").
+10. **Counting rules** (ADR 0025): per station, the admin switches three steps of this flow in Admin > System > Counting rules. The
+    *opening count* (on by default; off, a shift opens at once, carried from the last closing count, and the stock is counted once, at
+    closing), the *co-signature* (a handed-in count waits for a second person; separate from `requires_overseer`, which is the production
+    overseer) and the *manager's approval* (on by default; off, a count that differs is approved by the rule: the same adjustments, the same
+    lock and hash link, no decider, audit `count.approve_by_rule`). A switch applies to the next start or count; counts already waiting keep
+    waiting.
 
 **4.5 Payment at the till**
 
@@ -500,7 +506,9 @@ full audit trail; detailed analytics for the admin; Amharic and English.
    are new rows referencing old ones. Soft deletes only.
 5. Shifts are per station. A shift instance opens with a confirmed opening count and closes
    with a confirmed closing count. Any variance line requires a reason and admin/manager
-   approval before the count can lock. Locked counts are immutable and hash-chained
+   approval before the count can lock. (The admin may switch the opening count, the
+   co-signature and the manager's approval per station, ADR 0025; a reason is always required,
+   and an approval by the rule is audited and locked the same way.) Locked counts are immutable and hash-chained
    (sha256(previous_hash + payload)). The next shift's opening expected values are the
    previous locked closing values.
 6. Permissions are enforced server-side on every endpoint; the UI only hides what the API
