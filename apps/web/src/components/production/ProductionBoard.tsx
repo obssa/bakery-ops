@@ -485,13 +485,16 @@ const collision: CollisionDetection = (args) => {
 const columnJump: KeyboardCoordinateGetter = (event, { currentCoordinates, context }) => {
   if (event.code !== "ArrowRight" && event.code !== "ArrowLeft") return undefined;
   event.preventDefault();
-  const rect = context.collisionRect;
+  const rect = context.collisionRect ?? context.active?.rect.current.translated ?? context.active?.rect.current.initial ?? null;
   if (!rect) return undefined;
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
+  // the drop targets are measured now, from their nodes: right after a card is lifted the library may not have measured them yet, and a
+  // first arrow press must still move the card (a hidden column or tab measures 0 x 0 and is left out)
   const targets: { x: number; y: number }[] = [];
-  for (const [, box] of context.droppableRects) {
-    if (box.width > 0 && box.height > 0) targets.push({ x: box.left + box.width / 2, y: box.top + Math.min(box.height / 2, 80) });
+  for (const container of context.droppableContainers.getEnabled()) {
+    const box = container.node.current?.getBoundingClientRect();
+    if (box && box.width > 0 && box.height > 0) targets.push({ x: box.left + box.width / 2, y: box.top + Math.min(box.height / 2, 80) });
   }
   targets.sort((a, b) => a.x - b.x);
   const next = event.code === "ArrowRight" ? targets.find((target) => target.x > cx + 1) : [...targets].reverse().find((target) => target.x < cx - 1);
