@@ -749,6 +749,7 @@ with before and after). Only the demo branch's admin holds it: another branch's 
 branch's 409, the 403 of every other role and the boolean; `DemoLoginTest` now turns the buttons on through the switch and adds the kill
 switch and another branch's switch. CI no longer sets the variable: the e2e-p6 spec switches the buttons on and off as the demo admin on
 the System page, checks the sign-in page follows, captures the card at 1440 and 390 in both languages under axe, and leaves it off.
+Claim restated at `da2708c`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
