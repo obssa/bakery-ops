@@ -791,7 +791,7 @@ Production, Inventory, Planner, People and Shifts, and a bread baker saw the Pad
   - The `@live` sign-in check now asserts the page lists no screens.
 
 No API or permission changed.
-Claim restated at `6877daf`; the tag stays on `2f6bbd9`.
+Claim restated at `abc298d` (after the crawl follows each person to their own language: the demo floor staff land in Amharic); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
