@@ -687,6 +687,38 @@ are; they no longer hide anything. The first runs caught the arrow keys not movi
 
 The flat CI's first `main` push (`3e16c6c`) reused its pull request's run 43117097547 in 33 s and deployed at once (deploy 43119486775); its `@live` had 2 failures and 1 flaky test, both in `p2-stockout-production`: the live E2E branch held 107 requested and 97 in-progress requests left by earlier runs, and the board's 200-row page hid the run's new request. The board fix and the specs' clean-up above are the answer; the next deploy's `@live` passed.
 
+**The counting rules (phase-6/counting-rules, ADR 0025).** Ramin, 2026-11-12: "a setting page where the admin can turn on and off the double
+count and the co-sign feature". Asked whether "double count" meant counting at both ends of a shift or the manager's approval, he answered
+"both". Admin > System > Counting rules (`/admin/system/counting`, `shifts.manage`, the admin) has one card per rule, in the order a shift
+meets them. Each card says what On and Off mean, has a "?", an "All stations" switch that reads "On at n of m stations" when mixed, and one
+switch per station that runs shifts. A switch moves at once and goes back with the server's reason if refused. The page says how many counts
+wait now and links to them, because a switch never releases a waiting count. The System page links to it with where each rule stands; People's
+stations table says the counts' co-signature is set there now. API: `stations.count_opening` (default on), `count_cosign` (backfilled from
+`requires_overseer`, which keeps meaning the production overseer only) and `count_approval` (default on), migration `2026_11_18_100000`;
+`GET` and `PUT /counting-rules`. The PUT is one transaction over the named stations, locked in id order, with one audited
+`station.counting_rules` per station that changes; it is idempotent and refuses another branch's station, the warehouse, a station named
+twice or an entry that changes nothing. Behaviour:
+- **Opening count off:** a start opens the shift at once, carried (`StartShift`), and the shift bar offers only "Start shift".
+- **Co-sign off:** a handed-in count skips `awaiting_cosign` (`SubmitCount`).
+- **Approval off:** a count that differs is approved by the rule at its submit or right after its co-signature (`CountApproval::byRule`).
+  `ApproveCount` and the rule now share `Counts/CountApproval`, so the adjustments, the accepted reasons and the hash-chain lock are a
+  manager's, with `decided_by_user_id` null, the audit row `count.approve_by_rule` and no VarianceDecided. When an adjustment would go
+  below zero, or an item was deleted since, the count waits for a person (`count.approve_by_rule_skipped`).
+
+`Replay` now reads whether a count waited for a co-signature from the count itself (co-signed, or still waiting), not from today's switch.
+`GET /me` work stations and the shift and queue station blocks carry `counting_rules`. The e2e helper `resolvePendingCounts` approves only
+what still waits after a co-signature. Tests:
+- Pest `CountingRulesTest` (12): the list, several stations at once with one audit row each, all or none, admin only and idempotent, a
+  carried start, co-sign on and off, approval by the rule at submit and after a co-signature (adjustment, lock, `HashChain::verify` and
+  `verifyAll`, `LedgerOracle`), a waiting count left waiting, the rule skipped when stock moved, Replay by what the count did, and
+  `requires_overseer` untouched.
+- The co-sign tests now set `count_cosign`.
+- `screens-counting-rules-logic` covers the page's arithmetic.
+- `screens-counting-rules` runs on the CI stack: the admin switches the kitchen's opening count off on the page and its next shift opens
+  carried with no count. It captures at 1440 and 390 in en and am, with axe and no sideways scroll, and puts the rules back.
+
+Claim restated at `421c862`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
