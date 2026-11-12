@@ -793,6 +793,8 @@ Production, Inventory, Planner, People and Shifts, and a bread baker saw the Pad
 No API or permission changed.
 Claim restated at `abc298d` (after the crawl follows each person to their own language: the demo floor staff land in Amharic); the tag stays on `2f6bbd9`.
 
+Live on 2026-11-12: #139 (demo sign-in, deploy 43227473645), #140 (counting rules, deploy 43239985767), #141 (the demo sign-in switch, deploy 43282792552) and #142 (navigation follows the page guards, deploy 43297237911), each with 44 of 44 `@live`; main reused each PR's full run. The gate run recorded is #142's PR run 43293686644.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
