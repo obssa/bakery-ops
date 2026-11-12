@@ -55,9 +55,10 @@ test.describe("sign-in page: demo buttons (temporary)", () => {
       await expect(section.getByRole("button")).toHaveCount(ROLES.length);
       const roles = await section.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.getAttribute("data-role")));
       expect(roles).toEqual([...ROLES]);
-      await expect(section.getByRole("button", { name: `${en.people.roles.bread_baker}, Abebe Girma` })).toBeVisible();
+      // the name is "Role , Person": the hidden comma is positioned, so Chromium reads a space before it
+      await expect(section.getByRole("button", { name: new RegExp(`^${en.people.roles.bread_baker}\\s*,\\s*Abebe Girma$`) })).toBeVisible();
 
-      await section.getByRole("button", { name: `${en.people.roles.admin}, Dawit Bekele` }).click();
+      await section.getByRole("button", { name: new RegExp(`^${en.people.roles.admin}\\s*,\\s*Dawit Bekele$`) }).click();
       await expect(page).toHaveURL(/\/app\/en\/admin\/$/);
       await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
     });

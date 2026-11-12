@@ -81,7 +81,6 @@ export function DemoLogins() {
                 type="button"
                 onClick={() => void signInAs(person.role)}
                 disabled={pending !== null}
-                aria-label={`${roleName}, ${name}`}
                 aria-busy={busy || undefined}
                 data-role={person.role}
                 className={`${buttonClass({ variant: "secondary", size: "lg", compact: true })} w-full min-w-0 justify-start! gap-3 py-2 text-left`}
@@ -90,7 +89,11 @@ export function DemoLogins() {
                   <Icon className="size-[18px]" strokeWidth={ICON_STROKE} />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-semibold text-neutral-900">{busy ? t("login.submitting") : roleName}</span>
+                  {/* the name is the visible text (axe label-content-name-mismatch), read as "Role, Person" through the hidden comma */}
+                  <span className="truncate text-sm font-semibold text-neutral-900">
+                    {busy ? t("login.submitting") : roleName}
+                    <span className="sr-only">, </span>
+                  </span>
                   <span className="truncate text-[13px] font-normal text-neutral-600">{name}</span>
                 </span>
               </button>
