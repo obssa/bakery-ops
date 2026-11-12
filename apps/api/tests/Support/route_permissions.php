@@ -244,7 +244,7 @@ return [
     'GET /api/v1/shifts/{shift}/summary' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
     'GET /api/v1/shifts/{shift}/counts' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
     'GET /api/v1/stock-counts/{count}' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],
-    // the counting rules (ADR 0025): the admin's alone
+    // the counting rules (ADR 0026): the admin's alone
     'GET /api/v1/counting-rules' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
     'PUT /api/v1/counting-rules' => ['permission' => 'shifts.manage', 'roles' => ['admin'], 'module' => 'shifts'],
     'GET /api/v1/variance-reasons' => ['permission' => 'shifts.view', 'roles' => $floor, 'module' => 'shifts'],

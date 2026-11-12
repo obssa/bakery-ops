@@ -12,7 +12,7 @@ use App\Shared\Models\Station;
 use Illuminate\Http\JsonResponse;
 
 /**
- * The counting rules (Admin > System > Counting rules, ADR 0025): shifts.manage, the admin. Another branch's station is never listed and
+ * The counting rules (Admin > System > Counting rules, ADR 0026): shifts.manage, the admin. Another branch's station is never listed and
  * never changed (BranchScoped, and the request's exists rule names the branch).
  *
  *   GET /counting-rules  200 {data: {stations: [{id, code, name_en, name_am, opening_count, cosign, approval}], waiting: {awaiting_cosign,

@@ -22,7 +22,7 @@ const SHIFTS_MESSAGE_KEYS = [
     'shifts.start.force_forbidden', 'shifts.cancel.forbidden',
     'shifts.template.window_invalid', 'shifts.template.station_unknown', 'shifts.template.not_for_station',
     'shifts.roster.user_invalid',
-    // the counting rules (ADR 0025): a PUT /counting-rules entry that changes nothing (a validation message)
+    // the counting rules (ADR 0026): a PUT /counting-rules entry that changes nothing (a validation message)
     'shifts.rules.name_one',
 ];
 

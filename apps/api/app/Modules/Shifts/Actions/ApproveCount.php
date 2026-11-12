@@ -22,7 +22,7 @@ use Carbon\CarbonImmutable;
  * every variance line in ascending (item_id, location_id) order (Ledger::lock, and again inside Ledger::appendMany, which reuses
  * the locks it already holds).
  *
- * The writes are CountApproval's (shared with the counting rule that approves by itself where manager approval is off, ADR 0025).
+ * The writes are CountApproval's (shared with the counting rule that approves by itself where manager approval is off, ADR 0026).
  * Under those locks one `count_adjustment` is written for every line with a variance, both signs, in a single Ledger::appendMany run
  * as the counted shift (ActorContext::runAs with the count's shift and station: the approver is still the user, the row names the
  * shift whose stock it corrects). The quantity is the DELTA (counted minus expected at the snapshot), never "set the stock to the

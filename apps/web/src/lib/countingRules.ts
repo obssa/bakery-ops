@@ -1,6 +1,6 @@
 import type { CountingRule, CountingRulesView } from "./api/types";
 
-// The counting rules (Admin > System > Counting rules, Ramin 2026-11-12, ADR 0025): per station, the admin switches the opening count, the
+// The counting rules (Admin > System > Counting rules, Ramin 2026-11-12, ADR 0026): per station, the admin switches the opening count, the
 // co-signature and the manager's approval. The page shows one card per rule with an "All stations" switch over the stations' own switches;
 // this file is the arithmetic of that page, kept free of React so the logic spec can pin it.
 

@@ -98,7 +98,7 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
 
   const userId = me?.user.id ?? 0;
   const powers = { canCount: can(me, "shifts.count"), canManage: can(me, "shifts.manage") };
-  // the counting rule (ADR 0025): where the opening count is off, a start opens the shift at once, so "start without counting" is the only start
+  // the counting rule (ADR 0026): where the opening count is off, a start opens the shift at once, so "start without counting" is the only start
   const opensCounting = countsAtOpening(station);
   const actions = { ...barActions(shift, userId, powers), ...(opensCounting ? {} : { startCarried: false }) };
   const crew = onDuty(shift);

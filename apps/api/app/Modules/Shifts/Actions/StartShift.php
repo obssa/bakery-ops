@@ -44,7 +44,7 @@ use Illuminate\Support\Collection;
  *   5. The status (step 3.3a): a station with places to count and no `carry` goes to `opening` with one prefilled opening draft per
  *      place (the shift opens when they are submitted: SubmitCount); a station with nothing to count, `carry`, and every call-in
  *      open at once, carried. ShiftOpened is dispatched after the commit, when the status reaches `open`. A station whose opening count
- *      is switched off (Admin > System > Counting rules, ADR 0025) starts every shift as `carry` does.
+ *      is switched off (Admin > System > Counting rules, ADR 0026) starts every shift as `carry` does.
  * The person acting needs shifts.count at the station (403 shifts.station.forbidden); a station that tracks no shifts is 422.
  */
 final class StartShift
@@ -79,7 +79,7 @@ final class StartShift
         if ($options->force && ! $this->access->mayManage($person)) {
             throw ShiftError::forceForbidden();
         }
-        // the counting rule (ADR 0025): with the opening count switched off at the station, every start opens at once, carried from the
+        // the counting rule (ADR 0026): with the opening count switched off at the station, every start opens at once, carried from the
         // last closing count, as a start without counting always did
         $carry = $options->carry || ! $station->count_opening;
 

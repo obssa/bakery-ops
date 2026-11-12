@@ -26,7 +26,7 @@ use Ramsey\Uuid\Uuid;
 
 /**
  * What approving a `pending_approval` count writes, the one way: a manager's decision (ApproveCount) and the counting rule that approves
- * by itself where manager approval is switched off (SubmitCount, CosignCount; ADR 0025) both come here, inside their own transaction
+ * by itself where manager approval is switched off (SubmitCount, CosignCount; ADR 0026) both come here, inside their own transaction
  * and after the count and shift rows are locked.
  *
  * One `count_adjustment` per line with a variance, both signs, in a single Ledger::appendMany run as the counted shift (ActorContext::runAs
@@ -48,7 +48,7 @@ final class CountApproval
     ) {}
 
     /**
-     * The counting rule (ADR 0025): at a station whose manager approval is switched off, a count that differs is approved by itself the
+     * The counting rule (ADR 0026): at a station whose manager approval is switched off, a count that differs is approved by itself the
      * moment it would start waiting for a decision (at its submit, or at its co-signature). The writes are a manager's (approve()), with
      * no decider (`decided_by_user_id` null, the decision `approved`) and the audit row `count.approve_by_rule`. When the approval would be
      * refused (an item deleted since the count, or stock that moved so far that an adjustment would go below zero) the count waits for a

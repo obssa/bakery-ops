@@ -10,7 +10,7 @@ import { findOrCreateLocation, findOrCreateStation, loginOnce } from "../support
 import { openAs } from "../support/pad";
 import { ensureOpenShift, settleStation } from "../support/shifts";
 
-// phase-6/counting-rules (Ramin 2026-11-12: "a setting page where the admin can turn on and off the double count and the co-sign"; ADR 0025).
+// phase-6/counting-rules (Ramin 2026-11-12: "a setting page where the admin can turn on and off the double count and the co-sign"; ADR 0026).
 // On the CI stack, as the E2E Test Branch's admin: Admin > System > Counting rules shows one card per rule with its "All stations" switch and a
 // switch per station; the admin switches the kitchen's opening count off on the page, and the kitchen's next shift opens at once, carried,
 // with no count to do. Captures at 1440 x 900 and 390 x 844 in English and Amharic, with axe and no sideways scroll. The rules are put back

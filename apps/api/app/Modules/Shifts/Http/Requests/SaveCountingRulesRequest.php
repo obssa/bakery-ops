@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
- * PUT /counting-rules (ADR 0025): the stations to change and, for each, any of the three rules. Every station named must be one of the
+ * PUT /counting-rules (ADR 0026): the stations to change and, for each, any of the three rules. Every station named must be one of the
  * branch's stations that runs shifts (another branch's, a removed one or the warehouse is a 422 on its id), each at most once, and each
  * entry must change at least one rule. Stations not named keep their rules.
  */

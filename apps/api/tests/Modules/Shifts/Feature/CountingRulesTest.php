@@ -23,7 +23,7 @@ use Tests\Support\ShiftsFixture;
 pest()->group('module:shifts', 'feature');
 
 /*
- * The counting rules (Ramin 2026-11-12, ADR 0025): per station, the admin switches the opening count, the co-signature and the manager's
+ * The counting rules (Ramin 2026-11-12, ADR 0026): per station, the admin switches the opening count, the co-signature and the manager's
  * approval on and off in Admin > System > Counting rules (GET and PUT /counting-rules, shifts.manage). A rule applies to the next start,
  * submit or co-signature; counts already waiting keep waiting. Co-sign is its own switch: the production overseer (requires_overseer) is
  * untouched by it. Monday 2026-11-02, the kitchen counts in grams.

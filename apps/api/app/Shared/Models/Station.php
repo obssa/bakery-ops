@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property Bilingual|null $name
  * @property bool $requires_overseer
  * @property bool $tracks_shifts
- * @property bool $count_opening a shift starts with an opening count (else it opens at once, carried); the counting rules, ADR 0025
+ * @property bool $count_opening a shift starts with an opening count (else it opens at once, carried); the counting rules, ADR 0026
  * @property bool $count_cosign a handed-in count waits for a second person's co-signature
  * @property bool $count_approval a count that differs waits for a manager's decision (else the rule approves it)
  * @property int $sort
@@ -77,7 +77,7 @@ final class Station extends Model
     }
 
     /**
-     * The station's counting rules as every answer shows them (ADR 0025): `opening_count` (a shift starts by counting), `cosign` (a handed-in
+     * The station's counting rules as every answer shows them (ADR 0026): `opening_count` (a shift starts by counting), `cosign` (a handed-in
      * count waits for a second person), `approval` (a count that differs waits for a manager).
      *
      * @return array{opening_count: bool, cosign: bool, approval: bool}

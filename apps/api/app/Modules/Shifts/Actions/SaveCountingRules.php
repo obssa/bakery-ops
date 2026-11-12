@@ -9,7 +9,7 @@ use App\Shared\Models\Station;
 use Illuminate\Database\ConnectionInterface;
 
 /**
- * PUT /counting-rules (Ramin 2026-11-12, ADR 0025; shifts.manage, the admin): switch the counting rules of one station or of many at once.
+ * PUT /counting-rules (Ramin 2026-11-12, ADR 0026; shifts.manage, the admin): switch the counting rules of one station or of many at once.
  * One transaction for the whole request: the stations named are locked FOR UPDATE in id order, and every station whose rules change is
  * one AuditedAction (`station.counting_rules`, its before and after), so either every change lands or none does. A station whose rules
  * already are what was asked writes nothing. A rule applies from the next start, submit or co-signature: shifts already open and counts

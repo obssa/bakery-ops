@@ -5,7 +5,7 @@ import { applyChanges, type RuleChange } from "../countingRules";
 import { authed, can, useSession } from "../session";
 import type { CountingRulesView } from "./types";
 
-// GET and PUT /counting-rules (ADR 0025): the admin's alone (shifts.manage). A switch shows its new position at once and goes back if the
+// GET and PUT /counting-rules (ADR 0026): the admin's alone (shifts.manage). A switch shows its new position at once and goes back if the
 // server refuses it; the answer is the whole view, which replaces what the page holds.
 
 const KEY = ["counting-rules"] as const;

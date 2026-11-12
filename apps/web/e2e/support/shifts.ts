@@ -207,7 +207,7 @@ export async function settleStation(admin: Api, station: StationRef): Promise<vo
 export async function resolvePendingCounts(admin: Api, station: StationRef): Promise<void> {
   const queue = (await admin.get<{ data: { id: number; status: string }[] }>("/stock-counts", { station_id: station.id })).data;
   for (const row of queue) {
-    // a co-signature at a station whose manager approval is off (the counting rules, ADR 0025) approves the count by itself
+    // a co-signature at a station whose manager approval is off (the counting rules, ADR 0026) approves the count by itself
     const after = row.status === "awaiting_cosign" ? await admin.post<{ status: string }>(`/stock-counts/${row.id}/cosign`, {}) : row;
     if (after.status === "pending_approval") await admin.post(`/stock-counts/${row.id}/approve`, {});
   }

@@ -179,7 +179,7 @@ final class Replay
 
     /**
      * Did this count wait for a co-signature after it was handed in? Read from what the count did, not from today's counting rule, which the
-     * admin may have switched since (ADR 0025): a co-signed count did, one that waits for it now does, and one that was approved without a
+     * admin may have switched since (ADR 0026): a co-signed count did, one that waits for it now does, and one that was approved without a
      * co-signature never did (nothing leaves `awaiting_cosign` for a decision unsigned). The one case its rows cannot tell is a count
      * rejected before anyone co-signed it (a co-signer and an approver both reject); that one follows the station's co-sign rule.
      */

@@ -73,7 +73,7 @@ export interface Brand {
 
 export type ShiftStatus = "scheduled" | "opening" | "open" | "counting" | "pending_approval" | "locked" | "cancelled";
 
-/** A station's counting rules (ADR 0025): a shift starts by counting, a handed-in count waits for a co-signature, a count that differs waits for a manager. */
+/** A station's counting rules (ADR 0026): a shift starts by counting, a handed-in count waits for a co-signature, a count that differs waits for a manager. */
 export interface CountingRules {
   opening_count: boolean;
   cosign: boolean;

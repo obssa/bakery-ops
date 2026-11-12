@@ -687,7 +687,7 @@ are; they no longer hide anything. The first runs caught the arrow keys not movi
 
 The flat CI's first `main` push (`3e16c6c`) reused its pull request's run 43117097547 in 33 s and deployed at once (deploy 43119486775); its `@live` had 2 failures and 1 flaky test, both in `p2-stockout-production`: the live E2E branch held 107 requested and 97 in-progress requests left by earlier runs, and the board's 200-row page hid the run's new request. The board fix and the specs' clean-up above are the answer; the next deploy's `@live` passed.
 
-**The counting rules (phase-6/counting-rules, ADR 0025).** Ramin, 2026-11-12: "a setting page where the admin can turn on and off the double
+**The counting rules (phase-6/counting-rules, ADR 0026).** Ramin, 2026-11-12: "a setting page where the admin can turn on and off the double
 count and the co-sign feature". Asked whether "double count" meant counting at both ends of a shift or the manager's approval, he answered
 "both". Admin > System > Counting rules (`/admin/system/counting`, `shifts.manage`, the admin) has one card per rule, in the order a shift
 meets them. Each card says what On and Off mean, has a "?", an "All stations" switch that reads "On at n of m stations" when mixed, and one

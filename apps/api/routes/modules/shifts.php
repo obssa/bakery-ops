@@ -42,7 +42,7 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/stations/{station}/handover', [HandoverController::class, 'show'])->whereNumber('station')->middleware('device')->name('shifts.handover');
     });
 
-    // the counting rules (ADR 0025): the admin reads and switches them in Admin > System > Counting rules
+    // the counting rules (ADR 0026): the admin reads and switches them in Admin > System > Counting rules
     Route::get('/counting-rules', [CountingRulesController::class, 'show'])->middleware('permission:shifts.manage')->name('shifts.counting_rules.show');
 
     Route::middleware(['permission:shifts.manage', 'idempotency'])->group(function (): void {

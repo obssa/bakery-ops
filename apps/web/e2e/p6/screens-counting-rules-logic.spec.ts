@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { CountingRulesView } from "../../src/lib/api/types";
 import { applyChanges, countsAtOpening, RULES, ruleState, switchAll, switchOne } from "../../src/lib/countingRules";
 
-// The counting rules page's arithmetic (phase-6/counting-rules, lib/countingRules.ts, ADR 0025): where a rule stands across the stations,
+// The counting rules page's arithmetic (phase-6/counting-rules, lib/countingRules.ts, ADR 0026): where a rule stands across the stations,
 // the changes an "All stations" switch sends (only the stations not already so), the view shown at once before the server answers, and
 // whether a station's shift starts by counting. Plain functions, no page: it runs in p6-a11y beside the screenshots of the page.
 

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * The counting rules (Ramin 2026-11-12, ADR 0025): three switches per station the admin turns on and off in Admin > System > Counting rules
+ * The counting rules (Ramin 2026-11-12, ADR 0026): three switches per station the admin turns on and off in Admin > System > Counting rules
  * (PUT /counting-rules, shifts.manage).
  *
  * - count_opening: a shift starts with an opening count (on, as before) or opens at once, carried from the last closing count (off).

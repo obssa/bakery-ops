@@ -1,4 +1,4 @@
-# ADR 0025: The admin switches the counting rules per station
+# ADR 0026: The admin switches the counting rules per station
 
 - Status: **accepted** (phase-6/counting-rules, 2026-11-12)
 - Date: 2026-11-12

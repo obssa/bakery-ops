@@ -311,7 +311,7 @@ function StationsTable() {
       intro={
         <>
           {t("stations_intro")}{" "}
-          {/* the counts' co-signature has its own switch since the counting rules (ADR 0025); this one is the batches' only */}
+          {/* the counts' co-signature has its own switch since the counting rules (ADR 0026); this one is the batches' only */}
           <Link href="/admin/system/counting" className={TEXT_LINK}>
             {t("cosign_moved")}
           </Link>

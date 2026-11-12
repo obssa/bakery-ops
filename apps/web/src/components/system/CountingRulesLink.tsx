@@ -10,7 +10,7 @@ import { focusRing } from "../styles";
 import { ICON_STROKE } from "../icons";
 import { CARD } from "../admin/kit";
 
-// Admin > System: the way to the counting rules (ADR 0025), with where each rule stands, for the admin (shifts.manage).
+// Admin > System: the way to the counting rules (ADR 0026), with where each rule stands, for the admin (shifts.manage).
 
 export function CountingRulesLink() {
   const t = useTranslations("counting_rules");

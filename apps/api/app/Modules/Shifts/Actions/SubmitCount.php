@@ -40,7 +40,7 @@ use Carbon\CarbonImmutable;
  * ledger_movement_id the newest movement of the branch; variance_qty is counted minus expected in exact decimals. Nothing here
  * writes a movement: a count with a variance waits in pending_approval (approval is step 3.3b), one without goes to approved, and
  * at a station whose co-sign rule is on every count first waits in awaiting_cosign (CosignCount, step 3.3c). The counting rules are the
- * station's (Admin > System > Counting rules, ADR 0025): co-sign on or off, and with manager approval off a count that differs is approved
+ * station's (Admin > System > Counting rules, ADR 0026): co-sign on or off, and with manager approval off a count that differs is approved
  * by the rule in this same transaction (CountApproval::byRule), unless the approval would be refused, when it waits for a person. CountSubmitted is
  * announced after commit (3.3c); a line of the draft for an item deleted since is dropped (step 3.7d; audit count.lines_dropped, ids in dropped_item_ids of the answer). A cash-drawer count (step 3.5)
  * has no lines: its declaration must have been entered (422 shifts.cash.declaration_missing, shifts.cash.float_required at a closing), a
@@ -176,7 +176,7 @@ final class SubmitCount
                     ])->save();
                 }
 
-                // the counting rules of the station (ADR 0025): co-sign first where it is on; else a count that differs waits for a decision
+                // the counting rules of the station (ADR 0026): co-sign first where it is on; else a count that differs waits for a decision
                 // (or, with manager approval off, the rule approves it below); one that does not is approved at once
                 $to = $station->count_cosign ? CountStatus::AwaitingCosign : ($differs ? CountStatus::PendingApproval : CountStatus::Approved);
                 $c->forceFill([

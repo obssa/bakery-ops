@@ -13,7 +13,7 @@ import { CARD, Notice, TEXT_LINK } from "../admin/kit";
 import { ICON_STROKE } from "../icons";
 import { Alert, Button, Chip, HelpTip, PageHeader, Skeleton, Status, Switch } from "../ui";
 
-// Admin > System > Counting rules (Ramin 2026-11-12, ADR 0025): the admin switches, per station or for every station at once, whether a
+// Admin > System > Counting rules (Ramin 2026-11-12, ADR 0026): the admin switches, per station or for every station at once, whether a
 // shift starts by counting (the "double count": once when it opens, again when it closes), whether a handed-in count waits for a second
 // person's co-signature, and whether a count that differs waits for a manager's approval. One card per rule, in the order a shift meets
 // them; its "All stations" switch sits over the stations' own. A switch moves at once and goes back if the server refuses it. A rule
