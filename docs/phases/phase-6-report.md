@@ -751,6 +751,48 @@ switch and another branch's switch. CI no longer sets the variable: the e2e-p6 s
 the System page, checks the sign-in page follows, captures the card at 1440 and 390 in both languages under axe, and leaves it off.
 Claim restated at `da2708c`; the tag stays on `2f6bbd9`.
 
+**Every role sees only what it opens (phase-6/role-navigation, ADR 0027; Ramin, 2026-11-12: "if the role doesn't have access to it,
+it's pointless to show the option on the menu").**
+
+Before this, the API refused what a role may not do, but the web offered it anyway. Seven admin sidebar sections were shown to every
+role, and every list of screens showed all six to everyone (the sidebar's "Stations", the top bar's "Screens", the start page and the
+sign-in footer). A few links inside pages checked another permission than their page's, or none. A waiter saw Till, Kitchen, Bar,
+Production, Inventory, Planner, People and Shifts, and a bread baker saw the Pad, the Till and both displays. Each of those ended on
+"Your account cannot open this page".
+
+- **The access table.** `apps/web/src/lib/access.ts` `ROUTES` gives every page its guard's permission. The kitchen and bar displays also
+  need the person to work at that station (`/me` `work_stations`, or `stations.all`).
+- **Who reads it.** `canOpen` decides the admin sidebar (Analytics leads to My figures for `analytics.view_own`), its "Stations", the top
+  bar's "Screens" menu (gone with fewer than two screens) and the start page (one screen: straight there). It also decides the section tabs
+  of Inventory, Payments, Analytics and Shifts, the links inside pages (`CanLink`: Today's cards, System's devices link, the counting
+  rules' links, the shifts overview, review and count links, the order record, the reconciliation drill) and the bell's lines.
+- **The sign-in page** lists no screens.
+- **Where a person lands.** After signing in, a person lands on their own screen (`homeOf`): the console for the admin and the manager,
+  the till for a cashier, the pad for a waiter, their station's display for a chef or barista, and the production board for the bakers.
+  `?next=` is followed only when the person opens it, and the sign-in waits for `/me`. A typed address the role does not open says so
+  and offers "Go to my screen" (en/am `admin.go_home`).
+- **What each role sees now.**
+
+  | Role | Admin sidebar | Station screens |
+  |---|---|---|
+  | manager | Today, Orders, Payments, Tables, Catalog, Inventory, Planner, Shifts, Analytics, Audit log | all five |
+  | cashier | Today, Orders, Payments, Catalog, Inventory, Shifts, Analytics | Pad, Till, Production |
+  | waiter | Today, Orders, Catalog, Analytics | Pad |
+  | chef / barista | Today, Catalog, Inventory, Shifts, Analytics | their own display, Production |
+  | bakers | Today, Catalog, Inventory, Shifts, Analytics | Production |
+
+- **Tests.**
+  - `screens-role-navigation-logic.spec.ts` reads every `page.tsx` and fails when a page's guard and its rule disagree, a page has no rule,
+    or a rule names no page. It reads the role matrix from `PermissionRegistry.php` and pins every role's screens, admin pages and landing.
+  - `screens-role-navigation.spec.ts` (p6-a11y, CI stack) switches the demo buttons on, signs each of the eight roles in through its
+    button, and checks the landing page, the sidebar, "Stations" and "Screens" lists, and that every listed page opens without the refusal
+    or a 403. It captures the manager's, cashier's, waiter's and bread baker's sidebar at 1440 and as the 390 drawer in both languages
+    under axe, and switches the buttons off again.
+  - The `@live` sign-in check now asserts the page lists no screens.
+
+No API or permission changed.
+Claim restated at `6877daf`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
