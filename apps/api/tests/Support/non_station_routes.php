@@ -129,6 +129,9 @@ return [
     'GET /api/v1/locations/{location}/chain' => 'shifts',
     'GET /api/v1/locations/{location}/chain/verify' => 'shifts',
     'GET /api/v1/replay' => 'shifts',
+    // the counting rules (ADR 0026): the admin's settings page, back office
+    'GET /api/v1/counting-rules' => 'shifts',
+    'PUT /api/v1/counting-rules' => 'shifts',
     'GET /api/v1/shift-templates' => 'shifts',
     'POST /api/v1/shift-templates' => 'shifts',
     'DELETE /api/v1/shift-templates/{template}' => 'shifts',
