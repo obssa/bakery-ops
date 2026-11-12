@@ -683,7 +683,7 @@ a safety cap of 1000 (`RequestBoard::BOARD_CAP`); a column holding fewer cards t
 planner test of `stockout-catalog-planning`) now leave the board as they found it, in a `finally`, through the API and only for their own
 run's product (`leaveProductionAsFound`: cancel what is requested or accepted, finish what is in the oven as its baker, confirm what waits
 by someone other than its maker; anything that cannot be settled is logged, not forced). The 107 and 97 already on live are left as they
-are; they no longer hide anything. The first runs caught the test pressing the arrow key before the board had picked the card up (it now waits for each announcement, as a keyboard user hears it). Claim restated at `21e4007` (after the merge of `main` with the flat CI); the tag stays on `2f6bbd9`.
+are; they no longer hide anything. The first runs caught the test pressing the arrow key before the board had picked the card up (it now waits for each announcement, as a keyboard user hears it). Claim restated at `8366c20` (after the merge of `main` with the flat CI); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
