@@ -187,7 +187,7 @@ export async function finishClosingCounts(admin: Api, shiftId: number): Promise<
  * `counting` one has its counts submitted. A flow that starts a shift from the screen calls this first (the E2E branch's stations
  * already carry the shifts the other fixtures opened) and ensureOpenShift again at the end.
  */
-export async function settleStation(admin: Api, station: StationRef): Promise<void> {
+export async function settleStation(admin: Api, station: StationRef, counter: Api = admin): Promise<void> {
   await resolvePendingCounts(admin, station);
   const shift = await currentShift(admin, station);
   if (!shift) return;
@@ -196,7 +196,9 @@ export async function settleStation(admin: Api, station: StationRef): Promise<vo
     return;
   }
   if (shift.status === "open") await admin.post(`/shifts/${shift.id}/close`, {});
-  await finishClosingCounts(admin, shift.id);
+  // at a station whose counts need a co-signature, `counter` (someone who works there) hands them in, so that the admin, who did not
+  // count them, can co-sign them in resolvePendingCounts: nobody co-signs their own count
+  await finishClosingCounts(counter, shift.id);
 }
 
 /**

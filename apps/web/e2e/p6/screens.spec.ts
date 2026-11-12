@@ -1292,7 +1292,8 @@ test.describe("screens: the shift's strip", () => {
     if (!cakeRoom) throw new Error("the demo bakery has no cake room");
     const baker = await demoPerson(demo, "cake_baker");
     try {
-      await settleStation(demo.admin, cakeRoom);
+      // the cake baker counts the closing, so the admin can co-sign it (the cake room's counts need a second person)
+      await settleStation(demo.admin, cakeRoom, baker.api);
       await resolvePendingCounts(demo.admin, cakeRoom);
       await openAs(page, baker.api, "en/production/", { device: demo.device });
       await expect(page.getByRole("heading", { level: 1, name: t.production.title })).toBeVisible({ timeout: 30_000 });
