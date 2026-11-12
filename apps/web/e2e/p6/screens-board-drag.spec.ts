@@ -121,7 +121,8 @@ test.describe("screens: dragging a card along the production board", () => {
       await grip.focus();
       // each key waits for what the board announces to a screen reader, as a keyboard user hears it before the next key
       await overseer.keyboard.press("Space");
-      await expect(overseer.getByText(t.drag_picked.replace("{name}", cake), { exact: true })).toBeAttached();
+      // lifted: the grip is pressed while the card is held (its "Picked up" line is replaced at once by where it is over)
+      await expect(grip).toHaveAttribute("aria-pressed", "true");
       await overseer.keyboard.press("ArrowRight");
       await expect(overseer.getByText(t.drag_over.replace("{name}", cake).replace("{column}", t.col_done_today), { exact: true })).toBeAttached();
       await overseer.keyboard.press("Space");
