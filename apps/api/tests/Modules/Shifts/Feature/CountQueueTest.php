@@ -78,7 +78,7 @@ it('leaves out lines that match and counts that are not waiting', function () {
 });
 
 it('lists counts that wait for a co-signature, oldest first, and filters by status and station', function () {
-    $this->f->cakeRoom->forceFill(['requires_overseer' => true])->save();
+    $this->f->cakeRoom->forceFill(['count_cosign' => true])->save();
     $first = ($this->handIn)($this->f->kitchen, $this->f->chef, $this->flour, '9500');
     $second = ($this->handIn)($this->f->cakeRoom, $this->f->baker, $this->sugar, '1900');
 

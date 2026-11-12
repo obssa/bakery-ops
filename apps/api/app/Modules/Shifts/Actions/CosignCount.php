@@ -7,6 +7,7 @@ namespace App\Modules\Shifts\Actions;
 use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Contracts\HashChain;
+use App\Modules\Shifts\Counts\CountApproval;
 use App\Modules\Shifts\Counts\CountLock;
 use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Exceptions\ShiftError;
@@ -19,7 +20,7 @@ use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 
 /**
- * POST /stock-counts/{count}/cosign (phase-3 plan section 4, "Who may act"). At a station that requires an overseer a submitted count
+ * POST /stock-counts/{count}/cosign (phase-3 plan section 4, "Who may act"). At a station whose co-sign rule is on (ADR 0025) a submitted count
  * waits in `awaiting_cosign` for a second person: the overseer flagged at that station, or a holder of shifts.cosign at it (admin,
  * manager), never the person who counted. One AuditedAction (count.cosign, the note in its context) in the lock order count row, shift
  * row; no balance is touched (a co-signature writes no stock).
@@ -41,6 +42,7 @@ final class CosignCount
         private readonly CountAnnouncer $announcer,
         private readonly HashChain $chain,
         private readonly CashDeclarations $cash,
+        private readonly CountApproval $approval,
     ) {}
 
     /**
@@ -63,7 +65,7 @@ final class CosignCount
         }
 
         try {
-            return $this->audit->run(function (StockCount $c) use ($person, $shift): StockCount {
+            return $this->audit->run(function (StockCount $c) use ($person, $shift, $station): StockCount {
                 CountLock::refresh($c);
                 if ($c->status !== CountStatus::AwaitingCosign) {
                     $this->refuseOrRepeat($c, $person);
@@ -89,6 +91,11 @@ final class CosignCount
 
                 if ($c->status === CountStatus::Approved) {
                     $this->chain->lock($c, $person);
+                } elseif (! $station->count_approval) {
+                    // the counting rule (ADR 0025): manager approval is off at the station, so the co-signed count is approved by itself
+                    $this->approval->byRule($c, $shift, $person);
+                }
+                if ($c->status === CountStatus::Locked) {
                     ShiftResolution::lockWhenResolved($shift, $now);
                 }
                 $this->announcer->submitted($c, $person);

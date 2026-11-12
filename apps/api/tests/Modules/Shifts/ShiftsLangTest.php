@@ -22,6 +22,8 @@ const SHIFTS_MESSAGE_KEYS = [
     'shifts.start.force_forbidden', 'shifts.cancel.forbidden',
     'shifts.template.window_invalid', 'shifts.template.station_unknown', 'shifts.template.not_for_station',
     'shifts.roster.user_invalid',
+    // the counting rules (ADR 0025): a PUT /counting-rules entry that changes nothing (a validation message)
+    'shifts.rules.name_one',
 ];
 
 it('has an English and an Amharic text for every shifts message, with the same keys in both files', function () {

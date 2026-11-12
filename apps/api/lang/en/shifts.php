@@ -76,4 +76,7 @@ return [
         'reason_required' => 'The cash does not match what was expected. Choose a reason.',
         'note_required' => 'This reason needs a short note about the cash.',
     ],
+    'rules' => [
+        'name_one' => 'Name at least one rule to change for this station: the opening count, the co-signature or the approval by a manager.',
+    ],
 ];

@@ -67,6 +67,7 @@ final class AuthController
                 'name_am' => $s->name_am,
                 'tracks_shifts' => $s->tracks_shifts,
                 'requires_overseer' => $s->requires_overseer,
+                'counting_rules' => $s->countingRules(),
                 'current_shift' => $this->shifts->currentFor($s->id),
             ])->values()->all(),
             'brand' => BrandProfile::view(BrandProfile::query()->first()),

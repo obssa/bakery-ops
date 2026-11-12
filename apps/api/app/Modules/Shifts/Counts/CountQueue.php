@@ -101,7 +101,7 @@ final class CountQueue
             $row['lines_count'] = count($row['lines']);
             unset($row['lines'], $row['cash'], $row['below_reserved']);
             $out[] = $row + [
-                'station' => ['id' => $station->id, 'code' => $station->code->value, 'name_en' => $station->name_en, 'name_am' => $station->name_am, 'requires_overseer' => $station->requires_overseer],
+                'station' => ['id' => $station->id, 'code' => $station->code->value, 'name_en' => $station->name_en, 'name_am' => $station->name_am, 'requires_overseer' => $station->requires_overseer, 'counting_rules' => $station->countingRules()],
                 'shift' => ['id' => $shift->id, 'date' => $shift->date->toDateString(), 'status' => $shift->status->value],
                 'variance_lines' => $varying,
             ];

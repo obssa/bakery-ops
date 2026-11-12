@@ -25,7 +25,7 @@ pest()->group('module:shifts', 'feature');
 beforeEach(function () {
     $this->branch = actInBranch(Branch::factory()->create());
     $this->f = ShiftsFixture::build($this->branch, $this);
-    $this->f->kitchen->forceFill(['requires_overseer' => true])->save();
+    $this->f->kitchen->forceFill(['count_cosign' => true])->save();
     $this->travelTo(CarbonImmutable::parse('2026-11-02 08:00:00', 'UTC'));
     $this->place = $this->f->place($this->f->kitchen);
     $this->flour = $this->f->ingredient();

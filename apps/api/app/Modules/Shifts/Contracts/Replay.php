@@ -7,6 +7,7 @@ namespace App\Modules\Shifts\Contracts;
 use App\Modules\Inventory\Contracts\Locations;
 use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Orders\Contracts\Orders;
+use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\ShiftRoster;
 use App\Modules\Shifts\Models\StockCount;
@@ -170,10 +171,28 @@ final class Replay
             return $decision === null ? 'approved' : $decision->value;
         }
         if (self::byThen($count->submitted_at, $t) !== null) {
-            return $station->requires_overseer && self::byThen($count->cosigned_at, $t) === null ? 'awaiting_cosign' : 'pending_approval';
+            return self::waitedForCosign($count, $station) && self::byThen($count->cosigned_at, $t) === null ? 'awaiting_cosign' : 'pending_approval';
         }
 
         return 'draft';
+    }
+
+    /**
+     * Did this count wait for a co-signature after it was handed in? Read from what the count did, not from today's counting rule, which the
+     * admin may have switched since (ADR 0025): a co-signed count did, one that waits for it now does, and one that was approved without a
+     * co-signature never did (nothing leaves `awaiting_cosign` for a decision unsigned). The one case its rows cannot tell is a count
+     * rejected before anyone co-signed it (a co-signer and an approver both reject); that one follows the station's co-sign rule.
+     */
+    private static function waitedForCosign(StockCount $count, Station $station): bool
+    {
+        if ($count->cosigned_at !== null || $count->status === CountStatus::AwaitingCosign) {
+            return true;
+        }
+        if ($count->status === CountStatus::Rejected) {
+            return $station->count_cosign;
+        }
+
+        return false;
     }
 
     /** The timestamp when it had happened by the moment, else null. */

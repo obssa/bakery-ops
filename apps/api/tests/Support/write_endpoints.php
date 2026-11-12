@@ -1517,6 +1517,18 @@ return [
     ],
     // Counts (step 3.3a): variance reasons, close, the lines of a count and its submit
     [
+        'method' => 'PUT',
+        'uri' => '/api/v1/counting-rules',
+        'module' => 'shifts',
+        'table' => 'audit_log',
+        'setup' => function (TestCase $t) use ($shiftsFloor): array {
+            $shiftsFloor($t);
+
+            return [];
+        },
+        'payload' => fn (): array => ['stations' => [['id' => Station::query()->where('code', StationCode::Kitchen)->latest('id')->firstOrFail()->id, 'opening_count' => false]]],
+    ],
+    [
         'method' => 'POST',
         'uri' => '/api/v1/variance-reasons',
         'module' => 'shifts',
@@ -1646,7 +1658,7 @@ return [
         'table' => 'audit_log',
         'setup' => function (TestCase $t) use ($shiftsFloor): array {
             $f = $shiftsFloor($t);
-            $f->kitchen->forceFill(['requires_overseer' => true])->save();
+            $f->kitchen->forceFill(['count_cosign' => true])->save();
             $item = $f->ingredient();
             $f->stock($item, $f->place($f->kitchen), '100');
             $shift = $f->running($f->kitchen, $f->chef);

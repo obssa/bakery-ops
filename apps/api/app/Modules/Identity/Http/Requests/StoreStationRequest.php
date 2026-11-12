@@ -49,6 +49,9 @@ final class StoreStationRequest extends FormRequest
             'name_en' => (string) $data['name_en'],
             'name_am' => (string) $data['name_am'],
             'requires_overseer' => (bool) ($data['requires_overseer'] ?? false),
+            // a new station's counts are co-signed where its batches are (the counting rules start as the migration started them, ADR 0025);
+            // after that the two are separate: Admin > System > Counting rules switches co-sign, People the overseer
+            'count_cosign' => (bool) ($data['requires_overseer'] ?? false),
             // a warehouse runs no shifts unless it is said to (plan section 3, migration 2); every other station does
             'tracks_shifts' => (bool) ($data['tracks_shifts'] ?? $data['code'] !== StationCode::Store->value),
             'sort' => (int) ($data['sort'] ?? 0),

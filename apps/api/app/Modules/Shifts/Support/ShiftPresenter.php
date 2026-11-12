@@ -64,6 +64,7 @@ final class ShiftPresenter
             'name_am' => $station->name_am,
             'tracks_shifts' => $station->tracks_shifts,
             'requires_overseer' => $station->requires_overseer,
+            'counting_rules' => $station->countingRules(),
         ];
     }
 

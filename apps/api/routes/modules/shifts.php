@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Shifts\Http\Controllers\ChainController;
+use App\Modules\Shifts\Http\Controllers\CountingRulesController;
 use App\Modules\Shifts\Http\Controllers\CountsController;
 use App\Modules\Shifts\Http\Controllers\HandoverController;
 use App\Modules\Shifts\Http\Controllers\NotesController;
@@ -41,7 +42,11 @@ Route::prefix('api/v1')->middleware(['api', 'auth:sanctum', 'actor'])->group(fun
         Route::get('/stations/{station}/handover', [HandoverController::class, 'show'])->whereNumber('station')->middleware('device')->name('shifts.handover');
     });
 
+    // the counting rules (ADR 0025): the admin reads and switches them in Admin > System > Counting rules
+    Route::get('/counting-rules', [CountingRulesController::class, 'show'])->middleware('permission:shifts.manage')->name('shifts.counting_rules.show');
+
     Route::middleware(['permission:shifts.manage', 'idempotency'])->group(function (): void {
+        Route::put('/counting-rules', [CountingRulesController::class, 'update'])->name('shifts.counting_rules.update');
         Route::post('/shift-templates', [TemplatesController::class, 'store'])->name('shifts.templates.store');
         Route::patch('/shift-templates/{template}', [TemplatesController::class, 'update'])->whereNumber('template')->name('shifts.templates.update');
         Route::delete('/shift-templates/{template}', [TemplatesController::class, 'destroy'])->whereNumber('template')->name('shifts.templates.destroy');

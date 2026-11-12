@@ -107,7 +107,7 @@ it('announces a refused submit never', function () {
 });
 
 it('announces the co-signature as a second CountSubmitted whose status moves on', function () {
-    $this->f->kitchen->forceFill(['requires_overseer' => true])->save();
+    $this->f->kitchen->forceFill(['count_cosign' => true])->save();
     $this->f->overseer($this->f->cashier2, $this->f->kitchen);
     ($this->fill)();
     Event::fake([CountSubmitted::class]);
@@ -182,7 +182,7 @@ it('announces no decision when it is refused', function () {
 });
 
 it('reaches the right inboxes through the real events when the queue runs inline', function () {
-    $this->f->kitchen->forceFill(['requires_overseer' => true])->save();
+    $this->f->kitchen->forceFill(['count_cosign' => true])->save();
     $this->f->overseer($this->f->cashier2, $this->f->kitchen);
     ($this->fill)();
     $heard = fn (string $type): array => Notification::query()->where('type', $type)->orderBy('user_id')->pluck('user_id')->all();

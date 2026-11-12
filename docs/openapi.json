@@ -486,6 +486,25 @@
                                                     "requires_overseer": {
                                                         "type": "boolean"
                                                     },
+                                                    "counting_rules": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "opening_count": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "cosign": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "approval": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "opening_count",
+                                                            "cosign",
+                                                            "approval"
+                                                        ]
+                                                    },
                                                     "current_shift": {
                                                         "type": [
                                                             "object",
@@ -523,6 +542,7 @@
                                                     "name_am",
                                                     "tracks_shifts",
                                                     "requires_overseer",
+                                                    "counting_rules",
                                                     "current_shift"
                                                 ]
                                             }
@@ -3083,6 +3103,129 @@
                 }
             }
         },
+        "/v1/counting-rules": {
+            "get": {
+                "operationId": "shifts.counting_rules.show",
+                "tags": [
+                    "CountingRules"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "stations": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "waiting": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "awaiting_cosign": {
+                                                            "type": "integer"
+                                                        },
+                                                        "pending_approval": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "awaiting_cosign",
+                                                        "pending_approval"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "stations",
+                                                "waiting"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "shifts.counting_rules.update",
+                "tags": [
+                    "CountingRules"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SaveCountingRulesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "stations": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                },
+                                                "waiting": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "awaiting_cosign": {
+                                                            "type": "integer"
+                                                        },
+                                                        "pending_approval": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "awaiting_cosign",
+                                                        "pending_approval"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "stations",
+                                                "waiting"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/shifts/{shift}/counts": {
             "get": {
                 "operationId": "shifts.counts.index",
@@ -4607,6 +4750,25 @@
                                                         },
                                                         "requires_overseer": {
                                                             "type": "boolean"
+                                                        },
+                                                        "counting_rules": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "opening_count": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "cosign": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "approval": {
+                                                                    "type": "boolean"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "opening_count",
+                                                                "cosign",
+                                                                "approval"
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
@@ -4615,7 +4777,8 @@
                                                         "name_en",
                                                         "name_am",
                                                         "tracks_shifts",
-                                                        "requires_overseer"
+                                                        "requires_overseer",
+                                                        "counting_rules"
                                                     ]
                                                 },
                                                 "template": {
@@ -4956,6 +5119,25 @@
                                                 },
                                                 "requires_overseer": {
                                                     "type": "boolean"
+                                                },
+                                                "counting_rules": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "opening_count": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "cosign": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "approval": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "opening_count",
+                                                        "cosign",
+                                                        "approval"
+                                                    ]
                                                 }
                                             },
                                             "required": [
@@ -4964,7 +5146,8 @@
                                                 "name_en",
                                                 "name_am",
                                                 "tracks_shifts",
-                                                "requires_overseer"
+                                                "requires_overseer",
+                                                "counting_rules"
                                             ]
                                         },
                                         "shift": {
@@ -4999,6 +5182,25 @@
                                                         },
                                                         "requires_overseer": {
                                                             "type": "boolean"
+                                                        },
+                                                        "counting_rules": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "opening_count": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "cosign": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "approval": {
+                                                                    "type": "boolean"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "opening_count",
+                                                                "cosign",
+                                                                "approval"
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
@@ -5007,7 +5209,8 @@
                                                         "name_en",
                                                         "name_am",
                                                         "tracks_shifts",
-                                                        "requires_overseer"
+                                                        "requires_overseer",
+                                                        "counting_rules"
                                                     ]
                                                 },
                                                 "template": {
@@ -12434,6 +12637,25 @@
                                                                     },
                                                                     "requires_overseer": {
                                                                         "type": "boolean"
+                                                                    },
+                                                                    "counting_rules": {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                            "opening_count": {
+                                                                                "type": "boolean"
+                                                                            },
+                                                                            "cosign": {
+                                                                                "type": "boolean"
+                                                                            },
+                                                                            "approval": {
+                                                                                "type": "boolean"
+                                                                            }
+                                                                        },
+                                                                        "required": [
+                                                                            "opening_count",
+                                                                            "cosign",
+                                                                            "approval"
+                                                                        ]
                                                                     }
                                                                 },
                                                                 "required": [
@@ -12442,7 +12664,8 @@
                                                                     "name_en",
                                                                     "name_am",
                                                                     "tracks_shifts",
-                                                                    "requires_overseer"
+                                                                    "requires_overseer",
+                                                                    "counting_rules"
                                                                 ]
                                                             },
                                                             "template": {
@@ -12767,6 +12990,25 @@
                                                 },
                                                 "requires_overseer": {
                                                     "type": "boolean"
+                                                },
+                                                "counting_rules": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "opening_count": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "cosign": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "approval": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "opening_count",
+                                                        "cosign",
+                                                        "approval"
+                                                    ]
                                                 }
                                             },
                                             "required": [
@@ -12775,7 +13017,8 @@
                                                 "name_en",
                                                 "name_am",
                                                 "tracks_shifts",
-                                                "requires_overseer"
+                                                "requires_overseer",
+                                                "counting_rules"
                                             ]
                                         },
                                         "template": {
@@ -13305,6 +13548,25 @@
                                                 },
                                                 "requires_overseer": {
                                                     "type": "boolean"
+                                                },
+                                                "counting_rules": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "opening_count": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "cosign": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "approval": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "opening_count",
+                                                        "cosign",
+                                                        "approval"
+                                                    ]
                                                 }
                                             },
                                             "required": [
@@ -13313,7 +13575,8 @@
                                                 "name_en",
                                                 "name_am",
                                                 "tracks_shifts",
-                                                "requires_overseer"
+                                                "requires_overseer",
+                                                "counting_rules"
                                             ]
                                         },
                                         "template": {
@@ -13584,6 +13847,25 @@
                                                 },
                                                 "requires_overseer": {
                                                     "type": "boolean"
+                                                },
+                                                "counting_rules": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "opening_count": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "cosign": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "approval": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "opening_count",
+                                                        "cosign",
+                                                        "approval"
+                                                    ]
                                                 }
                                             },
                                             "required": [
@@ -13592,7 +13874,8 @@
                                                 "name_en",
                                                 "name_am",
                                                 "tracks_shifts",
-                                                "requires_overseer"
+                                                "requires_overseer",
+                                                "counting_rules"
                                             ]
                                         },
                                         "template": {
@@ -13854,6 +14137,25 @@
                                                 },
                                                 "requires_overseer": {
                                                     "type": "boolean"
+                                                },
+                                                "counting_rules": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "opening_count": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "cosign": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "approval": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "opening_count",
+                                                        "cosign",
+                                                        "approval"
+                                                    ]
                                                 }
                                             },
                                             "required": [
@@ -13862,7 +14164,8 @@
                                                 "name_en",
                                                 "name_am",
                                                 "tracks_shifts",
-                                                "requires_overseer"
+                                                "requires_overseer",
+                                                "counting_rules"
                                             ]
                                         },
                                         "template": {
@@ -14121,6 +14424,25 @@
                                                 },
                                                 "requires_overseer": {
                                                     "type": "boolean"
+                                                },
+                                                "counting_rules": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "opening_count": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "cosign": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "approval": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "opening_count",
+                                                        "cosign",
+                                                        "approval"
+                                                    ]
                                                 }
                                             },
                                             "required": [
@@ -14129,7 +14451,8 @@
                                                 "name_en",
                                                 "name_am",
                                                 "tracks_shifts",
-                                                "requires_overseer"
+                                                "requires_overseer",
+                                                "counting_rules"
                                             ]
                                         },
                                         "template": {
@@ -14391,6 +14714,25 @@
                                                         },
                                                         "requires_overseer": {
                                                             "type": "boolean"
+                                                        },
+                                                        "counting_rules": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "opening_count": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "cosign": {
+                                                                    "type": "boolean"
+                                                                },
+                                                                "approval": {
+                                                                    "type": "boolean"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "opening_count",
+                                                                "cosign",
+                                                                "approval"
+                                                            ]
                                                         }
                                                     },
                                                     "required": [
@@ -14399,7 +14741,8 @@
                                                         "name_en",
                                                         "name_am",
                                                         "tracks_shifts",
-                                                        "requires_overseer"
+                                                        "requires_overseer",
+                                                        "counting_rules"
                                                     ]
                                                 },
                                                 "template": {
@@ -18485,6 +18828,42 @@
                     "assignments"
                 ],
                 "title": "ReplaceUserStationsRequest"
+            },
+            "SaveCountingRulesRequest": {
+                "type": "object",
+                "description": "PUT /counting-rules (ADR 0025): the stations to change and, for each, any of the three rules. Every station named must be one of the\nbranch's stations that runs shifts (another branch's, a removed one or the warehouse is a 422 on its id), each at most once, and each\nentry must change at least one rule. Stations not named keep their rules.",
+                "properties": {
+                    "stations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "opening_count": {
+                                    "type": "boolean"
+                                },
+                                "cosign": {
+                                    "type": "boolean"
+                                },
+                                "approval": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "id"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "uniqueItems": true
+                    }
+                },
+                "required": [
+                    "stations"
+                ],
+                "title": "SaveCountingRulesRequest"
             },
             "ScheduleShiftRequest": {
                 "type": "object",

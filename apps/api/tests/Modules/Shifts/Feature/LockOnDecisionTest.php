@@ -107,7 +107,7 @@ it('locks a count when it is approved, in the same step, with the adjustment in 
 
 it('locks a count that a co-signature resolves without a difference', function () {
     $this->f->overseer($this->f->manager, $this->f->kitchen);
-    DB::table('stations')->where('id', $this->f->kitchen->id)->update(['requires_overseer' => true]);
+    DB::table('stations')->where('id', $this->f->kitchen->id)->update(['count_cosign' => true]);
     ($this->same)();
     $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'awaiting_cosign');
 

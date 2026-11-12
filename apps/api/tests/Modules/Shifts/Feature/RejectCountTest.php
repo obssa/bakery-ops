@@ -180,7 +180,7 @@ it('refuses a count that is not waiting for a decision, naming its status', func
 })->with(['draft', 'approved']);
 
 it('rejects a count that waits for a co-signature too', function () {
-    $this->f->kitchen->forceFill(['requires_overseer' => true])->save();
+    $this->f->kitchen->forceFill(['count_cosign' => true])->save();
     $this->f->lines($this->f->chef, $this->count, ['confirm_all' => true, 'lines' => [['item_id' => $this->flour->id, 'counted_qty' => '9500', 'reason_id' => $this->f->reasonId('spoilage')]]])->assertOk();
     $this->f->submit($this->f->chef, $this->count)->assertOk()->assertJsonPath('status', 'awaiting_cosign');
 

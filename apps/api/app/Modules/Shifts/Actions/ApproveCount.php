@@ -5,27 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Shifts\Actions;
 
 use App\Modules\Audit\Contracts\AuditedAction;
-use App\Modules\Catalog\Contracts\Items;
-use App\Modules\Inventory\Contracts\StockLevel;
-use App\Modules\Inventory\Ledger\Ledger;
-use App\Modules\Inventory\Ledger\MovementIntent;
-use App\Modules\Inventory\Ledger\MovementReason;
-use App\Modules\Shifts\Contracts\HashChain;
+use App\Modules\Shifts\Counts\CountApproval;
 use App\Modules\Shifts\Counts\CountLock;
-use App\Modules\Shifts\Counts\VarianceMath;
 use App\Modules\Shifts\Enums\CountDecision;
 use App\Modules\Shifts\Enums\CountStatus;
-use App\Modules\Shifts\Enums\ReasonStatus;
 use App\Modules\Shifts\Exceptions\ShiftError;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
-use App\Modules\Shifts\Models\StockCountLine;
 use App\Modules\Shifts\Support\ShiftAccess;
-use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Station;
-use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
-use Ramsey\Uuid\Uuid;
 
 /**
  * POST /stock-counts/{count}/approve (phase-3 plan section 4, "How a count works", and section 10.4). One AuditedAction
@@ -33,6 +22,7 @@ use Ramsey\Uuid\Uuid;
  * every variance line in ascending (item_id, location_id) order (Ledger::lock, and again inside Ledger::appendMany, which reuses
  * the locks it already holds).
  *
+ * The writes are CountApproval's (shared with the counting rule that approves by itself where manager approval is off, ADR 0025).
  * Under those locks one `count_adjustment` is written for every line with a variance, both signs, in a single Ledger::appendMany run
  * as the counted shift (ActorContext::runAs with the count's shift and station: the approver is still the user, the row names the
  * shift whose stock it corrects). The quantity is the DELTA (counted minus expected at the snapshot), never "set the stock to the
@@ -57,11 +47,8 @@ final class ApproveCount
     public function __construct(
         private readonly AuditedAction $audit,
         private readonly ShiftAccess $access,
-        private readonly Ledger $ledger,
-        private readonly ActorContext $actor,
         private readonly CountAnnouncer $announcer,
-        private readonly Items $items,
-        private readonly HashChain $chain,
+        private readonly CountApproval $approval,
     ) {}
 
     /**
@@ -92,34 +79,9 @@ final class ApproveCount
                 }
                 ShiftLock::refresh($shift);
 
-                $lines = StockCountLine::query()->where('count_id', $c->id)->orderBy('item_id')->get();
-                $varying = $lines->filter(static fn (StockCountLine $line): bool => $line->variance_qty instanceof Quantity && ! $line->variance_qty->isZero())->values();
-                $deleted = $this->items->deleted(array_values($varying->pluck('item_id')->map(static fn (mixed $id): int => (int) $id)->all()));
-                if ($deleted !== []) {
-                    throw ShiftError::itemUnavailable($deleted);
-                }
-                $written = $this->adjust($c, $shift, array_values($varying->all()));
-
-                $now = CarbonImmutable::now()->startOfSecond();
-                foreach ($lines as $line) {
-                    $line->forceFill(['adjustment_movement_id' => $written[$line->id] ?? null]);
-                    if ($line->reason_status === ReasonStatus::Pending) {
-                        $line->reason_status = $line->reason_status->transitionTo(ReasonStatus::Accepted);
-                    }
-                    $line->save();
-                }
-                $c->forceFill([
-                    'status' => $c->status->transitionTo(CountStatus::Approved),
-                    'decision' => CountDecision::Approved,
-                    'decided_by_user_id' => $person,
-                    'decided_at' => $now,
-                    'decision_note' => $note,
-                    'version' => $c->version + 1,
-                ])->save();
-
-                $this->chain->lock($c, $person);
-                ShiftResolution::lockWhenResolved($shift, $now);
-                $this->announcer->decided($c, count($written));
+                $written = $this->approval->approve($c, $shift, $person, $note, $person);
+                ShiftResolution::lockWhenResolved($shift, CarbonImmutable::now()->startOfSecond());
+                $this->announcer->decided($c, $written);
 
                 return $c;
             }, $count, 'count.approve');
@@ -132,53 +94,5 @@ final class ApproveCount
     private static function decidedApproved(StockCount $count): bool
     {
         return $count->decision === CountDecision::Approved && in_array($count->status, [CountStatus::Approved, CountStatus::Locked], true);
-    }
-
-    /**
-     * Write the adjustments of the variance lines or none.
-     *
-     * @param  list<StockCountLine>  $varying
-     * @return array<int, int> movement id by line id
-     *
-     * @throws ShiftError shifts.adjustment.insufficient
-     */
-    private function adjust(StockCount $count, ShiftInstance $shift, array $varying): array
-    {
-        if ($varying === []) {
-            return [];
-        }
-
-        $pairs = [];
-        foreach ($varying as $line) {
-            $pairs[] = [$line->item_id, $count->location_id];
-        }
-        $levels = $this->ledger->lock($pairs);
-        $intents = [];
-        foreach ($varying as $line) {
-            $delta = $line->variance_qty ?? Quantity::zero();
-            $level = $levels[Ledger::key($line->item_id, $count->location_id)] ?? null;
-            $onHand = $level instanceof StockLevel ? $level->onHand : Quantity::zero();
-            VarianceMath::assertApplicable($line->item_id, $count->location_id, $onHand, $delta);
-            $intents[] = MovementIntent::of(
-                $line->item_id,
-                $count->location_id,
-                $delta,
-                MovementReason::CountAdjustment,
-                'stock_count_line',
-                $line->id,
-                null,
-                Uuid::uuid5(Uuid::NAMESPACE_URL, "count-line:{$count->branch_id}:{$line->id}")->toString(),
-            );
-        }
-
-        $stamp = ['shift_instance_id' => $shift->id, 'station_id' => $shift->station_id] + $this->actor->toArray();
-        $movements = $this->actor->runAs($stamp, fn (): array => $this->ledger->appendMany($intents));
-
-        $byLine = [];
-        foreach ($varying as $index => $line) {
-            $byLine[$line->id] = $movements[$index]->id;
-        }
-
-        return $byLine;
     }
 }

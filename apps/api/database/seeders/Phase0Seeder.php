@@ -229,6 +229,7 @@ final class Phase0Seeder extends Seeder
                     'name_en' => $name->en,
                     'name_am' => $name->am,
                     'requires_overseer' => $spec['requires_overseer'],
+                    'count_cosign' => $spec['requires_overseer'], // the counting rules start as the migration starts them (ADR 0025)
                     'tracks_shifts' => $code !== StationCode::Store->value, // the warehouse runs no shifts, as POST /stations decides
                     'sort' => $spec['sort'],
                 ]), null, 'station.create', self::SOURCE);

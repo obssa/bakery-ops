@@ -261,7 +261,7 @@ it('does not see another branch\'s count', function () {
 });
 
 it('sends the count to a co-signer first at a station that requires an overseer', function () {
-    $this->f->kitchen->forceFill(['requires_overseer' => true])->save();
+    $this->f->kitchen->forceFill(['count_cosign' => true])->save();
     $count = ($this->closeAndGetCount)();
     $this->f->lines($this->f->chef, $count, ['confirm_all' => true])->assertOk();
 
