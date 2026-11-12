@@ -11,6 +11,7 @@ return [
     ],
     'demo_login' => [
         'unavailable' => 'ለዚህ ሚና የማሳያ መለያ የለም።',
+        'not_demo_branch' => 'የማሳያ መግቢያ ቁልፎችን ማብራትና ማጥፋት የሚችለው የማሳያ ዳቦ ቤቱ አስተዳዳሪ ብቻ ነው።',
     ],
     'branch' => [
         'required' => 'የትኛውን ቅርንጫፍ እንደሆነ ይግለጹ (branch_id)።',

@@ -6,6 +6,7 @@ use App\Modules\Identity\Http\Controllers\AuthController;
 use App\Modules\Identity\Http\Controllers\BrandController;
 use App\Modules\Identity\Http\Controllers\BroadcastingAuthController;
 use App\Modules\Identity\Http\Controllers\DemoLoginController;
+use App\Modules\Identity\Http\Controllers\DemoLoginSwitchController;
 use App\Modules\Identity\Http\Controllers\DevicesController;
 use App\Modules\Identity\Http\Controllers\ShortCodeController;
 use App\Modules\Identity\Http\Controllers\StationsController;
@@ -21,7 +22,8 @@ use Illuminate\Support\Facades\Route;
  */
 Route::prefix('api/v1')->middleware('api')->group(function (): void {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login')->name('identity.login');
-    // TEMPORARY (ADR 0025): the sign-in page's one-click demo buttons; both answer 404 unless bakery.demo.login is on
+    // TEMPORARY (ADR 0025): the sign-in page's one-click demo buttons; both answer 404 unless the demo branch's admin switched them on
+    // (PUT /brand/demo-login) and the server does not force them off (BAKERY_DEMO_LOGIN=false)
     Route::get('/demo-logins', [DemoLoginController::class, 'index'])->middleware('throttle:demo-logins')->name('identity.demo-logins.index');
     Route::post('/demo-login', [DemoLoginController::class, 'store'])->middleware('throttle:login')->name('identity.demo-login');
     // a station route (step 5.1a): the pad's lock screen answers only an enrolled pad once identity.require_enrolled_device is on
@@ -63,6 +65,9 @@ Route::prefix('api/v1')->middleware('api')->group(function (): void {
             Route::put('/brand/clock', [BrandController::class, 'updateClock'])->middleware('idempotency')->name('identity.brand.clock');
             Route::post('/brand/logo', [BrandController::class, 'storeLogo'])->middleware('idempotency')->name('identity.brand.logo.store');
             Route::delete('/brand/logo', [BrandController::class, 'destroyLogo'])->middleware('idempotency')->name('identity.brand.logo.destroy');
+            // TEMPORARY (ADR 0025): the demo branch's admin switches the sign-in page's demo buttons on and off (Admin > System)
+            Route::get('/brand/demo-login', [DemoLoginSwitchController::class, 'show'])->name('identity.brand.demo-login.show');
+            Route::put('/brand/demo-login', [DemoLoginSwitchController::class, 'update'])->middleware('idempotency')->name('identity.brand.demo-login.update');
         });
     });
 

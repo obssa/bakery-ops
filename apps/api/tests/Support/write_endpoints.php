@@ -303,6 +303,20 @@ return [
         },
         'payload' => fn (): array => ['clock_also' => 'h12'],
     ],
+    // TEMPORARY (ADR 0025): the demo branch's switch of the sign-in page's demo buttons; the first save writes the demo branch's row
+    [
+        'method' => 'PUT',
+        'uri' => '/api/v1/brand/demo-login',
+        'module' => 'identity',
+        'table' => 'brand_profiles',
+        'setup' => function (TestCase $t) use ($admin): array {
+            $me = $admin();
+            Branch::query()->whereKey($me->branch_id)->update(['name' => (string) config('bakery.demo.branch'), 'settings' => json_encode(['demo' => true])]);
+
+            return [];
+        },
+        'payload' => fn (): array => ['on' => true],
+    ],
     [
         'method' => 'POST',
         'uri' => '/api/v1/brand/logo',

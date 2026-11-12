@@ -20,7 +20,8 @@ export interface DemoPerson {
 
 /**
  * TEMPORARY (ADR 0025, Ramin 2026-11-12): one button per role that signs its demo person in without a password, so the owner can look
- * at every role's screens. The section is drawn only when GET /demo-logins answers (the server's BAKERY_DEMO_LOGIN is on); any other
+ * at every role's screens. The section is drawn only when GET /demo-logins answers (the demo bakery's admin switched it on in Admin > System,
+ * PUT /brand/demo-login, and the server's BAKERY_DEMO_LOGIN=false does not force it off); any other
  * answer (404 when it is off, a network failure) draws nothing, and the page is the plain sign-in page. Removal: delete this file and its
  * line in page.tsx, the `login.demo` messages and ROLE_ICONS, with the API side (App\Modules\Identity\Demo\DemoLogins).
  */

@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace App\Modules\Identity\Demo;
 
+use App\Modules\Identity\Models\BrandProfile;
 use App\Modules\Identity\Models\User;
 use App\Shared\Models\Branch;
 use App\Shared\Tenancy\BranchScope;
 
 /**
  * TEMPORARY (ADR 0025, Ramin 2026-11-12): the demo people the sign-in page offers as one-click buttons, one per role, so the owner can
- * look at every role's screens without typing a password. Only while bakery.demo.login is on, only in the demo branch (named
+ * look at every role's screens without typing a password. Only while the demo branch's admin has switched them on in Admin > System
+ * (brand_profiles.demo_login, PUT /brand/demo-login) and the server does not force them off (BAKERY_DEMO_LOGIN=false,
+ * bakery.demo.login_forced_off), only in the demo branch (named
  * bakery.demo.branch and marked settings.demo = true by bakery:seed-demo), and only the accounts listed here, found by their made-up
  * phone numbers (Database\Seeders\Demo\DemoBakery::PEOPLE; DemoLoginTest keeps the two lists in step): the second waiter and the
  * shared pad's account are never offered, nor anyone the admin adds to the demo branch, nor anyone of another branch.
  *
- * Removal: unset BAKERY_DEMO_LOGIN on the server, then delete this class, DemoLoginController, its request, its two routes and the
- * web section (components/DemoLogins.tsx).
+ * Removal: switch it off in Admin > System (or set BAKERY_DEMO_LOGIN=false on the server), then delete this class, DemoLoginController,
+ * DemoLoginSwitchController, their requests and routes, the brand_profiles.demo_login column (a new migration) and the web parts
+ * (app/[locale]/login/DemoLogins.tsx, components/system/DemoLoginCard.tsx).
  */
 final class DemoLogins
 {
@@ -32,9 +36,52 @@ final class DemoLogins
         'bread_baker' => '+251900000109',
     ];
 
+    /** The buttons are offered: the server does not force them off, and the demo branch's admin switched them on. */
     public function enabled(): bool
     {
-        return config('bakery.demo.login') === true;
+        if ($this->forcedOff()) {
+            return false;
+        }
+        $branch = $this->branch();
+
+        return $branch !== null && $this->switchedOn($branch->id);
+    }
+
+    /** BAKERY_DEMO_LOGIN=false on the server: off whatever the switch says (the kill switch). */
+    public function forcedOff(): bool
+    {
+        return config('bakery.demo.login_forced_off') === true;
+    }
+
+    /** Whether $branchId is the demo branch, the only one whose admin holds the switch. */
+    public function isDemoBranch(int $branchId): bool
+    {
+        return $this->branch()?->id === $branchId;
+    }
+
+    /**
+     * The switch as Admin > System shows it to the admin of $branchId: on (the saved position), available (this is the demo branch, so
+     * this admin may switch it) and forced_off (the server's kill switch; the buttons stay off whatever is saved).
+     *
+     * @return array{on: bool, available: bool, forced_off: bool}
+     */
+    public function state(int $branchId): array
+    {
+        $available = $this->isDemoBranch($branchId);
+
+        return [
+            'on' => $available && $this->switchedOn($branchId),
+            'available' => $available,
+            'forced_off' => $this->forcedOff(),
+        ];
+    }
+
+    private function switchedOn(int $branchId): bool
+    {
+        return BrandProfile::query()->withoutGlobalScope(BranchScope::class)
+            ->where('branch_id', $branchId)
+            ->where('demo_login', true)
+            ->exists();
     }
 
     /**

@@ -3855,6 +3855,111 @@
                 }
             }
         },
+        "/v1/brand/demo-login": {
+            "get": {
+                "operationId": "identity.brand.demo-login.show",
+                "tags": [
+                    "DemoLoginSwitch"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "on": {
+                                                    "type": "string"
+                                                },
+                                                "available": {
+                                                    "type": "boolean"
+                                                },
+                                                "forced_off": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "on",
+                                                "available",
+                                                "forced_off"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "put": {
+                "operationId": "identity.brand.demo-login.update",
+                "tags": [
+                    "DemoLoginSwitch"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateDemoLoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "on": {
+                                                    "type": "string"
+                                                },
+                                                "available": {
+                                                    "type": "boolean"
+                                                },
+                                                "forced_off": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "on",
+                                                "available",
+                                                "forced_off"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    }
+                }
+            }
+        },
         "/v1/devices": {
             "get": {
                 "operationId": "identity.devices.index",
@@ -20726,6 +20831,19 @@
                     }
                 },
                 "title": "UpdateChannelRequest"
+            },
+            "UpdateDemoLoginRequest": {
+                "type": "object",
+                "description": "TEMPORARY (ADR 0025): PUT /brand/demo-login {on: true|false}, the demo branch's switch of the sign-in page's demo buttons. Anything but a\nboolean is 422 validation.failed.",
+                "properties": {
+                    "on": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "on"
+                ],
+                "title": "UpdateDemoLoginRequest"
             },
             "UpdateDiningTableRequest": {
                 "type": "object",

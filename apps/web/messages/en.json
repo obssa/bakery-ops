@@ -776,6 +776,18 @@
       "saved_none": "Saved: Ethiopian time only.",
       "saved_h12": "Saved: the 12-hour international time shows beside Ethiopian time.",
       "saved_h24": "Saved: the 24-hour international time shows beside Ethiopian time."
+    },
+    "demo_login": {
+      "title": "Demo sign-in buttons",
+      "temporary": "Temporary",
+      "intro": "On: the sign-in page shows one button per demo role; anyone with the link can open the demo bakery as any role, admin included. Turn it off before the bakery uses the site.",
+      "switch": "Demo sign-in buttons",
+      "hint_on": "On: the sign-in page shows the eight role buttons.",
+      "hint_off": "Off: the sign-in page asks for a phone number and password only.",
+      "forced_off": "The server has switched them off (BAKERY_DEMO_LOGIN=false), so they cannot be turned on here until the server allows it.",
+      "see_login": "See the sign-in page",
+      "saved_on": "Demo sign-in buttons are on.",
+      "saved_off": "Demo sign-in buttons are off."
     }
   },
   "counting_rules": {

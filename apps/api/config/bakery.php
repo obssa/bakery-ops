@@ -46,10 +46,16 @@ return [
         // testing (the seeders refuse to run without it); local and testing fall back to the documented
         // Database\Seeders\Demo\DemoCredentials::LOCAL_PASSWORD, which is refused everywhere else.
         'password' => env('BAKERY_DEMO_PASSWORD'),
-        // TEMPORARY (ADR 0025, Ramin 2026-11-12): one-click sign-in as each demo person on the sign-in page, without a password. Off
-        // unless BAKERY_DEMO_LOGIN=true; off, GET /demo-logins and POST /demo-login answer 404 and the page shows nothing. Anyone who
-        // can open the site can then sign in as any demo person, the demo admin included: turn it off before the shop uses the site.
-        'login' => filter_var(env('BAKERY_DEMO_LOGIN', false), FILTER_VALIDATE_BOOL),
+        // TEMPORARY (ADR 0025, Ramin 2026-11-12): one-click sign-in as each demo person on the sign-in page, without a password. The
+        // demo branch's admin switches it on and off in Admin > System (brand_profiles.demo_login, off by default); while off, GET
+        // /demo-logins and POST /demo-login answer 404 and the page shows nothing. BAKERY_DEMO_LOGIN=false (or 0, off, no) is the
+        // server's kill switch: off whatever the switch says. Unset (or anything else), the admin's switch decides. Anyone who can open
+        // the site can sign in as any demo person while it is on, the demo admin included: turn it off before the shop uses the site.
+        'login_forced_off' => (static function (): bool {
+            $value = env('BAKERY_DEMO_LOGIN');
+
+            return $value === false || in_array(strtolower(trim(is_scalar($value) ? (string) $value : '')), ['false', '0', 'off', 'no'], true);
+        })(),
         // How many days of trading history Phase4Seeder plays into a FRESH demo branch (phase-4 plan section 8): the clock is
         // anchored DEMO_HISTORY_DAYS + 2 days back and the days after the anchor are played to yesterday. A branch that already
         // holds data never gets history, whatever this says. CI's e2e-p4 uses the default; tests set a small number.

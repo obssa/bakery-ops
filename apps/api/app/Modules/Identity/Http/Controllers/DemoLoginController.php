@@ -12,8 +12,9 @@ use App\Modules\Identity\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 
 /**
- * TEMPORARY (ADR 0025): the sign-in page's demo buttons. Both routes are public and throttled, and both answer a bare 404 while
- * bakery.demo.login is off, as if they did not exist.
+ * TEMPORARY (ADR 0025): the sign-in page's demo buttons. Both routes are public and throttled, and both answer a bare 404 while the
+ * buttons are off (DemoLogins::enabled(): the demo branch's admin switch, PUT /brand/demo-login, unless BAKERY_DEMO_LOGIN=false forces
+ * them off), as if they did not exist.
  *
  *   GET  /demo-logins  {data: [{role, name_en, name_am}]}: the demo people that can be signed in, no phone number or code
  *   POST /demo-login   {role}: signs that demo person in; the answer is POST /login's (token, token_type, user, permissions, locale)

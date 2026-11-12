@@ -32,6 +32,8 @@ return [
     'PUT /api/v1/brand/clock' => 'identity',
     'POST /api/v1/brand/logo' => 'identity',
     'DELETE /api/v1/brand/logo' => 'identity',
+    'GET /api/v1/brand/demo-login' => 'identity',
+    'PUT /api/v1/brand/demo-login' => 'identity',
     'GET /api/v1/media/brand/{sha}.{ext}' => 'identity',
     'GET /api/v1/users' => 'identity',
     'POST /api/v1/users' => 'identity',

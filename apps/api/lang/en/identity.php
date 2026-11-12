@@ -12,6 +12,7 @@ return [
     ],
     'demo_login' => [
         'unavailable' => 'There is no demo account for that role.',
+        'not_demo_branch' => 'Only the demo bakery\'s admin can switch the demo sign-in buttons.',
     ],
     'branch' => [
         'required' => 'Say which branch you mean (branch_id).',

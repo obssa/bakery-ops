@@ -20,8 +20,6 @@ services:
       # (ci.yml gate-p4, files-s3): the tests keep the code default and turn the flag on themselves where they test it.
       IDENTITY_REQUIRE_DEVICE: "true"
       # The three Phase 3 shift rules are ON by default in the code (step 3.7e), so the e2e stack runs them without an override.
-      # TEMPORARY (ADR 0025): the sign-in page's one-click demo buttons, off unless the e2e job asks (e2e.yml input demo_login; e2e-p6 does).
-      BAKERY_DEMO_LOGIN: ${BAKERY_DEMO_LOGIN:-false}
       BROADCAST_CONNECTION: ${BROADCAST_CONNECTION:-null}
       REVERB_APP_ID: ci
       REVERB_APP_KEY: ci-key

@@ -45,6 +45,9 @@ return [
     'PUT /api/v1/brand/clock' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'POST /api/v1/brand/logo' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
     'DELETE /api/v1/brand/logo' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    // TEMPORARY (ADR 0025): the demo branch's admin switches the sign-in page's demo buttons on and off
+    'GET /api/v1/brand/demo-login' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
+    'PUT /api/v1/brand/demo-login' => ['permission' => 'branding.manage', 'roles' => ['admin'], 'module' => 'identity'],
     // live updates (step 1.2, ADR 0009): every active user may ask; the channel rules decide which channel (403 otherwise)
     'POST /api/v1/broadcasting/auth' => ['permission' => 'identity.authenticated', 'roles' => $all, 'module' => 'identity'],
 

@@ -59,7 +59,7 @@ export default async function LoginPage(props: LocaleProps) {
             <Smartphone className="mt-0.5 size-5 shrink-0 text-neutral-600" strokeWidth={1.75} aria-hidden="true" />
             <span>{t("login.station_hint")}</span>
           </p>
-          {/* TEMPORARY (ADR 0025): drawn only while the server's BAKERY_DEMO_LOGIN is on */}
+          {/* TEMPORARY (ADR 0025): drawn only while the demo bakery's admin has switched it on (Admin > System) */}
           <DemoLogins />
         </div>
 

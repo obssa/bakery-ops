@@ -737,13 +737,26 @@ passed only because the old `resolvePendingCounts` threw earlier, in the count s
 `settleStation` now takes who counts, and the capture has the cake baker count. Claim restated at `ee8de81` (after `main` brought the
 demo sign-in, ADR 0025, so the counting rules are ADR 0026); the tag stays on `2f6bbd9`.
 
+**phase-6/demo-login-switch (TEMPORARY, ADR 0025 amended; Ramin, 2026-11-12).** Turning the demo buttons on needed a line in the live
+`.env` and a configuration refresh on the server; Ramin asked for a better way. The demo bakery's admin now switches them in **Admin >
+System > Demo sign-in buttons** (a card marked "Temporary": one switch, what On means and who can then sign in, a link to the sign-in
+page). The switch is `brand_profiles.demo_login` on the demo branch's row (migration `2026_11_19_100000`, default off), read by
+`GET /brand/demo-login` and changed by `PUT /brand/demo-login {on}` (`branding.manage`, idempotent, audited `identity.brand.demo_login`
+with before and after). Only the demo branch's admin holds it: another branch's admin sees no card and a PUT gets a bilingual 409
+(`identity.demo_login.not_demo_branch`). `BAKERY_DEMO_LOGIN` is now only a kill switch: `false` keeps the buttons off whatever is saved
+(the card then shows the switch off and disabled, with the reason); unset, the switch decides. The live `.env` needs nothing.
+`DemoLoginSwitchTest` pins the default, on and off with the audit rows, the name and clock kept, the replay, the kill switch, another
+branch's 409, the 403 of every other role and the boolean; `DemoLoginTest` now turns the buttons on through the switch and adds the kill
+switch and another branch's switch. CI no longer sets the variable: the e2e-p6 spec switches the buttons on and off as the demo admin on
+the System page, checks the sign-in page follows, captures the card at 1440 and 390 in both languages under axe, and leaves it off.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
       photos' licences meet the plan's rule), when convenient. The tests do not check Q4's point, and the photos ship in this public
       repository, so read it before calling that part settled.
 - [ ] Ramin: review the restyled screens on the live URL (Q18).
-- [ ] Ramin: turn the one-click demo sign-in off (delete `BAKERY_DEMO_LOGIN=true` from the live `.env`, `config:cache`) before the bakery
+- [ ] Ramin: turn the one-click demo sign-in off (Admin > System > Demo sign-in buttons, as the demo bakery's admin) before the bakery
       uses the site, then remove the feature (ADR 0025, "Removal").
 - [ ] Ramin: replace the demo photos with the shop's own through the product page's Replace, the weakest matches first (papaya juice, bottled water, Ethiopian coffee, bread roll, mulmul).
 - [ ] Phase 5's open items, unchanged (`phase-5-report.md`).

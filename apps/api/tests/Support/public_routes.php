@@ -13,7 +13,8 @@ return [
     'api/v1/auth/login',
     'api/v1/short-code/verify',
     // TEMPORARY (ADR 0025): the sign-in page's one-click demo buttons, public like /login and throttled; both answer 404 unless
-    // bakery.demo.login is on, and only the demo branch's listed demo people can be signed in (DemoLogins).
+    // the demo branch's admin switched them on (PUT /brand/demo-login) and BAKERY_DEMO_LOGIN does not force them off, and only the demo
+    // branch's listed demo people can be signed in (DemoLogins).
     'GET api/v1/demo-logins',
     'POST api/v1/demo-login',
     // Telegram calls it without a bearer token (step 2.5b): guarded by the secret in the path and the X-Telegram-Bot-Api-Secret-Token

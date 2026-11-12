@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $logo_key
  * @property int|null $logo_size
  * @property string $clock_also
+ * @property bool $demo_login
  * @property int $created_by_user_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -46,6 +47,7 @@ final class BrandProfile extends Model
         return [
             'branch_id' => 'integer',
             'logo_size' => 'integer',
+            'demo_login' => 'boolean',
             'created_by_user_id' => 'integer',
             'created_at' => 'immutable_datetime',
             'updated_at' => 'immutable_datetime',
