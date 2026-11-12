@@ -687,6 +687,19 @@ are; they no longer hide anything. The first runs caught the arrow keys not movi
 
 The flat CI's first `main` push (`3e16c6c`) reused its pull request's run 43117097547 in 33 s and deployed at once (deploy 43119486775); its `@live` had 2 failures and 1 flaky test, both in `p2-stockout-production`: the live E2E branch held 107 requested and 97 in-progress requests left by earlier runs, and the board's 200-row page hid the run's new request. The board fix and the specs' clean-up above are the answer; the next deploy's `@live` passed.
 
+**phase-6/demo-logins (TEMPORARY, ADR 0025; Ramin, 2026-11-12).** Ramin asked for a demo account for each role on the sign-in page, and
+chose one-click buttons for every role, admin included, for now. Under the sign-in form, a "Demo accounts · Temporary" section holds one
+button per role of the demo bakery (Dawit, admin; Meron, manager; Selam, cashier; Yonas, waiter; Biniam, chef; Tigist, barista; Hirut,
+cake baker; Abebe, bread baker): a tap signs that person in through `Authenticate`, as `POST /login` does (same answer, same `auth.login`
+audit row, marked `via: demo_button`), and lands where their sign-in lands. It sits behind `BAKERY_DEMO_LOGIN`, off by default: off,
+`GET /demo-logins` and `POST /demo-login` answer 404 and the page shows nothing new. Only the demo branch (`settings.demo`) and its listed
+people are reachable, the list carries no phone number, and both routes are throttled. `DemoLoginTest` pins the switch, the list, a
+sign-in per role, the refusals (unknown role, switched off, role taken away, the pad's account, another branch, a branch no longer marked
+demo), the throttle and the seeder's people; e2e-p6 runs its stack with the switch on (`e2e.yml` input `demo_login`), signs the admin in
+with one tap and captures the page at 1440 and 390 in both languages under axe; the `@live` check passes with the switch on or off.
+While it is on, anyone who opens the site can sign in as any demo person; the runbook has the line and how to turn it off. Claim restated
+at `27a1542` (after the first run: the two routes classified as non-station routes, and the buttons named by their visible text for axe); the tag stays on `2f6bbd9`.
+
 **The counting rules (phase-6/counting-rules, ADR 0026).** Ramin, 2026-11-12: "a setting page where the admin can turn on and off the double
 count and the co-sign feature". Asked whether "double count" meant counting at both ends of a shift or the manager's approval, he answered
 "both". Admin > System > Counting rules (`/admin/system/counting`, `shifts.manage`, the admin) has one card per rule, in the order a shift
@@ -717,13 +730,13 @@ what still waits after a co-signature. Tests:
 - `screens-counting-rules` runs on the CI stack: the admin switches the kitchen's opening count off on the page and its next shift opens
   carried with no count. It captures at 1440 and 390 in en and am, with axe and no sideways scroll, and puts the rules back.
 
-Claim restated at `421c862`; the tag stays on `2f6bbd9`.
-
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
       photos' licences meet the plan's rule), when convenient. The tests do not check Q4's point, and the photos ship in this public
       repository, so read it before calling that part settled.
 - [ ] Ramin: review the restyled screens on the live URL (Q18).
+- [ ] Ramin: turn the one-click demo sign-in off (delete `BAKERY_DEMO_LOGIN=true` from the live `.env`, `config:cache`) before the bakery
+      uses the site, then remove the feature (ADR 0025, "Removal").
 - [ ] Ramin: replace the demo photos with the shop's own through the product page's Replace, the weakest matches first (papaya juice, bottled water, Ethiopian coffee, bread roll, mulmul).
 - [ ] Phase 5's open items, unchanged (`phase-5-report.md`).

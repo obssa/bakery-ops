@@ -702,7 +702,7 @@ jobs:
       && (needs.web-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'web-build'))
       && (needs.docker-build.result == 'success' || !contains(fromJSON(needs.changes.outputs.jobs || '[]'), 'docker-build')))
     uses: ./.github/workflows/e2e.yml
-    with: { phase: 6, projects: "p6-product-photo p6-a11y", profiles: "full", history_days: "2" }
+    with: { phase: 6, projects: "p6-product-photo p6-a11y", profiles: "full", history_days: "2", demo_login: true }
 
   # The restore drill (phase-5 plan 5.5b and 7.1; ADR 0020; go-live checklist item backup-drill-ci), on the compose stack and the API image,
   # which carries the MariaDB 10.11 clients of the live host: first the backup tests (group ops: the real mysqldump and mysql against the

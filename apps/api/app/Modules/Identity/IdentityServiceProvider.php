@@ -45,6 +45,8 @@ final class IdentityServiceProvider extends ServiceProvider
         Gate::define('identity.authenticated', static fn (User $user): bool => $user->is_active);
 
         RateLimiter::for('login', static fn (Request $request): Limit => Limit::perMinute(10)->by('login|'.$request->ip()));
+        // TEMPORARY (ADR 0025): the sign-in page reads the demo people on every visit, so the list has its own budget, not the login's
+        RateLimiter::for('demo-logins', static fn (Request $request): Limit => Limit::perMinute(60)->by('demo-logins|'.$request->ip()));
         RateLimiter::for('short-code', static fn (Request $request): Limit => Limit::perMinute(30)
             ->by('short-code|'.$request->ip().'|'.$request->header(ResolveActor::DEVICE_HEADER, '')));
 

@@ -28,6 +28,13 @@ on:
         required: false
         type: string
         default: ""
+      demo_login:
+        description: >-
+          TEMPORARY (ADR 0025): turn on the sign-in page's one-click demo buttons (BAKERY_DEMO_LOGIN) on the stack. Off by default, so the
+          other phases' sign-in pages are the plain ones.
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   playwright:
@@ -56,6 +63,7 @@ jobs:
         env:
           COMPOSE_PROFILES: ${{ inputs.profiles }}
           BROADCAST_CONNECTION: ${{ contains(format(',{0},', inputs.profiles), ',ws,') && 'reverb' || 'null' }}
+          BAKERY_DEMO_LOGIN: ${{ inputs.demo_login && 'true' || 'false' }}
         run: |
           echo "profiles: '${COMPOSE_PROFILES}', broadcasting: ${BROADCAST_CONNECTION}"
           docker compose -f compose.yml -f compose.ci.yml up -d --wait --wait-timeout 180

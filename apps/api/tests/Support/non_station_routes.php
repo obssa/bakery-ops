@@ -20,6 +20,9 @@ return [
     'POST /api/v1/devices/{id}/rename' => 'identity',
     'POST /api/v1/devices/{id}/revoke' => 'identity',
     'POST /api/v1/login' => 'identity',
+    // TEMPORARY (ADR 0025): the sign-in page's one-click demo buttons, public like /login
+    'GET /api/v1/demo-logins' => 'identity',
+    'POST /api/v1/demo-login' => 'identity',
     'POST /api/v1/logout' => 'identity',
     'GET /api/v1/me' => 'identity',
     'GET /api/v1/stations' => 'identity',

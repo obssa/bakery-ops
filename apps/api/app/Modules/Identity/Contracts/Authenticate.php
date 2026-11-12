@@ -50,11 +50,27 @@ final class Authenticate
             throw IdentityError::invalidCredentials();
         }
 
+        return $this->issue($user, ['phone' => $user->phone]);
+    }
+
+    /**
+     * TEMPORARY (ADR 0025): sign a demo person in without a password, from the sign-in page's demo buttons. The caller (DemoLogins)
+     * has already checked that the flag is on and that $user is an active demo person of the demo branch. The answer and the audit
+     * row are a login's, the row marked via=demo_button so the audit log tells the two apart.
+     */
+    public function signInDemo(User $user): AuthResult
+    {
+        return $this->issue($user, ['phone' => $user->phone, 'via' => 'demo_button']);
+    }
+
+    /** @param array<string, mixed> $audit */
+    private function issue(User $user, array $audit): AuthResult
+    {
         $token = $user->createToken($this->tokenName())->plainTextToken;
 
         $this->branch->set($user->branch);
         $this->actor->authenticate($user->id);
-        $this->audit->recordEvent('auth.login', $user->getMorphClass(), $user->id, ['phone' => $user->phone]);
+        $this->audit->recordEvent('auth.login', $user->getMorphClass(), $user->id, $audit);
 
         return new AuthResult($user, $token, $this->permissionsOf($user), $user->locale);
     }

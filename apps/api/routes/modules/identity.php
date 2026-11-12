@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Identity\Http\Controllers\AuthController;
 use App\Modules\Identity\Http\Controllers\BrandController;
 use App\Modules\Identity\Http\Controllers\BroadcastingAuthController;
+use App\Modules\Identity\Http\Controllers\DemoLoginController;
 use App\Modules\Identity\Http\Controllers\DevicesController;
 use App\Modules\Identity\Http\Controllers\ShortCodeController;
 use App\Modules\Identity\Http\Controllers\StationsController;
@@ -20,6 +21,9 @@ use Illuminate\Support\Facades\Route;
  */
 Route::prefix('api/v1')->middleware('api')->group(function (): void {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login')->name('identity.login');
+    // TEMPORARY (ADR 0025): the sign-in page's one-click demo buttons; both answer 404 unless bakery.demo.login is on
+    Route::get('/demo-logins', [DemoLoginController::class, 'index'])->middleware('throttle:demo-logins')->name('identity.demo-logins.index');
+    Route::post('/demo-login', [DemoLoginController::class, 'store'])->middleware('throttle:login')->name('identity.demo-login');
     // a station route (step 5.1a): the pad's lock screen answers only an enrolled pad once identity.require_enrolled_device is on
     Route::post('/short-code/verify', [ShortCodeController::class, 'verify'])->middleware(['throttle:short-code', 'device'])->name('identity.short-code.verify');
 

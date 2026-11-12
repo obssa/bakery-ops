@@ -10,6 +10,9 @@ return [
     'login' => [
         'invalid' => 'The phone number or password is not right.',
     ],
+    'demo_login' => [
+        'unavailable' => 'There is no demo account for that role.',
+    ],
     'branch' => [
         'required' => 'Say which branch you mean (branch_id).',
     ],

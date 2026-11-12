@@ -40,7 +40,12 @@
     "submit": "Sign in",
     "submitting": "Signing in…",
     "station_hint": "On a station tablet, staff unlock with their short code after the device is signed in.",
-    "forgot": "Forgot your password? Ask your admin."
+    "forgot": "Forgot your password? Ask your admin.",
+    "demo": {
+      "title": "Demo accounts",
+      "temporary": "Temporary",
+      "intro": "Open any role of the demo bakery with one tap, no password. For trying the app; it is switched off before the bakery uses the site."
+    }
   },
   "pad": {
     "title": "Waiter pad",
