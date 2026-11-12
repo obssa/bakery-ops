@@ -18,7 +18,7 @@ import { loginOnce } from "../support/fixture";
 // - on a station screen, finds in the top bar's "Screens" menu only the screens it opens (no menu when it opens one screen).
 // The sidebar of the manager, the cashier, the waiter and the bread baker is captured at 1440 x 900 and, as the drawer, at 390 x 844, in
 // English and Amharic, each passing axe and, at the phone's width, not scrolling sideways. What each role saw is written to
-// test-results/screens/role-navigation.json.
+// test-results/screens/role-navigation-<role>.json.
 
 const SHOTS = path.join("test-results", "screens");
 const MESSAGES = { en, am } as const;
@@ -47,7 +47,6 @@ const EXPECTED: Record<Role, { home: string; sections: Section[]; stations: (key
 
 const ROLES = Object.keys(EXPECTED) as Role[];
 const CAPTURED: Role[] = ["manager", "cashier", "waiter", "bread_baker"];
-const seen: Record<string, { landed: string; sidebar: string[]; stations: string[]; screensMenu: string[] | null }> = {};
 
 async function capture(page: Page, name: string): Promise<void> {
   await fontsReady(page);
@@ -106,7 +105,6 @@ async function opens(page: Page, pathname: string): Promise<void> {
 
 test.describe("each role sees only what it can open (ADR 0027)", () => {
   test.skip(live, "the live host's demo switch is Ramin's: the sign-ins run on the CI stack");
-  test.describe.configure({ mode: "serial" });
 
   let admin: Api;
 
@@ -120,8 +118,6 @@ test.describe("each role sees only what it can open (ADR 0027)", () => {
 
   test.afterAll(async () => {
     await admin?.put("/brand/demo-login", { on: false });
-    mkdirSync(SHOTS, { recursive: true });
-    writeFileSync(path.join(SHOTS, "role-navigation.json"), JSON.stringify(seen, null, 2));
   });
 
   for (const role of ROLES) {
@@ -131,22 +127,24 @@ test.describe("each role sees only what it can open (ADR 0027)", () => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await placeDevice(page, deviceOf(process.env.DEMO_ADMIN_PHONE));
       await signInAs(page, role);
-      await expect(page).toHaveURL(new RegExp(`/app/en/${want.home}/$`), { timeout: 30_000 });
+      // in the person's own language (the demo bakery's floor staff read Amharic)
+      await expect(page).toHaveURL(new RegExp(`/app/(en|am)/${want.home}/$`), { timeout: 30_000 });
       const landed = new URL(page.url()).pathname;
+      const own = MESSAGES[landed.startsWith("/app/am/") ? "am" : "en"];
 
       // a station screen: the top bar's "Screens" menu lists only the screens the role opens (none when it opens one)
       let screensMenu: string[] | null = null;
       if (want.home !== "admin") {
-        await expect(page.getByText(en.admin.checking)).toHaveCount(0, { timeout: 30_000 });
-        const button = page.getByRole("button", { name: en.nav.main, exact: true });
-        const screens = [...want.stations.map((key) => en.nav[key]), en.nav.admin];
+        await expect(page.getByText(own.admin.checking)).toHaveCount(0, { timeout: 30_000 });
+        const button = page.getByRole("button", { name: own.nav.main, exact: true });
+        const screens = [...want.stations.map((key) => own.nav[key]), own.nav.admin];
         if (screens.length < 2) {
           await expect(button).toHaveCount(0);
         } else {
           await button.click();
-          screensMenu = (await linksOf(page, en.nav.main)).map(([name]) => name);
+          screensMenu = (await linksOf(page, own.nav.main)).map(([name]) => name);
           const order = ["pad", "till", "kds_kitchen", "kds_bar", "production", "admin"] as const;
-          expect(screensMenu).toEqual(order.filter((key) => key === "admin" || want.stations.includes(key)).map((key) => en.nav[key]));
+          expect(screensMenu).toEqual(order.filter((key) => key === "admin" || want.stations.includes(key)).map((key) => own.nav[key]));
           await page.keyboard.press("Escape");
         }
       }
@@ -158,7 +156,9 @@ test.describe("each role sees only what it can open (ADR 0027)", () => {
       expect(sidebar.map(([name]) => name)).toEqual(want.sections.map((key) => en.admin[key]));
       const stations = await linksOf(page, en.nav.main);
       expect(stations.map(([name]) => name)).toEqual(want.stations.map((key) => en.nav[key]));
-      seen[role] = { landed, sidebar: sidebar.map(([name]) => name), stations: stations.map(([name]) => name), screensMenu };
+      mkdirSync(SHOTS, { recursive: true });
+      const seen = { landed, sidebar: sidebar.map(([name]) => name), stations: stations.map(([name]) => name), screensMenu };
+      writeFileSync(path.join(SHOTS, `role-navigation-${role}.json`), JSON.stringify(seen, null, 2));
 
       // every one of them opens for this role
       for (const [, pathname] of [...sidebar, ...stations]) await opens(page, pathname);
@@ -188,7 +188,7 @@ test.describe("each role sees only what it can open (ADR 0027)", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await placeDevice(page, deviceOf(process.env.DEMO_ADMIN_PHONE));
     await signInAs(page, "bread_baker");
-    await expect(page).toHaveURL(/\/app\/en\/production\/$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/app\/(en|am)\/production\/$/, { timeout: 30_000 });
     await page.goto("en/admin/people/");
     await expect(page.getByText(en.admin.no_access)).toBeVisible({ timeout: 30_000 });
     await page.getByRole("link", { name: en.admin.go_home }).click();
