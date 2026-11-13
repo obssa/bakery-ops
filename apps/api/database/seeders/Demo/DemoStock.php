@@ -160,6 +160,13 @@ final class DemoStock
                 $margin = $this->margin($item, $location);
                 if ($available->isLessThan($qty->multipliedBy(self::TODAY_COVER)->plus($margin))) {
                     $want = $qty->plus($next[$location][$itemId] ?? $qty)->plus($margin)->minus($available)->toScale(0, RoundingMode::Up);
+                    // Below the restock line today, but a small need tomorrow can leave nothing to make: what is there already covers
+                    // today, tomorrow and the margin. The 90-day window ending 2026-11-13 met it on 2026-11-07 (bread rolls at the display
+                    // case: 18 available, 14 needed, 2 tomorrow, margin 2; 18 < 14 x 1.2 + 2, and 14 + 2 + 2 - 18 = 0), and a request for
+                    // 0 is refused (production.product.not_producible). No batch is asked for then.
+                    if (! $want->isPositive()) {
+                        continue;
+                    }
                     $batches[] = [$item, (string) $want];
                     $made[] = [$item, $want];
                 }
