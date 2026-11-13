@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert, Info, Search, X } from "lucide-react";
-import { useId, useMemo, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 import { Link } from "@/i18n/navigation";
 import { useCategories, useItems } from "@/lib/api/hooks";
 import type { ProductImageView } from "@/lib/api/types";
@@ -282,10 +282,25 @@ export function TableCard({
   children: ReactNode;
 }) {
   const id = useId();
+  // a table wider than the window scrolls sideways in its box: the box then takes the keyboard focus (named by the caption), so the
+  // arrow keys reach the columns past the edge even when no row holds a button or a link (axe scrollable-region-focusable; phase-6/
+  // stock-requests met it on an empty list at 390 px). A box that fits takes no tab stop.
+  const scroller = useRef<HTMLDivElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const measure = () => setScrolls(box.scrollWidth > box.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    if (box.firstElementChild) observer.observe(box.firstElementChild);
+    return () => observer.disconnect();
+  }, []);
   // relative: a header's visually hidden label (sr-only, absolutely placed) stays inside the scroll box; without it, it is placed by the
   // page and pushes a narrow window into a sideways scroll (Templates at 390 px: 757 px wide)
   const table = (
-    <div className="relative overflow-x-auto">
+    <div ref={scroller} className={`relative overflow-x-auto ${scrolls ? "rounded-[inherit] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-brand-600/35" : ""}`} {...(scrolls ? { tabIndex: 0, role: "group", "aria-label": caption } : {})}>
       <Table className={`${minWidth} ${compact ? `${COMPACT} [&_tr>*:first-child]:pl-5 [&_tr>*:last-child]:pr-5 ${ROWS}` : `${EDGES} ${ONE_LINE_HEAD}`}`}>
         <caption className="sr-only">{caption}</caption>
         {children}

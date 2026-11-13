@@ -377,7 +377,7 @@ function PickItemSheet({ pick, onClose, onRequested }: { pick: TransferPick; onC
                   const held = compareDecimal(has, "0") > 0;
                   return (
                     <li key={candidate.id}>
-                      <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 text-[15px] has-[:checked]:bg-ink-50">
+                      <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 text-[15px] has-[:checked]:bg-neutral-100">
                         <input
                           type="radio"
                           name={`${itemsId}-item`}
