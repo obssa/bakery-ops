@@ -795,6 +795,35 @@ Claim restated at `abc298d` (after the crawl follows each person to their own la
 
 Live on 2026-11-12: #139 (demo sign-in, deploy 43227473645), #140 (counting rules, deploy 43239985767), #141 (the demo sign-in switch, deploy 43282792552) and #142 (navigation follows the page guards, deploy 43297237911), each with 44 of 44 `@live`; main reused each PR's full run. The gate run recorded is #142's PR run 43293686644.
 
+**Asking for any stock, from the admin and from the stations (phase-6/stock-requests; Ramin, 2026-11-14: the kitchen display's stock strip
+shows only 8 ingredients and there is no way to ask for anything else, and no way in the admin to start a transfer).**
+
+- **One sheet, two ways in.** `RequestTransferSheet` keeps its fixed-item form for the strip's chip buttons and the production card's short
+  recipe lines, and gains a picker (`pick`). The person searches for the item among every active item kept in stock, ingredients and
+  products (a made-to-order product never is), in the page language. The items the source holds come first, each with what the source has
+  available, and the chosen one says so ("Store has 10,000 g."). The source is the branch store unless the person chooses another place
+  (never the cash drawer). The destination is either fixed by the caller or chosen among the places the person may ask into (their work
+  stations' places, every place for `stations.all`), never the source. The quantity is a decimal string in the item's base unit
+  (`isQuantityText`), the note optional. POST /transfers carries `from_location_id`, and the API's refusals show inline in the page language.
+- **Where it opens.** Admin > Inventory > Transfers has "New transfer" in its title row for `transfers.request`, and the new row lands in
+  Requested. The kitchen and bar displays have "Request stock" at the end of the stock strip, with the destination fixed to the station's own
+  place. The strip itself stays at its 8 rows (`STRIP_ROWS`); the button reaches the items the station does not hold yet. The production
+  board has "Request stock" among its top bar's buttons, with the destination the board's station's place (on "All stations", a choice among
+  its production stations).
+- **What did not change.** No endpoint, permission or page. The picker reads GET /items (`catalog.view`), GET /locations and GET
+  /stock?location= (`inventory.view`, held by the same floor roles as `transfers.request`). A request still writes a `requested` row and moves
+  nothing until someone at the source confirms it.
+- **Tests.** `screens-stock-requests.spec.ts` (p6-a11y, CI stack):
+  - the manager starts a transfer from the store to the bakery in Admin > Transfers and confirms it there, and the stock moves;
+  - the chef asks for an ingredient the kitchen does not hold through the strip's "Request stock", and nothing moves before the confirm;
+  - the bread baker's board fixes the bakery as the destination;
+  - a waiter sees neither button.
+
+  It captures the admin's and the kitchen's sheets at 1440 and 390 in English and Amharic under axe. The fixed-item flows keep their
+  p2-purchase-transfer and production tests.
+
+Claim restated at `57b7268`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
