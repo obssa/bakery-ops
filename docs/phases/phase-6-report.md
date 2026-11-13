@@ -821,8 +821,16 @@ shows only 8 ingredients and there is no way to ask for anything else, and no wa
 
   It captures the admin's and the kitchen's sheets at 1440 and 390 in English and Amharic under axe. The fixed-item flows keep their
   p2-purchase-transfer and production tests.
+- **Two fixes the run asked for.**
+  - axe found a sideways-scrolling table with nothing focusable in it (an empty Requested list at 390 px). `TableCard`'s scroll box now
+    takes the keyboard focus, named by its caption, only while it scrolls sideways.
+  - The 90-day demo history (pest-gate-p4, perf-dashboards) stopped on `production.product.not_producible`. On 2026-11-07, in the window
+    ending 2026-11-13, the display case held 18 bread rolls against a need of 14 today and 2 tomorrow with a margin of 2. That is below the
+    restock line (14 × 1.2 + 2 = 18.8), but the batch it computed was 14 + 2 + 2 − 18 = 0, and a request for 0 is refused.
+    `DemoStock::decide` now asks for no batch when there is nothing to make. The production rules are unchanged. Main would have hit the
+    same failure from that date on.
 
-Claim restated at `57b7268`; the tag stays on `2f6bbd9`.
+Claim restated at `7b665a1`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
