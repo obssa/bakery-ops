@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -10,6 +11,7 @@ import { useConfirmTransfer, useRejectTransfer, useTransfers, type Transfer, typ
 import { compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { can, useSession } from "@/lib/session";
+import { RequestTransferSheet } from "./RequestTransferSheet";
 import { InventoryNav, QueryBox, qty, useStamp, useNamer } from "./shared";
 
 // Admin > Inventory > Transfers (step 2.3): stock a station asked the store for. The requested list is the work: confirm
@@ -20,6 +22,10 @@ import { InventoryNav, QueryBox, qty, useStamp, useNamer } from "./shared";
 // Step 6.4c (fresh-counter.md 4.4, the CatalogList board): the title row with its Amharic twin, the section's tabs, the status as the
 // toolbar's segments (Requested, Confirmed, Rejected, All), the transfers a table card (Requested amber, Confirmed brand, Rejected red; the
 // linked row ink-100; Confirm the primary button and Reject the secondary one, named by the item as before).
+//
+// phase-6/stock-requests (Ramin: there was no way to start a transfer in the admin): "New transfer" in the title row, for a person who may
+// request transfers, opens the request sheet with the item, the source (the store by default) and the destination picked there
+// (RequestTransferSheet's `pick`); the new row lands in Requested, which the page then shows. It is still confirmed here as before.
 
 const STATUSES: readonly TransferStatus[] = ["requested", "confirmed", "rejected"];
 
@@ -33,10 +39,26 @@ export function TransfersScreen({ titleAm }: { titleAm?: string }) {
   const linked = /^\d+$/.test(params.get("transfer") ?? "") ? Number(params.get("transfer")) : null;
   const [filter, setFilter] = useState<Filter>(linked === null ? "requested" : "all");
   const transfers = useTransfers(filter === "all" ? null : filter);
+  const me = useSession((s) => s.me);
+  const [creating, setCreating] = useState(false);
 
   return (
     <>
-      <PageHeader title={t("transfers.title")} intro={t("transfers.intro")} twin={titleAm ? { text: titleAm, lang: "am" } : undefined} />
+      <PageHeader
+        title={t("transfers.title")}
+        intro={t("transfers.intro")}
+        twin={titleAm ? { text: titleAm, lang: "am" } : undefined}
+        actions={
+          can(me, "transfers.request") ? (
+            <Button size="md" onClick={() => setCreating(true)}>
+              <Plus className="size-[18px]" strokeWidth={2.2} aria-hidden="true" />
+              {t("transfers.new")}
+            </Button>
+          ) : undefined
+        }
+      />
+      {/* a new request lands in the Requested list, which the page then shows */}
+      {creating ? <RequestTransferSheet pick={{ title: t("transfers.new") }} onClose={() => setCreating(false)} onRequested={() => setFilter("requested")} /> : null}
       <div className="flex flex-col gap-6">
         <InventoryNav />
         <Toolbar>

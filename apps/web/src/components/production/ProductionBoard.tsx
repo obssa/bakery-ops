@@ -18,7 +18,7 @@ import {
   type KeyboardCoordinateGetter,
 } from "@dnd-kit/core";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CircleCheckBig, ClipboardCheck, ClipboardList, Flame, Plus, Store, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CircleCheckBig, ClipboardCheck, ClipboardList, Flame, PackagePlus, Plus, Store, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -38,6 +38,7 @@ import { useNow } from "@/lib/useNow";
 import { ICON_STROKE } from "../icons";
 import { StationHeaderActions } from "../StationHeaderActions";
 import { focusRing } from "../styles";
+import { RequestTransferSheet } from "../inventory/RequestTransferSheet";
 import { DisplayCasePanel } from "../till/DisplayCasePanel";
 import { Alert, Button, Drawer, HelpTip, SegmentedControl, Select } from "../ui";
 import { ShiftBar } from "../shifts/ShiftBar";
@@ -71,6 +72,10 @@ import type { ProductionTwins } from "./twins";
 // Pending confirmation -> Done today confirms it, Pending confirmation -> In progress opens Send back. While a card is dragged, a column it
 // cannot go to is dimmed and says why (lib/productionBoard.ts dropMove); the card moves at once and goes back with the reason if the
 // server refuses. The board reads itself again after every move, so the status updates by itself.
+//
+// phase-6/stock-requests: "Request stock" among the bar's buttons, for a person who may request transfers, opens the request sheet with the
+// item picked there and the destination the board's station's own place (on "All stations", a choice among the board's production
+// stations' places the person may ask into); the store is the source unless they choose another.
 
 const PRODUCTION_KINDS = ["cake_room", "bakery"] as const;
 
@@ -102,7 +107,7 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
     const requested = Number(params.get("request"));
     return Number.isInteger(requested) && requested > 0 ? { id: requested } : null;
   });
-  const [sheet, setSheet] = useState<"new_batch" | "display_case" | null>(null);
+  const [sheet, setSheet] = useState<"new_batch" | "display_case" | "request_stock" | null>(null);
 
   // a notification link to this page while it is open names another card
   const linked = Number(params.get("request"));
@@ -277,6 +282,12 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
             <span className="sr-only">{t("display_case")}</span>
           </Button>
         ) : null}
+        {can(me, "transfers.request") ? (
+          <Button type="button" variant="secondary" size="md" onClick={() => setSheet("request_stock")}>
+            <PackagePlus className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
+            {t("request_stock")}
+          </Button>
+        ) : null}
         {can(me, "production.request") ? (
           <Button type="button" size="md" onClick={() => setSheet("new_batch")}>
             <Plus className="size-[18px]" strokeWidth={ICON_STROKE} aria-hidden="true" />
@@ -399,6 +410,13 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
         </CardPanel>
       ) : null}
 
+      {/* the stock this station's place asks the store for: the board's station, or one of its production stations on "All stations" */}
+      {sheet === "request_stock" ? (
+        <RequestTransferSheet
+          pick={{ title: t("request_stock"), toStations: stationId !== "all" ? [stationId] : choices.map((choice) => choice.id) }}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
       {sheet === "new_batch" ? <NewBatchDialog stationId={stationId} onClose={() => setSheet(null)} onAsked={refresh} /> : null}
       {sheet === "display_case" ? (
         <Drawer label={t("display_case")} onClose={() => setSheet(null)}>

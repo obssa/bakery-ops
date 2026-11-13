@@ -1,6 +1,6 @@
 "use client";
 
-import { PackagePlus } from "lucide-react";
+import { PackagePlus, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useState } from "react";
 import type { Locale, StockState, StripRow } from "@/lib/api/types";
@@ -18,6 +18,11 @@ import { Alert } from "../ui";
 // it is out (the word is there as well as the colour). Each chip's button asks the store for more ("Request transfer of <name>"). A LiveFeed
 // over GET /stations/{station}/stock-strip (ETag, 304) at the display's own cadence. Quantities show in the item's base unit as the API sends
 // them ("1000 g").
+//
+// phase-6/stock-requests (Ramin: the strip shows only 8 ingredients and there was no way to ask for anything else): the strip stays at its
+// STRIP_ROWS rows, and "Request stock" at its end opens the request sheet with the item picked there (every item kept in stock, the ones the
+// station does not hold yet among them, each with what the source has), the destination fixed to this station's place and the store as the
+// source. Shown to a person who may request transfers, whenever the station has a place of its own.
 
 const CHIP: Record<StockState, string> = {
   ok: "bg-night-divider text-neutral-700",
@@ -35,6 +40,7 @@ export function StockStrip({ stationId }: { stationId: number }) {
   const feed = useMemo(() => createStripFeed(stationId), [stationId]);
   const snapshot = useLiveFeed(feed);
   const [asking, setAsking] = useState<StripRow | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const place = snapshot?.state.locationId ?? null;
   const rows = snapshot?.state.rows ?? [];
@@ -110,6 +116,17 @@ export function StockStrip({ stationId }: { stationId: number }) {
             )}
           </div>
         )}
+        {/* the way to the rest: any item kept in stock, the ones this place does not hold yet among them */}
+        {mayAsk && place !== null ? (
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 self-start rounded-full border border-night-border px-4 text-sm font-semibold text-night-text hover:bg-night-divider motion-safe:transition-colors motion-safe:duration-150 lg:ml-auto lg:self-center ${focusRing}`}
+          >
+            <Plus className="size-[18px]" strokeWidth={2} aria-hidden="true" />
+            {t("request_stock")}
+          </button>
+        ) : null}
       </div>
       </section>
 
@@ -125,6 +142,9 @@ export function StockStrip({ stationId }: { stationId: number }) {
           onClose={() => setAsking(null)}
           onRequested={() => feed.refresh()}
         />
+      ) : null}
+      {picking && place !== null ? (
+        <RequestTransferSheet pick={{ title: t("request_stock"), toLocationId: place }} onClose={() => setPicking(false)} onRequested={() => feed.refresh()} />
       ) : null}
     </>
   );

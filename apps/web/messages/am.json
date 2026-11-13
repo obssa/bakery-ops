@@ -381,7 +381,8 @@
     "request_production_of": "የ{name} ምርት ጠይቅ",
     "requested": "ተጠይቋል",
     "requested_named": "የ{name} ምርት ተጠይቋል",
-    "working": "በመሥራት ላይ…"
+    "working": "በመሥራት ላይ…",
+    "request_stock": "ክምችት ጠይቅ"
   },
   "production": {
     "title": "የምርት ሰሌዳ",
@@ -553,7 +554,8 @@
     "give_choose": "ጋጋሪ ይምረጡ",
     "give_submit": "ይስጡ",
     "wait_min": "{minutes} ደቂቃ",
-    "showing_of": "ከ{total} {shown} ብቻ ይታያሉ"
+    "showing_of": "ከ{total} {shown} ብቻ ይታያሉ",
+    "request_stock": "ክምችት ጠይቅ"
   },
   "transfer": {
     "title": "ማስተላለፍ ጠይቅ፦ {name}",
@@ -566,7 +568,25 @@
     "sent": "ማስተላለፍ ተጠይቋል። የመጋዘን ኃላፊው ያረጋግጠዋል።",
     "close": "ዝጋ",
     "need_qty": "እንደ 6 ወይም 2.5 ያለ ቁጥር ያስገቡ።",
-    "working": "በመሥራት ላይ…"
+    "working": "በመሥራት ላይ…",
+    "from": "ከ",
+    "to_label": "ወደ",
+    "find_item": "ዕቃ ፈልግ",
+    "item": "ዕቃ",
+    "none_held": "የለም",
+    "no_match": "የሚመሳሰል ዕቃ የለም።",
+    "more_matches": "ከ{total} ውስጥ {shown} ይታያሉ። ዝርዝሩን ለማጥበብ ተጨማሪ ይጻፉ።",
+    "place_has": "{place} ውስጥ {qty} አለ።",
+    "place_has_none": "{place} ውስጥ ምንም የለም።",
+    "qty_plain": "መጠን",
+    "choose": "ይምረጡ…",
+    "need_item": "ዕቃ ይምረጡ።",
+    "need_to": "ክምችቱ የሚሄድበትን ቦታ ይምረጡ።",
+    "no_destination": "ክምችት መጠየቅ በሚችል ቦታ ላይ አይሠሩም።",
+    "sent_what": "{item}፣ {qty}፦ {from} → {to}",
+    "sent_from": "ማስተላለፍ ተጠይቋል። {from} ያለ ሰው ያረጋግጠዋል።",
+    "another": "ሌላ ጠይቅ",
+    "loading": "በመጫን ላይ…"
   },
   "admin": {
     "catalog": "ካታሎግ",
@@ -1358,7 +1378,8 @@
       "reject_about": "{item}፣ {qty}",
       "reason": "ምክንያት",
       "reason_hint": "የጠየቀው ሰው ያየዋል።",
-      "reject_confirm": "ዝውውሩን ውድቅ አድርግ"
+      "reject_confirm": "ዝውውሩን ውድቅ አድርግ",
+      "new": "አዲስ ዝውውር"
     },
     "reorder": {
       "title": "እንደገና ማዘዝ",

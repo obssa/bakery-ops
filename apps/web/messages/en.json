@@ -381,7 +381,8 @@
     "request_production_of": "Request production of {name}",
     "requested": "Requested",
     "requested_named": "Production of {name} requested",
-    "working": "Working…"
+    "working": "Working…",
+    "request_stock": "Request stock"
   },
   "production": {
     "title": "Production board",
@@ -553,7 +554,8 @@
     "give_choose": "Choose a baker",
     "give_submit": "Give it",
     "wait_min": "{minutes} min",
-    "showing_of": "Showing {shown} of {total}"
+    "showing_of": "Showing {shown} of {total}",
+    "request_stock": "Request stock"
   },
   "transfer": {
     "title": "Request transfer: {name}",
@@ -566,7 +568,25 @@
     "sent": "Transfer requested. The store keeper will confirm it.",
     "close": "Close",
     "need_qty": "Enter a number such as 6 or 2.5.",
-    "working": "Working…"
+    "working": "Working…",
+    "from": "From",
+    "to_label": "To",
+    "find_item": "Find an item",
+    "item": "Item",
+    "none_held": "none",
+    "no_match": "No item matches.",
+    "more_matches": "Showing {shown} of {total}. Type more to narrow the list.",
+    "place_has": "{place} has {qty}.",
+    "place_has_none": "{place} has none of it.",
+    "qty_plain": "Quantity",
+    "choose": "Choose…",
+    "need_item": "Choose an item.",
+    "need_to": "Choose where the stock goes.",
+    "no_destination": "You do not work at a place that can ask for stock.",
+    "sent_what": "{item}, {qty}: {from} → {to}",
+    "sent_from": "Transfer requested. Someone at {from} will confirm it.",
+    "another": "Request another",
+    "loading": "Loading…"
   },
   "admin": {
     "catalog": "Catalog",
@@ -1358,7 +1378,8 @@
       "reject_about": "{item}, {qty}",
       "reason": "Reason",
       "reason_hint": "The person who asked will see it.",
-      "reject_confirm": "Reject transfer"
+      "reject_confirm": "Reject transfer",
+      "new": "New transfer"
     },
     "reorder": {
       "title": "Reorder",
