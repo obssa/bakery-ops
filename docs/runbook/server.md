@@ -627,6 +627,9 @@ database queue, run by the `queue:work` cron line:
 - **Turning it off:** remove the `.env` line and `php artisan config:cache`; delete the variable and redeploy for the web shell.
 - **Failed jobs** older than 30 days are pruned by the scheduler daily at 04:10 Addis Ababa time (`queue:prune-failed --hours=720`, on the
   existing `schedule:run` cron line). Nobody deletes rows by hand; `php artisan queue:failed` lists what is left.
+- **Idempotency snapshots** (`idempotency_keys`) whose replay window ended more than 24 hours ago are pruned daily at 02:00 Addis Ababa
+  time, before the backup (`bakery:prune-idempotency`, ADR 0028), 500 rows per statement for at most 15 minutes; a larger backlog goes on
+  the next night. By hand: `php artisan bakery:prune-idempotency` (it prints how many rows went and whether it stopped at its budget).
 
 ## Poll budget and the load test (Phase 5, step 5.5d; plan 10.2 D15)
 

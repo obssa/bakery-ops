@@ -37,6 +37,11 @@ Schedule::command('analytics:weekly-summary')->weeklyOn(1, '07:00')->timezone(co
 // days stays for whoever looks into it (the System page of step 5.5c counts them).
 Schedule::command('queue:prune-failed --hours=720')->dailyAt('04:10')->timezone('Africa/Addis_Ababa');
 
+// The idempotency snapshots (ADR 0003, ADR 0028): a stored answer whose replay window ended more than 24 hours ago goes, daily at 02:00 in
+// the shop's time, before the backup of 02:30, so the dump does not carry them. In chunks of 500 ids, each statement well under the shared
+// host's 20-second limit, for at most 15 minutes a night; a run that overruns is not started twice.
+Schedule::command('bakery:prune-idempotency')->dailyAt('02:00')->timezone('Africa/Addis_Ababa')->withoutOverlapping(30);
+
 // Backups and the restore drill (phase-5 plan 5.5b, 10.2 D13; ADR 0020; docs/runbook/backup-restore.md), on the same schedule:run line, in the
 // shop's time while it is closed: the dump and the files snapshot every night at 02:30, before the chain check of 03:00; the drill on Sundays at
 // 03:30, after both (it records `skipped` until BACKUP_DRILL_DATABASE is set). A run that overruns is not started twice.

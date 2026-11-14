@@ -29,7 +29,8 @@ use Throwable;
  *     Idempotency-Replayed: true; the handler never runs twice;
  *   - the same key with a different fingerprint is 422;
  *   - 5xx responses are not stored, so a transient failure can be retried with the same key;
- *   - snapshots expire after config('bakery.idempotency.ttl_hours').
+ *   - snapshots expire after config('bakery.idempotency.ttl_hours'); `bakery:prune-idempotency` deletes them prune_after_hours later
+ *     (ADR 0028), never while this middleware holds the key's lock.
  * Secrets (step 4.3e): the fields named in SECRET_FIELDS (a PIN, a short code, a password) are left out of the fingerprint at any depth, so
  * nobody who reads idempotency_keys can find a 4 to 6 digit PIN by hashing the rest of the body with every candidate. The same key with every
  * other field equal is therefore the same request whatever secret came with it: a success is replayed (the PIN is not checked again), and a
