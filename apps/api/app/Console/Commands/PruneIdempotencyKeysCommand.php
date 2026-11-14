@@ -39,8 +39,8 @@ final class PruneIdempotencyKeysCommand extends Command
 
     public function handle(): int
     {
-        $chunk = (string) $this->option('chunk'); // Artisan::call may pass an int
-        $budget = (string) $this->option('budget');
+        $chunk = self::text($this->option('chunk')); // Artisan::call may pass an int
+        $budget = self::text($this->option('budget'));
         if (preg_match('/^[1-9]\d{0,3}$/', $chunk) !== 1 || (int) $chunk > 1000) {
             $this->error('--chunk must be a whole number from 1 to 1000.');
 
@@ -100,6 +100,11 @@ final class PruneIdempotencyKeysCommand extends Command
             .($left ? ', stopped at the time budget, the next run goes on' : '').'.');
 
         return self::SUCCESS;
+    }
+
+    private static function text(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '';
     }
 
     private static function afterHours(): int

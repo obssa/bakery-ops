@@ -123,7 +123,7 @@ it('dumps it when an option file of the host sets mysqldump\'s own limit, which 
         '--single-transaction', '--quick', '--no-tablespaces', (string) $db->getDatabaseName(), 'idempotency_keys',
     ]);
     expect($control->exitCode())->toBe(3)
-        ->and($control->errorOutput())->toContain('1969', 'the host file alone stops the dump of the table');
+        ->and($control->errorOutput())->toContain('Error 1969'); // the host file alone stops the dump of the table
 
     putenv('HOME='.$home);
     expect(Artisan::call('backup:run'))->toBe(0, Artisan::output());
@@ -158,5 +158,5 @@ it('runs both clients with the limit lifted on the command line, and keeps the o
     expect($client->dumpArguments('/x/.client-1', 'db'))->toContain('--max-statement-time=0')
         ->and($client->restoreArguments('/x/.client-1', 'db'))->toContain('--init-command=SET SESSION max_statement_time=0')
         ->and($client->restoreArguments('/x/.client-1', 'db')[1])->toBe('--defaults-extra-file=/x/.client-1')
-        ->and(implode(' ', $client->dumpArguments('/x/.client-1', 'db')))->not->toContain('init-command', 'mysqldump refuses init-command (exit 7)');
+        ->and(implode(' ', $client->dumpArguments('/x/.client-1', 'db')))->not->toContain('init-command'); // mysqldump refuses it (exit 7)
 });
