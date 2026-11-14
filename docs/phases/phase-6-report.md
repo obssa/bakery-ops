@@ -832,6 +832,35 @@ shows only 8 ingredients and there is no way to ask for anything else, and no wa
 
 Claim restated at `7b665a1`; the tag stays on `2f6bbd9`.
 
+**The nightly backup under the shared host's statement limit (phase-6/backup-fix; ADR 0028).** `backup:run` failed on 2026-11-13 and
+2026-11-14 (`backup.dump_failed`, exit 3, `Error 2013: Lost connection to server during query when dumping table idempotency_keys at row:
+43208`), and the `@live` check that the last good backup is younger than 26 hours went red, as it should. `idempotency_keys` had grown to
+45,413 rows and 603.6 MB because nothing deleted an expired snapshot unless its own key came back.
+
+- **`bakery:prune-idempotency`**, daily at 02:00 in the shop's time (before the backup of 02:30), `withoutOverlapping`. It deletes a
+  snapshot 24 hours after its own `expires_at` (`bakery.idempotency.prune_after_hours`), so 48 hours after the write. An expired snapshot is
+  never replayed, so no answer changes, and the day of margin keeps the expired answers for whoever looks into a retry the morning after.
+  - It works in chunks of 500 ids read on the `expires_at` index, each deleted by primary key in one statement, and only while the run
+    holds that key's idempotency lock, so a row a request holds right now stays.
+  - It stops at the first chunk after 15 minutes and goes on the next night.
+  - `PruneIdempotencyKeysTest` (module:shared) covers expired, fresh and in-flight rows, the chunks, the budget, the option checks and the
+    schedule.
+- **The clients lift the limit on their command line.** `mysqldump --max-statement-time=0`; `mysql --init-command=SET SESSION
+  max_statement_time=0` for the drill. Checked against the MariaDB 10.3 to 10.11.19 clients:
+  - mysqldump already sends `SET @@MAX_STATEMENT_TIME=0` by default. The flag keeps a host option file (`~/.my.cnf`) from putting a limit
+    back.
+  - mysqldump refuses `init-command` in its option file (exit 7), so that route would have broken every backup.
+  - A dump stopped by the limit fails with 1969. The live 2013 is a dropped connection: the same line was reproduced with a reader that
+    stalls past `net_write_timeout`, and a host watchdog would end the same way.
+  - So the prune is what fixes the failed nights. ADR 0028 names what to read on the host (read only) and the tables that may need a
+    different dump later.
+  - `StatementLimitTest` (group ops, backup-drill job) runs the real clients on the CI MariaDB 10.11 under a 10 ms global limit set as root.
+    A plain read of a 120 MB table stops with 1969, and `backup:run` dumps it to its last row. A host `~/.my.cnf` that stops a bare dump
+    does not stop `backup:run`. A restore statement the limit stops is restored.
+- The runbook (`backup-restore.md`) has a section on the 20-second limit and the new 02:00 job, and `server.md` lists the prune.
+
+Claim restated at `19bf22c`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
