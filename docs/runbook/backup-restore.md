@@ -8,6 +8,7 @@ this runbook is run by an agent or by CI against the live host.
 
 | Job | When (Africa/Addis_Ababa) | What it does |
 |---|---|---|
+| `bakery:prune-idempotency` | every night at 02:00 | deletes the stored idempotency answers whose replay window ended more than 24 hours ago, 500 rows per statement, for at most 15 minutes (ADR 0028), so the dump does not carry them |
 | `backup:run` | every night at 02:30 | dumps the database (gzip) and snapshots the files folder (receipt photos) and the media folder (product photos, step 6.1b) as hard links into the backup folder, writes the manifest, applies retention |
 | `backup:drill` | Sundays at 03:30 | restores the newest good dump into the scratch database, checks the ledger, the hash chains, the triggers and the row counts, empties it again |
 
@@ -31,6 +32,24 @@ is a row in `ops_runs`; the System page of step 5.5c shows the last backup and t
 
 Settings (all in `<app>/.env`, then `php artisan config:cache`): `BACKUP_PATH` (empty: the default folder), `BACKUP_KEEP` (30),
 `BACKUP_MAX_MB` (2048), `BACKUP_DRILL_DATABASE` (empty: drill skipped), `BACKUP_REMOTE` (empty: no off-site copy).
+
+## The host's 20-second statement limit
+
+The shared host's MariaDB stops any statement that runs longer than 20 seconds (`max_statement_time=20`, global and per session; a query
+stopped this way fails with error 1969). The app's database user cannot change the global value, but any session may lift it for itself
+(ADR 0028):
+
+- `backup:run` runs mysqldump with `--max-statement-time=0`. mysqldump does this by default too; the flag makes sure no option file of the
+  host (`~/.my.cnf`) puts a limit back. mysqldump has no `init-command`: never add one to an option file, mysqldump refuses to start (exit 7).
+- `backup:drill` runs mysql with `--init-command=SET SESSION max_statement_time=0`.
+- Anything else you run by hand inherits the limit. For a long query in phpMyAdmin or tinker, run `SET SESSION max_statement_time=0` first
+  in the same session. For a restore by hand, add `--init-command="SET SESSION max_statement_time=0"` to `mysql`.
+- A dump that fails with **1969** was stopped by the limit. A dump that fails with **2013** (`Lost connection to server during query when
+  dumping table ... at row: N`) lost its connection: the server gave up on a reader that stalled (`net_write_timeout`), or the host killed
+  a long-running connection. Both come from one table's single `SELECT` taking too long, which the client cannot lift. This happened on
+  2026-11-13 and 2026-11-14 with `idempotency_keys` at about 600 MB, before `bakery:prune-idempotency` existed. Read
+  `SELECT @@net_write_timeout, @@net_read_timeout` and the table sizes (`information_schema.tables`) before changing anything, and see
+  ADR 0028, "Consequences", for the tables that may get there next.
 
 ## Where the dumps are
 
@@ -74,8 +93,9 @@ decision. Restore the database **and** the files and media folders of the **same
    call). Note its name.
 4. **Restore the database** into the app's database. The dump replaces every table it holds (`DROP TABLE IF EXISTS` then `CREATE`):
    - in phpMyAdmin: *Import*, the `.sql.gz` file, format SQL; or
-   - in the terminal: `zcat <folder>/bakery-ops-<night>.sql.gz | mysql <app database>` (the client asks for the password with `-p`, or
-     reads it from `~/.my.cnf`; never type it on the command line).
+   - in the terminal: `zcat <folder>/bakery-ops-<night>.sql.gz | mysql --init-command="SET SESSION max_statement_time=0" <app database>`
+     (the client asks for the password with `-p`, or reads it from `~/.my.cnf`; never type it on the command line; the init command lifts
+     the host's 20-second limit for this session, see above).
 5. **Restore the files folder and the media folder** of the same night:
    - `rsync -a --delete <folder>/bakery-ops-<night>.files/ <app>/storage/app/private/files/` (the receipt photos);
    - `rsync -a --delete <folder>/bakery-ops-<night>.media/ <app>/storage/app/private/media/` (the product photos; a night from before
@@ -114,7 +134,7 @@ own error text is in `storage/logs` (`ops: mysqldump failed`, `ops: mysql failed
 | `backup.no_path` | no `BACKUP_PATH` and no home folder | set `BACKUP_PATH` to an absolute folder |
 | `backup.path_inside_app` | the folder is inside the app | move it outside (a deploy would delete it) |
 | `backup.path_unwritable` | the folder cannot be created or written | check the folder's owner and the disk |
-| `backup.dump_failed` | mysqldump exited with an error (`exit_code`) | run `php artisan backup:run` by hand and read the log line; check `command -v mysqldump` |
+| `backup.dump_failed` | mysqldump exited with an error (`exit_code`) | run `php artisan backup:run` by hand and read the log line; check `command -v mysqldump`; for error 1969 or 2013 see [the host's 20-second statement limit](#the-hosts-20-second-statement-limit) |
 | `backup.dump_incomplete` | the dump did not end with `-- Dump completed` | usually a killed process or a full disk |
 | `backup.write_failed` | the dump or manifest could not be written | the disk is full or the folder unwritable |
 | `backup.files_failed` | the files or media snapshot could not be made | check the files and media folders and the disk |
