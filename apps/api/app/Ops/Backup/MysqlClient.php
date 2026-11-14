@@ -17,6 +17,14 @@ use Illuminate\Support\Facades\Log;
  * dump() runs `mysqldump --single-transaction --quick --routines --triggers --hex-blob --no-tablespaces` on the connection's database
  * and gzips its output as it arrives (nothing is held in memory or written twice); the dump must end with mysqldump's
  * "-- Dump completed" line. restore() feeds a gzipped dump to `mysql` on another database.
+ *
+ * The statement limit (ADR 0028): the shared host kills any statement after 20 seconds (max_statement_time, global and per session), and
+ * one table's SELECT or one restore statement can take longer. Both sessions lift it for themselves, which needs no privilege:
+ *   - mysqldump gets `--max-statement-time=0` (MariaDB's mysqldump sends `SET @@MAX_STATEMENT_TIME=0` when it connects; it does so by
+ *     default too, but an option file of the host, such as ~/.my.cnf, may set the option, and the command line wins over every option file).
+ *     mysqldump has no init-command option and refuses one in its option file (exit 7), so that route is closed;
+ *   - mysql gets `--init-command=SET SESSION max_statement_time=0`: the client sets no limit of its own.
+ * Neither flag carries a secret, so they stay in the arguments; the option file keeps only the credentials and the server.
  */
 final class MysqlClient
 {
@@ -33,8 +41,21 @@ final class MysqlClient
     {
         return [
             $this->config->binary('mysqldump'), '--defaults-extra-file='.$optionFile,
-            '--single-transaction', '--quick', '--routines', '--triggers', '--hex-blob', '--no-tablespaces',
+            '--single-transaction', '--quick', '--routines', '--triggers', '--hex-blob', '--no-tablespaces', '--max-statement-time=0',
             '--default-character-set=utf8mb4', $database,
+        ];
+    }
+
+    /**
+     * The arguments restore() runs, the option file's path in place of $optionFile.
+     *
+     * @return list<string>
+     */
+    public function restoreArguments(string $optionFile, string $database): array
+    {
+        return [
+            $this->config->binary('mysql'), '--defaults-extra-file='.$optionFile,
+            '--init-command=SET SESSION max_statement_time=0', '--default-character-set=utf8mb4', $database,
         ];
     }
 
@@ -90,8 +111,7 @@ final class MysqlClient
     public function restore(string $gzPath, Connection $target, string $workDir): void
     {
         $this->withOptionFile($target, $workDir, function (string $optionFile, string $stderr) use ($gzPath, $target): void {
-            $arguments = [$this->config->binary('mysql'), '--defaults-extra-file='.$optionFile, '--default-character-set=utf8mb4', (string) $target->getDatabaseName()];
-            $process = proc_open($arguments, [0 => ['pipe', 'r'], 1 => ['file', $stderr, 'a'], 2 => ['file', $stderr, 'a']], $pipes);
+            $process = proc_open($this->restoreArguments($optionFile, (string) $target->getDatabaseName()), [0 => ['pipe', 'r'], 1 => ['file', $stderr, 'a'], 2 => ['file', $stderr, 'a']], $pipes);
             if (! is_resource($process)) {
                 throw OpsFailure::because('drill.restore_failed', ['exit_code' => null]);
             }

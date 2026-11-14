@@ -9,8 +9,9 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * One stored response per (branch_id, user_id, key) (ADR 0003). Written only by the Idempotency middleware;
- * scoped explicitly there, so it does not use BranchScoped. A row is replayed until expires_at; nothing sweeps it: an
- * expired row is deleted when its own key comes back, never by a user. request_hash leaves the secret fields out
+ * scoped explicitly there, so it does not use BranchScoped. A row is replayed until expires_at; an expired row is deleted
+ * when its own key comes back, and `bakery:prune-idempotency` deletes the rest prune_after_hours (24) later, nightly, in
+ * chunks (ADR 0028); never by a user. request_hash leaves the secret fields out
  * (Idempotency::SECRET_FIELDS), and response_body holds {kind: json|raw|encrypted, data} (an answer carrying a secret is
  * encrypted with the app key, step 4.3e).
  *

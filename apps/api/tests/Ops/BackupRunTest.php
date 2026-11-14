@@ -109,7 +109,7 @@ it('puts the password in a 0600 option file it deletes afterwards, never in the 
     $option = (string) file_get_contents($record.'/option');
     expect($arguments)->not->toContain($password)
         ->and(strtok($arguments, "\n"))->toStartWith('--defaults-extra-file=')
-        ->and($arguments)->toContain("--single-transaction\n--quick\n--routines\n--triggers\n--hex-blob\n--no-tablespaces\n")
+        ->and($arguments)->toContain("--single-transaction\n--quick\n--routines\n--triggers\n--hex-blob\n--no-tablespaces\n--max-statement-time=0\n")
         ->and(trim((string) file_get_contents($record.'/mode')))->toBe('600')
         ->and($option)->toStartWith($this->ops->folder.'/')
         ->and(file_exists($option))->toBeFalse('the option file is deleted')

@@ -15,6 +15,9 @@ return [
         'ttl_hours' => 24,
         // How long the in-flight lock is held at most if the handler never returns.
         'lock_seconds' => 60,
+        // How long after its expires_at a snapshot is deleted by bakery:prune-idempotency (ADR 0028): 48 hours after the write with the
+        // 24 hours above. An expired snapshot is never replayed, so this only keeps a day of them for whoever looks into a retry.
+        'prune_after_hours' => 24,
     ],
 
     'identity' => [
