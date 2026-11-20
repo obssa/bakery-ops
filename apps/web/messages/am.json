@@ -26,7 +26,13 @@
     "sync_online_short": "በመስመር ላይ",
     "sync_sending_short": "{count} በመጠባበቅ",
     "sync_offline_waiting_short": "ከመስመር ውጭ · {count}",
-    "sync_conflicts_short": "{count} ያልተቀመጡ"
+    "sync_conflicts_short": "{count} ያልተቀመጡ",
+    "sync_checking": "የሚጠብቀውን በማረጋገጥ ላይ…",
+    "sync_checking_short": "በማረጋገጥ ላይ…",
+    "update_ready": "አዲስ የመተግበሪያው ስሪት ዝግጁ ነው።",
+    "update_reload": "እንደገና ጫን",
+    "update_wait": "በዚህ ታብሌት ላይ የሚጠብቁት ለውጦች ከተላኩ በኋላ መጫን ይቻላል።",
+    "update_stale": "ይህ ገጽ ከቀድሞው የመተግበሪያው ስሪት ነው፤ ከፊሉ መጫን አልቻለም። ለመቀጠል እንደገና ይጫኑ።"
   },
   "home": {
     "screens": "ገጾች",
@@ -285,6 +291,7 @@
     "print_waiting": "አታሚውን በመጠበቅ ላይ…",
     "print_printing": "በማተም ላይ…",
     "print_printed": "ታትሟል።",
+    "print_sent": "ወደ አታሚው ተልኳል። ደረሰኙ መውጣቱን ያረጋግጡ፤ ካልወጣ ለደንበኛው የደረሰኙን ማስፈንጠሪያ ይስጡ።",
     "print_failed": "አልታተመም፦ {reason}። ለደንበኛው የደረሰኙን ማስፈንጠሪያ ይስጡ፣ ወይም ኮዱን እንዲያነብ ያድርጉ።",
     "print_expired": "አልታተመም፦ ደረሰኙ አታሚውን ብዙ ጊዜ ጠብቋል። ለደንበኛው የደረሰኙን ማስፈንጠሪያ ይስጡ፣ ወይም ኮዱን እንዲያነብ ያድርጉ።",
     "print_reason_paper_out": "አታሚው ወረቀት አልቆበታል",
@@ -1134,6 +1141,7 @@
     "kind_serve_line": "መቅረቡን ምልክት ማድረግ",
     "kind_cancel_order": "ትዕዛዝ መሰረዝ",
     "pending_elsewhere": "{count, plural, one {# ከሌላ ገጽ ይጠብቃል} other {# ከሌሎች ገጾች ይጠብቃሉ}}",
+    "pending_others": "{count, plural, one {# የሌላ መለያ ለውጥ ያ መለያ በዚህ ታብሌት እስኪገባ ይጠብቃል} other {# የሌሎች መለያዎች ለውጦች እነዚያ መለያዎች በዚህ ታብሌት እስኪገቡ ይጠብቃሉ}}",
     "kind_pay_batch": "ክፍያ መቀበል",
     "kind_start_batch": "ምርት መጀመር",
     "kind_finish_batch": "ምርት መጨረስ",

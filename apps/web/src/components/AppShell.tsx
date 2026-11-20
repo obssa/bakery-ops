@@ -112,13 +112,20 @@ function useStationShift(): { name: string | null; nameAm: string | null; shift:
 export function SyncChip({ compact = false }: { compact?: boolean }) {
   const t = useTranslations("shell");
   const online = useOnline();
-  const { here, elsewhere, conflicts, held } = useSyncState();
+  const { here, elsewhere, conflicts, held, loaded } = useSyncState();
+  // the signed-in person's own writes (another account's wait for that account and are said apart, in the band under the bar)
   const waiting = here + elsewhere;
 
   let tone: Tone = "positive";
   let text = t("sync_online");
   let short = t("sync_online_short");
-  if (conflicts > 0) {
+  if (!loaded) {
+    // the queue is still being read from the tablet (and the connection's state is not known before the page has started): never "all
+    // sent" before anything is known (2026-11-20)
+    tone = "neutral";
+    text = t("sync_checking");
+    short = t("sync_checking_short");
+  } else if (conflicts > 0) {
     tone = "amber";
     text = t("sync_conflicts", { count: conflicts });
     short = t("sync_conflicts_short", { count: conflicts });

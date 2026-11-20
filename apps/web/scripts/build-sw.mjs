@@ -29,7 +29,10 @@ const { count, size, warnings } = await generateSW({
   directoryIndex: "index.html",
   cleanupOutdatedCaches: true,
   clientsClaim: true,
-  skipWaiting: true,
+  // a new version's worker waits instead of taking over open tabs (2026-11-20): the old one keeps serving the files the tab started with,
+  // so its later parts still load; the tab offers Reload (components/ServiceWorker.tsx), which posts SKIP_WAITING (workbox adds the
+  // listener when skipWaiting is off)
+  skipWaiting: false,
   // no navigation fallback; one runtime route, the product photos (above): anything else not precached goes to the network untouched
   runtimeCaching: [
     {

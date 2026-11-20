@@ -55,6 +55,9 @@ export function usePrintReceipt(orderId: number) {
 
   const latest = canView ? latestJob(jobs.data ?? []) : answered;
   const fallback = printingOff || (asked && showsLink(latest, refusal));
+  // without print.view the jobs cannot be read (GET /print-jobs), so the job's answer is all this screen ever learns: it says the receipt
+  // was sent, never "waiting" for ever, and Print stays available (2026-11-20; no role holds print.create without print.view today)
+  const unwatched = !canView && latest !== null;
 
   async function print() {
     setBusy(true);
@@ -80,7 +83,7 @@ export function usePrintReceipt(orderId: number) {
     }
   }
 
-  return { canPrint, printingOff: mayPrint && printingOff, busy, error, latest, fallback, inFlight: inFlight(latest), print };
+  return { canPrint, printingOff: mayPrint && printingOff, busy, error, latest, unwatched, fallback, inFlight: unwatched ? false : inFlight(latest), print };
 }
 
 export type PrintState = ReturnType<typeof usePrintReceipt>;
@@ -101,7 +104,9 @@ export function PrintStatus({ state }: { state: PrintState }) {
   const errorText = useErrorText();
   const job = state.latest;
   let text: string | null = null;
-  if (job) {
+  if (job && state.unwatched) {
+    text = t("print_sent");
+  } else if (job) {
     const phase = printPhase(job.status);
     if (phase === "failed") text = t("print_failed", { reason: t(`print_reason_${failureReason(job.failure_key)}`) });
     else text = t(`print_${phase}`);

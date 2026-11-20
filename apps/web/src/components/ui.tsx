@@ -827,24 +827,48 @@ function ProductPlaceholder({ name, category, size }: { name: string; category?:
 /**
  * A dialog over the screen (the till's pay sheet and void form): named for screen readers, closed by Escape or a tap on
  * the backdrop. The page behind stays as it was; the dialog holds what must be decided before going on.
+ *
+ * `inline` shows the same dialog in the page's flow instead (the till's pay sheet beside the waiting list from 1024 px): not modal, no
+ * backdrop, Escape inside it still closes it. Both looks keep one element tree, so switching between them (a tablet turned across 1024 px)
+ * only changes classes: what the dialog holds is never mounted again, and a payment on its way keeps its state.
  */
-export function Modal({ label, onClose, size = "md", children }: { label: string; onClose: () => void; size?: "md" | "lg"; children: ReactNode }) {
+export function Modal({
+  label,
+  onClose,
+  size = "md",
+  inline = false,
+  children,
+}: {
+  label: string;
+  onClose: () => void;
+  size?: "md" | "lg";
+  inline?: boolean;
+  children: ReactNode;
+}) {
   useEffect(() => {
+    if (inline) return;
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, inline]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-scrim p-4 sm:items-center" onClick={onClose}>
+    <div className={inline ? "min-w-0" : "fixed inset-0 z-40 flex items-end justify-center bg-scrim p-4 sm:items-center"} onClick={inline ? undefined : onClose}>
       <div
         role="dialog"
-        aria-modal="true"
+        aria-modal={inline ? undefined : "true"}
         aria-label={label}
-        className={`max-h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-lg"} space-y-4 overflow-y-auto rounded-[20px] bg-white p-6 shadow-float`}
-        onClick={(event) => event.stopPropagation()}
+        className={inline ? "min-w-0" : `max-h-full w-full ${size === "lg" ? "max-w-3xl" : "max-w-lg"} space-y-4 overflow-y-auto rounded-[20px] bg-white p-6 shadow-float`}
+        onClick={inline ? undefined : (event) => event.stopPropagation()}
+        onKeyDown={
+          inline
+            ? (event) => {
+                if (event.key === "Escape") onClose();
+              }
+            : undefined
+        }
       >
         {children}
       </div>

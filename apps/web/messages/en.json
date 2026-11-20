@@ -26,7 +26,13 @@
     "sync_online_short": "Online",
     "sync_sending_short": "{count} waiting",
     "sync_offline_waiting_short": "Offline · {count}",
-    "sync_conflicts_short": "{count} to check"
+    "sync_conflicts_short": "{count} to check",
+    "sync_checking": "Checking what is waiting…",
+    "sync_checking_short": "Checking…",
+    "update_ready": "A new version of the app is ready.",
+    "update_reload": "Reload",
+    "update_wait": "It can be loaded once the changes waiting on this tablet are sent.",
+    "update_stale": "This page is from an older version of the app and part of it could not load. Reload to continue."
   },
   "home": {
     "screens": "Screens",
@@ -285,6 +291,7 @@
     "print_waiting": "Waiting for the printer…",
     "print_printing": "Printing…",
     "print_printed": "Printed.",
+    "print_sent": "Sent to the printer. Check that the receipt came out; if not, give the customer the receipt link.",
     "print_failed": "Not printed: {reason}. Give the customer the receipt link, or let them scan the code.",
     "print_expired": "Not printed: the receipt waited too long for the printer. Give the customer the receipt link, or let them scan the code.",
     "print_reason_paper_out": "the printer is out of paper",
@@ -1134,6 +1141,7 @@
     "kind_serve_line": "mark served",
     "kind_cancel_order": "cancel order",
     "pending_elsewhere": "{count, plural, one {# waiting from another screen} other {# waiting from other screens}}",
+    "pending_others": "{count, plural, one {# change by another account waits until that account signs in on this tablet} other {# changes by other accounts wait until those accounts sign in on this tablet}}",
     "kind_pay_batch": "take payment",
     "kind_start_batch": "start batch",
     "kind_finish_batch": "finish batch",

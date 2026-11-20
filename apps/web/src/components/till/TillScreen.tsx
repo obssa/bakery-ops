@@ -181,18 +181,22 @@ export function TillScreen({ titleTwin }: { /** the Amharic title beside the Eng
             onOpen={choose}
             head={viewTabs}
           />
-          {wide && sheet ? (
-            sheet
-          ) : (
-            <div className="min-w-0 space-y-6">
-              {wide && orders.length > 0 ? (
-                <div className="rounded-[20px] border border-dashed border-neutral-300">
-                  <EmptyState icon={HandCoins} title={t("pick_title")} body={t("pick_body")} />
-                </div>
-              ) : null}
-              <DisplayCasePanel />
-            </div>
-          )}
+          {/* one place for the sheet at every width: beside the list from 1024 px, a dialog over the screen below it (a fixed overlay, so
+              where it sits in the page does not matter). Turning the tablet across 1024 px only changes how it shows; it is never mounted
+              again, so a Complete on its way, the change to give and the receipt stay (2026-11-20: it moved between two places before) */}
+          <div className="min-w-0">
+            {sheet}
+            {wide && sheet ? null : (
+              <div className="min-w-0 space-y-6">
+                {wide && orders.length > 0 ? (
+                  <div className="rounded-[20px] border border-dashed border-neutral-300">
+                    <EmptyState icon={HandCoins} title={t("pick_title")} body={t("pick_body")} />
+                  </div>
+                ) : null}
+                <DisplayCasePanel />
+              </div>
+            )}
+          </div>
         </div>
       ) : view === "order" ? (
         <div className="space-y-4">
@@ -207,7 +211,8 @@ export function TillScreen({ titleTwin }: { /** the Amharic title beside the Eng
         </div>
       )}
 
-      {sheet && !(wide && view === "queue") ? sheet : null}
+      {/* another view closes the sheet (switchView): this only covers a sheet left open outside the queue, never at the same time */}
+      {sheet && view !== "queue" ? sheet : null}
       {voiding ? (
         <VoidDialog
           order={voiding}

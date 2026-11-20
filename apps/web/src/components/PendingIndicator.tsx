@@ -4,8 +4,10 @@ import { CloudUpload } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { usePathname } from "@/i18n/navigation";
-import { pendingCounts, screenOf } from "@/lib/outbox/logic";
+import { screenOf } from "@/lib/outbox/logic";
 import { useOutbox } from "@/lib/outbox/store";
+import { useSession } from "@/lib/session";
+import { syncCounts } from "@/lib/syncState";
 import { ConflictTray } from "./ConflictTray";
 import { ICON_STROKE } from "./icons";
 
@@ -20,22 +22,22 @@ export function useSyncState() {
   const queue = useOutbox((s) => s.queue);
   // a write on the wire for the first time is not waiting yet (its screen shows it busy); after a failure it is
   const sendingId = useOutbox((s) => s.sendingId);
-  const { here, elsewhere } = useMemo(
-    () => pendingCounts(queue.filter((item) => item.id !== sendingId || item.attempts > 0), screenOf(pathname)),
-    [queue, sendingId, pathname],
-  );
-  const conflicts = useOutbox((s) => s.failures.length);
+  const userId = useSession((s) => s.me?.user.id ?? null);
+  // the person's own writes waiting, the other accounts' apart, and the refused writes as the tray lists them (lib/syncState.ts)
+  const { here, elsewhere, others, conflicts } = useMemo(() => syncCounts(queue, sendingId, userId, screenOf(pathname)), [queue, sendingId, userId, pathname]);
   const held = useOutbox((s) => s.held !== null && s.items.length > 0);
   // the queue could not be written to the tablet (no IndexedDB, or a write failed): what waits lives in this page only (ADR 0029)
   const unsaved = useOutbox((s) => s.loaded && !s.durable && s.queue.length > 0);
-  return { here, elsewhere, conflicts, held, unsaved };
+  // the queue has not been read from the tablet yet: nothing can be said about it (the chip says it is checking, never "all sent")
+  const loaded = useOutbox((s) => s.loaded);
+  return { here, elsewhere, others, conflicts, held, unsaved, loaded };
 }
 
 export function PendingIndicator() {
   const t = useTranslations("outbox");
-  const { here, elsewhere, conflicts, held, unsaved } = useSyncState();
+  const { here, elsewhere, others, conflicts, held, unsaved } = useSyncState();
 
-  if (here === 0 && elsewhere === 0 && conflicts === 0 && !held && !unsaved) return null;
+  if (here === 0 && elsewhere === 0 && others === 0 && conflicts === 0 && !held && !unsaved) return null;
   return (
     <div role="region" aria-label={t("region")} className="border-b border-neutral-200 bg-neutral-50">
       <div className="flex flex-col gap-2 px-4 py-3 sm:px-6">
@@ -49,6 +51,7 @@ export function PendingIndicator() {
             </span>
           </p>
         ) : null}
+        {others > 0 ? <p className="text-[15px] font-medium text-neutral-700">{t("pending_others", { count: others })}</p> : null}
         {unsaved ? (
           <p role="alert" className="text-[15px] font-semibold text-amber-900">
             {t("not_durable")}
