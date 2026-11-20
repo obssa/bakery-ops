@@ -60,7 +60,11 @@ it('answers {data, cursor, server_time} with the Order resource, newest first, w
     $response->assertOk()->assertHeader('Cache-Control', 'no-cache, private');
     expect(array_keys($response->json()))->toBe(['data', 'cursor', 'server_time'])
         ->and(($this->ids)($response))->toBe([$b['id'], $a['id']])
-        ->and($response->json('data.1'))->toBe($a)
+        // the same Order resource, but `actions` are the reader's own (ADR 0032): the waiter who sent it may do nothing more, the cashier
+        // reading the list may void it
+        ->and(array_diff_key($response->json('data.1'), ['actions' => true]))->toBe(array_diff_key($a, ['actions' => true]))
+        ->and($a['actions'])->toBe([])
+        ->and($response->json('data.1.actions'))->toBe(['void'])
         ->and($response->json('data.1'))->not->toHaveKey('events')
         ->and($response->json('cursor'))->toBeString()
         ->and($response->headers->get('ETag'))->toBeString();
