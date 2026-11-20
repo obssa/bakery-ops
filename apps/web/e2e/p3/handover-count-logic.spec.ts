@@ -145,24 +145,16 @@ test.describe("p3 count screen: logic", () => {
     expect(stageOf(count({ status: "rejected" }))).toBe("sent_back");
   });
 
-  test("approve and reject belong to shifts.approve, never to the person who counted; co-sign to the overseers", () => {
-    const pending = count({ status: "pending_approval", counted_by: { id: 11, name: "Abebe" } });
-    const manager = { userId: 20, permissions: ["shifts.view", "shifts.approve", "shifts.cosign"], worksAtStation: true, requiresOverseer: false };
-    expect(approvalActions(pending, manager)).toEqual({ approve: true, cosign: false, reject: true, unlock: false });
-    expect(approvalActions(pending, { ...manager, userId: 11 })).toEqual({ approve: false, cosign: false, reject: false, unlock: false }); // the counter
-    expect(approvalActions(pending, { ...manager, permissions: ["shifts.view"] })).toEqual({ approve: false, cosign: false, reject: false, unlock: false });
-
-    const waiting = count({ status: "awaiting_cosign" });
-    expect(approvalActions(waiting, manager)).toEqual({ approve: false, cosign: true, reject: true, unlock: false });
-    // an overseer flagged at a station that requires one co-signs without holding shifts.cosign
-    expect(approvalActions(waiting, { userId: 30, permissions: ["shifts.view"], worksAtStation: true, requiresOverseer: true })).toMatchObject({ cosign: true, reject: true });
-    expect(approvalActions(waiting, { userId: 30, permissions: ["shifts.view"], worksAtStation: false, requiresOverseer: true })).toMatchObject({ cosign: false });
-
-    const locked = count({ status: "locked" });
-    const admin = { ...manager, permissions: ["shifts.view", "shifts.approve", "shifts.unlock"] };
-    expect(approvalActions(locked, admin)).toEqual({ approve: false, cosign: false, reject: false, unlock: true });
-    expect(approvalActions(count({ status: "locked", superseded_by_id: 9 }), admin).unlock).toBe(false); // already replaced by a revision
-    expect(approvalActions(locked, manager).unlock).toBe(false);
+  test("the decisions offered are the count's own actions (ADR 0032: the API decides them for the person)", () => {
+    const pending = (actions: ("approve" | "reject" | "cosign" | "unlock")[]) => count({ status: "pending_approval", counted_by: { id: 11, name: "Abebe" }, actions });
+    expect(approvalActions(pending(["approve", "reject"]))).toEqual({ approve: true, cosign: false, reject: true, unlock: false });
+    // the manager who counted it may send it back for a recount, never approve it: the API lists reject alone, and the screen offers it
+    expect(approvalActions(pending(["reject"]))).toEqual({ approve: false, cosign: false, reject: true, unlock: false });
+    expect(approvalActions(pending([]))).toEqual({ approve: false, cosign: false, reject: false, unlock: false });
+    expect(approvalActions(count({ status: "awaiting_cosign", actions: ["cosign", "reject"] }))).toEqual({ approve: false, cosign: true, reject: true, unlock: false });
+    expect(approvalActions(count({ status: "locked", actions: ["unlock"] }))).toEqual({ approve: false, cosign: false, reject: false, unlock: true });
+    // a count read before the API listed its actions offers nothing until it is read again
+    expect(approvalActions(count({ status: "pending_approval" }))).toEqual({ approve: false, cosign: false, reject: false, unlock: false });
   });
 
   test("quantities read with their sign, and a hash is shortened for the list but never altered", () => {

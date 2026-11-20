@@ -76,7 +76,6 @@ function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
   const errorText = useErrorText();
   const client = useQueryClient();
   const keys = useKeys();
-  const me = useSession((s) => s.me);
   const signedIn = useSession((s) => s.status === "signed-in");
 
   const countQuery = useQuery({ queryKey: ["count", countId], queryFn: () => getCount(countId), enabled: signedIn, refetchInterval: POLL_MS });
@@ -102,15 +101,8 @@ function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
     return useActiveStation.getState().claim(stationId);
   }, [stationId]);
 
-  const actions = useMemo(() => {
-    if (!count || !me) return { approve: false, cosign: false, reject: false, unlock: false };
-    return approvalActions(count, {
-      userId: me.user.id,
-      permissions: me.permissions,
-      worksAtStation: shift !== null && (me.work_stations ?? []).some((station) => station.station_id === shift.station.id),
-      requiresOverseer: shift?.station.counting_rules?.cosign ?? shift?.station.requires_overseer ?? false,
-    });
-  }, [count, me, shift]);
+  // the count's own `actions` (ADR 0032): what the API lets this person do with it now
+  const actions = useMemo(() => (count ? approvalActions(count) : { approve: false, cosign: false, reject: false, unlock: false }), [count]);
 
   const lines = useMemo(() => {
     if (!count) return [];

@@ -1,3 +1,4 @@
+import { may } from "./api/actions";
 import { compareDecimal, subtractDecimal, trimDecimal } from "./decimal";
 import type { Count, CountLine, ShiftStatus, VarianceReason } from "./api/types";
 
@@ -109,31 +110,13 @@ export interface ApprovalActions {
   unlock: boolean;
 }
 
-export interface Approver {
-  userId: number;
-  permissions: readonly string[];
-  /** the person works at the count's station (assigned there, or holds stations.all) */
-  worksAtStation: boolean;
-  /** the station asks for an overseer's co-signature */
-  requiresOverseer: boolean;
-}
-
 /**
- * What a person is offered on a count (the API decides in the end and answers 403 or 409 in both languages): approve and reject by
- * `shifts.approve` and never for the person who counted; co-sign (and reject at that step) by `shifts.cosign`, or by an overseer at a
- * station that asks for one; unlock by `shifts.unlock`, on a locked count that no revision has replaced.
+ * What a person is offered on a count: the count's own `actions` (ADR 0032), the API's ApproveCount, CosignCount, RejectCount and
+ * UnlockCount deciding them for that person. The API lets a holder of shifts.approve send back a count they counted themselves (a recount,
+ * not a decision on stock), so Reject is offered then too; the person who counted never approves or co-signs their own.
  */
-export function approvalActions(count: Pick<Count, "status" | "counted_by" | "superseded_by_id">, who: Approver): ApprovalActions {
-  const has = (permission: string) => who.permissions.includes(permission);
-  const counter = count.counted_by?.id === who.userId;
-  const canCosign = !counter && (has("shifts.cosign") || (who.requiresOverseer && who.worksAtStation));
-  const canApprove = !counter && has("shifts.approve");
-  return {
-    approve: count.status === "pending_approval" && canApprove,
-    cosign: count.status === "awaiting_cosign" && canCosign,
-    reject: (count.status === "pending_approval" && canApprove) || (count.status === "awaiting_cosign" && canCosign),
-    unlock: count.status === "locked" && count.superseded_by_id === null && has("shifts.unlock"),
-  };
+export function approvalActions(count: Pick<Count, "actions">): ApprovalActions {
+  return { approve: may(count, "approve"), cosign: may(count, "cosign"), reject: may(count, "reject"), unlock: may(count, "unlock") };
 }
 
 /** "-500.0000" -> "-500", "12.5000" -> "+12.5", "0.0000" -> "0", null -> "": a difference as it reads on the screen. */
