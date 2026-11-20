@@ -1082,6 +1082,8 @@ now, one name per write endpoint.
   enum.
 - **Still to come.** The web reads the lists and the mirror in the second half of this item, a pull request of its own.
 
+Claim restated at `ef9a74e`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
