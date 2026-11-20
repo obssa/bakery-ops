@@ -5,6 +5,7 @@ import { request } from "./api/client";
 import { uuid } from "./api/idempotency";
 import type { Locale, ShortCodeVerified } from "./api/types";
 import { actingHooks, useSession } from "./session";
+import { ACTING_SESSION_HEADER } from "./outbox/logic";
 
 // The shared pad (docs/architecture.md section 6): the device is signed in as the pad account, and a waiter wakes it
 // with their short code. POST /short-code/verify starts a 10-minute acting session; every pad call then carries its id
@@ -15,7 +16,7 @@ import { actingHooks, useSession } from "./session";
 /** Locks the pad after this long without a touch. */
 export const IDLE_LOCK_MS = 60_000;
 
-export const ACTING_HEADER = "X-Acting-Session";
+export const ACTING_HEADER = ACTING_SESSION_HEADER;
 
 export type LockReason = "idle" | "expired" | "manual";
 
@@ -76,8 +77,20 @@ export const useActing = create<ActingState>()((set, get) => ({
   },
 }));
 
+/**
+ * Whether a 401 identity.acting_session.expired locks the pad now: a call made now (no session named) does; a queued write does only when
+ * it carried the session of the waiter who has the pad now. Waiter A's write refused after A's session ended never locks waiter B out
+ * (ADR 0029).
+ */
+export function expiryLocks(current: number | null, refused: number | null | undefined): boolean {
+  return refused === undefined || refused === current;
+}
+
 // a 401 identity.acting_session.expired from any call locks the pad (the device stays signed in)
-actingHooks.onExpired = () => useActing.getState().lock("expired");
+actingHooks.onExpired = (sessionId) => {
+  const state = useActing.getState();
+  if (expiryLocks(state.sessionId, sessionId)) state.lock("expired");
+};
 
 /** Why the pad should lock now, or null: 60 s without a touch, or the 10-minute session over. */
 export function lockDue(state: Pick<ActingState, "user" | "expiresAt" | "touchedAt">, now: number): LockReason | null {

@@ -287,7 +287,7 @@ test.describe("offline logic: the outbox", () => {
     expect((await loadOutbox(db, storage)).items.map((i) => i.id)).toEqual(["already", "s"]);
 
     // IndexedDB refused the write: the items still go out from this tab, and the old queue stays for the next start
-    const broken: OutboxDb = { ...memoryOutboxDb(), replaceAll: async () => Promise.reject(new Error("quota")) };
+    const broken: OutboxDb = { ...memoryOutboxDb(), apply: async () => Promise.reject(new Error("quota")) };
     const blocked = new FakeStorage(new Map([[LEGACY_STORAGE_KEY, legacy]]));
     const fallback = await loadOutbox(broken, blocked);
     expect(fallback.items.map((i) => i.id)).toEqual(["s"]);

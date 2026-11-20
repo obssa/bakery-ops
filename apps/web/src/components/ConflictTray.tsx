@@ -9,6 +9,7 @@ import type { Order, ShortfallLine } from "@/lib/api/types";
 import { useCarts, type Refusal } from "@/lib/cart";
 import { useErrorText } from "@/lib/errors";
 import { cartSourceOf, sourceOfOrder, trayEntries, type Bilingual, type TrayEntry } from "@/lib/outbox/tray";
+import { cartOwnerOf } from "@/lib/outbox/logic";
 import { useOutbox } from "@/lib/outbox/store";
 import { authed } from "@/lib/session";
 import { focusRing } from "./styles";
@@ -53,7 +54,9 @@ async function askForCart(entry: TrayEntry): Promise<void> {
   const shortfall = source.serverOrderId !== null && Array.isArray(body.shortfall) ? (body.shortfall as ShortfallLine[]) : [];
   const error: Refusal | null =
     shortfall.length > 0 ? null : { key: entry.key, message_en: entry.message.en ?? entry.key, message_am: entry.message.am ?? entry.message.en ?? entry.key };
-  useCarts.setState({ restore: { source, shortfall, error, resolves: [item.id] } });
+  // it goes back to the cart of the waiter it was queued for, never into another waiter's (ADR 0029)
+  const owner = cartOwnerOf(item);
+  useCarts.setState({ restore: { source, shortfall, error, resolves: [item.id], ...(owner ? { owner } : {}) } });
 }
 
 function Entry({ entry }: { entry: TrayEntry }) {

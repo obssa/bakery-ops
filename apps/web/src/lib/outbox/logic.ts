@@ -67,6 +67,17 @@ export interface OutboxItem {
   idempotencyKey: string;
   /** headers fixed when the write was queued: the pad's X-Acting-Session (the waiter who tapped, not whoever acts at retry time) */
   headers?: Record<string, string>;
+  /**
+   * The station the write was queued at (X-Station-Id), fixed then like the acting session (ADR 0029): a payment queued on the till goes
+   * on the till's shift even when it is sent from the kitchen display. null: none was picked. Missing on a write queued before this was
+   * kept: it goes with the station picked when it is sent, as it always did.
+   */
+  station?: number | null;
+  /**
+   * The waiter whose acting session the write carries (the pad), fixed when it was queued: the tray's "Edit and resend" gives the order back
+   * to that waiter's cart only (ADR 0029). null: no acting session (the signed-in account itself). Missing on older writes.
+   */
+  actor?: { id: number; name: string } | null;
   /** the line or order the write is about, so a screen can show "sending" on it */
   subjectId: number | null;
   /** the order's client_uuid, so the pad finds the answer to its own send */
@@ -96,6 +107,25 @@ export interface OutboxItem {
 }
 
 export type Outcome = "retry" | "conflict" | "device" | "signed_out";
+
+/** The header of the shared pad's acting session (lib/acting.ts names it from here). */
+export const ACTING_SESSION_HEADER = "X-Acting-Session";
+
+/** The acting session a queued write carries, or null (a write of the signed-in account itself). */
+export function actingSessionOf(item: Pick<OutboxItem, "headers">): number | null {
+  const raw = item.headers?.[ACTING_SESSION_HEADER];
+  const id = raw === undefined ? NaN : Number(raw);
+  return Number.isInteger(id) ? id : null;
+}
+
+/**
+ * Whose cart the tray's "Edit and resend" gives a refused write back to (ADR 0029): the waiter it was queued for on the pad, the signed-in
+ * account itself on the till; undefined for a write queued before this was kept (the cart that opens next takes it, as before).
+ */
+export function cartOwnerOf(item: Pick<OutboxItem, "actor" | "userId">): { id: number; name: string | null } | undefined {
+  if (item.actor === undefined) return undefined;
+  return item.actor ? { id: item.actor.id, name: item.actor.name } : { id: item.userId, name: null };
+}
 
 const MAX_BACKOFF_MS = 60_000;
 

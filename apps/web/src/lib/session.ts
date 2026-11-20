@@ -130,8 +130,11 @@ export const useSession = create<SessionState>()((set, get) => ({
   },
 }));
 
-/** Set by lib/acting.ts: what a 401 `identity.acting_session.expired` does (lock the pad). */
-export const actingHooks = { onExpired: () => {} };
+/**
+ * Set by lib/acting.ts: what a 401 `identity.acting_session.expired` does (lock the pad). A queued write names the acting session it
+ * carried (null: none); a call made now names none.
+ */
+export const actingHooks: { onExpired: (sessionId?: number | null) => void } = { onExpired: () => {} };
 
 /**
  * A 401 on a call. The acting session of the shared pad ending is not the device signing out: the pad locks and the
