@@ -949,6 +949,43 @@ started, stock bought) got the stored refusal again until the page was reloaded.
 
 Claim restated at `06f9063`; the tag stays on `2f6bbd9`.
 
+**The pay sheet across a rotation, and the low items of the review (phase-6/pay-sheet-and-polish).** The rest of the web's implicit
+state machines from the 2026-11-20 review:
+
+- **Item 4, the pay sheet.** Turning the till across 1024 px mounted the sheet again in another place. A payment on its way lost its
+  "Taking payment…", Complete became pressable again, and the answer's change to give was gone. Only the batch's key stood between that
+  and a second charge. Now `Modal` takes `inline` and keeps one element tree for both looks, and the till gives the sheet one place at
+  every width. A rotation only changes classes.
+- **Item 29, two photo picks.** The slower of two picks of one row could overwrite the newer. The latest pick wins, and an older one's
+  photo is let go of. Removing the row lets go of a pick still on its way.
+- **Item 24, the sync chip.**
+  - **Before the queue is loaded,** it says "Checking…" instead of "all sent".
+  - **Other accounts' writes.** It counts the signed-in person's own writes. Another account's writes wait until that account signs in,
+    and the band under the bar says so apart.
+  - **Conflicts.** The count is the tray's entries, so a write held back by another refused one is no longer counted twice
+    (`lib/syncState.ts`).
+- **Item 27, a feed's answer older than the screen's own change.** The bell's unread count came back for a moment after "Mark all as
+  read". `LiveFeed.amend` now drops the answer of a look asked before the change and looks once more. That look starts from where the
+  dropped one asked: its ETag and cursor are not kept.
+- **Item 28, the transfer sheet.** "Enter a quantity" no longer shows beside an earlier refusal. Editing the quantity clears both, and a
+  quantity refused on the tablet clears the server's old message.
+- **Item 30, a new version.**
+  - **The new worker waits.** The shell cache no longer takes over open tabs (`skipWaiting` off), so the old worker keeps serving the
+    files a tab started with.
+  - **Reload.** The tab says "A new version of the app is ready" and offers Reload once nothing waits on the tablet. Reload posts
+    `SKIP_WAITING`.
+  - **A part that cannot load** (a file a deploy removed) reloads the page once, if nothing waits and the connection is up. Otherwise
+    the tab asks for a reload, which is offered while what waits is saved on the tablet.
+  - **New versions** are looked for every 30 minutes (`lib/swUpdate.ts`).
+- **Item 31, printing without print.view.** Without `GET /print-jobs` the screen only had the job's first answer, so it said "Waiting for
+  the printer" for ever and Print stayed disabled. It now says the receipt was sent, asks the cashier to check it came out, and keeps
+  Print. No server permission changed, and no role holds print.create without print.view today.
+- **Tests.**
+  - `e2e/p6/screens-polish-logic.spec.ts` covers the chip's counts, the dropped feed answer and the update rules.
+  - `e2e/p6/screens-pay-rotate.spec.ts` runs on the CI stack. It holds a payment's answer while the window turns from 1280 x 800 to
+    800 x 1280 and back. The sheet keeps "Taking payment…" with Complete gone, the batch is sent once, and the change stays after the
+    answer.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
