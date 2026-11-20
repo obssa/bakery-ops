@@ -127,6 +127,44 @@ export function cartOwnerOf(item: Pick<OutboxItem, "actor" | "userId">): { id: n
   return item.actor ? { id: item.actor.id, name: item.actor.name } : { id: item.userId, name: null };
 }
 
+/** Whether a cancel of order `orderId` already waits in the queue (the cart's Clear queues one cancel per order, never two). */
+export function cancelWaits(items: readonly Pick<OutboxItem, "kind" | "subjectId" | "state">[], orderId: number): boolean {
+  return items.some((i) => i.state === "pending" && i.kind === "cancel_order" && i.subjectId === orderId);
+}
+
+/** The writes a kitchen or bar display makes on one order line: their subjectId is a line id, never an order's. */
+export const LINE_KINDS: readonly OutboxKind[] = ["accept_line", "ready_line", "reject_line", "serve_line"];
+
+/**
+ * Whether a write about order line `lineId` waits in the queue. The kind matters: a subjectId is a line id for these writes and an order id
+ * for an order's (a cancel, a send), so order 42's cancel must not show line 42 as sending.
+ */
+export function lineWaits(items: readonly Pick<OutboxItem, "kind" | "subjectId" | "state">[], lineId: number): boolean {
+  return items.some((i) => i.state === "pending" && LINE_KINDS.includes(i.kind) && i.subjectId === lineId);
+}
+
+/** How long an accepted tap holds its line's buttons while the display reads the new status (its feed polls every few seconds). */
+export const TAP_HOLD_MS = 15_000;
+
+/**
+ * Whether a display's tap on a line still holds its buttons (the double tap of the kitchen display): a write it queued that is still in the
+ * queue holds them, and so does one already accepted while the display has not read the line's new status yet (the line still shows the
+ * status it was tapped in), for at most `holdMs` after the tap. A refused write (a conflict) lets go at once: the tray says why, and the line
+ * can be tapped again.
+ */
+export function tapHolds(
+  tap: { itemId: string; status: string; at: number } | null,
+  queue: readonly Pick<OutboxItem, "id" | "state">[],
+  status: string,
+  now: number,
+  holdMs = TAP_HOLD_MS,
+): boolean {
+  if (!tap || tap.status !== status) return false;
+  const item = queue.find((i) => i.id === tap.itemId);
+  if (item) return item.state === "pending";
+  return now - tap.at < holdMs;
+}
+
 const MAX_BACKOFF_MS = 60_000;
 
 /** How long a write waits after its `failures`-th failed attempt: 1, 2, 4 ... seconds, at most 60. */

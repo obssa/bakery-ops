@@ -7,6 +7,7 @@ import { addToCart, cartFrom, cartTotal, emptyCart, newOrderOf, orderLinesOf, re
 import { useErrorText } from "@/lib/errors";
 import type { Menu } from "@/lib/api/types";
 import type { FeedSnapshot } from "@/lib/live/feed";
+import { cancelWaits } from "@/lib/outbox/logic";
 import { queueCancelOrder, queuePadSend, queueReplaceLines, queueSendExisting, useOutbox } from "@/lib/outbox/store";
 import { focusRing } from "../styles";
 import { Cart, unitsOf } from "./Cart";
@@ -70,23 +71,32 @@ export function OrderingSurface({
     useCarts.setState((s) => ({ restore: null, carts: { ...s.carts, [userId]: restored } }));
   }, [restore, menuItems, userId]);
 
+  // the cart's own words for a send that could not be queued (the page's language: the pad is used in one)
+  const notQueued = () => ({ key: "pad.send_not_queued", message_en: t("send_not_queued"), message_am: t("send_not_queued") });
+
   function send() {
     if (cart.sending) return;
     // the new send replaces this order's refused writes in the conflict tray (and the ones this cart was rebuilt from)
     useOutbox.getState().supersede(cart.orderUuid, cart.resolves);
     act((c) => ({ ...c, sending: true, shortfall: [], lineErrors: {}, error: null, resolves: [] }));
     onSendStarted();
+    let queued;
     if (cart.serverOrderId === null) {
-      queuePadSend(newOrderOf(cart));
+      queued = queuePadSend(newOrderOf(cart));
     } else {
       const replaced = queueReplaceLines(cart.serverOrderId, cart.orderUuid, orderLinesOf(cart));
-      queueSendExisting(cart.serverOrderId, cart.orderUuid, replaced?.id ?? null);
+      queued = replaced ? queueSendExisting(cart.serverOrderId, cart.orderUuid, replaced.id) : null;
     }
+    // nothing was queued (the account signed out under the pad): no answer will ever come to end "Sending", so the cart says so now and
+    // can be sent again once someone is signed in
+    if (!queued) act((c) => ({ ...c, sending: false, error: notQueued() }));
   }
 
   function clear() {
     if (cart.serverOrderId !== null) {
-      // the API holds it open: cancel it there too (an unsent order, nothing reserved)
+      // the API holds it open: cancel it there too (an unsent order, nothing reserved). One cancel per order: a second tap while the first
+      // waits would be refused (the order is cancelled already) and land in the conflict tray as a false refusal
+      if (cancelWaits(useOutbox.getState().items, cart.serverOrderId)) return;
       queueCancelOrder(cart.serverOrderId, cart.orderUuid);
       return;
     }

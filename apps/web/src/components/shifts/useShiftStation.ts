@@ -46,8 +46,8 @@ export function useShiftStation(options: { kinds?: readonly StationCode[]; stati
 
   // every call this screen makes names the station it works at
   useEffect(() => {
-    useActiveStation.getState().set(stationId);
-    return () => useActiveStation.getState().set(null);
+    // the station is held while this screen is on view; leaving lets go of this screen's claim only (lib/station.ts)
+    return useActiveStation.getState().claim(stationId);
   }, [stationId]);
 
   const shift = snapshot?.state.shift ?? null;

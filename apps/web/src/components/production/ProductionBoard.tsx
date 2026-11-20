@@ -30,7 +30,8 @@ import { trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
 import { boardColumns, columnCount, COLUMNS, createProductionFeed, ownStationId, type Column } from "@/lib/live/production";
 import { useLiveFeed } from "@/lib/live/useLiveFeed";
-import { boardSummary, dropMove, type BoardSummary, type DropRefusal, type DropVerdict } from "@/lib/productionBoard";
+import { useOutbox } from "@/lib/outbox/store";
+import { boardSummary, dropMove, refusedMoves, type BoardSummary, type DropRefusal, type DropVerdict, type ShownMove } from "@/lib/productionBoard";
 import { useProductImages } from "@/lib/productImages";
 import { authed, can, useSession } from "@/lib/session";
 import { useStationHeader } from "@/lib/topBar";
@@ -154,8 +155,20 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   const [dragged, setDragged] = useState<ProductionRequest | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
   // a card moved before the server answered: shown in its new column until the board's next read carries a newer version of it
-  const [moved, setMoved] = useState<Map<number, { column: Column; version: number }>>(() => new Map());
+  const [moved, setMoved] = useState<Map<number, ShownMove>>(() => new Map());
   const ring = useKeyRing();
+  // a start queued offline and refused when the outbox sent it: the card goes back to where the server has it, and the board says so (the
+  // conflict tray keeps the reason)
+  const queue = useOutbox((s) => s.queue);
+  useEffect(() => {
+    const refused = refusedMoves(moved, queue);
+    if (refused.length === 0) return;
+    const next = new Map(moved);
+    for (const id of refused) next.delete(id);
+    setMoved(next);
+    const request = snapshot?.state.requests.find((r) => r.id === refused[0]);
+    setMoveError(t("move_refused", { name: request ? (locale === "am" ? request.product.name_am : request.product.name_en) : "" }));
+  }, [moved, queue, snapshot, t, locale]);
   useEffect(() => {
     const requests = snapshot?.state.requests;
     if (!requests || moved.size === 0) return;
@@ -230,21 +243,34 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
     // each write keeps its key (and the batch its client_uuid) across the retries of the same move, by its subject: a drop again after a
     // lost answer replays the first write instead of making a second; a definite answer lets them go (ADR 0030)
     let step = "";
+    // accept and start are two writes: when the first went through and the second did not, the request is the baker's now (the board shows
+    // it accepted, in Requested) and the words say so, instead of "could not be moved" about a move that half happened
+    let accepted = false;
     try {
+      let started: Awaited<ReturnType<typeof submitStartBatch>> | null = null;
       if (move === "accept_start" || move === "start") {
         if (move === "accept_start") {
           step = `accept:${request.id}`;
           await acceptRequest(request.id, ring.keyFor(step));
           ring.done(step);
+          accepted = true;
         }
         step = `start:${request.id}`;
-        await submitStartBatch(request.id, ring.keyFor(`${step}:uuid`), ring.keyFor(step));
+        started = await submitStartBatch(request.id, ring.keyFor(`${step}:uuid`), ring.keyFor(step));
         ring.done(step);
         ring.done(`${step}:uuid`);
       } else if (request.batch) {
         step = `confirm:${request.batch.id}`;
         await confirmBatch(request.batch.id, ring.keyFor(step));
         ring.done(step);
+      }
+      // queued offline: the card waits in its new column for that write, and goes back if the outbox has it refused later
+      if (started && !started.sent) {
+        const item = started.item.id;
+        setMoved((current) => {
+          const shown = current.get(request.id);
+          return shown ? new Map(current).set(request.id, { ...shown, item }) : current;
+        });
       }
     } catch (failure) {
       if (step) {
@@ -256,7 +282,8 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
         next.delete(request.id);
         return next;
       });
-      setMoveError(t("move_failed", { name: nameOf(request), reason: errorText.message(failure) }));
+      const reason = errorText.message(failure);
+      setMoveError(accepted ? t("move_half_done", { name: nameOf(request), reason }) : t("move_failed", { name: nameOf(request), reason }));
     } finally {
       refresh();
     }

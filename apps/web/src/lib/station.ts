@@ -12,12 +12,33 @@ import { shiftRequiredNotice, type ShiftRequiredKind } from "./shifts";
  */
 interface ActiveStation {
   stationId: number | null;
-  set: (stationId: number | null) => void;
+  /**
+   * The screen mounted now works at `stationId` until the returned release is called. Screens claim it as they mount and release it as they
+   * go, and the station is the latest claim still held: a screen that unmounts after the next one has claimed (a route change mounts the new
+   * screen before the old one's cleanup runs) lets go of its own claim only, never of the station the screen on view set.
+   */
+  claim: (stationId: number | null) => () => void;
 }
+
+interface Claim {
+  stationId: number | null;
+}
+
+/** The claims held now, oldest first; the last one names the station. */
+let claims: Claim[] = [];
 
 export const useActiveStation = create<ActiveStation>()((set) => ({
   stationId: null,
-  set: (stationId) => set({ stationId }),
+  claim: (stationId) => {
+    const claim: Claim = { stationId };
+    claims = [...claims, claim];
+    set({ stationId });
+    return () => {
+      if (!claims.includes(claim)) return;
+      claims = claims.filter((held) => held !== claim);
+      set({ stationId: claims.at(-1)?.stationId ?? null });
+    };
+  },
 }));
 
 export const STATION_HEADER = "X-Station-Id";

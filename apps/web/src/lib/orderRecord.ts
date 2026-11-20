@@ -311,6 +311,20 @@ export function urlsStale(readAt: number, now: number, lifeMs = SIGNED_URL_LIFE_
 // --- what the page offers -------------------------------------------------------------------------------------------------------------------
 
 /** The whole order is voided while it is sent and not paid in full (the board's rule; 409 orders.order.paid otherwise). */
+/** What the void dialog does for an order: void it (or one of its payments), refund it, or neither. */
+export type VoidPath = "void" | "refund" | "none";
+
+/**
+ * The API's own rules: an order is voided (VoidOrder) or has a payment voided (VoidPayment) while it is sent and not paid or closed, and a
+ * voided order keeps the part payments it had, which can still be voided; only a closed order is refunded (RefundOrder). An open order (a
+ * draft), a cancelled one and one paid but not closed yet have neither, so the dialog says so instead of offering a write the API refuses.
+ */
+export function voidPath(order: Pick<Order, "status">): VoidPath {
+  if (order.status === "closed") return "refund";
+  if (UNPAID_STATUSES.includes(order.status) || order.status === "voided") return "void";
+  return "none";
+}
+
 export function canVoidOrder(order: Order): boolean {
   return isPayable(order);
 }

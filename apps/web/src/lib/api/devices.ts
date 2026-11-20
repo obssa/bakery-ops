@@ -44,7 +44,7 @@ interface Write<T> {
 export function useEnrolDevice() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ body, idempotencyKey }: Write<NewDevice>) => authed<EnrolledDevice>("/devices", { method: "POST", body, idempotencyKey }),
+    mutationFn: ({ body, idempotencyKey, device }: Write<NewDevice> & { device?: string }) => authed<EnrolledDevice>("/devices", { method: "POST", body, idempotencyKey, device }),
     onSuccess: () => client.invalidateQueries({ queryKey: DEVICES_KEY }),
   });
 }

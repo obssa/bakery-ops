@@ -2,7 +2,7 @@
 
 import { AlarmClock, Hourglass, Timer, X, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { Line, Locale, RejectReason, Ticket } from "@/lib/api/types";
 import { REJECT_REASONS } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
@@ -10,6 +10,7 @@ import { ageOf, secondsSince, type TicketAge } from "@/lib/kds";
 import { useWaitText } from "@/lib/useWaitText";
 import { orderNoText } from "@/lib/orderNo";
 import { useNow } from "@/lib/useNow";
+import { lineWaits, tapHolds, TAP_HOLD_MS, type OutboxItem } from "@/lib/outbox/logic";
 import { queueAcceptLine, queueReadyLine, queueRejectLine, useOutbox } from "@/lib/outbox/store";
 import { focusRing } from "../styles";
 import { Button, Field, IconButton, TextInput } from "../ui";
@@ -43,7 +44,7 @@ function TimerChip({ sentAt, seconds, age }: { sentAt: string | null; seconds: n
   );
 }
 
-function RejectPanel({ line, itemName, onDone }: { line: Line; itemName: string; onDone: () => void }) {
+function RejectPanel({ line, itemName, onDone, onQueued }: { line: Line; itemName: string; onDone: () => void; onQueued: (item: OutboxItem | null) => void }) {
   const t = useTranslations("kds");
   const [reason, setReason] = useState<RejectReason | null>(null);
   const [note, setNote] = useState("");
@@ -56,7 +57,7 @@ function RejectPanel({ line, itemName, onDone }: { line: Line; itemName: string;
       onSubmit={(event) => {
         event.preventDefault();
         if (!reason || !ready) return;
-        queueRejectLine(line.id, { reason, note: note.trim() === "" ? null : note.trim() });
+        onQueued(queueRejectLine(line.id, { reason, note: note.trim() === "" ? null : note.trim() }));
         onDone();
       }}
     >
@@ -95,7 +96,22 @@ function RejectPanel({ line, itemName, onDone }: { line: Line; itemName: string;
 function LineRow({ line, waiter }: { line: Line; waiter: string }) {
   const t = useTranslations("kds");
   const locale = useLocale() as Locale;
-  const pending = useOutbox((s) => s.items.some((item) => item.subjectId === line.id));
+  // a write about this line waits: only a line's own writes count (an order's cancel names the order's id, which can be a line's too)
+  const pending = useOutbox((s) => lineWaits(s.items, line.id));
+  const queue = useOutbox((s) => s.queue);
+  // the last tap's write: it holds the buttons until the display reads the line's new status, so a second tap in between is never a second
+  // write the API refuses (the line moved on already) into the conflict tray; a refused write lets go at once, and a hold ends after
+  // TAP_HOLD_MS whatever happens
+  const [tap, setTap] = useState<{ itemId: string; status: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!tap) return;
+    const timer = setTimeout(() => setTap(null), TAP_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [tap]);
+  const held = pending || tapHolds(tap, queue, line.status, tap?.at ?? 0);
+  const tapped = (item: OutboxItem | null) => {
+    if (item) setTap({ itemId: item.id, status: line.status, at: Date.now() });
+  };
   const [rejecting, setRejecting] = useState(false);
   const name = locale === "am" ? line.item.name_am : line.item.name_en;
   const modifiers = line.modifiers.map((m) => (locale === "am" ? m.name_am : m.name_en));
@@ -125,23 +141,23 @@ function LineRow({ line, waiter }: { line: Line; waiter: string }) {
           {waiter ? <span className="font-medium text-night-text-muted">{waiter}</span> : null}
         </p>
       ) : rejecting ? (
-        <RejectPanel line={line} itemName={name} onDone={() => setRejecting(false)} />
+        <RejectPanel line={line} itemName={name} onDone={() => setRejecting(false)} onQueued={tapped} />
       ) : line.status === "queued" ? (
         <div className="flex gap-2">
-          <Button size="lg" className="flex-1 font-bold" aria-label={t("accept_line", { name })} disabled={pending} onClick={() => queueAcceptLine(line.id)}>
+          <Button size="lg" className="flex-1 font-bold" aria-label={t("accept_line", { name })} disabled={held} onClick={() => tapped(queueAcceptLine(line.id))}>
             {t("accept")}
           </Button>
-          <Button size="lg" variant="secondary" aria-label={t("reject_line", { name })} disabled={pending} onClick={() => setRejecting(true)}>
+          <Button size="lg" variant="secondary" aria-label={t("reject_line", { name })} disabled={held} onClick={() => setRejecting(true)}>
             {t("reject")}
           </Button>
         </div>
       ) : (
         // Cooking: "Ready" across the card as the board has it; a line found spoiled while being made is still rejected, from the small button
         <div className="flex gap-2">
-          <Button size="lg" className="flex-1 font-bold" aria-label={t("ready_line", { name })} disabled={pending} onClick={() => queueReadyLine(line.id)}>
+          <Button size="lg" className="flex-1 font-bold" aria-label={t("ready_line", { name })} disabled={held} onClick={() => tapped(queueReadyLine(line.id))}>
             {t("ready")}
           </Button>
-          <IconButton size="lg" variant="secondary" label={t("reject_line", { name })} title={t("reject")} disabled={pending} onClick={() => setRejecting(true)}>
+          <IconButton size="lg" variant="secondary" label={t("reject_line", { name })} title={t("reject")} disabled={held} onClick={() => setRejecting(true)}>
             <X className="size-5" strokeWidth={2} aria-hidden="true" />
           </IconButton>
         </div>

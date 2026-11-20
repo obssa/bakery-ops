@@ -42,11 +42,20 @@ export function deviceId(): string {
   return renewDeviceId();
 }
 
-/** Forgets this device's id and makes a new one (after a revoke, or to enrol in this branch a tablet enrolled in another). */
+/** Forgets this device's id and makes a new one (after a revoke). */
 export function renewDeviceId(): string {
-  const made = `dev-${uuid()}`;
-  store(made);
-  return (memoryId = made);
+  return adoptDeviceId(newDeviceId());
+}
+
+/** A new device id, not kept yet: "Enrol this device" enrols it first and keeps it only once the API has enrolled it (adoptDeviceId). */
+export function newDeviceId(): string {
+  return `dev-${uuid()}`;
+}
+
+/** Makes `id` this device's id from now on (an id just enrolled). */
+export function adoptDeviceId(id: string): string {
+  store(id);
+  return (memoryId = id);
 }
 
 /** The id as a person reads it off the screen and finds it in the admin's list: its last eight characters, in capitals. */

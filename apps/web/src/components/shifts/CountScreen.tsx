@@ -98,8 +98,8 @@ function Loaded({ shiftId, titleAm }: { shiftId: number; titleAm?: string }) {
   // every call this screen makes names the station it works at (X-Station-Id)
   useEffect(() => {
     if (stationId === null) return;
-    useActiveStation.getState().set(stationId);
-    return () => useActiveStation.getState().set(null);
+    // the station is held while this screen is on view; leaving lets go of this screen's claim only (lib/station.ts)
+    return useActiveStation.getState().claim(stationId);
   }, [stationId]);
 
   // the station's shift as the menu in the station top bar (ShiftBar look="menu", as on every station screen): its state as a chip, its
