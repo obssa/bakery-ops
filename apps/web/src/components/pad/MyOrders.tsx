@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { may } from "@/lib/api/actions";
 import type { Line, LineStatus, Locale, Order } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
 import { visibleLines } from "@/lib/live/pad";
@@ -49,7 +50,8 @@ function LineRow({ line }: { line: Line }) {
       </div>
       <div className="flex items-center gap-2">
         <Badge tone={TONE[line.status]}>{pending ? t("sending") : status}</Badge>
-        {line.status === "ready" ? (
+        {/* the line's own `actions` (ADR 0032): the API lets the order's waiter (or stations.all) serve a ready line */}
+        {may(line, "serve") ? (
           <Button type="button" size="lg" aria-label={t("serve_line", { name })} disabled={pending} onClick={() => queueServeLine(line.id)}>
             {t("serve")}
           </Button>
@@ -90,7 +92,8 @@ function OrderCard({ order }: { order: Order }) {
       </ul>
       <footer className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-base font-semibold tabular-nums text-neutral-900">{t("order_total", { total: order.totals.total, currency: order.currency })}</p>
-        {order.status === "open" ? (
+        {/* the order's own `actions`: the API's CancelOrder (an order not sent yet, its waiter or stations.all) */}
+        {may(order, "cancel") ? (
           <Button type="button" variant="secondary" aria-label={t("cancel_order_aria", { no: orderNoText(order.order_no) })} disabled={pending} onClick={() => queueCancelOrder(order.id, order.client_uuid)}>
             {t("cancel_order")}
           </Button>

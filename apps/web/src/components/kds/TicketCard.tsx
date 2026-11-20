@@ -3,6 +3,7 @@
 import { AlarmClock, Hourglass, Timer, X, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useState } from "react";
+import { may } from "@/lib/api/actions";
 import type { Line, Locale, RejectReason, Ticket } from "@/lib/api/types";
 import { REJECT_REASONS } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
@@ -142,24 +143,33 @@ function LineRow({ line, waiter }: { line: Line; waiter: string }) {
         </p>
       ) : rejecting ? (
         <RejectPanel line={line} itemName={name} onDone={() => setRejecting(false)} onQueued={tapped} />
-      ) : line.status === "queued" ? (
+      ) : !may(line, "accept") && !may(line, "ready") && !may(line, "reject") ? null : line.status === "queued" ? (
+        // the buttons are the line's own `actions` (ADR 0032): the API's line steps for the people at this station
         <div className="flex gap-2">
-          <Button size="lg" className="flex-1 font-bold" aria-label={t("accept_line", { name })} disabled={held} onClick={() => tapped(queueAcceptLine(line.id))}>
-            {t("accept")}
-          </Button>
-          <Button size="lg" variant="secondary" aria-label={t("reject_line", { name })} disabled={held} onClick={() => setRejecting(true)}>
-            {t("reject")}
-          </Button>
+          {may(line, "accept") ? (
+            <Button size="lg" className="flex-1 font-bold" aria-label={t("accept_line", { name })} disabled={held} onClick={() => tapped(queueAcceptLine(line.id))}>
+              {t("accept")}
+            </Button>
+          ) : null}
+          {may(line, "reject") ? (
+            <Button size="lg" variant="secondary" aria-label={t("reject_line", { name })} disabled={held} onClick={() => setRejecting(true)}>
+              {t("reject")}
+            </Button>
+          ) : null}
         </div>
       ) : (
         // Cooking: "Ready" across the card as the board has it; a line found spoiled while being made is still rejected, from the small button
         <div className="flex gap-2">
-          <Button size="lg" className="flex-1 font-bold" aria-label={t("ready_line", { name })} disabled={held} onClick={() => tapped(queueReadyLine(line.id))}>
-            {t("ready")}
-          </Button>
-          <IconButton size="lg" variant="secondary" label={t("reject_line", { name })} title={t("reject")} disabled={held} onClick={() => setRejecting(true)}>
-            <X className="size-5" strokeWidth={2} aria-hidden="true" />
-          </IconButton>
+          {may(line, "ready") ? (
+            <Button size="lg" className="flex-1 font-bold" aria-label={t("ready_line", { name })} disabled={held} onClick={() => tapped(queueReadyLine(line.id))}>
+              {t("ready")}
+            </Button>
+          ) : null}
+          {may(line, "reject") ? (
+            <IconButton size="lg" variant="secondary" label={t("reject_line", { name })} title={t("reject")} disabled={held} onClick={() => setRejecting(true)}>
+              <X className="size-5" strokeWidth={2} aria-hidden="true" />
+            </IconButton>
+          ) : null}
         </div>
       )}
     </li>

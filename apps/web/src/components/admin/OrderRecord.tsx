@@ -219,7 +219,7 @@ function RecordBody({ order, detail, titleAm }: { order: OrderDetail; detail: De
             <Timeline order={order} payments={payments} people={people} />
           </div>
           <div className="flex min-w-0 flex-col gap-5">
-            <Payments order={order} payments={payments} people={people} onVoid={(payment) => setVoiding({ payment })} onPhoto={openPhoto} />
+            <Payments payments={payments} people={people} onVoid={(payment) => setVoiding({ payment })} onPhoto={openPhoto} />
             <Receipt order={order} />
             {receiptAvailable(order) ? <RefundSection order={order} people={people} mayRefund={may(order, "refund")} onRefund={() => setRefunding(true)} /> : null}
           </div>
@@ -480,13 +480,11 @@ function EntryItem({ entry, currency, payment, line, people }: { entry: RecordEn
 // --- the payments -------------------------------------------------------------------------------------------------------------------------
 
 function Payments({
-  order,
   payments,
   people,
   onVoid,
   onPhoto,
 }: {
-  order: OrderDetail;
   payments: PaymentsQuery;
   people: People;
   onVoid: (paymentId: number) => void;
