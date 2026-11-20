@@ -1,0 +1,66 @@
+# The shared crontab's guard (docs/runbook/server.md, "The shared crontab").
+# The live host's crontab is shared by several sites, and the host's crontab wrapper can empty all of it when two crontab
+# calls overlap (2026-11-17: every site's scheduler stopped for three days). On the host, ~/bin/crontab-sync keeps the crontab
+# equal to the per-site files in ~/crontab.d, and a crontab line runs it four times an hour. That line cannot help once the
+# whole crontab is gone, so this workflow runs it from outside, every hour: it installs the copy of scripts/ops/crontab-sync.sh
+# from this commit, then runs it. Hourly it trusts the account's mirror file (no crontab call unless something is wrong); once
+# a day it reads through crontab too (--full), which also catches edits made in cPanel's own page. A failed run emails the
+# repository owner (GitHub's own notification), which is the alert. No secret is printed; the host comes from the deploy secrets.
+name: crontab-guard
+
+on:
+  schedule:
+    - cron: "41 * * * *"
+    - cron: "17 10 * * *"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Read through crontab (--full) instead of trusting the mirror file"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crontab-guard
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: crontab-sync on the live host
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      SSH_USER: ${{ secrets.DEPLOY_USER }}
+      SSH_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH (pinned host key)
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_HOST" && test -n "$SSH_USER" && test -n "$KEY" && test -n "$KNOWN_HOSTS" \
+            || { echo "deploy secrets are incomplete (DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS)"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          printf 'Host target\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  ServerAliveInterval 15\n' \
+            "$SSH_HOST" "$SSH_USER" "$SSH_PORT" > ~/.ssh/config
+
+      - name: Install this commit's crontab-sync
+        run: |
+          ssh target 'install -d -m 700 "$HOME/bin" && cat > "$HOME/bin/crontab-sync.new" && chmod 700 "$HOME/bin/crontab-sync.new" && mv "$HOME/bin/crontab-sync.new" "$HOME/bin/crontab-sync"' \
+            < scripts/ops/crontab-sync.sh
+
+      - name: Run it
+        env:
+          FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.full || github.event.schedule == '17 10 * * *' }}
+        run: |
+          flags=""
+          [ "$FULL" = "true" ] && flags="--full"
+          ssh target "\$HOME/bin/crontab-sync $flags < /dev/null"
