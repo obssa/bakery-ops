@@ -73,17 +73,20 @@ test.describe("a write's refresh during a first load", () => {
     expect(needsFreshLoad({ fetchStatus: "idle", data: undefined }, true)).toBe(false);
   });
 
-  test("refetchType none cancels nothing", async () => {
-    const client = new AppQueryClient();
-    const server = slowServer();
-    const observer = new QueryObserver(client, { queryKey: ["inv", "list"], queryFn: server.fn, retry: false });
-    const unsubscribe = observer.subscribe(() => {});
-    await settle();
-    await client.invalidateQueries({ queryKey: ["inv"], refetchType: "none" });
-    server.releaseAll();
-    await settle();
-    expect(server.calls).toBe(1);
-    expect(observer.getCurrentResult().data).toEqual(["old rule"]);
-    unsubscribe();
-  });
+  for (const refetchType of ["none", "inactive"] as const) {
+    test(`refetchType ${refetchType} cancels nothing: the shown query is not refetched, so its load must finish`, async () => {
+      const client = new AppQueryClient();
+      const server = slowServer();
+      const observer = new QueryObserver(client, { queryKey: ["inv", "list"], queryFn: server.fn, retry: false });
+      const unsubscribe = observer.subscribe(() => {});
+      await settle();
+      await client.invalidateQueries({ queryKey: ["inv"], refetchType });
+      server.releaseAll();
+      await settle();
+      expect(server.calls).toBe(1);
+      expect(observer.getCurrentResult().status).toBe("success");
+      expect(observer.getCurrentResult().data).toEqual(["old rule"]);
+      unsubscribe();
+    });
+  }
 });

@@ -18,7 +18,9 @@ export function needsFreshLoad(state: { fetchStatus: string; data: unknown }, ac
 
 export class AppQueryClient extends QueryClient {
   override invalidateQueries(filters?: InvalidateQueryFilters, options?: InvalidateOptions): Promise<void> {
-    if ((filters?.refetchType ?? "active") !== "none") {
+    // only when the invalidation refetches the queries that are shown: a cancelled load nobody refetches would stay "fetching"
+    const refetches = filters?.refetchType ?? "active";
+    if (refetches === "active" || refetches === "all") {
       for (const query of this.getQueryCache().findAll(filters)) {
         if (needsFreshLoad(query.state, query.isActive())) void query.cancel({ silent: true });
       }
