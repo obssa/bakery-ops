@@ -1,3 +1,5 @@
+import { may, statusesWhere } from "./api/actions";
+import { STATE_MACHINES } from "./api/stateMachines";
 import type { RosterRow, Shift, WorkStation } from "./api/types";
 import { clockText, type ClockFormat } from "./clock";
 
@@ -21,24 +23,20 @@ export function barMode(shift: Shift | null): BarMode {
 }
 
 /**
- * The mode of each shift status, every one named (the API's ShiftStatus): only a running shift (opening, open, counting: the API's
- * ShiftStatus::isRunning) holds the station; one scheduled, handed in for approval, locked or cancelled holds nothing, so the station is
- * idle and a shift may start. A status this build does not know gives null: no state and no action, never a guess (the old catch-all said
- * "counting" and offered the count of a shift that had none to do).
+ * The mode of a shift status, read from the generated mirror of the API's ShiftStatus (ADR 0032, lib/api/stateMachines.ts): only a running
+ * shift (ShiftStatus::isRunning: opening, open, counting) holds the station and is named by its status; one scheduled, handed in for
+ * approval, locked or cancelled holds nothing, so the station is idle and a shift may start. A status this build does not know gives
+ * null: no state and no action, never a guess.
  */
-const MODES: Record<Shift["status"], BarMode> = {
-  scheduled: "idle",
-  opening: "opening",
-  open: "open",
-  counting: "counting",
-  pending_approval: "idle",
-  locked: "idle",
-  cancelled: "idle",
-};
+const RUNNING = statusesWhere("shift", "isRunning");
+const KNOWN: readonly string[] = STATE_MACHINES.shift.values;
+const NAMED: readonly BarMode[] = ["opening", "open", "counting"];
 
 function modeOf(shift: Shift | null): BarMode | null {
   if (shift === null) return "idle";
-  return Object.prototype.hasOwnProperty.call(MODES, shift.status) ? MODES[shift.status] : null;
+  if (!KNOWN.includes(shift.status)) return null;
+  if (!RUNNING.includes(shift.status)) return "idle";
+  return NAMED.includes(shift.status as BarMode) ? (shift.status as BarMode) : null;
 }
 
 export interface BarActions {
@@ -63,28 +61,27 @@ export interface Powers {
   canManage: boolean;
 }
 
-/** What the person may do about the shift running at the station (null: none running), in the state it is in. */
-export function barActions(shift: Shift | null, userId: number, powers: Powers): BarActions {
+/**
+ * What the person may do about the shift running at the station (null: none running), in the state it is in. Join, leave, close and cancel
+ * are the shift's own `actions` (ADR 0032: the API's JoinShift, LeaveShift, CloseShift and CancelShift decide them, for this person). Starting
+ * a shift is the station's, before any shift exists, so it stays the person's shifts.count; so does going to the count screen of a count in
+ * progress.
+ */
+export function barActions(shift: Shift | null, _userId: number, powers: Powers): BarActions {
   const none = { start: false, startCarried: false, join: false, leave: false, close: false, continueCount: false, cancel: false };
   const mode = modeOf(shift);
   // a status this build does not know: the bar names no state it cannot be sure of and offers nothing; the API decides what is true
   if (mode === null) return { mode: "idle", ...none };
   if (shift === null || mode === "idle") return { mode: "idle", ...none, start: powers.canCount, startCarried: powers.canCount };
+  const listed = { join: may(shift, "join"), leave: may(shift, "leave"), close: may(shift, "close"), cancel: may(shift, "cancel") };
   switch (mode) {
     case "opening":
-      return {
-        mode: "opening",
-        ...none,
-        continueCount: powers.canCount,
-        cancel: powers.canManage || (powers.canCount && shift.started_by?.id === userId),
-      };
-    case "open": {
-      const on = isOnDuty(shift, userId);
-      return { mode: "open", ...none, join: powers.canCount && !on, leave: powers.canCount && on, close: powers.canCount };
-    }
+      return { mode: "opening", ...none, ...listed, continueCount: powers.canCount };
+    case "open":
+      return { mode: "open", ...none, ...listed };
     case "counting":
       // the closing count is in progress; the station is frozen until it is submitted
-      return { mode: "counting", ...none, continueCount: powers.canCount };
+      return { mode: "counting", ...none, ...listed, continueCount: powers.canCount };
   }
 }
 

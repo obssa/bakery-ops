@@ -59,21 +59,24 @@ test.describe("p3 shift bar: logic", () => {
     expect(barActions(null, 11, { canCount: false, canManage: false })).toMatchObject({ mode: "idle", start: false, startCarried: false });
   });
 
-  test("an open shift: join when not on it, leave and close when on it", () => {
-    expect(barActions(shift(), 12, crew)).toMatchObject({ mode: "open", join: true, leave: false, close: true, start: false });
-    expect(barActions(shift(), 11, crew)).toMatchObject({ mode: "open", join: false, leave: true, close: true });
-    expect(barActions(shift(), 11, { canCount: false, canManage: false })).toMatchObject({ join: false, leave: false, close: false });
+  test("an open shift: join, leave and close are what the shift's actions say (ADR 0032: the API decides them for the person)", () => {
+    expect(barActions(shift({ actions: ["join", "close"] }), 12, crew)).toMatchObject({ mode: "open", join: true, leave: false, close: true, start: false });
+    expect(barActions(shift({ actions: ["leave", "close"] }), 11, crew)).toMatchObject({ mode: "open", join: false, leave: true, close: true });
+    expect(barActions(shift({ actions: [] }), 11, crew)).toMatchObject({ join: false, leave: false, close: false });
+    // a shift read before the API listed its actions offers nothing until it is read again
+    expect(barActions(shift(), 11, crew)).toMatchObject({ join: false, leave: false, close: false });
   });
 
-  test("an opening shift: continue the count, and only its starter or a manager may cancel it", () => {
-    const opening = shift({ status: "opening", opening_mode: "counted" });
-    expect(barActions(opening, 11, crew)).toMatchObject({ mode: "opening", continueCount: true, cancel: true, close: false, join: false });
-    expect(barActions(opening, 12, crew)).toMatchObject({ continueCount: true, cancel: false });
-    expect(barActions(opening, 12, { canCount: true, canManage: true })).toMatchObject({ cancel: true });
+  test("an opening shift: continue the count, and cancel when the shift's actions say so (its starter, or a manager)", () => {
+    const opening = (actions: ("cancel" | "join" | "leave")[]) => shift({ status: "opening", opening_mode: "counted", actions });
+    expect(barActions(opening(["cancel", "leave"]), 11, crew)).toMatchObject({ mode: "opening", continueCount: true, cancel: true, close: false });
+    expect(barActions(opening(["join"]), 12, crew)).toMatchObject({ continueCount: true, cancel: false, join: true });
+    expect(barActions(opening(["cancel"]), 12, { canCount: true, canManage: true })).toMatchObject({ cancel: true });
+    expect(barActions(opening(["cancel"]), 12, { canCount: false, canManage: true })).toMatchObject({ cancel: true, continueCount: false });
   });
 
-  test("a counting shift (closing) goes to the count and offers nothing else", () => {
-    expect(barActions(shift({ status: "counting" }), 11, crew)).toMatchObject({ mode: "counting", continueCount: true, close: false, join: false, start: false });
+  test("a counting shift (closing) goes to the count, and close and join stay off while the API lists neither", () => {
+    expect(barActions(shift({ status: "counting", actions: ["leave"] }), 11, crew)).toMatchObject({ mode: "counting", continueCount: true, close: false, join: false, start: false });
   });
 
   test("the till's Pay is blocked only where enforcement is known and no shift is open", () => {
