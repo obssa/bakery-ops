@@ -62,7 +62,7 @@ final class Access
     {
         $branchId = $this->branch->id();
         $key = 'pin:'.$branchId.':'.$this->entryPoint();
-        if (($remaining = $this->attempts->lockedFor($key)) > 0) {
+        if (($remaining = $this->attempts->reserve($key)) > 0) {
             throw IdentityError::shortCodeLocked($remaining);
         }
 
@@ -71,6 +71,8 @@ final class Access
                 continue;
             }
             if ($candidate->isPinLocked()) {
+                $this->attempts->release($key);
+
                 throw IdentityError::shortCodeLocked($candidate->pinLockRemainingSeconds());
             }
             $this->attempts->clear($key);
@@ -78,7 +80,7 @@ final class Access
             return $candidate;
         }
 
-        $this->attempts->fail($key);
+        $this->attempts->failed($key);
 
         throw IdentityError::pinRejected();
     }
