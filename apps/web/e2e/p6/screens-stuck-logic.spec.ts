@@ -230,7 +230,7 @@ test.describe("20: the void dialog follows the API's void and refund rules", () 
     expect(voidPath({ actions: ["void"] })).toBe("void");
     expect(voidPath({ actions: ["edit", "send", "cancel"] })).toBe("none");
     expect(voidPath({ actions: [] })).toBe("none");
-    // a voided order lists nothing of its own; a part payment it kept is voided from the order record, which chose it already
+    // a settled order (paid in full, not served) and a voided one list no void of their own, but a payment of theirs may still be voided
     expect(voidPath({ actions: [] }, true)).toBe("void");
     expect(voidPath({})).toBe("none");
     expect(en.till.void_none).toContain("{no}");

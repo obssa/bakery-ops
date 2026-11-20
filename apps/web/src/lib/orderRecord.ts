@@ -315,13 +315,13 @@ export type VoidPath = "void" | "refund" | "none";
 
 /**
  * Read from what the API says the person may do (ADR 0032: VoidOrder, VoidPayment and RefundOrder decide it). Refund when the order may be
- * refunded (closed, within the window); void when it may be voided (sent and not paid), and void too when one of its payments was chosen
- * already (the order record offers a payment's void only where that payment's own `actions` say so, a part payment a voided order kept
- * among them). Anything else has neither, and the dialog says so instead of offering a write the API refuses.
+ * refunded (closed, within the window); void when it may be voided as a whole (sent and not paid), and void too when one of its payments
+ * may be (each payment's own `actions`: a settled order, paid in full and not served yet, keeps its payments voidable, and so does a part
+ * payment a voided order kept). Anything else has neither, and the dialog says so instead of offering a write the API refuses.
  */
-export function voidPath(order: Pick<Order, "actions">, paymentChosen = false): VoidPath {
+export function voidPath(order: Pick<Order, "actions">, aPaymentVoidable = false): VoidPath {
   if (may(order, "refund")) return "refund";
-  if (may(order, "void") || paymentChosen) return "void";
+  if (may(order, "void") || aPaymentVoidable) return "void";
   return "none";
 }
 

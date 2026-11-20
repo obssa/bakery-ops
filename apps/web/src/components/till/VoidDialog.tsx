@@ -55,15 +55,18 @@ export function VoidDialog({
   const no = useOrderNo(order);
   const errorText = useErrorText();
   const queries = useQueryClient();
-  // what the API says may happen (ADR 0032; lib/orderRecord.ts voidPath): a refund once it may be refunded, a void while it may be voided or
-  // one of its payments was chosen (a part payment a voided order kept can still be voided, which the order record offers; the till and the
-  // board never open the dialog on one), and otherwise neither: the dialog says so
-  const path = voidPath(order, payment !== undefined);
-  const closed = path !== "void";
+  // what the API says may happen (ADR 0032; lib/orderRecord.ts voidPath): a refund once the order may be refunded; otherwise a void while the
+  // order may be voided as a whole or one of its payments may be (each payment's own actions: a settled order, paid in full and not served,
+  // keeps its payments voidable though the order is not), and neither once they are read and none may: the dialog says so
   const hasPayments = compareDecimal(order.totals.paid, "0", 2) > 0;
-  const wholeAllowed = !closed && canVoidOrder(order);
-  const payments = useOrderPayments(hasPayments && !closed ? order.id : null);
+  const refund = voidPath(order) === "refund";
+  const payments = useOrderPayments(hasPayments && !refund ? order.id : null);
   const voidable = (payments.data?.data ?? []).filter(canVoidPayment);
+  // while the payments are still being read the dialog opens on them (their list shows it is loading)
+  const paymentsPending = hasPayments && !refund && payments.data === undefined && !payments.isError;
+  const path = voidPath(order, payment !== undefined || voidable.length > 0 || paymentsPending);
+  const closed = path !== "void";
+  const wholeAllowed = !closed && canVoidOrder(order);
 
   const [target, setTarget] = useState<Target | null>(payment ?? (hasPayments ? null : "order"));
   const [reason, setReason] = useState("");
