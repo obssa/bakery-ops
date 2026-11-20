@@ -124,8 +124,12 @@ it('answers a second approve with the count and writes nothing, not even an audi
     $again = $this->f->approve($this->f->admin, $this->count)->assertOk();
     $byTheOther = $this->f->approve($this->f->manager, $this->count)->assertOk();
 
+    // the same count; its `actions` are the reader's own (ADR 0032): the admin may unlock the locked count, the manager may not
+    $noActions = fn (array $count): array => array_diff_key($count, ['actions' => true]);
     expect($again->json())->toBe($first->json())
-        ->and($byTheOther->json())->toBe($first->json())
+        ->and($noActions($byTheOther->json()))->toBe($noActions($first->json()))
+        ->and($first->json('actions'))->toBe(['unlock'])
+        ->and($byTheOther->json('actions'))->toBe([])
         ->and(DB::table('stock_movements')->count())->toBe($movements)
         ->and(AuditLog::query()->count())->toBe($audit)
         ->and(AuditLog::query()->where('action', 'count.approve')->count())->toBe(1)
