@@ -1145,7 +1145,7 @@ its actions offers nothing until it is read again.
     the rest.
   - The CI stack's browser specs drive the switched screens against the API's real lists.
 
-Claim restated at `e342f19`; the tag stays on `2f6bbd9`.
+Claim restated at `96bc39f` (the void dialog reads the payments' own actions before it says nothing can be voided: a settled order lists no void of its own, its payments do); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
