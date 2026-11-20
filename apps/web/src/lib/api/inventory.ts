@@ -1,5 +1,7 @@
 "use client";
 
+import type { PurchaseAction, TransferAction } from "./actions";
+
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authed, useSession } from "../session";
 import type { Collection, DecimalString } from "./types";
@@ -95,6 +97,8 @@ export interface Purchase {
   cancel_reason: string | null;
   notes: string | null;
   version: number;
+  /** the moves the person looking may make now (ADR 0032) */
+  actions?: readonly PurchaseAction[];
   /** the confirm answer only, and only with costs.view */
   costs?: { item_id: number; cost_before: DecimalString | null; cost_after: DecimalString }[];
 }
@@ -136,6 +140,9 @@ export interface Transfer {
   production_request_id: number | null;
   /** requested rows only */
   source_available?: DecimalString;
+  version?: number;
+  /** the decisions the person looking may take now (ADR 0032) */
+  actions?: readonly TransferAction[];
 }
 
 export interface ReorderRule {

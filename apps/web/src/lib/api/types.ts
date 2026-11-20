@@ -1,3 +1,4 @@
+import type { CountAction, LineAction, OrderAction, PaymentAction, RequestAction, ShiftAction } from "./actions";
 // Response and request shapes of the endpoints the Phase 0 shell calls, typed by hand from docs/openapi.json
 // (components.schemas.*Resource / Store*Request) and the PHP resources behind it, which are more precise than the
 // generated spec in places (`kind` and `fulfilment` are enums; POST bodies echo the resource). Money and quantities are
@@ -136,6 +137,8 @@ export interface Shift {
   closing_started_at: string | null;
   me_on_roster: boolean;
   version: number;
+  /** what the person looking may do about the shift now (ADR 0032) */
+  actions?: readonly ShiftAction[];
   roster: RosterRow[];
   counts: ShiftCountSummary[];
   notes_count: number;
@@ -355,6 +358,8 @@ export interface Line {
   /** step 4.1b: when the line was refunded (a line is refunded once); absent in answers older than the refund */
   refunded_at?: string | null;
   version: number;
+  /** the steps the person looking may take on the line now (ADR 0032); a ticket line carries the station's own only */
+  actions?: readonly LineAction[];
 }
 
 export interface OrderTotals {
@@ -404,6 +409,8 @@ export interface Order {
   cancelled: { reason: string | null; at: string } | null;
   voided: { reason: string; by: number | null; approved_by: number | null; at: string } | null;
   version: number;
+  /** the moves the person looking may make on the order now (ADR 0032) */
+  actions?: readonly OrderAction[];
   created_at: string | null;
   lines: Line[];
   /** step 4.1b: the money that came back, when the last refund was made and every refund; absent in answers older than the refund */
@@ -603,6 +610,8 @@ export interface PaymentView {
   void_reason: string | null;
   voided_at: string | null;
   flags: { duplicate_reference: boolean; duplicate_receipt: boolean };
+  /** the decisions the person looking may take on the payment now (ADR 0032) */
+  actions?: readonly PaymentAction[];
 }
 
 /** GET /orders/{order}/payments */
@@ -982,6 +991,8 @@ export interface ProductionRequest {
   batch: ProductionBatch | null;
   created_at: string | null;
   version: number;
+  /** the moves the person looking may make now (ADR 0032): the board's buttons and drops read these */
+  actions?: readonly RequestAction[];
 }
 
 /** GET /production/requests?view=board */
@@ -1307,6 +1318,8 @@ export interface CountSummary {
   chain: CountChain | null;
   blocked_by_pending: { count_id: number } | null;
   version: number;
+  /** the decisions the person looking may take on the count now (ADR 0032) */
+  actions?: readonly CountAction[];
   lines_count: number;
 }
 
