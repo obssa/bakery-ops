@@ -1007,7 +1007,7 @@ only. Each was read in the code before it was changed; all eight were real.
   holds the kitchen display's reads after an Accept the API took, and checks that a second tap makes no second write and nothing lands
   in the tray. The cart and the production board's rollback are covered by the logic spec only.
 
-Claim restated at `a91332d`; the tag stays on `2f6bbd9`.
+Claim restated at `84aa4bc`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
