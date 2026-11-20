@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { ApiError } from "@/lib/api/client";
 import { useItems } from "@/lib/api/hooks";
-import { uuid } from "@/lib/api/idempotency";
+import { uuid, useIdempotencyKey } from "@/lib/api/idempotency";
 import { refundOrder, uploadReceiptPhoto, useOrderPayments } from "@/lib/api/till";
 import type { Line, Locale, Order, PaymentView, RefundBody, RefundResult } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
@@ -81,9 +81,11 @@ export function RefundDialog({ order, onClose, onRefunded }: { order: Order; onC
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [result, setResult] = useState<RefundResult | null>(null);
-  // one refund for the dialog's life; one key per request (a new one after a refusal, the same one when the outcome is unknown)
+  // one refund for the dialog's life; one key per request (ADR 0030): the same one while the outcome is unknown, a new one after a refusal
+  // and for a changed request (other lines, another split, another reason). The PIN is left out of the key's payload, as the API leaves it
+  // out of its fingerprint, so retyping it after a lost answer is still the same request.
   const [clientUuid] = useState(() => uuid());
-  const [attempt, setAttempt] = useState(() => uuid());
+  const keys = useIdempotencyKey();
 
   // the local picture's address is let go with the dialog
   const photoUrl = photo.status === "none" ? null : photo.url;
@@ -170,7 +172,9 @@ export function RefundDialog({ order, onClose, onRefunded }: { order: Order; onC
     setPending(true);
     setError(null);
     try {
-      const answer = await refundOrder(order.id, body, attempt);
+      // JSON drops the undefined PIN from the payload the key is chosen by
+      const answer = await refundOrder(order.id, body, keys.keyFor({ order: order.id, ...body, pin: undefined }));
+      keys.done();
       setResult(answer);
       void queries.invalidateQueries({ queryKey: ["order", order.id] });
       void queries.invalidateQueries({ queryKey: ["order-payments", order.id] });
@@ -181,7 +185,7 @@ export function RefundDialog({ order, onClose, onRefunded }: { order: Order; onC
       setError(failure);
       setPin("");
       // a refusal wrote nothing: the next try is a new request; no answer (or a 5xx) may have refunded, so the same key replays it
-      if (!keepsKey(failure)) setAttempt(uuid());
+      keys.failed(failure);
       // a photo the API cannot use (not found, claimed, too old) needs a new one
       if (refundField(failure) === "proof") setPhoto({ status: "none" });
     } finally {

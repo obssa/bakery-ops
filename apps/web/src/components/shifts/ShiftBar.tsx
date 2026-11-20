@@ -2,10 +2,10 @@
 
 import { ChevronDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { CanLink } from "@/components/CanLink";
 import { ApiError } from "@/lib/api/client";
-import { uuid } from "@/lib/api/idempotency";
+import { useKeyRing } from "@/lib/api/idempotency";
 import { closeShift, joinShift, leaveShift, cancelShift, startShift } from "@/lib/api/shifts";
 import type { Locale, Shift } from "@/lib/api/types";
 import { useErrorText } from "@/lib/errors";
@@ -72,16 +72,9 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
   const [noting, setNoting] = useState(false);
   const [declaring, setDeclaring] = useState(false);
 
-  // one key per logical action, reused by a retry of the same request and dropped when it succeeded (ADR 0003)
-  const keys = useRef<Map<string, string>>(new Map());
-  function keyFor(name: string): string {
-    let key = keys.current.get(name);
-    if (!key) {
-      key = uuid();
-      keys.current.set(name, key);
-    }
-    return key;
-  }
+  // one key per logical action, reused by a retry of the same request while its outcome is unknown and dropped on an answer (ADR 0003,
+  // ADR 0030); a start is named by its station, so a start at another station is never answered with this one's shift
+  const keys = useKeyRing();
 
   // a running shift answers the refusal "start a shift first"
   const status = shift?.status ?? null;
@@ -113,15 +106,15 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
     setBusy(name);
     setFailure(null);
     try {
-      const next = await call(keyFor(keyName));
-      keys.current.delete(keyName);
+      const next = await call(keys.keyFor(keyName));
+      keys.done(keyName);
       useShiftNotice.getState().clear();
       feed?.amend((state) => ({ ...state, shift: next && ["opening", "open", "counting"].includes(next.status) ? next : null }));
       feed?.refresh();
     } catch (error) {
       setFailure(error);
-      // a definite answer ends this attempt; only a lost connection retries under the same key
-      if (!(error instanceof ApiError) || error.status !== 0) keys.current.delete(keyName);
+      // a definite answer ends this attempt; only an unknown outcome (no answer, a 5xx) retries under the same key
+      keys.failed(keyName, error);
       // someone else started the shift first, or closed it: look at once so the bar offers what is true now
       feed?.refresh();
     } finally {
@@ -132,7 +125,7 @@ export function ShiftBar({ model, look = "card", quiet = false }: { model: Shift
   const stationId = station.station_id;
   const start = (carry: boolean) => {
     const name = carry ? "start_carried" : "start";
-    return run(name, name, async (key) => (await startShift(stationId, carry, key)).shift);
+    return run(name, `${name}:${stationId}`, async (key) => (await startShift(stationId, carry, key)).shift);
   };
   const act = (name: "join" | "leave" | "close" | "cancel", call: (id: number, key: string) => Promise<Shift>) => {
     const id = shift?.id;

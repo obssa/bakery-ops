@@ -47,7 +47,7 @@ function SupplierTable({ rows, onEdit }: { rows: Supplier[]; onEdit: (supplier: 
 
   function toggle(supplier: Supplier) {
     const body = { is_active: !supplier.is_active };
-    update.mutate({ id: supplier.id, body, idempotencyKey: idempotency.keyFor({ id: supplier.id, ...body }) }, { onSuccess: () => idempotency.done() });
+    update.mutate({ id: supplier.id, body, idempotencyKey: idempotency.keyFor({ id: supplier.id, ...body }) }, { onSuccess: () => idempotency.done(), onError: idempotency.failed });
   }
 
   return (
@@ -141,8 +141,8 @@ function SupplierForm({ editing, onDone }: { editing: Supplier | null; onDone: (
         setNotes("");
       }
     };
-    if (editing) update.mutate({ id: editing.id, body, idempotencyKey: idempotency.keyFor({ id: editing.id, ...body }) }, { onSuccess: done });
-    else create.mutate({ body, idempotencyKey: idempotency.keyFor(body) }, { onSuccess: done });
+    if (editing) update.mutate({ id: editing.id, body, idempotencyKey: idempotency.keyFor({ id: editing.id, ...body }) }, { onSuccess: done, onError: idempotency.failed });
+    else create.mutate({ body, idempotencyKey: idempotency.keyFor(body) }, { onSuccess: done, onError: idempotency.failed });
   }
 
   const fieldError = (field: string) => errorText.field(mutation.error, field);

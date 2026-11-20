@@ -23,7 +23,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCategories, useItems } from "@/lib/api/hooks";
-import { uuid } from "@/lib/api/idempotency";
+import { useKeyRing } from "@/lib/api/idempotency";
 import { acceptRequest, confirmBatch, submitStartBatch } from "@/lib/api/production";
 import type { Collection, Locale, ProductionRequest, Station } from "@/lib/api/types";
 import { trimDecimal } from "@/lib/decimal";
@@ -155,6 +155,7 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
   const [moveError, setMoveError] = useState<string | null>(null);
   // a card moved before the server answered: shown in its new column until the board's next read carries a newer version of it
   const [moved, setMoved] = useState<Map<number, { column: Column; version: number }>>(() => new Map());
+  const ring = useKeyRing();
   useEffect(() => {
     const requests = snapshot?.state.requests;
     if (!requests || moved.size === 0) return;
@@ -226,16 +227,30 @@ export function ProductionBoard({ twins }: { twins?: ProductionTwins }) {
     if (move === "finish") return open(request, "finish");
     if (move === "send_back") return setOpened({ id: request.id, focus: "send_back" });
     setMoved((current) => new Map(current).set(request.id, { column: target, version: request.version }));
+    // each write keeps its key (and the batch its client_uuid) across the retries of the same move, by its subject: a drop again after a
+    // lost answer replays the first write instead of making a second; a definite answer lets them go (ADR 0030)
+    let step = "";
     try {
-      if (move === "accept_start") {
-        await acceptRequest(request.id, uuid());
-        await submitStartBatch(request.id, uuid(), uuid());
-      } else if (move === "start") {
-        await submitStartBatch(request.id, uuid(), uuid());
+      if (move === "accept_start" || move === "start") {
+        if (move === "accept_start") {
+          step = `accept:${request.id}`;
+          await acceptRequest(request.id, ring.keyFor(step));
+          ring.done(step);
+        }
+        step = `start:${request.id}`;
+        await submitStartBatch(request.id, ring.keyFor(`${step}:uuid`), ring.keyFor(step));
+        ring.done(step);
+        ring.done(`${step}:uuid`);
       } else if (request.batch) {
-        await confirmBatch(request.batch.id, uuid());
+        step = `confirm:${request.batch.id}`;
+        await confirmBatch(request.batch.id, ring.keyFor(step));
+        ring.done(step);
       }
     } catch (failure) {
+      if (step) {
+        ring.failed(step, failure);
+        ring.failed(`${step}:uuid`, failure);
+      }
       setMoved((current) => {
         const next = new Map(current);
         next.delete(request.id);

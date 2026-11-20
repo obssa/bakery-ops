@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
-import { uuid } from "@/lib/api/idempotency";
+import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { useOrderPayments, voidOrder, voidPayment } from "@/lib/api/till";
 import type { Locale, Order, PaymentView } from "@/lib/api/types";
 import { compareDecimal } from "@/lib/decimal";
@@ -11,7 +11,6 @@ import { useErrorText } from "@/lib/errors";
 import { isSettled, UNPAID_STATUSES } from "@/lib/live/orders";
 import { useOrderNo } from "@/lib/orderNo";
 import { useClock } from "@/lib/useDates";
-import { keepsKey } from "@/lib/paySheet";
 import { RefundDialog } from "../refunds/RefundDialog";
 import { Alert, Button, Field, Modal, TextInput } from "../ui";
 import { OnlineOnlyButton } from "../OnlineOnly";
@@ -69,8 +68,9 @@ export function VoidDialog({
   const [pin, setPin] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  // one key per request: a retry of the same request (a double tap, a lost answer) is the same write
-  const [attempt, setAttempt] = useState(() => uuid());
+  // one key per request (ADR 0030): a retry of the same request (a double tap, a lost answer) is the same write; a changed request (another
+  // payment, another reason) is a new one with a new key. The PIN is left out of the key's payload, as the API leaves it out of its fingerprint.
+  const keys = useIdempotencyKey();
 
   const title = hasPayments && !wholeAllowed ? t("void_payment_title", { no }) : t("void_title", { no });
   if (closed) return <RefundDialog order={order} onClose={onClose} onRefunded={onVoided} />;
@@ -82,8 +82,10 @@ export function VoidDialog({
     setPending(true);
     setError(null);
     try {
-      if (target === "order") await voidOrder(order.id, { reason: reason.trim(), pin }, attempt);
-      else await voidPayment(target, { reason: reason.trim(), pin }, attempt);
+      const key = keys.keyFor({ order: order.id, target, reason: reason.trim() });
+      if (target === "order") await voidOrder(order.id, { reason: reason.trim(), pin }, key);
+      else await voidPayment(target, { reason: reason.trim(), pin }, key);
+      keys.done();
       void queries.invalidateQueries({ queryKey: ["order-payments", order.id] });
       onVoided();
       onClose();
@@ -92,7 +94,7 @@ export function VoidDialog({
       setPin("");
       // a refusal (a wrong PIN, a void the order no longer allows) wrote nothing: the next try is a new request with a new key. When the
       // outcome is unknown (no answer, a 5xx) the key is kept, so a void that did go through is answered again, not refused (4.5b's rule)
-      if (!keepsKey(failure)) setAttempt(uuid());
+      keys.failed(failure);
       setPending(false);
     }
   }

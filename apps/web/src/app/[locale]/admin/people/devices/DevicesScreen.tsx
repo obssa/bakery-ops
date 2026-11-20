@@ -223,6 +223,7 @@ function RenameDialog({ device, onClose, onDone }: { device: Device; onClose: ()
           idempotency.done();
           onDone(renamed.name);
         },
+        onError: idempotency.failed,
       },
     );
   }
@@ -275,6 +276,7 @@ function RevokeDialog({ device, onClose, onDone }: { device: Device; onClose: ()
                   idempotency.done();
                   onDone(device.name);
                 },
+                onError: idempotency.failed,
               },
             )
           }
@@ -307,6 +309,7 @@ function BridgeCard() {
           setName("");
           if (device.token) setShown({ name: device.name, token: device.token });
         },
+        onError: idempotency.failed,
       },
     );
   }

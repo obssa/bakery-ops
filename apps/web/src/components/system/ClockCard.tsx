@@ -52,6 +52,7 @@ export function ClockCard() {
           key.done();
           setSaved(t(`saved_${also}`));
         },
+        onError: key.failed,
       },
     );
   }

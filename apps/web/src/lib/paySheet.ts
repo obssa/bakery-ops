@@ -1,3 +1,4 @@
+import { outcomeUnknown } from "./api/idempotency";
 import type { PaymentChannel } from "./api/types";
 import { addDecimal, compareDecimal, subtractDecimal } from "./decimal";
 import { photoToken } from "./outbox/logic";
@@ -268,15 +269,9 @@ export function refusedPhoto(error: unknown): string | null {
  * After a failed write, is its Idempotency-Key kept for the retry? Only when the outcome is unknown: no answer (network), a server error
  * (5xx, which the API never stores) or the same key still running (idempotency.in_flight); the write may have happened, so the retry must
  * replay it. A refusal (4xx) wrote nothing and the API would replay it under the same key, so the next try takes a new key; the batch's
- * and the rows' client_uuids stay, so even then nothing can be recorded twice.
+ * and the rows' client_uuids stay, so even then nothing can be recorded twice. The one rule for every form is outcomeUnknown (ADR 0030).
  */
-export function keepsKey(error: unknown): boolean {
-  if (typeof error !== "object" || error === null || !("status" in error)) return true;
-  const { status, key } = error as { status: unknown; key?: unknown };
-  if (typeof status !== "number") return true;
-  if (status === 0 || status >= 500) return true;
-  return key === "idempotency.in_flight";
-}
+export const keepsKey = outcomeUnknown;
 
 /** A reference's last 4 characters, as the printed receipt shows it (the till's receipt preview, the order record of step 4.5d). */
 export function referenceTail(reference: string | null | undefined): string | null {

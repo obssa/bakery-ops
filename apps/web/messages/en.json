@@ -587,6 +587,7 @@
     "no_destination": "You do not work at a place that can ask for stock.",
     "sent_what": "{item}, {qty}: {from} → {to}",
     "sent_from": "Transfer requested. Someone at {from} will confirm it.",
+    "sent_earlier": "Your first request had already gone through, for {qty}. Your change was not sent. Send another request if you need more.",
     "another": "Request another",
     "loading": "Loading…"
   },
