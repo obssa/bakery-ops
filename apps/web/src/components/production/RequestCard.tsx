@@ -10,9 +10,9 @@ import type { Locale, ProductImageView, ProductionRequest } from "@/lib/api/type
 import { whenText, type DateFormatLike } from "@/lib/dates";
 import { trimDecimal, compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
-import { cardMove, cardQty, columnOf, type CardMove } from "@/lib/live/production";
+import { cardQty, columnOf } from "@/lib/live/production";
 import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
-import { nextMover, ovenAge, requestWait } from "@/lib/productionBoard";
+import { cardMove, nextMover, ovenAge, requestWait, type CardMove } from "@/lib/productionBoard";
 import { useSession } from "@/lib/session";
 import { useClock, useDateFormat } from "@/lib/useDates";
 import { useNow } from "@/lib/useNow";

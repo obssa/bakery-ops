@@ -101,7 +101,11 @@ export function CountPanel({
     [group, client, shiftId],
   );
 
-  const [saving, setSaving] = useState(0);
+  // the line writes in flight (a count: two may overlap), and the cash declaration's own save (a yes or no): kept apart, so the end of one
+  // never says the other is done
+  const [writes, setWrites] = useState(0);
+  const [cashBusy, setCashBusy] = useState(false);
+  const saving = writes > 0 || cashBusy;
   const [failure, setFailure] = useState<unknown>(null);
   const [review, setReview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -125,7 +129,7 @@ export function CountPanel({
 
   async function write(body: { lines?: LineEdit[]; confirm_all?: boolean }): Promise<boolean> {
     const name = `lines:${count.id}:${JSON.stringify(body)}`;
-    setSaving((n) => n + 1);
+    setWrites((n) => n + 1);
     setFailure(null);
     try {
       const outcome = await submitLines(count.id, body, keys.keyFor(name));
@@ -140,7 +144,7 @@ export function CountPanel({
       void client.invalidateQueries({ queryKey: ["shift-counts", shiftId] });
       return false;
     } finally {
-      setSaving((n) => n - 1);
+      setWrites((n) => n - 1);
     }
   }
 
@@ -189,7 +193,7 @@ export function CountPanel({
           <Badge tone="neutral">{t(count.type === "opening" ? "type_opening" : "type_closing")}</Badge>
           <StageBadge count={count} />
           {count.seq > 1 ? <span className="text-[13px] text-neutral-600">{t("revision", { seq: count.seq })}</span> : null}
-          {saving > 0 ? (
+          {saving ? (
             <span role="status" className="text-[13px] text-neutral-600">
               {t("saving")}
             </span>
@@ -243,7 +247,7 @@ export function CountPanel({
 
         {count.cash ? (
           editable ? (
-            <CashDeclaration count={count} cash={count.cash} reasons={reasons} onChange={onChange} onBusy={(busy) => setSaving(busy ? 1 : 0)} />
+            <CashDeclaration count={count} cash={count.cash} reasons={reasons} onChange={onChange} onBusy={setCashBusy} />
           ) : (
             <CashSummaryView count={count} cash={count.cash} />
           )
@@ -251,7 +255,7 @@ export function CountPanel({
           <>
             {editable ? (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-neutral-50 px-4 py-3">
-                <Button type="button" variant="secondary" size="lg" disabled={untouched === 0 || saving > 0} onClick={() => void write({ confirm_all: true })}>
+                <Button type="button" variant="secondary" size="lg" disabled={untouched === 0 || saving} onClick={() => void write({ confirm_all: true })}>
                   <CircleCheck className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
                   {t("nothing_changed")}
                 </Button>
@@ -287,7 +291,7 @@ export function CountPanel({
                       {(props) => <TextInput {...props} inputMode="decimal" className="tabular-nums" value={addQty} onChange={(event) => setAddQty(event.target.value)} />}
                     </Field>
                   </div>
-                  <Button type="button" variant="secondary" disabled={addItem === "" || saving > 0} onClick={() => void add()}>
+                  <Button type="button" variant="secondary" disabled={addItem === "" || saving} onClick={() => void add()}>
                     <Plus className="size-5" strokeWidth={ICON_STROKE} aria-hidden="true" />
                     {t("add_button")}
                   </Button>
@@ -305,7 +309,7 @@ export function CountPanel({
         {editable ? (
           <div className="flex justify-end border-t border-neutral-200 pt-5">
             {/* handing in needs the connection and every draft on the server first */}
-            <Button type="button" size="xl" disabled={saving > 0 || waiting} onClick={() => setReview(true)} className="min-w-64">
+            <Button type="button" size="xl" disabled={saving || waiting} onClick={() => setReview(true)} className="min-w-64">
               {t("review_button")}
             </Button>
           </div>

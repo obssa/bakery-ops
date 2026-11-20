@@ -8,7 +8,8 @@ import { useOrderPayments, voidOrder, voidPayment } from "@/lib/api/till";
 import type { Locale, Order, PaymentView } from "@/lib/api/types";
 import { compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
-import { isSettled, UNPAID_STATUSES } from "@/lib/live/orders";
+import { isSettled } from "@/lib/live/orders";
+import { voidPath } from "@/lib/orderRecord";
 import { useOrderNo } from "@/lib/orderNo";
 import { useClock } from "@/lib/useDates";
 import { keepsKey } from "@/lib/paySheet";
@@ -56,9 +57,11 @@ export function VoidDialog({
   const no = useOrderNo(order);
   const errorText = useErrorText();
   const queries = useQueryClient();
-  // paid or closed: refunded, never voided. A voided order is not closed: a part payment it kept can still be voided (step 4.3c), which the
-  // order record offers; the till and the board never open the dialog on one
-  const closed = !UNPAID_STATUSES.includes(order.status) && order.status !== "voided";
+  // closed: refunded, never voided. A voided order is not closed: a part payment it kept can still be voided (step 4.3c), which the order
+  // record offers; the till and the board never open the dialog on one. An open, cancelled or paid-not-closed order has neither (the API's
+  // VoidOrder, VoidPayment and RefundOrder rules, lib/orderRecord.ts voidPath): the dialog says so
+  const path = voidPath(order);
+  const closed = path !== "void";
   const hasPayments = compareDecimal(order.totals.paid, "0", 2) > 0;
   const wholeAllowed = !closed && !isSettled(order);
   const payments = useOrderPayments(hasPayments && !closed ? order.id : null);
@@ -73,7 +76,20 @@ export function VoidDialog({
   const [attempt, setAttempt] = useState(() => uuid());
 
   const title = hasPayments && !wholeAllowed ? t("void_payment_title", { no }) : t("void_title", { no });
-  if (closed) return <RefundDialog order={order} onClose={onClose} onRefunded={onVoided} />;
+  if (path === "refund") return <RefundDialog order={order} onClose={onClose} onRefunded={onVoided} />;
+  if (path === "none") {
+    return (
+      <Modal label={t("void_title", { no })} onClose={onClose}>
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-neutral-900">{t("void_title", { no })}</h2>
+          <Alert>{t("void_none", { no })}</Alert>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t("close")}
+          </Button>
+        </div>
+      </Modal>
+    );
+  }
   const valid = target !== null && reason.trim() !== "" && PIN.test(pin);
 
   async function submit(event: FormEvent) {

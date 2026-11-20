@@ -151,6 +151,66 @@ export function dropMove(me: Me | null, request: ProductionRequest, target: Colu
   return { move: target === "done_today" ? "confirm" : "send_back" };
 }
 
+/** A card shown in its new column before the server said so: the move, and the queued write it waits for when it went offline. */
+export interface ShownMove {
+  column: Column;
+  /** the request's version when it moved: the move ends when the board reads a newer one */
+  version: number;
+  /** the outbox write of a start queued offline: the card goes back if the outbox has it refused later */
+  item?: string;
+}
+
+/**
+ * The cards whose queued move was refused since (the outbox holds the write as a conflict): they go back to the column the server has them
+ * in. Before, such a card stayed in its new column until the page was reloaded, while the server never moved it.
+ */
+export function refusedMoves(moved: ReadonlyMap<number, ShownMove>, queue: readonly { id: string; state: string }[]): number[] {
+  const refused: number[] = [];
+  for (const [id, move] of moved) {
+    if (move.item !== undefined && queue.some((i) => i.id === move.item && i.state === "conflict")) refused.push(id);
+  }
+  return refused;
+}
+
+/**
+ * The column a request moves to next: Requested goes to In progress, In progress to where FinishBatch puts the batch (Pending confirmation
+ * at a station that needs an overseer, Done today at one that does not), Pending confirmation to Done today. null for a request that is
+ * done, cancelled or on no column.
+ */
+export function nextColumn(request: ProductionRequest): Column | null {
+  switch (columnOf(request)) {
+    case "requested":
+      return "in_progress";
+    case "in_progress":
+      return request.station.requires_overseer ? "pending_confirmation" : "done_today";
+    case "pending_confirmation":
+      return "done_today";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The one action a board card offers this person (fresh-counter.md 3.5, step 6.3c), the next move of the request card's own buttons:
+ * accept an open request (a baker, when nobody or they have it), start the batch they accepted, finish the batch they started (the request
+ * card opens on its Done form: produced and waste are counted there), or confirm a finished batch they may sign off and did not make
+ * themselves (the API refuses the one who made it). None otherwise: the card is still opened by its name.
+ */
+export type CardMove = "accept" | "start" | "finish" | "confirm";
+
+const CARD_MOVES: Partial<Record<DropMove, CardMove>> = { accept_start: "accept", start: "start", finish: "finish", confirm: "confirm" };
+
+/**
+ * The card's button is the drop on its next column, read from the one table of rules (dropMove), so the button and the drag can never
+ * disagree about who may move a card: a drop that accepts and starts is the button "Accept" (the button takes one step at a time).
+ */
+export function cardMove(me: Me | null, request: ProductionRequest): CardMove | null {
+  const target = nextColumn(request);
+  if (!me || !target) return null;
+  const verdict = dropMove(me, request, target);
+  return verdict && "move" in verdict ? (CARD_MOVES[verdict.move] ?? null) : null;
+}
+
 /** Who moves a card next, for a viewer who has no button on it: the words' key and the name they carry. */
 export type NextMover =
   | { key: "next_accept_any" }

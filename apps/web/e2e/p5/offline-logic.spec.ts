@@ -684,8 +684,10 @@ test.describe("offline logic: the conflict tray (step 5.2c)", () => {
     expect(needsLookup({ ...sendExisting, subjectId: null }, "closed")).toBe(false);
     expect(needsLookup(item({ kind: "ready_line", subjectId: 90, attempts: 2 }), "closed")).toBe(false);
 
-    for (const status of ["sent", "in_progress", "ready", "served", "closed"]) expect(landed(sendExisting, { status })).toBe(true);
-    for (const status of ["open", "cancelled", "voided"]) expect(landed(sendExisting, { status })).toBe(false);
+    // every status only a sent order reaches (the API's OrderStatus transitions): a void needs a sent order, and a quick cash sale may be
+    // paid before the lost answer is looked up (phase-6/stuck-screens); an open order is cancelled without being sent, so cancelled says nothing
+    for (const status of ["sent", "in_progress", "ready", "served", "paid", "closed", "voided"]) expect(landed(sendExisting, { status })).toBe(true);
+    for (const status of ["open", "cancelled"]) expect(landed(sendExisting, { status })).toBe(false);
     expect(landed(cancel, { status: "cancelled" })).toBe(true);
     expect(landed(cancel, { status: "sent" })).toBe(false);
     expect(landed(cancel, null)).toBe(false);

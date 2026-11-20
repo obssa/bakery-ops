@@ -157,10 +157,14 @@ test.describe("ADR 0029: the tabs of one tablet share one outbox", () => {
 });
 
 test.describe("ADR 0029: a queued write keeps the station it was queued at", () => {
-  test.afterEach(() => useActiveStation.getState().set(null));
+  let release: (() => void) | null = null;
+  test.afterEach(() => {
+    release?.();
+    release = null;
+  });
 
   test("the station fixed by the caller wins over the one picked now; none fixed sends the one picked now", () => {
-    useActiveStation.getState().set(5);
+    release = useActiveStation.getState().claim(5);
     expect(baseHeaders("application/json", undefined, "dev-1")[STATION_HEADER]).toBe("5");
     // a payment queued on the till (station 3) and sent from the kitchen display (station 5)
     expect(baseHeaders("application/json", undefined, "dev-1", 3)[STATION_HEADER]).toBe("3");

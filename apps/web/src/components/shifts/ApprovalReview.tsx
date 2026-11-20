@@ -98,8 +98,8 @@ function Loaded({ countId, titleAm }: { countId: number; titleAm?: string }) {
   const stationId = shift?.station.id ?? null;
   useEffect(() => {
     if (stationId === null) return;
-    useActiveStation.getState().set(stationId);
-    return () => useActiveStation.getState().set(null);
+    // the station is held while this screen is on view; leaving lets go of this screen's claim only (lib/station.ts)
+    return useActiveStation.getState().claim(stationId);
   }, [stationId]);
 
   const actions = useMemo(() => {

@@ -152,7 +152,8 @@
     "mute": "Mute chime",
     "unmute": "Unmute chime",
     "restore_other": "This refused order belongs to {name}. It opens in their cart when they unlock the pad with their code.",
-    "restore_other_unnamed": "This refused order belongs to another waiter. It opens in their cart when they unlock the pad with their code."
+    "restore_other_unnamed": "This refused order belongs to another waiter. It opens in their cart when they unlock the pad with their code.",
+    "send_not_queued": "The order was not saved: nobody is signed in on this tablet. Sign in, then send it again."
   },
   "till": {
     "title": "Cashier till",
@@ -299,6 +300,7 @@
     "void_payments_loading": "Loading the payments…",
     "void_whole_order": "The whole order (the stock held for it is released)",
     "void_payment_submit": "Void this payment",
+    "void_none": "Order {no} can't be voided or refunded now. Only a sent order that is not paid can be voided, and only a closed one refunded.",
     "tab_closed": "Closed orders",
     "closed_intro": "Orders closed lately, newest first. A refund needs a manager's PIN.",
     "closed_loading": "Loading the closed orders…",
@@ -549,6 +551,8 @@
     "drop_not_overseer": "Only an overseer or a manager can confirm it or send it back.",
     "drop_own_batch": "Someone other than {name}, who made it, confirms it.",
     "move_failed": "{name} could not be moved: {reason}",
+    "move_half_done": "{name} is accepted for you but not started: {reason}",
+    "move_refused": "{name} went back: its start was refused when it was sent. \"Changes not saved\" says why.",
     "give_label": "Give it to a baker",
     "give_back_label": "Take it back from {name} and give it to",
     "give_hint": "The baker you choose sees it on the board and accepts it.",
