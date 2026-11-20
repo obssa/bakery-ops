@@ -214,19 +214,14 @@ test.describe("19: a send that may have landed did, whatever the order went on t
 });
 
 test.describe("20: the void dialog follows the API's void and refund rules", () => {
-  test("void while sent and not paid (or voided, for a payment it kept), refund only once closed, neither for the rest", () => {
-    const expected: Record<Status, string> = {
-      open: "none",
-      sent: "void",
-      in_progress: "void",
-      ready: "void",
-      served: "void",
-      paid: "none",
-      closed: "refund",
-      cancelled: "none",
-      voided: "void",
-    };
-    for (const status of ORDER_STATUSES) expect(voidPath({ status }), status).toBe(expected[status]);
+  test("refund when the order lists refund, void when it lists void or a payment of it was chosen, neither for the rest (ADR 0032)", () => {
+    expect(voidPath({ actions: ["refund"] })).toBe("refund");
+    expect(voidPath({ actions: ["void"] })).toBe("void");
+    expect(voidPath({ actions: ["edit", "send", "cancel"] })).toBe("none");
+    expect(voidPath({ actions: [] })).toBe("none");
+    // a voided order lists nothing of its own; a part payment it kept is voided from the order record, which chose it already
+    expect(voidPath({ actions: [] }, true)).toBe("void");
+    expect(voidPath({})).toBe("none");
     expect(en.till.void_none).toContain("{no}");
     expect(am.till.void_none).toContain("{no}");
   });

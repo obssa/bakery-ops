@@ -1,6 +1,6 @@
+import { may } from "./api/actions";
 import type { Order, OrderEvent, OrderTotals, PaymentView } from "./api/types";
 import { addDecimal, compareDecimal, subtractDecimal } from "./decimal";
-import { isPayable, UNPAID_STATUSES } from "./live/orders";
 
 // The order record page (step 4.5d, /admin/orders/record?id=): the rules, as plain logic tested without a browser
 // (e2e/p4/pay-timeline-logic.spec.ts).
@@ -310,33 +310,32 @@ export function urlsStale(readAt: number, now: number, lifeMs = SIGNED_URL_LIFE_
 
 // --- what the page offers -------------------------------------------------------------------------------------------------------------------
 
-/** The whole order is voided while it is sent and not paid in full (the board's rule; 409 orders.order.paid otherwise). */
 /** What the void dialog does for an order: void it (or one of its payments), refund it, or neither. */
 export type VoidPath = "void" | "refund" | "none";
 
 /**
- * The API's own rules: an order is voided (VoidOrder) or has a payment voided (VoidPayment) while it is sent and not paid or closed, and a
- * voided order keeps the part payments it had, which can still be voided; only a closed order is refunded (RefundOrder). An open order (a
- * draft), a cancelled one and one paid but not closed yet have neither, so the dialog says so instead of offering a write the API refuses.
+ * Read from what the API says the person may do (ADR 0032: VoidOrder, VoidPayment and RefundOrder decide it). Refund when the order may be
+ * refunded (closed, within the window); void when it may be voided (sent and not paid), and void too when one of its payments was chosen
+ * already (the order record offers a payment's void only where that payment's own `actions` say so, a part payment a voided order kept
+ * among them). Anything else has neither, and the dialog says so instead of offering a write the API refuses.
  */
-export function voidPath(order: Pick<Order, "status">): VoidPath {
-  if (order.status === "closed") return "refund";
-  if (UNPAID_STATUSES.includes(order.status) || order.status === "voided") return "void";
+export function voidPath(order: Pick<Order, "actions">, paymentChosen = false): VoidPath {
+  if (may(order, "refund")) return "refund";
+  if (may(order, "void") || paymentChosen) return "void";
   return "none";
 }
 
-export function canVoidOrder(order: Order): boolean {
-  return isPayable(order);
+/** The whole order may be voided now: sent, not paid in full, and the person may ask (the order's `actions`). */
+export function canVoidOrder(order: Pick<Order, "actions">): boolean {
+  return may(order, "void");
 }
 
 /**
- * One payment is voided while its order is sent and not paid or closed (a paid or closed order is refunded instead: 409
- * payments.void.order_closed), and while it is not voided and nothing of it was paid back (4.5b's VoidDialog offers the same ones). A
- * part-paid order voided as a whole keeps its payment, and that payment can still be voided (step 4.3c): its money goes back.
+ * One payment may be voided now: the payment's own `actions` (not voided, nothing of it paid back, its order not paid or closed, and the
+ * person may ask). A part-paid order voided as a whole keeps its payment, and that payment can still be voided: its money goes back.
  */
-export function canVoidPayment(order: Pick<Order, "status">, payment: Pick<PaymentView, "status" | "refunded_amount">): boolean {
-  const open = UNPAID_STATUSES.includes(order.status) || order.status === "voided";
-  return open && payment.status !== "voided" && compareDecimal(payment.refunded_amount, "0", 2) === 0;
+export function canVoidPayment(payment: Pick<PaymentView, "actions">): boolean {
+  return may(payment, "void");
 }
 
 /** The receipt exists once the order is paid in full (settled, paid or closed), never for a cancelled or voided one (as the API's ReceiptBuilder). */

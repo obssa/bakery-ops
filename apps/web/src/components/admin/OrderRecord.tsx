@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { CanLink } from "@/components/CanLink";
+import { may } from "@/lib/api/actions";
 import { usePayment } from "@/lib/api/adminPayments";
 import { useRosterPeople } from "@/lib/api/adminShifts";
 import { ApiError } from "@/lib/api/client";
@@ -33,7 +34,7 @@ import {
   type Tone,
 } from "@/lib/orderRecord";
 import { referenceTail } from "@/lib/paySheet";
-import { can, useSession } from "@/lib/session";
+import { useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
 import { HistoryLink } from "../audit/HistoryLink";
 import { PhotoThumb, PhotoViewer } from "../payments/PhotoViewer";
@@ -162,7 +163,6 @@ function RecordBody({ order, detail, titleAm }: { order: OrderDetail; detail: De
   const payments = useOrderPayments(order.id);
   const roster = useRosterPeople();
   const me = useSession((s) => s.me);
-  const mayVoid = can(me, "orders.void_request");
   const [voiding, setVoiding] = useState<{ payment?: number } | null>(null);
   const [refunding, setRefunding] = useState(false);
   const [viewing, setViewing] = useState<{ paymentId: number; fileId: number } | null>(null);
@@ -211,7 +211,7 @@ function RecordBody({ order, detail, titleAm }: { order: OrderDetail; detail: De
         <p className="-mt-2 text-[13px] text-neutral-600">{t("read_at", { time: addisStamp(new Date(readAt).toISOString(), dates) })}</p>
         {detail.isRefetchError || payments.isRefetchError ? <Alert>{t("stale")}</Alert> : null}
 
-        <Details order={order} payments={payments.data ?? null} people={people} mayVoid={mayVoid} onVoid={() => setVoiding({})} />
+        <Details order={order} payments={payments.data ?? null} people={people} onVoid={() => setVoiding({})} />
 
         <div className="grid items-start gap-5 min-[87.5rem]:grid-cols-[minmax(0,1fr)_26rem]">
           <div className="flex min-w-0 flex-col gap-5">
@@ -219,9 +219,9 @@ function RecordBody({ order, detail, titleAm }: { order: OrderDetail; detail: De
             <Timeline order={order} payments={payments} people={people} />
           </div>
           <div className="flex min-w-0 flex-col gap-5">
-            <Payments order={order} payments={payments} people={people} mayVoid={mayVoid} onVoid={(payment) => setVoiding({ payment })} onPhoto={openPhoto} />
+            <Payments order={order} payments={payments} people={people} onVoid={(payment) => setVoiding({ payment })} onPhoto={openPhoto} />
             <Receipt order={order} />
-            {receiptAvailable(order) ? <RefundSection order={order} people={people} mayRefund={mayVoid} onRefund={() => setRefunding(true)} /> : null}
+            {receiptAvailable(order) ? <RefundSection order={order} people={people} mayRefund={may(order, "refund")} onRefund={() => setRefunding(true)} /> : null}
           </div>
         </div>
       </div>
@@ -243,13 +243,11 @@ function Details({
   order,
   payments,
   people,
-  mayVoid,
   onVoid,
 }: {
   order: OrderDetail;
   payments: OrderPayments | null;
   people: People;
-  mayVoid: boolean;
   onVoid: () => void;
 }) {
   const t = useTranslations("orderRecord");
@@ -269,7 +267,7 @@ function Details({
           ? t("state_over", { amount: subtractDecimal("0.00", money.balance), currency: order.currency })
           : t("state_none");
   const stateTone: ChipTone = money.state === "due" ? "amber" : money.state === "settled" ? "green" : money.state === "over" ? "red" : "neutral";
-  const voidable = mayVoid && canVoidOrder(order);
+  const voidable = canVoidOrder(order);
 
   return (
     <Panel
@@ -485,14 +483,12 @@ function Payments({
   order,
   payments,
   people,
-  mayVoid,
   onVoid,
   onPhoto,
 }: {
   order: OrderDetail;
   payments: PaymentsQuery;
   people: People;
-  mayVoid: boolean;
   onVoid: (paymentId: number) => void;
   onPhoto: (paymentId: number, fileId: number) => void;
 }) {
@@ -521,7 +517,7 @@ function Payments({
               key={payment.id}
               payment={payment}
               people={people}
-              voidable={mayVoid && canVoidPayment(order, payment)}
+              voidable={canVoidPayment(payment)}
               onVoid={() => onVoid(payment.id)}
               onPhoto={onPhoto}
             />

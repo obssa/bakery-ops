@@ -292,24 +292,17 @@ test.describe("p4 order record: the rules", () => {
     expect(urlsStale(readAt, readAt - 60_000)).toBe(false);
   });
 
-  test("the voids offered and the receipt: the whole order while it is sent and unpaid, a payment while the order is not paid, a receipt once paid in full", () => {
-    const unpaid = order({ status: "served" });
+  test("the voids offered and the receipt: what the API's actions say (ADR 0032), and a receipt once paid in full", () => {
+    // the API decides who may void what (VoidOrder, VoidPayment); the page offers exactly the moves the record lists
+    const unpaid = order({ status: "served", actions: ["void"] });
     expect(canVoidOrder(unpaid)).toBe(true);
-    expect(canVoidOrder(order({ status: "open" }))).toBe(false);
+    expect(canVoidOrder(order({ status: "served", actions: [] }))).toBe(false);
+    expect(canVoidOrder(order({ status: "served" })), "a record read before the API listed its actions offers nothing").toBe(false);
     const settled = order({ status: "ready", settled_at: "2026-10-27T08:00:00+00:00", totals: { subtotal: "120.00", discount: "0.00", tax: "0.00", total: "120.00", paid: "120.00", balance: "0.00" } });
-    expect(canVoidOrder(settled)).toBe(false);
-    expect(canVoidPayment(settled, payment(1))).toBe(true);
-    expect(canVoidPayment(settled, payment(1, { status: "voided" }))).toBe(false);
-    expect(canVoidPayment(settled, payment(1, { refunded_amount: "10.00" }))).toBe(false);
+    expect(canVoidPayment(payment(1, { actions: ["void"] }))).toBe(true);
+    expect(canVoidPayment(payment(1, { actions: ["verify", "dispute"] }))).toBe(false);
+    expect(canVoidPayment(payment(1))).toBe(false);
     const closed = order({ status: "closed", settled_at: "2026-10-27T08:00:00+00:00" });
-    expect(canVoidOrder(closed)).toBe(false);
-    expect(canVoidPayment(closed, payment(1))).toBe(false);
-    expect(canVoidPayment(order({ status: "paid" }), payment(1))).toBe(false);
-    // a part-paid order voided as a whole still holds its payment, which can be voided (its money goes back); the order itself cannot again
-    const voidedOrder = order({ status: "voided", totals: { subtotal: "0.00", discount: "0.00", tax: "0.00", total: "0.00", paid: "20.00", balance: "-20.00" } });
-    expect(canVoidOrder(voidedOrder)).toBe(false);
-    expect(canVoidPayment(voidedOrder, payment(1, { amount: "20.00" }))).toBe(true);
-    expect(canVoidPayment(order({ status: "cancelled" }), payment(1))).toBe(false);
 
     expect(receiptAvailable(unpaid)).toBe(false);
     expect(receiptAvailable(settled)).toBe(true);

@@ -8,8 +8,7 @@ import { useOrderPayments, voidOrder, voidPayment } from "@/lib/api/till";
 import type { Locale, Order, PaymentView } from "@/lib/api/types";
 import { compareDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
-import { isSettled } from "@/lib/live/orders";
-import { voidPath } from "@/lib/orderRecord";
+import { canVoidOrder, canVoidPayment, voidPath } from "@/lib/orderRecord";
 import { useOrderNo } from "@/lib/orderNo";
 import { useClock } from "@/lib/useDates";
 import { RefundDialog } from "../refunds/RefundDialog";
@@ -56,15 +55,15 @@ export function VoidDialog({
   const no = useOrderNo(order);
   const errorText = useErrorText();
   const queries = useQueryClient();
-  // closed: refunded, never voided. A voided order is not closed: a part payment it kept can still be voided (step 4.3c), which the order
-  // record offers; the till and the board never open the dialog on one. An open, cancelled or paid-not-closed order has neither (the API's
-  // VoidOrder, VoidPayment and RefundOrder rules, lib/orderRecord.ts voidPath): the dialog says so
-  const path = voidPath(order);
+  // what the API says may happen (ADR 0032; lib/orderRecord.ts voidPath): a refund once it may be refunded, a void while it may be voided or
+  // one of its payments was chosen (a part payment a voided order kept can still be voided, which the order record offers; the till and the
+  // board never open the dialog on one), and otherwise neither: the dialog says so
+  const path = voidPath(order, payment !== undefined);
   const closed = path !== "void";
   const hasPayments = compareDecimal(order.totals.paid, "0", 2) > 0;
-  const wholeAllowed = !closed && !isSettled(order);
+  const wholeAllowed = !closed && canVoidOrder(order);
   const payments = useOrderPayments(hasPayments && !closed ? order.id : null);
-  const voidable = (payments.data?.data ?? []).filter((p) => p.status !== "voided" && compareDecimal(p.refunded_amount, "0", 2) === 0);
+  const voidable = (payments.data?.data ?? []).filter(canVoidPayment);
 
   const [target, setTarget] = useState<Target | null>(payment ?? (hasPayments ? null : "order"));
   const [reason, setReason] = useState("");

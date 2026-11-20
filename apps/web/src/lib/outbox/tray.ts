@@ -1,3 +1,4 @@
+import { onlyThrough } from "../api/actions";
 import type { NewOrderLine, OrderStatus, OrderType } from "../api/types";
 import type { CartSource } from "../cart";
 import { trimDecimal } from "../decimal";
@@ -177,11 +178,11 @@ export function supersede(queue: OutboxItem[], orderUuid: string | null, ids: re
 
 const LOOKED_UP: readonly OutboxKind[] = ["send_existing", "cancel_order"];
 /**
- * The statuses only a sent order reaches (the API's OrderStatus transitions: open goes to sent or cancelled, and everything after sent is
- * reached from it): a send that may have landed did land when the order is in one of them. Paid and voided count too (a quick cash sale
- * is paid before the lost answer is looked up; a void needs a sent order). Cancelled does not: an open order is cancelled without being sent.
+ * The statuses only a sent order reaches, read from the generated mirror of the API's OrderStatus (ADR 0032, lib/api/stateMachines.ts):
+ * a send that may have landed did land when the order is in one of them. Paid and voided are among them (a quick cash sale is paid
+ * before the lost answer is looked up; a void needs a sent order); cancelled is not, since an open order is cancelled without being sent.
  */
-export const SENT: readonly OrderStatus[] = ["sent", "in_progress", "ready", "served", "paid", "closed", "voided"];
+export const SENT = onlyThrough("order", "open", "sent") as readonly OrderStatus[];
 
 /** Whether a refusal may only mean the write had already landed: tried before without an answer, about an order that moved on. */
 export function needsLookup(item: OutboxItem, reason: RefusalReason): boolean {
