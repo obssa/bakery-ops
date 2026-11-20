@@ -1,7 +1,8 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
+import { AppQueryClient } from "@/lib/api/queryClient";
 import { startOutbox } from "@/lib/outbox/store";
 import { useSession } from "@/lib/session";
 import { ErrorTracking } from "./ErrorTracking";
@@ -11,7 +12,7 @@ import { ServiceWorker } from "./ServiceWorker";
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
     () =>
-      new QueryClient({
+      new AppQueryClient({
         defaultOptions: {
           queries: { retry: 1, refetchOnWindowFocus: false },
           mutations: { retry: false },
