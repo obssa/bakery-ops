@@ -32,6 +32,8 @@ pest()->group('module:payments', 'feature');
 const PAYMENT_KEYS = [
     'id', 'order_id', 'client_uuid', 'channel', 'amount', 'tendered_amount', 'change_amount', 'currency', 'reference_no', 'status', 'received_at',
     'received_by', 'shift_id', 'batch_uuid', 'receipt', 'verified_at', 'disputed_at', 'dispute_reason', 'refunded_amount', 'void_reason', 'voided_at', 'flags',
+    // the decisions the person looking may take now (ADR 0032)
+    'actions',
 ];
 
 beforeEach(function () {
