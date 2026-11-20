@@ -54,6 +54,7 @@ export function NewBatchDialog({ stationId, onClose, onAsked }: { stationId: num
       onAsked();
       onClose();
     } catch (error) {
+      keys.failed(error);
       setFailure(error);
     } finally {
       setBusy(false);

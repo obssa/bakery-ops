@@ -101,6 +101,7 @@ function RuleCard({ rule, view }: { rule: CountingRule; view: CountingRulesView 
           key.done();
           setSaid(message);
         },
+        onError: key.failed,
       },
     );
   }

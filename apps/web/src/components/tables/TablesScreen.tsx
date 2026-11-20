@@ -151,6 +151,7 @@ function TableGrid({
           idempotency.done();
           onNotice(t(saved.is_active ? "switched_on" : "switched_off", { code: saved.code }));
         },
+        onError: idempotency.failed,
       },
     );
   }
@@ -296,6 +297,7 @@ function TableDrawer({
             idempotency.done();
             onDone(t("saved", { code: saved.code }));
           },
+          onError: idempotency.failed,
         },
       );
       return;
@@ -308,6 +310,7 @@ function TableDrawer({
           idempotency.done();
           onDone(t("added", { code: saved.code }));
         },
+        onError: idempotency.failed,
       },
     );
   }

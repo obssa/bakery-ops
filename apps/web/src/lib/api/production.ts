@@ -3,6 +3,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { submit, type Submitted } from "../outbox/store";
 import { authed, useSession } from "../session";
+import type { Transfer } from "./inventory";
 import type { BatchAnswer, NewTransfer, ProductionCard, ProductionRequest } from "./types";
 
 // The calls of the production board (Phase 2, step 2.8a). The board itself is the LiveFeed of lib/live/production.ts;
@@ -46,9 +47,12 @@ export function cancelRequest(id: number, reason: string, idempotencyKey: string
   return authed<ProductionRequest>(`/production/requests/${id}/cancel`, { method: "POST", body: reason ? { reason } : {}, idempotencyKey });
 }
 
-/** POST /transfers: the request sheet (kitchen strip, production card) asks the store for an ingredient. */
-export function requestTransfer(body: NewTransfer, idempotencyKey: string): Promise<{ id: number; status: string }> {
-  return authed<{ id: number; status: string }>("/transfers", { method: "POST", body, idempotencyKey });
+/**
+ * POST /transfers: the request sheet (kitchen strip, production card, Admin > Transfers) asks for stock. The answer is the transfer; for a
+ * client_uuid already used it is the transfer written then (200), whatever this body asks.
+ */
+export function requestTransfer(body: NewTransfer, idempotencyKey: string): Promise<Transfer> {
+  return authed<Transfer>("/transfers", { method: "POST", body, idempotencyKey });
 }
 
 /** POST /production/requests: the till asks for a batch of a product by hand (qty left out: the product's batch size). */

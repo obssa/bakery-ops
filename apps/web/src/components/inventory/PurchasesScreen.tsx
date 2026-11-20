@@ -458,6 +458,7 @@ function NewPurchasePanel({ costs, onSaved, onClose }: { costs: boolean; onSaved
           idempotency.done();
           onSaved(purchase);
         },
+        onError: idempotency.failed,
       },
     );
   }
@@ -613,6 +614,7 @@ function PurchaseCard({
           setEditing(null);
           setNote(t("purchases.lines_saved"));
         },
+        onError: linesKey.failed,
       },
     );
   }
@@ -627,6 +629,7 @@ function PurchaseCard({
           setNote(t("purchases.confirmed_note"));
           onConfirmed(answer);
         },
+        onError: confirmKey.failed,
       },
     );
   }
@@ -641,6 +644,7 @@ function PurchaseCard({
           setCancelling(false);
           setNote(t("purchases.cancelled_note"));
         },
+        onError: cancelKey.failed,
       },
     );
   }

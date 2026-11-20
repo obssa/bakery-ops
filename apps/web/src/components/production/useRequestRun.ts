@@ -6,8 +6,9 @@ import { useIdempotencyKey } from "@/lib/api/idempotency";
 
 // One write of a production request (accept, start, done, confirm, send back, cancel), shared by the board card's one action and the
 // request card's buttons (step 6.3c): busy while it runs, the refusal kept to show inline, one Idempotency-Key per logical write reused
-// by a retry (ADR 0003), and the card and the board read again once the server has it. A write the outbox queued offline (start and
-// done, step 5.2a) changed nothing on the server yet: the board is read again when the outbox has sent it.
+// by a retry only while the outcome is unknown (ADR 0003, ADR 0030), and the card and the board read again once the server has it. A
+// write the outbox queued offline (start and done, step 5.2a) changed nothing on the server yet: the board is read again when the outbox
+// has sent it.
 
 export interface RequestRun {
   /** the write in flight, by its kind */
@@ -36,6 +37,8 @@ export function useRequestRun(requestId: number, onChanged: () => void): Request
       onChanged();
       return true;
     } catch (failure) {
+      // a refusal ends the attempt: once its cause is fixed (a shift started, stock moved in) the same tap is a new request (ADR 0030)
+      keys.failed(failure);
       setError(failure);
       return false;
     } finally {

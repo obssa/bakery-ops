@@ -43,6 +43,7 @@ export function EnrolThisDevice({ renew = false, onEnrolled }: { renew?: boolean
           setName("");
           onEnrolled(device);
         },
+        onError: idempotency.failed,
       },
     );
   }
