@@ -568,6 +568,7 @@ web:transfer.need_to,/admin/inventory/transfers,Choose where the stock goes.,ክ
 web:transfer.no_destination,/admin/inventory/transfers,You do not work at a place that can ask for stock.,ክምችት መጠየቅ በሚችል ቦታ ላይ አይሠሩም።,,
 web:transfer.sent_what,/admin/inventory/transfers,"{item}, {qty}: {from} → {to}",{item}፣ {qty}፦ {from} → {to},,
 web:transfer.sent_from,/admin/inventory/transfers,Transfer requested. Someone at {from} will confirm it.,ማስተላለፍ ተጠይቋል። {from} ያለ ሰው ያረጋግጠዋል።,,
+web:transfer.sent_earlier,/admin/inventory/transfers,"Your first request had already gone through, for {qty}. Your change was not sent. Send another request if you need more.",የመጀመሪያው ጥያቄዎ ቀድሞ ደርሷል፣ ለ{qty}። ያደረጉት ለውጥ አልተላከም። ተጨማሪ ካስፈለገ ሌላ ጥያቄ ይላኩ።,,
 web:transfer.another,/admin/inventory/transfers,Request another,ሌላ ጠይቅ,,
 web:transfer.loading,/admin/inventory/transfers,Loading…,በመጫን ላይ…,,
 web:admin.catalog,every admin screen (sidebar),Catalog,ካታሎግ,,
