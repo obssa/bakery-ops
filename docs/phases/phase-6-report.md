@@ -986,6 +986,8 @@ state machines from the 2026-11-20 review:
     800 x 1280 and back. The sheet keeps "Taking payment…" with Complete gone, the batch is sent once, and the change stays after the
     answer.
 
+Claim restated at `dc2e601`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
