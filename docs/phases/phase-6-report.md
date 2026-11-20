@@ -1084,6 +1084,30 @@ now, one name per write endpoint.
 
 Claim restated at `9e8e8d9` (the reads that compare a whole record now leave its reader-dependent `actions` out); the tag stays on `2f6bbd9`.
 
+**Two live flakes after the review's fixes (phase-6/live-flakes).** Both passed on their retry; one was the app, one the test.
+
+- **A write while a screen's first load is out (app).** `p2 purchase-admin` (deploy 44787036661) saved a reorder rule and waited 15 s
+  for its item on the reorder list. The trace shows the screen's first `GET /reorder-list` sent at 41.454 s and still out when the
+  rule's POST answered at 41.940 s. The write's `invalidateQueries` refetched the rules table but not the list. TanStack Query (5.104.4,
+  `Query.fetch`) hands an invalidation the in-flight load's promise when the query has no data yet (`cancelRefetch` only acts once it
+  has data), and that load had been sent before the write. Any screen could show a list from before a write made in its first
+  moments, until something else refreshed it. It was not the live feed change of #162: the reorder list is a plain query.
+  - **Fix.** `lib/api/queryClient.ts`: the app's `AppQueryClient` (used by `components/Providers.tsx`) first cancels, silently, the
+    in-flight first load of every shown query an invalidation matches, so the refetch it starts is sent after the write. Queries with
+    data, queries nobody shows, and an invalidation that does not refetch shown queries (`refetchType` "none" or "inactive", where a
+    cancelled load would never be replaced) are left as before. One place, so the 58 invalidations need no change.
+  - **Test.** `e2e/p6/screens-query-refresh-logic.spec.ts` releases the server's answers in order: the stock QueryClient keeps the
+    pre-write list (the bug), the app's client refetches and shows the write.
+- **"My figures" read while Today was loading (test).** `p4 dashboards-live` (deploy 44778440203) clicked Today and read the "My work"
+  row headers once. The visibility check had matched the 30 days' table, and the read came while Today's `GET /analytics/staff` was still
+  out (the trace shows it unanswered), so it got no row headers. The test now waits for Today's answer and polls the row headers.
+- **Seen on this branch's CI, not caused by it.** `p6 screens-board-drag` (the overseer's keyboard move to Done today) failed both tries
+  in run 44794910167: the card was lifted, Done today said "Drop here", and ArrowRight left it over Pending confirmation. The overseer's
+  page made no invalidation (the trace has only its first loads and the feed's 304s), and a re-run of the same commit passed. It is a
+  flake of the keyboard move itself, left for its own look.
+
+Claim restated at `2cdd142`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
