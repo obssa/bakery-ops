@@ -14,6 +14,7 @@ use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Hashing\HashManager;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * manifest identity.provides: "verifyShortCode(branch, code) -> User; argon2id; 5 attempts then 15-min lockout".
@@ -101,7 +102,7 @@ final class ShortCodes
     public function verify(int $branchId, string $code, string $entryPoint, ?int $userId = null): User
     {
         $key = "short-code:{$branchId}:{$entryPoint}";
-        if (($remaining = $this->attempts->lockedFor($key)) > 0) {
+        if (($remaining = $this->attempts->reserve($key)) > 0) {
             throw IdentityError::shortCodeLocked($remaining);
         }
 
@@ -115,6 +116,8 @@ final class ShortCodes
                     continue;
                 }
                 if ($candidate->isPinLocked()) {
+                    $this->attempts->release($key);
+
                     throw IdentityError::shortCodeLocked($candidate->pinLockRemainingSeconds());
                 }
                 $this->attempts->clear($key);
@@ -124,7 +127,7 @@ final class ShortCodes
             }
         }
 
-        $this->attempts->fail($key);
+        $this->attempts->failed($key);
 
         throw IdentityError::shortCodeInvalid();
     }
@@ -150,35 +153,57 @@ final class ShortCodes
         return $user->short_code_hash !== null && $this->hasher()->check($code, $user->short_code_hash);
     }
 
+    /**
+     * The named user's row is locked (FOR UPDATE) while the code is checked and the count written, so parallel wrong tries
+     * against one person are taken one at a time and never check more than max_attempts codes before the lock. A lock that
+     * has run out is a fresh start: the count begins again at 0 (it used to carry on from max_attempts, so one wrong try
+     * after the 15 minutes locked the person again).
+     */
     private function verifyNamed(int $branchId, string $code, string $key, int $userId): User
     {
-        $user = User::query()
-            ->withoutGlobalScope(BranchScope::class)
-            ->where('branch_id', $branchId)
-            ->whereKey($userId)
-            ->first();
+        // the outcome leaves the transaction as a value: throwing inside it would roll back the count it just wrote
+        /** @var array{0: 'ok'|'locked'|'invalid', 1: User|null, 2: int} $result */
+        $result = DB::transaction(function () use ($branchId, $code, $userId): array {
+            $user = User::query()
+                ->withoutGlobalScope(BranchScope::class)
+                ->where('branch_id', $branchId)
+                ->whereKey($userId)
+                ->lockForUpdate()
+                ->first();
 
-        if ($user === null || ! $user->is_active || ! $user->hasShortCode()) {
-            $this->attempts->fail($key);
+            if ($user === null || ! $user->is_active || ! $user->hasShortCode()) {
+                return ['invalid', null, 0];
+            }
+            if ($user->isPinLocked()) {
+                return ['locked', $user, $user->pinLockRemainingSeconds()];
+            }
+            if ($this->matches($user, $code)) {
+                $this->resetUserAttempts($user);
 
-            throw IdentityError::shortCodeInvalid();
-        }
-        if ($user->isPinLocked()) {
-            throw IdentityError::shortCodeLocked($user->pinLockRemainingSeconds());
-        }
-        if ($this->matches($user, $code)) {
+                return ['ok', $user, 0];
+            }
+
+            $failures = ($user->pin_locked_until === null ? $user->short_code_attempts : 0) + 1;
+            $user->forceFill([
+                'short_code_attempts' => $failures,
+                'pin_locked_until' => $failures >= $this->maxAttempts ? CarbonImmutable::now()->addMinutes($this->lockMinutes) : null,
+            ])->saveQuietly();
+
+            return ['invalid', $user, 0];
+        });
+        [$outcome, $user, $lockedFor] = $result;
+
+        if ($outcome === 'ok' && $user instanceof User) {
             $this->attempts->clear($key);
-            $this->resetUserAttempts($user);
 
             return $user;
         }
+        if ($outcome === 'locked') {
+            $this->attempts->release($key);
 
-        $failures = $user->short_code_attempts + 1;
-        $user->forceFill([
-            'short_code_attempts' => $failures,
-            'pin_locked_until' => $failures >= $this->maxAttempts ? CarbonImmutable::now()->addMinutes($this->lockMinutes) : $user->pin_locked_until,
-        ])->saveQuietly();
-        $this->attempts->fail($key);
+            throw IdentityError::shortCodeLocked($lockedFor);
+        }
+        $this->attempts->failed($key);
 
         throw IdentityError::shortCodeInvalid();
     }

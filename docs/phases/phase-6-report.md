@@ -884,6 +884,25 @@ implicit state machines, 2026-11-20).**
 
 Claim restated at `e563c06`; the tag stays on `2f6bbd9`.
 
+**The short-code lockout counts honestly (phase-6/short-code-lockout; Ramin, 2026-11-20, item 7 of the implicit state machines review).**
+Two faults in "5 attempts then 15-min lockout", no change to the API's answers or to the audit:
+
+- **A lock that ran out did not give the tries back.** A named person's `short_code_attempts` stayed at 5 when `pin_locked_until`
+  passed, so one wrong try after the 15 minutes made it 6 and locked them again. An expired lock now starts the count at 0, so the
+  person has 5 tries again. A right code still resets both columns.
+- **Parallel tries could check more than 5 codes.** Both counters read the count, checked the code, then wrote the count back, so a burst
+  of tries all read the same number.
+  - The named person's row is now locked (`FOR UPDATE`) while the code is checked and the count written.
+  - The entry point's `AttemptCounter` takes an attempt before the code is checked, by an atomic cache increment (`reserve`). A try
+    past the 5th of a window is refused with `identity.short_code.locked` without its code being checked.
+  - A try refused only because the named person is locked gives its attempt back (`release`), so asking for a locked person still never
+    locks the pad. The manager-PIN prompt (`Access::verifyPinFor`) uses the same counter, so it gets the same fix.
+- **Tests.**
+  - `ShortCodeVerifyTest`: the person's fresh 5 tries after the lock, the second lock, and the pad's fresh 5 tries. It also checks
+    that asking for a locked person does not count against the pad.
+  - `tests/Gate/ShortCodeLockoutRaceTest.php` (group concurrency): ten forked tries at once, against one named person and against one
+    pad, on the database cache store as on the live host. In both, exactly five are checked (401) and five are refused as locked (423).
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
