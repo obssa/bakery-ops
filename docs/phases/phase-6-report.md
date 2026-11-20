@@ -928,7 +928,7 @@ and 14 of the review of the app's implicit state machines, 2026-11-20).**
   and the write runs once; an in-flight row just before and after `abandon_after_seconds`; 422 in flight. The race cases fail on the code
   before this change.
 
-Claim restated at `b235619`; the tag stays on `2f6bbd9`.
+Claim restated at `0137a3f`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
