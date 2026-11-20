@@ -11,6 +11,7 @@ import type {
   ReconciliationCell,
   ReconciliationChannelRow,
 } from "./api/types";
+import { may } from "./api/actions";
 import { PAYMENT_STATUSES } from "./api/types";
 import { addDecimal } from "./decimal";
 import { CASH } from "./payment";
@@ -294,14 +295,14 @@ export function chipsOf(payment: PaymentView): PaymentChip[] {
   return chips;
 }
 
-/** recorded or disputed -> verified (step 4.3c). */
-export function canVerify(payment: Pick<PaymentView, "status">): boolean {
-  return payment.status === "recorded" || payment.status === "disputed";
+/** The payment may be verified now: its own `actions` (ADR 0032; the API's VerifyPayment: recorded or disputed, for a payments.verify holder). */
+export function canVerify(payment: Pick<PaymentView, "actions">): boolean {
+  return may(payment, "verify");
 }
 
-/** recorded -> disputed only. */
-export function canDispute(payment: Pick<PaymentView, "status">): boolean {
-  return payment.status === "recorded";
+/** The payment may be disputed now: its own `actions` (the API's DisputePayment: recorded only). */
+export function canDispute(payment: Pick<PaymentView, "actions">): boolean {
+  return may(payment, "dispute");
 }
 
 export const REASON_MIN = 3;

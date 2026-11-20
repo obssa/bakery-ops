@@ -260,10 +260,13 @@ test.describe("admin payments logic", () => {
       "duplicate_receipt",
     ]);
     expect(chipsOf(payment({ id: 1, flags: { duplicate_reference: false, duplicate_receipt: true } }))).toEqual(["duplicate_receipt"]);
-    expect([canVerify(payment({ id: 1 })), canDispute(payment({ id: 1 }))]).toEqual([true, true]);
-    expect([canVerify(payment({ id: 1, status: "disputed" })), canDispute(payment({ id: 1, status: "disputed" }))]).toEqual([true, false]);
-    expect([canVerify(payment({ id: 1, status: "verified" })), canDispute(payment({ id: 1, status: "verified" }))]).toEqual([false, false]);
-    expect([canVerify(payment({ id: 1, status: "voided" })), canDispute(payment({ id: 1, status: "voided" }))]).toEqual([false, false]);
+    // the payment's own actions (ADR 0032): the API decides verify and dispute for the person looking
+    const listed = (actions: ("verify" | "dispute" | "void")[], status: "recorded" | "disputed" | "verified" = "recorded") => payment({ id: 1, status, actions });
+    expect([canVerify(listed(["verify", "dispute", "void"])), canDispute(listed(["verify", "dispute", "void"]))]).toEqual([true, true]);
+    expect([canVerify(listed(["verify"], "disputed")), canDispute(listed(["verify"], "disputed"))]).toEqual([true, false]);
+    expect([canVerify(listed([], "verified")), canDispute(listed([], "verified"))]).toEqual([false, false]);
+    expect([canVerify(listed(["void"])), canDispute(listed(["void"]))]).toEqual([false, false]);
+    expect([canVerify(payment({ id: 1 })), canDispute(payment({ id: 1 }))]).toEqual([false, false]);
   });
 
   test("a dispute needs a reason of 3 to 255 characters after trimming", () => {
