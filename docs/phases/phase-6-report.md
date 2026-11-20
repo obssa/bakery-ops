@@ -885,6 +885,8 @@ that check was slow, its late 401 forgot the new token and sent them back to the
   while the E2E admin signs in through the form, then answered 401, and the admin stays on Today with the new token. It also checks the
   start page's Retry.
 
+Claim restated at `7e2d0b8`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
