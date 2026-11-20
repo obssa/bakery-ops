@@ -182,6 +182,8 @@ export function PaySheet({
   const [queued, setQueued] = useState<{ change: string | null } | null>(null);
   // set before the completed sheet's draft is dropped, so no new sheet starts behind the receipt
   const finished = useRef(false);
+  // the number of the latest photo picked per row (takePhoto)
+  const picks = useRef<Record<string, number>>({});
 
   useEffect(() => {
     onPendingChange?.(pending);
@@ -211,6 +213,8 @@ export function PaySheet({
 
   function removeRow(rowId: string) {
     const photo = drafts().drafts[order.id]?.rows.find((row) => row.id === rowId)?.photo.clientUuid ?? null;
+    // a photo still being picked for this row is let go of when it arrives
+    picks.current[rowId] = (picks.current[rowId] ?? 0) + 1;
     forgetPicture(rowId);
     drafts().rows(order.id, (all) => all.filter((row) => row.id !== rowId));
     if (photo) void releasePhotos([photo]);
@@ -237,12 +241,23 @@ export function PaySheet({
   }
 
   async function takePhoto(rowId: string, file: File) {
+    // the latest pick of a row wins: a second photo chosen while the first is still being shrunk or kept makes the first one's late steps
+    // change nothing (2026-11-20: the slower of two picks could overwrite the newer one)
+    const pick = (picks.current[rowId] ?? 0) + 1;
+    picks.current[rowId] = pick;
+    const stale = () => picks.current[rowId] !== pick;
     const replaced = drafts().drafts[order.id]?.rows.find((row) => row.id === rowId)?.photo.clientUuid ?? null;
     drafts().photo(order.id, rowId, () => ({ ...NO_PHOTO, status: "uploading" }));
     setPhotoFailures((all) => without(all, rowId));
     if (replaced) void releasePhotos([replaced]);
     const blob = await downscale(file);
+    if (stale()) return;
     const kept = await keepPhoto(blob);
+    if (stale()) {
+      // a newer pick took the row meanwhile: this photo is let go of
+      if (kept.kept) void releasePhotos([kept.photo.clientUuid]);
+      return;
+    }
     if (!kept.kept) {
       // the tablet already keeps as much as it may: the photos waiting must go first
       forgetPicture(rowId);
@@ -530,25 +545,12 @@ export function PaySheet({
     </div>
   );
 
-  if (!inline) {
-    return (
-      <Modal label={t("pay_title", { no })} onClose={close} size="lg">
-        {content}
-      </Modal>
-    );
-  }
   // from 1024 px the sheet is the till's centre, beside the waiting list (fresh-counter.md 3.4): a dialog that does not hide the page, so
-  // the cashier can turn to another order; Escape inside it closes it as the dialog's Escape does
+  // the cashier can turn to another order; Escape inside it closes it as the dialog's Escape does. Below, a dialog over the screen. One
+  // element tree for both (Modal's `inline`), so a tablet turned across 1024 px keeps the sheet, its payment on its way and its receipt
   return (
-    <section
-      role="dialog"
-      aria-label={t("pay_title", { no })}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") close();
-      }}
-      className="min-w-0"
-    >
+    <Modal label={t("pay_title", { no })} onClose={close} size="lg" inline={inline}>
       {content}
-    </section>
+    </Modal>
   );
 }

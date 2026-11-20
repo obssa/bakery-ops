@@ -58,6 +58,8 @@ export class LiveFeed<Page, State> {
   private again = false;
   /** the next look starts from scratch (reload) */
   private fresh = false;
+  /** how many local changes (amend) were applied: a look's answer counts only if none came while it was asked */
+  private amends = 0;
 
   constructor(
     private readonly source: FeedSource<Page>,
@@ -89,8 +91,13 @@ export class LiveFeed<Page, State> {
     this.abort?.abort();
   }
 
-  /** Applies a change this screen made itself (the bell marking a line read) to the state at once, without a look. */
+  /**
+   * Applies a change this screen made itself (the bell marking a line read) to the state at once, without a look. A look already in flight
+   * was asked before the change, so its answer would undo it (the bell's unread count came back for a moment): that answer is dropped and
+   * the feed looks once more.
+   */
   amend(change: (state: State) => State): void {
+    this.amends += 1;
     this.set({ state: change(this.snapshot.state) });
   }
 
@@ -130,9 +137,17 @@ export class LiveFeed<Page, State> {
     const { signal } = this.abort;
     const fresh = this.fresh;
     this.fresh = false;
+    const amends = this.amends;
     try {
       const result = await this.source.fetchPage({ cursor: fresh ? null : this.snapshot.cursor, etag: fresh ? null : this.etag, signal });
       if (signal.aborted) return "stopped";
+      if (this.amends !== amends) {
+        // the screen changed the state while this look was asked: the answer may predate that change. Nothing of it is kept (not even its
+        // ETag or cursor, so the next look asks again from where this one did), and the next look comes right after
+        if (fresh) this.fresh = true;
+        this.again = true;
+        return "unchanged";
+      }
       if (result.etag) this.etag = result.etag;
       if (result.notModified) {
         if (this.snapshot.error !== null || this.snapshot.failures > 0) this.set({ error: null, failures: 0 });

@@ -89,7 +89,15 @@ function useTransferSend(onRequested?: () => void) {
     const value = qty.trim();
     const ok = isQuantityText(value) && value.replace(/[0.]/g, "") !== "";
     setInvalid(!ok);
+    // a quantity refused here never reaches the server: an earlier send's refusal no longer describes the form (2026-11-20: both showed)
+    if (!ok) setError(null);
     return ok;
+  }
+
+  /** The person changed the quantity: what was said about the old one (here or by the server) no longer applies. */
+  function edited() {
+    setInvalid(false);
+    setError(null);
   }
 
   async function send(body: Omit<NewTransfer, "client_uuid">) {
@@ -124,7 +132,7 @@ function useTransferSend(onRequested?: () => void) {
     setInvalid(false);
   }
 
-  return { busy, error, invalid, sent, earlier, checkQty, send, again, setError };
+  return { busy, error, invalid, sent, earlier, checkQty, edited, send, again, setError };
 }
 
 function FixedItemSheet({ subject, onClose, onRequested }: { subject: TransferSubject; onClose: () => void; onRequested?: () => void }) {
@@ -165,7 +173,17 @@ function FixedItemSheet({ subject, onClose, onRequested }: { subject: TransferSu
           {subject.toName ? <p className="text-base text-neutral-700">{t("to", { place: subject.toName })}</p> : null}
           {subject.sourceAvailable !== undefined ? <p className="text-base text-neutral-700">{t("source_has", { qty: trimDecimal(subject.sourceAvailable), unit: subject.unit })}</p> : null}
           <Field label={t("qty", { unit: subject.unit })} error={sending.invalid ? t("need_qty") : errorText.field(sending.error, "qty")}>
-            {(fieldProps) => <TextInput {...fieldProps} inputMode="decimal" value={qty} onChange={(event) => setQty(event.target.value)} />}
+            {(fieldProps) => (
+              <TextInput
+                {...fieldProps}
+                inputMode="decimal"
+                value={qty}
+                onChange={(event) => {
+                  setQty(event.target.value);
+                  sending.edited();
+                }}
+              />
+            )}
           </Field>
           <Field label={t("note")} optionalLabel={t("optional")}>
             {(fieldProps) => <TextInput {...fieldProps} value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
@@ -450,7 +468,17 @@ function PickItemSheet({ pick, onClose, onRequested }: { pick: TransferPick; onC
           ) : null}
 
           <Field label={item ? t("qty", { unit }) : t("qty_plain")} error={sending.invalid ? t("need_qty") : errorText.field(sending.error, "qty")}>
-            {(fieldProps) => <TextInput {...fieldProps} inputMode="decimal" value={qty} onChange={(event) => setQty(event.target.value)} />}
+            {(fieldProps) => (
+              <TextInput
+                {...fieldProps}
+                inputMode="decimal"
+                value={qty}
+                onChange={(event) => {
+                  setQty(event.target.value);
+                  sending.edited();
+                }}
+              />
+            )}
           </Field>
           <Field label={t("note")} optionalLabel={t("optional")}>
             {(fieldProps) => <TextInput {...fieldProps} value={note} maxLength={255} onChange={(event) => setNote(event.target.value)} />}
