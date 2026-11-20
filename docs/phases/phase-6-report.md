@@ -832,6 +832,27 @@ shows only 8 ingredients and there is no way to ask for anything else, and no wa
 
 Claim restated at `7b665a1`; the tag stays on `2f6bbd9`.
 
+**The outbox across tabs, and queued writes that keep their context (phase-6/outbox-integrity, ADR 0029; from the review of the app's
+implicit state machines, 2026-11-20).**
+
+- **Two tabs no longer erase each other's queue.** A tab writes only the records it changed (`apply`, never a clear) and folds in what the
+  other tabs wrote (`mergeQueue`, after a "changed" message on a BroadcastChannel). One tab sends at a time, under a Web Lock. The tab
+  that sent a write passes the answer to the tab whose screen waits for it.
+- **A queued write keeps its station.** Its `X-Station-Id` is the one picked when it was queued, so a payment queued on the till and sent
+  from the kitchen display stays on the till's shift. A write queued before this change goes with the station of the moment, as before.
+- **One waiter's refusal stays with that waiter.**
+  - An ended acting session on a queued write locks the pad only when it was the session of the waiter who has the pad now.
+  - "Edit and resend" fills only that waiter's cart. Until then the panel says whose order waits (new keys `pad.restore_other`,
+    `pad.restore_other_unnamed`).
+- **A database upgrade by a newer tab no longer leaves writes unsaved.** The connection is opened again on the next use. If a write still
+  fails, the shell says the waiting changes live in this page only (`outbox.not_durable`).
+- **A send pass stops when its account signs out.**
+- **Tests.**
+  - `offline-tabs-logic.spec.ts` (no browser): the merge and diff rules over one shared store, the frozen station header, the pad lock
+    rule and the cart owner.
+  - `offline-tabs.spec.ts` (p5-offline, CI stack): two tabs of one tablet, offline, each send an order. Both are in IndexedDB, both
+    survive a reload, and each reaches the API once. A write queued after another page upgraded the database is still stored.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
