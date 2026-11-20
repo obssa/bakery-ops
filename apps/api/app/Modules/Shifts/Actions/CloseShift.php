@@ -12,6 +12,7 @@ use App\Modules\Shifts\Exceptions\ShiftError;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Shared\Models\Station;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -41,11 +42,8 @@ final class CloseShift
         if (! $this->access->mayManage($person)) {
             $this->access->assertAt($person, 'shifts.count', Station::query()->withTrashed()->findOrFail($shift->station_id));
         }
-        if ($shift->status === ShiftStatus::Counting) {
+        if (self::verdict($shift)->settled()) {
             return $shift;
-        }
-        if ($shift->status !== ShiftStatus::Open) {
-            throw ShiftError::notOpen($shift->status->value);
         }
 
         try {
@@ -85,5 +83,18 @@ final class CloseShift
         } catch (AlreadyReached) {
             return ShiftInstance::query()->findOrFail($shift->id);
         }
+    }
+
+    /**
+     * The shift's own rule, read by the action and by the shift's `actions` list (ADR 0032): an open shift is closed (its closing count
+     * starts); one already counting is a repeat; any other status is no close.
+     */
+    public static function verdict(ShiftInstance $shift): Verdict
+    {
+        if ($shift->status === ShiftStatus::Counting) {
+            return Verdict::repeat();
+        }
+
+        return Verdict::unless($shift->status !== ShiftStatus::Open, ShiftError::notOpen($shift->status->value));
     }
 }

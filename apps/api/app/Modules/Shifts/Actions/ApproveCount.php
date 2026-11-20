@@ -14,6 +14,7 @@ use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Shared\Models\Station;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -68,14 +69,8 @@ final class ApproveCount
         try {
             return $this->audit->run(function (StockCount $c) use ($person, $shift, $note): StockCount {
                 CountLock::refresh($c);
-                if (self::decidedApproved($c)) {
+                if (self::verdict($c, $person)->settled()) {
                     throw AlreadyReached::here();
-                }
-                if ($c->status !== CountStatus::PendingApproval) {
-                    throw ShiftError::countNotPending($c->status->value);
-                }
-                if ($c->counted_by_user_id === $person) {
-                    throw ShiftError::approveSelf();
                 }
                 ShiftLock::refresh($shift);
 
@@ -94,5 +89,21 @@ final class ApproveCount
     private static function decidedApproved(StockCount $count): bool
     {
         return $count->decision === CountDecision::Approved && in_array($count->status, [CountStatus::Approved, CountStatus::Locked], true);
+    }
+
+    /**
+     * The count's own rule for this person, read by the action (under the count lock) and by the count's `actions` list (ADR 0032): a
+     * count waiting for approval is approved by someone who did not count it; one already approved is a repeat.
+     */
+    public static function verdict(StockCount $count, int $person): Verdict
+    {
+        if (self::decidedApproved($count)) {
+            return Verdict::repeat();
+        }
+        if ($count->status !== CountStatus::PendingApproval) {
+            return Verdict::refused(ShiftError::countNotPending($count->status->value));
+        }
+
+        return Verdict::unless($count->counted_by_user_id === $person, ShiftError::approveSelf());
     }
 }

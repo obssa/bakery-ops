@@ -11,6 +11,7 @@ use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Modules\Shifts\Support\ShiftRosters;
 use App\Shared\Models\Station;
+use App\Shared\StateMachine\Verdict;
 
 /**
  * POST /shifts/{shift}/join (phase-3 plan section 4): the person puts themselves on a running shift (opening, open or counting; 409
@@ -39,10 +40,7 @@ final class JoinShift
         $personId ??= $this->access->person('shifts.count');
         $station = Station::query()->withTrashed()->findOrFail($shift->station_id);
         $this->access->assertAt($personId, 'shifts.count', $station);
-        if (! $shift->status->isRunning()) {
-            throw ShiftError::notRunning($shift->status->value);
-        }
-        if ($this->rosters->onDuty($shift, $personId)) {
+        if (self::verdict($shift, $this->rosters->onDuty($shift, $personId))->settled()) {
             return $shift;
         }
 
@@ -62,5 +60,18 @@ final class JoinShift
         } catch (AlreadyReached) {
             return ShiftInstance::query()->findOrFail($shift->id);
         }
+    }
+
+    /**
+     * The shift's own rule for this person, read by the action and by the shift's `actions` list (ADR 0032): a person joins a running shift
+     * they are not on; one already on duty is a repeat.
+     */
+    public static function verdict(ShiftInstance $shift, bool $onDuty): Verdict
+    {
+        if (! $shift->status->isRunning()) {
+            return Verdict::refused(ShiftError::notRunning($shift->status->value));
+        }
+
+        return $onDuty ? Verdict::repeat() : Verdict::allowed();
     }
 }

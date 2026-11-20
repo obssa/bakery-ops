@@ -22,6 +22,7 @@ use App\Modules\Shifts\Models\StockCountLine;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Station;
+use App\Shared\StateMachine\Verdict;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -75,10 +76,9 @@ final class RejectCount
         $shift = ShiftInstance::query()->findOrFail($count->shift_instance_id);
         $station = Station::query()->withTrashed()->findOrFail($shift->station_id);
         $this->access->assertAt($person, 'shifts.view', $station);
-        if ($count->status === CountStatus::Rejected) {
+        if (self::verdict($count, $this->may($person, $station))->settled()) {
             return [$count, $this->recountOf($count)];
         }
-        $this->assertMayReject($person, $station, $count->status);
 
         try {
             return $this->audit->run(function (StockCount $c) use ($person, $shift, $station, $note, $lineIds): array {
@@ -139,12 +139,53 @@ final class RejectCount
      */
     private function assertMayReject(int $person, Station $station, CountStatus $status): void
     {
-        if ($status === CountStatus::AwaitingCosign && ! $this->access->mayCosign($person, $station)) {
-            throw ShiftError::cosignForbidden();
+        self::mayReject($status, $this->may($person, $station))->orThrow();
+    }
+
+    /**
+     * What the person may do at the station, for the rule below: hold shifts.approve at all, hold it at the station, co-sign there.
+     *
+     * @return array{approve: bool, approveAt: bool, cosign: bool}
+     */
+    private function may(int $person, Station $station): array
+    {
+        return [
+            'approve' => $this->access->has($person, 'shifts.approve'),
+            'approveAt' => $this->access->mayAt($person, 'shifts.approve', $station),
+            'cosign' => $this->access->mayCosign($person, $station),
+        ];
+    }
+
+    /**
+     * The count's own rule, read by the action and by the count's `actions` list (ADR 0032): a count waiting for its co-signature is
+     * rejected by someone who may co-sign it, one waiting for approval by a holder of shifts.approve at the station; a rejected one is a
+     * repeat; any other status is no reject.
+     *
+     * @param  array{approve: bool, approveAt: bool, cosign: bool}  $may
+     */
+    public static function verdict(StockCount $count, array $may): Verdict
+    {
+        if ($count->status === CountStatus::Rejected) {
+            return Verdict::repeat();
         }
-        if ($status === CountStatus::PendingApproval && ! $this->access->mayAt($person, 'shifts.approve', $station)) {
-            throw ShiftError::forbidden();
+        if (! in_array($count->status, [CountStatus::PendingApproval, CountStatus::AwaitingCosign], true)) {
+            return Verdict::refused(ShiftError::countNotPending($count->status->value));
         }
+
+        return self::mayReject($count->status, $may);
+    }
+
+    /** @param  array{approve: bool, approveAt: bool, cosign: bool}  $may */
+    private static function mayReject(CountStatus $status, array $may): Verdict
+    {
+        if ($status === CountStatus::AwaitingCosign && ! $may['cosign']) {
+            return Verdict::refused(ShiftError::cosignForbidden());
+        }
+        if ($status === CountStatus::PendingApproval && ! ($may['approve'] && $may['approveAt'])) {
+            return Verdict::refused(ShiftError::forbidden());
+        }
+
+        return Verdict::allowed();
     }
 
     private function recountOf(StockCount $rejected): StockCount

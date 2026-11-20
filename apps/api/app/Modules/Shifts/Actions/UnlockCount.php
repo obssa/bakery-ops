@@ -19,6 +19,7 @@ use App\Modules\Shifts\Models\StockCountLine;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Station;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -79,12 +80,20 @@ final class UnlockCount
      */
     private function assertUnlockable(StockCount $count): void
     {
+        self::verdict($count)->orThrow();
+    }
+
+    /**
+     * The count's own rule, read by the action and by the count's `actions` list (ADR 0032): only a locked count no revision has replaced
+     * is unlocked.
+     */
+    public static function verdict(StockCount $count): Verdict
+    {
         if ($count->status !== CountStatus::Locked) {
-            throw ShiftError::countNotLocked($count->status->value);
+            return Verdict::refused(ShiftError::countNotLocked($count->status->value));
         }
-        if ($count->superseded_by_id !== null) {
-            throw ShiftError::alreadySuperseded($count->superseded_by_id);
-        }
+
+        return Verdict::unless($count->superseded_by_id !== null, ShiftError::alreadySuperseded($count->superseded_by_id ?? 0));
     }
 
     private function makeRevision(StockCount $locked, string $reason, CarbonImmutable $now): StockCount

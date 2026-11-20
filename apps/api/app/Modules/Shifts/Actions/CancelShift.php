@@ -9,6 +9,7 @@ use App\Modules\Shifts\Enums\ShiftStatus;
 use App\Modules\Shifts\Exceptions\ShiftError;
 use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Support\ShiftAccess;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -31,15 +32,8 @@ final class CancelShift
     public function handle(ShiftInstance $shift, ?string $reason): ShiftInstance
     {
         $person = $this->access->person('shifts.view');
-        $starter = $shift->started_by_user_id === $person && in_array($shift->status, [ShiftStatus::Opening, ShiftStatus::Cancelled], true);
-        if (! $starter && ! $this->access->mayManage($person)) {
-            throw ShiftError::cancelForbidden();
-        }
-        if ($shift->status === ShiftStatus::Cancelled) {
+        if (self::verdict($shift, $person, $this->access->mayManage($person))->settled()) {
             return $shift;
-        }
-        if (! in_array($shift->status, [ShiftStatus::Scheduled, ShiftStatus::Opening], true)) {
-            throw ShiftError::notCancellable($shift->status->value);
         }
 
         try {
@@ -66,5 +60,22 @@ final class CancelShift
         } catch (AlreadyReached) {
             return ShiftInstance::query()->findOrFail($shift->id);
         }
+    }
+
+    /**
+     * The shift's own rule for this person, read by the action and by the shift's `actions` list (ADR 0032): the person who started an
+     * opening shift cancels it, a manager (shifts.manage) cancels one scheduled or opening; a cancelled one is a repeat.
+     */
+    public static function verdict(ShiftInstance $shift, int $person, bool $mayManage): Verdict
+    {
+        $starter = $shift->started_by_user_id === $person && in_array($shift->status, [ShiftStatus::Opening, ShiftStatus::Cancelled], true);
+        if (! $starter && ! $mayManage) {
+            return Verdict::refused(ShiftError::cancelForbidden());
+        }
+        if ($shift->status === ShiftStatus::Cancelled) {
+            return Verdict::repeat();
+        }
+
+        return Verdict::unless(! in_array($shift->status, [ShiftStatus::Scheduled, ShiftStatus::Opening], true), ShiftError::notCancellable($shift->status->value));
     }
 }

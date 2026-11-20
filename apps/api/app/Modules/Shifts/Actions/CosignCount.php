@@ -16,6 +16,7 @@ use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Models\StockCountLine;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Shared\Models\Station;
+use App\Shared\StateMachine\Verdict;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 
@@ -54,14 +55,8 @@ final class CosignCount
         $shift = ShiftInstance::query()->findOrFail($count->shift_instance_id);
         $station = Station::query()->withTrashed()->findOrFail($shift->station_id);
         $this->access->assertAt($person, 'shifts.view', $station);
-        if ($count->status !== CountStatus::AwaitingCosign) {
-            return $this->refuseOrRepeat($count, $person);
-        }
-        if (! $this->access->mayCosign($person, $station)) {
-            throw ShiftError::cosignForbidden();
-        }
-        if ($count->counted_by_user_id === $person) {
-            throw ShiftError::cosignSelf();
+        if (self::verdict($count, $person, $this->access->mayCosign($person, $station))->settled()) {
+            return $count;
         }
 
         try {
@@ -114,11 +109,35 @@ final class CosignCount
      */
     private function refuseOrRepeat(StockCount $count, int $person): StockCount
     {
-        $moved = in_array($count->status, [CountStatus::PendingApproval, CountStatus::Approved, CountStatus::Locked], true);
-        if ($moved && $count->cosigned_by_user_id === $person) {
+        if (self::moved($count, $person)->settled()) {
             return $count;
         }
 
         throw ShiftError::notAwaitingCosign($count->status->value);
+    }
+
+    /**
+     * The count's own rule for this person, read by the action and by the count's `actions` list (ADR 0032): a count waiting for its
+     * co-signature is co-signed by the station's overseer or a holder of shifts.cosign there, never by the person who counted it; one this
+     * person co-signed already (it moved on) is a repeat.
+     */
+    public static function verdict(StockCount $count, int $person, bool $mayCosign): Verdict
+    {
+        if ($count->status !== CountStatus::AwaitingCosign) {
+            return self::moved($count, $person);
+        }
+        if (! $mayCosign) {
+            return Verdict::refused(ShiftError::cosignForbidden());
+        }
+
+        return Verdict::unless($count->counted_by_user_id === $person, ShiftError::cosignSelf());
+    }
+
+    /** A count past its co-signature: a repeat for the one who co-signed it, else no co-sign. */
+    private static function moved(StockCount $count, int $person): Verdict
+    {
+        $moved = in_array($count->status, [CountStatus::PendingApproval, CountStatus::Approved, CountStatus::Locked], true);
+
+        return $moved && $count->cosigned_by_user_id === $person ? Verdict::repeat() : Verdict::refused(ShiftError::notAwaitingCosign($count->status->value));
     }
 }

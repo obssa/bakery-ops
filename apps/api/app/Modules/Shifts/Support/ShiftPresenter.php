@@ -28,6 +28,7 @@ final class ShiftPresenter
         private readonly ActorContext $actor,
         private readonly CountReads $countReads,
         private readonly CountPresenter $countPresenter,
+        private readonly ShiftActions $actions,
     ) {}
 
     /**
@@ -144,6 +145,8 @@ final class ShiftPresenter
                 'cancel_reason' => $shift->cancel_reason,
                 'me_on_roster' => $me !== null && $roster->contains(static fn (ShiftRoster $r): bool => $r->user_id === $me),
                 'version' => $shift->version,
+                // what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules
+                'actions' => $this->actions->for($shift),
             ];
             if ($full) {
                 $row['roster'] = $roster->map(static fn (ShiftRoster $r): array => [

@@ -10,6 +10,7 @@ use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Support\ShiftAccess;
 use App\Modules\Shifts\Support\ShiftRosters;
 use App\Shared\Models\Station;
+use App\Shared\StateMachine\Verdict;
 
 /**
  * POST /shifts/{shift}/leave (phase-3 plan section 4): the person goes off duty on a running shift (left_at is set; the row stays as
@@ -33,10 +34,7 @@ final class LeaveShift
         $personId = $this->access->person('shifts.count');
         $station = Station::query()->withTrashed()->findOrFail($shift->station_id);
         $this->access->assertAt($personId, 'shifts.count', $station);
-        if (! $shift->status->isRunning()) {
-            throw ShiftError::notRunning($shift->status->value);
-        }
-        if (! $this->rosters->onDuty($shift, $personId)) {
+        if (self::verdict($shift, $this->rosters->onDuty($shift, $personId))->settled()) {
             return $shift;
         }
 
@@ -56,5 +54,18 @@ final class LeaveShift
         } catch (AlreadyReached) {
             return ShiftInstance::query()->findOrFail($shift->id);
         }
+    }
+
+    /**
+     * The shift's own rule for this person, read by the action and by the shift's `actions` list (ADR 0032): a person on duty leaves a
+     * running shift; one not on it is a repeat.
+     */
+    public static function verdict(ShiftInstance $shift, bool $onDuty): Verdict
+    {
+        if (! $shift->status->isRunning()) {
+            return Verdict::refused(ShiftError::notRunning($shift->status->value));
+        }
+
+        return $onDuty ? Verdict::allowed() : Verdict::repeat();
     }
 }

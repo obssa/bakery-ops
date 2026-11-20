@@ -14,9 +14,11 @@ use App\Modules\Shifts\Cash\CashDeclarations;
 use App\Modules\Shifts\Contracts\Locks;
 use App\Modules\Shifts\Enums\CountStatus;
 use App\Modules\Shifts\Enums\CountType;
+use App\Modules\Shifts\Models\ShiftInstance;
 use App\Modules\Shifts\Models\StockCount;
 use App\Modules\Shifts\Models\StockCountLine;
 use App\Modules\Shifts\Models\VarianceReason;
+use App\Shared\Models\Station;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonInterface;
 
@@ -40,6 +42,7 @@ final class CountPresenter
         private readonly Stock $stock,
         private readonly Locks $locks,
         private readonly CashDeclarations $cash,
+        private readonly CountActions $actions,
     ) {}
 
     /**
@@ -126,6 +129,11 @@ final class CountPresenter
             }
         }
 
+        // the station of each count's shift, for the decisions the person looking may take on it (`actions`, ADR 0032)
+        $shiftStations = ShiftInstance::query()->whereKey(array_values(array_unique(array_map(static fn (StockCount $c): int => $c->shift_instance_id, $counts))))
+            ->pluck('station_id', 'id')->all();
+        $stations = Station::query()->withTrashed()->whereKey(array_values(array_unique($shiftStations)))->get()->keyBy('id')->all();
+
         $out = [];
         foreach ($counts as $count) {
             $lines = $linesBy[$count->id] ?? [];
@@ -154,6 +162,7 @@ final class CountPresenter
                 ] : null,
                 'blocked_by_pending' => $this->blockedBy($count),
                 'version' => $count->version,
+                'actions' => $this->actions->for($count, $stations[$shiftStations[$count->shift_instance_id] ?? 0] ?? null),
             ];
             if (! $full) {
                 $row['lines_count'] = count($lines);
