@@ -156,6 +156,7 @@ function TemplateRows({ rows, stations, manage, onEdit }: { rows: ShiftTemplate[
                               idempotency.done();
                               setConfirming(null);
                             },
+                            onError: idempotency.failed,
                           },
                         )
                       }
@@ -208,6 +209,7 @@ function TemplateForm({ editing, stations, presetStation, onDone }: { editing: S
           if (editing) onDone();
           else setForm(emptyTemplateForm());
         },
+        onError: idempotency.failed,
       },
     );
   }

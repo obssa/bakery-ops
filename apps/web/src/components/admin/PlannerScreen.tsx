@@ -98,6 +98,7 @@ function ScheduleForm() {
           setQty("");
           setNote("");
         },
+        onError: idempotency.failed,
       },
     );
   }
@@ -247,7 +248,7 @@ function RequestRow({ request, locale, look, people }: { request: ProductionRequ
     const key = idempotency.keyFor({ id: request.id, userId });
     assign.mutate(
       { id: request.id, userId: Number(userId), idempotencyKey: key },
-      { onSuccess: () => idempotency.done() },
+      { onSuccess: () => idempotency.done(), onError: idempotency.failed },
     );
   }
 

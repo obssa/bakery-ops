@@ -181,6 +181,7 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
     try {
       id = (await create.mutateAsync({ body, idempotencyKey: itemKey.keyFor(body) })).id;
     } catch (error) {
+      itemKey.failed(error);
       if (errorText.field(error, "sku")) setMore(true);
       setFocusTurn((turn) => turn + 1);
       return;
@@ -196,6 +197,7 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
         await addPrice.mutateAsync({ id, price: typedPrice, idempotencyKey: priceKey.keyFor({ item: id, price: typedPrice }) });
         priceKey.done();
       } catch (error) {
+        priceKey.failed(error);
         priceError = errorText.message(error);
       }
     }
@@ -205,6 +207,7 @@ function NewItemForm({ initialKind }: { initialKind: ItemKind }) {
         await putRecipe.mutateAsync({ id, body: recipe, idempotencyKey: recipeKey.keyFor({ item: id, recipe }) });
         recipeKey.done();
       } catch (error) {
+        recipeKey.failed(error);
         recipeError = errorText.message(error);
       }
     }
@@ -651,6 +654,7 @@ function NewCategoryModal({ kind, onClose, onCreated }: { kind: ItemKind; onClos
           idempotency.done();
           onCreated(category);
         },
+        onError: idempotency.failed,
       },
     );
   }

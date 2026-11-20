@@ -5,9 +5,10 @@ import { useLocale, useTranslations } from "next-intl";
 import { useId, useMemo, useRef, useState } from "react";
 import { groupDigits } from "@/lib/analytics";
 import { useItems } from "@/lib/api/hooks";
-import { useLocations, useStock, type LocationRow } from "@/lib/api/inventory";
+import { useLocations, useStock, type LocationRow, type Transfer } from "@/lib/api/inventory";
 import { requestTransfer } from "@/lib/api/production";
-import { uuid, useIdempotencyKey } from "@/lib/api/idempotency";
+import { outcomeUnknown, uuid, useIdempotencyKey } from "@/lib/api/idempotency";
+import { answeredAsSent } from "@/lib/transfers";
 import type { Item, Locale, Me, NewTransfer } from "@/lib/api/types";
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
@@ -67,7 +68,12 @@ export function RequestTransferSheet(props: SheetProps) {
   return props.subject ? <FixedItemSheet subject={props.subject} onClose={props.onClose} onRequested={props.onRequested} /> : <PickItemSheet pick={props.pick} onClose={props.onClose} onRequested={props.onRequested} />;
 }
 
-/** The send of both sheets: the client UUID and Idempotency-Key kept for a retry, the quantity checked as a decimal string. */
+/**
+ * The send of both sheets, the quantity checked as a decimal string (ADR 0030). The client UUID and the Idempotency-Key are kept only while
+ * the last send's outcome is unknown (no answer, a 5xx): a resend then cannot ask twice. A refusal wrote nothing, so the next send is a new
+ * request with a new UUID and key. When the person changed the request after an unknown outcome, the API answers with the first one (its
+ * client_uuid is known): the sheet says so (`earlier`) instead of showing the change as sent.
+ */
 function useTransferSend(onRequested?: () => void) {
   const keys = useIdempotencyKey();
   const client = useQueryClient();
@@ -76,6 +82,7 @@ function useTransferSend(onRequested?: () => void) {
   const [error, setError] = useState<unknown>(null);
   const [invalid, setInvalid] = useState(false);
   const [sent, setSent] = useState(false);
+  const [earlier, setEarlier] = useState<Transfer | null>(null);
 
   /** Whether `qty` is a positive decimal string; marks the field otherwise. */
   function checkQty(qty: string): boolean {
@@ -90,13 +97,19 @@ function useTransferSend(onRequested?: () => void) {
     setError(null);
     const full: NewTransfer = { client_uuid: clientUuid.current, ...body };
     try {
-      await requestTransfer(full, keys.keyFor(full));
+      const answer = await requestTransfer(full, keys.keyFor(full));
       keys.done();
+      setEarlier(answeredAsSent(full, answer) ? null : answer);
       setSent(true);
       void client.invalidateQueries({ queryKey: ["inv"] });
       onRequested?.();
     } catch (failure) {
       setError(failure);
+      if (!outcomeUnknown(failure)) {
+        // a refusal wrote nothing: the next send is a new request
+        keys.done();
+        clientUuid.current = uuid();
+      }
     } finally {
       setBusy(false);
     }
@@ -106,11 +119,12 @@ function useTransferSend(onRequested?: () => void) {
   function again() {
     clientUuid.current = uuid();
     setSent(false);
+    setEarlier(null);
     setError(null);
     setInvalid(false);
   }
 
-  return { busy, error, invalid, sent, checkQty, send, again, setError };
+  return { busy, error, invalid, sent, earlier, checkQty, send, again, setError };
 }
 
 function FixedItemSheet({ subject, onClose, onRequested }: { subject: TransferSubject; onClose: () => void; onRequested?: () => void }) {
@@ -141,6 +155,7 @@ function FixedItemSheet({ subject, onClose, onRequested }: { subject: TransferSu
           <p role="status" className="rounded-md bg-green-50 px-4 py-3 text-base text-green-800">
             {t("sent")}
           </p>
+          {sending.earlier ? <EarlierNotice earlier={sending.earlier} /> : null}
           <Button type="button" onClick={onClose}>
             {t("close")}
           </Button>
@@ -167,6 +182,16 @@ function FixedItemSheet({ subject, onClose, onRequested }: { subject: TransferSu
         </form>
       )}
     </Modal>
+  );
+}
+
+/** The first request had gone through before the person changed it (ADR 0030): the change was not sent. */
+function EarlierNotice({ earlier }: { earlier: Transfer }) {
+  const t = useTranslations("transfer");
+  return (
+    <p data-testid="transfer-sent-earlier" className="rounded-md bg-amber-50 px-4 py-3 text-base text-amber-900">
+      {t("sent_earlier", { qty: figure(earlier.qty, earlier.item.unit) })}
+    </p>
   );
 }
 
@@ -292,10 +317,21 @@ function PickItemSheet({ pick, onClose, onRequested }: { pick: TransferPick; onC
       <h2 className="text-lg font-semibold text-neutral-900">{pick.title}</h2>
       {sending.sent ? (
         <>
-          <p role="status" className="rounded-md bg-green-50 px-4 py-3 text-base text-green-800">
-            {item && toPlace && from ? <span className="block font-semibold">{t("sent_what", { item: named(item), qty: figure(qty.trim(), unit), from: named(from), to: named(toPlace) })}</span> : null}
-            {from ? t("sent_from", { from: named(from) }) : t("sent")}
-          </p>
+          {sending.earlier ? (
+            // the API answered with the first request (its client_uuid was known): what it holds, not what the form says now
+            <p role="status" className="rounded-md bg-green-50 px-4 py-3 text-base text-green-800">
+              <span className="block font-semibold">
+                {t("sent_what", { item: named(sending.earlier.item), qty: figure(sending.earlier.qty, sending.earlier.item.unit), from: named(sending.earlier.from_location), to: named(sending.earlier.to_location) })}
+              </span>
+              {t("sent_from", { from: named(sending.earlier.from_location) })}
+            </p>
+          ) : (
+            <p role="status" className="rounded-md bg-green-50 px-4 py-3 text-base text-green-800">
+              {item && toPlace && from ? <span className="block font-semibold">{t("sent_what", { item: named(item), qty: figure(qty.trim(), unit), from: named(from), to: named(toPlace) })}</span> : null}
+              {from ? t("sent_from", { from: named(from) }) : t("sent")}
+            </p>
+          )}
+          {sending.earlier ? <EarlierNotice earlier={sending.earlier} /> : null}
           <div className="flex flex-wrap gap-3">
             <Button type="button" onClick={onClose}>
               {t("close")}

@@ -13,23 +13,91 @@ export function uuid(): string {
 }
 
 /**
- * One Idempotency-Key per logical write (ADR 0003): submitting the same payload again (a retry after a timeout or a
- * double tap) reuses the key, so the API replays the first answer instead of writing twice; a changed payload gets
- * a new key, because the API refuses a known key with a different body. After a success, call done() so the next
- * write, even with an identical payload, is a new one.
+ * After a failed write, is its outcome unknown (ADR 0030)? Only then may a retry reuse its Idempotency-Key: no answer (a network failure
+ * or a timeout, status 0), a server error (5xx, which the API never stores) or the same key still running (idempotency.in_flight). The
+ * write may have happened, so the retry must replay it. Any other answer is definite: a refusal (4xx) wrote nothing, and the API stores it
+ * and would replay it under the same key even after its cause is gone (a shift started, stock bought), so the next try takes a new key.
+ * Something that is not an API answer at all (a bug before the call) counts as unknown: keeping the key can never write twice.
+ */
+export function outcomeUnknown(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("status" in error)) return true;
+  const { status, key } = error as { status: unknown; key?: unknown };
+  if (typeof status !== "number") return true;
+  if (status === 0 || status >= 500) return true;
+  return key === "idempotency.in_flight";
+}
+
+/**
+ * The key of one logical write, by its payload (ADR 0003, ADR 0030). The same payload gets the same key while the last outcome is
+ * unknown, so a retry after a lost answer or a double tap replays the first answer instead of writing twice. A changed payload always gets
+ * a new key (the API refuses a known key with another body). A definite answer ends the attempt: done() after a success, failed(error)
+ * after a refusal, so the next tap, even with the same payload, is a new request that the server checks again.
+ *
+ * The payload given is what the server's fingerprint covers: leave a PIN out, as the API does (its SECRET_FIELDS), so retyping the PIN
+ * after an unknown outcome is still the same write.
+ */
+export class KeySlot {
+  private last: { fingerprint: string; key: string } | null = null;
+
+  keyFor(payload: unknown): string {
+    const fingerprint = JSON.stringify(payload);
+    if (this.last?.fingerprint !== fingerprint) this.last = { fingerprint, key: uuid() };
+    return this.last.key;
+  }
+
+  /** The write was answered: the next one is new. */
+  done(): void {
+    this.last = null;
+  }
+
+  /** The write failed: the key is kept only while the outcome is unknown. */
+  failed(error: unknown): void {
+    if (!outcomeUnknown(error)) this.last = null;
+  }
+}
+
+/**
+ * Named keys for a screen with several writes (the production board's moves, a station's shift actions): the same name gets the same key
+ * while the last outcome under it is unknown; done(name) and failed(name, error) end the attempt as KeySlot does.
+ */
+export class KeyRing {
+  private readonly keys = new Map<string, string>();
+
+  keyFor(name: string): string {
+    let key = this.keys.get(name);
+    if (!key) {
+      key = uuid();
+      this.keys.set(name, key);
+    }
+    return key;
+  }
+
+  done(name: string): void {
+    this.keys.delete(name);
+  }
+
+  failed(name: string, error: unknown): void {
+    if (!outcomeUnknown(error)) this.keys.delete(name);
+  }
+}
+
+/**
+ * One Idempotency-Key per logical write, for a form (a KeySlot kept across renders): keyFor(payload) when sending, done() after a
+ * success, failed(error) after a failure (it may be passed straight as a mutation's onError).
  */
 export function useIdempotencyKey() {
-  const last = useRef<{ fingerprint: string; key: string } | null>(null);
+  const slot = useRef<KeySlot | null>(null);
 
-  const keyFor = useCallback((payload: unknown): string => {
-    const fingerprint = JSON.stringify(payload);
-    if (last.current?.fingerprint !== fingerprint) last.current = { fingerprint, key: uuid() };
-    return last.current.key;
-  }, []);
+  const keyFor = useCallback((payload: unknown): string => (slot.current ??= new KeySlot()).keyFor(payload), []);
+  const done = useCallback(() => slot.current?.done(), []);
+  const failed = useCallback((error: unknown) => slot.current?.failed(error), []);
 
-  const done = useCallback(() => {
-    last.current = null;
-  }, []);
+  return { keyFor, done, failed };
+}
 
-  return { keyFor, done };
+/** A KeyRing kept across renders. */
+export function useKeyRing(): KeyRing {
+  const ring = useRef<KeyRing | null>(null);
+  ring.current ??= new KeyRing();
+  return ring.current;
 }

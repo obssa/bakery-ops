@@ -398,6 +398,7 @@ function PublishForm({ product, base, first, onPublished }: { product: Item; bas
           setSaved(t("published", { version: recipe.version ?? 1 }));
           onPublished();
         },
+        onError: idempotency.failed,
       },
     );
   }

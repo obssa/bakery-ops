@@ -621,6 +621,7 @@ function CategoriesSection({ onClose }: { onClose: () => void }) {
           setNameEn("");
           setNameAm("");
         },
+        onError: idempotency.failed,
       },
     );
   }
