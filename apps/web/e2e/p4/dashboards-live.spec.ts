@@ -109,8 +109,10 @@ test.describe("p4 analytics dashboards", () => {
         // a row per kind of work (the orders the cashier took as a waiter's, the payments as a cashier's), every one the cashier's own
         const mine = own.getByRole("table", { name: "My work" });
         await expect(rowOf(mine, fixture.cashier.name).filter({ has: own.getByRole("cell", { name: "Cashier", exact: true }) })).toBeVisible({ timeout: 30_000 });
-        const people = (await mine.getByRole("rowheader").allTextContents()).map((text) => text.trim());
-        expect([...new Set(people)]).toEqual([fixture.cashier.name]);
+        // polled: the table re-renders when its figures come in, and a read in between saw no rows at all (live, 2026-11-20)
+        await expect
+          .poll(async () => [...new Set((await mine.getByRole("rowheader").allTextContents()).map((text) => text.trim()))], { timeout: 30_000 })
+          .toEqual([fixture.cashier.name]);
       } finally {
         await context.close();
       }
