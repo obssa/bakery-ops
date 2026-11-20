@@ -1049,6 +1049,39 @@ state machines from the 2026-11-20 review:
 Claim restated at `1afab70` (rebased onto main bff879f, after the stuck-screens and claims-that-outlive-a-lock paragraphs); the tag stays
 on `2f6bbd9`.
 
+**Records say what may happen next (phase-6/allowed-actions, ADR 0032; the implicit-state review of 2026-11-20, item 33), the API half.**
+The web copied about a dozen of the API's rules (who may approve a count, which card a baker may drag, whether an order may still be
+voided), three of them already wrong. Every record with a status machine now carries `actions`: the moves the person looking may make
+now, one name per write endpoint.
+
+- **The records and their names:**
+  - order: `edit`, `send`, `cancel`, `void`, `refund`
+  - order line: `accept`, `ready`, `reject`, `serve`; the station tickets carry the station's three only
+  - payment: `verify`, `dispute`, `void`
+  - production request: `assign`, `accept`, `start`, `finish`, `confirm`, `send_back`, `cancel`
+  - transfer: `confirm`, `reject`
+  - purchase: `edit`, `confirm`, `cancel`
+  - shift: `join`, `leave`, `close`, `cancel`
+  - count: `approve`, `cosign`, `reject`, `unlock`
+- **The list and the action read one method.** Each action's rule is now a static `verdict()` method (`App\Shared\StateMachine\Verdict`:
+  allowed, repeat, or refused with the refusal the action throws). The action reads it before it writes, and again under its lock. The
+  record's `*Actions` class reads the same method, for the person who acts, with the route's and the action's permissions, asked once per
+  answer.
+- **One copy disagreed with the API.** The count screens said the person who counted never rejects their own count; the API lets a holder
+  of `shifts.approve` send their own count back, as a recount. The list follows the API.
+- **A matrix per record proves the list.** `Tests\Support\ActionsMatrix` builds the record in every state it can be in. For every role of
+  the bakery it reads the list through the API and calls every endpoint in a rolled-back savepoint. It fails on any move the list offers
+  and the API refuses, or the other way round. The only exception is a refusal for the person's situation (`payments.shift.required`,
+  `inventory.shift.required`): it means "start a shift first", not "never".
+  - The tests: `RequestActionsTest`, `CountActionsTest`, `ShiftActionsTest`, `OrderActionsTest` (orders and lines), `PaymentActionsTest`,
+    `InventoryActionsTest`.
+  - They were checked against a wrong list: a cancel offered to everyone failed in every state where the API answered 403.
+- **A mirror for screens without a record.** `php artisan bakery:state-machines` writes `apps/web/src/lib/api/stateMachines.ts` from the
+  status enums: their values, transitions, the statuses reachable from each, the terminal ones, and their yes/no questions (`isRunning`,
+  `isSubmitted`, ...). `tests/Unit/StateMachinesMirrorTest.php` fails when the committed file is not the command's output, or misses an
+  enum.
+- **Still to come.** The web reads the lists and the mirror in the second half of this item, a pull request of its own.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the

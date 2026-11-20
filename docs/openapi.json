@@ -962,6 +962,11 @@
                                         },
                                         "version": {
                                             "type": "integer"
+                                        },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "the moves the person looking may make now (ADR 0032): the board's buttons and drops read these, never a copy of the rules",
+                                            "items": {}
                                         }
                                     },
                                     "required": [
@@ -983,7 +988,8 @@
                                         "cancel_reason",
                                         "batch",
                                         "created_at",
-                                        "version"
+                                        "version",
+                                        "actions"
                                     ]
                                 }
                             }
@@ -5151,6 +5157,11 @@
                                                 "version": {
                                                     "type": "string"
                                                 },
+                                                "actions": {
+                                                    "type": "array",
+                                                    "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                                    "items": {}
+                                                },
                                                 "roster": {
                                                     "type": "string"
                                                 },
@@ -5189,6 +5200,7 @@
                                                 "cancel_reason",
                                                 "me_on_roster",
                                                 "version",
+                                                "actions",
                                                 "roster",
                                                 "counts",
                                                 "notes_count"
@@ -5583,6 +5595,11 @@
                                                 "version": {
                                                     "type": "string"
                                                 },
+                                                "actions": {
+                                                    "type": "array",
+                                                    "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                                    "items": {}
+                                                },
                                                 "roster": {
                                                     "type": "string"
                                                 },
@@ -5621,6 +5638,7 @@
                                                 "cancel_reason",
                                                 "me_on_roster",
                                                 "version",
+                                                "actions",
                                                 "roster",
                                                 "counts",
                                                 "notes_count"
@@ -7904,6 +7922,11 @@
                                                 "duplicate_receipt"
                                             ]
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "the decisions the person looking may take on the payment now (ADR 0032): the screens read these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "order": {
                                             "type": [
                                                 "object",
@@ -7993,6 +8016,7 @@
                                         "void_reason",
                                         "voided_at",
                                         "flags",
+                                        "actions",
                                         "order",
                                         "refunds"
                                     ]
@@ -8225,6 +8249,11 @@
                                                 "duplicate_receipt"
                                             ]
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "the decisions the person looking may take on the payment now (ADR 0032): the screens read these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "order": {
                                             "type": [
                                                 "object",
@@ -8314,6 +8343,7 @@
                                         "void_reason",
                                         "voided_at",
                                         "flags",
+                                        "actions",
                                         "order",
                                         "refunds"
                                     ]
@@ -8546,6 +8576,11 @@
                                                 "duplicate_receipt"
                                             ]
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "the decisions the person looking may take on the payment now (ADR 0032): the screens read these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "order": {
                                             "type": [
                                                 "object",
@@ -8635,6 +8670,7 @@
                                         "void_reason",
                                         "voided_at",
                                         "flags",
+                                        "actions",
                                         "order",
                                         "refunds"
                                     ]
@@ -8862,6 +8898,11 @@
                                                             "duplicate_receipt"
                                                         ]
                                                     },
+                                                    "actions": {
+                                                        "type": "array",
+                                                        "description": "the decisions the person looking may take on the payment now (ADR 0032): the screens read these, never a copy of the rules",
+                                                        "items": {}
+                                                    },
                                                     "order": {
                                                         "type": [
                                                             "object",
@@ -8925,6 +8966,7 @@
                                                     "void_reason",
                                                     "voided_at",
                                                     "flags",
+                                                    "actions",
                                                     "order"
                                                 ]
                                             }
@@ -9332,6 +9374,11 @@
                                                 "duplicate_receipt"
                                             ]
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "the decisions the person looking may take on the payment now (ADR 0032): the screens read these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "order": {
                                             "type": [
                                                 "object",
@@ -9421,6 +9468,7 @@
                                         "void_reason",
                                         "voided_at",
                                         "flags",
+                                        "actions",
                                         "order",
                                         "refunds"
                                     ]
@@ -11963,6 +12011,11 @@
                                         },
                                         "version": {
                                             "type": "integer"
+                                        },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "the moves the person looking may make now (ADR 0032): the board's buttons and drops read these, never a copy of the rules",
+                                            "items": {}
                                         }
                                     },
                                     "required": [
@@ -11984,7 +12037,8 @@
                                         "cancel_reason",
                                         "batch",
                                         "created_at",
-                                        "version"
+                                        "version",
+                                        "actions"
                                     ]
                                 }
                             }
@@ -12266,6 +12320,11 @@
                                         },
                                         "version": {
                                             "type": "integer"
+                                        },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "the moves the person looking may make now (ADR 0032): the board's buttons and drops read these, never a copy of the rules",
+                                            "items": {}
                                         }
                                     },
                                     "required": [
@@ -12287,7 +12346,8 @@
                                         "cancel_reason",
                                         "batch",
                                         "created_at",
-                                        "version"
+                                        "version",
+                                        "actions"
                                     ]
                                 }
                             }
@@ -12575,6 +12635,11 @@
                                         },
                                         "version": {
                                             "type": "integer"
+                                        },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "the moves the person looking may make now (ADR 0032): the board's buttons and drops read these, never a copy of the rules",
+                                            "items": {}
                                         }
                                     },
                                     "required": [
@@ -12596,7 +12661,8 @@
                                         "cancel_reason",
                                         "batch",
                                         "created_at",
-                                        "version"
+                                        "version",
+                                        "actions"
                                     ]
                                 }
                             }
@@ -13038,6 +13104,11 @@
                                                             "version": {
                                                                 "type": "string"
                                                             },
+                                                            "actions": {
+                                                                "type": "array",
+                                                                "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                                                "items": {}
+                                                            },
                                                             "roster": {
                                                                 "type": "string"
                                                             },
@@ -13076,6 +13147,7 @@
                                                             "cancel_reason",
                                                             "me_on_roster",
                                                             "version",
+                                                            "actions",
                                                             "roster",
                                                             "counts",
                                                             "notes_count"
@@ -13391,6 +13463,11 @@
                                         "version": {
                                             "type": "string"
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "roster": {
                                             "type": "string"
                                         },
@@ -13429,6 +13506,7 @@
                                         "cancel_reason",
                                         "me_on_roster",
                                         "version",
+                                        "actions",
                                         "roster",
                                         "counts",
                                         "notes_count"
@@ -13949,6 +14027,11 @@
                                         "version": {
                                             "type": "string"
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "roster": {
                                             "type": "string"
                                         },
@@ -13987,6 +14070,7 @@
                                         "cancel_reason",
                                         "me_on_roster",
                                         "version",
+                                        "actions",
                                         "roster",
                                         "counts",
                                         "notes_count"
@@ -14248,6 +14332,11 @@
                                         "version": {
                                             "type": "string"
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "roster": {
                                             "type": "string"
                                         },
@@ -14286,6 +14375,7 @@
                                         "cancel_reason",
                                         "me_on_roster",
                                         "version",
+                                        "actions",
                                         "roster",
                                         "counts",
                                         "notes_count"
@@ -14538,6 +14628,11 @@
                                         "version": {
                                             "type": "string"
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "roster": {
                                             "type": "string"
                                         },
@@ -14576,6 +14671,7 @@
                                         "cancel_reason",
                                         "me_on_roster",
                                         "version",
+                                        "actions",
                                         "roster",
                                         "counts",
                                         "notes_count"
@@ -14825,6 +14921,11 @@
                                         "version": {
                                             "type": "string"
                                         },
+                                        "actions": {
+                                            "type": "array",
+                                            "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                            "items": {}
+                                        },
                                         "roster": {
                                             "type": "string"
                                         },
@@ -14863,6 +14964,7 @@
                                         "cancel_reason",
                                         "me_on_roster",
                                         "version",
+                                        "actions",
                                         "roster",
                                         "counts",
                                         "notes_count"
@@ -15115,6 +15217,11 @@
                                                 "version": {
                                                     "type": "string"
                                                 },
+                                                "actions": {
+                                                    "type": "array",
+                                                    "description": "what the person looking may do about the shift now (ADR 0032): the shift bar reads these, never a copy of the rules",
+                                                    "items": {}
+                                                },
                                                 "roster": {
                                                     "type": "string"
                                                 },
@@ -15153,6 +15260,7 @@
                                                 "cancel_reason",
                                                 "me_on_roster",
                                                 "version",
+                                                "actions",
                                                 "roster",
                                                 "counts",
                                                 "notes_count"
