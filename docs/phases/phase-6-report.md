@@ -903,6 +903,8 @@ Two faults in "5 attempts then 15-min lockout", no change to the API's answers o
   - `tests/Gate/ShortCodeLockoutRaceTest.php` (group concurrency): ten forked tries at once, against one named person and against one
     pad, on the database cache store as on the live host. In both, exactly five are checked (401) and five are refused as locked (423).
 
+Claim restated at `fc209f0`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
