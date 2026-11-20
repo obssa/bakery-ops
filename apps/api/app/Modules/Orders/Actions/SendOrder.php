@@ -26,6 +26,7 @@ use App\Modules\Orders\Support\OrderTotals;
 use App\Modules\Orders\Support\PricedLine;
 use App\Modules\Orders\Support\ShortfallReport;
 use App\Shared\Events\OrderSent;
+use App\Shared\StateMachine\Verdict;
 use App\Shared\Tenancy\CurrentBranch;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
@@ -79,7 +80,7 @@ final class SendOrder
             throw OrderError::notOpen($order->status);
         }
 
-        return $order; // already sent: the send happened, here it is
+        return $order; // already sent: the send happened, here it is (a repeat: self::verdict)
     }
 
     private function sendOpen(Order $order): Order
@@ -89,9 +90,7 @@ final class SendOrder
             throw new SentMeanwhile;
         }
         $lines = OrderLine::query()->where('order_id', $order->id)->where('status', LineStatus::Queued->value)->with('modifiers')->orderBy('id')->get();
-        if ($lines->isEmpty()) {
-            throw OrderError::empty();
-        }
+        self::verdict($order, $lines->isNotEmpty())->orThrow();
         $sentAt = CarbonImmutable::now()->startOfSecond();
 
         /** @var array<int, PricedLine> $priced line id => what it is at sent_at */
@@ -182,5 +181,19 @@ final class SendOrder
         }
 
         return $deltas;
+    }
+
+    /**
+     * The order's own rule, read by the action and by the order's `actions` list (ADR 0032): an order not sent yet that has lines waiting
+     * is sent; one already sent is a repeat (the send happened); a cancelled or voided one is no send. Whether every line is in stock is
+     * found when it is sent (409 orders.send.shortfall), not listed.
+     */
+    public static function verdict(Order $order, bool $hasQueuedLines): Verdict
+    {
+        return match ($order->status) {
+            OrderStatus::Open => Verdict::unless(! $hasQueuedLines, OrderError::empty()),
+            OrderStatus::Cancelled, OrderStatus::Voided => Verdict::refused(OrderError::notOpen($order->status)),
+            default => Verdict::repeat(),
+        };
     }
 }

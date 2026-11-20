@@ -11,6 +11,7 @@ use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Support\PaymentLock;
 use App\Shared\Events\PaymentVerified;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -29,10 +30,9 @@ final class VerifyPayment
      */
     public function handle(Payment $payment, User $by, ?string $note): Payment
     {
-        if ($payment->status === PaymentStatus::Verified) {
+        if (self::verdict($payment)->settled()) {
             return $payment;
         }
-        $payment->status->transitionTo(PaymentStatus::Verified);
 
         try {
             $payment = $this->audit->run(function (Payment $payment) use ($by): Payment {
@@ -58,5 +58,18 @@ final class VerifyPayment
         event(new PaymentVerified($payment->branch_id, $payment->id, $payment->order_id, $payment->channel->code, $payment->amount->amount(), $by->id));
 
         return $payment;
+    }
+
+    /**
+     * The payment's own rule, read by the action and by the payment's `actions` list (ADR 0032): a recorded or disputed payment is
+     * verified; a verified one is a repeat; a voided one is no verify.
+     */
+    public static function verdict(Payment $payment): Verdict
+    {
+        if ($payment->status === PaymentStatus::Verified) {
+            return Verdict::repeat();
+        }
+
+        return Verdict::unless(! $payment->status->canTransitionTo(PaymentStatus::Verified), IllegalTransition::between($payment->status, PaymentStatus::Verified));
     }
 }

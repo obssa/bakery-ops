@@ -20,6 +20,7 @@ use App\Modules\Orders\Support\OrderLock;
 use App\Modules\Orders\Support\OrderTimeline;
 use App\Modules\Orders\Support\OrderTotals;
 use App\Modules\Orders\Support\PricedLine;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 
@@ -51,9 +52,7 @@ final class ReplaceLines
      */
     public function handle(Order $order, array $inputs): Order
     {
-        if ($order->status !== OrderStatus::Open) {
-            throw OrderError::notOpen($order->status);
-        }
+        self::verdict($order)->orThrow();
         $onOrder = [];
         foreach (OrderLine::query()->where('order_id', $order->id)->with('modifiers')->orderBy('id')->get() as $line) {
             if ($line->status !== LineStatus::Voided) {
@@ -139,5 +138,11 @@ final class ReplaceLines
         if ($had !== $asks) {
             throw OrderError::lineChanged($line, 'modifier_ids');
         }
+    }
+
+    /** The order's own rule, read by the action and by the order's `actions` list (ADR 0032): only an order not sent yet is edited. */
+    public static function verdict(Order $order): Verdict
+    {
+        return Verdict::unless($order->status !== OrderStatus::Open, OrderError::notOpen($order->status));
     }
 }

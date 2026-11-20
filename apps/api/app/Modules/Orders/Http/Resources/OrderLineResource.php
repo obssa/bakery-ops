@@ -6,6 +6,7 @@ namespace App\Modules\Orders\Http\Resources;
 
 use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Orders\Models\OrderLineModifier;
+use App\Modules\Orders\Support\OrderActions;
 use App\Shared\Models\Station;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -74,6 +75,8 @@ final class OrderLineResource extends JsonResource
             // step 4.1b: a line is refunded once
             'refunded_at' => $line->refunded_at?->toIso8601String(),
             'version' => $line->version,
+            // the steps the person looking may take on the line now (ADR 0032): the displays and the pad read these
+            'actions' => app(OrderActions::class)->line($line),
         ];
     }
 }

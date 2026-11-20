@@ -25,6 +25,7 @@ final class PaymentViews
         private readonly Files $files,
         private readonly Orders $orders,
         private readonly Duplicates $duplicates,
+        private readonly PaymentActions $actions,
     ) {}
 
     /**
@@ -95,6 +96,8 @@ final class PaymentViews
                 'void_reason' => $payment->void_reason,
                 'voided_at' => $payment->voided_at?->toIso8601String(),
                 'flags' => $flags[$payment->id] ?? ['duplicate_reference' => false, 'duplicate_receipt' => false],
+                // the decisions the person looking may take on the payment now (ADR 0032): the screens read these, never a copy of the rules
+                'actions' => $this->actions->for($payment),
             ];
             if ($withOrder) {
                 $view['order'] = isset($orders[$payment->order_id]) ? $orders[$payment->order_id]->toArray() : null;

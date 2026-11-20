@@ -13,6 +13,7 @@ use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Support\PaymentLock;
 use App\Shared\Events\PaymentVoided;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
 
@@ -45,15 +46,24 @@ final class VoidPayment
      */
     public function assertVoidable(Payment $payment, ?string $orderStatus = null): void
     {
-        $payment->status->transitionTo(PaymentStatus::Voided);
+        self::verdict($payment, $orderStatus ?? $this->orders->forPayment($payment->order_id)->status)->orThrow();
+    }
+
+    /**
+     * The payment's own rule, read by the action and by the payment's `actions` list (ADR 0032): a payment not voided yet, with nothing
+     * refunded from it, of an order that is not paid or closed (that one is refunded instead), is voided; a manager's PIN approves it.
+     */
+    public static function verdict(Payment $payment, string $orderStatus): Verdict
+    {
+        if (! $payment->status->canTransitionTo(PaymentStatus::Voided)) {
+            return Verdict::refused(IllegalTransition::between($payment->status, PaymentStatus::Voided));
+        }
         $refunded = $payment->refunded_amount;
         if ($refunded instanceof Money && $refunded->isPositive()) {
-            throw PaymentError::voidRefunded($refunded->amount());
+            return Verdict::refused(PaymentError::voidRefunded($refunded->amount()));
         }
-        $orderStatus ??= $this->orders->forPayment($payment->order_id)->status;
-        if (in_array($orderStatus, ['paid', 'closed'], true)) {
-            throw PaymentError::voidOrderClosed($orderStatus);
-        }
+
+        return Verdict::unless(in_array($orderStatus, ['paid', 'closed'], true), PaymentError::voidOrderClosed($orderStatus));
     }
 
     /**

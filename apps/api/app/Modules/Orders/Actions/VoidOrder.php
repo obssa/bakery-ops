@@ -17,6 +17,7 @@ use App\Modules\Orders\Support\CartLines;
 use App\Modules\Orders\Support\OrderLock;
 use App\Modules\Orders\Support\OrderTimeline;
 use App\Shared\Events\OrderVoided;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -51,12 +52,23 @@ final class VoidOrder
      */
     public function assertVoidable(Order $order): void
     {
+        self::verdict($order)->orThrow();
+    }
+
+    /**
+     * The order's own rule, read by the action and by the order's `actions` list (ADR 0032): a sent order that is not paid (nor settled)
+     * is voided; a paid one is refunded instead, an open one cancelled.
+     */
+    public static function verdict(Order $order): Verdict
+    {
         if (in_array($order->status, [OrderStatus::Paid, OrderStatus::Closed], true) || $order->settled_at !== null) {
-            throw OrderError::paid($order->status);
+            return Verdict::refused(OrderError::paid($order->status));
         }
-        if (! in_array($order->status, [OrderStatus::Sent, OrderStatus::InProgress, OrderStatus::Ready, OrderStatus::Served], true)) {
-            throw OrderError::notVoidable($order->status);
-        }
+
+        return Verdict::unless(
+            ! in_array($order->status, [OrderStatus::Sent, OrderStatus::InProgress, OrderStatus::Ready, OrderStatus::Served], true),
+            OrderError::notVoidable($order->status),
+        );
     }
 
     /**

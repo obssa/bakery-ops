@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Orders\Support;
 
 use App\Modules\Audit\Contracts\AuditedAction;
+use App\Modules\Orders\Enums\LineStatus;
 use App\Modules\Orders\Enums\OrderEventType;
 use App\Modules\Orders\Enums\OrderStatus;
 use App\Modules\Orders\Exceptions\OrderError;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderLine;
+use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 
 /**
  * The frame of every station action (accept, ready, reject, served; phase-1 plan section 6 item 3 "1.3c"): ONE database
@@ -51,9 +54,7 @@ final class LineWork
             OrderLock::refresh($order);
             $locked = OrderLine::query()->whereKey($line->id)->lockForUpdate()->firstOrFail();
             $line->setRawAttributes($locked->getAttributes(), true);
-            if ($order->status === OrderStatus::Open) {
-                throw OrderError::notSent($order->status);
-            }
+            self::sent($order)->orThrow();
 
             $payload = $work($line, $order);
             $line->version = $line->version + 1;
@@ -69,5 +70,22 @@ final class LineWork
 
             return $line;
         }, $line, $action, $context);
+    }
+
+    /**
+     * A line's own rule, read by the line actions (the order must be sent, the line's table must allow the step) and by the line's
+     * `actions` list (ADR 0032).
+     */
+    public static function verdict(OrderLine $line, Order $order, LineStatus $to): Verdict
+    {
+        return self::sent($order)->then(static fn (): Verdict => Verdict::unless(
+            ! $line->status->canTransitionTo($to),
+            IllegalTransition::between($line->status, $to),
+        ));
+    }
+
+    private static function sent(Order $order): Verdict
+    {
+        return Verdict::unless($order->status === OrderStatus::Open, OrderError::notSent($order->status));
     }
 }

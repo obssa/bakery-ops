@@ -12,6 +12,7 @@ use App\Modules\Payments\Models\Payment;
 use App\Modules\Payments\Support\PaymentLock;
 use App\Shared\Events\PaymentDisputed;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -34,7 +35,7 @@ final class DisputePayment
      */
     public function handle(Payment $payment, User $by, string $reason): Payment
     {
-        $payment->status->transitionTo(PaymentStatus::Disputed);
+        self::verdict($payment)->orThrow();
 
         $payment = $this->audit->run(function (Payment $payment) use ($by, $reason): Payment {
             PaymentLock::refresh($payment);
@@ -65,5 +66,11 @@ final class DisputePayment
         ));
 
         return $payment;
+    }
+
+    /** The payment's own rule, read by the action and by the payment's `actions` list (ADR 0032): only a recorded payment is disputed. */
+    public static function verdict(Payment $payment): Verdict
+    {
+        return Verdict::unless(! $payment->status->canTransitionTo(PaymentStatus::Disputed), IllegalTransition::between($payment->status, PaymentStatus::Disputed));
     }
 }

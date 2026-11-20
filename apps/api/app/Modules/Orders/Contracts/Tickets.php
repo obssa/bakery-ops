@@ -142,13 +142,29 @@ final class Tickets
                     'notes' => $order->notes,
                 ],
                 array_values(array_map(
-                    static fn (OrderLine $line): array => (new OrderLineResource($line))->resolve(),
+                    static fn (OrderLine $line): array => self::stationLine((new OrderLineResource($line->setRelation('order', $order)))->resolve()),
                     ($lines->get($orderId) ?? collect())->all(),
                 )),
             );
         }
 
         return $tickets;
+    }
+
+    /**
+     * A ticket line carries the station's own steps (accept, ready, reject) and not the waiter's (serve): everyone who reads the rail holds
+     * orders.accept at the station (OrderAccess::assertAtStationRail), so the steps are the same for each of them and the rail's ETag, one
+     * per station, stays true for all (ADR 0032).
+     *
+     * @param  array<string, mixed>  $line
+     * @return array<string, mixed>
+     */
+    private static function stationLine(array $line): array
+    {
+        $actions = is_array($line['actions'] ?? null) ? $line['actions'] : [];
+        $line['actions'] = array_values(array_intersect($actions, ['accept', 'ready', 'reject']));
+
+        return $line;
     }
 
     private static function parse(?string $cursor): ?int

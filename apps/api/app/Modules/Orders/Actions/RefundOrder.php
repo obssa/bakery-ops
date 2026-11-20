@@ -26,6 +26,7 @@ use App\Modules\Orders\Support\OrderTimeline;
 use App\Modules\Orders\Support\OrderTotals;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Events\OrderRefunded;
+use App\Shared\StateMachine\Verdict;
 use App\Shared\Values\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Connection;
@@ -138,14 +139,7 @@ final class RefundOrder
      */
     private function plan(Order $order, Collection $lines, array $lineIds): array
     {
-        if ($order->status !== OrderStatus::Closed) {
-            throw OrderError::refundNotRefundable($order->status);
-        }
-        $hours = (int) config('payments.refund_window_hours', 72);
-        $closedAt = $order->closed_at ?? $order->paid_at;
-        if ($closedAt !== null && CarbonImmutable::now()->isAfter($closedAt->addHours($hours))) {
-            throw OrderError::refundWindowClosed($hours);
-        }
+        self::verdict($order)->orThrow();
 
         /** @var array<int, OrderLine> $charged */
         $charged = [];
@@ -341,5 +335,21 @@ final class RefundOrder
         }
 
         return $connection;
+    }
+
+    /**
+     * The order's own rule, read by the action and by the order's `actions` list (ADR 0032): a closed order is refunded within
+     * payments.refund_window_hours of its close. Which lines, and whether the products may be refunded at all, is the refund's input and
+     * the admin's settings, found when it is asked for.
+     */
+    public static function verdict(Order $order): Verdict
+    {
+        if ($order->status !== OrderStatus::Closed) {
+            return Verdict::refused(OrderError::refundNotRefundable($order->status));
+        }
+        $hours = (int) config('payments.refund_window_hours', 72);
+        $closedAt = $order->closed_at ?? $order->paid_at;
+
+        return Verdict::unless($closedAt !== null && CarbonImmutable::now()->isAfter($closedAt->addHours($hours)), OrderError::refundWindowClosed($hours));
     }
 }

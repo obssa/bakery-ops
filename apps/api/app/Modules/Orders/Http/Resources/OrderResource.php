@@ -8,8 +8,10 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Orders\Models\DiningTable;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\OrderEvent;
+use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Orders\Models\OrderRefund;
 use App\Modules\Orders\Models\OrderRefundLine;
+use App\Modules\Orders\Support\OrderActions;
 use App\Modules\Orders\Support\OrderTotals;
 use Closure;
 use Illuminate\Http\Request;
@@ -61,6 +63,8 @@ final class OrderResource extends JsonResource
         $table = $order->diningTable;
         $owner = $order->owner;
         $totals = new OrderTotals($order->subtotal, $order->discount, $order->tax, $order->total);
+        // each line reads its order for its own `actions` (the order must be sent; its owner serves it)
+        $order->lines->each(static fn (OrderLine $line): OrderLine => $line->setRelation('order', $order));
 
         return [
             'id' => $order->id,
@@ -103,6 +107,8 @@ final class OrderResource extends JsonResource
                 'at' => $order->voided_at->toIso8601String(),
             ],
             'version' => $order->version,
+            // the moves the person looking may make on the order now (ADR 0032): the screens read these, never a copy of the rules
+            'actions' => app(OrderActions::class)->order($order),
             'created_at' => $order->created_at?->toIso8601String(),
             'lines' => OrderLineResource::collection($order->lines)->resolve($request),
             'refunds' => self::refunds($order),

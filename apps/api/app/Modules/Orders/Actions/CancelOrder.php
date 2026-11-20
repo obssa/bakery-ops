@@ -14,6 +14,7 @@ use App\Modules\Orders\Models\OrderLine;
 use App\Modules\Orders\Support\CartLines;
 use App\Modules\Orders\Support\OrderLock;
 use App\Modules\Orders\Support\OrderTimeline;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -36,9 +37,7 @@ final class CancelOrder
      */
     public function handle(Order $order, ?string $reason): Order
     {
-        if ($order->status !== OrderStatus::Open) {
-            throw OrderError::notOpen($order->status);
-        }
+        self::verdict($order)->orThrow();
 
         return $this->audit->run(function (Order $order) use ($reason): Order {
             OrderLock::refresh($order);
@@ -61,5 +60,11 @@ final class CancelOrder
 
             return $order;
         }, $order, 'order.cancel', $reason === null ? [] : ['reason' => $reason]);
+    }
+
+    /** The order's own rule, read by the action and by the order's `actions` list (ADR 0032): only an order not sent yet is cancelled. */
+    public static function verdict(Order $order): Verdict
+    {
+        return Verdict::unless($order->status !== OrderStatus::Open, OrderError::notOpen($order->status));
     }
 }
