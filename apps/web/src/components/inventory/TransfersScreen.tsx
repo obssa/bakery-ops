@@ -96,7 +96,14 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
     setRefused(null);
     confirm.mutate(
       { id: transfer.id, idempotencyKey: confirmKey.keyFor({ id: transfer.id }) },
-      { onSuccess: () => confirmKey.done(), onError: (error) => setRefused({ id: transfer.id, error }) },
+      {
+        onSuccess: () => confirmKey.done(),
+        onError: (error) => {
+          // a refusal (not enough at the source, a shift to start) ends the attempt: once its cause is fixed the same tap is checked again
+          confirmKey.failed(error);
+          setRefused({ id: transfer.id, error });
+        },
+      },
     );
   }
 
@@ -111,6 +118,7 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
           setRejecting(null);
           setReason("");
         },
+        onError: rejectKey.failed,
       },
     );
   }

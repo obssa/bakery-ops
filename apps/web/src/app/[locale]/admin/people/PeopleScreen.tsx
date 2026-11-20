@@ -156,7 +156,10 @@ function OnCallCell({ user, onSaved }: { user: User; onSaved: (message: string |
           setShown(null);
           onSaved(next ? t("on_call_saved_on", { name: user.name }) : t("on_call_saved_off", { name: user.name }));
         },
-        onError: () => setShown(null),
+        onError: (error) => {
+          idempotency.failed(error);
+          setShown(null);
+        },
       },
     );
   }
@@ -206,6 +209,7 @@ function NewPersonCard() {
           setPhone("");
           setPassword("");
         },
+        onError: idempotency.failed,
       },
     );
   }
@@ -370,7 +374,10 @@ function StationRow({ station, onSaved }: { station: Station; onSaved: (message:
           setShown(null);
           onSaved(t("station_saved", { name }));
         },
-        onError: () => setShown(null),
+        onError: (error) => {
+          idempotency.failed(error);
+          setShown(null);
+        },
       },
     );
   }

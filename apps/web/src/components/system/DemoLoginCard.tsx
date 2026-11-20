@@ -39,6 +39,7 @@ export function DemoLoginCard() {
           key.done();
           setSaid(t(next ? "saved_on" : "saved_off"));
         },
+        onError: key.failed,
       },
     );
   }

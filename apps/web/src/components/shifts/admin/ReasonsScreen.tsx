@@ -71,7 +71,7 @@ function ReasonRows({ rows, manage, onEdit }: { rows: VarianceReason[]; manage: 
 
   function toggle(row: VarianceReason) {
     const body = { name_en: row.name_en, name_am: row.name_am, is_active: !row.is_active };
-    save.mutate({ id: row.id, body, idempotencyKey: idempotency.keyFor({ id: row.id, ...body }) }, { onSuccess: () => idempotency.done() });
+    save.mutate({ id: row.id, body, idempotencyKey: idempotency.keyFor({ id: row.id, ...body }) }, { onSuccess: () => idempotency.done(), onError: idempotency.failed });
   }
 
   return (
@@ -168,6 +168,7 @@ function ReasonForm({ editing, onDone }: { editing: VarianceReason | null; onDon
             setRequiresNote(false);
           }
         },
+        onError: idempotency.failed,
       },
     );
   }

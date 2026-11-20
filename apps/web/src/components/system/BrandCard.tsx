@@ -53,6 +53,7 @@ export function BrandCard() {
           nameKey.done();
           setSaved(answer.data.name_en ? t("saved_name") : t("saved_default"));
         },
+        onError: nameKey.failed,
       },
     );
   }
@@ -70,6 +71,7 @@ export function BrandCard() {
           logoKey.done();
           setSaved(t("saved_logo"));
         },
+        onError: logoKey.failed,
       },
     );
   }
@@ -143,6 +145,7 @@ export function BrandCard() {
                         logoKey.done();
                         setSaved(t("saved_no_logo"));
                       },
+                      onError: logoKey.failed,
                     },
                   );
                 }}

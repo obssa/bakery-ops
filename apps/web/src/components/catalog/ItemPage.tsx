@@ -183,6 +183,8 @@ function ProductPage({ product, created }: { product: Item; created: CreatedItem
           setEdits({});
           setNotice(t("saved"));
         },
+        // no release on a failure here: the save is two writes (the changes, then the price) and the answer does not say which one
+        // was refused, so both keys stay and a retry replays the one that went through (the item's version would refuse a second edit)
       },
     );
   }
@@ -198,6 +200,7 @@ function ProductPage({ product, created }: { product: Item; created: CreatedItem
           menuKey.done();
           setNotice(active ? t("put_back_done", { name }) : t("taken_off", { name }));
         },
+        onError: menuKey.failed,
       },
     );
   }

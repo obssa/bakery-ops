@@ -176,6 +176,7 @@ export function PhotoCard({ product, menuEntry, price, category, canManage, clas
           setSaid(t("saved"));
         },
         onError: (error) => {
+          uploadKey.failed(error);
           // back to the frame as it was, with the server's words under the card
           setStage({ kind: "framing", photo, view });
           setRefusal(errorText.message(error));
@@ -195,6 +196,7 @@ export function PhotoCard({ product, menuEntry, price, category, canManage, clas
           setSaid(t("removed"));
         },
         onError: (error) => {
+          removeKey.failed(error);
           setConfirming(false);
           setRefusal(errorText.message(error));
         },

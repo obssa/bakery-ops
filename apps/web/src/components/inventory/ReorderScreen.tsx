@@ -135,7 +135,7 @@ function RulesTable({ rows, manage, onEdit }: { rows: ReorderRule[]; manage: boo
 
   function toggle(rule: ReorderRule) {
     const body = { is_active: !rule.is_active };
-    update.mutate({ id: rule.id, body, idempotencyKey: updateKey.keyFor({ id: rule.id, ...body }) }, { onSuccess: () => updateKey.done() });
+    update.mutate({ id: rule.id, body, idempotencyKey: updateKey.keyFor({ id: rule.id, ...body }) }, { onSuccess: () => updateKey.done(), onError: updateKey.failed });
   }
 
   function deleteRule() {
@@ -147,6 +147,7 @@ function RulesTable({ rows, manage, onEdit }: { rows: ReorderRule[]; manage: boo
           removeKey.done();
           setDeleting(null);
         },
+        onError: removeKey.failed,
       },
     );
   }
@@ -285,10 +286,10 @@ function RuleForm({ editing, onDone }: { editing: ReorderRule | null; onDone: ()
     const picked = items.data?.find((i) => String(i.id) === itemId);
     if (editing) {
       const body = { min_qty: min.trim(), reorder_qty: order.trim(), ...(roles.length > 0 ? { notify_roles: roles } : {}) };
-      update.mutate({ id: editing.id, body, idempotencyKey: idempotency.keyFor({ id: editing.id, ...body }) }, { onSuccess: done(name(editing.item)) });
+      update.mutate({ id: editing.id, body, idempotencyKey: idempotency.keyFor({ id: editing.id, ...body }) }, { onSuccess: done(name(editing.item)), onError: idempotency.failed });
     } else {
       const body = { item_id: Number(itemId), min_qty: min.trim(), reorder_qty: order.trim(), ...(placeId ? { location_id: Number(placeId) } : {}), ...(roles.length > 0 ? { notify_roles: roles } : {}) };
-      create.mutate({ body, idempotencyKey: idempotency.keyFor(body) }, { onSuccess: done(picked ? name(picked) : "") });
+      create.mutate({ body, idempotencyKey: idempotency.keyFor(body) }, { onSuccess: done(picked ? name(picked) : ""), onError: idempotency.failed });
     }
   }
 

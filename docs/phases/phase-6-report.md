@@ -910,6 +910,22 @@ that check was slow, its late 401 forgot the new token and sent them back to the
 
 Claim restated at `a36da5e`; the tag stays on `2f6bbd9`.
 
+**A refusal is not replayed once its cause is fixed (phase-6/idempotency-keys; ADR 0030).** The API stores a refusal (4xx) for its
+Idempotency-Key and replays it. Most of the web's forms kept the key until a success, so a second tap after the cause was fixed (a shift
+started, stock bought) got the stored refusal again until the page was reloaded.
+
+- **One rule, `outcomeUnknown`.** A key is kept only while the outcome is unknown: no answer, a 5xx, or the same key still running. Every
+  form's key holder lets the key go on a definite answer, with `failed(error)` beside `done()`.
+- **The production board's drops** keep one key per write and request across the retries of a move. Before, every write took a new key.
+- **The void and refund dialogs** choose their key from their request without the PIN, as the API's fingerprint does. A changed request
+  is now a new request instead of `422 key_reused`.
+- **The shift bar's start key** is named by its station.
+- **The transfer request sheet** keeps its client_uuid only across an unknown outcome. When the API answers with a first request the person
+  has since changed, the sheet shows that transfer and says the change was not sent (en and am).
+- **Tests.** `e2e/p6/screens-idempotency-logic.spec.ts` covers the rule. `e2e/p6/screens-idempotency.spec.ts` runs on the CI stack:
+  - a confirm refused for want of stock goes through on the same tap once the store bought more;
+  - a lost answer followed by an edited resend leaves one transfer, for the first quantity, and the sheet says so.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
