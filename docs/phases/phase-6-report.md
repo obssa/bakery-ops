@@ -967,6 +967,8 @@ and 14 of the review of the app's implicit state machines, 2026-11-20).**
   and the write runs once; an in-flight row just before and after `abandon_after_seconds`; 422 in flight. The race cases fail on the code
   before this change.
 
+Claim restated at `cf402a3`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the

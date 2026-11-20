@@ -44,7 +44,8 @@ started by cron every minute (`queue:work --stop-when-empty --max-time=50`), and
   `response_body` null), `updated_at` now. When the handler answers, the row gets the answer (as before), or, for an answer that is not kept
   (5xx, a refusal of a request that carried a secret), the row is deleted so the key runs again. A handler that throws also leaves no row.
 - A request that finds the key's row **without an answer** gets the existing `409 idempotency.in_flight`, also when the first request's lock
-  has run out. The client already treats that as "the outcome is unknown, try again later" (the outbox and the pay sheet).
+  has run out. The client already treats that as "the outcome is unknown, try again later" (the outbox, the pay sheet, and
+  since ADR 0030 the screens' key holder, which keeps the same key for the retry).
 - **A row without an answer that is older than `abandon_after_seconds` (300 s) belongs to a request that died** (the PHP process was killed
   between writing it and answering). The next request with that key takes the row over and runs. 300 s is far longer than any request runs
   on the host, and a till retrying a write whose first try died waits at most 5 minutes, the same as it would for a host that is down.
