@@ -9,7 +9,7 @@ import { useActing } from "@/lib/acting";
 import { useBrand, useBrandTitle } from "@/lib/brand";
 import type { Locale } from "@/lib/api/types";
 import { frameOf, isCurrent, isNightScreen } from "@/lib/screens";
-import { useSession } from "@/lib/session";
+import { signOutTarget, useSession } from "@/lib/session";
 import { barMode, type BarMode } from "@/lib/shifts";
 import { useStationChrome } from "@/lib/station";
 import { useTopBarSlots } from "@/lib/topBar";
@@ -240,6 +240,7 @@ function ScreensMenu({ night }: { night: boolean }) {
 function AccountMenu({ fill, night }: { fill: boolean; night: boolean }) {
   const t = useTranslations();
   const router = useRouter();
+  const pathname = usePathname();
   const status = useSession((s) => s.status);
   const me = useSession((s) => s.me);
   const signOut = useSession((s) => s.signOut);
@@ -288,7 +289,7 @@ function AccountMenu({ fill, night }: { fill: boolean; night: boolean }) {
             onClick={async () => {
               setOpen(false);
               await signOut();
-              router.replace("/login");
+              router.replace(signOutTarget(pathname));
             }}
             className={`${buttonClass({ variant: "secondary", size: "md" })} w-full`}
           >

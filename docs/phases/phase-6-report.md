@@ -861,6 +861,30 @@ Claim restated at `7b665a1`; the tag stays on `2f6bbd9`.
 
 Claim restated at `19bf22c`; the tag stays on `2f6bbd9`.
 
+**The sign-in's races (phase-6/session-races; the implicit-state review of 2026-11-20, items 8 and 25).** `lib/session.ts` applied every
+GET /me answer whenever it arrived. A device that still held an old token checked it when a page opened. If the person signed in while
+that check was slow, its late 401 forgot the new token and sent them back to the sign-in page, and a late 200 put the old person back.
+
+- **Generations.** A sign-in, a sign-out and an expiry each start a new generation. A /me answer counts only while the generation it was
+  asked in is still the current one. This also fixes a sign-out during the start-up check, which used to end "signed in" with no token.
+- **No answer is asked again.** A start-up check, or the /me read after a sign-in, that gets no answer (network, 5xx) is asked again after
+  5, 15, 30 and then every 60 seconds, and at once when the connection comes back. Before, the sign-in answer (no work stations, no
+  device) stayed for the whole visit, so a chef could not open the kitchen display until a reload. A refusal of that read keeps the
+  sign-in answer and does not ask again; the next refused call signs out, as every call does.
+- **The start page offers Retry.** It said "Checking…" for ever when the check got no answer, because only the guarded pages had the
+  network message and Retry. It now shows the same message and button (`SessionUnreachable`).
+- **A deliberate sign-out comes back to the screen it left.** It went to `/login` without `next`. The sign-in page now returns there
+  when the next person's role opens that screen (`useFinishSignIn` checks `canOpen`), so a shared till stays the till. Anyone else lands
+  on their own screen. The start page and the sign-in page carry no `next`.
+- **Not a defect: `expired` is reset.** A sign-in and a sign-out both clear it. The "Your sign-in has ended" line stays only on the
+  sign-in page until someone signs in again, which is what it is for.
+- **Tests:** `screens-session-logic.spec.ts` (p6-a11y) replaces fetch and releases each /me answer in the order the test chooses: a late
+  401, a late 200, a sign-in slower than the old check, a sign-out and an expiry during the check, the retry after no answer, the retry
+  dropped by a sign-out, the sign-in's own /me failing or refused, and the sign-out's target. Eight of its eleven cases fail on the code
+  before this change. `screens-session.spec.ts` (p6-a11y) runs the first race in the browser: the old token's /me is held by a route
+  while the E2E admin signs in through the form, then answered 401, and the admin stays on Today with the new token. It also checks the
+  start page's Retry.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the

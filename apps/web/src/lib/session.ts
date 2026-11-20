@@ -64,7 +64,105 @@ function storeToken(token: string | null): void {
   }
 }
 
+/**
+ * The session's generation: a sign-in, a sign-out and an expiry each start a new one. A GET /me answer is applied only while the
+ * generation it was asked in is still the current one, so a slow read of the token stored before a sign-in can never sign the new
+ * person out (its 401) or put the old person back (its 200), and a read that ends after a sign-out cannot sign the device back in
+ * with no token (implicit-state review, 2026-11-20).
+ */
+let generation = 0;
 let initialising: Promise<void> | null = null;
+/** The person is the sign-in answer's (no work_stations, device, acting, brand) until GET /me is read once for this sign-in. */
+let provisional = false;
+
+/** How long a session that could not read GET /me waits before asking again; the last delay repeats. Tests shorten it. */
+export const sessionRetry: { delays: number[] } = { delays: [5_000, 15_000, 30_000, 60_000] };
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let retryStep = 0;
+
+function listenOnline(on: boolean): void {
+  if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+  if (on) window.addEventListener("online", retryNow);
+  else window.removeEventListener("online", retryNow);
+}
+
+function clearRetryTimer(): void {
+  if (retryTimer !== null) clearTimeout(retryTimer);
+  retryTimer = null;
+  listenOnline(false);
+}
+
+function stopRetry(): void {
+  clearRetryTimer();
+  retryStep = 0;
+}
+
+/** Asks GET /me again after the next delay, or at once when the connection comes back. */
+function scheduleRetry(): void {
+  if (retryTimer !== null) return;
+  const delays = sessionRetry.delays;
+  const delay = delays[Math.min(retryStep, delays.length - 1)] ?? 60_000;
+  retryStep += 1;
+  retryTimer = setTimeout(retryNow, delay);
+  listenOnline(true);
+}
+
+function retryNow(): void {
+  clearRetryTimer();
+  const session = useSession.getState();
+  if (session.status === "unknown" && session.unreachable) void session.init();
+  else if (session.status === "signed-in" && provisional && session.token) void confirm(session.token, generation, "keep");
+}
+
+/** A new sign-in, sign-out or expiry: answers asked for the one before are dropped, and so is their retry. */
+function nextGeneration(): number {
+  generation += 1;
+  initialising = null;
+  provisional = false;
+  stopRetry();
+  return generation;
+}
+
+/**
+ * Reads GET /me for `token` and applies the answer only if `asked` is still the session's generation. A refusal (401, 403) of the
+ * token found at start-up signs the device out ("sign-out"); after a fresh sign-in the sign-in answer is kept ("keep": the next call
+ * that is refused signs out, as every call does). No answer (network, 5xx) keeps the token and asks again later (sessionRetry).
+ */
+async function confirm(token: string, asked: number, onRefused: "sign-out" | "keep"): Promise<Me | null> {
+  const set = useSession.setState;
+  try {
+    const me = await readMe(token);
+    if (asked !== generation) return null;
+    provisional = false;
+    stopRetry();
+    set({ me, status: "signed-in", unreachable: false });
+    return me;
+  } catch (error) {
+    if (asked !== generation) return null;
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      stopRetry();
+      if (onRefused === "sign-out") {
+        storeToken(null);
+        set({ token: null, me: null, status: "signed-out", unreachable: false });
+      } else {
+        provisional = false;
+      }
+    } else {
+      set({ unreachable: true });
+      scheduleRetry();
+    }
+    return null;
+  }
+}
+
+/**
+ * Where a deliberate sign-out goes: the sign-in page, which comes back to this screen when the next person's role opens it (the shared
+ * till or pad stays the till or the pad; LoginForm's useFinishSignIn checks canOpen, so anyone else lands on their own screen).
+ */
+export function signOutTarget(pathname: string): { pathname: "/login"; query?: { next: string } } {
+  if (!pathname.startsWith("/") || pathname.startsWith("//") || pathname === "/" || pathname.startsWith("/login")) return { pathname: "/login" };
+  return { pathname: "/login", query: { next: pathname } };
+}
 
 export const useSession = create<SessionState>()((set, get) => ({
   token: null,
@@ -74,47 +172,37 @@ export const useSession = create<SessionState>()((set, get) => ({
   unreachable: false,
 
   init: () => {
-    initialising ??= (async () => {
-      const token = get().token ?? storedToken();
-      if (!token) {
-        set({ status: "signed-out", token: null, me: null });
-        return;
-      }
-      set({ token, unreachable: false });
-      try {
-        const me = await readMe(token);
-        set({ me, status: "signed-in" });
-      } catch (error) {
-        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-          storeToken(null);
-          set({ token: null, me: null, status: "signed-out" });
-        } else {
-          set({ unreachable: true });
-        }
-      } finally {
-        initialising = null;
-      }
-    })();
-    return initialising;
+    if (initialising) return initialising;
+    const token = get().token ?? storedToken();
+    if (!token) {
+      set({ status: "signed-out", token: null, me: null, unreachable: false });
+      return Promise.resolve();
+    }
+    set({ token, unreachable: false });
+    const run: Promise<void> = confirm(token, generation, "sign-out").then(() => undefined);
+    initialising = run;
+    void run.finally(() => {
+      if (initialising === run) initialising = null;
+    });
+    return run;
   },
 
   signIn: (login) => {
+    const asked = nextGeneration();
     storeToken(login.token);
     const first: Me = { user: login.user, permissions: login.permissions, locale: login.locale, acting: null, device: null, work_stations: [] };
+    provisional = true;
     set({ token: login.token, me: first, status: "signed-in", expired: false, unreachable: false });
-    // the sign-in answer has no work_stations: read /me once more so the station screens (and where the person lands) know where they work
-    return readMe(login.token)
-      .then((me) => {
-        if (get().token === login.token) set({ me });
-        return me;
-      })
-      .catch(() => first);
+    // the sign-in answer has no work_stations: read /me once more so the station screens (and where the person lands) know where they
+    // work; when it cannot be read now it is asked again (sessionRetry, or when the connection is back) rather than kept for the visit
+    return confirm(login.token, asked, "keep").then((me) => me ?? first);
   },
 
   signOut: async () => {
     const token = get().token;
+    nextGeneration();
     storeToken(null);
-    set({ token: null, me: null, status: "signed-out", expired: false });
+    set({ token: null, me: null, status: "signed-out", expired: false, unreachable: false });
     if (token) {
       try {
         await request("/logout", { method: "POST", token, idempotencyKey: uuid() });
@@ -125,8 +213,9 @@ export const useSession = create<SessionState>()((set, get) => ({
   },
 
   expire: () => {
+    nextGeneration();
     storeToken(null);
-    set({ token: null, me: null, status: "signed-out", expired: true });
+    set({ token: null, me: null, status: "signed-out", expired: true, unreachable: false });
   },
 }));
 
