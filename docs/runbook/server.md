@@ -43,12 +43,40 @@ Status: **provisioned 2026-10-19** (steps 1-10 done from the owner's PC over SSH
 ### Cron entries
 
 ```
-* * * * * cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan schedule:run >> /dev/null 2>&1
-* * * * * cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan queue:work --stop-when-empty --max-time=50 >> /dev/null 2>&1
+* * * * * cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan schedule:run >> /dev/null 2>&1 # bakery-ops
+* * * * * cd $HOME/bakery-ops.orcamind.dev && /opt/alt/php83/usr/bin/php artisan queue:work --stop-when-empty --max-time=50 >> /dev/null 2>&1 # bakery-ops
 ```
 
 The scheduler's line has no random sleep: `schedule:run` must start inside the minute a `dailyAt` task is due, and a sleep of up to
 59 s plus PHP's start could push it into the next minute and skip the task (the 02:30 backup of 2026-11-11 was skipped that way).
+
+### The shared crontab (since 2026-11-20)
+
+The account's crontab is shared by several sites. **Never edit it directly** (`crontab -e`, `crontab -`, `crontab <file>`, or cPanel's
+Cron Jobs page). Each site owns one file, `~/crontab.d/<name>.cron`, whose every line ends in ` # <name>` (or ` # <name>-<word>`);
+this site's is `~/crontab.d/bakery-ops.cron` and holds the two lines above with ` # bakery-ops` at the end. To change a line, edit
+the file and run `~/bin/crontab-sync`. `~/crontab.d/README` on the host says the same for the other sites.
+
+Why: on this CloudLinux/CageFS host `/usr/bin/crontab` is a wrapper that, on every call (a plain `crontab -l` too), copies the real
+crontab into the account's mirror file (`/var/spool/cron/<user>`), runs the command on the mirror, then saves the mirror back as the
+real crontab. When two calls overlap, the copy fails with `BlockingIOError: Resource temporarily unavailable`, the wrapper hides the
+error, and the empty mirror is saved as the crontab. On 2026-11-17 another site's first install left only its own lines, and every
+other site's scheduler and queue stopped until 2026-11-20 (here: no backups, 108 jobs waiting, the p2 stock-out flows red on @live).
+A back-to-back `crontab -l` / `crontab -` / `crontab -l` emptied it again on 2026-11-20 for about half a minute.
+
+`scripts/ops/crontab-sync.sh` (installed as `~/bin/crontab-sync`, tests in `scripts/tests/test_crontab_sync.py`):
+
+- reads the mirror file directly and stops there when it already matches the files (no crontab call at all);
+- otherwise takes `~/.crontab-sync.lock`, trusts only two equal `crontab -l` reads 3 s apart, keeps a copy in
+  `~/backups/crontab.<time>.sync.bak`, writes once, waits, reads twice again, and tries up to 5 times;
+- changes only the lines whose trailing tag belongs to one of the files; every other line stays, in order;
+- when it finds the crontab emptied, puts the other lines back from `~/crontab.d/.last-good` (its last good copy);
+- logs changes and failures to `~/logs/crontab-sync.log`; `--check` reports a needed repair without writing.
+
+It runs at :07, :22, :37 and :52 from its own crontab line (`~/crontab.d/crontab-sync.cron`), and every hour from GitHub
+(`.github/workflows/crontab-guard.yml`, which also installs this commit's copy of the script). That GitHub run is the one that brings
+the crontab back when it is wiped entirely, and it reads through `crontab` once a day (10:17 UTC) to catch edits made outside the
+mirror. A failed run emails the repository owner. The host has no `/dev/fd`, so the script never uses `<(...)`.
 
 ## Queued work (Phase 2)
 
