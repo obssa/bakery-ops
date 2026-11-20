@@ -64,6 +64,11 @@ export interface RequestOptions {
    * finally goes (ADR 0029). null: no station. Left out: the station picked now (lib/station.ts).
    */
   station?: number | null;
+  /**
+   * The device id this call goes out with, when it is not the one kept yet: "Enrol this device" with a new id sends that id, and the
+   * device keeps it only once it is enrolled (a failed enrolment leaves the old one, still enrolled where it was). Left out: this device's id.
+   */
+  device?: string;
 }
 
 /** How long a call may wait for an answer before it counts as a network failure (a hung connection must not freeze a feed). */
@@ -145,7 +150,7 @@ function isForm(body: unknown): body is FormData {
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? "GET";
-  const device = deviceId();
+  const device = options.device ?? deviceId();
   const page = currentPath();
   const headers = baseHeaders("application/json", options.headers, device, options.station);
   if (options.body !== undefined && !isForm(options.body)) headers["Content-Type"] = "application/json";

@@ -6,15 +6,15 @@ import { Alert, Button, Field, Select, TextInput } from "@/components/ui";
 import { useEnrolDevice } from "@/lib/api/devices";
 import { useIdempotencyKey, uuid } from "@/lib/api/idempotency";
 import type { DeviceKind, EnrolledDevice, NewDevice } from "@/lib/api/types";
-import { deviceId, renewDeviceId } from "@/lib/device";
+import { adoptDeviceId, deviceId, newDeviceId } from "@/lib/device";
 import { useErrorText } from "@/lib/errors";
 
 const KINDS: readonly DeviceKind[] = ["tablet", "till", "kds"];
 
 /**
  * "Enrol this device" (step 5.1b): the admin, signed in on the device itself, names it and enrols the id it sends (POST /devices). Shown
- * on the "not enrolled" screen and on the Devices screen. `renew` first gives the device a new id, once: for an id that cannot be
- * enrolled here (revoked, or taken by another branch; ADR 0017 decision 6).
+ * on the "not enrolled" screen and on the Devices screen. `renew` enrols a new id instead, for an id that cannot be enrolled here (revoked,
+ * or taken by another branch; ADR 0017 decision 6); the device keeps the new id once it is enrolled, never before.
  */
 export function EnrolThisDevice({ renew = false, onEnrolled }: { renew?: boolean; onEnrolled: (device: EnrolledDevice) => void }) {
   const t = useTranslations("devices");
@@ -25,19 +25,22 @@ export function EnrolThisDevice({ renew = false, onEnrolled }: { renew?: boolean
   const [clientUuid, setClientUuid] = useState(() => uuid());
   const [name, setName] = useState("");
   const [kind, setKind] = useState<DeviceKind>("tablet");
-  const renewed = useRef(false);
+  // the new id `renew` enrols: made once and sent (as the fingerprint and as X-Device-Id) on every try, and kept as this device's id only
+  // once the API enrolled it. A failed try leaves the device its old id: one enrolled in another branch stays enrolled there
+  const proposed = useRef<string | null>(null);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (renew && !renewed.current) {
-      renewDeviceId();
-      renewed.current = true;
-    }
-    const body: NewDevice = { name: name.trim(), fingerprint: deviceId(), kind, client_uuid: clientUuid };
+    const fingerprint = renew ? (proposed.current ??= newDeviceId()) : deviceId();
+    const body: NewDevice = { name: name.trim(), fingerprint, kind, client_uuid: clientUuid };
     enrol.mutate(
-      { body, idempotencyKey: idempotency.keyFor(body) },
+      { body, idempotencyKey: idempotency.keyFor(body), device: fingerprint },
       {
         onSuccess: (device) => {
+          if (renew) {
+            adoptDeviceId(fingerprint);
+            proposed.current = null;
+          }
           idempotency.done();
           setClientUuid(uuid());
           setName("");

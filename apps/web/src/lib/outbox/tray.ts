@@ -1,4 +1,4 @@
-import type { NewOrderLine, OrderType } from "../api/types";
+import type { NewOrderLine, OrderStatus, OrderType } from "../api/types";
 import type { CartSource } from "../cart";
 import { trimDecimal } from "../decimal";
 import { photosOf, type Conflict, type OutboxItem, type OutboxKind } from "./logic";
@@ -176,7 +176,12 @@ export function supersede(queue: OutboxItem[], orderUuid: string | null, ids: re
 }
 
 const LOOKED_UP: readonly OutboxKind[] = ["send_existing", "cancel_order"];
-const SENT: readonly string[] = ["sent", "in_progress", "ready", "served", "closed"];
+/**
+ * The statuses only a sent order reaches (the API's OrderStatus transitions: open goes to sent or cancelled, and everything after sent is
+ * reached from it): a send that may have landed did land when the order is in one of them. Paid and voided count too (a quick cash sale
+ * is paid before the lost answer is looked up; a void needs a sent order). Cancelled does not: an open order is cancelled without being sent.
+ */
+export const SENT: readonly OrderStatus[] = ["sent", "in_progress", "ready", "served", "paid", "closed", "voided"];
 
 /** Whether a refusal may only mean the write had already landed: tried before without an answer, about an order that moved on. */
 export function needsLookup(item: OutboxItem, reason: RefusalReason): boolean {
@@ -186,7 +191,7 @@ export function needsLookup(item: OutboxItem, reason: RefusalReason): boolean {
 /** Whether the order, as the server now has it, already shows what the write wanted. */
 export function landed(item: Pick<OutboxItem, "kind">, order: { status: string } | null): boolean {
   if (!order) return false;
-  if (item.kind === "send_existing") return SENT.includes(order.status);
+  if (item.kind === "send_existing") return (SENT as readonly string[]).includes(order.status);
   if (item.kind === "cancel_order") return order.status === "cancelled";
   return false;
 }

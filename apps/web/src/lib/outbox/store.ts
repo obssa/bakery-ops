@@ -223,6 +223,8 @@ function onTabMessage(message: TabMessage): void {
   const { item } = message;
   const waiter = waiters.get(item.id);
   if (message.outcome === "accepted") {
+    // another tab of this device got a write through: the device is not held (the tabs share one device id)
+    if (useOutbox.getState().held) useOutbox.setState({ held: null });
     if (waiter) {
       waiters.delete(item.id);
       waiter.resolve({ sent: true, answer: message.answer });
@@ -406,14 +408,14 @@ function send(item: OutboxItem, token: string): Promise<unknown> {
 }
 
 let wakeTimer: ReturnType<typeof setTimeout> | null = null;
-/** true after a device refusal: no timer sends again (only a new write, the online event or a sign-in tries once more) */
-let deviceHalt = false;
 
 function scheduleWake(): void {
   if (wakeTimer !== null) clearTimeout(wakeTimer);
   wakeTimer = null;
   const me = useSession.getState().me;
-  if (!me || deviceHalt) return;
+  // after a device refusal (`held`, what the tray and the sync chip show) no timer sends again: only a new write, the online event or a
+  // sign-in tries once more. One flag says both, so the screen never says "held" while the timers send, or the other way round
+  if (!me || useOutbox.getState().held !== null) return;
   const at = nextWakeAt(useOutbox.getState().queue, me.user.id);
   if (at === null) return;
   wakeTimer = setTimeout(() => {
@@ -534,11 +536,13 @@ export const useOutbox = create<OutboxState>()((set, get) => {
             }
             if (outcome === "device") {
               // this tablet is not enrolled (or was revoked): the "not enrolled" screen says so; the write waits, with its key, until an
-              // admin enrols the device and the page starts again (step 5.1b); the tray says what is kept (step 5.2c)
-              deviceHalt = true;
+              // admin enrols the device and the page starts again (step 5.1b); the tray says what is kept (step 5.2c). `held` also stops the
+              // timers (scheduleWake)
               set({ held: { key: error.key, en: error.messages.en ?? null, am: error.messages.am ?? null } });
               return;
             }
+            // the API refused the write itself: it got past the device check, so the device is no longer held (as when a write is accepted)
+            if (outcome === "conflict" && !local && get().held) set({ held: null });
             if (outcome === "conflict" && !local && needsLookup(item, reasonOf({ status: error.status, body: error.body }))) {
               // tried before without an answer, then refused because the order moved on: the first try may have landed (its key expired
               // since); the order as the server has it says so (step 5.2c)
@@ -600,7 +604,6 @@ export const useOutbox = create<OutboxState>()((set, get) => {
       };
 
       set({ sending: true });
-      deviceHalt = false;
       try {
         // one tab of the tablet sends at a time, and first takes in what the others wrote (ADR 0029)
         await withFlushLock(async () => {
