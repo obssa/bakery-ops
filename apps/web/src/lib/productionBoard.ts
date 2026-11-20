@@ -1,3 +1,4 @@
+import { may } from "./api/actions";
 import type { Me, ProductionRequest } from "./api/types";
 import { canSignOff, columnOf, type Column } from "./live/production";
 
@@ -115,22 +116,28 @@ export type DropVerdict = { move: DropMove } | { refused: DropRefusal } | null;
 
 /**
  * What dropping the card on `target` does for this person: null when it is its own column (nothing happens), a move when the column is its
- * next step and the person may make it, otherwise why not. The server decides in the end; this mirrors its rules (AcceptRequest,
- * StartBatch, FinishBatch, ConfirmBatch, SendBackBatch) so a drop that would be refused is dimmed before it is made.
+ * next step and the request's `actions` list the move, otherwise why not. The API says which moves the person may make (ADR 0032, from
+ * AcceptRequest, StartBatch, FinishBatch, ConfirmBatch and SendBackBatch themselves), so a drop that would be refused is dimmed before it is
+ * made and no rule of the server is copied here.
  */
 export function dropMove(me: Me | null, request: ProductionRequest, target: Column): DropVerdict {
   const from = columnOf(request);
   if (!from || from === target) return null;
   if (from === "done_today") return { refused: { reason: "drop_done" } };
+  // whether the move is made is the request's `actions` (ADR 0032: the API's AcceptRequest, StartBatch, FinishBatch, ConfirmBatch and
+  // SendBackBatch decide it for this person); the person and the batch only choose the words of a refusal
   const fulfils = !!me && me.permissions.includes("production.fulfil");
-  const mine = !!me && request.assigned_to?.id === me.user.id;
   const baker = request.assigned_to?.name ?? "";
 
   if (from === "requested") {
     if (target !== "in_progress") return { refused: { reason: "drop_no_skip" } };
-    if (!fulfils) return { refused: { reason: "drop_not_baker" } };
-    if (request.status === "requested") return request.assigned_to === null || mine ? { move: "accept_start" } : { refused: { reason: "drop_given_to", name: baker } };
-    return mine ? { move: "start" } : { refused: { reason: "drop_not_yours_start", name: baker } };
+    // a request nobody started is accepted and started by the one drop; an accepted one is started
+    if (request.status === "requested" && may(request, "accept")) return { move: "accept_start" };
+    if (request.status === "accepted" && may(request, "start")) return { move: "start" };
+    // the words: someone else has it, or the person is no baker of this station (or nothing is listed yet)
+    const someoneElse = request.assigned_to !== null && request.assigned_to.id !== me?.user.id;
+    if (!fulfils || !someoneElse) return { refused: { reason: "drop_not_baker" } };
+    return request.status === "requested" ? { refused: { reason: "drop_given_to", name: baker } } : { refused: { reason: "drop_not_yours_start", name: baker } };
   }
 
   if (from === "in_progress") {
@@ -139,16 +146,17 @@ export function dropMove(me: Me | null, request: ProductionRequest, target: Colu
     // second step, someone else's), straight to Done today at a station that does not (Pending confirmation is then never used)
     const lands: Column = request.station.requires_overseer ? "pending_confirmation" : "done_today";
     if (target !== lands) return { refused: { reason: request.station.requires_overseer ? "drop_finish_first" : "drop_no_overseer" } };
-    if (fulfils && mine && request.batch?.status === "started") return { move: "finish" };
+    if (may(request, "finish")) return { move: "finish" };
     return { refused: { reason: "drop_not_yours_finish", name: baker } };
   }
 
   // pending confirmation: confirmed into Done today, or sent back to the oven
   if (target === "requested") return { refused: { reason: "drop_no_back" } };
+  const move: DropMove = target === "done_today" ? "confirm" : "send_back";
+  if (may(request, move)) return { move };
   const maker = request.batch?.finished_by ?? null;
-  if (!request.batch || !canSignOff(me, request.station.id)) return { refused: { reason: "drop_not_overseer" } };
-  if (me && maker?.id === me.user.id) return { refused: { reason: "drop_own_batch", name: maker.name } };
-  return { move: target === "done_today" ? "confirm" : "send_back" };
+  if (me && maker?.id === me.user.id && canSignOff(me, request.station.id)) return { refused: { reason: "drop_own_batch", name: maker.name } };
+  return { refused: { reason: "drop_not_overseer" } };
 }
 
 /** A card shown in its new column before the server said so: the move, and the queued write it waits for when it went offline. */

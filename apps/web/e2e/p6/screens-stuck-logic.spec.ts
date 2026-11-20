@@ -157,7 +157,18 @@ test.describe("17: the production board's card and drag follow one table of rule
         cases.push(request({ station, assigned_to, status: "cancelled" }));
       }
     }
-    for (const who of people) for (const r of cases) expect(cardMove(who, r), `${who?.user.id ?? "nobody"} on ${r.status}`).toBe(handWritten(who, r));
+    // the API lists what the person may do (ADR 0032); here the old hand-written rules stand in for it, and the card's button must be the
+    // move the list allows on the card's next column, for every person and every state; with nothing listed there is no button at all
+    const listed = (who: Me | null, r: ProductionRequest): ProductionRequest => {
+      const move = handWritten(who, r);
+      return { ...r, actions: move === null ? [] : move === "confirm" ? ["confirm", "send_back"] : [move] };
+    };
+    for (const who of people) {
+      for (const r of cases) {
+        expect(cardMove(who, listed(who, r)), `${who?.user.id ?? "nobody"} on ${r.status}`).toBe(handWritten(who, r));
+        expect(cardMove(who, { ...r, actions: [] }), `${who?.user.id ?? "nobody"} on ${r.status}, nothing listed`).toBeNull();
+      }
+    }
   });
 
   test("the next column: In progress, then where the batch lands (an overseer's station waits in Pending confirmation), then Done today", () => {

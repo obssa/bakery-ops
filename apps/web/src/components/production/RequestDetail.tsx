@@ -4,13 +4,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
+import { may } from "@/lib/api/actions";
 import { ApiError } from "@/lib/api/client";
 import { uuid } from "@/lib/api/idempotency";
 import { acceptRequest, assignRequest, batchGroup, cancelRequest, confirmBatch, sendBackBatch, submitFinishBatch, submitStartBatch, useProductionCard } from "@/lib/api/production";
 import type { CardLine, IngredientShort, Locale, ProductImageView, ProductionRequest, RequestStatus } from "@/lib/api/types";
 import { compareDecimal, isQuantityText, trimDecimal } from "@/lib/decimal";
 import { useErrorText } from "@/lib/errors";
-import { canCancel, canSignOff } from "@/lib/live/production";
 import { onOutboxApplied, useWaiting } from "@/lib/outbox/store";
 import { can, useSession } from "@/lib/session";
 import { useDateFormat } from "@/lib/useDates";
@@ -141,8 +141,6 @@ export function RequestDetail({
   const name = locale === "am" ? request.product.name_am : request.product.name_en;
   const batch = request.batch;
   const unit = request.product.unit;
-  const mine = !!me && request.assigned_to?.id === me.user.id;
-  const fulfils = can(me, "production.fulfil");
   const { busy, error, run: runWrite } = useRequestRun(request.id, onChanged);
 
   const [produced, setProduced] = useState(() => trimDecimal(batch?.planned_qty ?? request.requested_qty));
@@ -194,13 +192,14 @@ export function RequestDetail({
   }
 
   const status = request.status;
-  const canAccept = status === "requested" && fulfils && (request.assigned_to === null || mine);
-  const canStart = status === "accepted" && fulfils && mine;
-  const canFinish = status === "in_progress" && fulfils && mine && batch?.status === "started";
-  const signOff = status === "pending_confirmation" && batch !== null && canSignOff(me, request.station.id);
-  const cancellable = (status === "requested" || status === "accepted") && canCancel(me, request);
+  // the card's buttons are the request's `actions` (ADR 0032): the API's own rules for this person, never a copy of them here
+  const canAccept = may(request, "accept");
+  const canStart = may(request, "start");
+  const canFinish = may(request, "finish") && batch !== null;
+  const signOff = (may(request, "confirm") || may(request, "send_back")) && batch !== null;
+  const cancellable = may(request, "cancel");
   // a planner gives a request nobody has started to a baker, or takes it back from the one who accepted it (Ramin 2026-11-11)
-  const bakers = (status === "requested" || status === "accepted") && can(me, "production.plan") ? (card.data?.bakers ?? null) : null;
+  const bakers = may(request, "assign") ? (card.data?.bakers ?? null) : null;
   const others = (bakers ?? []).filter((baker) => baker.id !== request.assigned_to?.id);
   const recipe = card.data?.recipe ?? null;
   const consume = card.data?.consume_location ?? null;
@@ -418,12 +417,16 @@ export function RequestDetail({
         ) : null}
         {signOff && batch ? (
           <>
-            <Button type="button" size="lg" disabled={blocked} onClick={() => void run("confirm", null, (key) => confirmBatch(batch.id, key))}>
-              {busy === "confirm" ? t("working") : t("confirm")}
-            </Button>
-            <Button type="button" variant="secondary" size="lg" disabled={blocked} onClick={() => setForm(form === "send_back" ? null : "send_back")}>
-              {t("send_back")}
-            </Button>
+            {may(request, "confirm") ? (
+              <Button type="button" size="lg" disabled={blocked} onClick={() => void run("confirm", null, (key) => confirmBatch(batch.id, key))}>
+                {busy === "confirm" ? t("working") : t("confirm")}
+              </Button>
+            ) : null}
+            {may(request, "send_back") ? (
+              <Button type="button" variant="secondary" size="lg" disabled={blocked} onClick={() => setForm(form === "send_back" ? null : "send_back")}>
+                {t("send_back")}
+              </Button>
+            ) : null}
           </>
         ) : null}
         {cancellable ? (

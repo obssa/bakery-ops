@@ -179,10 +179,16 @@ test.describe("the production board's waits, drops and next movers", () => {
     expect(summary.waiting).toBe(2);
   });
 
-  test("a baker drags a request nobody has to the oven: accepted and started in one drop", () => {
-    expect(dropMove(baker, request({}), "in_progress")).toEqual({ move: "accept_start" });
-    expect(dropMove(baker, request({ assigned_to: ref(baker) }), "in_progress")).toEqual({ move: "accept_start" });
-    expect(dropMove(baker, request({ status: "accepted", assigned_to: ref(baker) }), "in_progress")).toEqual({ move: "start" });
+  test("a baker drags a request nobody has to the oven: accepted and started in one drop, as the request's actions allow (ADR 0032)", () => {
+    expect(dropMove(baker, request({ actions: ["accept", "cancel"] }), "in_progress")).toEqual({ move: "accept_start" });
+    expect(dropMove(baker, request({ assigned_to: ref(baker), actions: ["accept"] }), "in_progress")).toEqual({ move: "accept_start" });
+    expect(dropMove(baker, request({ status: "accepted", assigned_to: ref(baker), actions: ["start"] }), "in_progress")).toEqual({ move: "start" });
+  });
+
+  test("the drop is the request's actions, not the person's permissions: nothing listed, nothing moved (a record read before the API listed them too)", () => {
+    expect(dropMove(baker, request({ actions: [] }), "in_progress")).toEqual({ refused: { reason: "drop_not_baker" } });
+    expect(dropMove(baker, request({}), "in_progress")).toEqual({ refused: { reason: "drop_not_baker" } });
+    expect(dropMove(manager, finished(6, baker), "done_today")).toEqual({ refused: { reason: "drop_not_overseer" } });
   });
 
   test("nobody else takes a request given to or accepted by someone, and a non-baker starts nothing", () => {
@@ -204,8 +210,8 @@ test.describe("the production board's waits, drops and next movers", () => {
   test("where an overseer is needed, the baker who started a batch finishes it on Pending confirmation; Done today is a second step", () => {
     const mine = { ...inOven(5, 600), assigned_to: ref(baker) };
     expect(mine.station.requires_overseer).toBe(true);
-    expect(dropMove(baker, mine, "pending_confirmation")).toEqual({ move: "finish" });
-    expect(dropMove(baker, mine, "done_today")).toEqual({ refused: { reason: "drop_finish_first" } });
+    expect(dropMove(baker, { ...mine, actions: ["finish"] }, "pending_confirmation")).toEqual({ move: "finish" });
+    expect(dropMove(baker, { ...mine, actions: ["finish"] }, "done_today")).toEqual({ refused: { reason: "drop_finish_first" } });
     expect(dropMove(manager, mine, "done_today")).toEqual({ refused: { reason: "drop_finish_first" } });
     expect(dropMove(otherBaker, mine, "pending_confirmation")).toEqual({ refused: { reason: "drop_not_yours_finish", name: "Person 10" } });
     expect(dropMove(manager, mine, "pending_confirmation")).toEqual({ refused: { reason: "drop_not_yours_finish", name: "Person 10" } });
@@ -214,15 +220,17 @@ test.describe("the production board's waits, drops and next movers", () => {
   test("where no overseer is needed, finishing goes straight to Done today and Pending confirmation is never used", () => {
     const oven = inOven(8, 600);
     const mine = { ...oven, assigned_to: ref(baker), station: { ...oven.station, requires_overseer: false } };
-    expect(dropMove(baker, mine, "done_today")).toEqual({ move: "finish" });
-    expect(dropMove(baker, mine, "pending_confirmation")).toEqual({ refused: { reason: "drop_no_overseer" } });
+    expect(dropMove(baker, { ...mine, actions: ["finish"] }, "done_today")).toEqual({ move: "finish" });
+    expect(dropMove(baker, { ...mine, actions: ["finish"] }, "pending_confirmation")).toEqual({ refused: { reason: "drop_no_overseer" } });
     expect(dropMove(otherBaker, mine, "done_today")).toEqual({ refused: { reason: "drop_not_yours_finish", name: "Person 10" } });
   });
 
   test("an overseer or a manager confirms a batch someone else made, or sends it back; never their own", () => {
-    expect(dropMove(manager, finished(6, baker), "done_today")).toEqual({ move: "confirm" });
-    expect(dropMove(overseer, finished(6, baker), "done_today")).toEqual({ move: "confirm" });
-    expect(dropMove(manager, finished(6, baker), "in_progress")).toEqual({ move: "send_back" });
+    const signable = { ...finished(6, baker), actions: ["confirm", "send_back"] as const };
+    expect(dropMove(manager, signable, "done_today")).toEqual({ move: "confirm" });
+    expect(dropMove(overseer, signable, "done_today")).toEqual({ move: "confirm" });
+    expect(dropMove(manager, signable, "in_progress")).toEqual({ move: "send_back" });
+    expect(dropMove(manager, { ...finished(6, baker), actions: ["send_back"] as const }, "done_today")).toEqual({ refused: { reason: "drop_not_overseer" } });
     expect(dropMove(baker, finished(6, baker), "done_today")).toEqual({ refused: { reason: "drop_not_overseer" } });
     const ownManager = finished(7, manager);
     expect(dropMove(manager, ownManager, "done_today")).toEqual({ refused: { reason: "drop_own_batch", name: "Person 20" } });

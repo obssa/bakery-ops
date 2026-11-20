@@ -77,17 +77,14 @@ export function ownStationId(me: Me | null): number | null {
   return own.length === 1 ? own[0].station_id : null;
 }
 
-/** May this person sign off (or send back) a batch made at the station? production.confirm, or the overseer flagged there. */
+/**
+ * Could this person sign off a batch made at the station (production.confirm, or the overseer flagged there)? Only the words of a refused
+ * drop read it, to say "you made this batch" rather than "an overseer confirms": whether a batch is confirmed is the request's `actions`.
+ */
 export function canSignOff(me: Me | null, stationId: number): boolean {
   if (!me) return false;
   if (me.permissions.includes("production.confirm")) return true;
   return me.user.stations.some((station) => station.station_id === stationId && station.is_overseer);
-}
-
-/** May this person cancel the request? A planner, or the person who asked. */
-export function canCancel(me: Me | null, request: ProductionRequest): boolean {
-  if (!me) return false;
-  return me.permissions.includes("production.plan") || request.requested_by?.id === me.user.id;
 }
 
 /** The quantity a card shows large: what was made once the batch is counted, otherwise what was asked for (in the product's unit). */
