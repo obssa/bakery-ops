@@ -105,12 +105,17 @@ test.describe("p4 analytics dashboards", () => {
         await expect(tab).toHaveAttribute("href", /\/admin\/analytics\/me\/?$/, { timeout: 30_000 });
         await tab.click();
         await expect(own.getByRole("heading", { level: 1, name: "My figures" })).toBeVisible({ timeout: 30_000 });
+        // the page opens on the last 30 days; Today's own figures are read once the click's request has answered (2026-11-20, deploy
+        // 44778440203: read while Today was loading, the table was the 30 days' one and then its loading state, and no rowheader came back)
+        const todays = own.waitForResponse((answer) => answer.url().includes(`/analytics/staff?from=${today}&to=${today}`) && answer.ok());
         await own.getByRole("button", { name: "Today", exact: true }).click();
+        await todays;
         // a row per kind of work (the orders the cashier took as a waiter's, the payments as a cashier's), every one the cashier's own
         const mine = own.getByRole("table", { name: "My work" });
         await expect(rowOf(mine, fixture.cashier.name).filter({ has: own.getByRole("cell", { name: "Cashier", exact: true }) })).toBeVisible({ timeout: 30_000 });
-        const people = (await mine.getByRole("rowheader").allTextContents()).map((text) => text.trim());
-        expect([...new Set(people)]).toEqual([fixture.cashier.name]);
+        await expect
+          .poll(async () => [...new Set((await mine.getByRole("rowheader").allTextContents()).map((text) => text.trim()))], { timeout: 15_000 })
+          .toEqual([fixture.cashier.name]);
       } finally {
         await context.close();
       }
