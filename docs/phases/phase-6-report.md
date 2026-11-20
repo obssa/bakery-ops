@@ -931,6 +931,46 @@ Two faults in "5 attempts then 15-min lockout", no change to the API's answers o
 
 Claim restated at `43d6527`; the tag stays on `2f6bbd9`.
 
+**Screens that stuck or said something untrue (phase-6/stuck-screens; the implicit-state review of 2026-11-20, items 16 to 23).** Web
+only. Each was read in the code before it was changed; all eight were real.
+
+- **16, Enrol this device.** With `renew` (a tablet enrolled in another branch) the old code gave the device a new id before the enrolment
+  was sent, so a failed enrolment left the tablet with an id nobody had enrolled, and enrolled in neither branch. The new id is now made
+  once, sent as the fingerprint and as `X-Device-Id` on every try (`RequestOptions.device`), and kept as the device's id only once the API
+  has enrolled it (`newDeviceId`, `adoptDeviceId` in `lib/device.ts`).
+- **17, the production board.** A start dropped while offline is queued, so the board kept the card in its new column until it read a newer
+  version of it; when the outbox had that start refused later, the version never changed and the card stayed there until a reload. The
+  card now remembers its queued write and goes back when the outbox holds it as a conflict (`refusedMoves`), and the board says so. Accept
+  and start are two writes: when the accept went through and the start did not, the board said the card "could not be moved"; it now says
+  it is accepted for the baker but not started. The card's button (`cardMove`) was a second copy of the drop rules; it is now the drop on
+  the card's next column (`nextColumn`, `dropMove`), and a test checks it against the old rules for every person and state.
+- **18, the pad's cart.** A send that could not be queued (nobody signed in under the pad) left the cart on "Sending" for ever; it now ends
+  with a message. A second Clear while the first cancel waited queued a second cancel, which the API refused into the conflict tray; Clear
+  now queues one cancel per order (`cancelWaits`).
+- **19, the tray's look-up.** A send whose answer was lost counts as landed when the order shows a status only a sent order reaches. Paid
+  and voided were missing, so a quick cash sale showed as a refused send. Cancelled still does not count (an open order is cancelled
+  without being sent). `offline-logic.spec.ts` had pinned voided as not landed; it now follows the API's transitions.
+- **20, the void dialog.** It sent every order that was not sent-to-served (or voided) to the refund, open and cancelled ones too, which
+  the API refuses. `voidPath` follows the API: void (or a payment void) while sent and not paid, refund only once closed, and for an open,
+  cancelled or paid-not-closed order a plain message.
+- **21, the shift bar.** Every status but opening and open showed as "counting" and offered the count. Each status is now mapped: an ended
+  or scheduled shift (pending approval, locked, cancelled, scheduled) holds no station, so the bar is idle and a shift may start; a status
+  this build does not know shows no state and no action. The count panel's cash declaration set the write counter to 1 or 0, so the end of
+  one save could say another was done; they are two flags now. The station a screen works at was cleared by the old screen's cleanup when
+  a route change mounted the new screen first; each screen now holds a claim (`useActiveStation.claim`) and lets go of its own only.
+- **22, the kitchen display.** A line showed "Sending…" for any queued write with its id, an order's cancel included (an order id can be
+  a line id); only a line's own writes count now (`lineWaits`). After an accepted tap, Accept was free again until the display read the
+  line's new status, and a second tap made a write the API refused into the tray. A tap now holds the line's buttons until the new status
+  is read, a refusal lets go at once, and no hold lasts longer than 15 s (`tapHolds`).
+- **23, the device hold.** The outbox kept two flags: `held` (what the tray and the sync chip say) and a module flag that stopped the
+  timers, reset at every pass. They could disagree in both directions. `held` is now the only one: the timers stop while it is set, and any
+  answer past the device check (an acceptance, a refusal of the write itself, or another tab's acceptance) clears it.
+- **Tests.** `screens-stuck-logic.spec.ts` (p6-a11y) covers each item without a browser. `screens-stuck.spec.ts` (p6-a11y, CI stack)
+  holds the kitchen display's reads after an Accept the API took, and checks that a second tap makes no second write and nothing lands
+  in the tray. The cart and the production board's rollback are covered by the logic spec only.
+
+Claim restated at `ab90901`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
