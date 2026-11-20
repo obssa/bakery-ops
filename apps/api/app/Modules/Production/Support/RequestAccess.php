@@ -83,9 +83,15 @@ final class RequestAccess
      */
     public function assertMayConfirm(int $personId, Station $station): void
     {
-        if (! $this->people->can($personId, 'production.confirm') && ! $this->people->isOverseer($personId, $station)) {
+        if (! $this->mayConfirm($personId, $station)) {
             throw ProductionError::confirmForbidden();
         }
+    }
+
+    /** production.confirm (admin, manager), or the overseer flagged at the station: who signs a finished batch off or sends it back. */
+    public function mayConfirm(int $personId, Station $station): bool
+    {
+        return $this->people->can($personId, 'production.confirm') || $this->people->isOverseer($personId, $station);
     }
 
     public function mayCancel(int $personId, ProductionRequest $request): bool

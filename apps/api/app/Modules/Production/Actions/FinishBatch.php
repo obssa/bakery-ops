@@ -14,6 +14,7 @@ use App\Modules\Production\Support\RequestAccess;
 use App\Shared\Events\BatchDone;
 use App\Shared\Models\Station;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 use App\Shared\Values\Quantity;
 use Carbon\CarbonImmutable;
 
@@ -49,9 +50,7 @@ final class FinishBatch
         $request = $batch->request;
         $person = $this->access->person('production.fulfil');
         $this->access->assertAtStation($person, $request);
-        if ($request->assigned_to_user_id !== $person) {
-            throw ProductionError::taken();
-        }
+        self::assignee($request, $person)->orThrow();
         if (self::settled($batch, $produced, $waste)) {
             return $batch;
         }
@@ -131,5 +130,23 @@ final class FinishBatch
         }
 
         throw IllegalTransition::between($batch->status, BatchStatus::Finished);
+    }
+
+    /**
+     * The batch's own rule for this person, read by the request's `actions` list (ADR 0032): the request's baker finishes a batch that is
+     * in the oven. A batch already finished is no finish (Done again with the same numbers is a repeat the action answers itself).
+     */
+    public static function verdict(ProductionBatch $batch, ProductionRequest $request, int $person): Verdict
+    {
+        return self::assignee($request, $person)->then(static fn (): Verdict => Verdict::unless(
+            $batch->status !== BatchStatus::Started,
+            IllegalTransition::between($batch->status, BatchStatus::Finished),
+        ));
+    }
+
+    /** Only the baker the request is assigned to finishes its batch (409 production.request.taken). */
+    private static function assignee(ProductionRequest $request, int $person): Verdict
+    {
+        return Verdict::unless($request->assigned_to_user_id !== $person, ProductionError::taken());
     }
 }

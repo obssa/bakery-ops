@@ -16,6 +16,7 @@ use App\Modules\Production\Support\RequestAccess;
 use App\Shared\Actor\ActorContext;
 use App\Shared\Models\Station;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 use App\Shared\Tenancy\CurrentBranch;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -128,10 +129,19 @@ final class StartBatch
             return true;
         }
 
+        return self::verdict($request, $person)->settled();
+    }
+
+    /**
+     * The request's own rule for this person, read by the action and by the request's `actions` list (ADR 0032): only the baker who
+     * accepted it starts it; a request nobody accepted is not started; any other status is no start at all.
+     */
+    public static function verdict(ProductionRequest $request, int $person): Verdict
+    {
         return match ($request->status) {
-            RequestStatus::Requested => throw ProductionError::notAccepted($request->status->value),
-            RequestStatus::Accepted => $request->assigned_to_user_id !== $person ? throw ProductionError::taken() : false,
-            default => throw IllegalTransition::between($request->status, RequestStatus::InProgress),
+            RequestStatus::Requested => Verdict::refused(ProductionError::notAccepted($request->status->value)),
+            RequestStatus::Accepted => Verdict::unless($request->assigned_to_user_id !== $person, ProductionError::taken()),
+            default => Verdict::refused(IllegalTransition::between($request->status, RequestStatus::InProgress)),
         };
     }
 }

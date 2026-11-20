@@ -12,6 +12,7 @@ use App\Modules\Production\Models\ProductionBatch;
 use App\Modules\Production\Support\RequestAccess;
 use App\Shared\Models\Station;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 
 /**
  * POST /production/batches/{batch}/send-back (phase-2 plan section 4): an overseer who does not accept the numbers sends the finished
@@ -36,8 +37,7 @@ final class SendBackBatch
     public function handle(ProductionBatch $batch, int $person, string $note): ProductionBatch
     {
         $station = Station::query()->withTrashed()->findOrFail($batch->station_id);
-        $this->access->assertMayConfirm($person, $station);
-        $batch->status->transitionTo(BatchStatus::Started);
+        self::verdict($batch, $this->access->mayConfirm($person, $station))->orThrow();
 
         return $this->audit->run(function (ProductionBatch $batch) use ($note): ProductionBatch {
             $request = BatchLock::refresh($batch);
@@ -55,5 +55,18 @@ final class SendBackBatch
 
             return $batch;
         }, $batch, 'production_batch.send_back');
+    }
+
+    /**
+     * The batch's own rule, read by the action and by the request's `actions` list (ADR 0032): someone who may sign batches off at the
+     * station (production.confirm, or its overseer) sends a finished batch back to the oven; any other batch is no send back.
+     */
+    public static function verdict(ProductionBatch $batch, bool $mayConfirm): Verdict
+    {
+        if (! $mayConfirm) {
+            return Verdict::refused(ProductionError::confirmForbidden());
+        }
+
+        return Verdict::unless(! $batch->status->canTransitionTo(BatchStatus::Started), IllegalTransition::between($batch->status, BatchStatus::Started));
     }
 }

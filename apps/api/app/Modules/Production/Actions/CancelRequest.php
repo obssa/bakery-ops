@@ -10,6 +10,7 @@ use App\Modules\Production\Exceptions\ProductionError;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Modules\Production\Support\RequestAccess;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -71,11 +72,26 @@ final class CancelRequest
      */
     private static function settled(ProductionRequest $request): bool
     {
+        return self::statusVerdict($request)->settled();
+    }
+
+    /**
+     * The request's own rule, read by the action and by the request's `actions` list (ADR 0032): a planner, or the person who asked,
+     * cancels a request nobody has started; a cancelled one is a repeat; one in the oven or waiting for its sign-off is finished or sent
+     * back, never cancelled; a done one is no cancel at all.
+     */
+    public static function verdict(ProductionRequest $request, bool $mayCancel): Verdict
+    {
+        return $mayCancel ? self::statusVerdict($request) : Verdict::refused(ProductionError::cancelForbidden());
+    }
+
+    private static function statusVerdict(ProductionRequest $request): Verdict
+    {
         return match ($request->status) {
-            RequestStatus::Cancelled => true,
-            RequestStatus::Requested, RequestStatus::Accepted => false,
-            RequestStatus::InProgress, RequestStatus::PendingConfirmation => throw ProductionError::inProgress($request->status->value),
-            RequestStatus::Done => throw IllegalTransition::between($request->status, RequestStatus::Cancelled),
+            RequestStatus::Cancelled => Verdict::repeat(),
+            RequestStatus::Requested, RequestStatus::Accepted => Verdict::allowed(),
+            RequestStatus::InProgress, RequestStatus::PendingConfirmation => Verdict::refused(ProductionError::inProgress($request->status->value)),
+            RequestStatus::Done => Verdict::refused(IllegalTransition::between($request->status, RequestStatus::Cancelled)),
         };
     }
 }

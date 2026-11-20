@@ -22,6 +22,7 @@ final class RequestPresenter
     public function __construct(
         private readonly Items $items,
         private readonly People $people,
+        private readonly RequestActions $actions,
     ) {}
 
     /**
@@ -129,6 +130,8 @@ final class RequestPresenter
             'batch' => $request->batch instanceof ProductionBatch ? $this->batchRow($request->batch, $person) : null,
             'created_at' => $request->created_at?->toIso8601String(),
             'version' => $request->version,
+            // the moves the person looking may make now (ADR 0032): the board's buttons and drops read these, never a copy of the rules
+            'actions' => $this->actions->for($request),
         ];
     }
 

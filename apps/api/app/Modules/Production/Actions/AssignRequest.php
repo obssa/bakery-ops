@@ -10,6 +10,7 @@ use App\Modules\Production\Exceptions\ProductionError;
 use App\Modules\Production\Models\ProductionRequest;
 use App\Modules\Production\Support\RequestAccess;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 
 /**
  * POST /production/requests/{request}/assign (phase-2 plan section 4): a planner (production.plan) names the baker who makes a
@@ -48,9 +49,7 @@ final class AssignRequest
         try {
             return $this->audit->run(function (ProductionRequest $request) use ($userId, $planner): ProductionRequest {
                 RequestLock::refresh($request);
-                if (! in_array($request->status, [RequestStatus::Requested, RequestStatus::Accepted], true)) {
-                    throw IllegalTransition::between($request->status, RequestStatus::Requested);
-                }
+                self::verdict($request)->orThrow();
                 if ($request->assigned_to_user_id === $userId) {
                     throw AlreadyReached::here();
                 }
@@ -69,5 +68,17 @@ final class AssignRequest
         } catch (AlreadyReached) {
             return ProductionRequest::query()->findOrFail($request->id);
         }
+    }
+
+    /**
+     * The request's own rule, read by the action and by the request's `actions` list (ADR 0032): a request nobody has started (requested,
+     * or accepted and not started) can be given to a baker; any other status is no assign. Who it is given to is the planner's input.
+     */
+    public static function verdict(ProductionRequest $request): Verdict
+    {
+        return Verdict::unless(
+            ! in_array($request->status, [RequestStatus::Requested, RequestStatus::Accepted], true),
+            IllegalTransition::between($request->status, RequestStatus::Requested),
+        );
     }
 }

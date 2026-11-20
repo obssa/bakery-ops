@@ -13,6 +13,7 @@ use App\Modules\Production\Support\RequestAccess;
 use App\Shared\Events\BatchDone;
 use App\Shared\Models\Station;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -93,19 +94,26 @@ final class ConfirmBatch
      */
     private function settled(ProductionBatch $batch, int $confirmer, Station $station): bool
     {
-        if ($batch->status === BatchStatus::Confirmed) {
-            $this->access->assertMayConfirm($confirmer, $station);
+        return self::verdict($batch, $confirmer, $this->access->mayConfirm($confirmer, $station))->settled();
+    }
 
-            return true;
+    /**
+     * The batch's own rule for this person, read by the action and by the request's `actions` list (ADR 0032): a finished batch is
+     * confirmed by someone who may sign it off (production.confirm, or the station's overseer) and did not make it; a confirmed one is a
+     * repeat for whoever may sign off; one still in the oven is no confirm.
+     */
+    public static function verdict(ProductionBatch $batch, int $confirmer, bool $mayConfirm): Verdict
+    {
+        if ($batch->status === BatchStatus::Confirmed) {
+            return $mayConfirm ? Verdict::repeat() : Verdict::refused(ProductionError::confirmForbidden());
         }
         if ($batch->status === BatchStatus::Started) {
-            throw IllegalTransition::between($batch->status, BatchStatus::Confirmed);
+            return Verdict::refused(IllegalTransition::between($batch->status, BatchStatus::Confirmed));
         }
         if ($batch->finished_by_user_id === $confirmer) {
-            throw ProductionError::selfConfirm();
+            return Verdict::refused(ProductionError::selfConfirm());
         }
-        $this->access->assertMayConfirm($confirmer, $station);
 
-        return false;
+        return Verdict::unless(! $mayConfirm, ProductionError::confirmForbidden());
     }
 }

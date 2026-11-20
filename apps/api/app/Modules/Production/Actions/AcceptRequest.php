@@ -12,6 +12,7 @@ use App\Modules\Production\Models\ProductionRequest;
 use App\Modules\Production\Support\RequestAccess;
 use App\Shared\Models\Station;
 use App\Shared\StateMachine\IllegalTransition;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -80,12 +81,20 @@ final class AcceptRequest
      */
     private function settled(ProductionRequest $request, int $person): bool
     {
+        return self::verdict($request, $person)->settled();
+    }
+
+    /**
+     * The request's own rule for this person, read by the action and by the request's `actions` list (ADR 0032): a request nobody has
+     * (or this person was given) may be accepted; one accepted by this person is a repeat; one another baker has is taken; any other
+     * status is no accept at all.
+     */
+    public static function verdict(ProductionRequest $request, int $person): Verdict
+    {
         return match ($request->status) {
-            RequestStatus::Requested => $request->assigned_to_user_id !== null && $request->assigned_to_user_id !== $person
-                ? throw ProductionError::taken()
-                : false,
-            RequestStatus::Accepted => $request->assigned_to_user_id === $person ? true : throw ProductionError::taken(),
-            default => throw IllegalTransition::between($request->status, RequestStatus::Accepted),
+            RequestStatus::Requested => Verdict::unless($request->assigned_to_user_id !== null && $request->assigned_to_user_id !== $person, ProductionError::taken()),
+            RequestStatus::Accepted => $request->assigned_to_user_id === $person ? Verdict::repeat() : Verdict::refused(ProductionError::taken()),
+            default => Verdict::refused(IllegalTransition::between($request->status, RequestStatus::Accepted)),
         };
     }
 }
