@@ -1081,6 +1081,10 @@ now, one name per write endpoint.
   `isSubmitted`, ...). `tests/Unit/StateMachinesMirrorTest.php` fails when the committed file is not the command's output, or misses an
   enum.
 - **Still to come.** The web reads the lists and the mirror in the second half of this item, a pull request of its own.
+- **Also.** `e2e/p4/dashboards-live.spec.ts` polls the cashier's "My work" row headers: a read during the table's re-render saw none on
+  live.
+
+Claim restated at `70d9f0d`; the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
