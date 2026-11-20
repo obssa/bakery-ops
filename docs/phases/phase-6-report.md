@@ -900,6 +900,8 @@ started, stock bought) got the stored refusal again until the page was reloaded.
   - a confirm refused for want of stock goes through on the same tap once the store bought more;
   - a lost answer followed by an edited resend leaves one transfer, for the first quantity, and the sheet says so.
 
+Claim restated at `ed6c426`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
