@@ -1,5 +1,5 @@
 import { currentPath, DEVICE_HEADER, deviceId, isDeviceRefusal, useDeviceGate } from "../device";
-import { stationHeaders, useShiftNotice } from "../station";
+import { STATION_HEADER, stationHeaders, useShiftNotice } from "../station";
 import type { ApiErrorBody, Locale } from "./types";
 
 // The one way the shell talks to /api/v1 (ADR 0007): bearer token, JSON, and an Idempotency-Key on every write
@@ -59,6 +59,11 @@ export interface RequestOptions {
    * page's read of the pad's menu, an extra the page does without on a computer that is not enrolled).
    */
   deviceGate?: boolean;
+  /**
+   * The station this call is for, fixed by the caller: a queued write sends the station it was queued at, not the one on screen when it
+   * finally goes (ADR 0029). null: no station. Left out: the station picked now (lib/station.ts).
+   */
+  station?: number | null;
 }
 
 /** How long a call may wait for an answer before it counts as a network failure (a hung connection must not freeze a feed). */
@@ -90,9 +95,13 @@ function withTimeout(caller: AbortSignal | undefined, ms: number): { signal: Abo
   };
 }
 
-/** What every call sends besides its own headers: the station picked (if any), and this device's id last, so no caller's copy wins. */
-function baseHeaders(accept: string, extra: Record<string, string> | undefined, device: string): Record<string, string> {
-  return { Accept: accept, ...stationHeaders(), ...extra, [DEVICE_HEADER]: device };
+/**
+ * What every call sends besides its own headers: the station (the one the caller fixed, else the one picked now, if any), and this
+ * device's id last, so no caller's copy wins.
+ */
+export function baseHeaders(accept: string, extra: Record<string, string> | undefined, device: string, station?: number | null): Record<string, string> {
+  const stationPart = station === undefined ? stationHeaders() : station === null ? {} : { [STATION_HEADER]: String(station) };
+  return { Accept: accept, ...stationPart, ...extra, [DEVICE_HEADER]: device };
 }
 
 /**
@@ -138,7 +147,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const method = options.method ?? "GET";
   const device = deviceId();
   const page = currentPath();
-  const headers = baseHeaders("application/json", options.headers, device);
+  const headers = baseHeaders("application/json", options.headers, device, options.station);
   if (options.body !== undefined && !isForm(options.body)) headers["Content-Type"] = "application/json";
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (WRITE_METHODS.has(method)) {

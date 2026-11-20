@@ -150,7 +150,9 @@
     "cancel_order": "Cancel order",
     "cancel_order_aria": "Cancel order {no}",
     "mute": "Mute chime",
-    "unmute": "Unmute chime"
+    "unmute": "Unmute chime",
+    "restore_other": "This refused order belongs to {name}. It opens in their cart when they unlock the pad with their code.",
+    "restore_other_unnamed": "This refused order belongs to another waiter. It opens in their cart when they unlock the pad with their code."
   },
   "till": {
     "title": "Cashier till",
@@ -1150,7 +1152,8 @@
     "hint_photo": "The receipt photo cannot be sent. Discard this, then take the payment again on the till with a new photo.",
     "hint_dependency": "The change it waited for was saved without what this one needs. Discard it and do it again.",
     "hint_session": "The code had expired before it was sent. Unlock again with the code and do it again.",
-    "hint_other": "Read the message, then change it and send it again, or discard it."
+    "hint_other": "Read the message, then change it and send it again, or discard it.",
+    "not_durable": "Changes waiting here are kept only while this page is open: this tablet could not save them. Keep the page open until they are sent."
   },
   "bell": {
     "bell": "Notifications",

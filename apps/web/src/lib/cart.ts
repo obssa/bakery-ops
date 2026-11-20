@@ -185,6 +185,16 @@ export interface CartRestore {
   shortfall: ShortfallLine[];
   error: Refusal | null;
   resolves: string[];
+  /**
+   * Whose cart takes it (ADR 0029): the waiter the refused write was queued for on the pad, or the signed-in cashier on the till; another
+   * waiter's cart never does. Left out for a write queued before this was kept: the cart that opens next takes it.
+   */
+  owner?: { id: number; name: string | null };
+}
+
+/** Whether the cart of `userId` may take this restore: the owner's cart only, or any cart for an older write. */
+export function restoresInto(restore: Pick<CartRestore, "owner">, userId: number): boolean {
+  return restore.owner === undefined || restore.owner.id === userId;
 }
 
 interface CartsState {

@@ -26,14 +26,16 @@ export function useSyncState() {
   );
   const conflicts = useOutbox((s) => s.failures.length);
   const held = useOutbox((s) => s.held !== null && s.items.length > 0);
-  return { here, elsewhere, conflicts, held };
+  // the queue could not be written to the tablet (no IndexedDB, or a write failed): what waits lives in this page only (ADR 0029)
+  const unsaved = useOutbox((s) => s.loaded && !s.durable && s.queue.length > 0);
+  return { here, elsewhere, conflicts, held, unsaved };
 }
 
 export function PendingIndicator() {
   const t = useTranslations("outbox");
-  const { here, elsewhere, conflicts, held } = useSyncState();
+  const { here, elsewhere, conflicts, held, unsaved } = useSyncState();
 
-  if (here === 0 && elsewhere === 0 && conflicts === 0 && !held) return null;
+  if (here === 0 && elsewhere === 0 && conflicts === 0 && !held && !unsaved) return null;
   return (
     <div role="region" aria-label={t("region")} className="border-b border-neutral-200 bg-neutral-50">
       <div className="flex flex-col gap-2 px-4 py-3 sm:px-6">
@@ -45,6 +47,11 @@ export function PendingIndicator() {
               {here > 0 && elsewhere > 0 ? " · " : null}
               {elsewhere > 0 ? t("pending_elsewhere", { count: elsewhere }) : null}
             </span>
+          </p>
+        ) : null}
+        {unsaved ? (
+          <p role="alert" className="text-[15px] font-semibold text-amber-900">
+            {t("not_durable")}
           </p>
         ) : null}
         <ConflictTray />

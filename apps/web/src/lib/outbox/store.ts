@@ -6,12 +6,15 @@ import { uuid } from "../api/idempotency";
 import { receiptForm, UPLOAD_TIMEOUT_MS } from "../api/till";
 import type { NewOrder, NewOrderLine, RejectBody, StoredFileView } from "../api/types";
 import { actingHooks, useSession } from "../session";
-import { actingHeaders } from "../acting";
+import { ACTING_HEADER, actingHeaders, useActing } from "../acting";
 import type { Order } from "../api/types";
 import { onReconnect } from "../reconnect";
-import { loadOutbox, memoryPhotoDb, openOutboxDb, type OutboxDb, type PhotoDb } from "./db";
+import { useActiveStation } from "../station";
+import { diffQueue, loadOutbox, memoryPhotoDb, mergeQueue, openOutboxDb, savedOf, type OutboxDb, type PhotoDb, type Saved } from "./db";
+import { openTabChannel, withFlushLock, type TabChannel, type TabMessage } from "./tabs";
 import {
   abandonedPhotos,
+  actingSessionOf,
   groupOf,
   LocalRefusal,
   nextSendable,
@@ -46,6 +49,10 @@ import { discardEntry, landed, needsLookup, reasonOf, resendEntry, supersede } f
 // (resend), changes it in the cart (the cart's next send supersedes it) or discards it. An order write tried before without an answer and
 // refused because the order moved on is looked up (GET /orders/{id}) and settled when it had landed. The outbox resumes on every reconnect
 // (reconnect.ts: online, or visible after a gap).
+// ADR 0029, the tabs of one tablet: each tab writes only the records it changed, folds in what the others wrote (tabs.ts, db.ts
+// mergeQueue), and sends under a tablet-wide lock, one tab at a time. Each write keeps the station and the waiter it was queued for, so a
+// retry sent from another screen goes on the right shift, and a refusal of one waiter's write never locks or fills another waiter's pad.
+// A pass stops when the account that started it signs out.
 
 export type { OutboxItem, OutboxKind } from "./logic";
 
@@ -132,12 +139,111 @@ function view(queue: OutboxItem[]): Pick<OutboxState, "queue" | "items" | "failu
 
 let db: OutboxDb | null = null;
 let writing: Promise<void> = Promise.resolve();
+/** what this tab last wrote to the store or read from it (ADR 0029): the base of diffQueue and mergeQueue */
+let saved: Saved = new Map();
+/** the store's connection count at this tab's last write; another one (a newer page upgraded the database) writes the whole queue again */
+let savedEpoch = 0;
+/** the writes this tab let go for good (a screen here showed their refusal): kept out when another tab's copy comes back in */
+const dropped = new Set<string>();
+let channel: TabChannel | null = null;
 
-/** Writes the queue as it now is (one write after another, so the last one wins). */
-function persist(queue: OutboxItem[]): void {
+function setDurable(durable: boolean): void {
+  if (useOutbox.getState().durable !== durable) useOutbox.setState({ durable });
+}
+
+/**
+ * Writes what this tab changed in the queue since its last write, and only that (ADR 0029): the records of the other tabs stay. A write
+ * that fails says the queue is kept in this tab only (the shell shows it); the next one tries again.
+ */
+async function writeStep(): Promise<void> {
   const target = db;
   if (!target) return;
-  writing = writing.then(() => target.replaceAll(queue)).catch(() => {});
+  const queue = useOutbox.getState().queue;
+  const epoch = target.epoch();
+  const { puts, deletes } = diffQueue(saved, queue, epoch !== savedEpoch);
+  if (puts.length === 0 && deletes.length === 0) {
+    savedEpoch = epoch;
+    return;
+  }
+  try {
+    await target.apply(puts, deletes);
+    saved = savedOf(queue);
+    setDurable(true);
+    channel?.post({ type: "changed" });
+    if (target.epoch() === epoch) {
+      savedEpoch = epoch;
+    } else {
+      // the connection was opened again during this write: write everything once more
+      savedEpoch = -1;
+      persist();
+    }
+  } catch {
+    setDurable(false);
+  }
+}
+
+/** Writes the queue as it now is, after the writes before (one after another). */
+function persist(): void {
+  if (!db) return;
+  writing = writing.then(writeStep).catch(() => {});
+}
+
+/** Folds in what the other tabs wrote to the store (ADR 0029), after this tab's own writes; resolves once it is in. */
+function syncFromStore(): Promise<void> {
+  writing = writing
+    .then(async () => {
+      const target = db;
+      if (!target || !useOutbox.getState().loaded) return;
+      if (target.epoch() !== savedEpoch) await writeStep();
+      let stored: OutboxItem[];
+      try {
+        stored = await target.all();
+      } catch {
+        setDurable(false);
+        return;
+      }
+      const local = useOutbox.getState().queue;
+      const merged = mergeQueue(saved, local, stored).filter((i) => !dropped.has(i.id));
+      saved = savedOf(stored);
+      seqFloor = Math.max(seqFloor, ...merged.map((i) => i.seq));
+      if (merged.length !== local.length || merged.some((item, index) => item !== local[index])) useOutbox.setState(view(merged));
+      // what this tab has that the store does not (its own changes, what it dropped)
+      await writeStep();
+    })
+    .catch(() => {});
+  return writing;
+}
+
+/** Another tab wrote to the store, or sent a write (maybe one a screen here waits for): ADR 0029. */
+function onTabMessage(message: TabMessage): void {
+  if (message.type === "changed") {
+    void syncFromStore();
+    return;
+  }
+  const { item } = message;
+  const waiter = waiters.get(item.id);
+  if (message.outcome === "accepted") {
+    if (waiter) {
+      waiters.delete(item.id);
+      waiter.resolve({ sent: true, answer: message.answer });
+    }
+    appliedListeners.forEach((l) => l(item, "accepted"));
+    return;
+  }
+  const error = new ApiError(message.status, message.body as ConstructorParameters<typeof ApiError>[1]);
+  if (waiter) {
+    // the screen here waits for it and shows the refusal itself: it is not kept as a conflict (as when this tab sends it)
+    waiters.delete(item.id);
+    dropped.add(item.id);
+    const queue = useOutbox.getState().queue;
+    if (queue.some((i) => i.id === item.id)) {
+      useOutbox.setState(view(queue.filter((i) => i.id !== item.id)));
+      persist();
+    }
+    waiter.reject(error);
+  }
+  if (isActingExpired(error)) actingHooks.onExpired(actingSessionOf(item));
+  appliedListeners.forEach((l) => l(item, "refused"));
 }
 
 export type OutboxOutcome = "accepted" | "refused";
@@ -169,8 +275,9 @@ function releaseWaiters(): void {
   const told = new Set<string>();
   for (const [id, waiter] of waiters) {
     const item = queue.find((i) => i.id === id);
-    waiters.delete(id);
+    // gone from this tab's queue: another tab sent it, and its answer comes on the tab channel (onTabMessage)
     if (!item) continue;
+    waiters.delete(id);
     if (item.state === "conflict" && item.conflict) {
       told.add(id);
       waiter.reject(new ApiError(item.conflict.status, item.conflict.body));
@@ -184,7 +291,7 @@ function releaseWaiters(): void {
     let rest = queue.filter((i) => !told.has(i.id));
     const shown = rest.filter((i) => blockers.has(i.id) && !rest.some((o) => o.dependsOn === i.id || o.conflict?.blockedBy === i.id));
     rest = rest.filter((i) => !shown.includes(i));
-    persist(rest);
+    persist();
     useOutbox.setState(view(rest));
     const photos = shown.flatMap(photosOf);
     if (photos.length > 0) void releasePhotos(photos);
@@ -269,10 +376,14 @@ export async function keepPhoto(blob: Blob): Promise<KeptPhoto> {
   return { kept: true, photo };
 }
 
-/** Sends a queued write: an `upload_photos` write sends its photos (POST /files each, its own client_uuid and key), any other its request. */
+/**
+ * Sends a queued write: an `upload_photos` write sends its photos (POST /files each, its own client_uuid and key), any other its request.
+ * Either goes with the station the write was queued at (ADR 0029; an older write without one, with the station picked now).
+ */
 function send(item: OutboxItem, token: string): Promise<unknown> {
+  const station = item.station;
   if (item.kind !== "upload_photos") {
-    return request(item.path, { method: item.method, body: item.body, idempotencyKey: item.idempotencyKey, token, headers: item.headers });
+    return request(item.path, { method: item.method, body: item.body, idempotencyKey: item.idempotencyKey, token, headers: item.headers, station });
   }
   return sendPhotos(photosOf(item), photoStore, async (photo) => {
     try {
@@ -282,6 +393,7 @@ function send(item: OutboxItem, token: string): Promise<unknown> {
         idempotencyKey: photo.key,
         token,
         timeoutMs: UPLOAD_TIMEOUT_MS,
+        station,
       });
     } catch (thrown) {
       // a refusal names the photo it is about, so the screen (and the tray) can say which
@@ -314,7 +426,7 @@ let seqFloor = 0;
 
 export const useOutbox = create<OutboxState>()((set, get) => {
   const commit = (queue: OutboxItem[]) => {
-    persist(queue);
+    persist();
     set(view(queue));
   };
 
@@ -335,6 +447,9 @@ export const useOutbox = create<OutboxState>()((set, get) => {
       const seq = Math.max(seqFloor, ...queue.map((i) => i.seq)) + 1;
       seqFloor = seq;
       const subjectUuid = input.subjectUuid ?? null;
+      // fixed now, with the key (ADR 0029): the station this screen works at, and the waiter whose acting session the write carries
+      const acting = useActing.getState();
+      const actor = input.headers?.[ACTING_HEADER] !== undefined && acting.user ? { id: acting.user.id, name: acting.user.name } : null;
       const item: OutboxItem = {
         id: uuid(),
         seq,
@@ -344,6 +459,8 @@ export const useOutbox = create<OutboxState>()((set, get) => {
         body: input.body,
         idempotencyKey: input.idempotencyKey ?? uuid(),
         ...(input.headers ? { headers: input.headers } : {}),
+        station: useActiveStation.getState().stationId,
+        actor,
         subjectId: input.subjectId,
         subjectUuid,
         group: input.group !== undefined ? input.group : groupOf(input.kind, subjectUuid, input.subjectId),
@@ -386,15 +503,19 @@ export const useOutbox = create<OutboxState>()((set, get) => {
 
     flush: async () => {
       if (get().sending) return;
-      const { token, me } = useSession.getState();
-      if (!token || !me || !get().loaded) {
+      const session = useSession.getState();
+      if (!session.token || !session.me || !get().loaded) {
         releaseWaiters();
         return;
       }
-      set({ sending: true });
-      deviceHalt = false;
-      try {
+
+      /** One pass: every write of the signed-in account that may go now, one after another. */
+      const pass = async () => {
+        const { token, me } = useSession.getState();
+        if (!token || !me) return;
         for (;;) {
+          // the account signed out (or another signed in) since the pass started: what is left waits for its own account (ADR 0029)
+          if (useSession.getState().token !== token) return;
           const item = nextSendable(get().queue, me.user.id, Date.now());
           if (!item) return;
           let answer: unknown;
@@ -431,6 +552,7 @@ export const useOutbox = create<OutboxState>()((set, get) => {
                   waiter.resolve({ sent: true, answer });
                 }
                 appliedListeners.forEach((l) => l(item, "accepted"));
+                channel?.post({ type: "applied", item, outcome: "accepted", answer });
                 continue;
               }
             }
@@ -445,8 +567,11 @@ export const useOutbox = create<OutboxState>()((set, get) => {
               } else {
                 commit(refused);
               }
-              if (isActingExpired(error)) actingHooks.onExpired();
+              // an ended acting session locks the pad only when it is the session of the waiter who has the pad now (ADR 0029)
+              if (isActingExpired(error)) actingHooks.onExpired(actingSessionOf(item));
               appliedListeners.forEach((l) => l(item, "refused"));
+              // a screen of another tab may be waiting for it: it shows the refusal there
+              if (!waiter) channel?.post({ type: "applied", item, outcome: "refused", status: error.status, body: error.body });
               continue;
             }
             // the network or the server failed: keep it, same key, try again later
@@ -470,7 +595,23 @@ export const useOutbox = create<OutboxState>()((set, get) => {
             waiter.resolve({ sent: true, answer });
           }
           appliedListeners.forEach((l) => l(item, "accepted"));
+          channel?.post({ type: "applied", item, outcome: "accepted", answer });
         }
+      };
+
+      set({ sending: true });
+      deviceHalt = false;
+      try {
+        // one tab of the tablet sends at a time, and first takes in what the others wrote (ADR 0029)
+        await withFlushLock(async () => {
+          await syncFromStore();
+          try {
+            await pass();
+          } finally {
+            // the store holds what this pass did before the next tab takes its turn
+            await writing;
+          }
+        });
       } finally {
         set({ sending: false, sendingId: null });
         releaseWaiters();
@@ -510,7 +651,7 @@ let started = false;
 /** Everything waiting may go now (the connection is back, someone signed in, the queue was just read). */
 function resume(): void {
   const queue = resumeAll(useOutbox.getState().queue);
-  persist(queue);
+  persist();
   useOutbox.setState(view(queue));
   void useOutbox.getState().flush();
 }
@@ -538,13 +679,17 @@ export function startOutbox(): () => void {
       const { items, durable } = await loadOutbox(db, storage);
       if (!durable) db = null;
       photoDb = durable ? opened : null;
+      // what the store holds now (ADR 0029); the other tabs' writes come in on the channel from here on
+      saved = durable ? savedOf(items) : new Map();
+      savedEpoch = opened?.epoch() ?? 0;
+      if (durable) channel ??= openTabChannel(onTabMessage);
       // writes queued while the saved queue was being read go after it
       const known = new Set(items.map((i) => i.id));
       const last = items.reduce((max, i) => Math.max(max, i.seq), 0);
       const early = useOutbox.getState().queue.filter((i) => !known.has(i.id)).map((i, index) => ({ ...i, seq: last + index + 1 }));
       const queue = [...items, ...early];
       seqFloor = Math.max(seqFloor, last + early.length);
-      persist(queue);
+      persist();
       useOutbox.setState({ ...view(queue), loaded: true, durable });
       resume();
       // the photos a reload or a closed tab left behind, that nothing queued needs

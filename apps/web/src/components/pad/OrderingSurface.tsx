@@ -3,7 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
-import { addToCart, cartFrom, cartTotal, emptyCart, newOrderOf, orderLinesOf, useCarts, type Cart as CartState } from "@/lib/cart";
+import { addToCart, cartFrom, cartTotal, emptyCart, newOrderOf, orderLinesOf, restoresInto, useCarts, type Cart as CartState } from "@/lib/cart";
 import { useErrorText } from "@/lib/errors";
 import type { Menu } from "@/lib/api/types";
 import type { FeedSnapshot } from "@/lib/live/feed";
@@ -56,11 +56,14 @@ export function OrderingSurface({
   const act = useCallback((change: (cart: CartState) => CartState) => update(userId, change), [update, userId]);
 
   // the conflict tray's "Edit and resend" (step 5.2c): the refused order comes back into this person's cart once the menu is here, unless
-  // the cart already holds another order (that one is sent or cleared first)
+  // the cart already holds another order (that one is sent or cleared first), and only into the cart of the waiter it was queued for: while
+  // another waiter has the pad it waits, and the panel says whose it is (ADR 0029)
   const restore = useCarts((s) => s.restore);
   const menuItems = menu?.loaded ? menu.state?.items : undefined;
+  const othersRestore = restore && !restoresInto(restore, userId) ? restore : null;
   useEffect(() => {
     if (!restore || !menuItems) return;
+    if (!restoresInto(restore, userId)) return;
     const current = useCarts.getState().carts[userId];
     if (current && current.lines.length > 0 && current.orderUuid !== restore.source.orderUuid) return;
     const restored = cartFrom(restore.source, menuItems, restore, restore.resolves);
@@ -101,6 +104,11 @@ export function OrderingSurface({
 
   const panel = (
     <>
+      {othersRestore ? (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[15px] text-amber-900">
+          {othersRestore.owner?.name ? t("restore_other", { name: othersRestore.owner.name }) : t("restore_other_unnamed")}
+        </p>
+      ) : null}
       <OrderHead type={cart.type} tableId={cart.tableId} locked={locked} sent={cart.serverOrderId !== null} onChange={() => setSheet(true)} />
       <Cart cart={cart} menu={items} categories={menu?.state?.categories} currency={currency} onChange={act} onSend={send} onClear={clear} />
     </>
