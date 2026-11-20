@@ -6,6 +6,7 @@ namespace App\Modules\Inventory;
 
 use App\Modules\Inventory\Console\SweepAlertsCommand;
 use App\Modules\Inventory\Listeners\QueueBalanceEvaluation;
+use App\Modules\Inventory\Support\InventoryActions;
 use App\Shared\Events\StockChanged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -18,6 +19,13 @@ use Illuminate\Support\ServiceProvider;
  */
 final class InventoryServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        // the `actions` of the transfers and purchases of one answer (ADR 0032): one instance per request remembers what it asked
+        // (scoped, so Octane forgets it after the request, traps.md)
+        $this->app->scoped(InventoryActions::class);
+    }
+
     public function boot(): void
     {
         Event::listen(StockChanged::class, [QueueBalanceEvaluation::class, 'handle']);

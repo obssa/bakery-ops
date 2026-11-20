@@ -69,6 +69,12 @@ final class TransferAccess
         }
     }
 
+    /** May the person decide a transfer out of $source (transfers.confirm, working at its station): the `actions` list's question. */
+    public function mayDecideFrom(User $person, Location $source): bool
+    {
+        return $this->access->can($person, 'transfers.confirm') && $this->worksAt($person, 'transfers.confirm', $source);
+    }
+
     private function worksAt(User $person, string $permission, Location $location): bool
     {
         $station = $location->station_id === null ? null : Station::query()->withTrashed()->find($location->station_id);

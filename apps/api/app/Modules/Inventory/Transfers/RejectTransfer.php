@@ -9,6 +9,7 @@ use App\Modules\Inventory\Enums\TransferStatus;
 use App\Modules\Inventory\Exceptions\TransferError;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Transfer;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -67,10 +68,16 @@ final class RejectTransfer
      */
     private static function settled(Transfer $transfer): bool
     {
+        return self::verdict($transfer)->settled();
+    }
+
+    /** The transfer's own rule, read by the action and by the transfer's `actions` list (ADR 0032): a transfer asked for is rejected; a rejected one is a repeat; a confirmed one is no reject. */
+    public static function verdict(Transfer $transfer): Verdict
+    {
         return match ($transfer->status) {
-            TransferStatus::Rejected => true,
-            TransferStatus::Confirmed => throw TransferError::confirmed(),
-            TransferStatus::Requested => false,
+            TransferStatus::Rejected => Verdict::repeat(),
+            TransferStatus::Confirmed => Verdict::refused(TransferError::confirmed()),
+            TransferStatus::Requested => Verdict::allowed(),
         };
     }
 }

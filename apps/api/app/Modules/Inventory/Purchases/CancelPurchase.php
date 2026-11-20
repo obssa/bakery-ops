@@ -8,6 +8,7 @@ use App\Modules\Audit\Contracts\AuditedAction;
 use App\Modules\Inventory\Enums\PurchaseStatus;
 use App\Modules\Inventory\Exceptions\PurchaseError;
 use App\Modules\Inventory\Models\Purchase;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -54,10 +55,19 @@ final class CancelPurchase
     /** The purchase itself when it is already cancelled; null when it is a draft; a confirmed one is refused. */
     private static function answer(Purchase $purchase): ?Purchase
     {
+        return self::verdict($purchase)->settled() ? $purchase : null;
+    }
+
+    /**
+     * The purchase's own rule, read by the action and by the purchase's `actions` list (ADR 0032): a draft is cancelled; a cancelled one
+     * is a repeat; a confirmed one is no cancel.
+     */
+    public static function verdict(Purchase $purchase): Verdict
+    {
         return match ($purchase->status) {
-            PurchaseStatus::Cancelled => $purchase,
-            PurchaseStatus::Confirmed => throw PurchaseError::confirmed(),
-            PurchaseStatus::Draft => null,
+            PurchaseStatus::Cancelled => Verdict::repeat(),
+            PurchaseStatus::Confirmed => Verdict::refused(PurchaseError::confirmed()),
+            PurchaseStatus::Draft => Verdict::allowed(),
         };
     }
 }

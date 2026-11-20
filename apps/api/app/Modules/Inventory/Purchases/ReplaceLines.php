@@ -9,6 +9,7 @@ use App\Modules\Inventory\Enums\PurchaseStatus;
 use App\Modules\Inventory\Exceptions\PurchaseError;
 use App\Modules\Inventory\Models\Purchase;
 use App\Modules\Inventory\Models\PurchaseLine;
+use App\Shared\StateMachine\Verdict;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -35,9 +36,7 @@ final class ReplaceLines
      */
     public function handle(Purchase $purchase, array $inputs): Purchase
     {
-        if ($purchase->status !== PurchaseStatus::Draft) {
-            throw PurchaseError::notDraft($purchase->status);
-        }
+        self::verdict($purchase)->orThrow();
         $mine = array_values(array_map(
             static fn (mixed $uuid): string => strtolower((string) $uuid),
             PurchaseLine::query()->where('purchase_id', $purchase->id)->pluck('client_uuid')->all(),
@@ -56,5 +55,11 @@ final class ReplaceLines
 
             return $purchase;
         }, $purchase, 'purchase.lines_replace');
+    }
+
+    /** The purchase's own rule, read by the action and by the purchase's `actions` list (ADR 0032): only a draft is edited. */
+    public static function verdict(Purchase $purchase): Verdict
+    {
+        return Verdict::unless($purchase->status !== PurchaseStatus::Draft, PurchaseError::notDraft($purchase->status));
     }
 }

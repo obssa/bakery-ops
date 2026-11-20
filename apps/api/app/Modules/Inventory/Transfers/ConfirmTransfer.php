@@ -11,6 +11,7 @@ use App\Modules\Inventory\Ledger\Ledger;
 use App\Modules\Inventory\Ledger\MovementIntent;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Transfer;
+use App\Shared\StateMachine\Verdict;
 use Carbon\CarbonImmutable;
 
 /**
@@ -95,10 +96,16 @@ final class ConfirmTransfer
      */
     private static function settled(Transfer $transfer): bool
     {
+        return self::verdict($transfer)->settled();
+    }
+
+    /** The transfer's own rule, read by the action and by the transfer's `actions` list (ADR 0032): a transfer asked for is confirmed; a confirmed one is a repeat; a rejected one is no confirm. */
+    public static function verdict(Transfer $transfer): Verdict
+    {
         return match ($transfer->status) {
-            TransferStatus::Confirmed => true,
-            TransferStatus::Rejected => throw TransferError::rejected(),
-            TransferStatus::Requested => false,
+            TransferStatus::Confirmed => Verdict::repeat(),
+            TransferStatus::Rejected => Verdict::refused(TransferError::rejected()),
+            TransferStatus::Requested => Verdict::allowed(),
         };
     }
 }

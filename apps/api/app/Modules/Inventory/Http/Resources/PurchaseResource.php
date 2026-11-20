@@ -8,6 +8,7 @@ use App\Modules\Identity\Contracts\Access;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Models\Purchase;
 use App\Modules\Inventory\Models\PurchaseLine;
+use App\Modules\Inventory\Support\InventoryActions;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -67,6 +68,8 @@ final class PurchaseResource extends JsonResource
             'cancel_reason' => $purchase->cancel_reason,
             'notes' => $purchase->notes,
             'version' => $purchase->version,
+            // the moves the person looking may make now (ADR 0032): edit, confirm, cancel
+            'actions' => app(InventoryActions::class)->purchase($purchase),
         ];
     }
 

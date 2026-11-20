@@ -15,6 +15,7 @@ use App\Modules\Inventory\Ledger\MovementReason;
 use App\Modules\Inventory\Models\Purchase;
 use App\Modules\Inventory\Models\PurchaseLine;
 use App\Shared\Actor\ActorContext;
+use App\Shared\StateMachine\Verdict;
 use App\Shared\Values\CurrencyMismatch;
 use Carbon\CarbonImmutable;
 
@@ -108,10 +109,19 @@ final class ConfirmPurchase
      */
     private static function settled(Purchase $purchase): bool
     {
+        return self::verdict($purchase)->settled();
+    }
+
+    /**
+     * The purchase's own rule, read by the action and by the purchase's `actions` list (ADR 0032): a draft is confirmed; a confirmed one
+     * is a repeat; a cancelled one is no confirm.
+     */
+    public static function verdict(Purchase $purchase): Verdict
+    {
         return match ($purchase->status) {
-            PurchaseStatus::Confirmed => true,
-            PurchaseStatus::Cancelled => throw PurchaseError::cancelled(),
-            PurchaseStatus::Draft => false,
+            PurchaseStatus::Confirmed => Verdict::repeat(),
+            PurchaseStatus::Cancelled => Verdict::refused(PurchaseError::cancelled()),
+            PurchaseStatus::Draft => Verdict::allowed(),
         };
     }
 }

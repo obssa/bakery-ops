@@ -8,6 +8,7 @@ use App\Modules\Inventory\Contracts\Stock;
 use App\Modules\Inventory\Enums\TransferStatus;
 use App\Modules\Inventory\Models\Location;
 use App\Modules\Inventory\Models\Transfer;
+use App\Modules\Inventory\Support\InventoryActions;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -61,7 +62,8 @@ final class TransferResource extends JsonResource
             $body['source_available'] = app(Stock::class)->of($transfer->item_id, $transfer->from_location_id)->available()->toString();
         }
 
-        return $body + ['version' => $transfer->version];
+        // the decisions the person looking may take now (ADR 0032): confirm, reject
+        return $body + ['version' => $transfer->version, 'actions' => app(InventoryActions::class)->transfer($transfer)];
     }
 
     /**
