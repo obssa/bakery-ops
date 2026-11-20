@@ -8,6 +8,7 @@ use App\Modules\Notifications\Models\Notification;
 use App\Modules\Notifications\Models\NotificationDelivery;
 use App\Modules\Notifications\Support\RecipientLocale;
 use Closure;
+use GuzzleHttp\Client;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 
@@ -27,6 +28,11 @@ final class PushDriver implements Driver
 {
     /** how long a push service may hold a message for a phone that is off, in seconds */
     private const int TTL = 3600;
+
+    /** the longest one send to the push service may take, in seconds, and the part of it allowed for connecting */
+    public const int TIMEOUT_SECONDS = 20;
+
+    public const int CONNECT_TIMEOUT_SECONDS = 5;
 
     private ?WebPush $client = null;
 
@@ -107,8 +113,17 @@ final class PushDriver implements Driver
         );
     }
 
+    /**
+     * The library's own HTTP client, with explicit timeouts: the auto-discovered one has none, and a send must end well inside the delivery's
+     * claim (DeliverNotification::CLAIM_SECONDS, ADR 0031), or a slow push service could outlast the claim and a second copy send again.
+     */
     private function client(): WebPush
     {
-        return $this->client ??= $this->makeClient !== null ? ($this->makeClient)($this->vapid) : new WebPush(['VAPID' => $this->vapid]);
+        return $this->client ??= $this->makeClient !== null
+            ? ($this->makeClient)($this->vapid)
+            : new WebPush(['VAPID' => $this->vapid], [], new Client([
+                'timeout' => self::TIMEOUT_SECONDS,
+                'connect_timeout' => self::CONNECT_TIMEOUT_SECONDS,
+            ]));
     }
 }

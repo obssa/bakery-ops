@@ -15,6 +15,9 @@ return [
         'ttl_hours' => 24,
         // How long the in-flight lock is held at most if the handler never returns.
         'lock_seconds' => 60,
+        // How long a key's row may stay "in flight" (written, no answer yet) before its request counts as dead and the same key may run
+        // again (ADR 0031). Until then a duplicate gets 409, also after the lock above ran out. Longer than any request runs on the host.
+        'abandon_after_seconds' => 300,
         // How long after its expires_at a snapshot is deleted by bakery:prune-idempotency (ADR 0028): 48 hours after the write with the
         // 24 hours above. An expired snapshot is never replayed, so this only keeps a day of them for whoever looks into a retry.
         'prune_after_hours' => 24,

@@ -25,6 +25,10 @@ use Throwable;
  * Rule 7 / ADR 0003. Every POST/PUT/PATCH/DELETE needs an Idempotency-Key. Scope is (branch, user, key):
  *   - a lock (Redis SET NX in production, the cache store's lock in general) guards the key while the first
  *     request runs; a duplicate arriving meanwhile gets 409 and retries;
+ *   - the key's row is written as "in flight" (no answer yet) before the handler runs, so a duplicate that arrives after the lock
+ *     ran out (a handler slower than lock_seconds) also gets 409 instead of running the write a second time; a row still without an
+ *     answer abandon_after_seconds after it was written belongs to a request that died, and the next request with the key runs
+ *     (ADR 0031);
  *   - the same key with the same request fingerprint replays the stored response (status + body) and marks it
  *     Idempotency-Replayed: true; the handler never runs twice;
  *   - the same key with a different fingerprint is 422;
@@ -87,6 +91,7 @@ final class Idempotency
             return ApiError::json('idempotency.in_flight', 409);
         }
 
+        $claimed = null;
         try {
             $stored = IdempotencyKey::query()
                 ->where('branch_id', $branchId)
@@ -107,27 +112,67 @@ final class Idempotency
                     // an encrypted answer the app key no longer opens cannot be replayed, and running the write again could repeat it
                     return self::replay($stored) ?? ApiError::json('idempotency.key_reused', 422);
                 }
+                // no answer yet: the first request with this key is still running after its lock ran out, unless it died long ago
+                if (! self::abandoned($stored)) {
+                    return ApiError::json('idempotency.in_flight', 409);
+                }
             }
+
+            $claimed = self::claim($stored, $branchId, $userId, $key, $fingerprint);
 
             $response = $next($request);
 
             $snapshot = self::keeps($response->getStatusCode(), $carriesSecret) ? self::snapshot($request, $response) : null;
             if ($snapshot !== null) {
-                IdempotencyKey::query()->updateOrCreate(
-                    ['branch_id' => $branchId, 'user_id' => $userId, 'key' => $key],
-                    [
-                        'request_hash' => $fingerprint,
-                        'response_status' => $response->getStatusCode(),
-                        'response_body' => $snapshot,
-                        'expires_at' => CarbonImmutable::now()->addHours(self::ttlHours()),
-                    ],
-                );
+                $claimed->forceFill([
+                    'request_hash' => $fingerprint,
+                    'response_status' => $response->getStatusCode(),
+                    'response_body' => $snapshot,
+                    'expires_at' => CarbonImmutable::now()->addHours(self::ttlHours()),
+                ])->save();
+                $claimed = null;
             }
 
             return $response;
         } finally {
+            // an answer that is not kept (a server error, a refusal of a request with a secret) or a handler that threw: the in-flight
+            // row goes, so the same key runs again; deleting it never hides the handler's own exception
+            if ($claimed !== null) {
+                try {
+                    $claimed->delete();
+                } catch (Throwable $e) {
+                    Log::warning('idempotency: the in-flight row of a request could not be removed', ['error' => $e::class]);
+                }
+            }
             $lock->release();
         }
+    }
+
+    /**
+     * The key's row marked in flight: no answer, written now. An existing row (an abandoned one) is taken over; its updated_at is set
+     * explicitly so a row that changes nothing else still counts as written now.
+     */
+    private static function claim(?IdempotencyKey $stored, int $branchId, int $userId, string $key, string $fingerprint): IdempotencyKey
+    {
+        $row = $stored ?? new IdempotencyKey(['branch_id' => $branchId, 'user_id' => $userId, 'key' => $key]);
+        $row->forceFill([
+            'request_hash' => $fingerprint,
+            'response_status' => null,
+            'response_body' => null,
+            'expires_at' => CarbonImmutable::now()->addHours(self::ttlHours()),
+        ]);
+        $row->setUpdatedAt($row->freshTimestamp());
+        $row->save();
+
+        return $row;
+    }
+
+    /** Whether a row without an answer was written longer ago than any request runs: its request died, and the key may run again. */
+    private static function abandoned(IdempotencyKey $stored): bool
+    {
+        $since = $stored->updated_at;
+
+        return $since === null || $since->lt(CarbonImmutable::now()->subSeconds(self::abandonSeconds()));
     }
 
     /** The lock name for one (branch, user, key); public so tests can hold it. */
@@ -295,6 +340,13 @@ final class Idempotency
         $hours = config('bakery.idempotency.ttl_hours');
 
         return is_int($hours) && $hours > 0 ? $hours : 24;
+    }
+
+    private static function abandonSeconds(): int
+    {
+        $seconds = config('bakery.idempotency.abandon_after_seconds');
+
+        return is_int($seconds) && $seconds > 0 ? $seconds : 300;
     }
 
     private static function lockSeconds(): int

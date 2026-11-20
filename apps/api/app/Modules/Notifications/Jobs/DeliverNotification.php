@@ -15,6 +15,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
@@ -31,6 +32,14 @@ use Throwable;
  *  - A driver that was switched off after the delivery was planned, or a recipient who is no longer active, ends it as failed
  *    at once with that reason: nothing is sent and nothing is retried.
  * Idempotent: a delivery that is already sent, gone or failed is left alone, so a redelivered job never sends twice.
+ *
+ * Claimed before it is sent (item 13 of the 2026-11-20 state-machine review, ADR 0031): the check that the delivery is still pending and the
+ * send run while this job holds the delivery's own cache lock (the database store's atomic insert on the live host), and the row is
+ * read again once the lock is held. Two copies of the job (a redelivery after the queue's retry_after, a second worker) therefore
+ * never both see "pending" and both send: the copy that finds the lock taken does nothing and is done, because the copy holding it
+ * either finishes the delivery or is itself redelivered by the queue. The lock lives CLAIM_SECONDS, shorter than the database
+ * queue's retry_after (90 s), so a worker that dies mid-send leaves a lock that has expired by the time the queue hands its job out
+ * again: the delivery is retried, or failed by failed() once the tries are used, and is never left pending for ever.
  */
 final class DeliverNotification implements ShouldQueue
 {
@@ -39,6 +48,9 @@ final class DeliverNotification implements ShouldQueue
     use Queueable;
 
     public int $tries = 3;
+
+    /** How long one copy of the job holds a delivery while it sends; below the queue's retry_after (90 s), above a driver's timeouts. */
+    public const int CLAIM_SECONDS = 60;
 
     public function __construct(
         public readonly int $deliveryId,
@@ -57,52 +69,77 @@ final class DeliverNotification implements ShouldQueue
 
     public function handle(DriverRegistry $drivers, EventScope $scope, RecipientLocale $locales): void
     {
-        $scope->run($this->branchId, null, function () use ($drivers, $locales): void {
-            $delivery = NotificationDelivery::query()->with(['notification', 'endpoint'])->find($this->deliveryId);
-            if ($delivery === null || $delivery->status !== 'pending') {
-                return;
-            }
+        $lock = Cache::lock(self::lockName($this->deliveryId), self::CLAIM_SECONDS);
+        if (! $lock->get()) {
+            return; // another copy of this job is sending this delivery right now
+        }
+        try {
+            $scope->run($this->branchId, null, fn () => $this->deliver($drivers, $locales));
+        } finally {
+            $lock->release();
+        }
+    }
 
-            $driver = $drivers->for($delivery->driver);
-            if ($driver === null) {
-                $this->finish($delivery, 'failed', 'driver_disabled', countAttempt: false);
+    /** The lock name of one delivery; public so tests can hold it as a second worker would. */
+    public static function lockName(int $deliveryId): string
+    {
+        return 'notification-delivery:'.$deliveryId;
+    }
 
-                return;
-            }
-            if ($locales->of($delivery->notification->user_id) === null) {
-                $this->finish($delivery, 'failed', 'recipient_inactive', countAttempt: false);
+    private function deliver(DriverRegistry $drivers, RecipientLocale $locales): void
+    {
+        $delivery = NotificationDelivery::query()->with(['notification', 'endpoint'])->find($this->deliveryId);
+        if ($delivery === null || $delivery->status !== 'pending') {
+            return;
+        }
 
-                return;
-            }
+        $driver = $drivers->for($delivery->driver);
+        if ($driver === null) {
+            $this->finish($delivery, 'failed', 'driver_disabled', countAttempt: false);
 
-            try {
-                $outcome = $driver->send($delivery);
-            } catch (Throwable $e) {
-                $this->failedTry($delivery, Scrub::text($e->getMessage()));
+            return;
+        }
+        if ($locales->of($delivery->notification->user_id) === null) {
+            $this->finish($delivery, 'failed', 'recipient_inactive', countAttempt: false);
 
-                return;
-            }
+            return;
+        }
 
-            if ($outcome === DeliveryOutcome::Gone) {
-                $delivery->endpoint->forceFill(['revoked_at' => $delivery->endpoint->revoked_at ?? CarbonImmutable::now()])->save();
-                $this->finish($delivery, 'gone', null);
+        try {
+            $outcome = $driver->send($delivery);
+        } catch (Throwable $e) {
+            $this->failedTry($delivery, Scrub::text($e->getMessage()));
 
-                return;
-            }
-            $delivery->endpoint->forceFill(['last_success_at' => CarbonImmutable::now()])->save();
-            $this->finish($delivery, 'sent', null);
-        });
+            return;
+        }
+
+        if ($outcome === DeliveryOutcome::Gone) {
+            $delivery->endpoint->forceFill(['revoked_at' => $delivery->endpoint->revoked_at ?? CarbonImmutable::now()])->save();
+            $this->finish($delivery, 'gone', null);
+
+            return;
+        }
+        $delivery->endpoint->forceFill(['last_success_at' => CarbonImmutable::now()])->save();
+        $this->finish($delivery, 'sent', null);
     }
 
     /** The queue gave the job up for a reason of its own (a crashed worker, a database error): the delivery is failed. */
     public function failed(Throwable $exception): void
     {
-        app(EventScope::class)->run($this->branchId, null, function () use ($exception): void {
-            $delivery = NotificationDelivery::query()->find($this->deliveryId);
-            if ($delivery !== null && $delivery->status === 'pending') {
-                $this->finish($delivery, 'failed', Scrub::text($exception->getMessage()), countAttempt: false);
-            }
-        });
+        $lock = Cache::lock(self::lockName($this->deliveryId), self::CLAIM_SECONDS);
+        if (! $lock->get()) {
+            return; // another copy is sending it now: that copy decides how the delivery ends
+        }
+        try {
+            app(EventScope::class)->run($this->branchId, null, function () use ($exception): void {
+                $delivery = NotificationDelivery::query()->find($this->deliveryId);
+                if ($delivery !== null && $delivery->status === 'pending') {
+                    $this->finish($delivery, 'failed', Scrub::text($exception->getMessage()), countAttempt: false);
+                }
+            });
+        } finally {
+            $lock->release();
+        }
     }
 
     private function failedTry(NotificationDelivery $delivery, string $error): void
