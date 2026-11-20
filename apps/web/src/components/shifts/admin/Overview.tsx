@@ -4,6 +4,7 @@ import { CircleCheck, Hourglass } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { CanLink } from "@/components/CanLink";
+import { may } from "@/lib/api/actions";
 import { useWorkStations, usePlaces, useTemplates } from "@/lib/api/adminShifts";
 import { uuid } from "@/lib/api/idempotency";
 import { ApiError } from "@/lib/api/client";
@@ -158,11 +159,11 @@ function Running({ shift, queue }: { shift: ShiftSummary; queue: readonly QueueR
   const t = useTranslations("adminShifts");
   const name = useName();
   const errorText = useErrorText();
-  const me = useSession((s) => s.me);
   const key = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
-  const canCancel = shift.status === "opening" && (can(me, "shifts.manage") || shift.started_by?.id === me?.user.id);
+  // the shift's own `actions` (ADR 0032): the API's CancelShift decides it for this person; the overview offers it for an opening shift
+  const canCancel = shift.status === "opening" && may(shift, "cancel");
 
   async function cancel() {
     if (busy) return;
