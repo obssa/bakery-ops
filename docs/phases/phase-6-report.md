@@ -1108,6 +1108,43 @@ Claim restated at `9e8e8d9` (the reads that compare a whole record now leave its
 
 Claim restated at `2cdd142`; the tag stays on `2f6bbd9`.
 
+**Records say what may happen next, the web half (phase-6/allowed-actions-web, ADR 0032; the implicit-state review, item 33).** The screens
+now offer exactly the moves a record's `actions` list, and copy none of the API's rules. `lib/api/actions.ts` reads the lists (`may`).
+Where a screen has no record, it reads the generated mirror instead (`onlyThrough`, `statusesWhere`). A record read before the API listed
+its actions offers nothing until it is read again.
+
+- **What switched:**
+  - The outbox's sent statuses are the generated order machine's: the statuses only `sent` leads to.
+  - The void dialog and the order record: the order's `void` and `refund`, and each payment's `void`.
+  - The shift bar: the shift's `join`, `leave`, `close` and `cancel`. A running shift is named by the generated `isRunning`. Starting a
+    shift stays the person's `shifts.count`, since no shift exists yet.
+  - The shifts overview: an opening shift's `cancel`.
+  - The production board: its drops, the card's button and the request card's buttons are the request's actions. The person and the
+    batch only choose the words of a refused drop.
+  - The count review: the count's actions.
+  - The kitchen and bar displays: the line's `accept`, `ready` and `reject`.
+  - The pad: the line's `serve` and the order's `cancel`.
+  - The transfers screen and the purchases screen: their records' actions.
+  - The payment's `verify` and `dispute`.
+- **Two copies disagreed with the API, and now follow it:**
+  - A manager or admin who counted a count is offered Reject (a recount), which the API allows.
+  - A transfer's Confirm and Reject show only for someone who works at the source's station, not for every holder of
+    `transfers.confirm`.
+- **Unchanged words and layout.** The only change is buttons that appear or disappear because the API says so. A queued kitchen line
+  keeps Accept and Reject; Ready stays the step after Accept, although the API also allows it straight away.
+- **Not switched, by design (ADR 0032):** paying (`isPayable`, the till's own rule, decided by Payments) and the receipt's availability.
+  Neither is a move on the record.
+- **The keyboard flake above, found.** dnd-kit's `KeyboardSensor` lifts the card at once, but adds its keydown listener only from a
+  `setTimeout` it sets at pickup. Chrome runs input before timers, so the test's ArrowRight, sent the moment the grip read pressed, could
+  reach the page first and be dropped. It is test timing: no person types inside one timer tick. `screens-board-drag` now waits for one
+  timer of the page's own, set after the sensor's, before the arrow. No sleep, no retry.
+- **Tests:** the logic specs read `actions`.
+  - `screens-stuck-logic` proves the card's button is the listed move for every person and state, and that nothing is offered with
+    nothing listed.
+  - `screens-production-logic`, `handover-count-logic`, `handover-shift-bar-logic`, `pay-admin-logic` and `pay-timeline-logic` pin down
+    the rest.
+  - The CI stack's browser specs drive the switched screens against the API's real lists.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
