@@ -125,7 +125,11 @@ it('holds a delivery for less time than the queue waits before it hands a job ou
 });
 
 it('builds the real push client with its timeouts when no test replaces it', function () {
-    $driver = new PushDriver(['subject' => 'mailto:ops@example.test', 'publicKey' => 'p', 'privateKey' => 'k'], app(RecipientLocale::class));
+    $keys = VAPID::createVapidKeys();
+    $driver = new PushDriver(
+        ['subject' => 'mailto:ops@example.test', 'publicKey' => $keys['publicKey'], 'privateKey' => $keys['privateKey']],
+        app(RecipientLocale::class),
+    );
 
     $client = (new ReflectionMethod($driver, 'client'))->invoke($driver);
 
