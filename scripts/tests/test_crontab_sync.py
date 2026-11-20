@@ -120,6 +120,23 @@ class CrontabSyncTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.tab(), OTHER + SITE)
 
+    def test_lines_are_replaced_where_they_stand(self):
+        # the site's lines sit between two other lines: a changed line is fixed there, not moved to the end
+        old = "* * * * * sleep 5 && cd $HOME/site && php artisan schedule:run # site"
+        self.set_tab([OTHER[0], OTHER[1], old, OTHER[2], OTHER[3]])
+        r = self.run_sync()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.tab(), [OTHER[0], OTHER[1], *SITE, OTHER[2], OTHER[3]])
+
+    def test_a_site_that_puts_its_own_lines_last_and_this_tool_agree(self):
+        # another site's own installer moves its two lines to the end; the tool keeps that order and writes nothing
+        self.fragment("other", OTHER[1:3])
+        self.set_tab([OTHER[0], *SITE, OTHER[3], OTHER[1], OTHER[2]])
+        r = self.run_sync()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("in sync", r.stdout)
+        self.assertNotIn("-", self.calls())
+
     def test_tags_are_matched_exactly(self):
         # a site called "site-test" is not "site": its line stays untouched
         test_line = "* * * * * cd $HOME/site-test && php artisan schedule:run # site-test"

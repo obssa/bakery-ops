@@ -68,7 +68,8 @@ fragments=("$dir"/*.cron)
 shopt -u nullglob
 [ "${#fragments[@]}" -gt 0 ] || die "no fragments in $dir" 2
 
-declare -A owner=()
+declare -A owner=() by_tag=()
+tags=()
 : >"$tmp/ours"
 for f in $(printf '%s\n' "${fragments[@]}" | LC_ALL=C sort); do
   name="$(basename "$f" .cron)"
@@ -80,9 +81,11 @@ for f in $(printf '%s\n' "${fragments[@]}" | LC_ALL=C sort); do
     tag="${BASH_REMATCH[1]}"
     [[ "$tag" == "$name" || "$tag" == "$name"-* ]] || die "$f: tag '$tag' does not start with '$name'" 2
     if [ -n "${owner[$tag]:-}" ] && [ "${owner[$tag]}" != "$name" ]; then die "tag '$tag' is used by ${owner[$tag]} and $name" 2; fi
+    [ -z "${owner[$tag]:-}" ] && tags+=("$tag")
     owner[$tag]="$name"
     [[ "$line" == MAILTO=* ]] && die "$f: MAILTO belongs to no fragment" 2
     printf '%s\n' "$line" >>"$tmp/ours"
+    by_tag[$tag]+="$line"$'\n'
   done <"$f"
 done
 [ -s "$tmp/ours" ] || die "the fragments hold no lines" 2
@@ -91,18 +94,29 @@ is_ours() { # is_ours LINE: the line's trailing tag belongs to a fragment
   [[ "$1" =~ \ \#\ ([a-z0-9][a-z0-9._-]*)$ ]] && [ -n "${owner[${BASH_REMATCH[1]}]:-}" ]
 }
 
-# desired SRC OUT: MAILTO first (the source's own, else MAILTO=""), the source's other lines in order, then the fragments' lines
+# desired SRC OUT: MAILTO first (the source's own, else MAILTO=""), then the source's lines in their order, where a tag's lines
+# are replaced in place by its fragment's lines (at the tag's first line; its other lines dropped), then the lines of tags the
+# source does not have yet. Keeping places is what lets a site that writes its own lines somewhere (e.g. at the end) and this
+# tool agree, so neither rewrites the crontab after the other.
 desired() {
-  local src="$1" out="$2" line mailto=""
+  local src="$1" out="$2" line mailto="" t
+  local -A done_tag=()
   : >"$out.rest"
   while IFS= read -r line || [ -n "$line" ]; do
     line="${line%$'\r'}"
     [ -z "${line//[[:space:]]/}" ] && continue
     if [[ "$line" == MAILTO=* ]]; then [ -z "$mailto" ] && mailto="$line"; continue; fi
-    is_ours "$line" && continue
+    if is_ours "$line"; then
+      t="${BASH_REMATCH[1]}"
+      if [ -z "${done_tag[$t]:-}" ]; then printf '%s' "${by_tag[$t]}" >>"$out.rest"; done_tag[$t]=1; fi
+      continue
+    fi
     printf '%s\n' "$line" >>"$out.rest"
   done <"$src"
-  { echo "${mailto:-MAILTO=\"\"}"; cat "$out.rest" "$tmp/ours"; } >"$out"
+  for t in "${tags[@]}"; do
+    [ -z "${done_tag[$t]:-}" ] && printf '%s' "${by_tag[$t]}" >>"$out.rest"
+  done
+  { echo "${mailto:-MAILTO=\"\"}"; cat "$out.rest"; } >"$out"
   rm -f "$out.rest"
 }
 
