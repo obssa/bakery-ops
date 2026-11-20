@@ -910,6 +910,24 @@ that check was slow, its late 401 forgot the new token and sent them back to the
 
 Claim restated at `a36da5e`; the tag stays on `2f6bbd9`.
 
+**Claims that outlive a lock: notification deliveries and in-flight idempotency keys (phase-6/delivery-and-key-locks, ADR 0031; items 13
+and 14 of the review of the app's implicit state machines, 2026-11-20).**
+
+- **A notification delivery is sent once, also when two copies of its job run.** `DeliverNotification` takes the delivery's own lock
+  (`CLAIM_SECONDS`, 60 s, below the queue's `retry_after` of 90 s), reads the row again under it, and only then checks "pending" and sends.
+  A copy that finds the lock taken does nothing; `failed()` respects the lock too. A worker that dies mid-send leaves a lock that has
+  expired by the time the queue hands its job out again, so the delivery is retried or failed, never stranded.
+- **A push send ends inside the claim.** The push library's auto-discovered HTTP client had no timeout; `PushDriver` now gives it 20 s
+  (5 s to connect).
+- **A slow write runs once under its Idempotency-Key.** The key's row is written "in flight" (no answer) before the handler runs. A request
+  that finds it without an answer gets `409 idempotency.in_flight`, also after the 60 s lock has run out, until the row is older than
+  `abandon_after_seconds` (300 s, `config/bakery.php`): then its request died and the key runs again. An answer that is not kept (5xx, a
+  refused request with a secret) or a handler that throws removes the row, as before.
+- **Tests.** `DeliveryClaimTest` (group concurrency): a second copy started while the first is sending sends nothing, a held claim stops
+  `handle` and `failed()`, the claim's timings. `IdempotencyMiddlewareTest`: a duplicate after a slow first request's lock ran out gets 409
+  and the write runs once; an in-flight row just before and after `abandon_after_seconds`; 422 in flight. The race cases fail on the code
+  before this change.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
