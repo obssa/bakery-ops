@@ -1082,7 +1082,7 @@ now, one name per write endpoint.
   enum.
 - **Still to come.** The web reads the lists and the mirror in the second half of this item, a pull request of its own.
 
-Claim restated at `ef9a74e`; the tag stays on `2f6bbd9`.
+Claim restated at `9e8e8d9` (the reads that compare a whole record now leave its reader-dependent `actions` out); the tag stays on `2f6bbd9`.
 
 ## What stays open after the claim
 
