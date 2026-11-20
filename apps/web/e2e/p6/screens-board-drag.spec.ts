@@ -123,6 +123,10 @@ test.describe("screens: dragging a card along the production board", () => {
       await overseer.keyboard.press("Space");
       // lifted: the grip is pressed while the card is held (its "Picked up" line is replaced at once by where it is over)
       await expect(grip).toHaveAttribute("aria-pressed", "true");
+      // dnd-kit's KeyboardSensor lifts the card at once but listens for the next keys only from a timer it sets then (setTimeout, no delay);
+      // Chrome runs input before timers, so an arrow sent the moment the grip reads pressed could reach the page first and be lost (CI,
+      // 2026-11-20: both tries of one run). One timer of the page's own, set now, runs after the sensor's: then it is listening.
+      await overseer.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
       await overseer.keyboard.press("ArrowRight");
       await expect(overseer.getByText(t.drag_over.replace("{name}", cake).replace("{column}", t.col_done_today), { exact: true })).toBeAttached();
       await overseer.keyboard.press("Space");
