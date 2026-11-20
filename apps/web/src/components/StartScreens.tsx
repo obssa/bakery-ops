@@ -7,6 +7,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { screensFor } from "@/lib/access";
 import { useSession } from "@/lib/session";
 import { ICON_STROKE, SCREEN_ICONS } from "./icons";
+import { SessionUnreachable } from "./RequireAuth";
 import { focusRing } from "./styles";
 
 // The start page's cards (step 6.2b; ADR 0027): one per screen this person can open, each named by the screen and "Open". A person with a
@@ -38,12 +39,16 @@ export function StartScreens() {
   const router = useRouter();
   const status = useSession((s) => s.status);
   const me = useSession((s) => s.me);
+  const unreachable = useSession((s) => s.unreachable);
   const screens = screensFor(me);
   const only = status === "signed-in" && screens.length === 1 ? screens[0]!.href : null;
 
   useEffect(() => {
     if (only) router.replace(only);
   }, [only, router]);
+
+  // the stored sign-in could not be checked: say so and offer Retry, as every guarded page does (no "Checking…" for ever)
+  if (status === "unknown" && unreachable) return <SessionUnreachable />;
 
   if (status === "unknown" || only) {
     return (

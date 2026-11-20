@@ -7,7 +7,7 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { canOpen, stationScreensFor } from "@/lib/access";
 import type { Me } from "@/lib/api/types";
 import { isCurrent } from "@/lib/screens";
-import { useSession } from "@/lib/session";
+import { signOutTarget, useSession } from "@/lib/session";
 import { useOnline } from "@/lib/useOnline";
 import { AppMark, BrandName, SyncChip } from "./AppShell";
 import { DateDisplaySwitch } from "./DateDisplaySwitch";
@@ -243,7 +243,7 @@ function AccountCard() {
             onClick={async () => {
               setOpen(false);
               await signOut();
-              router.replace("/login");
+              router.replace(signOutTarget(pathname));
             }}
             className={`${buttonClass({ variant: "secondary", size: "md" })} w-full`}
           >

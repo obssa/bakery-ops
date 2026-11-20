@@ -19,22 +19,12 @@ export function RequireAuth({ permission, children }: { permission?: string; chi
   const status = useSession((s) => s.status);
   const me = useSession((s) => s.me);
   const unreachable = useSession((s) => s.unreachable);
-  const init = useSession((s) => s.init);
 
   useEffect(() => {
     if (status === "signed-out") router.replace({ pathname: "/login", query: { next: pathname } });
   }, [status, pathname, router]);
 
-  if (status === "unknown" && unreachable) {
-    return (
-      <div className="max-w-xl space-y-4">
-        <Alert>{t("errors.network")}</Alert>
-        <Button variant="secondary" onClick={() => void init()}>
-          {t("common.retry")}
-        </Button>
-      </div>
-    );
-  }
+  if (status === "unknown" && unreachable) return <SessionUnreachable />;
 
   if (status !== "signed-in" || !me) {
     return (
@@ -47,6 +37,23 @@ export function RequireAuth({ permission, children }: { permission?: string; chi
   if (permission && !can(me, permission)) return <NoAccess />;
 
   return <>{children}</>;
+}
+
+/**
+ * The sign-in stored on this device could not be checked (GET /me had no answer). The session asks again by itself (lib/session.ts
+ * sessionRetry, and when the connection is back); Retry asks now. Every page that waits for the sign-in shows it, the start page too.
+ */
+export function SessionUnreachable() {
+  const t = useTranslations();
+  const init = useSession((s) => s.init);
+  return (
+    <div className="max-w-xl space-y-4">
+      <Alert>{t("errors.network")}</Alert>
+      <Button variant="secondary" onClick={() => void init()}>
+        {t("common.retry")}
+      </Button>
+    </div>
+  );
 }
 
 /**
