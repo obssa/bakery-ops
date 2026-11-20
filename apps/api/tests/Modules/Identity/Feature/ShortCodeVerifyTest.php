@@ -140,6 +140,91 @@ it('locks a named user after 5 failed attempts against that user and resets on s
         ->and($this->waiter->pin_locked_until)->toBeNull();
 })->group('module:identity', 'feature');
 
+it('gives a named user a fresh 5 tries once the lock has run out, not one', function () {
+    $named = fn (string $code, string $pad = 'pad-1') => $this->withHeaders(['X-Device-Id' => $pad])
+        ->postJson('/api/v1/short-code/verify', ['code' => $code, 'user_id' => $this->waiter->id, 'branch_id' => $this->branch->id]);
+    foreach (range(1, 5) as $i) {
+        $named('0000')->assertStatus(401);
+    }
+    $named('4821', 'pad-2')->assertStatus(423);
+
+    $this->travel(16)->minutes();
+
+    // one wrong try after the lock: refused as wrong, and the person is not locked again (it used to count on from 5 to 6)
+    $named('0000')->assertStatus(401)->assertJsonPath('message_key', 'identity.short_code.invalid');
+    $this->waiter->refresh();
+    expect($this->waiter->short_code_attempts)->toBe(1)
+        ->and($this->waiter->pin_locked_until)->toBeNull()
+        ->and($this->waiter->isPinLocked())->toBeFalse();
+
+    // 4 tries are left: three more wrong ones still answer 401 and the right code then signs in from another pad
+    foreach (range(1, 3) as $i) {
+        $named('0000')->assertStatus(401);
+    }
+    $this->waiter->refresh();
+    expect($this->waiter->short_code_attempts)->toBe(4)->and($this->waiter->isPinLocked())->toBeFalse();
+    $named('4821', 'pad-2')->assertOk()->assertJsonPath('user.id', $this->waiter->id);
+    $this->waiter->refresh();
+    expect($this->waiter->short_code_attempts)->toBe(0)->and($this->waiter->pin_locked_until)->toBeNull();
+})->group('module:identity', 'feature');
+
+it('locks a named user again after 5 wrong tries once the first lock has run out', function () {
+    $named = fn (string $code, string $pad = 'pad-1') => $this->withHeaders(['X-Device-Id' => $pad])
+        ->postJson('/api/v1/short-code/verify', ['code' => $code, 'user_id' => $this->waiter->id, 'branch_id' => $this->branch->id]);
+    foreach (range(1, 5) as $i) {
+        $named('0000')->assertStatus(401);
+    }
+    $this->travel(16)->minutes();
+
+    foreach (range(1, 4) as $i) {
+        $named('0000')->assertStatus(401);
+    }
+    $named('4821', 'pad-2')->assertOk(); // still open after 4: the count started again at 0
+    foreach (range(1, 5) as $i) {
+        $named('0000', 'pad-3')->assertStatus(401); // pad-1 has 4 of its own 5 tries used; pad-3 is a fresh entry point
+    }
+    $this->waiter->refresh();
+    expect($this->waiter->short_code_attempts)->toBe(5)
+        ->and($this->waiter->pin_locked_until)->not->toBeNull()
+        ->and($this->waiter->pin_locked_until->greaterThan(CarbonImmutable::now()->addMinutes(14)))->toBeTrue();
+    $named('4821', 'pad-2')->assertStatus(423)->assertJsonPath('message_key', 'identity.short_code.locked');
+})->group('module:identity', 'feature');
+
+it('gives an entry point a fresh 5 tries once its lock has run out', function () {
+    $try = fn (string $code) => $this->withHeaders(['X-Device-Id' => 'pad-1'])->postJson('/api/v1/short-code/verify', ['code' => $code]);
+    foreach (range(1, 5) as $i) {
+        $try('0000')->assertStatus(401);
+    }
+    $try('4821')->assertStatus(423);
+
+    $this->travel(15)->minutes();
+    $this->travel(1)->seconds();
+
+    foreach (range(1, 5) as $i) {
+        $try('0000')->assertStatus(401);
+    }
+    $try('4821')->assertStatus(423)->assertJsonPath('message_key', 'identity.short_code.locked');
+})->group('module:identity', 'feature');
+
+it('does not count a try against the entry point when the named person is locked', function () {
+    foreach (range(1, 5) as $i) {
+        $this->withHeaders(['X-Device-Id' => 'pad-1'])->postJson('/api/v1/short-code/verify', ['code' => '0000', 'user_id' => $this->waiter->id])->assertStatus(401);
+    }
+    $other = makeUser($this->branch, 'waiter');
+    actInBranch($this->branch);
+    withActor(makeUser($this->branch, 'admin')->id);
+    app(ShortCodes::class)->set($other, '7310');
+    app(CurrentBranch::class)->clear();
+    app(ActorContext::class)->reset();
+
+    // pad-2 asks for the locked person six times: 423 each time, and pad-2 itself is not locked by it
+    foreach (range(1, 6) as $i) {
+        $this->withHeaders(['X-Device-Id' => 'pad-2'])->postJson('/api/v1/short-code/verify', ['code' => '4821', 'branch_id' => $this->branch->id])->assertStatus(423);
+    }
+    $this->withHeaders(['X-Device-Id' => 'pad-2'])->postJson('/api/v1/short-code/verify', ['code' => '7310', 'branch_id' => $this->branch->id])
+        ->assertOk()->assertJsonPath('user.id', $other->id);
+})->group('module:identity', 'feature');
+
 it('does not accept a code from another branch, nor from an inactive user', function () {
     $other = Branch::factory()->create();
     $stranger = makeUser($other, 'waiter');

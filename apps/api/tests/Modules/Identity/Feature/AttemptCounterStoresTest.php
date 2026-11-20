@@ -24,13 +24,35 @@ it('counts failures and locks when the cache returns numbers as strings, as Redi
     $counter = new AttemptCounter(new Repository($store), 5, 15);
 
     foreach ([1, 2, 3, 4] as $_) {
-        expect($counter->fail('pad-1'))->toBe(0)
+        expect($counter->reserve('pad-1'))->toBe(0)
+            ->and($counter->failed('pad-1'))->toBe(0)
             ->and($counter->lockedFor('pad-1'))->toBe(0);
     }
 
-    expect($counter->fail('pad-1'))->toBe(15 * 60)
-        ->and($counter->lockedFor('pad-1'))->toBeGreaterThan(0)->toBeLessThanOrEqual(15 * 60);
+    expect($counter->reserve('pad-1'))->toBe(0)
+        ->and($counter->failed('pad-1'))->toBe(15 * 60)
+        ->and($counter->lockedFor('pad-1'))->toBeGreaterThan(0)->toBeLessThanOrEqual(15 * 60)
+        ->and($counter->reserve('pad-1'))->toBeGreaterThan(0);
 
     $counter->clear('pad-1');
     expect($counter->lockedFor('pad-1'))->toBe(0);
+});
+
+it('takes the attempt before the code is checked: the try past the fifth is refused, a released one does not count', function () {
+    $counter = new AttemptCounter(new Repository(new ArrayStore), 5, 15);
+
+    foreach ([1, 2, 3, 4, 5] as $_) {
+        expect($counter->reserve('pad-1'))->toBe(0); // five tries in flight at once, none settled yet
+    }
+    expect($counter->reserve('pad-1'))->toBe(15 * 60); // the sixth is refused before its code is checked
+
+    $counter->clear('pad-1');
+    foreach ([1, 2, 3, 4] as $_) {
+        expect($counter->reserve('pad-1'))->toBe(0);
+        $counter->release('pad-1'); // refused for another reason (the named person is locked): not counted
+    }
+    foreach ([1, 2, 3, 4] as $_) {
+        expect($counter->reserve('pad-1'))->toBe(0)->and($counter->failed('pad-1'))->toBe(0);
+    }
+    expect($counter->reserve('pad-1'))->toBe(0)->and($counter->failed('pad-1'))->toBe(15 * 60);
 });
