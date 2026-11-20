@@ -1145,6 +1145,8 @@ its actions offers nothing until it is read again.
     the rest.
   - The CI stack's browser specs drive the switched screens against the API's real lists.
 
+Claim restated at `e342f19`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
