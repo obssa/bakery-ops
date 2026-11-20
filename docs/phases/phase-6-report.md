@@ -882,6 +882,8 @@ implicit state machines, 2026-11-20).**
   - `offline-tabs.spec.ts` (p5-offline, CI stack): two tabs of one tablet, offline, each send an order. Both are in IndexedDB, both
     survive a reload, and each reaches the API once. A write queued after another page upgraded the database is still stored.
 
+Claim restated at `e563c06`; the tag stays on `2f6bbd9`.
+
 ## What stays open after the claim
 
 - [ ] Ramin: the open questions marked as his call (Q1 code-only sign-in, Q2 a refunds list, Q3 the branch name and switcher, Q4 that the
