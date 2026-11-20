@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { ACTIONS_CELL, EmptyRow, TableCard, ToolbarSegments, Toolbar } from "@/components/admin/kit";
 import { Alert, Button, Chip, Field, Modal, PageHeader, TextInput, type Tone } from "@/components/ui";
+import { may } from "@/lib/api/actions";
 import { useIdempotencyKey } from "@/lib/api/idempotency";
 import { useConfirmTransfer, useRejectTransfer, useTransfers, type Transfer, type TransferStatus } from "@/lib/api/inventory";
 import { compareDecimal } from "@/lib/decimal";
@@ -80,8 +81,6 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
   const t = useTranslations("inventory");
   const name = useNamer();
   const errorText = useErrorText();
-  const me = useSession((s) => s.me);
-  const decide = can(me, "transfers.confirm");
   const confirm = useConfirmTransfer();
   const reject = useRejectTransfer();
   const confirmKey = useIdempotencyKey();
@@ -175,26 +174,32 @@ function TransferTable({ rows, linked }: { rows: Transfer[]; linked: number | nu
                     {transfer.reject_reason ? <span className="block max-w-56 pt-1 text-[13px] text-neutral-600">{transfer.reject_reason}</span> : null}
                   </td>
                   <td className={ACTIONS_CELL}>
-                    {transfer.status === "requested" && decide ? (
+                    {/* the transfer's own `actions` (ADR 0032): the API's ConfirmTransfer and RejectTransfer decide them for this person, the
+                        station of the source included */}
+                    {may(transfer, "confirm") || may(transfer, "reject") ? (
                       <div className="flex justify-end gap-2">
-                        <Button size="md" compact disabled={busy} aria-label={t("transfers.confirm_named", { item: itemName })} onClick={() => confirmTransfer(transfer)}>
-                          {t("transfers.confirm")}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="md"
-                          compact
-                          disabled={busy}
-                          aria-label={t("transfers.reject_named", { item: itemName })}
-                          onClick={() => {
-                            setRefused(null);
-                            reject.reset();
-                            setReason("");
-                            setRejecting(transfer);
-                          }}
-                        >
-                          {t("transfers.reject")}
-                        </Button>
+                        {may(transfer, "confirm") ? (
+                          <Button size="md" compact disabled={busy} aria-label={t("transfers.confirm_named", { item: itemName })} onClick={() => confirmTransfer(transfer)}>
+                            {t("transfers.confirm")}
+                          </Button>
+                        ) : null}
+                        {may(transfer, "reject") ? (
+                          <Button
+                            variant="secondary"
+                            size="md"
+                            compact
+                            disabled={busy}
+                            aria-label={t("transfers.reject_named", { item: itemName })}
+                            onClick={() => {
+                              setRefused(null);
+                              reject.reset();
+                              setReason("");
+                              setRejecting(transfer);
+                            }}
+                          >
+                            {t("transfers.reject")}
+                          </Button>
+                        ) : null}
                       </div>
                     ) : null}
                   </td>

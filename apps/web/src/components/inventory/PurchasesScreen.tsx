@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type FormEvent, type RefObject } from "rea
 import { EmptyRow, Fact, InnerTable, TableCard, Toolbar, ToolbarSegments } from "@/components/admin/kit";
 import { ICON_STROKE } from "@/components/icons";
 import { Alert, Button, Chip, Field, IconButton, Modal, PageHeader, Panel, Select, Status, TextInput, type Tone } from "@/components/ui";
+import { may } from "@/lib/api/actions";
 import { useItems, useUnits } from "@/lib/api/hooks";
 import { uuid, useIdempotencyKey } from "@/lib/api/idempotency";
 import {
@@ -589,7 +590,11 @@ function PurchaseCard({
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState<string | null>(null);
-  const draft = purchase.status === "draft";
+  // the purchase's own `actions` (ADR 0032): the API's ReplaceLines, ConfirmPurchase and CancelPurchase decide them (a draft, for a holder
+  // of purchases.record)
+  const editable = may(purchase, "edit");
+  const confirmable = may(purchase, "confirm");
+  const cancellable = may(purchase, "cancel");
   const lines = purchase.lines ?? [];
   const failure = confirm.error ?? cancel.error ?? replace.error;
   const buyable = (items.data ?? []).filter((i) => i.is_active && (i.kind === "ingredient" || i.fulfilment === "bought_in"));
@@ -741,17 +746,23 @@ function PurchaseCard({
         {failure ? <Alert>{errorText.message(failure)}</Alert> : null}
         <Status>{note}</Status>
 
-        {draft && !editing ? (
+        {(editable || confirmable || cancellable) && !editing ? (
           <div className="flex flex-wrap gap-2.5 border-t border-neutral-200 pt-5">
-            <Button size="md" disabled={confirm.isPending} onClick={confirmPurchase}>
-              {confirm.isPending ? t("saving") : t("purchases.confirm")}
-            </Button>
-            <Button variant="secondary" size="md" onClick={startEditing}>
-              {t("purchases.edit_lines")}
-            </Button>
-            <Button variant="danger" size="md" onClick={() => setCancelling(true)}>
-              {t("purchases.cancel")}
-            </Button>
+            {confirmable ? (
+              <Button size="md" disabled={confirm.isPending} onClick={confirmPurchase}>
+                {confirm.isPending ? t("saving") : t("purchases.confirm")}
+              </Button>
+            ) : null}
+            {editable ? (
+              <Button variant="secondary" size="md" onClick={startEditing}>
+                {t("purchases.edit_lines")}
+              </Button>
+            ) : null}
+            {cancellable ? (
+              <Button variant="danger" size="md" onClick={() => setCancelling(true)}>
+                {t("purchases.cancel")}
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>
